@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
+import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from "fastify";
 import type { Pool } from "pg";
 import type { Logger } from "pino";
 
@@ -8,12 +8,24 @@ import { createHttpMetrics } from "../../platform/metrics.js";
 
 export function buildHttpApp(input: { logger: Logger; pool: Pool }): FastifyInstance {
   const logger: FastifyBaseLogger = input.logger;
-  const app = Fastify({ genReqId: () => randomUUID(), loggerInstance: logger });
+  const app = Fastify({
+    genReqId: () => randomUUID(),
+    logController: new LogController({ disableRequestLogging: true }),
+    loggerInstance: logger,
+  });
   const metrics = createHttpMetrics();
   const startedAt = new WeakMap<object, bigint>();
 
   app.addHook("onRequest", async (request) => {
     startedAt.set(request, process.hrtime.bigint());
+    input.logger.info(
+      {
+        method: request.method,
+        requestId: request.id,
+        route: request.routeOptions.url ?? "unknown",
+      },
+      "request started",
+    );
   });
 
   app.addHook("onSend", async (request, reply) => {
@@ -28,10 +40,18 @@ export function buildHttpApp(input: { logger: Logger; pool: Pool }): FastifyInst
       route: request.routeOptions.url ?? "unknown",
       status_code: String(reply.statusCode),
     };
+    const durationSeconds = Number(process.hrtime.bigint() - start) / 1_000_000_000;
     metrics.requests.inc(labels);
-    metrics.duration.observe(
-      labels,
-      Number(process.hrtime.bigint() - start) / 1_000_000_000,
+    metrics.duration.observe(labels, durationSeconds);
+    input.logger.info(
+      {
+        durationSeconds,
+        method: request.method,
+        requestId: request.id,
+        route: labels.route,
+        statusCode: reply.statusCode,
+      },
+      "request completed",
     );
   });
 

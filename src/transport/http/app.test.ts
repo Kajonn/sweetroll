@@ -33,6 +33,64 @@ describe("HTTP platform endpoints", () => {
     expect(response.headers["x-request-id"]).not.toBe("caller-controlled");
   });
 
+  it("logs only allow-listed request metadata", async () => {
+    const secret = "unique-query-secret-8d3b62";
+    const lines: string[] = [];
+    const loggingPool = new Pool({
+      connectionString: "postgres://invalid:invalid@127.0.0.1:1/invalid",
+    });
+    const loggingApp = buildHttpApp({
+      logger: pino({ base: null, timestamp: false }, { write: (line) => lines.push(line) }),
+      pool: loggingPool,
+    });
+
+    try {
+      const response = await loggingApp.inject({
+        headers: { authorization: `Bearer ${secret}` },
+        method: "GET",
+        url: `/health/live?access_token=${secret}`,
+      });
+      const records = lines.map((line) => JSON.parse(line) as Record<string, unknown>);
+      const requestId = response.headers["x-request-id"];
+
+      expect(lines.join("\n")).not.toContain(secret);
+      expect(records).toHaveLength(2);
+      expect(records[0]).toMatchObject({
+        method: "GET",
+        msg: "request started",
+        requestId,
+        route: "/health/live",
+      });
+      expect(records[1]).toMatchObject({
+        durationSeconds: expect.any(Number),
+        method: "GET",
+        msg: "request completed",
+        requestId,
+        route: "/health/live",
+        statusCode: 200,
+      });
+      expect(Object.keys(records[0] ?? {}).sort()).toEqual([
+        "level",
+        "method",
+        "msg",
+        "requestId",
+        "route",
+      ]);
+      expect(Object.keys(records[1] ?? {}).sort()).toEqual([
+        "durationSeconds",
+        "level",
+        "method",
+        "msg",
+        "requestId",
+        "route",
+        "statusCode",
+      ]);
+    } finally {
+      await loggingApp.close();
+      await loggingPool.end();
+    }
+  });
+
   it("returns bounded readiness failure details", async () => {
     const response = await app.inject({ method: "GET", url: "/health/ready" });
 

@@ -1,5 +1,5 @@
 import { Pool } from "pg";
 
 export function createPool(databaseUrl: string): Pool {
-  return new Pool({ connectionString: databaseUrl, max: 10 });
+  return new Pool({ connectionString: databaseUrl, connectionTimeoutMillis: 250, max: 10 });
 }

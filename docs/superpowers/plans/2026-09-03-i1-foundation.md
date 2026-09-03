@@ -50,6 +50,7 @@ dist/
 coverage/
 .env
 .superpowers/
+.worktrees/
 ```
 
 Create `.npmrc`:

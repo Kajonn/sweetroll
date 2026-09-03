@@ -90,7 +90,7 @@ Create `package.json`:
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "fastify": "5.5.0",
+    "fastify": "5.12.1",
     "pg": "8.16.3",
     "pino": "9.9.0",
     "prom-client": "15.1.3"
@@ -100,7 +100,7 @@ Create `package.json`:
     "@types/pg": "8.15.5",
     "tsx": "4.20.5",
     "typescript": "5.9.2",
-    "vitest": "3.2.4"
+    "vitest": "3.2.7"
   }
 }
 ```

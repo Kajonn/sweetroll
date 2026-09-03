@@ -1,2 +1,2 @@
-// Houses the implementation named by this file's location in design_v2.md.
-export {};
+export { loadConfig } from "./config.js";
+export type { AppConfig, LogLevel } from "./config.js";

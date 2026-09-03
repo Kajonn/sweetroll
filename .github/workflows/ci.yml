@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: sweetroll
+          POSTGRES_PASSWORD: sweetroll
+          POSTGRES_USER: sweetroll
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sweetroll -d sweetroll"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      TEST_DATABASE_URL: postgres://sweetroll:sweetroll@localhost:5432/sweetroll
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version-file: .nvmrc
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:integration
+      - run: npm run typecheck
+      - run: npm run build
+      - run: docker build -t sweetroll:ci .

@@ -1,0 +1,16 @@
+.shell {
+  display: grid;
+  grid-template-rows: 48px 1fr 28px;
+  height: 100vh;
+}
+.main {
+  display: grid;
+  grid-template-columns: 240px minmax(280px, 360px) 1fr;
+  min-height: 0;
+}
+@media (max-width: 1023px) {
+  .main { grid-template-columns: 240px 1fr; }
+}
+@media (max-width: 767px) {
+  .main { grid-template-columns: 1fr; }
+}

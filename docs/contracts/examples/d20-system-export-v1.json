@@ -196,7 +196,7 @@
           "bonus",
           "modifier"
         ],
-        "cost": 4,
+        "cost": 6,
         "ast": {
           "kind": "binary",
           "operator": "+",
@@ -232,7 +232,7 @@
         "dependencies": [
           "ability"
         ],
-        "cost": 9,
+        "cost": 7,
         "ast": {
           "kind": "binary",
           "operator": "&&",
@@ -320,7 +320,7 @@
       "sidesPerDie": 1000
     },
     "integrity": {
-      "checksum": "sha256:bb1b8130802e758bcf6bf6151f206b7397b5e7ff226978e47cd149319453acec"
+      "checksum": "sha256:69a1798cc9b4a56767a5f0c7217f72828ca530858b54e20ea4b04a519e8848b5"
     }
   }
 }

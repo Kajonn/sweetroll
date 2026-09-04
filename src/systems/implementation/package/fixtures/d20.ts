@@ -310,7 +310,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
       inferredType: "number",
       fallback: 0,
       dependencies: ["bonus", "modifier"],
-      cost: 4,
+      cost: 6,
       ast: {
         kind: "binary",
         operator: "+",
@@ -329,7 +329,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
       inferredType: "boolean",
       fallback: false,
       dependencies: ["ability"],
-      cost: 9,
+      cost: 7,
       ast: {
         kind: "binary",
         operator: "&&",

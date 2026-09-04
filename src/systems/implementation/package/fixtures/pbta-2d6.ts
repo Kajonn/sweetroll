@@ -258,7 +258,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
       inferredType: "number",
       fallback: 0,
       dependencies: ["harm"],
-      cost: 2,
+      cost: 3,
       ast: {
         kind: "call",
         function: "min",
@@ -274,7 +274,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
       inferredType: "number",
       fallback: 0,
       dependencies: ["forward", "move_stat"],
-      cost: 4,
+      cost: 6,
       ast: {
         kind: "binary",
         operator: "+",
@@ -293,7 +293,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
       inferredType: "boolean",
       fallback: false,
       dependencies: ["move_stat"],
-      cost: 9,
+      cost: 7,
       ast: {
         kind: "binary",
         operator: "&&",

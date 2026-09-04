@@ -326,7 +326,7 @@ Renders an AST back to canonical source text per contract §6.3:
 - removes insignificant whitespace;
 - uses explicit `keep` notation for keep nodes: `4d6kh3` is rendered as `4d6kh3`, `4d6kl1` as `4d6kl1` (the keep node specifies highest/lowest);
 - emits parens where needed to preserve AST meaning;
-- canonical dice notation: dice with count 1 render as `d<sides>`; dice with count `N` render as `<N>d<sides>`;
+- canonical dice notation: dice with count 1 render as `d<sides>`; dice with any count render as `dice(<count>, <sides>)` (function form, which round-trips);
 - operators render with their symbol in precedence order with parentheses added only where parenthesization is required to preserve meaning;
 - numbers render without trailing `.0` for integer-valued decimals.
 

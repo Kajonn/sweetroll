@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
@@ -73,6 +74,35 @@ async function emitOpenApi(): Promise<void> {
 }
 
 await emitOpenApi();
+
+function emitClientTypes(): void {
+  const openApiRelativePath = "docs/contracts/openapi-v1.json";
+  const schemaRelativePath = "web/src/api/schema.d.ts";
+  const openApiPath = resolve(cwd, openApiRelativePath);
+  const schemaPath = resolve(cwd, schemaRelativePath);
+
+  const generated = execSync(`npx --yes openapi-typescript ${openApiPath}`, {
+    stdio: ["ignore", "pipe", "pipe"],
+  }).toString();
+
+  if (checkMode) {
+    let current: string;
+    try {
+      current = readFileSync(schemaPath, "utf8");
+    } catch {
+      diffs.push(schemaRelativePath);
+      return;
+    }
+    if (current !== generated) {
+      diffs.push(schemaRelativePath);
+    }
+  } else {
+    mkdirSync(dirname(schemaPath), { recursive: true });
+    writeFileSync(schemaPath, generated, "utf8");
+  }
+}
+
+emitClientTypes();
 
 if (checkMode && diffs.length > 0) {
   console.error("Out-of-date contract artifacts:");

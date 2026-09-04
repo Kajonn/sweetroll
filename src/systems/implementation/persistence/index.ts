@@ -1,2 +1,16 @@
-// Houses the implementation named by this file's location in design_v2.md.
-export {};
+export {
+  createSystemPersistenceRepository,
+  type AuditRecord,
+  type DraftRecord,
+  type DraftSaveResult,
+  type IdempotencyReceipt,
+  type RecordReceiptInput,
+  type RecordReceiptResult,
+  type SaveDraftInput,
+  type SystemId,
+  type SystemPersistenceRepository,
+  type SystemRecord,
+  type UserId,
+  type VersionId,
+  type VersionRecord,
+} from "./repository.js";

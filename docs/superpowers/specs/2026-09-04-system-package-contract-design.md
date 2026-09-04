@@ -214,7 +214,7 @@ Codecs accept bytes or an unknown JavaScript value and return a result; caller-c
 
 ```typescript
 type PackageDiagnostic = {
-  code: PackageDiagnosticCode;
+  code: string; // PackageDiagnosticCode for decode; rule codes (invalid_syntax, invalid_expression, missing_reference, limit_exceeded) flow through the same shape
   path: string; // JSON Pointer
   message: string;
 };

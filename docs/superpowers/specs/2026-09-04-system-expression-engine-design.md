@@ -17,7 +17,7 @@ It does not implement the SystemRuntime Module, system persistence, authoring wo
 - A tokenizer that turns an expression source string into a token stream.
 - A parser that produces the exact `ExpressionAstV1` node shapes already defined in `src/systems/implementation/package/schema/expression.ts`.
 - A type checker that infers result types per the grammar typing rules and verifies them against declared result/fallback types.
-- `compileExpression(source, env)` producing one `CompiledExpressionV1`.
+- `compileExpression(source, opts)` producing one `CompiledExpressionBody` (a `CompiledExpressionV1` without its `id`); `compileDocument` assigns ids and assembles the signed package.
 - `compileDocument(document)` producing a full `SystemPackageV1` from a `SystemDocumentV1`.
 - `evaluate(compiled, bindings, rng?)` returning a scalar value or a roll result, deterministically for a given rng sequence.
 - `renderExpression(ast)` producing canonical source text.
@@ -63,7 +63,7 @@ SystemDocumentV1 (source expressions)
               compileDocument / compileExpression
                          |
                          v
-        CompiledExpressionV1 (typed AST, deps, cost)
+        CompiledExpressionBody (typed AST, deps, cost)
                          |
                          v
        evaluate(compiled, bindings, rng?) -> scalar or roll
@@ -73,7 +73,8 @@ SystemDocumentV1 (source expressions)
 
 `src/systems/implementation/rules/index.ts` exports exactly:
 
-- `compileExpression(source: string, opts: { env: ExpressionCompileEnv; resultType: ValueType; context: "computed" | "roll" | "validation"; fallback: ScalarValue }): CompileResult<CompiledExpressionV1>`
+- `compileExpression(source: string, opts: { env: ExpressionCompileEnv; resultType: ValueType; context: "computed" | "roll" | "validation"; fallback: ScalarValue }): CompileResult<CompiledExpressionBody>`
+  - where `CompiledExpressionBody = Omit<CompiledExpressionV1, "id">`. A standalone compiled expression has no natural id; the document layer (`compileDocument`) assigns expression ids. `compileExpression` therefore returns the compiled body without an id.
 - `compileDocument(document: SystemDocumentV1): CompileResult<SystemPackageV1>`
 - `evaluate(compiled: CompiledExpressionV1, bindings: Record<string, ScalarValue>, rng?: Rng): EvalResult`
 - `renderExpression(ast: ExpressionAstV1): string`
@@ -231,9 +232,9 @@ type CompileResult<T> =
 3. Check node-count and depth against `PACKAGE_LIMITS`; on exceed return `limit_exceeded` (no AST).
 4. Type-check using `opts.env`, `opts.context`, `opts.resultType`, `opts.fallback`; on failure return type/`missing_reference` diagnostics (no AST).
 5. Resolve dependencies; on failure return `missing_reference`.
-6. Return `CompiledExpressionV1` with `resultType: opts.resultType`, `inferredType`, `fallback: opts.fallback`, `dependencies`, `cost`, `ast`.
+6. Return `CompiledExpressionBody` (the `CompiledExpressionV1` fields without `id`) with `resultType: opts.resultType`, `inferredType`, `fallback: opts.fallback`, `dependencies`, `cost`, `ast`.
 
-The `resultType` and `fallback` come from the source expression definition; `env` from the calling layer. `compileDocument` supplies both. The `context` field controls whether dice are permitted (see §9.1).
+The `resultType` and `fallback` come from the source expression definition; `env` from the calling layer. `compileDocument` supplies both and assigns the expression `id`. The `context` field controls whether dice are permitted (see §9.1).
 
 ## 13. compileDocument
 
@@ -375,7 +376,7 @@ Using only committed package APIs and the compiler:
 
 1. `compileDocument(d20Document)` reproduces an `UnsignedSystemPackageV1` whose `expressions` ASTs, dependencies, and costs match the corrected `d20Package` fixture (after signing).
 2. Same for the 2d6 and d6-success-pool fixtures.
-3. `compileExpression("d20 + fields.modifier + inputs.bonus", ...)` returns the expected `CompiledExpressionV1`.
+3. `compileExpression("d20 + fields.modifier + inputs.bonus", ...)` returns the expected `CompiledExpressionBody`.
 4. `evaluate` on `d20`-bearing expressions with a seeded rng returns a deterministic `RollResult` with individual dice and a canonical rendered `expression`.
 5. `evaluate` on `10 + fields.modifier` returns the scalar `10 + modifier` (no roll object).
 6. `renderExpression` reproduces canonical source for the fixture ASTs.

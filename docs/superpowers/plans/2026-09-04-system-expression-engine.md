@@ -17,7 +17,7 @@
 - TypeScript types come from `src/systems/implementation/package/schema/index.ts`: `ExpressionAstV1`, `CompiledExpressionV1`, `SystemDocumentV1`, `SystemPackageV1`, `UnsignedSystemPackageV1`, `ScalarValue`, `ValueType`, `DefinitionId`. `PACKAGE_LIMITS` from `src/systems/implementation/package/limits.ts`; `signSystemPackage` from `src/systems/implementation/package/canonical.js`.
 - Exact ceilings: `expressionAstNodes` 256, `expressionAstDepth` 32, `expressionBytes` 1024, `dicePerRoll` 100, `sidesPerDie` 1000.
 - `cost` = exact AST node count. It is read by NO consumer and exists purely as deterministic metadata.
-- Diagnostics reuse the `PackageDiagnostic` shape `{ code, path, message }`. New codes: `invalid_syntax`, `invalid_expression`, `missing_reference`, `limit_exceeded`. Evaluator runtime failure code: `arithmetic_failure`.
+- Diagnostics reuse the `PackageDiagnostic` shape `{ code, path, message }`. The rules module defines its OWN local diagnostic type (a `RulesDiagnostic` with `code: string` and the same `path`/`message` fields), NOT the package `PackageDiagnosticCode` union — because the new codes `invalid_syntax`, `invalid_expression`, `missing_reference`, `limit_exceeded` (compile) and `arithmetic_failure` (runtime) are not members of `PackageDiagnosticCode` (which only has the 8 decode codes). Keeping a local type avoids widening/altering the package contract's decode codes. The rules code constructs diagnostics typed as `RulesDiagnostic` (or a generic `{ code: string; path: string; message: string }`) so TypeScript's strict mode is satisfied. Every task below that returns diagnostics uses this local type; the tests that assert `.code` still work since `code` is a string.
 - Compile failures always return diagnostics and never a partial AST or partial package.
 - Reference ids are `^[a-z][a-z0-9_]{0,63}$`; references are only `fields.<id>` and `inputs.<id>`.
 - Precedence (low→high): `||`, `&&`, `== !=`, `< <= > >=`, `+ -` (binary), `* /`, unary `- !`, atoms (`( )`, literals, refs, dice notation, functions).
@@ -623,43 +623,7 @@ class Parser {
       return { kind: "successCount", dice: diceExpr, threshold: thTok.value };
     }
     // min / max / round
-    const args: ExpressionAstV1[] = [];
     if (this.at("rparen")) { this.take(); return { kind: "call", function: name, arguments: [] }; }
-    for (;;) {
-      const arg = this.parseOr();
-      if (!arg) return undefined;
-      args.push(arg);
-      if (this.at("comma")) { this.take(); continue; }
-      break;
-    }
-    if (!this.at("rparen")) { this.fail("missing closing paren"); return undefined; }
-    this.take();
-    if (name === "round") {
-      const roundMode = args.length === 2 ? extraMode(this) : undefined;
-      if (roundMode) args.push(...[]); // handled below
-    }
-    const base: ExpressionAstV1 = { kind: "call", function: name, arguments: args };
-    if (name === "round" && args.length === 2) {
-      const second = args[1]!;
-      // if second arg is a roundMode literal (represented in the AST we build from tokens)
-      // The tokenizer emits roundMode; the parser's parseOr would reject it. Handle it specially:
-    }
-    return base;
-  }
-  // NOTE: roundMode handling refined below in the final implementation.
-}
-```
-
-The above `parseCall` sketch needs correct `roundMode` handling. The cleanest implementation: when `name === "round"`, after parsing the first argument, if the next token is `roundMode`, consume it and set `roundMode`; else parse a second expression. Final `parseCall` for `min`/`max`/`round`:
-
-```typescript
-  private parseCall(name: "min" | "max" | "round"): ExpressionAstV1 | undefined {
-    if (!this.at("lparen")) { this.fail(`expected '('`); return undefined; }
-    this.take();
-    if (this.at("rparen")) {
-      this.take();
-      return { kind: "call", function: name, arguments: [] };
-    }
     const args: ExpressionAstV1[] = [];
     let roundMode: "nearest" | "down" | "up" | undefined;
     for (;;) {
@@ -676,10 +640,10 @@ The above `parseCall` sketch needs correct `roundMode` handling. The cleanest im
     }
     if (!this.at("rparen")) { this.fail("missing closing paren"); return undefined; }
     this.take();
-    const call: { kind: "call"; function: "min" | "max" | "round"; arguments: ExpressionAstV1[]; roundMode?: string } =
+    const call: { kind: "call"; function: "min" | "max" | "round"; arguments: ExpressionAstV1[]; roundMode?: "nearest" | "down" | "up" } =
       { kind: "call", function: name, arguments: args };
     if (roundMode) call.roundMode = roundMode;
-    return call as ExpressionAstV1;
+    return call as unknown as ExpressionAstV1;
   }
   private parseAdvDis(which: "adv" | "dis"): ExpressionAstV1 | undefined {
     if (!this.at("lparen")) { this.fail("expected '(' after " + which); return undefined; }
@@ -692,7 +656,10 @@ The above `parseCall` sketch needs correct `roundMode` handling. The cleanest im
     const diceAst: ExpressionAstV1 = { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides };
     return { kind: "keep", mode: which === "adv" ? "highest" : "lowest", count: 2, dice: diceAst };
   }
+}
 ```
+
+The single `parseCall` above is the authoritative implementation. It handles `dice(count, sides)` and `countSuccesses(dice, threshold)` directly into their AST nodes (NOT `call` nodes — the `ExpressionAstV1Schema.call` variant only allows `min`/`max`/`round`), and `min`/`max`/`round` into `call` nodes with an optional `roundMode` set when a `roundMode` token follows the first argument.
 
 Then the top-level `parse` helper:
 
@@ -1067,6 +1034,7 @@ function missing(id: string): CompileResult<never> {
 }
 
 function fallbackTypeMatches(fallback: ScalarValue, resultType: ValueType): boolean {
+  if (fallback === null || fallback === undefined) return false;
   if (resultType === "number") return typeof fallback === "number";
   if (resultType === "text") return typeof fallback === "string";
   return typeof fallback === "boolean";
@@ -1111,13 +1079,12 @@ export function compileExpression(source: string, opts: CompileExpressionOpts): 
 }
 ```
 
-Note: the plan keeps `compileExpression` returning `CompiledExpressionBody` (no id); `compileDocument` (Task 6) adds the id. The spec §5 lists `compileExpression(...): CompileResult<CompiledExpressionV1>`; **spec update:** change §5 and §12 so `compileExpression` returns `CompileResult<CompiledExpressionBody>` (id assigned by the document layer). This is a deliberate, small deviation so a single expression isn't forced to invent an id.
+Note: the plan keeps `compileExpression` returning `CompiledExpressionBody` (no id); `compileDocument` (Task 6) adds the id. This is a deliberate, small deviation so a single expression isn't forced to invent an id. The spec (`§5`, `§12`) has ALREADY been updated to match — no further spec edit is needed in this task.
 
-- [ ] **Step 4: Run test and update spec**
+- [ ] **Step 4: Run test**
 
 Run: `npm test -- src/systems/implementation/rules/compile.test.ts` — PASS.
 Run `npm run typecheck` — PASS.
-Edit the spec `docs/superpowers/specs/2026-09-04-system-expression-engine-design.md` §5 and §12 to reflect `CompiledExpressionBody` (no id). Commit the spec change along with the code.
 
 - [ ] **Step 5: Commit**
 
@@ -1225,7 +1192,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
    - `computed` → its `valueType` (number/text/boolean)
    - `image` → skipped (not addressable)
    Duplicate field ids across entities: the structural codec already rejects duplicate definition ids; here, if a duplicate appears, keep the first.
-2. For each `document.expressions`, call `compileAst(parse(expr.source).ast, { env, resultType: expr.resultType, context: expr.context, fallback: expr.fallback })`. Parse first (so a parse error surfaces before compileAst); then `compileAst`. If any expression fails, return the combined diagnostics with `path` set to the expression id; never return a partial package.
+2. For each `document.expressions`, call `compileExpression(expr.source, { env, resultType: expr.resultType, context: expr.context, fallback: expr.fallback })`. This parses internally and returns a `CompiledExpressionBody`. If any expression fails, return the combined diagnostics with `path` set to the expression id; never return a partial package.
 3. Assemble `UnsignedSystemPackageV1`:
    ```typescript
    const unsigned: UnsignedSystemPackageV1 = {
@@ -1551,7 +1518,7 @@ git commit -m "feat: render expressions to canonical source text"
 Replace `src/systems/implementation/rules/index.ts`:
 
 ```typescript
-export { compileAst, compileExpression } from "./compile.js";
+export { compileExpression } from "./compile.js";
 export type { CompileResult, CompileExpressionOpts, CompiledExpressionBody } from "./compile.js";
 export { compileDocument } from "./compile-document.js";
 export type { CompileDocumentOpts } from "./compile-document.js";
@@ -1560,6 +1527,8 @@ export type { Rng, RollResult, DieResult, RuntimeDiagnostic, EvalResult } from "
 export { renderExpression } from "./render.js";
 export type { ExpressionCompileEnv } from "./typecheck.js";
 ```
+
+`compileAst` is NOT exported from the barrel. It remains `export`ed from `./compile.js` so `compile-document.ts` can import it via a relative import, but it is not part of the public rules surface.
 
 Do NOT export the tokenizer, parser, type checker, or render internals beyond `renderExpression`.
 

@@ -16,7 +16,12 @@
     "test:integration": "vitest run tests/integration",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "contracts:generate": "tsx scripts/generate-system-contracts.ts",
-    "contracts:check": "tsx scripts/generate-system-contracts.ts --check"
+    "contracts:check": "tsx scripts/generate-system-contracts.ts --check",
+    "web:dev": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run build",
+    "web:test": "npm --prefix web run test",
+    "web:test:e2e": "npm --prefix web run test:e2e",
+    "web:typecheck": "npm --prefix web run typecheck"
   },
   "dependencies": {
     "@fastify/cookie": "11.0.0",

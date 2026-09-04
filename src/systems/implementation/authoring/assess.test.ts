@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { decodeSystemDocument } from "../package/codec.js";
-import { d20Document, d20Package } from "../package/fixtures/index.js";
+import {
+  d20Document,
+  d20Package,
+  d6SuccessPoolDocument,
+  pbta2d6Document,
+} from "../package/fixtures/index.js";
 import { compileDocument } from "../rules/compile-document.js";
 import {
   assessDocument,
@@ -20,8 +25,12 @@ describe("assessment helpers", () => {
     expect(assessed.ok).toBe(true);
   });
 
-  it("assesses a valid reference document as ok with no diagnostics", () => {
-    const assessed = assessDocument(d20Document);
+  it.each([
+    ["d20", d20Document],
+    ["2d6", pbta2d6Document],
+    ["d6 success pool", d6SuccessPoolDocument],
+  ])("assesses the %s reference document as ok with no diagnostics", (_name, document) => {
+    const assessed = assessDocument(document);
     expect(assessed.ok).toBe(true);
     expect(assessed.assessment).toEqual({ ok: true, diagnostics: [] });
   });

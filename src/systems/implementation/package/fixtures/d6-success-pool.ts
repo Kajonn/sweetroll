@@ -1,6 +1,7 @@
 import { signSystemPackage } from "../canonical.js";
 import { PACKAGE_LIMITS } from "../limits.js";
 import type { SystemDocumentV1 } from "../schema/document.js";
+import type { SystemExportV1 } from "../schema/export.js";
 import type { SystemPackageV1, UnsignedSystemPackageV1 } from "../schema/package.js";
 
 export const d6SuccessPoolDocument: SystemDocumentV1 = {
@@ -408,3 +409,10 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
 };
 
 export const d6SuccessPoolPackage: SystemPackageV1 = signSystemPackage(unsignedPackage);
+
+export const d6SuccessPoolExport: SystemExportV1 = {
+  schemaVersion: "1.0",
+  mediaType: "application/vnd.sweetroll.system+json;version=1",
+  exportedAt: "2026-09-04T12:00:00Z",
+  package: d6SuccessPoolPackage,
+};

@@ -295,7 +295,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
       resultType: "number",
       inferredType: "number",
       fallback: 10,
-      dependencies: ["ability", "modifier", "proficient"],
+      dependencies: ["modifier"],
       cost: 3,
       ast: {
         kind: "binary",

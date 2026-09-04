@@ -170,9 +170,7 @@
         "inferredType": "number",
         "fallback": 10,
         "dependencies": [
-          "ability",
-          "modifier",
-          "proficient"
+          "modifier"
         ],
         "cost": 3,
         "ast": {
@@ -322,7 +320,7 @@
       "sidesPerDie": 1000
     },
     "integrity": {
-      "checksum": "sha256:3941ee5bd562573e48628e4cac7743d45e428ebfce7533da6b484b983e904435"
+      "checksum": "sha256:bb1b8130802e758bcf6bf6151f206b7397b5e7ff226978e47cd149319453acec"
     }
   }
 }

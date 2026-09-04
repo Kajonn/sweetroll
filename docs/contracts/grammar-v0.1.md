@@ -26,7 +26,6 @@ Literals are finite numbers, booleans, and bounded strings. References are only 
 | `round(number, mode?)` | Rounded number; mode is `nearest`, `down`, or `up` |
 | `d20`, `2d6` | Static dice result |
 | `4d6kh3`, `4d6kl1` | Keep highest/lowest dice result |
-| `adv(d20)`, `dis(d20)` | Roll twice and keep high/low |
 | `dice(count, sides)` | Dynamic dice pool; count is an integer expression and sides is a literal |
 | `countSuccesses(dice, threshold)` | Number of dice at or above the threshold |
 

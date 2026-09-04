@@ -138,7 +138,7 @@ export interface Identity {
     redirectUri: string;
     previousToken: string | undefined;
   }): Promise<Result<SessionHandle>>;
-  resolveSession(token: string): Promise<Result<AuthContext>>;
+  resolveSession(token: string): Promise<AuthContext>;
   signOut(token: string): Promise<Result<void>>;
 }
 ```

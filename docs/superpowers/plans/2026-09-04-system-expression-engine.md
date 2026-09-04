@@ -1,6 +1,6 @@
 # System Expression Engine v0.1 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Implement the math-and-dice tokenizer, parser, typed AST, type checker, dependency resolution, deterministic evaluator, normalized roll output, and node/depth budgets that compile `SystemDocumentV1` source expressions into `CompiledExpressionV1` values and deterministically evaluate them.
 
@@ -67,7 +67,7 @@ Rules:
 
 Dice-literal detection rule: a maximal run starting with an optional positive integer, then `d`, then a positive integer, is a dice literal ONLY if the run does not begin with a letter and the segment before `d` is entirely digits. This prevents `fields` from being misread.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 import { describe, expect, it } from "vitest";
@@ -124,12 +124,12 @@ describe("tokenizer", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm test -- src/systems/implementation/rules/tokenizer.test.ts`
 Expected: FAIL (module `./tokenizer.js` not found / no such export).
 
-- [ ] **Step 3: Implement `tokenize`**
+- [x] **Step 3: Implement `tokenize`**
 
 ```typescript
 import type { PackageDiagnostic } from "../package/diagnostics.js";
@@ -269,12 +269,12 @@ function matchStaticDice(source: string, i: number): StaticDice | null {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm test -- src/systems/implementation/rules/tokenizer.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/systems/implementation/rules/tokenizer.ts src/systems/implementation/rules/tokenizer.test.ts
@@ -314,7 +314,7 @@ Parser responsibilities and AST mapping (must match Task 3 type checker and the 
 
 Precedence implementation via climbing functions: `parseOr`, `parseAnd`, `parseEquality`, `parseComparison`, `parseAdditive`, `parseMultiplicative`, `parseUnary`, `parsePrimary`.
 
-- [ ] **Step 1: Extend tokenizer to emit roundMode and update its test**
+- [x] **Step 1: Extend tokenizer to emit roundMode and update its test**
 
 Modify `tokenizer.ts`: add `| { kind: "roundMode"; mode: "nearest"|"down"|"up"; start: number }` to `Token`. In the word branch, before the unknown-word error, check `["nearest","down","up"].includes(word)` and emit a `roundMode` token. Add to `tokenizer.test.ts`:
 
@@ -329,7 +329,7 @@ it("tokenizes round mode words", () => {
 
 Run: `npm test -- src/systems/implementation/rules/tokenizer.test.ts` — PASS.
 
-- [ ] **Step 2: Write the failing parser test**
+- [x] **Step 2: Write the failing parser test**
 
 ```typescript
 import { describe, expect, it } from "vitest";
@@ -423,12 +423,12 @@ describe("parser", () => {
 });
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `npm test -- src/systems/implementation/rules/parser.test.ts`
 Expected: FAIL (no `parse` export).
 
-- [ ] **Step 4: Implement the parser**
+- [x] **Step 4: Implement the parser**
 
 ```typescript
 import type { PackageDiagnostic } from "../package/diagnostics.js";
@@ -670,12 +670,12 @@ export function parse(source: string): ParseResult {
 }
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `npm test -- src/systems/implementation/rules/parser.test.ts`
 Expected: PASS. Then run `npm run typecheck` — MUST pass (add all needed types to `Token`, resolve the `roundMode` union in `parseCall` so the return is a valid `ExpressionAstV1`).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/systems/implementation/rules/parser.ts src/systems/implementation/rules/parser.test.ts src/systems/implementation/rules/tokenizer.ts src/systems/implementation/rules/tokenizer.test.ts
@@ -714,7 +714,7 @@ export function checkDeterministic(ast: ExpressionAstV1, context: "computed" | "
 ```
 Returns a diagnostic (`invalid_expression`) if the tree contains any `dice`/`keep`/`successCount` node and `context !== "roll"`. Empty array otherwise.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 import { describe, expect, it } from "vitest";
@@ -760,12 +760,12 @@ describe("typecheck", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm test -- src/systems/implementation/rules/typecheck.test.ts`
 Expected: FAIL (no `inferType` export).
 
-- [ ] **Step 3: Implement the type checker**
+- [x] **Step 3: Implement the type checker**
 
 ```typescript
 import type { PackageDiagnostic } from "../package/diagnostics.js";
@@ -890,12 +890,12 @@ export function checkDeterministic(ast: ExpressionAstV1, context: "computed" | "
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm test -- src/systems/implementation/rules/typecheck.test.ts`
 Expected: PASS. Run `npm run typecheck` — PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/systems/implementation/rules/typecheck.ts src/systems/implementation/rules/typecheck.test.ts
@@ -912,7 +912,7 @@ git commit -m "feat: add expression type checker and dependency resolution"
 
 **Interfaces:**
 - Consumes: `parse`, `countNodes`, `depthOf` (Task 2); `inferType`, `resolveDependencies`, `checkDeterministic`, `ExpressionCompileEnv` (Task 3); `PACKAGE_LIMITS`, `CompiledExpressionV1`, `ScalarValue`, `ValueType`, `DefinitionId` (package schema); `PackageDiagnostic` (diagnostics).
-- Produces: `compileExpression(source, opts): CompileResult<CompiledExpressionV1>` and exports the `CompileResult` type and shared helper `compileAst(ast, opts)` used by `compileDocument`.
+- Produces: `compileExpression(source, opts): CompileResult<CompiledExpressionBody>` and exports the `CompileResult` type and shared helper `compileAst(ast, opts)` used by `compileDocument`.
 
 ```typescript
 export type CompileResult<T> =
@@ -926,7 +926,7 @@ export type CompileExpressionOpts = {
   fallback: ScalarValue;
 };
 
-export function compileExpression(source: string, opts: CompileExpressionOpts): CompileResult<CompiledExpressionV1>;
+export function compileExpression(source: string, opts: CompileExpressionOpts): CompileResult<CompiledExpressionBody>;
 ```
 
 Pipeline:
@@ -946,7 +946,7 @@ Pipeline:
      `compileExpression(source, opts)` = `parse` then `compileAst`.
 9. Compute `cost = countNodes(ast)`, `inferredType = inferred type`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 import { describe, expect, it } from "vitest";
@@ -1002,12 +1002,12 @@ function repeatBinary(count: number): string {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm test -- src/systems/implementation/rules/compile.test.ts`
 Expected: FAIL (no `compileExpression`).
 
-- [ ] **Step 3: Implement compile**
+- [x] **Step 3: Implement compile**
 
 ```typescript
 import type { PackageDiagnostic } from "../package/diagnostics.js";
@@ -1081,12 +1081,12 @@ export function compileExpression(source: string, opts: CompileExpressionOpts): 
 
 Note: the plan keeps `compileExpression` returning `CompiledExpressionBody` (no id); `compileDocument` (Task 6) adds the id. This is a deliberate, small deviation so a single expression isn't forced to invent an id. The spec (`§5`, `§12`) has ALREADY been updated to match — no further spec edit is needed in this task.
 
-- [ ] **Step 4: Run test**
+- [x] **Step 4: Run test**
 
 Run: `npm test -- src/systems/implementation/rules/compile.test.ts` — PASS.
 Run `npm run typecheck` — PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/systems/implementation/rules/compile.ts src/systems/implementation/rules/compile.test.ts docs/superpowers/specs/2026-09-04-system-expression-engine-design.md
@@ -1117,7 +1117,7 @@ The d6-success-pool fixture is already correct.
 
 Because the fixture packages are signed with a checksum over the canonical package, fix `cost` in the `unsignedPackage` body then re-sign. The fixtures export a `const d20Package = signSystemPackage(unsignedPackage)` — so editing `cost` in `unsignedPackage` and running the fixtures module test re-signs at module load time, regenerating checksums automatically. No manual checksum editing needed; the test suite recomputes.
 
-- [ ] **Step 1: Write the failing assertion (cost == node count)**
+- [x] **Step 1: Write the failing assertion (cost == node count)**
 
 Add to `fixtures.test.ts` a check that each fixture's recorded cost equals its AST node count, using `countNodes` from the new rules module:
 
@@ -1135,25 +1135,25 @@ it("records cost equal to AST node count for every expression", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm test -- src/systems/implementation/package/fixtures/fixtures.test.ts`
 Expected: FAIL (d20 `check_expr` 4≠6, `ability_valid_expr` 9≠7; pbta `penalty_expr` 2≠3, `move_expr` 4≠6, `stat_valid_expr` 9≠7).
 
-- [ ] **Step 3: Correct the fixture cost values**
+- [x] **Step 3: Correct the fixture cost values**
 
 In `d20.ts` change `check_expr` `cost: 4` → `cost: 6` and `ability_valid_expr` `cost: 9` → `cost: 7`.
 In `pbta-2d6.ts` change `penalty_expr` `cost: 2` → `cost: 3`, `move_expr` `cost: 4` → `cost: 6`, `stat_valid_expr` `cost: 9` → `cost: 7`.
 
 (Verify against Task 2 node counts before editing: `check_expr` nodes = 6, `ability_valid_expr` = 7, `penalty_expr` = 3, `move_expr` = 6, `stat_valid_expr` = 7.)
 
-- [ ] **Step 4: Run test and regenerate contracts**
+- [x] **Step 4: Run test and regenerate contracts**
 
 Run: `npm test -- src/systems/implementation/package/fixtures/fixtures.test.ts` — PASS.
 Run: `npm test` — PASS (checks `package.test.ts` and others unaffected).
 Run: `npm run contracts:generate` to regenerate any embedded fixture artifacts, then `npm run contracts:check` to confirm consistency. Commit any regenerated artifact changes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/systems/implementation/package/fixtures/d20.ts src/systems/implementation/package/fixtures/pbta-2d6.ts src/systems/implementation/package/fixtures/fixtures.test.ts docs/contracts
@@ -1221,7 +1221,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
    ```
 4. `return { ok: true, value: signSystemPackage(unsigned) }`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 import { describe, expect, it } from "vitest";
@@ -1265,20 +1265,20 @@ describe("compileDocument", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm test -- src/systems/implementation/rules/compile-document.test.ts`
 Expected: FAIL (no `compileDocument`).
 
-- [ ] **Step 3: Implement compileDocument**
+- [x] **Step 3: Implement compileDocument**
 
 Implement per the specification above. Use `fixtures/index.ts` to confirm the exported document names (`d20Document`, `pbta2d6Document`, `d6SuccessPoolDocument` — check the actual export names in `fixtures/index.ts` and adjust the test imports to match).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm test -- src/systems/implementation/rules/compile-document.test.ts` — PASS. Run `npm run typecheck` — PASS. Confirm the compiled `expressions` ASTs equal the committed fixture ASTs by asserting `r.value.expressions[i].ast` deep-equality against the fixture `*Package.expressions[i].ast`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/systems/implementation/rules/compile-document.ts src/systems/implementation/rules/compile-document.test.ts
@@ -1337,7 +1337,7 @@ The evaluator must detect the presence of any roll node via `compiled.ast` (walk
 
 Determinism: call `rng` (default `Math.random`) exactly in left-to-right, depth-first roll order.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 import { describe, expect, it } from "vitest";
@@ -1402,22 +1402,22 @@ describe("evaluate", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm test -- src/systems/implementation/rules/evaluate.test.ts`
 Expected: FAIL (no `evaluate`).
 
-- [ ] **Step 3: Implement evaluate**
+- [x] **Step 3: Implement evaluate**
 
 Implement per the semantics above. Structure: a recursive `evalNode(node, ctx)` where ctx carries bindings, rng, and a list of `DieResult` and diagnostics; returns either a scalar value or a mark that a safe failure occurred (return `undefined` to signal failure and trigger fallback at the top). Because `CompiledExpressionV1` includes `fallback`, the top-level failure path returns `{ ok: true, result: fallback, diagnostics, roll }`.
 
 Carefully handle short-circuit `&&`/`||` (only evaluate the needed side) while still collecting dice deterministically.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm test -- src/systems/implementation/rules/evaluate.test.ts` — PASS. Run `npm run typecheck` — PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/systems/implementation/rules/evaluate.ts src/systems/implementation/rules/evaluate.test.ts
@@ -1446,7 +1446,7 @@ git commit -m "feat: add deterministic expression evaluator"
 - references render as `fields.<id>` / `inputs.<id>`.
 - literals: numbers, `true`/`false`, strings quoted with double quotes.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 import { describe, expect, it } from "vitest";
@@ -1483,20 +1483,20 @@ describe("renderExpression", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm test -- src/systems/implementation/rules/render.test.ts`
 Expected: FAIL (no `renderExpression`).
 
-- [ ] **Step 3: Implement renderExpression**
+- [x] **Step 3: Implement renderExpression**
 
 Implement per the rules above with a precedence-aware recursive renderer.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm test -- src/systems/implementation/rules/render.test.ts` — PASS. Run `npm run typecheck` — PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/systems/implementation/rules/render.ts src/systems/implementation/rules/render.test.ts
@@ -1532,7 +1532,7 @@ export type { ExpressionCompileEnv } from "./typecheck.js";
 
 Do NOT export the tokenizer, parser, type checker, or render internals beyond `renderExpression`.
 
-- [ ] **Step 1: Write/edit the barrel and a smoke test**
+- [x] **Step 1: Write/edit the barrel and a smoke test**
 
 ```typescript
 import { describe, expect, it } from "vitest";
@@ -1545,11 +1545,11 @@ it("exports the public engine functions", () => {
 });
 ```
 
-- [ ] **Step 2: Run the full test suite**
+- [x] **Step 2: Run the full test suite**
 
 Run: `npm test` — all tests pass. Run `npm run typecheck` and `npm run build` — both pass.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/systems/implementation/rules/index.ts src/systems/implementation/rules/index.test.ts
@@ -1566,7 +1566,7 @@ git commit -m "feat: expose expression engine public surface"
 **Interfaces:**
 - Consumes: all engine functions.
 
-- [ ] **Step 1: Add property tests**
+- [x] **Step 1: Add property tests**
 
 Add a property test (deterministic pseudo-random, no external fuzz library) that generates random arithmetic ASTs within budget and asserts:
 1. `evaluate(compiled, bindings, rng)` with a fixed seeded rng returns the same result twice.
@@ -1574,7 +1574,7 @@ Add a property test (deterministic pseudo-random, no external fuzz library) that
 
 Reference already-compiled fixture expressions so the property tests reuse realistic shapes.
 
-- [ ] **Step 2: Run full verification**
+- [x] **Step 2: Run full verification**
 
 Run: `npm test` — full unit suite green.
 Run: `npm run typecheck` — green.
@@ -1582,18 +1582,18 @@ Run: `npm run build` — green.
 Run: `npm run contracts:generate` then `npm run contracts:check` — consistent (fixture cost change regenerates any embedded artifacts; commit any diffs).
 Run integration tests (`TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run test:integration`) — the 9 existing integration tests still pass (this increment adds none).
 
-- [ ] **Step 3: Scope check**
+- [x] **Step 3: Scope check**
 
 Confirm `git diff <baseline>..HEAD -- src/systems/authoring.ts src/systems/runtime.ts src/transport src/bootstrap` is empty (no HTTP/`SystemRuntime` changes).
 Scan the new rules code for sensitive data: no `ownerId|actorId|email|token|audit` literals.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/systems/implementation/rules/property.test.ts
 git commit -m "test: add expression engine property tests"
 ```
 
-- [ ] **Step 5: Final whole-plan review**
+- [x] **Step 5: Final whole-plan review**
 
 Dispatch a reviewer subagent over the full branch diff (per the superpowers review workflow) and address findings before finishing the branch.

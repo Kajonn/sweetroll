@@ -12,7 +12,7 @@
     "migrate": "tsx src/bootstrap/migrate.ts",
     "start:http": "node dist/bootstrap/http.js",
     "start:migrate": "node dist/bootstrap/migrate.js",
-    "test": "vitest run --exclude tests/integration/**",
+    "test": "vitest run --exclude \"tests/integration/**\"",
     "test:integration": "vitest run tests/integration",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

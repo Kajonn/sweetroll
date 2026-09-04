@@ -1,10 +1,15 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
+import Fastify from "fastify";
+
 import { SystemDocumentV1Schema } from "../src/systems/implementation/package/schema/document.js";
 import { SystemExportV1Schema } from "../src/systems/implementation/package/schema/export.js";
 import { SystemPackageV1Schema } from "../src/systems/implementation/package/schema/package.js";
 import { d20Export } from "../src/systems/implementation/package/fixtures/d20.js";
+import { buildOpenApiDocument } from "../src/transport/http/openapi.js";
+import { buildSystemsRoutes } from "../src/transport/http/systems.js";
+import type { SystemAuthoring } from "../src/systems/authoring.js";
 
 const cwd = process.cwd();
 
@@ -36,6 +41,38 @@ for (const [relativePath, value] of outputs) {
     writeFileSync(absolutePath, content, "utf8");
   }
 }
+
+async function emitOpenApi(): Promise<void> {
+  const app = Fastify({ logger: false });
+  void app.register(buildSystemsRoutes({ authoring: {} as SystemAuthoring }));
+  await app.ready();
+  try {
+    const doc = buildOpenApiDocument(app);
+    const content = JSON.stringify(doc, null, 2) + "\n";
+    const relativePath = "docs/contracts/openapi-v1.json";
+    const absolutePath = resolve(cwd, relativePath);
+
+    if (checkMode) {
+      let existing: string;
+      try {
+        existing = readFileSync(absolutePath, "utf8");
+      } catch {
+        diffs.push(relativePath);
+        return;
+      }
+      if (existing !== content) {
+        diffs.push(relativePath);
+      }
+    } else {
+      mkdirSync(dirname(absolutePath), { recursive: true });
+      writeFileSync(absolutePath, content, "utf8");
+    }
+  } finally {
+    await app.close();
+  }
+}
+
+await emitOpenApi();
 
 if (checkMode && diffs.length > 0) {
   console.error("Out-of-date contract artifacts:");

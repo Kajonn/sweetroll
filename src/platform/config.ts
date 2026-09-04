@@ -2,11 +2,14 @@ const LOG_LEVELS = ["fatal", "error", "warn", "info", "debug", "trace", "silent"
 
 export type LogLevel = (typeof LOG_LEVELS)[number];
 
+export type NodeEnv = "development" | "production" | "test";
+
 export type AppConfig = {
   cookieSecure: boolean;
   databaseUrl: string;
   host: string;
   logLevel: LogLevel;
+  nodeEnv: NodeEnv;
   port: number;
   sessionCookieName: string;
   sessionTtlDays: number;
@@ -35,11 +38,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 
   const cookieSecure = env.COOKIE_SECURE === "true";
 
+  const nodeEnvRaw = env.NODE_ENV ?? "development";
+  if (nodeEnvRaw !== "development" && nodeEnvRaw !== "production" && nodeEnvRaw !== "test") {
+    throw new Error("NODE_ENV must be development, production, or test");
+  }
+
   return {
     cookieSecure,
     databaseUrl,
     host: env.HOST ?? "0.0.0.0",
     logLevel: logLevel as LogLevel,
+    nodeEnv: nodeEnvRaw,
     port,
     sessionCookieName: env.SESSION_COOKIE_NAME ?? "session",
     sessionTtlDays,

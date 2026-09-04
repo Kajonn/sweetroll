@@ -1,0 +1,31 @@
+=== I1 acceptance demonstration ===
+DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll
+REPO_ROOT=/home/jonas/dev/sweetroll
+
+--- Step 0: bring up compose postgres ---
+ Container sweetroll-postgres-1  Running
+--- Step 0: wait for pg_isready ---
+postgres is ready (after 1s)
+
+--- Step 0: run migrations ---
+
+> sweetroll@0.0.0 migrate
+> tsx src/bootstrap/migrate.ts
+
+{"level":30,"time":1788555596260,"service":"sweetroll","msg":"database migrations complete"}
+
+--- Steps 1-9: walk the documented interface ---
+STEP 1: 201 systemId=fa23f9cb-4244-4f27-90f8-da2799edcfa9
+STEP 2: 200 revision=2
+STEP 3: 200 snapshotId=b84037ba-d7a3-44db-ae9c-a838300d55e7
+STEP 4: 200 versionId=a69f128f-22e2-42ee-a75b-1965d341b965 semanticVersion=1.0.0
+STEP 5: 200 mediaType=application/vnd.sweetroll.system+json;version=1 checksum=sha256:169c0d07c9b7201d9a4ae37127656a2ff2f9997f72f284b65a9f8d6f802573c4
+STEP 6: 201 systemId=867d1310-f291-404b-a88b-9e134b5cdd15 revision=1
+STEP 7 (save): 200 revision=2 assessmentOk=false
+STEP 7 (publish): 422 diagnostics=["limit_exceeded"]
+STEP 8 (save): 200 revision=3
+STEP 8 (publish): 422 diagnostics=["breaking_removed_definition"]
+STEP 9 (unchanged v1.0.0 export): 200 checksum=sha256:169c0d07c9b7201d9a4ae37127656a2ff2f9997f72f284b65a9f8d6f802573c4
+ALL 8 STEPS PASSED
+
+=== I1 acceptance demonstration complete ===

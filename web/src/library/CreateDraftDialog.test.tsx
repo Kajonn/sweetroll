@@ -1,0 +1,58 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+
+import { createApiClient } from "../api/client.js";
+import { CreateDraftDialog } from "./CreateDraftDialog.js";
+
+describe("CreateDraftDialog", () => {
+  it("posts a blank draft on submit", async () => {
+    const fetch_ = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/systems") && init?.method === "POST") {
+        return new Response(
+          JSON.stringify({
+            workspace: {
+              system: {
+                systemId: "s1",
+                name: "Untitled system",
+                access: "owner",
+                lifecycle: "active",
+                createdAt: "2026-01-01T00:00:00Z",
+                updatedAt: "2026-01-01T00:00:00Z",
+              },
+              draft: null,
+              versions: [],
+              assessment: { ok: true, diagnostics: [] },
+            },
+            requestId: "r",
+          }),
+          { status: 201 },
+        );
+      }
+      return new Response("{}", { status: 200 });
+    });
+    const client = createApiClient({ baseUrl: "http://x", fetch: fetch_ as typeof fetch });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <CreateDraftDialog client={client} open onOpenChange={() => {}} />
+      </QueryClientProvider>,
+    );
+    await userEvent.click(screen.getByTestId("create-draft-submit"));
+    expect(fetch_).toHaveBeenCalledWith(expect.stringContaining("/systems"), expect.objectContaining({ method: "POST" }));
+  });
+
+  it("exposes three source radio options", () => {
+    const client = createApiClient({ baseUrl: "http://x", fetch: vi.fn() as typeof fetch });
+    const qc = new QueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <CreateDraftDialog client={client} open onOpenChange={() => {}} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByTestId("create-draft-kind-blank")).toBeInTheDocument();
+    expect(screen.getByTestId("create-draft-kind-clone")).toBeInTheDocument();
+    expect(screen.getByTestId("create-draft-kind-import")).toBeInTheDocument();
+  });
+});

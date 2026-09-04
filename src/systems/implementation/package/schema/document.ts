@@ -1,7 +1,7 @@
 import { Type, type Static } from "@sinclair/typebox";
 
 import { PACKAGE_LIMITS } from "../limits.js";
-import { DefinitionIdSchema, ScalarValueSchema, ValueTypeSchema } from "./common.js";
+import { DefinitionIdSchema, ValueTypeSchema } from "./common.js";
 
 const LABEL_MAX_LENGTH = 120;
 const LONG_TEXT_MAX_LENGTH = 2_000;
@@ -9,6 +9,12 @@ const TEXT_MAX_LENGTH = 10_000;
 
 const LabelSchema = Type.String({ maxLength: LABEL_MAX_LENGTH });
 const TextSchema = Type.String({ maxLength: TEXT_MAX_LENGTH });
+const DocumentScalarValueSchema = Type.Union([
+  TextSchema,
+  Type.Number(),
+  Type.Boolean(),
+  Type.Null(),
+]);
 
 export const ChoiceOptionV1Schema = Type.Object(
   {
@@ -175,7 +181,8 @@ export const ReferenceRecordV1Schema = Type.Object(
   {
     id: DefinitionIdSchema,
     label: LabelSchema,
-    values: Type.Record(DefinitionIdSchema, ScalarValueSchema, {
+    values: Type.Record(DefinitionIdSchema, DocumentScalarValueSchema, {
+      additionalProperties: false,
       maxProperties: PACKAGE_LIMITS.referenceRecordValues,
     }),
   },
@@ -277,7 +284,7 @@ export const SourceExpressionV1Schema = Type.Object(
     ]),
     resultType: ValueTypeSchema,
     source: Type.String({ maxLength: PACKAGE_LIMITS.expressionBytes }),
-    fallback: ScalarValueSchema,
+    fallback: DocumentScalarValueSchema,
   },
   { additionalProperties: false },
 );
@@ -294,7 +301,7 @@ export const ActionInputV1Schema = Type.Object(
       Type.Literal("text"),
     ]),
     required: Type.Boolean(),
-    default: ScalarValueSchema,
+    default: DocumentScalarValueSchema,
   },
   { additionalProperties: false },
 );

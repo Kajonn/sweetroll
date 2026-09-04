@@ -93,7 +93,24 @@ function document(): SystemDocumentV1 {
         ],
       },
     ],
-    referenceData: [],
+    referenceData: [
+      {
+        id: "creatures",
+        label: "Creatures",
+        records: [
+          {
+            id: "slime",
+            label: "Slime",
+            values: {
+              description: "A wobbling nuisance",
+              health: 3,
+              hostile: true,
+              weakness: null,
+            },
+          },
+        ],
+      },
+    ],
     sheets: [
       {
         id: "character_sheet",
@@ -201,6 +218,10 @@ describe("SystemDocumentV1Schema", () => {
 
   it.each([
     ["unknown root property", { ...document(), extra: true }],
+    [
+      "unknown nested property",
+      { ...document(), metadata: { ...document().metadata, extra: true } },
+    ],
     ["bad schema version", { ...document(), schemaVersion: "2.0" }],
     [
       "malformed definition id",
@@ -220,5 +241,93 @@ describe("SystemDocumentV1Schema", () => {
       source: "x".repeat(PACKAGE_LIMITS.expressionBytes + 1),
     };
     expect(validate(value)).toBe(false);
+  });
+
+  it("rejects malformed reference value keys", () => {
+    const value = document();
+    const values = value.referenceData[0]!.records[0]!.values as Record<string, unknown>;
+    values["Bad-Key"] = "invalid";
+
+    expect(validate(value)).toBe(false);
+  });
+
+  const scalarStringLocations: Array<[
+    string,
+    (value: SystemDocumentV1, text: string) => void,
+  ]> = [
+    [
+      "reference value",
+      (value, text) => {
+        value.referenceData[0]!.records[0]!.values.description = text;
+      },
+    ],
+    [
+      "expression fallback",
+      (value, text) => {
+        value.expressions[0]!.fallback = text;
+      },
+    ],
+    [
+      "action input default",
+      (value, text) => {
+        const action = value.actions[0];
+        if (action?.kind !== "roll") throw new Error("Expected roll action fixture");
+        action.inputs[0]!.default = text;
+      },
+    ],
+  ];
+
+  it.each(scalarStringLocations)("accepts a 10,000-character %s string", (_name, setValue) => {
+    const value = document();
+    setValue(value, "x".repeat(10_000));
+
+    expect(validate(value)).toBe(true);
+  });
+
+  it.each(scalarStringLocations)("rejects a %s string over 10,000 characters", (_name, setValue) => {
+    const value = document();
+    setValue(value, "x".repeat(10_001));
+
+    expect(validate(value)).toBe(false);
+  });
+
+  const collectionCeilings: Array<[
+    string,
+    number,
+    (value: SystemDocumentV1, count: number) => void,
+  ]> = [
+    [
+      "entities",
+      PACKAGE_LIMITS.entities,
+      (value, count) => {
+        value.entities = Array.from({ length: count }, () => value.entities[0]!);
+      },
+    ],
+    [
+      "reference records",
+      PACKAGE_LIMITS.referenceRecordsPerSet,
+      (value, count) => {
+        const referenceData = value.referenceData[0]!;
+        referenceData.records = Array.from({ length: count }, () => referenceData.records[0]!);
+      },
+    ],
+    [
+      "sheet sections",
+      PACKAGE_LIMITS.sectionsPerSheet,
+      (value, count) => {
+        const sheet = value.sheets[0]!;
+        sheet.sections = Array.from({ length: count }, () => sheet.sections[0]!);
+      },
+    ],
+  ];
+
+  it.each(collectionCeilings)("enforces the %s collection ceiling", (_name, limit, setCount) => {
+    const boundary = document();
+    setCount(boundary, limit);
+    expect(validate(boundary)).toBe(true);
+
+    const overLimit = document();
+    setCount(overLimit, limit + 1);
+    expect(validate(overLimit)).toBe(false);
   });
 });

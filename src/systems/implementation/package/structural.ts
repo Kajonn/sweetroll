@@ -28,10 +28,12 @@ export function preflightPackageAstLimits(
   try {
     if (!isObject(value) || !Array.isArray(value.expressions)) return [];
     const diagnostics: PackageDiagnostic[] = [];
-    value.expressions.forEach((expression, expressionIndex) => {
-      if (!isObject(expression) || !isObject(expression.ast)) return;
+    for (const [expressionIndex, expression] of value.expressions.entries()) {
+      if (!isObject(expression)) continue;
+      if (!isObject(expression.ast)) return [];
       const exceeded = preflightAst(expression.ast);
-      if (exceeded === null) return;
+      if (exceeded === "invalid") return [];
+      if (exceeded === null) continue;
       diagnostics.push({
         code: "limit_exceeded",
         path: `${prefix}/expressions/${expressionIndex}/ast`,
@@ -39,7 +41,7 @@ export function preflightPackageAstLimits(
           ? `Expression AST exceeds ${PACKAGE_LIMITS.expressionAstNodes} nodes.`
           : `Expression AST exceeds depth ${PACKAGE_LIMITS.expressionAstDepth}.`,
       });
-    });
+    }
     return diagnostics;
   } catch {
     return [];
@@ -322,7 +324,7 @@ function measureAst(root: ExpressionAstV1): { depth: number; nodes: number } {
   return { depth, nodes };
 }
 
-function preflightAst(root: Record<string, unknown>): "depth" | "nodes" | null {
+function preflightAst(root: Record<string, unknown>): "depth" | "invalid" | "nodes" | null {
   const pending: { node: unknown; depth: number }[] = [{ node: root, depth: 1 }];
   let nodes = 0;
   while (pending.length > 0) {
@@ -330,7 +332,7 @@ function preflightAst(root: Record<string, unknown>): "depth" | "nodes" | null {
     if (current.depth > PACKAGE_LIMITS.expressionAstDepth) return "depth";
     nodes += 1;
     if (nodes > PACKAGE_LIMITS.expressionAstNodes) return "nodes";
-    if (!isObject(current.node)) continue;
+    if (!isObject(current.node) || !isLocallyValidAstNode(current.node)) return "invalid";
 
     const childDepth = current.depth + 1;
     switch (current.node.kind) {
@@ -360,6 +362,76 @@ function preflightAst(root: Record<string, unknown>): "depth" | "nodes" | null {
     }
   }
   return null;
+}
+
+function isLocallyValidAstNode(node: Record<string, unknown>): boolean {
+  switch (node.kind) {
+    case "numberLiteral":
+      return hasOnlyKeys(node, ["kind", "value"]) && isFiniteNumber(node.value);
+    case "stringLiteral":
+      return hasOnlyKeys(node, ["kind", "value"]) && typeof node.value === "string";
+    case "booleanLiteral":
+      return hasOnlyKeys(node, ["kind", "value"]) && typeof node.value === "boolean";
+    case "reference":
+      return hasOnlyKeys(node, ["kind", "scope", "id"])
+        && (node.scope === "fields" || node.scope === "inputs")
+        && typeof node.id === "string"
+        && /^[a-z][a-z0-9_]{0,63}$/.test(node.id);
+    case "unary":
+      return hasOnlyKeys(node, ["kind", "operator", "operand"])
+        && (node.operator === "-" || node.operator === "!")
+        && isObject(node.operand);
+    case "binary":
+      return hasOnlyKeys(node, ["kind", "operator", "left", "right"])
+        && typeof node.operator === "string"
+        && ["+", "-", "*", "/", "==", "!=", "<", "<=", ">", ">=", "&&", "||"]
+          .includes(node.operator)
+        && isObject(node.left)
+        && isObject(node.right);
+    case "call":
+      return hasOnlyKeys(node, ["kind", "function", "arguments"], ["roundMode"])
+        && (node.function === "min" || node.function === "max" || node.function === "round")
+        && Array.isArray(node.arguments)
+        && node.arguments.length <= 2
+        && node.arguments.every(isObject)
+        && (!Object.hasOwn(node, "roundMode")
+          || node.roundMode === "nearest"
+          || node.roundMode === "down"
+          || node.roundMode === "up");
+    case "dice":
+      return hasOnlyKeys(node, ["kind", "count", "sides"])
+        && isObject(node.count)
+        && isIntegerBetween(node.sides, 1, PACKAGE_LIMITS.sidesPerDie);
+    case "keep":
+      return hasOnlyKeys(node, ["kind", "mode", "count", "dice"])
+        && (node.mode === "highest" || node.mode === "lowest")
+        && isIntegerBetween(node.count, 1, PACKAGE_LIMITS.dicePerRoll)
+        && isObject(node.dice);
+    case "successCount":
+      return hasOnlyKeys(node, ["kind", "dice", "threshold"])
+        && isObject(node.dice)
+        && Number.isInteger(node.threshold);
+    default:
+      return false;
+  }
+}
+
+function hasOnlyKeys(
+  value: Record<string, unknown>,
+  required: string[],
+  optional: string[] = [],
+): boolean {
+  const keys = Object.keys(value);
+  return required.every((key) => Object.hasOwn(value, key))
+    && keys.every((key) => required.includes(key) || optional.includes(key));
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isIntegerBetween(value: unknown, minimum: number, maximum: number): value is number {
+  return Number.isInteger(value) && (value as number) >= minimum && (value as number) <= maximum;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

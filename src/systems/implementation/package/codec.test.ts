@@ -286,6 +286,33 @@ describe("system package codecs", () => {
     });
   });
 
+  it("defers malformed deep-looking AST roots to schema diagnostics", () => {
+    const invalidOperatorPackage = validSignedShapePackage();
+    invalidOperatorPackage.expressions[0]!.ast = {
+      kind: "unary",
+      operator: "invalid",
+      operand: unaryChain(1_000),
+    } as unknown as ExpressionAstV1;
+    const unknownKindPackage = validSignedShapePackage();
+    unknownKindPackage.expressions[0]!.ast = {
+      kind: "unknown",
+      operand: unaryChain(1_000),
+    } as unknown as ExpressionAstV1;
+    const expected = {
+      ok: false,
+      diagnostics: [
+        {
+          code: "invalid_schema",
+          path: "",
+          message: "Input does not match the required schema.",
+        },
+      ],
+    };
+
+    expect(decodeSystemPackage(invalidOperatorPackage)).toEqual(expected);
+    expect(decodeSystemPackage(unknownKindPackage)).toEqual(expected);
+  });
+
   it("rejects effective package limits above platform ceilings", () => {
     const value = validSignedShapePackage() as unknown as Record<string, unknown>;
     (value.effectiveLimits as Record<string, number>).dicePerRoll = 101;

@@ -43,6 +43,13 @@ describe("tokenizer", () => {
     expect(r.diagnostics[0]!.code).toBe("invalid_syntax");
   });
 
+  it("tokenizes round mode words", () => {
+    const r = tokenize("round(1.5, down)");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.tokens.map((t) => t.kind)).toEqual(["function", "lparen", "number", "comma", "roundMode", "rparen"]);
+  });
+
   it("recognizes booleans, functions, and operators", () => {
     const r = tokenize("fields.ability >= 3 && true");
     expect(r.ok).toBe(true);

@@ -10,7 +10,8 @@ export type Token =
   | { kind: "operator"; op: "+" | "-" | "*" | "/" | "<" | "<=" | ">" | ">=" | "==" | "!=" | "&&" | "||" | "!"; start: number }
   | { kind: "lparen"; start: number }
   | { kind: "rparen"; start: number }
-  | { kind: "comma"; start: number };
+  | { kind: "comma"; start: number }
+  | { kind: "roundMode"; mode: "nearest" | "down" | "up"; start: number };
 
 export type TokenizeResult =
   | { ok: true; tokens: Token[] }
@@ -90,6 +91,7 @@ export function tokenize(source: string): TokenizeResult {
       if (FUNCTIONS.has(word)) { tokens.push({ kind: "function", name: word as "min" | "max" | "round" | "dice" | "countSuccesses", start }); i = j; continue; }
       if (word === "true" || word === "false") { tokens.push({ kind: "boolean", value: word === "true", start }); i = j; continue; }
       if (ASSIGNED_FUNCTIONS.has(word)) { tokens.push({ kind: "advDis", which: word as "adv" | "dis", start }); i = j; continue; }
+      if (word === "nearest" || word === "down" || word === "up") { tokens.push({ kind: "roundMode", mode: word as "nearest" | "down" | "up", start }); i = j; continue; }
       return fail(`unknown identifier '${word}'`);
     }
 

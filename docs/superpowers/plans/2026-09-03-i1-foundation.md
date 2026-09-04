@@ -40,7 +40,7 @@
 - Consumes: Node.js process environment.
 - Produces: `loadConfig(env?: NodeJS.ProcessEnv): AppConfig` and the npm scripts used by every later task.
 
-- [ ] **Step 1: Add repository and Node metadata**
+- [x] **Step 1: Add repository and Node metadata**
 
 Create `.gitignore`:
 
@@ -66,7 +66,7 @@ Create `.nvmrc`:
 24
 ```
 
-- [ ] **Step 2: Create the npm package and lockfile**
+- [x] **Step 2: Create the npm package and lockfile**
 
 Create `package.json`:
 
@@ -109,7 +109,7 @@ Run: `npm install --package-lock-only`
 
 Expected: `package-lock.json` is created and npm reports no dependency resolution error.
 
-- [ ] **Step 3: Configure strict TypeScript compilation**
+- [x] **Step 3: Configure strict TypeScript compilation**
 
 Create `tsconfig.json`:
 
@@ -136,7 +136,7 @@ Create `tsconfig.json`:
 }
 ```
 
-- [ ] **Step 4: Write failing configuration tests**
+- [x] **Step 4: Write failing configuration tests**
 
 Create `src/platform/config.test.ts`:
 
@@ -182,13 +182,13 @@ describe("loadConfig", () => {
 });
 ```
 
-- [ ] **Step 5: Run the test to verify it fails**
+- [x] **Step 5: Run the test to verify it fails**
 
 Run: `npm test -- src/platform/config.test.ts`
 
 Expected: FAIL because `src/platform/config.ts` does not exist.
 
-- [ ] **Step 6: Implement configuration decoding**
+- [x] **Step 6: Implement configuration decoding**
 
 Create `src/platform/config.ts`:
 
@@ -236,7 +236,7 @@ export { loadConfig } from "./config.js";
 export type { AppConfig, LogLevel } from "./config.js";
 ```
 
-- [ ] **Step 7: Verify the typed workspace**
+- [x] **Step 7: Verify the typed workspace**
 
 Run: `npm test -- src/platform/config.test.ts`
 
@@ -246,7 +246,7 @@ Run: `npm run typecheck`
 
 Expected: exit status 0.
 
-- [ ] **Step 8: Commit the workspace foundation**
+- [x] **Step 8: Commit the workspace foundation**
 
 Because the repository currently has an unborn `main` branch, this first commit records the already-approved design and scaffold together with the workspace foundation.
 
@@ -273,7 +273,7 @@ git commit -m "chore: establish TypeScript workspace"
 - Consumes: `AppConfig`, a PostgreSQL `Pool`, and a Pino `Logger` supplied at process composition.
 - Produces: `buildHttpApp(input: { logger: Logger; pool: Pool }): FastifyInstance`, `/health/live`, `/health/ready`, `/metrics`, structured request logs, and a server-generated `x-request-id` response header.
 
-- [ ] **Step 1: Write failing HTTP adapter tests**
+- [x] **Step 1: Write failing HTTP adapter tests**
 
 Create `src/transport/http/app.test.ts`:
 
@@ -332,13 +332,13 @@ describe("HTTP platform endpoints", () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npm test -- src/transport/http/app.test.ts`
 
 Expected: FAIL because `src/transport/http/app.ts` does not exist.
 
-- [ ] **Step 3: Add the PostgreSQL, logging, and metrics platform helpers**
+- [x] **Step 3: Add the PostgreSQL, logging, and metrics platform helpers**
 
 Create `src/platform/database.ts`:
 
@@ -395,7 +395,7 @@ export function createHttpMetrics() {
 }
 ```
 
-- [ ] **Step 4: Implement the HTTP application**
+- [x] **Step 4: Implement the HTTP application**
 
 Create `src/transport/http/app.ts`:
 
@@ -471,7 +471,7 @@ export { createPool } from "./database.js";
 export { createLogger } from "./logging.js";
 ```
 
-- [ ] **Step 5: Compose the HTTP process**
+- [x] **Step 5: Compose the HTTP process**
 
 Replace `src/bootstrap/http.ts` with:
 
@@ -502,7 +502,7 @@ try {
 }
 ```
 
-- [ ] **Step 6: Verify HTTP behavior and compilation**
+- [x] **Step 6: Verify HTTP behavior and compilation**
 
 Run: `npm test -- src/transport/http/app.test.ts`
 
@@ -512,7 +512,7 @@ Run: `npm run typecheck && npm run build`
 
 Expected: both commands exit with status 0 and `dist/bootstrap/http.js` exists.
 
-- [ ] **Step 7: Commit HTTP observability**
+- [x] **Step 7: Commit HTTP observability**
 
 ```bash
 git add src/platform src/transport/http src/bootstrap/http.ts
@@ -534,7 +534,7 @@ git commit -m "feat: add observable HTTP process"
 - Consumes: a connected `pg.Client` and a directory containing immutable files named `NNNN_snake_case.sql`.
 - Produces: `runMigrations(client: Client, directory: string): Promise<void>`, checksum verification, ordered one-time application, and the `migrate` process mode.
 
-- [ ] **Step 1: Document the migration contract and add a fixture**
+- [x] **Step 1: Document the migration contract and add a fixture**
 
 Create `migrations/README.md`:
 
@@ -555,7 +555,7 @@ CREATE TABLE migration_probe (
 );
 ```
 
-- [ ] **Step 2: Write failing real-PostgreSQL tests**
+- [x] **Step 2: Write failing real-PostgreSQL tests**
 
 Create `tests/integration/migrations.test.ts`:
 
@@ -609,13 +609,13 @@ describeWithDatabase("runMigrations", () => {
 });
 ```
 
-- [ ] **Step 3: Run the integration test to verify it fails**
+- [x] **Step 3: Run the integration test to verify it fails**
 
 Run: `TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run test:integration -- migrations.test.ts`
 
 Expected: FAIL because `src/platform/migrations.ts` does not exist.
 
-- [ ] **Step 4: Implement the migration runner**
+- [x] **Step 4: Implement the migration runner**
 
 Create `src/platform/migrations.ts`:
 
@@ -676,7 +676,7 @@ export async function runMigrations(client: Client, directory: string): Promise<
 }
 ```
 
-- [ ] **Step 5: Compose the migrate process**
+- [x] **Step 5: Compose the migrate process**
 
 Replace `src/bootstrap/migrate.ts` with:
 
@@ -706,7 +706,7 @@ try {
 }
 ```
 
-- [ ] **Step 6: Verify migration behavior**
+- [x] **Step 6: Verify migration behavior**
 
 Run: `TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run test:integration -- migrations.test.ts`
 
@@ -716,7 +716,7 @@ Run: `npm run typecheck && npm run build`
 
 Expected: both commands exit with status 0 and `dist/bootstrap/migrate.js` exists.
 
-- [ ] **Step 7: Commit migration mode**
+- [x] **Step 7: Commit migration mode**
 
 ```bash
 git add migrations src/platform/migrations.ts src/bootstrap/migrate.ts tests
@@ -738,7 +738,7 @@ git commit -m "feat: add explicit SQL migration mode"
 - Consumes: the build and process scripts from Tasks 1 through 3.
 - Produces: one `sweetroll` image runnable as either HTTP or migrations, plus a local PostgreSQL environment.
 
-- [ ] **Step 1: Add local environment configuration**
+- [x] **Step 1: Add local environment configuration**
 
 Create `.env.example`:
 
@@ -774,7 +774,7 @@ volumes:
   sweetroll-postgres:
 ```
 
-- [ ] **Step 2: Add the single production artifact**
+- [x] **Step 2: Add the single production artifact**
 
 Create `.dockerignore`:
 
@@ -810,7 +810,7 @@ EXPOSE 3000
 CMD ["npm", "run", "start:http"]
 ```
 
-- [ ] **Step 3: Document exact development and process commands**
+- [x] **Step 3: Document exact development and process commands**
 
 Create `README.md`:
 
@@ -847,7 +847,7 @@ The default command runs HTTP. Run migrations from the same image with
 `docker run --rm --env-file .env sweetroll npm run start:migrate`.
 ```
 
-- [ ] **Step 4: Verify the complete local artifact**
+- [x] **Step 4: Verify the complete local artifact**
 
 Run: `docker compose up -d --wait postgres`
 
@@ -865,7 +865,7 @@ Run: `docker run --rm --network host -e DATABASE_URL=postgres://sweetroll:sweetr
 
 Expected: exit status 0 with a structured `database migrations complete` log.
 
-- [ ] **Step 5: Commit local and deployment packaging**
+- [x] **Step 5: Commit local and deployment packaging**
 
 ```bash
 git add .dockerignore .env.example Dockerfile compose.yaml README.md
@@ -884,7 +884,7 @@ git commit -m "chore: package application runtime"
 - Consumes: npm verification scripts, PostgreSQL 17, and the root Dockerfile.
 - Produces: required CI evidence on pushes and pull requests, plus a GHCR image tagged from `v*.*.*` releases.
 
-- [ ] **Step 1: Add CI with real PostgreSQL**
+- [x] **Step 1: Add CI with real PostgreSQL**
 
 Create `.github/workflows/ci.yml`:
 
@@ -932,7 +932,7 @@ jobs:
       - run: docker build -t sweetroll:ci .
 ```
 
-- [ ] **Step 2: Add versioned image delivery without deployment assumptions**
+- [x] **Step 2: Add versioned image delivery without deployment assumptions**
 
 Create `.github/workflows/release.yml`:
 
@@ -970,13 +970,13 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 ```
 
-- [ ] **Step 3: Run the full local verification sequence**
+- [x] **Step 3: Run the full local verification sequence**
 
 Run: `npm ci && npm test && TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run test:integration && npm run typecheck && npm run build && docker build -t sweetroll:i1-foundation .`
 
 Expected: dependency installation succeeds, all tests pass, TypeScript compiles, and the image builds.
 
-- [ ] **Step 4: Review scope against I1 Task 1**
+- [x] **Step 4: Review scope against I1 Task 1**
 
 Confirm all of the following:
 
@@ -989,9 +989,19 @@ Confirm all of the following:
 - CI verifies tests, types, compilation, and the image; release automation publishes the same image.
 - No worker, ORM, event bus, outbox, Identity behavior, system package, rules engine, or System Interfaces were implemented.
 
-- [ ] **Step 5: Commit CI and image delivery**
+- [x] **Step 5: Commit CI and image delivery**
 
 ```bash
 git add .github/workflows/ci.yml .github/workflows/release.yml
 git commit -m "ci: verify and publish application image"
 ```
+
+## Completion reconciliation (2026-09-04)
+
+Implementation in `main` satisfies every step above. Relevant commits:
+baa43da chore: establish TypeScript workspace
+436e3bf feat: add observable HTTP process
+030525c fix: harden HTTP observability
+a0333d3 feat: add explicit SQL migration mode
+5fe957a chore: package application runtime
+0d380d8 ci: verify and publish application image

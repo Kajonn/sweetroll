@@ -40,7 +40,7 @@
 - Consumes: TypeBox `Type` and `Static`.
 - Produces: `PACKAGE_LIMITS`, `DefinitionIdSchema`, `ScalarValueSchema`, `SystemDocumentV1Schema`, `SystemDocumentV1`, and all document component schemas/types used in Task 2.
 
-- [ ] **Step 1: Install the pinned runtime dependencies**
+- [x] **Step 1: Install the pinned runtime dependencies**
 
 Run:
 
@@ -50,7 +50,7 @@ npm install @sinclair/typebox@0.34.52 ajv@8.20.0 json-canonicalize@3.0.0
 
 Expected: `package.json` and `package-lock.json` list all three under `dependencies` with exact versions.
 
-- [ ] **Step 2: Write the failing document-schema tests**
+- [x] **Step 2: Write the failing document-schema tests**
 
 Create `src/systems/implementation/package/schema/document.test.ts` with a minimal valid document factory and these assertions:
 
@@ -114,13 +114,13 @@ describe("SystemDocumentV1Schema", () => {
 
 Extend the accepted fixture in the same test with one instance of each remaining field kind (`text`, `decimal`, `boolean`, `singleChoice`, `multiChoice`, `image`), heading sheet element, reset resource action, warning validation, and string/boolean expression fallback. Assert the complete fixture validates.
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [x] **Step 3: Run the test to verify it fails**
 
 Run: `npm test -- src/systems/implementation/package/schema/document.test.ts`
 
 Expected: FAIL because `limits.ts` and `schema/document.ts` do not exist.
 
-- [ ] **Step 4: Add exact platform limits and common schemas**
+- [x] **Step 4: Add exact platform limits and common schemas**
 
 Create `limits.ts`:
 
@@ -163,7 +163,7 @@ export const ValueTypeSchema = Type.Union([
 export type ValueType = Static<typeof ValueTypeSchema>;
 ```
 
-- [ ] **Step 5: Implement the editable document schema**
+- [x] **Step 5: Implement the editable document schema**
 
 Create `schema/document.ts`. Build every object with `{ additionalProperties: false }` and export its `Static` type. Use these exact discriminators and properties:
 
@@ -201,7 +201,7 @@ Also define the following exact containers:
 
 Use finite `Type.Number()` values; Ajv rejects JSON representations of non-finite numbers. Cap labels at 120 characters, descriptions/messages/output templates at 2,000, and ordinary text/default strings at 10,000.
 
-- [ ] **Step 6: Run the document tests and typecheck**
+- [x] **Step 6: Run the document tests and typecheck**
 
 Run: `npm test -- src/systems/implementation/package/schema/document.test.ts`
 
@@ -211,7 +211,7 @@ Run: `npm run typecheck`
 
 Expected: exit 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add package.json package-lock.json src/systems/implementation/package/limits.ts src/systems/implementation/package/schema/common.ts src/systems/implementation/package/schema/document.ts src/systems/implementation/package/schema/document.test.ts
@@ -234,7 +234,7 @@ git commit -m "feat: define editable system document contract"
 - Consumes: document component schemas from Task 1.
 - Produces: `ExpressionAstV1Schema`, `CompiledExpressionV1Schema`, `SystemPackageV1Schema`, `SystemPackageV1`, `UnsignedSystemPackageV1`, `SystemExportV1Schema`, `SystemExportV1`, and one schema barrel.
 
-- [ ] **Step 1: Write the failing compiled-contract tests**
+- [x] **Step 1: Write the failing compiled-contract tests**
 
 Create `schema/package.test.ts`. Build a minimal package with metadata IDs `00000000-0000-4000-8000-000000000001` and `00000000-0000-4000-8000-000000000002`, one entity/field, one sheet, and these compiled expressions:
 
@@ -249,13 +249,13 @@ const expressions = [
 
 Add valid instances of string/boolean literals, unary, `min`/`max`/`round` calls, static dice, keep-high, keep-low, and input references. Assert Ajv accepts the package and an export envelope. Assert rejection for an unknown AST kind, `sides: 1001`, AST cost 257, malformed checksum, account-shaped export property `ownerId`, and media type other than `application/vnd.sweetroll.system+json;version=1`.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `npm test -- src/systems/implementation/package/schema/package.test.ts`
 
 Expected: FAIL because the compiled schemas do not exist.
 
-- [ ] **Step 3: Implement the recursive AST schema**
+- [x] **Step 3: Implement the recursive AST schema**
 
 Create `schema/expression.ts` with `Type.Recursive`. Use this exact AST union:
 
@@ -275,7 +275,7 @@ type ExpressionAstV1 =
 
 Require integer `sides`, keep `count`, and success threshold. Bound sides and keep count with `PACKAGE_LIMITS`; bound call arguments to 2. Define `CompiledExpressionV1` exactly as tested, with dependencies capped at 1,024 and cost capped at 256. AST node count/depth are relationship checks in Task 3 because JSON Schema cannot express them reliably.
 
-- [ ] **Step 4: Implement package and export schemas**
+- [x] **Step 4: Implement package and export schemas**
 
 Create `schema/package.ts` by reusing Task 1 component schemas. `SystemPackageV1` has root `schemaVersion`, published metadata (`systemId`, `versionId`, `semanticVersion`, `name`, `description`, `language`, `defaultDice`), document collections, compiled expressions, effective limits, and `integrity: { checksum }`. UUIDs use pattern `^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`; semantic versions use `^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`; checksums use `^sha256:[0-9a-f]{64}$`.
 
@@ -309,7 +309,7 @@ Use UTC timestamp pattern `^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2
 
 Move the valid document factory from Task 1's test into `schema/test-values.ts`, and add `validUnsignedPackage()` and `validSignedShapePackage()` factories. The signed-shape factory uses `sha256:` followed by 64 zeroes; it is schema-valid but is not treated as integrity-verified until Task 4. Keep this helper out of `schema/index.ts` so production code cannot import test values accidentally.
 
-- [ ] **Step 5: Run compiled-contract tests and typecheck**
+- [x] **Step 5: Run compiled-contract tests and typecheck**
 
 Run: `npm test -- src/systems/implementation/package/schema/package.test.ts`
 
@@ -319,7 +319,7 @@ Run: `npm run typecheck`
 
 Expected: exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/systems/implementation/package/schema/
@@ -341,7 +341,7 @@ git commit -m "feat: define compiled system package contracts"
 - Consumes: all Task 1-2 schemas and types.
 - Produces: `PackageDiagnostic`, `DecodeResult<T>`, `decodeSystemDocument(input: unknown)`, `decodeSystemPackage(input: unknown)`, and `decodeSystemExport(input: unknown)`.
 
-- [ ] **Step 1: Write failing codec tests**
+- [x] **Step 1: Write failing codec tests**
 
 Create `codec.test.ts` using the valid document factory from `schema/test-values.ts`. Test these exact outcomes:
 
@@ -360,13 +360,13 @@ expect(decodeSystemDocument(new Uint8Array(PACKAGE_LIMITS.encodedBytes + 1))).to
 
 Add cases for invalid UTF-8, unknown property (`invalid_schema` with an RFC 6901 path), multibyte expression source over 1,024 bytes (`limit_exceeded`), 513 total fields, 1,025 total sheet elements, duplicate IDs in different definition kinds, missing sheet field/action/resource targets, missing resource-bump target, package AST over 256 nodes, AST depth 33, and package effective limit above a platform ceiling. Assert multiple diagnostics are ordered by `path`, then `code`.
 
-- [ ] **Step 2: Run the codec test to verify it fails**
+- [x] **Step 2: Run the codec test to verify it fails**
 
 Run: `npm test -- src/systems/implementation/package/codec.test.ts`
 
 Expected: FAIL because `codec.ts` does not exist.
 
-- [ ] **Step 3: Define diagnostics and Ajv mapping**
+- [x] **Step 3: Define diagnostics and Ajv mapping**
 
 Create `diagnostics.ts`:
 
@@ -391,7 +391,7 @@ export function sortDiagnostics(values: PackageDiagnostic[]): PackageDiagnostic[
 
 Map Ajv's `instancePath` to JSON Pointer. For `required`, append the escaped missing property; for `additionalProperties`, append the escaped extra property. Map ID-pattern failures to `invalid_definition_id`; all other Ajv failures use `invalid_schema`. Deduplicate equal code/path pairs.
 
-- [ ] **Step 4: Implement relationship and budget checks**
+- [x] **Step 4: Implement relationship and budget checks**
 
 Create `structural.ts` with one private traversal shared by documents and packages. It must:
 
@@ -406,7 +406,7 @@ Create `structural.ts` with one private traversal shared by documents and packag
 
 Do not check expression operand types, expression dependency existence, semantic-version compatibility, or authoring policy in this file.
 
-- [ ] **Step 5: Implement the bounded codecs**
+- [x] **Step 5: Implement the bounded codecs**
 
 Create `codec.ts`. Compile each schema once at module initialization with `new Ajv({ allErrors: true, strict: true })`. For string/`Uint8Array` input:
 
@@ -421,7 +421,7 @@ For object input, start at step 4. `decodeSystemPackage` verifies structural lim
 
 Update `package/index.ts` to export only the three codecs and their input/output types needed by sibling systems implementation code. Do not export Ajv, schemas, or structural helpers from this package-level barrel.
 
-- [ ] **Step 6: Run codec and package tests**
+- [x] **Step 6: Run codec and package tests**
 
 Run: `npm test -- src/systems/implementation/package/codec.test.ts src/systems/implementation/package/schema/`
 
@@ -431,7 +431,7 @@ Run: `npm run typecheck`
 
 Expected: exit 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/systems/implementation/package/
@@ -454,7 +454,7 @@ git commit -m "feat: decode bounded system package contracts"
 - Consumes: `UnsignedSystemPackageV1`, `SystemPackageV1`, and structural package validation.
 - Produces: `canonicalizePackage`, `calculatePackageChecksum`, `signSystemPackage`, and checksum verification inside package/export decode.
 
-- [ ] **Step 1: Write failing canonicalization tests**
+- [x] **Step 1: Write failing canonicalization tests**
 
 Create `canonical.test.ts` around a valid unsigned package:
 
@@ -472,13 +472,13 @@ expect(calculatePackageChecksum(reversed)).not.toBe(signed.integrity.checksum);
 
 Also assert `canonicalizePackage` is stable, signing does not mutate its input, changing a nested value changes the checksum, `decodeSystemPackage` accepts signed data, and package/export codecs return one `checksum_mismatch` diagnostic at `/integrity/checksum` or `/package/integrity/checksum` after tampering.
 
-- [ ] **Step 2: Run integrity tests to verify they fail**
+- [x] **Step 2: Run integrity tests to verify they fail**
 
 Run: `npm test -- src/systems/implementation/package/canonical.test.ts`
 
 Expected: FAIL because `canonical.ts` does not exist.
 
-- [ ] **Step 3: Implement RFC 8785 checksum helpers**
+- [x] **Step 3: Implement RFC 8785 checksum helpers**
 
 Create `canonical.ts`:
 
@@ -506,13 +506,13 @@ export function signSystemPackage(value: UnsignedSystemPackageV1): SystemPackage
 }
 ```
 
-- [ ] **Step 4: Verify integrity in codecs**
+- [x] **Step 4: Verify integrity in codecs**
 
 After schema and structural validation, compare `calculatePackageChecksum(value)` to `value.integrity.checksum`. Add `checksum_mismatch` without exposing either checksum value. For an export, prefix package diagnostic paths with `/package`. Export `signSystemPackage` from package `index.ts`; keep raw checksum/canonical helpers private to this implementation directory.
 
 Add `validSignedPackage()` to `schema/test-values.ts` by passing `validUnsignedPackage()` to `signSystemPackage`. Update codec success cases to use that helper; retain `validSignedShapePackage()` only in pure schema tests where checksum semantics are intentionally not evaluated.
 
-- [ ] **Step 5: Run all package tests and typecheck**
+- [x] **Step 5: Run all package tests and typecheck**
 
 Run: `npm test -- src/systems/implementation/package/`
 
@@ -522,7 +522,7 @@ Run: `npm run typecheck`
 
 Expected: exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/systems/implementation/package/
@@ -552,7 +552,7 @@ git commit -m "feat: add canonical system package integrity"
 - Consumes: schemas, codecs, and `signSystemPackage` from Tasks 1-4.
 - Produces: three deterministic document/package fixtures, generated JSON Schema artifacts, one valid export example, and `npm run contracts:generate`.
 
-- [ ] **Step 1: Write failing fixture acceptance tests**
+- [x] **Step 1: Write failing fixture acceptance tests**
 
 Create `fixtures/fixtures.test.ts`:
 
@@ -581,13 +581,13 @@ describe("reference system contracts", () => {
 });
 ```
 
-- [ ] **Step 2: Run fixture tests to verify they fail**
+- [x] **Step 2: Run fixture tests to verify they fail**
 
 Run: `npm test -- src/systems/implementation/package/fixtures/fixtures.test.ts`
 
 Expected: FAIL because fixture modules do not exist.
 
-- [ ] **Step 3: Implement the three original fixtures**
+- [x] **Step 3: Implement the three original fixtures**
 
 Create each fixture with deterministic UUIDs and timestamps. Each module exports one `SystemDocumentV1` and one signed `SystemPackageV1`; `d20.ts` also exports `d20Export`.
 
@@ -599,13 +599,13 @@ Use these exact capabilities and IDs:
 
 Construct compiled ASTs by hand to match each source. Dependencies are lexicographically ordered and deduplicated. Use `signSystemPackage` after constructing each unsigned package. Do not add copied setting, class, move, item, or flavor text.
 
-- [ ] **Step 4: Run fixture tests to verify they pass**
+- [x] **Step 4: Run fixture tests to verify they pass**
 
 Run: `npm test -- src/systems/implementation/package/fixtures/fixtures.test.ts`
 
 Expected: PASS with four cases.
 
-- [ ] **Step 5: Add deterministic contract generation**
+- [x] **Step 5: Add deterministic contract generation**
 
 Create `scripts/generate-system-contracts.ts` that imports the three root schemas and `d20Export`, creates `docs/contracts/examples`, and renders each JSON file as `JSON.stringify(value, null, 2) + "\n"`. Resolve paths from `process.cwd()` and define only these four generated files:
 
@@ -627,7 +627,7 @@ When invoked without flags, write the outputs. When invoked with `--check`, read
 
 Run `npm run contracts:generate` and inspect all four files for deterministic trailing-newline output.
 
-- [ ] **Step 6: Write grammar and capability documentation**
+- [x] **Step 6: Write grammar and capability documentation**
 
 Create `docs/contracts/grammar-v0.1.md` with this content, expanding the limits table with the remaining collection ceilings from `PACKAGE_LIMITS`:
 
@@ -713,7 +713,7 @@ Create `docs/contracts/capability-matrix-v0.1.md` with these two tables:
 | Automated roll consequences | Deferred |
 ```
 
-- [ ] **Step 7: Prove generated artifacts are stable**
+- [x] **Step 7: Prove generated artifacts are stable**
 
 Run: `npm run contracts:generate`
 
@@ -721,7 +721,7 @@ Run: `npm run contracts:check`
 
 Expected: exit 0 with no differing paths.
 
-- [ ] **Step 8: Run full verification**
+- [x] **Step 8: Run full verification**
 
 Run: `npm test`
 
@@ -735,7 +735,7 @@ Run: `npm run build`
 
 Expected: exit 0; scripts outside `src` are intentionally not emitted.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add package.json package-lock.json scripts/generate-system-contracts.ts src/systems/implementation/package/fixtures/ docs/contracts/
@@ -753,7 +753,7 @@ git commit -m "docs: publish system package v1 contracts"
 - Consumes: the complete package contract implementation.
 - Produces: evidence that the increment satisfies its acceptance demonstration without PostgreSQL.
 
-- [ ] **Step 1: Run focused acceptance tests**
+- [x] **Step 1: Run focused acceptance tests**
 
 Run:
 
@@ -763,7 +763,7 @@ npm test -- src/systems/implementation/package/
 
 Expected: every package contract test passes. Confirm output includes document variants, compiled AST variants, bounded invalid inputs, duplicate/missing references, canonical checksums, tamper rejection, and all three fixtures.
 
-- [ ] **Step 2: Regenerate contracts and verify a clean diff**
+- [x] **Step 2: Regenerate contracts and verify a clean diff**
 
 Run: `npm run contracts:check`
 
@@ -771,7 +771,7 @@ Run: `git status --short`
 
 Expected: check exits 0 and the worktree has no generated contract changes. Any difference is a generation-stability defect and must be fixed before continuing.
 
-- [ ] **Step 3: Run repository verification**
+- [x] **Step 3: Run repository verification**
 
 Run: `npm test`
 
@@ -789,7 +789,7 @@ Run: `npm run build`
 
 Expected: exit 0.
 
-- [ ] **Step 4: Inspect scope and security invariants**
+- [x] **Step 4: Inspect scope and security invariants**
 
 Run: `git diff 3842392..HEAD -- src/systems/authoring.ts src/systems/runtime.ts src/transport src/bootstrap`
 
@@ -799,8 +799,27 @@ Run: `rg -n "ownerId|actorId|email|token|audit" docs/contracts/examples src/syst
 
 Expected: no matches.
 
-- [ ] **Step 5: Record the final checkpoint**
+- [x] **Step 5: Record the final checkpoint**
 
 Run: `git status --short`
 
 Expected: clean worktree. No additional commit is needed when verification makes no changes. If a defect was fixed, rerun Steps 1-4 and commit only that fix with a focused `fix:` message.
+
+## Completion reconciliation (2026-09-04)
+
+Implementation in `main` satisfies every step above. Breaking-change comparison and the two missing reference fixtures are added by the I1 closure plan (`docs/superpowers/plans/2026-09-04-i1-closure.md`); commit SHAs will be appended by that plan's execution. Relevant prior commits:
+91ed4c7 feat: define editable system document contract
+5f71149 fix: tighten editable document schema
+313dabc feat: define compiled system package contracts
+1100fa5 feat: decode bounded system package contracts
+b56ae06 fix: harden system package decoding
+da6cd5d fix: preserve schema errors during AST preflight
+4c549d4 fix: breadth-first AST preflight validation
+daa60f6 feat: add canonical system package integrity
+675ea13 docs: publish system package v1 contracts
+e9cf32b fix: align fixture dependencies and grammar doc with v0.1 schema
+1ced72d fix: record cost equal to AST node count in fixtures
+1841d7b chore: regenerate contracts after spec reconciliation
+554b262 feat: add breaking-change comparison for system packages
+db4f520 feat: gate publish on package breaking-change comparison
+c3db396 test: assess PbtA 2d6 and d6 success pool; ship their JSON exports

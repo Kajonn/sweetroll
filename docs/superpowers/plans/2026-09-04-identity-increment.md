@@ -38,7 +38,7 @@
 - Consumes: nothing (pure types).
 - Produces: `OidcClient`, `AuthCodeInput`, `VerifiedClaims`, `AppError`, and `createTestOidcClient(codes: Map<string, VerifiedClaims>): OidcClient`. Task 3 consumes these.
 
-- [ ] **Step 1: Write the failing test adapter test**
+- [x] **Step 1: Write the failing test adapter test**
 
 Create `src/identity/adapters/test.test.ts`:
 
@@ -75,13 +75,13 @@ describe("createTestOidcClient", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `npm test -- src/identity/adapters/test.test.ts`
 
 Expected: FAIL because `./test.js` does not resolve.
 
-- [ ] **Step 3: Implement the port types, errors, and test adapter**
+- [x] **Step 3: Implement the port types, errors, and test adapter**
 
 Create `src/identity/oidc.ts`:
 
@@ -140,13 +140,13 @@ export function createTestOidcClient(codes: Map<string, VerifiedClaims>): OidcCl
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `npm test -- src/identity/adapters/test.test.ts`
 
 Expected: PASS with 2 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/identity/oidc.ts src/identity/errors.ts src/identity/adapters/test.ts src/identity/adapters/test.test.ts
@@ -166,7 +166,7 @@ git commit -m "feat: add identity OIDC port and test adapter"
 - Consumes: a connected `pg.Pool`.
 - Produces: `IdentityRepository` with `upsertExternalIdentity`, `createSession`, `findSessionByTokenHash`, `revokeSessionByTokenHash`, and types `UserId`, `SessionId`, `UpsertExternalIdentityInput`, `UpsertResult`, `CreateSessionInput`, `SessionRecord`. Task 3 composes these.
 
-- [ ] **Step 1: Write the identity schema migration**
+- [x] **Step 1: Write the identity schema migration**
 
 Create `migrations/0001_create_identity.sql`:
 
@@ -202,7 +202,7 @@ CREATE TABLE sessions (
 CREATE INDEX sessions_user_id_idx ON sessions (user_id);
 ```
 
-- [ ] **Step 2: Write the failing repository tests**
+- [x] **Step 2: Write the failing repository tests**
 
 Create `tests/integration/identity-repository.test.ts`:
 
@@ -312,13 +312,13 @@ describeWithDatabase("IdentityRepository", () => {
 });
 ```
 
-- [ ] **Step 3: Run the integration tests to verify they fail**
+- [x] **Step 3: Run the integration tests to verify they fail**
 
 Run: `TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run test:integration -- identity-repository.test.ts`
 
 Expected: FAIL because `src/identity/repository.ts` does not exist.
 
-- [ ] **Step 4: Implement the repository**
+- [x] **Step 4: Implement the repository**
 
 Create `src/identity/repository.ts`:
 
@@ -455,19 +455,19 @@ async function upsertExternalIdentityImpl(
 
 Note: the unique `(provider, subject)` constraint plus the transaction guarantees a single local user per external identity; a concurrent duplicate insert would fail the constraint and roll back (acceptable for this scope).
 
-- [ ] **Step 5: Run the integration tests to verify they pass**
+- [x] **Step 5: Run the integration tests to verify they pass**
 
 Run: `TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run test:integration -- identity-repository.test.ts`
 
 Expected: PASS with 3 tests.
 
-- [ ] **Step 6: Run the real migration against the compose database**
+- [x] **Step 6: Run the real migration against the compose database**
 
 Run: `docker compose up -d --wait postgres` then `DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run migrate`
 
 Expected: `database migrations complete`; the three tables are created (verify with `psql \dt`).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add migrations/0001_create_identity.sql src/identity/repository.ts tests/integration/identity-repository.test.ts
@@ -487,7 +487,7 @@ git commit -m "feat: add identity persistence"
 - Consumes: `OidcClient`, `createTestOidcClient`, `IdentityRepository`, `createIdentityRepository`, real PostgreSQL `Pool`.
 - Produces: the `Identity` Interface (`completeSignIn`, `resolveSession`, `signOut`), `SessionHandle`, `AuthContext`, `Result<T>`, `AppError`, and `createIdentityModule(input): Identity`. Task 4 consumes these.
 
-- [ ] **Step 1: Write the failing contract tests**
+- [x] **Step 1: Write the failing contract tests**
 
 Create `tests/integration/identity-module.test.ts`:
 
@@ -646,13 +646,13 @@ describeWithDatabase("Identity module", () => {
 });
 ```
 
-- [ ] **Step 2: Run the contract tests to verify they fail**
+- [x] **Step 2: Run the contract tests to verify they fail**
 
 Run: `TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run test:integration -- identity-module.test.ts`
 
 Expected: FAIL because `src/identity/index.ts` does not export `createIdentityModule`.
 
-- [ ] **Step 3: Implement the Identity module facade and helpers**
+- [x] **Step 3: Implement the Identity module facade and helpers**
 
 Create `src/identity/util.ts`:
 
@@ -788,7 +788,7 @@ export function createIdentityModule(input: CreateIdentityModuleInput): Identity
 }
 ```
 
-- [ ] **Step 4: Run the contract tests to verify they pass**
+- [x] **Step 4: Run the contract tests to verify they pass**
 
 Run: `TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run test:integration -- identity-module.test.ts`
 
@@ -798,7 +798,7 @@ Run: `npm run typecheck && npm test`
 
 Expected: typecheck exit 0; unit suite green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/identity/index.ts src/identity/util.ts tests/integration/identity-module.test.ts
@@ -822,13 +822,13 @@ git commit -m "feat: add identity module facade"
 - Consumes: `Identity` (`resolveSession`), `AuthContext`, and config flags.
 - Produces: `buildAuthHook(input): FastifyPluginCallback` that sets `request.auth: AuthContext`, and config fields `SESSION_COOKIE_NAME`, `SESSION_TTL_DAYS`, `COOKIE_SECURE`.
 
-- [ ] **Step 1: Add the cookie-parsing dependency**
+- [x] **Step 1: Add the cookie-parsing dependency**
 
 Run: `npm install @fastify/cookie@11.0.0`
 
 Note: Fastify 5 does not parse cookies by default; `@fastify/cookie` is required to read the session cookie.
 
-- [ ] **Step 2: Extend configuration**
+- [x] **Step 2: Extend configuration**
 
 Modify `src/platform/config.ts` to add `sessionCookieName`, `sessionTtlDays`, `cookieSecure`. Add these fields to the `AppConfig` type:
 
@@ -863,11 +863,11 @@ And include in the returned object:
     cookieSecure,
 ```
 
-- [ ] **Step 3: Update the config tests**
+- [x] **Step 3: Update the config tests**
 
 Modify `src/platform/config.test.ts`: set `COOKIE_SECURE`, `SESSION_COOKIE_NAME`, `SESSION_TTL_DAYS` in the explicit case and assert the new fields; add an assertion that the defaults are `session`, `30`, `false`; add a validation case where `SESSION_TTL_DAYS=0` throws.
 
-- [ ] **Step 4: Write the failing auth-hook test**
+- [x] **Step 4: Write the failing auth-hook test**
 
 Create `src/transport/http/auth-hook.test.ts`:
 
@@ -949,13 +949,13 @@ describe("buildAuthHook", () => {
 });
 ```
 
-- [ ] **Step 5: Run the auth-hook test to verify it fails**
+- [x] **Step 5: Run the auth-hook test to verify it fails**
 
 Run: `npm test -- src/transport/http/auth-hook.test.ts`
 
 Expected: FAIL because `src/transport/http/auth-hook.ts` does not exist.
 
-- [ ] **Step 6: Implement the auth hook**
+- [x] **Step 6: Implement the auth hook**
 
 Create `src/transport/http/auth-hook.ts`:
 
@@ -1004,7 +1004,7 @@ export const buildAuthHook: (input: BuildAuthHookInput) => FastifyPluginCallback
   };
 ```
 
-- [ ] **Step 7: Wire the cookie parser and auth hook into the app**
+- [x] **Step 7: Wire the cookie parser and auth hook into the app**
 
 Modify `src/transport/http/app.ts`:
 
@@ -1037,7 +1037,7 @@ export function buildHttpApp(input: {
   void app.register(input.authHook);
 ```
 
-- [ ] **Step 8: Wire composition in the bootstrap**
+- [x] **Step 8: Wire composition in the bootstrap**
 
 Modify `src/bootstrap/http.ts`:
 
@@ -1090,21 +1090,30 @@ try {
 }
 ```
 
-- [ ] **Step 9: Run the HTTP tests, typecheck, and build**
+- [x] **Step 9: Run the HTTP tests, typecheck, and build**
 
 Run: `npm test -- src/transport/http/ && npm run typecheck && npm run build`
 
 Expected: auth-hook tests PASS; typecheck and build exit 0.
 
-- [ ] **Step 10: Run the full verification suite**
+- [x] **Step 10: Run the full verification suite**
 
 Run: `npm test && TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run test:integration && npm run typecheck && npm run build`
 
 Expected: all suites green; typecheck and build exit 0.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add src/transport/http/auth-hook.ts src/transport/http/auth-hook.test.ts src/transport/http/app.ts src/bootstrap/http.ts src/platform/config.ts src/platform/config.test.ts package.json package-lock.json
 git commit -m "feat: add HTTP authentication hook"
 ```
+
+## Completion reconciliation (2026-09-04)
+
+Implementation in `main` satisfies every step above. Relevant commits:
+0714c40 feat: add identity OIDC port and test adapter
+52b19b6 feat: add identity persistence
+b5e1d16 feat: add identity module facade
+1c9861a feat: add HTTP authentication hook, session cookie, and composition
+4fb84f3 fix: add AppError status field and expired-session test coverage

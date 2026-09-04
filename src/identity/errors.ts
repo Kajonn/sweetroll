@@ -3,6 +3,7 @@ export type AppErrorCode = "invalid_authorization_code" | "internal" | "session_
 export type AppError = {
   code: AppErrorCode;
   message: string;
+  status?: number;
 };
 
 export function createInvalidCodeError(): AppError {

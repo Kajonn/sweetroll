@@ -5,6 +5,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createTestOidcClient } from "../../src/identity/adapters/test.js";
 import { createIdentityModule } from "../../src/identity/index.js";
+import { createIdentityRepository } from "../../src/identity/repository.js";
+import { hashToken, newSessionToken } from "../../src/identity/util.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const describeWithDatabase = databaseUrl === undefined ? describe.skip : describe;
@@ -136,6 +138,26 @@ describeWithDatabase("Identity module", () => {
   it("returns anonymous for unknown, expired, and revoked tokens", async () => {
     const identity = module();
     expect(await identity.resolveSession("no-such-token")).toEqual({ state: "anonymous" });
+  });
+
+  it("returns anonymous for an expired session token", async () => {
+    const identity = module();
+    const result = await identity.completeSignIn({
+      code: "code-ada",
+      redirectUri: "http://localhost/cb",
+      previousToken: undefined,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error.message);
+
+    const repo = createIdentityRepository(pool);
+    const token = newSessionToken();
+    await repo.createSession({
+      userId: result.value.userId,
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() - 10_000),
+    });
+    expect(await identity.resolveSession(token)).toEqual({ state: "anonymous" });
   });
 
   it("rejects an invalid authorization code", async () => {

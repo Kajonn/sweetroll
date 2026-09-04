@@ -4,8 +4,10 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { buildHttpApp } from "./app.js";
 
+const noopAuthHook = async () => {};
+
 const pool = new Pool({ connectionString: "postgres://invalid:invalid@127.0.0.1:1/invalid" });
-const app = buildHttpApp({ logger: pino({ enabled: false }), pool });
+const app = buildHttpApp({ logger: pino({ enabled: false }), pool, authHook: noopAuthHook });
 
 afterAll(async () => {
   await app.close();
@@ -42,6 +44,7 @@ describe("HTTP platform endpoints", () => {
     const loggingApp = buildHttpApp({
       logger: pino({ base: null, timestamp: false }, { write: (line) => lines.push(line) }),
       pool: loggingPool,
+      authHook: noopAuthHook,
     });
 
     try {

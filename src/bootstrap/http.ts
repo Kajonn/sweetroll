@@ -1,10 +1,32 @@
 import { loadConfig, createLogger, createPool } from "../platform/index.js";
+import { createIdentityModule } from "../identity/index.js";
+import { createTestOidcClient } from "../identity/adapters/test.js";
 import { buildHttpApp } from "../transport/http/index.js";
+import { buildAuthHook } from "../transport/http/auth-hook.js";
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel);
 const pool = createPool(config.databaseUrl);
-const app = buildHttpApp({ logger, pool });
+
+// The production OIDC adapter is deferred; the deterministic test adapter
+// with no codes satisfies the port for now (authenticates no one via OIDC,
+// but session resolve/sign-out over HTTP are fully functional).
+const identity = createIdentityModule({
+  oidc: createTestOidcClient(new Map()),
+  pool,
+  sessionTtlMs: config.sessionTtlDays * 86_400_000,
+});
+
+const app = buildHttpApp({
+  logger,
+  pool,
+  authHook: buildAuthHook({
+    identity,
+    cookieName: config.sessionCookieName,
+    secure: config.cookieSecure,
+    maxAgeSeconds: config.sessionTtlDays * 86_400,
+  }),
+});
 
 const shutdown = async (signal: string) => {
   logger.info({ signal }, "shutting down HTTP process");

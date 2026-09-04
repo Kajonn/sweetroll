@@ -1,12 +1,18 @@
 import { randomUUID } from "node:crypto";
 
-import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from "fastify";
+import cookie from "@fastify/cookie";
+import Fastify, {
+  type FastifyBaseLogger,
+  type FastifyInstance,
+  type FastifyPluginCallback,
+  LogController,
+} from "fastify";
 import type { Pool } from "pg";
 import type { Logger } from "pino";
 
 import { createHttpMetrics } from "../../platform/metrics.js";
 
-export function buildHttpApp(input: { logger: Logger; pool: Pool }): FastifyInstance {
+export function buildHttpApp(input: { logger: Logger; pool: Pool; authHook: FastifyPluginCallback }): FastifyInstance {
   const logger: FastifyBaseLogger = input.logger;
   const app = Fastify({
     genReqId: () => randomUUID(),
@@ -15,6 +21,8 @@ export function buildHttpApp(input: { logger: Logger; pool: Pool }): FastifyInst
   });
   const metrics = createHttpMetrics();
   const startedAt = new WeakMap<object, bigint>();
+
+  void app.register(cookie);
 
   app.addHook("onRequest", async (request) => {
     startedAt.set(request, process.hrtime.bigint());
@@ -71,6 +79,8 @@ export function buildHttpApp(input: { logger: Logger; pool: Pool }): FastifyInst
     reply.type(metrics.registry.contentType);
     return metrics.registry.metrics();
   });
+
+  void app.register(input.authHook);
 
   return app;
 }

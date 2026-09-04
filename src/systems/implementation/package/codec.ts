@@ -2,10 +2,12 @@ import { Buffer } from "node:buffer";
 
 import { Ajv, type ValidateFunction } from "ajv";
 
+import { calculatePackageChecksum } from "./canonical.js";
 import {
   diagnosticsFromAjv,
   sortDiagnostics,
   type DecodeResult,
+  type PackageDiagnostic,
 } from "./diagnostics.js";
 import {
   SystemDocumentV1Schema,
@@ -38,6 +40,7 @@ export function decodeSystemPackage(input: unknown): DecodeResult<SystemPackageV
     validatePackage,
     validatePackageStructure,
     preflightPackageAstLimits,
+    (value) => verifyPackageChecksum(value),
   ));
 }
 
@@ -47,6 +50,7 @@ export function decodeSystemExport(input: unknown): DecodeResult<SystemExportV1>
     validateExport,
     (value) => validatePackageStructure(value.package, "/package"),
     preflightExportAstLimits,
+    (value) => verifyPackageChecksum(value.package, "/package"),
   ));
 }
 
@@ -55,6 +59,7 @@ function decode<T>(
   validator: ValidateFunction<T>,
   structuralCheck: (value: T) => ReturnType<typeof validateDocumentStructure>,
   preflight?: (value: unknown) => ReturnType<typeof validateDocumentStructure>,
+  postValidate?: (value: T) => ReturnType<typeof verifyPackageChecksum>,
 ): DecodeResult<T> {
   const parsed = parseInput(input);
   if (!parsed.ok) return parsed;
@@ -68,7 +73,19 @@ function decode<T>(
   }
   const diagnostics = sortDiagnostics(structuralCheck(parsed.value));
   if (diagnostics.length > 0) return { ok: false, diagnostics };
+  const postDiagnostics = sortDiagnostics(postValidate?.(parsed.value as T) ?? []);
+  if (postDiagnostics.length > 0) return { ok: false, diagnostics: postDiagnostics };
   return { ok: true, value: structuredClone(parsed.value) };
+}
+
+function verifyPackageChecksum(value: SystemPackageV1, prefix = ""): PackageDiagnostic[] {
+  const expected = calculatePackageChecksum(value);
+  if (value.integrity.checksum === expected) return [];
+  return [{
+    code: "checksum_mismatch",
+    path: `${prefix}/integrity/checksum`,
+    message: "Package checksum does not match.",
+  }];
 }
 
 function noThrow<T>(operation: () => DecodeResult<T>): DecodeResult<T> {

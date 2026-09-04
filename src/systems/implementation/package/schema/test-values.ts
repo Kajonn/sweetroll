@@ -1,3 +1,4 @@
+import { signSystemPackage } from "../canonical.js";
 import { PACKAGE_LIMITS } from "../limits.js";
 import type { SystemDocumentV1 } from "./document.js";
 import type { CompiledExpressionV1 } from "./expression.js";
@@ -319,6 +320,10 @@ export function validUnsignedPackage(): UnsignedSystemPackageV1 {
       sidesPerDie: PACKAGE_LIMITS.sidesPerDie,
     },
   };
+}
+
+export function validSignedPackage(): SystemPackageV1 {
+  return signSystemPackage(validUnsignedPackage());
 }
 
 export function validSignedShapePackage(): SystemPackageV1 {

@@ -1,3 +1,4 @@
+export { signSystemPackage } from "./canonical.js";
 export {
   decodeSystemDocument,
   decodeSystemExport,

@@ -568,4 +568,102 @@ describeWithDatabase("SystemAuthoring", () => {
       lifecycle: "deprecated",
     });
   });
+
+  it("publishes a first version without a compatibility check", async () => {
+    const owner = await createUser("Grace");
+    const created = await authoring.createDraft(ctx(owner), {
+      source: { kind: "blank", name: "Compat First" },
+      idempotencyKey: randomUUID(),
+    });
+    if (!created.ok) throw new Error("unexpected");
+    await authoring.saveDraft(ctx(owner), { systemId: created.value.system.systemId, expectedRevision: 1, document: d20Document });
+    const published = await authoring.publish(ctx(owner), {
+      systemId: created.value.system.systemId,
+      expectedRevision: 2,
+      semanticVersion: "1.0.0",
+      releaseNotes: "Initial",
+      idempotencyKey: randomUUID(),
+    });
+    expect(published.ok).toBe(true);
+  });
+
+  it("blocks publishing a second version that removes a required field", async () => {
+    const owner = await createUser("Hank");
+    const created = await authoring.createDraft(ctx(owner), {
+      source: { kind: "blank", name: "Compat Block" },
+      idempotencyKey: randomUUID(),
+    });
+    if (!created.ok) throw new Error("unexpected");
+    const systemId = created.value.system.systemId;
+    await authoring.saveDraft(ctx(owner), { systemId, expectedRevision: 1, document: d20Document });
+    const first = await authoring.publish(ctx(owner), {
+      systemId,
+      expectedRevision: 2,
+      semanticVersion: "1.0.0",
+      releaseNotes: "Initial",
+      idempotencyKey: randomUUID(),
+    });
+    if (!first.ok) throw new Error("unexpected");
+
+    const mutated = structuredClone(d20Document);
+    mutated.entities[0].fields = mutated.entities[0].fields.filter((f) => f.id !== "proficient");
+    await authoring.saveDraft(ctx(owner), { systemId, expectedRevision: 2, document: mutated });
+    const blocked = await authoring.publish(ctx(owner), {
+      systemId,
+      expectedRevision: 3,
+      semanticVersion: "1.1.0",
+      releaseNotes: "Removed proficient",
+      idempotencyKey: randomUUID(),
+    });
+    expect(blocked.ok).toBe(false);
+    if (blocked.ok) throw new Error("expected failure");
+    expect(blocked.error.code).toBe("invalid_package");
+    expect(blocked.error.diagnostics ?? []).toContainEqual(
+      expect.objectContaining({
+        code: "breaking_removed_definition",
+        path: "/entities/character/fields/proficient",
+      }),
+    );
+  });
+
+  it("permits a compatible additive change between versions", async () => {
+    const owner = await createUser("Iris");
+    const created = await authoring.createDraft(ctx(owner), {
+      source: { kind: "blank", name: "Compat Additive" },
+      idempotencyKey: randomUUID(),
+    });
+    if (!created.ok) throw new Error("unexpected");
+    const systemId = created.value.system.systemId;
+    await authoring.saveDraft(ctx(owner), { systemId, expectedRevision: 1, document: d20Document });
+    const first = await authoring.publish(ctx(owner), {
+      systemId,
+      expectedRevision: 2,
+      semanticVersion: "1.0.0",
+      releaseNotes: "Initial",
+      idempotencyKey: randomUUID(),
+    });
+    if (!first.ok) throw new Error("unexpected");
+
+    const mutated = structuredClone(d20Document);
+    mutated.entities[0].fields.push({
+      kind: "text",
+      id: "notes",
+      label: "Notes",
+      required: false,
+      default: "",
+      minLength: 0,
+      maxLength: 200,
+    });
+    await authoring.saveDraft(ctx(owner), { systemId, expectedRevision: 2, document: mutated });
+    const second = await authoring.publish(ctx(owner), {
+      systemId,
+      expectedRevision: 3,
+      semanticVersion: "1.1.0",
+      releaseNotes: "Added notes",
+      idempotencyKey: randomUUID(),
+    });
+    expect(second.ok).toBe(true);
+    if (!second.ok) throw new Error("expected success");
+    expect(second.value.semanticVersion).toBe("1.1.0");
+  });
 });

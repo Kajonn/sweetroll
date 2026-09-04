@@ -25,6 +25,7 @@ import type {
   VersionRecord,
 } from "./implementation/persistence/index.js";
 import { compileDocument } from "./implementation/rules/compile-document.js";
+import { comparePackages } from "./implementation/package/compatibility.js";
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: AppError };
 
@@ -465,6 +466,18 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           semanticVersion: input.semanticVersion,
         });
         if (!compiled.ok) return { ok: false, error: errors.invalid_package(compiled.diagnostics) };
+
+        const previousVersions = await repo.listVersions(input.systemId);
+        const latest = previousVersions[0] ?? null;
+        if (latest !== null) {
+          const compatibility = comparePackages(latest.package as SystemPackageV1, compiled.value);
+          if (!compatibility.compatible) {
+            return {
+              ok: false,
+              error: errors.invalid_package(compatibility.findings as unknown as PackageDiagnostic[]),
+            };
+          }
+        }
 
         const result = await repo.publishVersion({
           systemId: input.systemId,

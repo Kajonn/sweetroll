@@ -55,6 +55,33 @@ describe("system package codecs", () => {
     });
   });
 
+  it("returns invalid results instead of throwing for hostile caller-controlled inputs", () => {
+    const byteProxy = new Proxy(new Uint8Array(0), {});
+    const hostileObject = Object.defineProperty({}, "schemaVersion", {
+      enumerable: true,
+      get() {
+        throw new Error("hostile getter");
+      },
+    });
+    const expected = {
+      ok: false,
+      diagnostics: [
+        {
+          code: "invalid_schema",
+          path: "",
+          message: "Input does not match the required schema.",
+        },
+      ],
+    };
+
+    for (const decode of [decodeSystemDocument, decodeSystemPackage, decodeSystemExport]) {
+      expect(() => decode(byteProxy)).not.toThrow();
+      expect(decode(byteProxy)).toEqual(expected);
+      expect(() => decode(hostileObject)).not.toThrow();
+      expect(decode(hostileObject)).toEqual(expected);
+    }
+  });
+
   it("maps unknown properties and malformed IDs to exact JSON Pointers", () => {
     const unknown = { ...validDocument(), "extra/property~": true };
     const malformed = validDocument();
@@ -224,6 +251,38 @@ describe("system package codecs", () => {
     expect(decodeSystemPackage(depthPackage)).toEqual({
       ok: false,
       diagnostics: [{ code: "limit_exceeded", path: "/expressions/0/ast", message: "Expression AST exceeds depth 32." }],
+    });
+  });
+
+  it("preflights deeply nested package and export ASTs before recursive schema validation", () => {
+    const packageValue = validSignedShapePackage();
+    packageValue.expressions[0]!.ast = unaryChain(1_000);
+    const exportValue = {
+      schemaVersion: "1.0",
+      mediaType: "application/vnd.sweetroll.system+json;version=1",
+      exportedAt: "2026-09-04T12:00:00Z",
+      package: packageValue,
+    };
+
+    expect(decodeSystemPackage(packageValue)).toEqual({
+      ok: false,
+      diagnostics: [
+        {
+          code: "limit_exceeded",
+          path: "/expressions/0/ast",
+          message: "Expression AST exceeds depth 32.",
+        },
+      ],
+    });
+    expect(decodeSystemExport(exportValue)).toEqual({
+      ok: false,
+      diagnostics: [
+        {
+          code: "limit_exceeded",
+          path: "/package/expressions/0/ast",
+          message: "Expression AST exceeds depth 32.",
+        },
+      ],
     });
   });
 

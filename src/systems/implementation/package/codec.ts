@@ -16,6 +16,8 @@ import {
   type SystemPackageV1,
 } from "./schema/index.js";
 import {
+  preflightExportAstLimits,
+  preflightPackageAstLimits,
   validateDocumentStructure,
   validatePackageStructure,
 } from "./structural.js";
@@ -27,32 +29,51 @@ const validatePackage = ajv.compile<SystemPackageV1>(SystemPackageV1Schema);
 const validateExport = ajv.compile<SystemExportV1>(SystemExportV1Schema);
 
 export function decodeSystemDocument(input: unknown): DecodeResult<SystemDocumentV1> {
-  return decode(input, validateDocument, validateDocumentStructure);
+  return noThrow(() => decode(input, validateDocument, validateDocumentStructure));
 }
 
 export function decodeSystemPackage(input: unknown): DecodeResult<SystemPackageV1> {
-  return decode(input, validatePackage, validatePackageStructure);
+  return noThrow(() => decode(
+    input,
+    validatePackage,
+    validatePackageStructure,
+    preflightPackageAstLimits,
+  ));
 }
 
 export function decodeSystemExport(input: unknown): DecodeResult<SystemExportV1> {
-  return decode(input, validateExport, (value) => validatePackageStructure(value.package, "/package"));
+  return noThrow(() => decode(
+    input,
+    validateExport,
+    (value) => validatePackageStructure(value.package, "/package"),
+    preflightExportAstLimits,
+  ));
 }
 
 function decode<T>(
   input: unknown,
   validator: ValidateFunction<T>,
   structuralCheck: (value: T) => ReturnType<typeof validateDocumentStructure>,
+  preflight?: (value: unknown) => ReturnType<typeof validateDocumentStructure>,
 ): DecodeResult<T> {
   const parsed = parseInput(input);
   if (!parsed.ok) return parsed;
 
+  const preflightDiagnostics = sortDiagnostics(preflight?.(parsed.value) ?? []);
+  if (preflightDiagnostics.length > 0) {
+    return { ok: false, diagnostics: preflightDiagnostics };
+  }
+  if (!validator(parsed.value)) {
+    return { ok: false, diagnostics: diagnosticsFromAjv(validator.errors) };
+  }
+  const diagnostics = sortDiagnostics(structuralCheck(parsed.value));
+  if (diagnostics.length > 0) return { ok: false, diagnostics };
+  return { ok: true, value: structuredClone(parsed.value) };
+}
+
+function noThrow<T>(operation: () => DecodeResult<T>): DecodeResult<T> {
   try {
-    if (!validator(parsed.value)) {
-      return { ok: false, diagnostics: diagnosticsFromAjv(validator.errors) };
-    }
-    const diagnostics = sortDiagnostics(structuralCheck(parsed.value));
-    if (diagnostics.length > 0) return { ok: false, diagnostics };
-    return { ok: true, value: structuredClone(parsed.value) };
+    return operation();
   } catch {
     return {
       ok: false,

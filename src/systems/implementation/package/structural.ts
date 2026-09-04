@@ -21,6 +21,40 @@ export function validatePackageStructure(
   return validateStructure(value, prefix);
 }
 
+export function preflightPackageAstLimits(
+  value: unknown,
+  prefix = "",
+): PackageDiagnostic[] {
+  try {
+    if (!isObject(value) || !Array.isArray(value.expressions)) return [];
+    const diagnostics: PackageDiagnostic[] = [];
+    value.expressions.forEach((expression, expressionIndex) => {
+      if (!isObject(expression) || !isObject(expression.ast)) return;
+      const exceeded = preflightAst(expression.ast);
+      if (exceeded === null) return;
+      diagnostics.push({
+        code: "limit_exceeded",
+        path: `${prefix}/expressions/${expressionIndex}/ast`,
+        message: exceeded === "nodes"
+          ? `Expression AST exceeds ${PACKAGE_LIMITS.expressionAstNodes} nodes.`
+          : `Expression AST exceeds depth ${PACKAGE_LIMITS.expressionAstDepth}.`,
+      });
+    });
+    return diagnostics;
+  } catch {
+    return [];
+  }
+}
+
+export function preflightExportAstLimits(value: unknown): PackageDiagnostic[] {
+  try {
+    if (!isObject(value)) return [];
+    return preflightPackageAstLimits(value.package, "/package");
+  } catch {
+    return [];
+  }
+}
+
 function validateStructure(value: StructuralValue, prefix: string): PackageDiagnostic[] {
   const budgetDiagnostics = validateBudgets(value, prefix);
   if (budgetDiagnostics.length > 0) return budgetDiagnostics;
@@ -286,4 +320,48 @@ function measureAst(root: ExpressionAstV1): { depth: number; nodes: number } {
     }
   }
   return { depth, nodes };
+}
+
+function preflightAst(root: Record<string, unknown>): "depth" | "nodes" | null {
+  const pending: { node: unknown; depth: number }[] = [{ node: root, depth: 1 }];
+  let nodes = 0;
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    if (current.depth > PACKAGE_LIMITS.expressionAstDepth) return "depth";
+    nodes += 1;
+    if (nodes > PACKAGE_LIMITS.expressionAstNodes) return "nodes";
+    if (!isObject(current.node)) continue;
+
+    const childDepth = current.depth + 1;
+    switch (current.node.kind) {
+      case "unary":
+        pending.push({ node: current.node.operand, depth: childDepth });
+        break;
+      case "binary":
+        pending.push(
+          { node: current.node.right, depth: childDepth },
+          { node: current.node.left, depth: childDepth },
+        );
+        break;
+      case "call":
+        if (Array.isArray(current.node.arguments)) {
+          for (const argument of current.node.arguments) {
+            pending.push({ node: argument, depth: childDepth });
+          }
+        }
+        break;
+      case "dice":
+        pending.push({ node: current.node.count, depth: childDepth });
+        break;
+      case "keep":
+      case "successCount":
+        pending.push({ node: current.node.dice, depth: childDepth });
+        break;
+    }
+  }
+  return null;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

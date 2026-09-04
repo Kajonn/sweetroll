@@ -11,7 +11,7 @@ export type PackageDiagnosticCode =
   | "missing_reference";
 
 export type PackageDiagnostic = {
-  code: PackageDiagnosticCode;
+  code: string;
   path: string;
   message: string;
 };

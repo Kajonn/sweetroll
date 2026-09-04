@@ -309,7 +309,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
       resultType: "number",
       inferredType: "number",
       fallback: 0,
-      dependencies: ["attribute", "bonus_dice", "skill"],
+      dependencies: ["attribute", "skill", "bonus_dice"],
       cost: 7,
       ast: {
         kind: "successCount",

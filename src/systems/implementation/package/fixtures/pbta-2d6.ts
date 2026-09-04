@@ -275,7 +275,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
       resultType: "number",
       inferredType: "number",
       fallback: 0,
-      dependencies: ["forward", "move_stat"],
+      dependencies: ["move_stat", "forward"],
       cost: 6,
       ast: {
         kind: "binary",

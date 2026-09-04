@@ -167,13 +167,15 @@ A sheet is a **single-column linear scroll** (predictable collapse to one column
 
 Expressions are **math plus basic dice** only, parsed into a lightweight typed AST and evaluated by the platform with hard budgets:
 
-- Arithmetic and comparison: `+ - * /`, `min`, `max`, `round`; division-by-zero fallback
+- Arithmetic, comparison, and boolean composition: `+ - * /`, `== != < <= > >=`, `&& ||`, `min`, `max`, and `round`; division-by-zero fallback
 - Field access: stable identifiers of sibling fields and current action inputs only
-- Dice: standard notation (`2d6`, `d20 + 2`), keep/drop (`4d6k3`), advantage-style helpers; server-side deterministic dice
+- Dice: standard notation (`2d6`, `d20 + 2`), keep-high/low (`4d6kh3`), advantage-style helpers, field-derived pools, and counted successes at a threshold; server-side deterministic dice
 - **No** chained derived-field dependency graphs
 - **No** lookup/aggregation over collections (`equipped.armor.bonus` is out)
 - **No** effect engine (set/increment/append) — resource changes are simple built-in "bump" actions
 - **No** `against target.defense` action chains
+
+Grammar v0.1 is fixed by `docs/superpowers/specs/2026-09-04-system-package-contract-design.md`. It excludes rerolls, exploding dice, push mechanics, custom faces, arbitrary property traversal, and executable extension points. The platform ceilings are 1,024 expression bytes, 256 AST nodes, depth 32, 100 dice per roll, and 1,000 sides per die.
 
 **Rolls** are a button press → server evaluates → result shows normalized expression, individual dice, modifiers, total, and audience. Rolls are factual; the platform does **not** auto-apply outcomes to state.
 
@@ -201,6 +203,8 @@ The MVP ships pre-built **starter templates from open-licensed systems** so a GM
 - A **Blank / from-scratch** template
 
 Templates are exported declarative packages that users can clone and customize with the minimal creator. They double as the platform's acceptance fixtures (see Testing).
+
+I1 contract validation uses three original, license-neutral reference fixtures: a d20 ability/check family, a 2d6 PbtA-style move family, and a d6 counted-success pool family. These fixtures define the capability ceiling without being represented as reviewed launch templates. Shipping any named open-license template still requires the separate license review.
 
 ## 6.7 Version upgrades and migration
 
@@ -719,7 +723,7 @@ The first GM app is a responsive web surface within the shared PWA. Native packa
 | OD-01  | Sharing model  | Systems discoverable, link-only, invitation-only, or all three at launch?         | Link-only plus private is the recommended MVP.                    |
 | OD-02  | GM visibility  | Do campaign GMs always see full character state?                                  | Disclosed campaign policy; default yes.                           |
 | OD-03  | Collaboration  | Can several creators edit one system draft concurrently?                          | Named collaborators; serialize draft edits in MVP.                |
-| OD-04  | Rules ceiling  | Which dice syntaxes and actions define the math-only grammar for target systems?  | Choose from the three reference systems before finalizing grammar.|
+| OD-04  | Rules ceiling (resolved) | Grammar v0.1 covers d20, 2d6, keep-high/low, advantage helpers, and threshold-counted dynamic d6 pools. | Defer reroll, explode, push, custom faces, lookups, and effects. |
 | OD-05  | Authentication | Passwordless email, social sign-in, or both?                                      | OIDC social plus email magic link.                                |
 | OD-06  | Business model | Free, subscription, paid storage, or marketplace?                                 | Do not couple MVP data ownership to an unvalidated payment model. |
 | OD-07  | Public content | What moderation/takedown is required before public discovery?                     | Keep discovery out of MVP unless staffing and process exist.      |
@@ -729,8 +733,8 @@ The first GM app is a responsive web surface within the shared PWA. Native packa
 
 ## 18.2 Immediate next actions
 
-1. Select three representative TTRPG systems and write the I1 capability matrix for every required field, rule, roll, action, and linear-sheet element.
-2. Resolve OD-04 and specify the math-and-dice grammar v0.1 before implementing the I1 parser and package schema.
+1. The I1 capability matrix selects license-neutral d20, 2d6 PbtA-style, and d6 counted-success families; its detailed matrix is in the system-package contract design.
+2. OD-04 is resolved by grammar v0.1 in the system-package contract design; implement that grammar after the package structural contracts.
 3. Resolve OD-05 and establish the identity, repository, database, CI/CD, OpenAPI, and observability foundations inside I1.
 4. Run license review on candidate templates before any package is described as a shipped open-license template.
 5. Build and acceptance-test I1 before starting the System Builder; treat its package and evaluation contracts as versioned interfaces.

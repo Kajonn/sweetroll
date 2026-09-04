@@ -166,6 +166,7 @@
     "expressions": [
       {
         "id": "defense_expr",
+        "context": "computed",
         "resultType": "number",
         "inferredType": "number",
         "fallback": 10,
@@ -189,12 +190,13 @@
       },
       {
         "id": "check_expr",
+        "context": "roll",
         "resultType": "number",
         "inferredType": "number",
         "fallback": 0,
         "dependencies": [
-          "bonus",
-          "modifier"
+          "modifier",
+          "bonus"
         ],
         "cost": 6,
         "ast": {
@@ -226,6 +228,7 @@
       },
       {
         "id": "ability_valid_expr",
+        "context": "validation",
         "resultType": "boolean",
         "inferredType": "boolean",
         "fallback": false,
@@ -320,7 +323,7 @@
       "sidesPerDie": 1000
     },
     "integrity": {
-      "checksum": "sha256:69a1798cc9b4a56767a5f0c7217f72828ca530858b54e20ea4b04a519e8848b5"
+      "checksum": "sha256:b383db1493dc405f506595d546628b8e22b2457cfa0a240871e14e09832a4102"
     }
   }
 }

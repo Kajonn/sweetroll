@@ -771,6 +771,7 @@
             "type": "object",
             "required": [
               "id",
+              "context",
               "resultType",
               "inferredType",
               "fallback",
@@ -782,6 +783,22 @@
               "id": {
                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                 "type": "string"
+              },
+              "context": {
+                "anyOf": [
+                  {
+                    "const": "computed",
+                    "type": "string"
+                  },
+                  {
+                    "const": "roll",
+                    "type": "string"
+                  },
+                  {
+                    "const": "validation",
+                    "type": "string"
+                  }
+                ]
               },
               "resultType": {
                 "anyOf": [

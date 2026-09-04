@@ -14,7 +14,9 @@
     "start:migrate": "node dist/bootstrap/migrate.js",
     "test": "vitest run --exclude \"tests/integration/**\"",
     "test:integration": "vitest run tests/integration",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "contracts:generate": "tsx scripts/generate-system-contracts.ts",
+    "contracts:check": "tsx scripts/generate-system-contracts.ts --check"
   },
   "dependencies": {
     "@fastify/cookie": "11.0.0",

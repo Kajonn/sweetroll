@@ -1,0 +1,407 @@
+import { signSystemPackage } from "../canonical.js";
+import { PACKAGE_LIMITS } from "../limits.js";
+import type { SystemDocumentV1 } from "../schema/document.js";
+import type { SystemPackageV1, UnsignedSystemPackageV1 } from "../schema/package.js";
+
+export const d6SuccessPoolDocument: SystemDocumentV1 = {
+  schemaVersion: "1.0",
+  metadata: {
+    name: "D6 Success Pool",
+    description: "Dice pool system counting successes on d6",
+    language: "en",
+    defaultDice: "d6",
+  },
+  entities: [
+    {
+      id: "character",
+      label: "Character",
+      fields: [
+        {
+          kind: "integer",
+          id: "attribute",
+          label: "Attribute",
+          default: 1,
+          required: true,
+          min: 0,
+          max: 5,
+          step: 1,
+        },
+        {
+          kind: "integer",
+          id: "skill",
+          label: "Skill",
+          default: 1,
+          required: true,
+          min: 0,
+          max: 5,
+          step: 1,
+        },
+        {
+          kind: "singleChoice",
+          id: "specialty",
+          label: "Specialty",
+          required: false,
+          default: null,
+          options: [
+            { id: "combatant", label: "Combatant" },
+            { id: "influencer", label: "Influencer" },
+            { id: "technician", label: "Technician" },
+          ],
+        },
+        {
+          kind: "singleChoice",
+          id: "condition",
+          label: "Condition",
+          required: false,
+          default: null,
+          options: [
+            { id: "focused", label: "Focused" },
+            { id: "impaired", label: "Impaired" },
+            { id: "fine", label: "Fine" },
+          ],
+        },
+        {
+          kind: "resource",
+          id: "stress",
+          label: "Stress",
+          default: { current: 0, max: 10 },
+          min: 0,
+          max: 10,
+          step: 1,
+          resetTo: "min",
+        },
+        {
+          kind: "computed",
+          id: "pool_size",
+          label: "Pool Size",
+          valueType: "number",
+          expressionId: "pool_size_expr",
+        },
+      ],
+    },
+  ],
+  referenceData: [],
+  sheets: [
+    {
+      id: "character_sheet",
+      label: "Character",
+      targetEntityId: "character",
+      sections: [
+        {
+          id: "core",
+          label: "Core",
+          elements: [
+            { kind: "heading", id: "core_heading", text: "Core", level: 2 },
+            { kind: "field", id: "attribute_element", fieldId: "attribute" },
+            { kind: "field", id: "skill_element", fieldId: "skill" },
+            { kind: "field", id: "specialty_element", fieldId: "specialty" },
+            { kind: "field", id: "condition_element", fieldId: "condition" },
+          ],
+        },
+        {
+          id: "pool",
+          label: "Pool",
+          elements: [
+            { kind: "heading", id: "pool_heading", text: "Dice Pool", level: 2 },
+            { kind: "field", id: "pool_size_element", fieldId: "pool_size" },
+            { kind: "resource", id: "stress_element", resourceId: "stress" },
+            { kind: "action", id: "test_pool_element", actionId: "test_pool" },
+          ],
+        },
+      ],
+    },
+  ],
+  expressions: [
+    {
+      id: "pool_size_expr",
+      context: "computed",
+      resultType: "number",
+      source: "fields.attribute + fields.skill",
+      fallback: 0,
+    },
+    {
+      id: "pool_roll_expr",
+      context: "roll",
+      resultType: "number",
+      source:
+        "countSuccesses(dice(fields.attribute + fields.skill + inputs.bonus_dice, 6), 6)",
+      fallback: 0,
+    },
+    {
+      id: "pool_valid_expr",
+      context: "validation",
+      resultType: "boolean",
+      source: "fields.pool_size >= 1 && fields.pool_size <= 10",
+      fallback: false,
+    },
+  ],
+  actions: [
+    {
+      kind: "roll",
+      id: "test_pool",
+      label: "Test Pool",
+      expressionId: "pool_roll_expr",
+      inputs: [
+        {
+          id: "bonus_dice",
+          label: "Bonus Dice",
+          valueType: "integer",
+          required: false,
+          default: 0,
+        },
+      ],
+      outputTemplate: "Successes: {total}",
+    },
+    {
+      kind: "resourceBump",
+      id: "mark_stress",
+      label: "Mark Stress",
+      resourceId: "stress",
+      operation: { kind: "delta", amount: 1 },
+    },
+    {
+      kind: "resourceBump",
+      id: "clear_stress",
+      label: "Clear Stress",
+      resourceId: "stress",
+      operation: { kind: "reset" },
+    },
+  ],
+  validations: [
+    {
+      id: "pool_valid",
+      expressionId: "pool_valid_expr",
+      severity: "error",
+      message: "Pool size must be between 1 and 10",
+      targetId: "pool_size",
+    },
+  ],
+};
+
+const unsignedPackage: UnsignedSystemPackageV1 = {
+  schemaVersion: "1.0",
+  systemId: "c0000000-0000-5000-8000-000000000001",
+  versionId: "c0000000-0000-5000-8000-000000000002",
+  semanticVersion: "1.0.0",
+  name: "D6 Success Pool",
+  description: "Dice pool system counting successes on d6",
+  language: "en",
+  defaultDice: "d6",
+  entities: [
+    {
+      id: "character",
+      label: "Character",
+      fields: [
+        {
+          kind: "integer",
+          id: "attribute",
+          label: "Attribute",
+          default: 1,
+          required: true,
+          min: 0,
+          max: 5,
+          step: 1,
+        },
+        {
+          kind: "integer",
+          id: "skill",
+          label: "Skill",
+          default: 1,
+          required: true,
+          min: 0,
+          max: 5,
+          step: 1,
+        },
+        {
+          kind: "singleChoice",
+          id: "specialty",
+          label: "Specialty",
+          required: false,
+          default: null,
+          options: [
+            { id: "combatant", label: "Combatant" },
+            { id: "influencer", label: "Influencer" },
+            { id: "technician", label: "Technician" },
+          ],
+        },
+        {
+          kind: "singleChoice",
+          id: "condition",
+          label: "Condition",
+          required: false,
+          default: null,
+          options: [
+            { id: "focused", label: "Focused" },
+            { id: "impaired", label: "Impaired" },
+            { id: "fine", label: "Fine" },
+          ],
+        },
+        {
+          kind: "resource",
+          id: "stress",
+          label: "Stress",
+          default: { current: 0, max: 10 },
+          min: 0,
+          max: 10,
+          step: 1,
+          resetTo: "min",
+        },
+        {
+          kind: "computed",
+          id: "pool_size",
+          label: "Pool Size",
+          valueType: "number",
+          expressionId: "pool_size_expr",
+        },
+      ],
+    },
+  ],
+  referenceData: [],
+  sheets: [
+    {
+      id: "character_sheet",
+      label: "Character",
+      targetEntityId: "character",
+      sections: [
+        {
+          id: "core",
+          label: "Core",
+          elements: [
+            { kind: "heading", id: "core_heading", text: "Core", level: 2 },
+            { kind: "field", id: "attribute_element", fieldId: "attribute" },
+            { kind: "field", id: "skill_element", fieldId: "skill" },
+            { kind: "field", id: "specialty_element", fieldId: "specialty" },
+            { kind: "field", id: "condition_element", fieldId: "condition" },
+          ],
+        },
+        {
+          id: "pool",
+          label: "Pool",
+          elements: [
+            { kind: "heading", id: "pool_heading", text: "Dice Pool", level: 2 },
+            { kind: "field", id: "pool_size_element", fieldId: "pool_size" },
+            { kind: "resource", id: "stress_element", resourceId: "stress" },
+            { kind: "action", id: "test_pool_element", actionId: "test_pool" },
+          ],
+        },
+      ],
+    },
+  ],
+  expressions: [
+    {
+      id: "pool_size_expr",
+      resultType: "number",
+      inferredType: "number",
+      fallback: 0,
+      dependencies: ["attribute", "skill"],
+      cost: 3,
+      ast: {
+        kind: "binary",
+        operator: "+",
+        left: { kind: "reference", scope: "fields", id: "attribute" },
+        right: { kind: "reference", scope: "fields", id: "skill" },
+      },
+    },
+    {
+      id: "pool_roll_expr",
+      resultType: "number",
+      inferredType: "number",
+      fallback: 0,
+      dependencies: ["attribute", "bonus_dice", "skill"],
+      cost: 7,
+      ast: {
+        kind: "successCount",
+        dice: {
+          kind: "dice",
+          count: {
+            kind: "binary",
+            operator: "+",
+            left: {
+              kind: "binary",
+              operator: "+",
+              left: { kind: "reference", scope: "fields", id: "attribute" },
+              right: { kind: "reference", scope: "fields", id: "skill" },
+            },
+            right: { kind: "reference", scope: "inputs", id: "bonus_dice" },
+          },
+          sides: 6,
+        },
+        threshold: 6,
+      },
+    },
+    {
+      id: "pool_valid_expr",
+      resultType: "boolean",
+      inferredType: "boolean",
+      fallback: false,
+      dependencies: ["pool_size"],
+      cost: 7,
+      ast: {
+        kind: "binary",
+        operator: "&&",
+        left: {
+          kind: "binary",
+          operator: ">=",
+          left: { kind: "reference", scope: "fields", id: "pool_size" },
+          right: { kind: "numberLiteral", value: 1 },
+        },
+        right: {
+          kind: "binary",
+          operator: "<=",
+          left: { kind: "reference", scope: "fields", id: "pool_size" },
+          right: { kind: "numberLiteral", value: 10 },
+        },
+      },
+    },
+  ],
+  actions: [
+    {
+      kind: "roll",
+      id: "test_pool",
+      label: "Test Pool",
+      expressionId: "pool_roll_expr",
+      inputs: [
+        {
+          id: "bonus_dice",
+          label: "Bonus Dice",
+          valueType: "integer",
+          required: false,
+          default: 0,
+        },
+      ],
+      outputTemplate: "Successes: {total}",
+    },
+    {
+      kind: "resourceBump",
+      id: "mark_stress",
+      label: "Mark Stress",
+      resourceId: "stress",
+      operation: { kind: "delta", amount: 1 },
+    },
+    {
+      kind: "resourceBump",
+      id: "clear_stress",
+      label: "Clear Stress",
+      resourceId: "stress",
+      operation: { kind: "reset" },
+    },
+  ],
+  validations: [
+    {
+      id: "pool_valid",
+      expressionId: "pool_valid_expr",
+      severity: "error",
+      message: "Pool size must be between 1 and 10",
+      targetId: "pool_size",
+    },
+  ],
+  effectiveLimits: {
+    expressionBytes: PACKAGE_LIMITS.expressionBytes,
+    expressionAstNodes: PACKAGE_LIMITS.expressionAstNodes,
+    expressionAstDepth: PACKAGE_LIMITS.expressionAstDepth,
+    dicePerRoll: PACKAGE_LIMITS.dicePerRoll,
+    sidesPerDie: PACKAGE_LIMITS.sidesPerDie,
+  },
+};
+
+export const d6SuccessPoolPackage: SystemPackageV1 = signSystemPackage(unsignedPackage);

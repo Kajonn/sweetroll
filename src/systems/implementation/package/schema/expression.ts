@@ -113,6 +113,11 @@ export type ExpressionAstV1 = Static<typeof ExpressionAstV1Schema>;
 export const CompiledExpressionV1Schema = Type.Object(
   {
     id: DefinitionIdSchema,
+    context: Type.Union([
+      Type.Literal("computed"),
+      Type.Literal("roll"),
+      Type.Literal("validation"),
+    ]),
     resultType: ValueTypeSchema,
     inferredType: ValueTypeSchema,
     fallback: ScalarValueSchema,

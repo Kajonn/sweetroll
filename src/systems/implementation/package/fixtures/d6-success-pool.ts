@@ -290,6 +290,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
   expressions: [
     {
       id: "pool_size_expr",
+      context: "computed",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
@@ -304,6 +305,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
     },
     {
       id: "pool_roll_expr",
+      context: "roll",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
@@ -331,6 +333,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
     },
     {
       id: "pool_valid_expr",
+      context: "validation",
       resultType: "boolean",
       inferredType: "boolean",
       fallback: false,

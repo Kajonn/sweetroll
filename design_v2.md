@@ -752,7 +752,7 @@ systemPackage:
   entities: [ { id, label, fields } ]
   referenceData: [ { typeId, records } ]
   sheets: [ { id, targetEntityType, sections, elements, bindings } ]
-  expressions: [ { id, resultType, ast, dependencies } ]
+  expressions: [ { id, context, resultType, ast, dependencies } ]
   actions: [ { id, inputs, rollNotation, output } ]
   validations: [ { id, condition, severity, messageKey, targetId } ]
   limits: { maxExpressionCost }

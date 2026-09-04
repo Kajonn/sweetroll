@@ -104,6 +104,8 @@ Actions are tagged as `roll` or `resourceBump`. Roll actions reference one numer
 - typed fallback; and
 - deterministic cost.
 
+Each compiled expression carries its `context` (`computed`, `roll`, or `validation`) so packages reconstruct faithfully for cloning, importing, and runtime evaluation.
+
 The AST supports literal, reference, unary, binary, function-call, dice, keep, and success-count nodes. Published packages contain no expression source that must be parsed during runtime resolution.
 
 The package also contains effective limits and integrity metadata. It is immutable once published.

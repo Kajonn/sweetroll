@@ -292,6 +292,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
   expressions: [
     {
       id: "defense_expr",
+      context: "computed",
       resultType: "number",
       inferredType: "number",
       fallback: 10,
@@ -306,6 +307,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
     },
     {
       id: "check_expr",
+      context: "roll",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
@@ -325,6 +327,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
     },
     {
       id: "ability_valid_expr",
+      context: "validation",
       resultType: "boolean",
       inferredType: "boolean",
       fallback: false,

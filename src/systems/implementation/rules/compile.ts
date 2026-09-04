@@ -46,6 +46,7 @@ export function compileAst(ast: ExpressionAstV1, opts: CompileExpressionOpts): C
   return {
     ok: true,
     value: {
+      context: opts.context,
       resultType: opts.resultType,
       inferredType: inferred.type,
       fallback: opts.fallback,

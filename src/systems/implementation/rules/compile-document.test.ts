@@ -45,4 +45,15 @@ describe("compileDocument", () => {
     if (r.ok) return;
     expect(r.diagnostics[0]!.code).toBe("missing_reference");
   });
+
+  it("preserves the expression context in compiled expressions", () => {
+    const result = compileDocument(d20Document, {
+      systemId: "00000000-0000-4000-8000-000000000000",
+      versionId: "00000000-0000-4000-8000-000000000001",
+      semanticVersion: "1.0.0",
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("compilation failed");
+    expect(result.value.expressions.map((e) => e.context)).toEqual(["computed", "roll", "validation"]);
+  });
 });

@@ -212,6 +212,7 @@ export function validDocument(): SystemDocumentV1 {
 const expressions: CompiledExpressionV1[] = [
   {
     id: "literal_expr",
+    context: "computed",
     resultType: "number",
     inferredType: "number",
     fallback: 0,
@@ -221,6 +222,7 @@ const expressions: CompiledExpressionV1[] = [
   },
   {
     id: "reference_expr",
+    context: "computed",
     resultType: "number",
     inferredType: "number",
     fallback: 0,
@@ -230,6 +232,7 @@ const expressions: CompiledExpressionV1[] = [
   },
   {
     id: "binary_expr",
+    context: "computed",
     resultType: "number",
     inferredType: "number",
     fallback: 0,
@@ -244,6 +247,7 @@ const expressions: CompiledExpressionV1[] = [
   },
   {
     id: "pool_expr",
+    context: "computed",
     resultType: "number",
     inferredType: "number",
     fallback: 0,

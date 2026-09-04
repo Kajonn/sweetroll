@@ -1,2 +1,11 @@
-// Houses the implementation named by this file's location in design_v2.md.
-export {};
+export {
+  decodeSystemDocument,
+  decodeSystemExport,
+  decodeSystemPackage,
+} from "./codec.js";
+export type { DecodeResult, PackageDiagnostic } from "./diagnostics.js";
+export type {
+  SystemDocumentV1,
+  SystemExportV1,
+  SystemPackageV1,
+} from "./schema/index.js";

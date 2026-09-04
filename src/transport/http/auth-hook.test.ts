@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import Fastify from "fastify";
+import cookie from "@fastify/cookie";
 import pino from "pino";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -18,6 +19,7 @@ const fakeIdentity = (resolve: (token: string) => Promise<AuthContext>): Identit
 
 async function build(identity: Identity) {
   const app = Fastify({ loggerInstance: pino({ enabled: false }) });
+  await app.register(cookie);
   await app.register(buildAuthHook({ identity, cookieName: "session", secure: true, maxAgeSeconds: 3600 }));
   app.get("/auth-test", async (request) => ({ auth: request.auth }));
   await app.ready();

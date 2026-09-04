@@ -19,9 +19,6 @@ export type BuildAuthHookInput = {
 export const buildAuthHook: (input: BuildAuthHookInput) => FastifyPluginCallback =
   ({ identity, cookieName, secure, maxAgeSeconds }) =>
   fp(async (app) => {
-    const cookie = (await import("@fastify/cookie")).default;
-    await app.register(cookie);
-
     app.addHook("preHandler", async (request, reply) => {
       const raw = request.cookies[cookieName];
       if (raw === undefined || raw.length === 0) {

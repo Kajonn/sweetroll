@@ -1,15 +1,14 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { RouterProvider } from "@tanstack/react-router";
 
-import { AppShell } from "./shell/AppShell.js";
+import { router } from "./router.js";
 import "./styles/global.css";
 
 const root = document.getElementById("root");
 if (root === null) throw new Error("Missing #root element");
 createRoot(root).render(
   <StrictMode>
-    <AppShell>
-      <div data-testid="placeholder">Library coming next</div>
-    </AppShell>
+    <RouterProvider router={router} />
   </StrictMode>,
 );

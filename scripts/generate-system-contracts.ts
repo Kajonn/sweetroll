@@ -8,6 +8,7 @@ import { SystemDocumentV1Schema } from "../src/systems/implementation/package/sc
 import { SystemExportV1Schema } from "../src/systems/implementation/package/schema/export.js";
 import { SystemPackageV1Schema } from "../src/systems/implementation/package/schema/package.js";
 import { d20Export } from "../src/systems/implementation/package/fixtures/d20.js";
+import { buildIdentityRoutes } from "../src/transport/http/identity.js";
 import { buildOpenApiDocument } from "../src/transport/http/openapi.js";
 import { buildSystemsRoutes } from "../src/transport/http/systems.js";
 import type { SystemAuthoring } from "../src/systems/authoring.js";
@@ -45,6 +46,7 @@ for (const [relativePath, value] of outputs) {
 
 async function emitOpenApi(): Promise<void> {
   const app = Fastify({ logger: false });
+  void app.register(buildIdentityRoutes());
   void app.register(buildSystemsRoutes({ authoring: {} as SystemAuthoring }));
   await app.ready();
   try {

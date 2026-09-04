@@ -5,7 +5,7 @@ import { createSystemAuthoringModule } from "../systems/authoring.js";
 import { createSystemPersistenceRepository } from "../systems/implementation/persistence/index.js";
 import { buildAuthHook } from "../transport/http/auth-hook.js";
 import { buildDevSignInRoutes } from "../transport/http/dev-signin.js";
-import { buildHttpApp, buildSystemsRoutes } from "../transport/http/index.js";
+import { buildHttpApp, buildIdentityRoutes, buildSystemsRoutes } from "../transport/http/index.js";
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel);
@@ -41,6 +41,7 @@ const app = buildHttpApp({
   }),
 });
 
+void app.register(buildIdentityRoutes());
 void app.register(buildSystemsRoutes({ authoring }));
 void app.register(
   buildDevSignInRoutes({

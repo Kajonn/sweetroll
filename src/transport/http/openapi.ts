@@ -1,6 +1,9 @@
 import type { FastifyInstance } from "fastify";
 
+import { identityRouteDefinitions, type IdentityRouteDefinition } from "./identity.js";
 import { systemsRouteDefinitions, type SystemsRouteDefinition } from "./systems.js";
+
+type RouteDefinition = SystemsRouteDefinition | IdentityRouteDefinition;
 
 export type OpenApiDocument = {
   openapi: "3.1.0";
@@ -62,7 +65,7 @@ function responseMapFromSchema(
   return out;
 }
 
-function definitionToOperation(definition: SystemsRouteDefinition): OpenApiOperation {
+function definitionToOperation(definition: RouteDefinition): OpenApiOperation {
   const schema = definition.schema as {
     body?: unknown;
     params?: Record<string, unknown>;
@@ -84,7 +87,8 @@ function definitionToOperation(definition: SystemsRouteDefinition): OpenApiOpera
 
 export function buildOpenApiDocument(_app: FastifyInstance): OpenApiDocument {
   const paths: Record<string, Record<string, OpenApiOperation>> = {};
-  for (const definition of systemsRouteDefinitions) {
+  const routeDefinitions: readonly RouteDefinition[] = [...systemsRouteDefinitions, ...identityRouteDefinitions];
+  for (const definition of routeDefinitions) {
     const path = toOpenApiPath(definition.path);
     paths[path] ??= {};
     paths[path][definition.method] = definitionToOperation(definition);

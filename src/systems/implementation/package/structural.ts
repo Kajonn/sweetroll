@@ -327,8 +327,9 @@ function measureAst(root: ExpressionAstV1): { depth: number; nodes: number } {
 function preflightAst(root: Record<string, unknown>): "depth" | "invalid" | "nodes" | null {
   const pending: { node: unknown; depth: number }[] = [{ node: root, depth: 1 }];
   let nodes = 0;
-  while (pending.length > 0) {
-    const current = pending.pop()!;
+  let nextIndex = 0;
+  while (nextIndex < pending.length) {
+    const current = pending[nextIndex++]!;
     if (current.depth > PACKAGE_LIMITS.expressionAstDepth) return "depth";
     nodes += 1;
     if (nodes > PACKAGE_LIMITS.expressionAstNodes) return "nodes";
@@ -341,8 +342,8 @@ function preflightAst(root: Record<string, unknown>): "depth" | "invalid" | "nod
         break;
       case "binary":
         pending.push(
-          { node: current.node.right, depth: childDepth },
           { node: current.node.left, depth: childDepth },
+          { node: current.node.right, depth: childDepth },
         );
         break;
       case "call":

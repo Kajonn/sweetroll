@@ -313,6 +313,41 @@ describe("system package codecs", () => {
     expect(decodeSystemPackage(unknownKindPackage)).toEqual(expected);
   });
 
+  it("screens both shallow binary branches before following either deep branch", () => {
+    const invalidUnary = {
+      kind: "unary",
+      operator: "invalid",
+      operand: { kind: "numberLiteral", value: 1 },
+    } as unknown as ExpressionAstV1;
+    const deepLeftPackage = validSignedShapePackage();
+    deepLeftPackage.expressions[0]!.ast = {
+      kind: "binary",
+      operator: "+",
+      left: unaryChain(1_000),
+      right: invalidUnary,
+    };
+    const deepRightPackage = validSignedShapePackage();
+    deepRightPackage.expressions[0]!.ast = {
+      kind: "binary",
+      operator: "+",
+      left: invalidUnary,
+      right: unaryChain(1_000),
+    };
+    const expected = {
+      ok: false,
+      diagnostics: [
+        {
+          code: "invalid_schema",
+          path: "",
+          message: "Input does not match the required schema.",
+        },
+      ],
+    };
+
+    expect(decodeSystemPackage(deepLeftPackage)).toEqual(expected);
+    expect(decodeSystemPackage(deepRightPackage)).toEqual(expected);
+  });
+
   it("rejects effective package limits above platform ceilings", () => {
     const value = validSignedShapePackage() as unknown as Record<string, unknown>;
     (value.effectiveLimits as Record<string, number>).dicePerRoll = 101;

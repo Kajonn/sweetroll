@@ -573,7 +573,7 @@ Every increment must meet all applicable criteria before work begins on the next
 
 | **Increment** | **Capability delivered** | **Depends on** | **Exit result** |
 |---------------|--------------------------|----------------|-----------------|
-| I1 - System backend and rules runtime | System definition, validation, evaluation, publishing, and version HTTP interface | None | A complete system can be created, validated, published, cloned, retrieved, exported, and evaluated through the documented HTTP interface. |
+| I1 - System backend and rules runtime | System definition, validation, evaluation, publishing, and version HTTP interface **(completed 2026-09-04)** | None | A complete system can be created, validated, published, cloned, retrieved, exported, and evaluated through the documented HTTP interface. |
 | I2 - System Builder frontend | No-code system authoring and publishing | I1 | A non-programmer can create and publish a playable system entirely through the web interface. |
 | I3 - Character backend | Runtime character state and commands | I1; I2 validates the package model | A client can create and fully operate a standalone character through the documented HTTP interface. |
 | I4 - Character Sheet frontend | Reusable schema-driven character experience | I3 | A standalone character can be created and played through a responsive web sheet online or offline. |
@@ -597,6 +597,8 @@ Every increment must meet all applicable criteria before work begins on the next
 10. Test `SystemAuthoring` through its Interface against real PostgreSQL and test `SystemRuntime` through its Interface with published fixtures. Add property tests, package fuzz tests, HTTP contract tests, OIDC Adapter contract tests, authorization matrices, concurrency tests, and budget-exhaustion tests.
 
 **Acceptance demonstration:** Using only the documented HTTP interface, create a rules-light system draft, evaluate representative math and dice expressions, publish an immutable version, clone it, export it, and prove that malformed or over-budget packages are rejected without changing the published version.
+
+> **I1 closed 2026-09-04.** All ten tasks implemented. Breaking-change comparison now blocks publish on type changes, removed definitions, removed actions/validations, and changed required/resultType/context. Three reference system fixtures (d20, PbtA 2d6, d6 counted-success) ship under `docs/contracts/examples/`. Acceptance demonstration recorded at `docs/acceptance/i1-2026-09-04.md`. See `docs/superpowers/plans/2026-09-04-i1-closure.md` for the closure plan and its commits.
 
 ## 17.4 I2 - System Builder frontend
 

@@ -28,7 +28,7 @@ It does not implement the SystemRuntime Module, system persistence, authoring wo
 
 - The SystemRuntime Module (`SystemRuntime.resolve`), render projections, character state, and resource semantics.
 - System persistence, authoring workflows, HTTP routes, or OpenAPI generation.
-- Semantic package assessment, compatibility comparison, and semantic-version policy.
+- Compatibility comparison is now implemented in the package layer (`src/systems/implementation/package/compatibility.ts`); this spec covers only the evaluator.
 - Rerolls, exploding dice, push mechanics, custom faces, failure cancellation, arbitrary keep predicates, property traversal beyond `fields.<id>` and `inputs.<id>`, collections, effects, loops, assignment, and user-defined functions (all excluded by grammar v0.1).
 - Wall-clock/time budgets for compile or evaluate (deferred to the runtime/HTTP layer where per-request time limits belong). Node and depth budgets are already enforced structurally by the package codec.
 - String concatenation, aggregate functions, and ternary.

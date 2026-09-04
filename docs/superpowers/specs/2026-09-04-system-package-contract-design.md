@@ -22,7 +22,7 @@ This increment fixes the vocabulary and wire representation that later package c
 **Out of scope:**
 
 - Tokenizer, parser, type checker, compiler, or evaluator implementation.
-- Semantic package assessment, compatibility comparison, and semantic-version policy.
+- **Compatibility comparison** is now part of I1: implemented in `src/systems/implementation/package/compatibility.ts` and gated in `SystemAuthoring.publish`. Returns typed `CompatibilityFinding`s with stable codes (`breaking_type_change`, `breaking_removed_definition`, `breaking_required_added`, `breaking_action_removed`, `breaking_validation_removed`, `breaking_expression_context_change`, `breaking_expression_result_type_change`). No semantic-version policy and no per-character migration belong to this increment.
 - System persistence, authoring workflows, HTTP routes, or OpenAPI generation.
 - Runtime character state and authoritative roll execution.
 - Reroll, explode, push, custom-face, lookup, collection, or effect semantics.

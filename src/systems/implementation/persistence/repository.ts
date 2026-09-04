@@ -30,8 +30,35 @@ export type VersionRecord = {
   checksum: string;
   package: unknown;
   releaseNotes: string;
+  lifecycle: string;
   createdAt: Date;
 };
+
+export type PreviewSnapshotRecord = {
+  snapshotId: string;
+  systemId: SystemId;
+  sourceRevision: number;
+  package: unknown;
+  createdAt: Date;
+  expiresAt: Date;
+};
+
+export type PublishVersionInput = {
+  systemId: SystemId;
+  expectedRevision: number;
+  sourceChecksum: string;
+  semanticVersion: string;
+  checksum: string;
+  package: unknown;
+  releaseNotes: string;
+  actorId: UserId;
+  requestId: string;
+};
+
+export type PublishVersionResult =
+  | { ok: true; version: VersionRecord }
+  | { ok: false; code: "stale_revision"; latestRevision: number | null }
+  | { ok: false; code: "duplicate_version" };
 
 export type IdempotencyReceipt = {
   receiptId: string;
@@ -60,6 +87,7 @@ export type SaveDraftInput = {
   document: unknown;
   sourceChecksum: string;
   updatedBy: UserId;
+  requestId: string;
 };
 
 export type DraftSaveResult =
@@ -112,6 +140,30 @@ export interface SystemPersistenceRepository {
     requestId: string;
   }): Promise<AuditRecord>;
   listAudit(systemId: SystemId): Promise<AuditRecord[]>;
+
+  createPreviewSnapshot(input: {
+    systemId: SystemId;
+    sourceRevision: number;
+    package: unknown;
+    expiresAt: Date;
+  }): Promise<PreviewSnapshotRecord>;
+  loadPreviewSnapshot(snapshotId: string): Promise<PreviewSnapshotRecord | null>;
+
+  updateSystemLifecycle(
+    systemId: SystemId,
+    lifecycle: "active" | "archived",
+  ): Promise<SystemRecord | null>;
+  updateVersionLifecycle(
+    versionId: VersionId,
+    lifecycle: "published" | "deprecated",
+  ): Promise<VersionRecord | null>;
+
+  listSystemsPage(
+    ownerId: UserId,
+    page: { limit: number; cursor: string | null },
+  ): Promise<{ systems: SystemRecord[]; nextCursor: string | null }>;
+
+  publishVersion(input: PublishVersionInput): Promise<PublishVersionResult>;
 }
 
 export function createSystemPersistenceRepository(pool: Pool): SystemPersistenceRepository {
@@ -167,7 +219,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
       const result = await pool.query<VersionRow>(
         `INSERT INTO system_versions (system_id, semantic_version, checksum, package_json, release_notes)
          VALUES ($1, $2, $3, $4::jsonb, $5)
-         RETURNING id, system_id, semantic_version, checksum, package_json, release_notes, created_at`,
+         RETURNING id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at`,
         [input.systemId, input.semanticVersion, input.checksum, JSON.stringify(input.package), input.releaseNotes],
       );
       return toVersionRecord(requireRow(result.rows[0], "insertVersion"));
@@ -175,7 +227,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
 
     async loadVersion(versionId) {
       const result = await pool.query<VersionRow>(
-        `SELECT id, system_id, semantic_version, checksum, package_json, release_notes, created_at
+        `SELECT id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at
            FROM system_versions
           WHERE id = $1`,
         [versionId],
@@ -186,7 +238,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
 
     async listVersions(systemId) {
       const result = await pool.query<VersionRow>(
-        `SELECT id, system_id, semantic_version, checksum, package_json, release_notes, created_at
+        `SELECT id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at
            FROM system_versions
           WHERE system_id = $1
           ORDER BY created_at DESC, id DESC`,
@@ -230,6 +282,77 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
       );
       return result.rows.map(toAuditRecord);
     },
+
+    async createPreviewSnapshot(input) {
+      const result = await pool.query<PreviewRow>(
+        `INSERT INTO preview_snapshots (system_id, source_revision, package_json, expires_at)
+         VALUES ($1, $2, $3::jsonb, $4)
+         RETURNING id, system_id, source_revision, package_json, created_at, expires_at`,
+        [input.systemId, input.sourceRevision, JSON.stringify(input.package), input.expiresAt],
+      );
+      return toPreviewSnapshot(requireRow(result.rows[0], "createPreviewSnapshot"));
+    },
+
+    async loadPreviewSnapshot(snapshotId) {
+      const result = await pool.query<PreviewRow>(
+        `SELECT id, system_id, source_revision, package_json, created_at, expires_at
+           FROM preview_snapshots
+          WHERE id = $1 AND expires_at > now()`,
+        [snapshotId],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toPreviewSnapshot(row);
+    },
+
+    async updateSystemLifecycle(systemId, lifecycle) {
+      const result = await pool.query<SystemRow>(
+        `UPDATE systems SET lifecycle = $2, updated_at = now()
+          WHERE id = $1
+          RETURNING id, owner_id, name, access, lifecycle, created_at, updated_at`,
+        [systemId, lifecycle],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toSystemRecord(row);
+    },
+
+    async updateVersionLifecycle(versionId, lifecycle) {
+      const result = await pool.query<VersionRow>(
+        `UPDATE system_versions SET lifecycle = $2
+          WHERE id = $1
+          RETURNING id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at`,
+        [versionId, lifecycle],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toVersionRecord(row);
+    },
+
+    async listSystemsPage(ownerId, page) {
+      const params: unknown[] = [ownerId, page.limit + 1];
+      let where = "owner_id = $1";
+      if (page.cursor !== null) {
+        params.push(page.cursor);
+        where += ` AND (created_at, id) < (SELECT created_at, id FROM systems WHERE id = $${params.length})`;
+      }
+      const result = await pool.query<SystemRow>(
+        `SELECT id, owner_id, name, access, lifecycle, created_at, updated_at
+           FROM systems
+          WHERE ${where}
+          ORDER BY created_at DESC, id DESC
+          LIMIT $2`,
+        params,
+      );
+      const hasMore = result.rows.length > page.limit;
+      const pageRows = hasMore ? result.rows.slice(0, page.limit) : result.rows;
+      const last = pageRows[pageRows.length - 1];
+      return {
+        systems: pageRows.map(toSystemRecord),
+        nextCursor: hasMore && last !== undefined ? last.id : null,
+      };
+    },
+
+    async publishVersion(input) {
+      return publishVersionImpl(pool, input);
+    },
   };
 }
 
@@ -259,8 +382,29 @@ type VersionRow = {
   checksum: string;
   package_json: unknown;
   release_notes: string;
+  lifecycle: string;
   created_at: Date;
 };
+
+type PreviewRow = {
+  id: string;
+  system_id: string;
+  source_revision: number;
+  package_json: unknown;
+  created_at: Date;
+  expires_at: Date;
+};
+
+function toPreviewSnapshot(row: PreviewRow): PreviewSnapshotRecord {
+  return {
+    snapshotId: row.id,
+    systemId: row.system_id,
+    sourceRevision: row.source_revision,
+    package: row.package_json,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+  };
+}
 
 type ReceiptRow = {
   id: string;
@@ -321,6 +465,7 @@ function toVersionRecord(row: VersionRow): VersionRecord {
     checksum: row.checksum,
     package: row.package_json,
     releaseNotes: row.release_notes,
+    lifecycle: row.lifecycle,
     createdAt: row.created_at,
   };
 }
@@ -373,8 +518,14 @@ async function saveDraftImpl(pool: Pool, input: SaveDraftInput): Promise<DraftSa
          RETURNING system_id, revision, document_json, source_checksum, updated_by, updated_at`,
         [input.systemId, JSON.stringify(input.document), input.sourceChecksum, input.updatedBy],
       );
+      const draft = toDraftRecord(requireRow(inserted.rows[0], "saveDraft"));
+      await client.query(
+        `INSERT INTO system_audit_records (system_id, actor_id, kind, summary, request_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [input.systemId, input.updatedBy, "draft_saved", `Draft revision ${draft.revision} saved`, input.requestId],
+      );
       await client.query("COMMIT");
-      return { ok: true, draft: toDraftRecord(requireRow(inserted.rows[0], "saveDraft")) };
+      return { ok: true, draft };
     }
     if (row.revision !== input.expectedRevision) {
       await client.query("COMMIT");
@@ -387,8 +538,14 @@ async function saveDraftImpl(pool: Pool, input: SaveDraftInput): Promise<DraftSa
         RETURNING system_id, revision, document_json, source_checksum, updated_by, updated_at`,
       [input.systemId, JSON.stringify(input.document), input.sourceChecksum, input.updatedBy],
     );
+    const draft = toDraftRecord(requireRow(updated.rows[0], "saveDraft"));
+    await client.query(
+      `INSERT INTO system_audit_records (system_id, actor_id, kind, summary, request_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [input.systemId, input.updatedBy, "draft_saved", `Draft revision ${draft.revision} saved`, input.requestId],
+    );
     await client.query("COMMIT");
-    return { ok: true, draft: toDraftRecord(requireRow(updated.rows[0], "saveDraft")) };
+    return { ok: true, draft };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -431,6 +588,58 @@ async function recordReceiptImpl(pool: Pool, input: RecordReceiptInput): Promise
     );
     await client.query("COMMIT");
     return { ok: true, reused: false, receipt: toReceipt(requireRow(inserted.rows[0], "recordReceipt")) };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function publishVersionImpl(pool: Pool, input: PublishVersionInput): Promise<PublishVersionResult> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const existing = await client.query<DraftRow>(
+      `SELECT system_id, revision, document_json, source_checksum, updated_by, updated_at
+         FROM system_drafts
+        WHERE system_id = $1
+        FOR UPDATE`,
+      [input.systemId],
+    );
+    const draft = existing.rows[0];
+    if (
+      draft === undefined ||
+      draft.revision !== input.expectedRevision ||
+      draft.source_checksum !== input.sourceChecksum
+    ) {
+      await client.query("COMMIT");
+      return { ok: false, code: "stale_revision", latestRevision: draft?.revision ?? null };
+    }
+    let inserted: VersionRow | undefined;
+    try {
+      const result = await client.query<VersionRow>(
+        `INSERT INTO system_versions (system_id, semantic_version, checksum, package_json, release_notes)
+         VALUES ($1, $2, $3, $4::jsonb, $5)
+         RETURNING id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at`,
+        [input.systemId, input.semanticVersion, input.checksum, JSON.stringify(input.package), input.releaseNotes],
+      );
+      inserted = result.rows[0];
+    } catch (error) {
+      if ((error as { code?: string }).code === "23505") {
+        await client.query("ROLLBACK");
+        return { ok: false, code: "duplicate_version" };
+      }
+      throw error;
+    }
+    const version = toVersionRecord(requireRow(inserted, "publishVersion"));
+    await client.query(
+      `INSERT INTO system_audit_records (system_id, actor_id, kind, summary, request_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [input.systemId, input.actorId, "version_published", `Published version ${input.semanticVersion}`, input.requestId],
+    );
+    await client.query("COMMIT");
+    return { ok: true, version };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

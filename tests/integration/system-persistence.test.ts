@@ -41,6 +41,7 @@ const DDL = `
     checksum text NOT NULL UNIQUE,
     package_json jsonb NOT NULL,
     release_notes text NOT NULL DEFAULT '',
+    lifecycle text NOT NULL DEFAULT 'published',
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (system_id, semantic_version)
   );
@@ -64,6 +65,28 @@ const DDL = `
     occurred_at timestamptz NOT NULL DEFAULT now(),
     request_id text NOT NULL
   );
+  CREATE TABLE preview_snapshots (
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    system_id       uuid NOT NULL REFERENCES systems(id) ON DELETE CASCADE,
+    source_revision integer NOT NULL,
+    package_json    jsonb NOT NULL,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    expires_at      timestamptz NOT NULL
+  );
+  CREATE FUNCTION system_versions_prevent_mutation() RETURNS trigger
+  LANGUAGE plpgsql AS $$
+  BEGIN
+    IF NEW.package_json IS DISTINCT FROM OLD.package_json
+       OR NEW.checksum IS DISTINCT FROM OLD.checksum
+       OR NEW.semantic_version IS DISTINCT FROM OLD.semantic_version THEN
+      RAISE EXCEPTION 'published system versions are immutable';
+    END IF;
+    RETURN NEW;
+  END;
+  $$;
+  CREATE TRIGGER system_versions_immutable
+    BEFORE UPDATE ON system_versions
+    FOR EACH ROW EXECUTE FUNCTION system_versions_prevent_mutation();
 `;
 
 describeWithDatabase("SystemPersistenceRepository", () => {
@@ -88,6 +111,9 @@ describeWithDatabase("SystemPersistenceRepository", () => {
 
   beforeEach(async () => {
     await pool.query(`SET search_path TO ${schema}`);
+    await pool.query(
+      "TRUNCATE system_audit_records, idempotency_receipts, preview_snapshots, system_versions, system_drafts, systems, users RESTART IDENTITY CASCADE",
+    );
   });
 
   afterAll(async () => {
@@ -150,6 +176,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       document: { schemaVersion: "1.0", head: "first" },
       sourceChecksum: "sha256:first",
       updatedBy: owner,
+      requestId: "req-test",
     });
     expect(first.ok).toBe(true);
     if (!first.ok) throw new Error("unexpected");
@@ -162,6 +189,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       document: { schemaVersion: "1.0", head: "second" },
       sourceChecksum: "sha256:second",
       updatedBy: owner,
+      requestId: "req-test",
     });
     expect(second.ok).toBe(true);
     if (!second.ok) throw new Error("unexpected");
@@ -173,6 +201,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       document: { schemaVersion: "1.0", head: "stale" },
       sourceChecksum: "sha256:stale",
       updatedBy: owner,
+      requestId: "req-test",
     });
     expect(stale).toEqual({ ok: false, code: "stale_revision", latestRevision: 2 });
 
@@ -195,6 +224,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       document: { schemaVersion: "1.0" },
       sourceChecksum: "sha256:x",
       updatedBy: owner,
+      requestId: "req-test",
     });
     expect(result).toEqual({ ok: false, code: "stale_revision", latestRevision: null });
   });
@@ -352,5 +382,149 @@ describeWithDatabase("SystemPersistenceRepository", () => {
     expect(records[1]?.requestId).toBe("req-1");
 
     expect(await repo.listAudit(randomUUID())).toEqual([]);
+  });
+
+  it("creates and loads unexpired preview snapshots and hides expired ones", async () => {
+    const owner = await createUser("Ada");
+    const repo = createSystemPersistenceRepository(pool);
+    const { systemId } = await repo.createSystem({ ownerId: owner, name: "Pocket Quest" });
+
+    const created = await repo.createPreviewSnapshot({
+      systemId,
+      sourceRevision: 3,
+      package: { schemaVersion: "1.0", name: "preview" },
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    expect(created.sourceRevision).toBe(3);
+
+    const loaded = await repo.loadPreviewSnapshot(created.snapshotId);
+    expect(loaded?.systemId).toBe(systemId);
+    expect(loaded?.package).toEqual({ schemaVersion: "1.0", name: "preview" });
+
+    const expired = await repo.createPreviewSnapshot({
+      systemId,
+      sourceRevision: 4,
+      package: { schemaVersion: "1.0", name: "expired" },
+      expiresAt: new Date(Date.now() - 1_000),
+    });
+    expect(await repo.loadPreviewSnapshot(expired.snapshotId)).toBeNull();
+    expect(await repo.loadPreviewSnapshot(randomUUID())).toBeNull();
+  });
+
+  it("changes system and version lifecycle and rejects package mutation", async () => {
+    const owner = await createUser("Ada");
+    const repo = createSystemPersistenceRepository(pool);
+    const { systemId } = await repo.createSystem({ ownerId: owner, name: "Pocket Quest" });
+    const version = await repo.insertVersion({
+      systemId,
+      semanticVersion: "1.0.0",
+      checksum: "sha256:aaa",
+      package: { schemaVersion: "1.0", name: "one" },
+      releaseNotes: "",
+    });
+
+    const archived = await repo.updateSystemLifecycle(systemId, "archived");
+    expect(archived?.lifecycle).toBe("archived");
+    const restored = await repo.updateSystemLifecycle(systemId, "active");
+    expect(restored?.lifecycle).toBe("active");
+    expect(await repo.updateSystemLifecycle(randomUUID(), "archived")).toBeNull();
+
+    const deprecated = await repo.updateVersionLifecycle(version.versionId, "deprecated");
+    expect(deprecated?.lifecycle).toBe("deprecated");
+    expect(await repo.updateVersionLifecycle(randomUUID(), "deprecated")).toBeNull();
+
+    await expect(
+      pool.query("UPDATE system_versions SET package_json = '{}'::jsonb WHERE id = $1", [version.versionId]),
+    ).rejects.toMatchObject({ message: "published system versions are immutable" });
+  });
+
+  it("paginates systems with a keyset cursor", async () => {
+    const owner = await createUser("Ada");
+    const repo = createSystemPersistenceRepository(pool);
+    const delay = () => new Promise((resolve) => setTimeout(resolve, 5));
+    await repo.createSystem({ ownerId: owner, name: "A" });
+    await delay();
+    await repo.createSystem({ ownerId: owner, name: "B" });
+    await delay();
+    await repo.createSystem({ ownerId: owner, name: "C" });
+
+    const page1 = await repo.listSystemsPage(owner, { limit: 2, cursor: null });
+    expect(page1.systems.map((s) => s.name)).toEqual(["C", "B"]);
+    expect(page1.nextCursor).toBe(page1.systems[1]?.systemId ?? null);
+
+    const page2 = await repo.listSystemsPage(owner, { limit: 2, cursor: page1.nextCursor });
+    expect(page2.systems.map((s) => s.name)).toEqual(["A"]);
+    expect(page2.nextCursor).toBeNull();
+  });
+
+  it("publishes a version transactionally with an audit record and rejects duplicates and stale input", async () => {
+    const owner = await createUser("Ada");
+    const repo = createSystemPersistenceRepository(pool);
+    const { systemId } = await repo.createSystem({ ownerId: owner, name: "Pocket Quest" });
+    await repo.saveDraft({
+      systemId,
+      expectedRevision: null,
+      document: { schemaVersion: "1.0", head: "one" },
+      sourceChecksum: "sha256:one",
+      updatedBy: owner,
+      requestId: "req-pub",
+    });
+
+    const published = await repo.publishVersion({
+      systemId,
+      expectedRevision: 1,
+      sourceChecksum: "sha256:one",
+      semanticVersion: "1.0.0",
+      checksum: "sha256:pkg",
+      package: { schemaVersion: "1.0", name: "pkg" },
+      releaseNotes: "First",
+      actorId: owner,
+      requestId: "req-pub",
+    });
+    expect(published.ok).toBe(true);
+    if (!published.ok) throw new Error("unexpected");
+    expect(published.version.lifecycle).toBe("published");
+
+    const audit = await repo.listAudit(systemId);
+    expect(audit.map((r) => r.kind)).toEqual(["version_published", "draft_saved"]);
+
+    const duplicate = await repo.publishVersion({
+      systemId,
+      expectedRevision: 1,
+      sourceChecksum: "sha256:one",
+      semanticVersion: "1.0.0",
+      checksum: "sha256:other",
+      package: { schemaVersion: "1.0", name: "other" },
+      releaseNotes: "",
+      actorId: owner,
+      requestId: "req-pub",
+    });
+    expect(duplicate).toEqual({ ok: false, code: "duplicate_version" });
+
+    const stale = await repo.publishVersion({
+      systemId,
+      expectedRevision: 99,
+      sourceChecksum: "sha256:one",
+      semanticVersion: "1.1.0",
+      checksum: "sha256:pkg2",
+      package: { schemaVersion: "1.0", name: "pkg2" },
+      releaseNotes: "",
+      actorId: owner,
+      requestId: "req-pub",
+    });
+    expect(stale).toEqual({ ok: false, code: "stale_revision", latestRevision: 1 });
+
+    const noDraft = await repo.publishVersion({
+      systemId: randomUUID(),
+      expectedRevision: 1,
+      sourceChecksum: "sha256:x",
+      semanticVersion: "1.0.0",
+      checksum: "sha256:y",
+      package: {},
+      releaseNotes: "",
+      actorId: owner,
+      requestId: "req-pub",
+    });
+    expect(noDraft).toEqual({ ok: false, code: "stale_revision", latestRevision: null });
   });
 });

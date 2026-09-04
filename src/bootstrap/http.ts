@@ -1,8 +1,10 @@
 import { loadConfig, createLogger, createPool } from "../platform/index.js";
 import { createIdentityModule } from "../identity/index.js";
 import { createTestOidcClient } from "../identity/adapters/test.js";
-import { buildHttpApp } from "../transport/http/index.js";
+import { createSystemAuthoringModule } from "../systems/authoring.js";
+import { createSystemPersistenceRepository } from "../systems/implementation/persistence/index.js";
 import { buildAuthHook } from "../transport/http/auth-hook.js";
+import { buildHttpApp, buildSystemsRoutes } from "../transport/http/index.js";
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel);
@@ -17,6 +19,10 @@ const identity = createIdentityModule({
   sessionTtlMs: config.sessionTtlDays * 86_400_000,
 });
 
+const authoring = createSystemAuthoringModule({
+  repo: createSystemPersistenceRepository(pool),
+});
+
 const app = buildHttpApp({
   logger,
   pool,
@@ -27,6 +33,8 @@ const app = buildHttpApp({
     maxAgeSeconds: config.sessionTtlDays * 86_400,
   }),
 });
+
+void app.register(buildSystemsRoutes({ authoring }));
 
 const shutdown = async (signal: string) => {
   logger.info({ signal }, "shutting down HTTP process");

@@ -2,8 +2,7 @@ import { PACKAGE_LIMITS } from "../package/limits.js";
 import type { CompiledExpressionV1, ExpressionAstV1, ScalarValue, ValueType } from "../package/schema/index.js";
 import { countNodes, depthOf, parse } from "./parser.js";
 import { checkDeterministic, inferType, resolveDependencies, type ExpressionCompileEnv } from "./typecheck.js";
-
-type RulesDiagnostic = { code: string; path: string; message: string };
+import type { RulesDiagnostic } from "./diagnostic.js";
 
 export type CompileResult<T> =
   | { ok: true; value: T }

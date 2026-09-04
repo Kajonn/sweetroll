@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
+import type { CompiledExpressionV1 } from "../package/schema/index.js";
 import { compileExpression, type CompileExpressionOpts } from "./compile.js";
 import { evaluate } from "./evaluate.js";
 
 const env = { fields: { modifier: "number" }, inputs: {} } as const;
 const rollOpts: CompileExpressionOpts = { env: env as never, resultType: "number", context: "roll", fallback: 0 };
 
-function compile(src: string, opts: CompileExpressionOpts = rollOpts) {
+function compile(src: string, opts: CompileExpressionOpts = rollOpts): CompiledExpressionV1 {
   const r = compileExpression(src, opts);
   if (!r.ok) throw new Error("compile fail");
-  return r.value as never;
+  return { ...r.value, id: "test" };
 }
 function seqRng(seq: number[]): () => number { let i = 0; return () => seq[i++]!; }
 
@@ -55,5 +56,22 @@ describe("evaluate", () => {
   it("rounds per mode", () => {
     const up = evaluate(compile("round(2.4, up)"), {});
     expect(up.ok && up.result).toBe(3);
+  });
+
+  it("falls back when a dynamic dice count exceeds the dice-per-roll ceiling", () => {
+    const r = evaluate(compile("dice(101, 6)"), {});
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.result).toBe(0);
+    expect(r.diagnostics.some((d) => d.code === "arithmetic_failure")).toBe(true);
+    expect(r.roll!.dice).toEqual([]);
+  });
+
+  it("falls back when die sides exceed the sides-per-die ceiling", () => {
+    const r = evaluate(compile("dice(2, 1001)"), {});
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.result).toBe(0);
+    expect(r.diagnostics.some((d) => d.code === "arithmetic_failure")).toBe(true);
   });
 });

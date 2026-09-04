@@ -2,7 +2,7 @@ import type { FieldV1, SystemDocumentV1, SystemPackageV1, ValueType } from "../p
 import type { UnsignedSystemPackageV1 } from "../package/schema/index.js";
 import { signSystemPackage } from "../package/canonical.js";
 import { PACKAGE_LIMITS } from "../package/limits.js";
-import { compileExpression, type CompileResult } from "./compile.js";
+import { compileExpression, type CompileResult, type CompiledExpressionBody } from "./compile.js";
 import type { ExpressionCompileEnv } from "./typecheck.js";
 
 export type CompileDocumentOpts = {
@@ -55,7 +55,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     }
   }
 
-  const compiled: { resultType: ValueType; inferredType: ValueType; fallback: boolean | number | string | null; dependencies: string[]; cost: number; ast: import("../package/schema/index.js").ExpressionAstV1 }[] = [];
+  const compiled: CompiledExpressionBody[] = [];
 
   for (const expr of document.expressions) {
     const result = compileExpression(expr.source, {

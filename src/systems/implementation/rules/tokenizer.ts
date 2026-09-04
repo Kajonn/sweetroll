@@ -1,4 +1,4 @@
-type RulesDiagnostic = { code: string; path: string; message: string };
+import type { RulesDiagnostic } from "./diagnostic.js";
 
 export type Token =
   | { kind: "number"; value: number; start: number }

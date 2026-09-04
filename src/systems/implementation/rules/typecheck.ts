@@ -1,11 +1,10 @@
 import type { ExpressionAstV1, ValueType, DefinitionId } from "../package/schema/index.js";
+import type { RulesDiagnostic } from "./diagnostic.js";
 
 export type ExpressionCompileEnv = {
   fields: Record<string, ValueType>;
   inputs: Record<string, ValueType>;
 };
-
-type RulesDiagnostic = { code: string; path: string; message: string };
 
 export type InferResult =
   | { ok: true; type: ValueType }

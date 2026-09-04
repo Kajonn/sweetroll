@@ -1,0 +1,1 @@
+export type RulesDiagnostic = { code: string; path: string; message: string };

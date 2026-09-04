@@ -1,7 +1,7 @@
 import type { ExpressionAstV1 } from "../package/schema/index.js";
 import { tokenize, type Token } from "./tokenizer.js";
+import type { RulesDiagnostic } from "./diagnostic.js";
 
-type RulesDiagnostic = { code: string; path: string; message: string };
 type BinaryOp = "+" | "-" | "*" | "/" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "&&" | "||";
 
 export type ParseResult =

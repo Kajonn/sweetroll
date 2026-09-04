@@ -33,10 +33,8 @@ function isAtom(ast: ExpressionAstV1): boolean {
 
 function renderNode(ast: ExpressionAstV1): string {
   switch (ast.kind) {
-    case "numberLiteral": {
-      const v = ast.value;
-      return Number.isInteger(v) ? String(v) : String(v);
-    }
+    case "numberLiteral":
+      return String(ast.value);
     case "stringLiteral":
       return `"${ast.value}"`;
     case "booleanLiteral":

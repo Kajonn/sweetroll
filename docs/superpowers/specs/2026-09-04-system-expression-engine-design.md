@@ -368,6 +368,7 @@ Tests are deterministic and require neither PostgreSQL nor HTTP.
 
 - Node count and depth: enforced by the parser (reject over-budget at parse), and re-checked by the compiler so a pre-built AST cannot bypass. Ceilings are `PACKAGE_LIMITS.expressionAstNodes` (256) and `PACKAGE_LIMITS.expressionAstDepth` (32).
 - Encoded/source bytes: already bounded by the document schema (`maxLength: PACKAGE_LIMITS.expressionBytes`) and the codec; the compiler trusts the caller's decoded value.
+- Dice per roll and sides per die: statically-bounded dice nodes are capped by the schema and the codec's structural preflight, while dynamically-computed dice counts are enforced at evaluation time. `evaluate` safe-fails to the fallback with an `arithmetic_failure` diagnostic when a roll's count exceeds `PACKAGE_LIMITS.dicePerRoll` or its sides exceed `PACKAGE_LIMITS.sidesPerDie`.
 - No wall-clock/time budget in this increment (deferred to runtime/HTTP).
 
 ## 19. Acceptance Demonstration

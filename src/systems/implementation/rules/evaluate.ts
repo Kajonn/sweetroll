@@ -1,4 +1,5 @@
 import type { CompiledExpressionV1, ExpressionAstV1, ScalarValue } from "../package/schema/index.js";
+import { PACKAGE_LIMITS } from "../package/limits.js";
 import { renderExpression } from "./render.js";
 
 export type Rng = () => number;
@@ -38,7 +39,15 @@ function isNonNegativeInteger(v: number): boolean {
   return Number.isInteger(v) && v >= 0;
 }
 
-function rollDice(count: number, sides: number, ctx: Ctx): DieResult[] {
+function rollDice(count: number, sides: number, ctx: Ctx): DieResult[] | undefined {
+  if (count > PACKAGE_LIMITS.dicePerRoll) {
+    fail(ctx, `dice count ${count} exceeds the ${PACKAGE_LIMITS.dicePerRoll}-die-per-roll limit`);
+    return undefined;
+  }
+  if (sides > PACKAGE_LIMITS.sidesPerDie) {
+    fail(ctx, `die sides ${sides} exceed the ${PACKAGE_LIMITS.sidesPerDie}-side-per-die limit`);
+    return undefined;
+  }
   const dice: DieResult[] = [];
   for (let i = 0; i < count; i++) {
     let value = Math.ceil(ctx.rng() * sides);
@@ -196,6 +205,7 @@ function evalNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined {
       const cn = num(count);
       if (cn === undefined || !isNonNegativeInteger(cn)) return fail(ctx, "dice count must be a non-negative integer");
       const dice = rollDice(cn, node.sides, ctx);
+      if (dice === undefined) return undefined;
       ctx.dice.push(...dice);
       return dice.reduce((s, d) => s + d.value, 0);
     }
@@ -206,6 +216,7 @@ function evalNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined {
       const cn = num(count);
       if (cn === undefined || !isNonNegativeInteger(cn)) return fail(ctx, "dice count must be a non-negative integer");
       const dice = rollDice(cn, node.dice.sides, ctx);
+      if (dice === undefined) return undefined;
       const chosen = Math.min(node.count, dice.length);
       const sorted = [...dice].sort((a, b) => node.mode === "highest" ? b.value - a.value : a.value - b.value);
       const keptSet = new Set(sorted.slice(0, chosen));
@@ -228,6 +239,7 @@ function evalNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined {
       const cn = num(count);
       if (cn === undefined || !isNonNegativeInteger(cn)) return fail(ctx, "dice count must be a non-negative integer");
       const dice = rollDice(cn, node.dice.sides, ctx);
+      if (dice === undefined) return undefined;
       ctx.dice.push(...dice);
       return dice.reduce((s, d) => (d.value >= node.threshold ? s + 1 : s), 0);
     }

@@ -122,7 +122,8 @@ describeWithDatabase("SystemAuthoring", () => {
   beforeAll(async () => {
     pool = new Pool({
       connectionString: databaseUrl,
-      max: 1,
+      application_name: schema,
+      max: 5,
       onConnect: async (client) => {
         await client.query(`SET search_path TO ${schema}`);
       },
@@ -165,6 +166,29 @@ describeWithDatabase("SystemAuthoring", () => {
   }
 
   const ctx = (actorId: string) => ({ actorId, requestId: randomUUID() });
+
+  async function waitForBlockedPublications(count: number): Promise<void> {
+    const deadline = Date.now() + 3_000;
+    while (Date.now() < deadline) {
+      const result = await pool.query<{ count: string }>(
+        `SELECT count(*)
+           FROM pg_stat_activity
+          WHERE application_name = $1
+            AND wait_event IN ('advisory', 'transactionid')`,
+        [schema],
+      );
+      if (Number(result.rows[0]?.count) >= count) return;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    const activity = await pool.query<{ wait_event: string | null; query: string }>(
+      `SELECT wait_event, query
+         FROM pg_stat_activity
+        WHERE datname = current_database()
+          AND usename = current_user
+          AND wait_event IS NOT NULL`,
+    );
+    throw new Error(`Timed out waiting for ${count} blocked publications: ${JSON.stringify(activity.rows)}`);
+  }
 
   it("creates a blank system with an initialized draft", async () => {
     const owner = await createUser("Ada");
@@ -683,6 +707,87 @@ describeWithDatabase("SystemAuthoring", () => {
     );
     expect(stored.rows[0]?.compatibility_findings_json).toEqual(unacknowledged.error.diagnostics);
   });
+
+  it("serializes concurrent breaking publications against the current latest major", async () => {
+    const owner = await createUser("Concurrent Publisher");
+    const created = await authoring.createDraft(ctx(owner), {
+      source: { kind: "blank", name: "Concurrent Breaking" },
+      idempotencyKey: randomUUID(),
+    });
+    if (!created.ok) throw new Error("unexpected");
+    const systemId = created.value.system.systemId;
+    await authoring.saveDraft(ctx(owner), { systemId, expectedRevision: 1, document: d20Document });
+    const first = await authoring.publish(ctx(owner), {
+      systemId,
+      expectedRevision: 2,
+      semanticVersion: "1.0.0",
+      releaseNotes: "Initial",
+      idempotencyKey: randomUUID(),
+      acknowledgeBreaking: false,
+    });
+    if (!first.ok) throw new Error("unexpected");
+
+    const breaking = structuredClone(d20Document);
+    breaking.entities[0].fields = breaking.entities[0].fields.filter((field) => field.id !== "proficient");
+    await authoring.saveDraft(ctx(owner), { systemId, expectedRevision: 2, document: breaking });
+
+    const publish = (semanticVersion: string) =>
+      authoring.publish(ctx(owner), {
+        systemId,
+        expectedRevision: 3,
+        semanticVersion,
+        releaseNotes: `Breaking ${semanticVersion}`,
+        idempotencyKey: randomUUID(),
+        acknowledgeBreaking: true,
+      });
+
+    const insertGate = 1_374_921_663;
+    await pool.query(`
+      CREATE FUNCTION block_concurrent_version_insert() RETURNS trigger
+      LANGUAGE plpgsql AS $$
+      BEGIN
+        PERFORM pg_advisory_xact_lock(${insertGate});
+        RETURN NEW;
+      END;
+      $$;
+      CREATE TRIGGER block_concurrent_version_insert
+        BEFORE INSERT ON system_versions
+        FOR EACH ROW EXECUTE FUNCTION block_concurrent_version_insert();
+    `);
+    const gateClient = await pool.connect();
+    await gateClient.query("SELECT pg_advisory_lock($1::integer)", [insertGate]);
+    let majorTwoPromise: ReturnType<typeof publish> | undefined;
+    let majorThreePromise: ReturnType<typeof publish> | undefined;
+    let majorTwo: Awaited<ReturnType<typeof publish>>;
+    let majorThree: Awaited<ReturnType<typeof publish>>;
+    try {
+      majorThreePromise = publish("3.0.0");
+      await waitForBlockedPublications(1);
+      majorTwoPromise = publish("2.0.0");
+      await waitForBlockedPublications(2);
+      await gateClient.query("SELECT pg_advisory_unlock($1::integer)", [insertGate]);
+      [majorTwo, majorThree] = await Promise.all([majorTwoPromise, majorThreePromise]);
+    } finally {
+      await gateClient.query("SELECT pg_advisory_unlock($1::integer)", [insertGate]);
+      gateClient.release();
+      await Promise.allSettled([majorTwoPromise, majorThreePromise].filter((value) => value !== undefined));
+      await pool.query("DROP TRIGGER block_concurrent_version_insert ON system_versions");
+      await pool.query("DROP FUNCTION block_concurrent_version_insert()");
+    }
+
+    expect(majorThree.ok).toBe(true);
+    expect(majorTwo.ok).toBe(false);
+    if (majorTwo.ok) throw new Error("major 2 must not publish after major 3");
+    expect(majorTwo.error.code).toBe("invalid_package");
+    expect(majorTwo.error.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "breaking_removed_definition",
+        path: "/entities/character/fields/proficient",
+      }),
+    );
+    const versions = await repo.listVersions(systemId);
+    expect(versions.map(({ semanticVersion }) => semanticVersion).sort()).toEqual(["1.0.0", "3.0.0"]);
+  }, 15_000);
 
   it("permits a compatible additive change between versions", async () => {
     const owner = await createUser("Iris");

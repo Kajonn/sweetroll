@@ -519,6 +519,7 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           package: compiled.value,
           releaseNotes: input.releaseNotes,
           compatibilityFindings,
+          acknowledgeBreaking: input.acknowledgeBreaking,
           actorId: ctx.actorId,
           requestId: ctx.requestId,
         });
@@ -527,6 +528,12 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
             return {
               ok: false,
               error: errors.conflict("The draft was modified by another request.", result.latestRevision),
+            };
+          }
+          if (result.code === "breaking_version") {
+            return {
+              ok: false,
+              error: errors.invalid_package(result.findings as unknown as PackageDiagnostic[]),
             };
           }
           return {

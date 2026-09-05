@@ -55,6 +55,7 @@ export type PublishVersionInput = {
   package: unknown;
   releaseNotes: string;
   compatibilityFindings: CompatibilityFinding[];
+  acknowledgeBreaking: boolean;
   actorId: UserId;
   requestId: string;
 };
@@ -62,6 +63,7 @@ export type PublishVersionInput = {
 export type PublishVersionResult =
   | { ok: true; version: VersionRecord }
   | { ok: false; code: "stale_revision"; latestRevision: number | null }
+  | { ok: false; code: "breaking_version"; findings: CompatibilityFinding[] }
   | { ok: false; code: "duplicate_version" };
 
 export type AuthorizedVersionUse = {
@@ -671,6 +673,23 @@ async function publishVersionImpl(pool: Pool, input: PublishVersionInput): Promi
     ) {
       await client.query("COMMIT");
       return { ok: false, code: "stale_revision", latestRevision: draft?.revision ?? null };
+    }
+    const latestVersion = await client.query<Pick<VersionRow, "semantic_version">>(
+      `SELECT semantic_version
+         FROM system_versions
+        WHERE system_id = $1
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1`,
+      [input.systemId],
+    );
+    const latest = latestVersion.rows[0];
+    if (input.compatibilityFindings.length > 0 && latest !== undefined) {
+      const nextMajor = Number(input.semanticVersion.split(".")[0]);
+      const latestMajor = Number(latest.semantic_version.split(".")[0]);
+      if (!input.acknowledgeBreaking || nextMajor <= latestMajor) {
+        await client.query("COMMIT");
+        return { ok: false, code: "breaking_version", findings: input.compatibilityFindings };
+      }
     }
     let inserted: VersionRow | undefined;
     try {

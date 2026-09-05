@@ -480,6 +480,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       package: { schemaVersion: "1.0", name: "pkg" },
       releaseNotes: "First",
       compatibilityFindings: [],
+      acknowledgeBreaking: false,
       actorId: owner,
       requestId: "req-pub",
     });
@@ -499,6 +500,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       package: { schemaVersion: "1.0", name: "other" },
       releaseNotes: "",
       compatibilityFindings: [],
+      acknowledgeBreaking: false,
       actorId: owner,
       requestId: "req-pub",
     });
@@ -513,6 +515,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       package: { schemaVersion: "1.0", name: "pkg2" },
       releaseNotes: "",
       compatibilityFindings: [],
+      acknowledgeBreaking: false,
       actorId: owner,
       requestId: "req-pub",
     });
@@ -527,6 +530,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       package: {},
       releaseNotes: "",
       compatibilityFindings: [],
+      acknowledgeBreaking: false,
       actorId: owner,
       requestId: "req-pub",
     });

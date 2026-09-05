@@ -1,3 +1,8 @@
+import { PublishedPackageCorruptError, type PublishedPackageLoader } from "./implementation/runtime/package-loader.js";
+import { buildCharacterProjection } from "./implementation/runtime/projection.js";
+import { resolveObservedValues } from "./implementation/runtime/resolve.js";
+import { decodeRuntimeState, initializeState } from "./implementation/runtime/state.js";
+
 export type VersionId = string;
 export type DefinitionId = string;
 export type CommandExecutionId = string;
@@ -187,4 +192,80 @@ export type RuntimeResult<T> =
 
 export interface SystemRuntime {
   resolve(input: RuntimeRequest): Promise<RuntimeResult<RuntimeResolution>>;
+}
+
+export function createSystemRuntime(input: {
+  loadPackage: PublishedPackageLoader;
+  authoritativeRollSecret: string;
+}): SystemRuntime {
+  if (input.authoritativeRollSecret.length === 0) {
+    throw new Error("Authoritative roll secret must not be empty.");
+  }
+
+  return {
+    async resolve(request) {
+      let packageValue;
+      try {
+        packageValue = await input.loadPackage(request.versionId);
+      } catch (error) {
+        if (error instanceof PublishedPackageCorruptError) {
+          return {
+            ok: false,
+            error: { code: "invalid_package", message: "Published package is corrupt." },
+          };
+        }
+        return { ok: false, error: { code: "internal", message: "Package loading failed." } };
+      }
+      if (packageValue === null) {
+        return { ok: false, error: { code: "not_found", message: "Published version not found." } };
+      }
+      if (packageValue.versionId !== request.versionId) {
+        return { ok: false, error: { code: "invalid_package", message: "Published package version differs from the request." } };
+      }
+
+      const entity = packageValue.entities.find((candidate) => candidate.id === request.entityId);
+      if (entity === undefined) {
+        return { ok: false, error: { code: "not_found", message: "Entity definition not found." } };
+      }
+
+      let stateResult: RuntimeResult<RuntimeStateV1>;
+      if (request.intent.kind === "initialize") {
+        if (request.state !== undefined) {
+          return { ok: false, error: { code: "bad_request", message: "Initialize does not accept existing state." } };
+        }
+        stateResult = initializeState(entity, request.intent.values);
+      } else if (request.intent.kind === "observe") {
+        if (request.state === undefined) {
+          return { ok: false, error: { code: "bad_request", message: "Observe requires state." } };
+        }
+        stateResult = decodeRuntimeState(entity, request.state);
+      } else {
+        return { ok: false, error: { code: "bad_request", message: "Runtime intent is not implemented." } };
+      }
+      if (!stateResult.ok) return stateResult;
+
+      const observed = resolveObservedValues(packageValue, entity, stateResult.value);
+      if (!observed.ok) return observed;
+      const projection = buildCharacterProjection({
+        packageValue,
+        entity,
+        state: stateResult.value,
+        derivedValues: observed.value.derivedValues,
+        validations: observed.value.validations,
+      });
+      return {
+        ok: true,
+        value: {
+          versionId: packageValue.versionId,
+          packageChecksum: packageValue.integrity.checksum,
+          state: stateResult.value,
+          derivedValues: observed.value.derivedValues,
+          validations: observed.value.validations,
+          changedDefinitionIds: [],
+          roll: null,
+          projection,
+        },
+      };
+    },
+  };
 }

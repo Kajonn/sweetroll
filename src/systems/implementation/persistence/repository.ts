@@ -1,4 +1,5 @@
 import { d20Package, pbta2d6Package, d6SuccessPoolPackage } from "../package/fixtures/index.js";
+import type { CompatibilityFinding } from "../package/compatibility.js";
 import type { SystemPackageV1 } from "../package/schema/index.js";
 import type { Pool, PoolClient } from "pg";
 
@@ -8,7 +9,7 @@ export type UserId = string;
 
 export type SystemRecord = {
   systemId: SystemId;
-  ownerId: UserId;
+  ownerId: UserId | null;
   name: string;
   access: string;
   lifecycle: string;
@@ -53,6 +54,7 @@ export type PublishVersionInput = {
   checksum: string;
   package: unknown;
   releaseNotes: string;
+  compatibilityFindings: CompatibilityFinding[];
   actorId: UserId;
   requestId: string;
 };
@@ -61,6 +63,16 @@ export type PublishVersionResult =
   | { ok: true; version: VersionRecord }
   | { ok: false; code: "stale_revision"; latestRevision: number | null }
   | { ok: false; code: "duplicate_version" };
+
+export type AuthorizedVersionUse = {
+  systemId: SystemId;
+  versionId: VersionId;
+  checksum: string;
+};
+
+export type DeleteOwnedSystemResult =
+  | { ok: true }
+  | { ok: false; code: "not_found" | "referenced" };
 
 export type IdempotencyReceipt = {
   receiptId: string;
@@ -126,6 +138,7 @@ export interface SystemPersistenceRepository {
   }): Promise<VersionRecord>;
   loadVersion(versionId: VersionId): Promise<VersionRecord | null>;
   listVersions(systemId: SystemId): Promise<VersionRecord[]>;
+  authorizeVersionUse(actorId: UserId, versionId: VersionId): Promise<AuthorizedVersionUse | null>;
 
   recordReceipt(input: RecordReceiptInput): Promise<RecordReceiptResult>;
   loadReceipt(input: {
@@ -165,7 +178,7 @@ export interface SystemPersistenceRepository {
     page: { limit: number; cursor: string | null },
   ): Promise<{ systems: SystemRecord[]; nextCursor: string | null }>;
 
-  deleteOwnedSystem(systemId: SystemId, ownerId: UserId): Promise<boolean>;
+  deleteOwnedSystem(systemId: SystemId, ownerId: UserId): Promise<DeleteOwnedSystemResult>;
 
   publishVersion(input: PublishVersionInput): Promise<PublishVersionResult>;
 }
@@ -249,6 +262,23 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
         [systemId],
       );
       return result.rows.map(toVersionRecord);
+    },
+
+    async authorizeVersionUse(actorId, versionId) {
+      const result = await pool.query<AuthorizedVersionUseRow>(
+        `SELECT s.id AS system_id, v.id AS version_id, v.checksum
+           FROM system_versions v
+           JOIN systems s ON s.id = v.system_id
+          WHERE v.id = $2
+            AND v.lifecycle = 'published'
+            AND s.lifecycle = 'active'
+            AND (s.owner_id = $1 OR s.access IN ('public', 'link'))`,
+        [actorId, versionId],
+      );
+      const row = result.rows[0];
+      return row === undefined
+        ? null
+        : { systemId: row.system_id, versionId: row.version_id, checksum: row.checksum };
     },
 
     async recordReceipt(input) {
@@ -359,19 +389,26 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
     },
 
     async deleteOwnedSystem(systemId, ownerId) {
-      const result = await pool.query(
-        `DELETE FROM systems
-          WHERE id = $1 AND owner_id = $2`,
-        [systemId, ownerId],
-      );
-      return (result.rowCount ?? 0) > 0;
+      try {
+        const result = await pool.query(
+          `DELETE FROM systems
+            WHERE id = $1 AND owner_id = $2`,
+          [systemId, ownerId],
+        );
+        return (result.rowCount ?? 0) > 0 ? { ok: true } : { ok: false, code: "not_found" };
+      } catch (error) {
+        if ((error as { code?: string }).code === "23503") {
+          return { ok: false, code: "referenced" };
+        }
+        throw error;
+      }
     },
   };
 }
 
 type SystemRow = {
   id: string;
-  owner_id: string;
+  owner_id: string | null;
   name: string;
   access: string;
   lifecycle: string;
@@ -397,6 +434,12 @@ type VersionRow = {
   release_notes: string;
   lifecycle: string;
   created_at: Date;
+};
+
+type AuthorizedVersionUseRow = {
+  system_id: string;
+  version_id: string;
+  checksum: string;
 };
 
 type PreviewRow = {
@@ -632,10 +675,18 @@ async function publishVersionImpl(pool: Pool, input: PublishVersionInput): Promi
     let inserted: VersionRow | undefined;
     try {
       const result = await client.query<VersionRow>(
-        `INSERT INTO system_versions (system_id, semantic_version, checksum, package_json, release_notes)
-         VALUES ($1, $2, $3, $4::jsonb, $5)
-         RETURNING id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at`,
-        [input.systemId, input.semanticVersion, input.checksum, JSON.stringify(input.package), input.releaseNotes],
+        `INSERT INTO system_versions
+           (system_id, semantic_version, checksum, package_json, release_notes, compatibility_findings_json)
+          VALUES ($1, $2, $3, $4::jsonb, $5, $6::jsonb)
+          RETURNING id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at`,
+        [
+          input.systemId,
+          input.semanticVersion,
+          input.checksum,
+          JSON.stringify(input.package),
+          input.releaseNotes,
+          JSON.stringify(input.compatibilityFindings),
+        ],
       );
       inserted = result.rows[0];
     } catch (error) {
@@ -722,7 +773,7 @@ export async function seedReferenceTemplates(runner: SeedRunner): Promise<SeedRe
     if (row === undefined) {
       await runner.query(
         `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at)
-         VALUES ($1, $2, '1.0.0', $3, $4::jsonb, 'Template seed', 'active', now())`,
+         VALUES ($1, $2, '1.0.0', $3, $4::jsonb, 'Template seed', 'published', now())`,
         [tpl.versionId, tpl.systemId, tpl.package.integrity.checksum, JSON.stringify(tpl.package)],
       );
       versionsReplaced += 1;
@@ -732,7 +783,7 @@ export async function seedReferenceTemplates(runner: SeedRunner): Promise<SeedRe
     await runner.query("DELETE FROM system_versions WHERE id = $1", [tpl.versionId]);
     await runner.query(
       `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at)
-       VALUES ($1, $2, '1.0.0', $3, $4::jsonb, 'Template seed', 'active', now())`,
+       VALUES ($1, $2, '1.0.0', $3, $4::jsonb, 'Template seed', 'published', now())`,
       [tpl.versionId, tpl.systemId, tpl.package.integrity.checksum, JSON.stringify(tpl.package)],
     );
     versionsReplaced += 1;

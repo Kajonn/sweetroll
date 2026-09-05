@@ -46,7 +46,7 @@ export interface paths {
         get: operations["get_system"];
         put?: never;
         post?: never;
-        delete?: never;
+        delete: operations["delete_systems_systemId"];
         options?: never;
         head?: never;
         patch: operations["patch_systems_systemId"];
@@ -651,6 +651,106 @@ export interface operations {
             };
         };
     };
+    delete_systems_systemId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                systemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        systemId: string;
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     patch_systems_systemId: {
         parameters: {
             query?: never;
@@ -1170,6 +1270,7 @@ export interface operations {
                     semanticVersion: string;
                     releaseNotes: string;
                     idempotencyKey: string;
+                    acknowledgeBreaking: boolean;
                 };
             };
         };

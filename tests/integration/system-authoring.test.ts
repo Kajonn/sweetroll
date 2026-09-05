@@ -6,6 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { d20Document, d20Export } from "../../src/systems/implementation/package/fixtures/index.js";
 import {
   createSystemPersistenceRepository,
+  seedReferenceTemplates,
   type SystemPersistenceRepository,
 } from "../../src/systems/implementation/persistence/index.js";
 import {
@@ -27,7 +28,7 @@ const DDL = `
   );
   CREATE TABLE systems (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    owner_id uuid REFERENCES users(id) ON DELETE RESTRICT,
     name text NOT NULL,
     access text NOT NULL DEFAULT 'private',
     lifecycle text NOT NULL DEFAULT 'active',
@@ -50,6 +51,7 @@ const DDL = `
     package_json jsonb NOT NULL,
     release_notes text NOT NULL DEFAULT '',
     lifecycle text NOT NULL DEFAULT 'published',
+    compatibility_findings_json jsonb NOT NULL DEFAULT '[]'::jsonb,
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (system_id, semantic_version)
   );
@@ -95,6 +97,20 @@ const DDL = `
   CREATE TRIGGER system_versions_immutable
     BEFORE UPDATE ON system_versions
     FOR EACH ROW EXECUTE FUNCTION system_versions_prevent_mutation();
+  CREATE TABLE characters (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    system_version_id uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+    entity_definition_id text NOT NULL,
+    name text NOT NULL,
+    revision integer NOT NULL CHECK (revision >= 1),
+    state_json jsonb NOT NULL,
+    visibility text NOT NULL CHECK (visibility = 'owner_only'),
+    lifecycle text NOT NULL CHECK (lifecycle IN ('active', 'archived')),
+    archived_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  );
 `;
 
 describeWithDatabase("SystemAuthoring", () => {
@@ -124,7 +140,7 @@ describeWithDatabase("SystemAuthoring", () => {
   beforeEach(async () => {
     await pool.query(`SET search_path TO ${schema}`);
     await pool.query(
-      "TRUNCATE system_audit_records, idempotency_receipts, preview_snapshots, system_versions, system_drafts, systems, users RESTART IDENTITY CASCADE",
+      "TRUNCATE characters, system_audit_records, idempotency_receipts, preview_snapshots, system_versions, system_drafts, systems, users RESTART IDENTITY CASCADE",
     );
   });
 
@@ -210,6 +226,7 @@ describeWithDatabase("SystemAuthoring", () => {
       semanticVersion: "1.0.0",
       releaseNotes: "",
       idempotencyKey: randomUUID(),
+      acknowledgeBreaking: false,
     });
     if (!published.ok) throw new Error(`publish failed: ${JSON.stringify(published.error)}`);
 
@@ -419,6 +436,7 @@ describeWithDatabase("SystemAuthoring", () => {
       semanticVersion: "1.0.0",
       releaseNotes: "First",
       idempotencyKey: key,
+      acknowledgeBreaking: false,
     });
     expect(published.ok).toBe(true);
     if (!published.ok) throw new Error(`publish failed: ${JSON.stringify(published.error)}`);
@@ -431,6 +449,7 @@ describeWithDatabase("SystemAuthoring", () => {
       semanticVersion: "1.0.0",
       releaseNotes: "First",
       idempotencyKey: key,
+      acknowledgeBreaking: false,
     });
     expect(replay.ok).toBe(true);
     if (!replay.ok || !published.ok) throw new Error("unexpected");
@@ -440,8 +459,9 @@ describeWithDatabase("SystemAuthoring", () => {
       systemId,
       expectedRevision: 2,
       semanticVersion: "1.0.0",
-      releaseNotes: "Changed",
+      releaseNotes: "First",
       idempotencyKey: key,
+      acknowledgeBreaking: true,
     });
     expect(mismatch).toEqual({
       ok: false,
@@ -454,6 +474,7 @@ describeWithDatabase("SystemAuthoring", () => {
       semanticVersion: "1.0.0",
       releaseNotes: "Again",
       idempotencyKey: randomUUID(),
+      acknowledgeBreaking: false,
     });
     expect(duplicate.ok).toBe(false);
     if (duplicate.ok) throw new Error("unexpected");
@@ -465,6 +486,7 @@ describeWithDatabase("SystemAuthoring", () => {
       semanticVersion: "1.1.0",
       releaseNotes: "",
       idempotencyKey: randomUUID(),
+      acknowledgeBreaking: false,
     });
     expect(stale.ok).toBe(false);
     if (stale.ok) throw new Error("unexpected");
@@ -477,6 +499,7 @@ describeWithDatabase("SystemAuthoring", () => {
       semanticVersion: "not-a-version",
       releaseNotes: "",
       idempotencyKey: randomUUID(),
+      acknowledgeBreaking: false,
     });
     expect(badSemver.ok).toBe(false);
     if (badSemver.ok) throw new Error("unexpected");
@@ -509,6 +532,7 @@ describeWithDatabase("SystemAuthoring", () => {
       semanticVersion: "1.0.0",
       releaseNotes: "",
       idempotencyKey: randomUUID(),
+      acknowledgeBreaking: false,
     });
     expect(blocked.ok).toBe(false);
     if (blocked.ok) throw new Error("unexpected");
@@ -523,6 +547,7 @@ describeWithDatabase("SystemAuthoring", () => {
       semanticVersion: "1.0.0",
       releaseNotes: "",
       idempotencyKey: randomUUID(),
+      acknowledgeBreaking: false,
     });
     expect(published.ok).toBe(true);
   });
@@ -543,6 +568,7 @@ describeWithDatabase("SystemAuthoring", () => {
       semanticVersion: "1.0.0",
       releaseNotes: "",
       idempotencyKey: randomUUID(),
+      acknowledgeBreaking: false,
     });
     if (!published.ok) throw new Error("unexpected");
 
@@ -583,11 +609,12 @@ describeWithDatabase("SystemAuthoring", () => {
       semanticVersion: "1.0.0",
       releaseNotes: "Initial",
       idempotencyKey: randomUUID(),
+      acknowledgeBreaking: false,
     });
     expect(published.ok).toBe(true);
   });
 
-  it("blocks publishing a second version that removes a required field", async () => {
+  it("requires acknowledgement and a greater major to publish a breaking version", async () => {
     const owner = await createUser("Hank");
     const created = await authoring.createDraft(ctx(owner), {
       source: { kind: "blank", name: "Compat Block" },
@@ -602,28 +629,59 @@ describeWithDatabase("SystemAuthoring", () => {
       semanticVersion: "1.0.0",
       releaseNotes: "Initial",
       idempotencyKey: randomUUID(),
+      acknowledgeBreaking: false,
     });
     if (!first.ok) throw new Error("unexpected");
 
     const mutated = structuredClone(d20Document);
     mutated.entities[0].fields = mutated.entities[0].fields.filter((f) => f.id !== "proficient");
     await authoring.saveDraft(ctx(owner), { systemId, expectedRevision: 2, document: mutated });
-    const blocked = await authoring.publish(ctx(owner), {
+    const unacknowledged = await authoring.publish(ctx(owner), {
       systemId,
       expectedRevision: 3,
-      semanticVersion: "1.1.0",
+      semanticVersion: "2.0.0",
       releaseNotes: "Removed proficient",
       idempotencyKey: randomUUID(),
+      acknowledgeBreaking: false,
     });
-    expect(blocked.ok).toBe(false);
-    if (blocked.ok) throw new Error("expected failure");
-    expect(blocked.error.code).toBe("invalid_package");
-    expect(blocked.error.diagnostics ?? []).toContainEqual(
+    expect(unacknowledged.ok).toBe(false);
+    if (unacknowledged.ok) throw new Error("expected failure");
+    expect(unacknowledged.error.code).toBe("invalid_package");
+    expect(unacknowledged.error.diagnostics ?? []).toContainEqual(
       expect.objectContaining({
         code: "breaking_removed_definition",
         path: "/entities/character/fields/proficient",
       }),
     );
+
+    const sameMajor = await authoring.publish(ctx(owner), {
+      systemId,
+      expectedRevision: 3,
+      semanticVersion: "1.1.0",
+      releaseNotes: "Removed proficient",
+      idempotencyKey: randomUUID(),
+      acknowledgeBreaking: true,
+    });
+    expect(sameMajor.ok).toBe(false);
+    if (sameMajor.ok) throw new Error("expected failure");
+    expect(sameMajor.error.code).toBe("invalid_package");
+    expect(sameMajor.error.diagnostics).toEqual(unacknowledged.error.diagnostics);
+
+    const acknowledged = await authoring.publish(ctx(owner), {
+      systemId,
+      expectedRevision: 3,
+      semanticVersion: "2.0.0",
+      releaseNotes: "Removed proficient",
+      idempotencyKey: randomUUID(),
+      acknowledgeBreaking: true,
+    });
+    expect(acknowledged.ok).toBe(true);
+    if (!acknowledged.ok) throw new Error(`expected success: ${JSON.stringify(acknowledged.error)}`);
+    const stored = await pool.query<{ compatibility_findings_json: unknown }>(
+      "SELECT compatibility_findings_json FROM system_versions WHERE id = $1",
+      [acknowledged.value.versionId],
+    );
+    expect(stored.rows[0]?.compatibility_findings_json).toEqual(unacknowledged.error.diagnostics);
   });
 
   it("permits a compatible additive change between versions", async () => {
@@ -641,6 +699,7 @@ describeWithDatabase("SystemAuthoring", () => {
       semanticVersion: "1.0.0",
       releaseNotes: "Initial",
       idempotencyKey: randomUUID(),
+      acknowledgeBreaking: false,
     });
     if (!first.ok) throw new Error("unexpected");
 
@@ -661,9 +720,103 @@ describeWithDatabase("SystemAuthoring", () => {
       semanticVersion: "1.1.0",
       releaseNotes: "Added notes",
       idempotencyKey: randomUUID(),
+      acknowledgeBreaking: false,
     });
     expect(second.ok).toBe(true);
     if (!second.ok) throw new Error("expected success");
     expect(second.value.semanticVersion).toBe("1.1.0");
+  });
+
+  it("authorizes only accessible active published versions without returning package JSON", async () => {
+    const owner = await createUser("Version Owner");
+    const stranger = await createUser("Version User");
+    const privateSystem = await repo.createSystem({ ownerId: owner, name: "Private" });
+    const privateVersion = await repo.insertVersion({
+      systemId: privateSystem.systemId,
+      semanticVersion: "1.0.0",
+      checksum: "private-checksum",
+      package: d20Export.package,
+      releaseNotes: "",
+    });
+
+    expect(await authoring.authorizeVersionUse(ctx(owner), privateVersion.versionId)).toEqual({
+      ok: true,
+      value: {
+        systemId: privateSystem.systemId,
+        versionId: privateVersion.versionId,
+        checksum: "private-checksum",
+      },
+    });
+    expect(await authoring.authorizeVersionUse(ctx(stranger), privateVersion.versionId)).toEqual({
+      ok: false,
+      error: { code: "not_found", message: "The requested resource does not exist." },
+    });
+
+    for (const access of ["public", "link"] as const) {
+      const accessibleSystem = await repo.createSystem({ ownerId: owner, name: access });
+      await pool.query("UPDATE systems SET access = $2 WHERE id = $1", [accessibleSystem.systemId, access]);
+      const version = await repo.insertVersion({
+        systemId: accessibleSystem.systemId,
+        semanticVersion: "1.0.0",
+        checksum: `${access}-checksum`,
+        package: d20Export.package,
+        releaseNotes: "",
+      });
+      expect(await authoring.authorizeVersionUse(ctx(stranger), version.versionId)).toEqual({
+        ok: true,
+        value: {
+          systemId: accessibleSystem.systemId,
+          versionId: version.versionId,
+          checksum: `${access}-checksum`,
+        },
+      });
+    }
+
+    await repo.updateVersionLifecycle(privateVersion.versionId, "deprecated");
+    expect((await authoring.authorizeVersionUse(ctx(owner), privateVersion.versionId)).ok).toBe(false);
+    await pool.query("UPDATE system_versions SET lifecycle = 'published' WHERE id = $1", [privateVersion.versionId]);
+    await repo.updateSystemLifecycle(privateSystem.systemId, "archived");
+    expect((await authoring.authorizeVersionUse(ctx(owner), privateVersion.versionId)).ok).toBe(false);
+
+    await seedReferenceTemplates(pool);
+    const template = await authoring.authorizeVersionUse(
+      ctx(stranger),
+      "11111111-1111-1111-1111-111111111a01",
+    );
+    expect(template).toEqual({
+      ok: true,
+      value: {
+        systemId: "00000000-0000-0000-0000-000000000a01",
+        versionId: "11111111-1111-1111-1111-111111111a01",
+        checksum: d20Export.package.integrity.checksum,
+      },
+    });
+  });
+
+  it("returns conflict without deleting a system or version pinned by a character", async () => {
+    const owner = await createUser("Pinned Owner");
+    const system = await repo.createSystem({ ownerId: owner, name: "Pinned" });
+    const version = await repo.insertVersion({
+      systemId: system.systemId,
+      semanticVersion: "1.0.0",
+      checksum: "pinned-checksum",
+      package: d20Export.package,
+      releaseNotes: "",
+    });
+    const character = await pool.query<{ id: string }>(
+      `INSERT INTO characters
+         (owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle)
+       VALUES ($1, $2, 'character', 'Pinned Hero', 1, '{}'::jsonb, 'owner_only', 'active')
+       RETURNING id`,
+      [owner, version.versionId],
+    );
+
+    expect(await authoring.deleteSystem(ctx(owner), system.systemId)).toEqual({
+      ok: false,
+      error: { code: "conflict", message: "The system is referenced and cannot be deleted." },
+    });
+    expect((await pool.query("SELECT id FROM characters WHERE id = $1", [character.rows[0]?.id])).rowCount).toBe(1);
+    expect((await pool.query("SELECT id FROM system_versions WHERE id = $1", [version.versionId])).rowCount).toBe(1);
+    expect((await pool.query("SELECT id FROM systems WHERE id = $1", [system.systemId])).rowCount).toBe(1);
   });
 });

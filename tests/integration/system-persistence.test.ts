@@ -42,6 +42,7 @@ const DDL = `
     package_json jsonb NOT NULL,
     release_notes text NOT NULL DEFAULT '',
     lifecycle text NOT NULL DEFAULT 'published',
+    compatibility_findings_json jsonb NOT NULL DEFAULT '[]'::jsonb,
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (system_id, semantic_version)
   );
@@ -478,6 +479,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       checksum: "sha256:pkg",
       package: { schemaVersion: "1.0", name: "pkg" },
       releaseNotes: "First",
+      compatibilityFindings: [],
       actorId: owner,
       requestId: "req-pub",
     });
@@ -496,6 +498,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       checksum: "sha256:other",
       package: { schemaVersion: "1.0", name: "other" },
       releaseNotes: "",
+      compatibilityFindings: [],
       actorId: owner,
       requestId: "req-pub",
     });
@@ -509,6 +512,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       checksum: "sha256:pkg2",
       package: { schemaVersion: "1.0", name: "pkg2" },
       releaseNotes: "",
+      compatibilityFindings: [],
       actorId: owner,
       requestId: "req-pub",
     });
@@ -522,6 +526,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       checksum: "sha256:y",
       package: {},
       releaseNotes: "",
+      compatibilityFindings: [],
       actorId: owner,
       requestId: "req-pub",
     });

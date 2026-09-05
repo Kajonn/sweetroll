@@ -25,7 +25,7 @@ import type {
   VersionRecord,
 } from "./implementation/persistence/index.js";
 import { compileDocument } from "./implementation/rules/compile-document.js";
-import { comparePackages } from "./implementation/package/compatibility.js";
+import { comparePackages, type CompatibilityFinding } from "./implementation/package/compatibility.js";
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: AppError };
 
@@ -143,6 +143,7 @@ export type PublishDraftInput = {
   semanticVersion: string;
   releaseNotes: string;
   idempotencyKey: string;
+  acknowledgeBreaking: boolean;
 };
 
 export type LifecycleChangeInput =
@@ -163,6 +164,10 @@ export interface SystemAuthoring {
   saveDraft(ctx: RequestContext, input: SaveDraftInput): Promise<Result<AuthoringWorkspace>>;
   previewDraft(ctx: RequestContext, input: PreviewDraftInput): Promise<Result<PreviewSnapshot>>;
   publish(ctx: RequestContext, input: PublishDraftInput): Promise<Result<PublishedVersion>>;
+  authorizeVersionUse(
+    ctx: RequestContext,
+    versionId: VersionId,
+  ): Promise<Result<{ systemId: SystemId; versionId: VersionId; checksum: string }>>;
   exportVersion(ctx: RequestContext, versionId: VersionId): Promise<Result<ExportedPackage>>;
   listVersions(
     ctx: RequestContext,
@@ -458,9 +463,11 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
         }
 
         const inputHash = hashInput({
+          systemId: input.systemId,
           expectedRevision: input.expectedRevision,
           semanticVersion: input.semanticVersion,
           releaseNotes: input.releaseNotes,
+          acknowledgeBreaking: input.acknowledgeBreaking,
         });
         const receipt = await receiptResult<PublishedVersion>(ctx, "system_publish", input.idempotencyKey, inputHash);
         if (receipt.replayed === "mismatch") return { ok: false, error: errors.mismatch() };
@@ -487,13 +494,19 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
 
         const previousVersions = await repo.listVersions(input.systemId);
         const latest = previousVersions[0] ?? null;
+        let compatibilityFindings: CompatibilityFinding[] = [];
         if (latest !== null) {
           const compatibility = comparePackages(latest.package as SystemPackageV1, compiled.value);
+          compatibilityFindings = compatibility.findings;
           if (!compatibility.compatible) {
-            return {
-              ok: false,
-              error: errors.invalid_package(compatibility.findings as unknown as PackageDiagnostic[]),
-            };
+            const nextMajor = Number(input.semanticVersion.split(".")[0]);
+            const latestMajor = Number(latest.semanticVersion.split(".")[0]);
+            if (!input.acknowledgeBreaking || nextMajor <= latestMajor) {
+              return {
+                ok: false,
+                error: errors.invalid_package(compatibility.findings as unknown as PackageDiagnostic[]),
+              };
+            }
           }
         }
 
@@ -505,6 +518,7 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           checksum: compiled.value.integrity.checksum,
           package: compiled.value,
           releaseNotes: input.releaseNotes,
+          compatibilityFindings,
           actorId: ctx.actorId,
           requestId: ctx.requestId,
         });
@@ -542,6 +556,16 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           expiresAt: new Date(now().getTime() + RECEIPT_TTL_MS),
         });
         return { ok: true, value: published };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async authorizeVersionUse(ctx, versionId) {
+      try {
+        const version = await repo.authorizeVersionUse(ctx.actorId, versionId);
+        if (version === null) return { ok: false, error: errors.not_found() };
+        return { ok: true, value: version };
       } catch {
         return { ok: false, error: errors.internal() };
       }
@@ -625,7 +649,15 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
     async deleteSystem(ctx, systemId) {
       try {
         const deleted = await repo.deleteOwnedSystem(systemId, ctx.actorId);
-        if (!deleted) return { ok: false, error: errors.not_found() };
+        if (!deleted.ok) {
+          if (deleted.code === "referenced") {
+            return {
+              ok: false,
+              error: errors.conflict("The system is referenced and cannot be deleted."),
+            };
+          }
+          return { ok: false, error: errors.not_found() };
+        }
         return { ok: true, value: { systemId } };
       } catch {
         return { ok: false, error: errors.internal() };

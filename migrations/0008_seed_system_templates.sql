@@ -18,7 +18,7 @@ ON CONFLICT (id) DO NOTHING;
 -- replaces them with the real compiled package and signed checksum.
 INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at)
 VALUES
-  ('11111111-1111-1111-1111-111111111a01', '00000000-0000-0000-0000-000000000a01', '1.0.0', 'pending:d20', '{}'::jsonb, 'Template seed', 'active', now()),
-  ('11111111-1111-1111-1111-111111111a02', '00000000-0000-0000-0000-000000000a02', '1.0.0', 'pending:pbta-2d6', '{}'::jsonb, 'Template seed', 'active', now()),
-  ('11111111-1111-1111-1111-111111111a03', '00000000-0000-0000-0000-000000000a03', '1.0.0', 'pending:d6-success-pool', '{}'::jsonb, 'Template seed', 'active', now())
+  ('11111111-1111-1111-1111-111111111a01', '00000000-0000-0000-0000-000000000a01', '1.0.0', 'pending:d20', '{}'::jsonb, 'Template seed', 'published', now()),
+  ('11111111-1111-1111-1111-111111111a02', '00000000-0000-0000-0000-000000000a02', '1.0.0', 'pending:pbta-2d6', '{}'::jsonb, 'Template seed', 'published', now()),
+  ('11111111-1111-1111-1111-111111111a03', '00000000-0000-0000-0000-000000000a03', '1.0.0', 'pending:d6-success-pool', '{}'::jsonb, 'Template seed', 'published', now())
 ON CONFLICT (id) DO NOTHING;

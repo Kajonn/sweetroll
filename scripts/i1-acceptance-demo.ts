@@ -122,6 +122,7 @@ async function main(): Promise<void> {
         semanticVersion: "1.0.0",
         releaseNotes: "I1 acceptance demo",
         idempotencyKey: `i1-demo-publish-${ts}`,
+        acknowledgeBreaking: false,
       }),
     );
     if (!step4.ok) throw new Error(`step 4: ${JSON.stringify(step4.error)}`);
@@ -181,6 +182,7 @@ async function main(): Promise<void> {
         semanticVersion: "1.1.0",
         releaseNotes: "Over-budget attempt",
         idempotencyKey: `i1-demo-publish-ob-${ts}`,
+        acknowledgeBreaking: false,
       }),
     );
     if (step7Publish.ok) throw new Error("step 7 publish: expected failure");
@@ -220,6 +222,7 @@ async function main(): Promise<void> {
         semanticVersion: "1.1.0",
         releaseNotes: "Breaking change attempt",
         idempotencyKey: `i1-demo-publish-bc-${ts}`,
+        acknowledgeBreaking: false,
       }),
     );
     if (step8Publish.ok) throw new Error("step 8 publish: expected failure");

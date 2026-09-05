@@ -140,6 +140,7 @@ const PublishBody = Type.Object({
   semanticVersion: Type.String({ pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$" }),
   releaseNotes: Type.String(),
   idempotencyKey: Type.String({ minLength: 1 }),
+  acknowledgeBreaking: Type.Boolean(),
 });
 
 const ChangeSystemLifecycleBody = Type.Object({
@@ -344,6 +345,7 @@ export const systemsRouteDefinitions: readonly SystemsRouteDefinition[] = [
         "200": Type.Object({ systemId: Type.String({ format: UUID_FORMAT }), requestId: Type.String() }),
         "401": UnauthorizedEnvelope,
         "404": ErrorEnvelope,
+        "409": ErrorEnvelope,
         "500": ErrorEnvelope,
       },
     },
@@ -539,7 +541,13 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
       post_systems_publish: async (request, reply) => {
         const params = request.params as { systemId: string };
         const body = request.body as
-          | { expectedRevision?: unknown; semanticVersion?: unknown; releaseNotes?: unknown; idempotencyKey?: unknown }
+          | {
+              expectedRevision?: unknown;
+              semanticVersion?: unknown;
+              releaseNotes?: unknown;
+              idempotencyKey?: unknown;
+              acknowledgeBreaking?: unknown;
+            }
           | undefined;
         if (
           body === undefined ||
@@ -547,7 +555,8 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
           typeof body.semanticVersion !== "string" ||
           typeof body.releaseNotes !== "string" ||
           typeof body.idempotencyKey !== "string" ||
-          body.idempotencyKey.length === 0
+          body.idempotencyKey.length === 0 ||
+          typeof body.acknowledgeBreaking !== "boolean"
         ) {
           return sendError(reply, badRequest("The request body is invalid."), request.id);
         }
@@ -557,6 +566,7 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
           semanticVersion: body.semanticVersion,
           releaseNotes: body.releaseNotes,
           idempotencyKey: body.idempotencyKey,
+          acknowledgeBreaking: body.acknowledgeBreaking,
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { version: result.value, requestId: request.id };

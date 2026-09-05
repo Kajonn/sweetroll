@@ -60,6 +60,10 @@ function makeAuthoring(overrides: Partial<SystemAuthoring> = {}): SystemAuthorin
         expiresAt: new Date(Date.now() + 60_000),
       } satisfies PreviewSnapshot,
     }),
+    authorizeVersionUse: async (_ctx, versionId) => ({
+      ok: true,
+      value: { systemId: randomUUID(), versionId, checksum: d20Package.integrity.checksum },
+    }),
     publish: async () => ({
       ok: true,
       value: {
@@ -229,7 +233,13 @@ describe("systems HTTP routes", () => {
       method: "POST",
       url: `/systems/${randomUUID()}/publish`,
       headers,
-      payload: { expectedRevision: 1, semanticVersion: "1.0.0", releaseNotes: "", idempotencyKey: "k" },
+      payload: {
+        expectedRevision: 1,
+        semanticVersion: "1.0.0",
+        releaseNotes: "",
+        idempotencyKey: "k",
+        acknowledgeBreaking: false,
+      },
     });
     expect(invalid.statusCode).toBe(422);
     expect(invalid.json().error.diagnostics).toHaveLength(1);
@@ -287,6 +297,45 @@ describe("systems HTTP routes", () => {
     expect(exported.json().package.integrity.checksum).toBe(d20Package.integrity.checksum);
   });
 
+  it("requires and forwards breaking-change acknowledgement when publishing", async () => {
+    let received: unknown;
+    const app = await build(
+      makeAuthoring({
+        publish: async (_ctx, input) => {
+          received = input;
+          return makeAuthoring().publish(_ctx, input);
+        },
+      }),
+    );
+    apps.push(app);
+    const url = `/systems/${randomUUID()}/publish`;
+    const headers = { cookie: "session=t" };
+    const payload = {
+      expectedRevision: 2,
+      semanticVersion: "2.0.0",
+      releaseNotes: "Breaking",
+      idempotencyKey: "publish-key",
+      acknowledgeBreaking: true,
+    };
+
+    const response = await app.inject({ method: "POST", url, headers, payload });
+    expect(response.statusCode).toBe(200);
+    expect(received).toEqual({ systemId: expect.any(String), ...payload });
+
+    const missing = await app.inject({
+      method: "POST",
+      url,
+      headers,
+      payload: {
+        expectedRevision: payload.expectedRevision,
+        semanticVersion: payload.semanticVersion,
+        releaseNotes: payload.releaseNotes,
+        idempotencyKey: payload.idempotencyKey,
+      },
+    });
+    expect(missing.statusCode).toBe(400);
+  });
+
   it("maps DELETE /systems/:systemId to deleteSystem and returns 404 when missing", async () => {
     let received: string | undefined;
     const app = await build(
@@ -321,6 +370,22 @@ describe("systems HTTP routes", () => {
       headers,
     });
     expect(missing.statusCode).toBe(404);
+
+    const referencedApp = await build(
+      makeAuthoring({
+        deleteSystem: async () => ({
+          ok: false,
+          error: { code: "conflict", message: "The system is referenced and cannot be deleted." },
+        }),
+      }),
+    );
+    apps.push(referencedApp);
+    const referenced = await referencedApp.inject({
+      method: "DELETE",
+      url: `/systems/${randomUUID()}`,
+      headers,
+    });
+    expect(referenced.statusCode).toBe(409);
   });
 
   it("maps GET /systems/:systemId/versions to listVersions and returns 404 when missing", async () => {

@@ -1,0 +1,214 @@
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  background: var(--color-surface);
+  color: var(--color-fg);
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.sectionHeading {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.heading2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.heading3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 2fr;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.fieldValue {
+  font-size: 14px;
+  color: var(--color-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.resourceRow {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto auto;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.resourceCurrent {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.resourceSeparator {
+  font-size: 14px;
+  color: var(--color-fg-muted);
+}
+
+.resourceMax {
+  font-size: 14px;
+  color: var(--color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.actionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.actionButton:hover {
+  filter: brightness(0.95);
+}
+
+.rollSheet {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+
+.rollSheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rollSheetTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rollSheetClose {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+}
+
+.rollSheetClose:hover {
+  background: var(--color-surface);
+  color: var(--color-fg);
+}
+
+.rollSheetRow {
+  display: grid;
+  grid-template-columns: minmax(80px, auto) 1fr;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+}
+
+.rollSheetLabel {
+  color: var(--color-fg-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.diceList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diceChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-fg);
+}
+
+.diagnosticList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diagnosticItem {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-error);
+}
+
+.formatted {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-fg);
+}
+
+.unsupported {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-warning);
+  font-style: italic;
+}

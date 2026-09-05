@@ -3,6 +3,7 @@ import { useReducer, useState } from "react";
 
 import type { ApiClient } from "../api/client.js";
 import { useOpenSystem } from "../api/openSystem.js";
+import type { DocumentAssessment } from "../api/server.js";
 import { t } from "../i18n/index.js";
 import {
   blankDocument,
@@ -67,7 +68,12 @@ export function DocumentEditor({ client, systemId }: { client: ApiClient; system
       ? (ws.draft.document as SystemDocumentV1)
       : blankDocument();
   return (
-    <DocumentEditorBody ws={ws} active={active} initialDoc={initialDoc} />
+    <DocumentEditorBody
+      ws={ws}
+      active={active}
+      initialDoc={initialDoc}
+      assessment={ws.assessment}
+    />
   );
 }
 
@@ -75,15 +81,19 @@ function DocumentEditorBody({
   ws,
   active,
   initialDoc,
+  assessment,
 }: {
   ws: NonNullable<ReturnType<typeof useOpenSystem>["data"]>;
   active: TabId;
   initialDoc: SystemDocumentV1;
+  assessment: DocumentAssessment;
 }) {
   const [document, dispatch] = useReducer(documentReducer, initialDoc);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(
     initialDoc.entities[0]?.id ?? null,
   );
+  const errorCount = assessment.diagnostics.length;
+  const publishDisabled = errorCount > 0;
 
   return (
     <section className={styles.container}>
@@ -104,6 +114,20 @@ function DocumentEditorBody({
           <Check aria-hidden size={14} />
           {t("editor.autosave.idle")}
         </span>
+        <button
+          type="button"
+          className={styles.publish}
+          data-testid="document-editor-publish"
+          disabled={publishDisabled}
+          aria-disabled={publishDisabled ? "true" : undefined}
+          title={
+            publishDisabled
+              ? t("editor.publish.disabled.reason", { count: errorCount })
+              : undefined
+          }
+        >
+          {t("editor.publish.label")}
+        </button>
       </header>
       <nav className={styles.tabs} aria-label={t("editor.tabsAriaLabel")}>
         {TABS.map((tab) => {

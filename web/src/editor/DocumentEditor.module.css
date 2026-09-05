@@ -45,6 +45,29 @@
   color: var(--color-fg-muted);
 }
 
+.publish {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  cursor: pointer;
+}
+
+.publish:hover:not(:disabled) {
+  background: var(--color-accent-fg);
+  color: var(--color-accent);
+}
+
+.publish:disabled {
+  background: var(--color-bg);
+  color: var(--color-fg-muted);
+  border-color: var(--color-border);
+  cursor: not-allowed;
+}
+
 .tabs {
   display: flex;
   gap: 4px;

@@ -24,6 +24,7 @@ import type {
 import { createSystemRuntime, type SystemRuntime } from "../../src/systems/runtime.js";
 import { createSystemAuthoringModule, type SystemAuthoring } from "../../src/systems/authoring.js";
 import { createSystemPersistenceRepository } from "../../src/systems/implementation/persistence/index.js";
+import { canonicalizeCharacterExport } from "../../src/characters/export.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const describeWithDatabase = databaseUrl === undefined ? describe.skip : describe;
@@ -1311,3 +1312,399 @@ describeWithDatabase("Characters (apply: executeAction)", () => {
   });
 });
 
+
+describeWithDatabase("Characters (manage/activity/export)", () => {
+  const schema = `characters_manage_${randomUUID().replaceAll("-", "")}`;
+  let pool: Pool;
+  let authoring: SystemAuthoring;
+  let runtime: SystemRuntime;
+  let characters: Characters;
+
+  beforeAll(async () => {
+    pool = new Pool({
+      connectionString: databaseUrl,
+      application_name: schema,
+      max: 8,
+      onConnect: async (client) => {
+        await client.query(`SET search_path TO ${schema}`);
+      },
+    });
+    const admin = new Client({ connectionString: databaseUrl });
+    await admin.connect();
+    await admin.query(`CREATE SCHEMA ${schema}`);
+    await admin.query(`SET search_path TO ${schema}`);
+    await admin.query(DDL);
+    await admin.end();
+
+    const repo = createSystemPersistenceRepository(pool);
+    authoring = createSystemAuthoringModule({ repo });
+    runtime = createSystemRuntime({
+      loadPackage: createPostgresPublishedPackageLoader(pool),
+      authoritativeRollSecret: "a".repeat(32),
+    });
+    characters = createCharactersModule({
+      pool,
+      runtime,
+      authorizeVersionUse: authoring.authorizeVersionUse,
+    });
+  });
+
+  beforeEach(async () => {
+    await pool.query(`SET search_path TO ${schema}`);
+    await pool.query(
+      "TRUNCATE character_audit_records, character_activity_events, character_rolls, character_command_executions, characters, system_versions, systems, users RESTART IDENTITY CASCADE",
+    );
+  });
+
+  afterAll(async () => {
+    const admin = new Client({ connectionString: databaseUrl });
+    await admin.connect();
+    await admin.query(`DROP SCHEMA ${schema} CASCADE`);
+    await admin.end();
+    await pool.end();
+  });
+
+  const ctx = (actorId: string) => ({ actorId, requestId: randomUUID() });
+
+  async function createUser(displayName: string): Promise<string> {
+    const result = await pool.query<{ id: string }>(
+      "INSERT INTO users (display_name) VALUES ($1) RETURNING id",
+      [displayName],
+    );
+    return result.rows[0]!.id;
+  }
+
+  function repackage(versionId: string): SystemPackageV1 {
+    const unsigned = structuredClone(d20Package) as unknown as UnsignedSystemPackageV1 & { integrity?: unknown };
+    delete unsigned.integrity;
+    unsigned.versionId = versionId;
+    return signSystemPackage(unsigned);
+  }
+
+  async function publishVersion(ownerId: string): Promise<{ systemId: string; versionId: string }> {
+    const systemResult = await pool.query<{ id: string }>(
+      "INSERT INTO systems (owner_id, name, access, lifecycle) VALUES ($1, $2, 'public', 'active') RETURNING id",
+      [ownerId, "D20"],
+    );
+    const systemId = systemResult.rows[0]!.id;
+    const versionId = randomUUID();
+    const packageValue = repackage(versionId);
+    await pool.query(
+      "INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, lifecycle) VALUES ($1, $2, '1.0.0', $3, $4::jsonb, 'published')",
+      [versionId, systemId, packageValue.integrity.checksum, JSON.stringify(packageValue)],
+    );
+    return { systemId, versionId };
+  }
+
+  async function createCharacter(ownerId: string, versionId: string): Promise<CharacterId> {
+    const created = await characters.create(ctx(ownerId), {
+      systemVersionId: versionId,
+      entityDefinitionId: "character",
+      name: "Aria",
+      idempotencyKey: randomUUID(),
+    });
+    if (!created.ok) throw new Error(`unexpected create failure: ${JSON.stringify(created.error)}`);
+    return created.value.characterId;
+  }
+
+  it("renames a character, increments revision, and writes activity/audit", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    const result = await characters.manage(ctx(owner), {
+      kind: "rename",
+      characterId,
+      name: "Renamed",
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(`unexpected: ${JSON.stringify(result.error)}`);
+    expect(result.value.character.name).toBe("Renamed");
+    expect(result.value.character.revision).toBe(2);
+    expect(result.value.roll).toBeNull();
+
+    const activity = await pool.query<{ kind: string }>(
+      "SELECT kind FROM character_activity_events WHERE character_id = $1 AND kind = 'character_renamed'",
+      [characterId],
+    );
+    expect(activity.rows).toHaveLength(1);
+    const audit = await pool.query<{ kind: string }>(
+      "SELECT kind FROM character_audit_records WHERE character_id = $1 AND kind = 'character_renamed'",
+      [characterId],
+    );
+    expect(audit.rows).toHaveLength(1);
+  });
+
+  it("transfers ownership, revokes the old owner immediately, grants the new owner, and replays the receipt for the old owner", async () => {
+    const owner = await createUser("Ada");
+    const newOwner = await createUser("Bob");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+    const key = randomUUID();
+
+    const result = await characters.manage(ctx(owner), {
+      kind: "transferOwnership",
+      characterId,
+      toUserId: newOwner,
+      expectedRevision: 1,
+      idempotencyKey: key,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(`unexpected: ${JSON.stringify(result.error)}`);
+    expect(result.value.character.ownerId).toBe(newOwner);
+    expect(result.value.character.revision).toBe(2);
+
+    const oldOwnerOpen = await characters.open(ctx(owner), characterId);
+    expect(oldOwnerOpen).toEqual({
+      ok: false,
+      error: {
+        code: "not_found",
+        message: "The requested character does not exist.",
+      },
+    });
+
+    const newOwnerOpen = await characters.open(ctx(newOwner), characterId);
+    expect(newOwnerOpen.ok).toBe(true);
+    if (!newOwnerOpen.ok) throw new Error("unexpected");
+    expect(newOwnerOpen.value.ownerId).toBe(newOwner);
+
+    const replay = await characters.manage(ctx(owner), {
+      kind: "transferOwnership",
+      characterId,
+      toUserId: newOwner,
+      expectedRevision: 1,
+      idempotencyKey: key,
+    });
+    expect(replay.ok).toBe(true);
+    if (!replay.ok) throw new Error("unexpected");
+    expect(replay.value.character.reconciliation.replayed).toBe(true);
+    expect(replay.value.character.ownerId).toBe(newOwner);
+  });
+
+  it("rejects transfer to a nonexistent destination user without mutating the character", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    const result = await characters.manage(ctx(owner), {
+      kind: "transferOwnership",
+      characterId,
+      toUserId: randomUUID(),
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unexpected");
+    expect(result.error.code).toBe("invalid_value");
+
+    const row = await pool.query<{ owner_id: string; revision: number }>(
+      "SELECT owner_id, revision FROM characters WHERE id = $1",
+      [characterId],
+    );
+    expect(row.rows[0]).toEqual({ owner_id: owner, revision: 1 });
+  });
+
+  it("blocks play commands on an archived character but allows read and export; recover restores play", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    const archived = await characters.manage(ctx(owner), {
+      kind: "archive",
+      characterId,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(archived.ok).toBe(true);
+    if (!archived.ok) throw new Error(`unexpected: ${JSON.stringify(archived.error)}`);
+    expect(archived.value.character.lifecycle).toBe("archived");
+    expect(archived.value.character.revision).toBe(2);
+
+    const blockedSet = await characters.apply(ctx(owner), {
+      kind: "setField",
+      characterId,
+      fieldId: "ability",
+      value: 15,
+      expectedRevision: 2,
+      idempotencyKey: randomUUID(),
+    });
+    expect(blockedSet.ok).toBe(false);
+    if (blockedSet.ok) throw new Error("unexpected");
+    expect(blockedSet.error.code).toBe("conflict");
+
+    const opened = await characters.open(ctx(owner), characterId);
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) throw new Error("unexpected");
+    expect(opened.value.lifecycle).toBe("archived");
+
+    const exported = await characters.exportCharacter(ctx(owner), { characterId });
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) throw new Error("unexpected");
+    expect(exported.value.lifecycle).toBe("archived");
+
+    const recovered = await characters.manage(ctx(owner), {
+      kind: "recover",
+      characterId,
+      expectedRevision: 2,
+      idempotencyKey: randomUUID(),
+    });
+    expect(recovered.ok).toBe(true);
+    if (!recovered.ok) throw new Error(`unexpected: ${JSON.stringify(recovered.error)}`);
+    expect(recovered.value.character.lifecycle).toBe("active");
+    expect(recovered.value.character.revision).toBe(3);
+
+    const playAgain = await characters.apply(ctx(owner), {
+      kind: "setField",
+      characterId,
+      fieldId: "ability",
+      value: 15,
+      expectedRevision: 3,
+      idempotencyKey: randomUUID(),
+    });
+    expect(playAgain.ok).toBe(true);
+    if (!playAgain.ok) throw new Error(`unexpected: ${JSON.stringify(playAgain.error)}`);
+    expect(playAgain.value.character.state.values.ability).toBe(15);
+  });
+
+  it("paginates activity in stable (occurred_at DESC, id DESC) order across tied timestamps with minimized payloads", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    let revision = 1;
+    for (let i = 0; i < 4; i += 1) {
+      const result = await characters.apply(ctx(owner), {
+        kind: "setField",
+        characterId,
+        fieldId: "ability",
+        value: 10 + i,
+        expectedRevision: revision,
+        idempotencyKey: randomUUID(),
+      });
+      if (!result.ok) throw new Error(`unexpected: ${JSON.stringify(result.error)}`);
+      revision = result.value.character.revision;
+    }
+
+    // Force every activity event to the same occurred_at to exercise the (occurred_at, id) tiebreak.
+    await pool.query("UPDATE character_activity_events SET occurred_at = now() WHERE character_id = $1", [characterId]);
+
+    const page1 = await characters.listActivity(ctx(owner), { characterId, limit: 3, cursor: null });
+    expect(page1.ok).toBe(true);
+    if (!page1.ok) throw new Error("unexpected");
+    expect(page1.value.events).toHaveLength(3);
+    expect(page1.value.nextCursor).not.toBeNull();
+
+    const page2 = await characters.listActivity(ctx(owner), {
+      characterId,
+      limit: 3,
+      cursor: page1.value.nextCursor,
+    });
+    expect(page2.ok).toBe(true);
+    if (!page2.ok) throw new Error("unexpected");
+    // 1 create + 4 field-set = 5 events total; page1 took 3, page2 has the remaining 2.
+    expect(page2.value.events).toHaveLength(2);
+    expect(page2.value.nextCursor).toBeNull();
+
+    const allIds = [...page1.value.events, ...page2.value.events].map((e) => e.id);
+    expect(new Set(allIds).size).toBe(5);
+
+    const fieldSetEvent = [...page1.value.events, ...page2.value.events].find(
+      (e) => e.kind === "character_field_set",
+    );
+    expect(fieldSetEvent).toBeDefined();
+    expect(fieldSetEvent!.payload).not.toHaveProperty("value");
+    expect(fieldSetEvent!.payload).toMatchObject({ fieldId: "ability" });
+    for (const event of [...page1.value.events, ...page2.value.events]) {
+      const serialized = JSON.stringify(event.payload);
+      expect(serialized).not.toMatch(/email|session|idempotencyKey|externalIdentity/i);
+    }
+  });
+
+  it("exports a canonical, account-data-free document with a stable media type and byte-equivalent replay", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    await characters.apply(ctx(owner), {
+      kind: "setField",
+      characterId,
+      fieldId: "ability",
+      value: 15,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+
+    const first = await characters.exportCharacter(ctx(owner), { characterId });
+    expect(first.ok).toBe(true);
+    if (!first.ok) throw new Error(`unexpected: ${JSON.stringify(first.error)}`);
+    expect(first.value.mediaType).toBe("application/vnd.sweetroll.character+json;version=1");
+    expect(first.value.schemaVersion).toBe("1.0");
+    expect(first.value.characterId).toBe(characterId);
+    expect(first.value.systemVersionId).toBe(versionId);
+    expect(first.value.revision).toBe(2);
+    expect(first.value.state.values.ability).toBe(15);
+    expect(first.value.migrationLineage).toEqual([]);
+    expect(typeof first.value.packageChecksum).toBe("string");
+    expect(first.value.packageChecksum.length).toBeGreaterThan(0);
+
+    const serialized = JSON.stringify(first.value);
+    expect(serialized).not.toContain(owner);
+    expect(serialized).not.toMatch(/ownerId|actorId|requestId|executionId/i);
+
+    const second = await characters.exportCharacter(ctx(owner), { characterId });
+    expect(second.ok).toBe(true);
+    if (!second.ok) throw new Error("unexpected");
+    expect(canonicalizeCharacterExport(second.value)).toBe(canonicalizeCharacterExport(first.value));
+
+    const auditRows = await pool.query<{ kind: string }>(
+      "SELECT kind FROM character_audit_records WHERE character_id = $1 AND kind = 'character_exported'",
+      [characterId],
+    );
+    expect(auditRows.rows.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("rejects manage commands from a non-owner as not_found with purge cache disposition", async () => {
+    const owner = await createUser("Ada");
+    const stranger = await createUser("Bob");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    const result = await characters.manage(ctx(stranger), {
+      kind: "rename",
+      characterId,
+      name: "Nope",
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unexpected");
+    expect(result.error.code).toBe("not_found");
+    expect(result.error.cacheDisposition).toBe("purge");
+  });
+
+  it("rejects listActivity from a non-owner as not_found", async () => {
+    const owner = await createUser("Ada");
+    const stranger = await createUser("Bob");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    const result = await characters.listActivity(ctx(stranger), { characterId, limit: 10, cursor: null });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unexpected");
+    expect(result.error.code).toBe("not_found");
+  });
+
+  it("rejects exportCharacter from a non-owner as not_found", async () => {
+    const owner = await createUser("Ada");
+    const stranger = await createUser("Bob");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    const result = await characters.exportCharacter(ctx(stranger), { characterId });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unexpected");
+    expect(result.error.code).toBe("not_found");
+  });
+});

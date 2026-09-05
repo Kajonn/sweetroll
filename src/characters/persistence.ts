@@ -96,6 +96,58 @@ export type ApplyCommandOutcome =
   | { kind: "archived" }
   | { kind: "conflict"; latestRevision: number };
 
+export type ManagementMutation =
+  | { kind: "rename"; name: string }
+  | { kind: "transferOwnership"; toUserId: UserId }
+  | { kind: "archive" }
+  | { kind: "recover" };
+
+export type ApplyManagementCommandInput = {
+  executionId: ExecutionId;
+  characterId: CharacterId;
+  actorId: UserId;
+  expectedRevision: number;
+  mutation: ManagementMutation;
+  activity: {
+    kind: string;
+    payloadJson: unknown;
+    requestId: string;
+  };
+  audit: {
+    kind: string;
+    summary: string;
+    requestId: string;
+  };
+  resultExpiresAt: Date;
+  buildResult: (args: { record: CharacterRecord }) => unknown;
+};
+
+export type ApplyManagementCommandOutcome =
+  | { kind: "applied"; record: CharacterRecord; resultJson: unknown }
+  | { kind: "already_completed"; resultJson: unknown }
+  | { kind: "not_found" }
+  | { kind: "invalid_target" }
+  | { kind: "conflict"; latestRevision: number };
+
+export type CharacterActivityRow = {
+  id: string;
+  characterRevision: number;
+  kind: string;
+  payloadJson: unknown;
+  rollId: string | null;
+  requestId: string;
+  occurredAt: Date;
+  cursorText: string;
+};
+
+/**
+ * Keyset-pagination anchor for activity. `occurredAtText` carries the precise
+ * `occurred_at` value from Postgres (microsecond precision) as text instead of
+ * a `Date`, because a JS `Date` only holds milliseconds and would break the
+ * `(occurred_at, id) < cursor` comparison for rows sharing the same millisecond.
+ */
+export type CharacterActivityCursor = { occurredAtText: string; id: string };
+
 export interface CharacterPersistenceRepository {
   loadExecution(input: {
     actorId: UserId;
@@ -114,12 +166,21 @@ export interface CharacterPersistenceRepository {
 
   applyCommandTx(input: ApplyCommandInput): Promise<ApplyCommandOutcome>;
 
+  applyManagementCommandTx(input: ApplyManagementCommandInput): Promise<ApplyManagementCommandOutcome>;
+
   finalizeExecutionError(input: { executionId: ExecutionId; resultJson: unknown; expiresAt: Date }): Promise<void>;
 
   changedDefinitionIdsSinceRevision(
     characterId: CharacterId,
     sinceRevision: number,
-  ): Promise<{ changedDefinitionIds: DefinitionId[]; latestActivity: { id: string; occurredAt: Date } | null }>;
+  ): Promise<{ changedDefinitionIds: DefinitionId[]; latestActivity: { id: string; occurredAtText: string } | null }>;
+
+  listActivityPage(
+    characterId: CharacterId,
+    page: { limit: number; cursor: CharacterActivityCursor | null },
+  ): Promise<CharacterActivityRow[]>;
+
+  recordAudit(input: { characterId: CharacterId; actorId: UserId; kind: string; summary: string; requestId: string }): Promise<void>;
 }
 
 type CharacterRow = {
@@ -351,6 +412,170 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       }
     },
 
+    async applyManagementCommandTx(input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const execResult = await client.query<{ status: string; result_json: unknown }>(
+          `SELECT status, result_json FROM character_command_executions WHERE execution_id = $1 FOR UPDATE`,
+          [input.executionId],
+        );
+        const execRow = execResult.rows[0];
+        if (execRow === undefined) throw new Error("applyManagementCommandTx: execution row missing");
+        if (execRow.status === "completed") {
+          await client.query("COMMIT");
+          return { kind: "already_completed", resultJson: execRow.result_json };
+        }
+
+        const charResult = await client.query<CharacterRow>(
+          `SELECT id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+             FROM characters WHERE id = $1 FOR UPDATE`,
+          [input.characterId],
+        );
+        const charRow = charResult.rows[0];
+        if (charRow === undefined || charRow.owner_id !== input.actorId) {
+          await client.query("ROLLBACK");
+          return { kind: "not_found" };
+        }
+        if (charRow.revision !== input.expectedRevision) {
+          const latestRevision = charRow.revision;
+          await client.query("ROLLBACK");
+          return { kind: "conflict", latestRevision };
+        }
+
+        if (input.mutation.kind === "transferOwnership") {
+          const destination = await client.query(`SELECT 1 FROM users WHERE id = $1`, [input.mutation.toUserId]);
+          if (destination.rows[0] === undefined) {
+            await client.query("ROLLBACK");
+            return { kind: "invalid_target" };
+          }
+        }
+
+        let updated: { rows: CharacterRow[] };
+        switch (input.mutation.kind) {
+          case "rename":
+            updated = await client.query<CharacterRow>(
+              `UPDATE characters SET name = $1, revision = revision + 1, updated_at = now()
+                WHERE id = $2
+              RETURNING id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+              [input.mutation.name, input.characterId],
+            );
+            break;
+          case "transferOwnership":
+            updated = await client.query<CharacterRow>(
+              `UPDATE characters SET owner_id = $1, revision = revision + 1, updated_at = now()
+                WHERE id = $2
+              RETURNING id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+              [input.mutation.toUserId, input.characterId],
+            );
+            break;
+          case "archive":
+            updated = await client.query<CharacterRow>(
+              `UPDATE characters SET lifecycle = 'archived', archived_at = now(), revision = revision + 1, updated_at = now()
+                WHERE id = $1
+              RETURNING id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+              [input.characterId],
+            );
+            break;
+          case "recover":
+            updated = await client.query<CharacterRow>(
+              `UPDATE characters SET lifecycle = 'active', archived_at = null, revision = revision + 1, updated_at = now()
+                WHERE id = $1
+              RETURNING id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+              [input.characterId],
+            );
+            break;
+        }
+        const updatedRow = requireRow(updated.rows[0], "applyManagementCommandTx.update");
+
+        await client.query(
+          `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, request_id)
+           VALUES ($1, $2, $3, $4::jsonb, $5)`,
+          [updatedRow.id, updatedRow.revision, input.activity.kind, JSON.stringify(input.activity.payloadJson), input.activity.requestId],
+        );
+        await client.query(
+          `INSERT INTO character_audit_records (character_id, actor_id, kind, summary, request_id)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [updatedRow.id, input.actorId, input.audit.kind, input.audit.summary, input.audit.requestId],
+        );
+
+        const record = toCharacterRecord(updatedRow);
+        const resultJson = input.buildResult({ record });
+        await client.query(
+          `UPDATE character_command_executions
+              SET status = 'completed', result_json = $1::jsonb, expires_at = $2
+            WHERE execution_id = $3`,
+          [JSON.stringify(resultJson), input.resultExpiresAt, input.executionId],
+        );
+        await client.query("COMMIT");
+        return { kind: "applied", record, resultJson };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async listActivityPage(characterId, page) {
+      const rowShape = `id, character_revision, kind, payload_json, roll_id, request_id,
+             occurred_at, to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS occurred_at_cursor`;
+      const rows =
+        page.cursor === null
+          ? await pool.query<{
+              id: string;
+              character_revision: number;
+              kind: string;
+              payload_json: unknown;
+              roll_id: string | null;
+              request_id: string;
+              occurred_at: Date;
+              occurred_at_cursor: string;
+            }>(
+              `SELECT ${rowShape}
+                 FROM character_activity_events
+                WHERE character_id = $1
+                ORDER BY occurred_at DESC, id DESC
+                LIMIT $2`,
+              [characterId, page.limit],
+            )
+          : await pool.query<{
+              id: string;
+              character_revision: number;
+              kind: string;
+              payload_json: unknown;
+              roll_id: string | null;
+              request_id: string;
+              occurred_at: Date;
+              occurred_at_cursor: string;
+            }>(
+              `SELECT ${rowShape}
+                 FROM character_activity_events
+                WHERE character_id = $1 AND (occurred_at, id) < ($2::timestamptz, $3)
+                ORDER BY occurred_at DESC, id DESC
+                LIMIT $4`,
+              [characterId, page.cursor.occurredAtText, page.cursor.id, page.limit],
+            );
+      return rows.rows.map((row) => ({
+        id: row.id,
+        characterRevision: row.character_revision,
+        kind: row.kind,
+        payloadJson: row.payload_json,
+        rollId: row.roll_id,
+        requestId: row.request_id,
+        occurredAt: row.occurred_at,
+        cursorText: row.occurred_at_cursor,
+      }));
+    },
+
+    async recordAudit(input) {
+      await pool.query(
+        `INSERT INTO character_audit_records (character_id, actor_id, kind, summary, request_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [input.characterId, input.actorId, input.kind, input.summary, input.requestId],
+      );
+    },
+
     async finalizeExecutionError(input) {
       await pool.query(
         `UPDATE character_command_executions
@@ -361,8 +586,9 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
     },
 
     async changedDefinitionIdsSinceRevision(characterId, sinceRevision) {
-      const result = await pool.query<{ id: string; payload_json: unknown; occurred_at: Date }>(
-        `SELECT id, payload_json, occurred_at FROM character_activity_events
+      const result = await pool.query<{ id: string; payload_json: unknown; occurred_at_cursor: string }>(
+        `SELECT id, payload_json, to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS occurred_at_cursor
+          FROM character_activity_events
           WHERE character_id = $1 AND character_revision > $2
           ORDER BY character_revision ASC`,
         [characterId, sinceRevision],
@@ -377,7 +603,8 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         }
       }
       const lastRow = result.rows[result.rows.length - 1];
-      const latestActivity = lastRow === undefined ? null : { id: lastRow.id, occurredAt: lastRow.occurred_at };
+      const latestActivity =
+        lastRow === undefined ? null : { id: lastRow.id, occurredAtText: lastRow.occurred_at_cursor };
       return { changedDefinitionIds: [...ids], latestActivity };
     },
   };

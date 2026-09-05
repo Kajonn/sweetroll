@@ -20,8 +20,10 @@ import {
   createCharacterPersistenceRepository,
   type CharacterPersistenceRepository,
   type CharacterRecord,
+  type ManagementMutation,
 } from "./persistence.js";
 import { claimExecution } from "./idempotency.js";
+import { buildCharacterExportDocument } from "./export.js";
 
 export type { RequestContext } from "../systems/authoring.js";
 
@@ -34,6 +36,30 @@ const COMMAND_KIND: Record<CharacterCommand["kind"], string> = {
   setField: "character_set_field",
   bumpResource: "character_bump_resource",
   executeAction: "character_execute_action",
+};
+const MANAGEMENT_COMMAND_KIND: Record<CharacterManagementCommand["kind"], string> = {
+  rename: "character_rename",
+  transferOwnership: "character_transfer_ownership",
+  archive: "character_archive",
+  recover: "character_recover",
+};
+const MANAGEMENT_ACTIVITY_KIND: Record<CharacterManagementCommand["kind"], string> = {
+  rename: "character_renamed",
+  transferOwnership: "character_ownership_transferred",
+  archive: "character_archived",
+  recover: "character_recovered",
+};
+const MANAGEMENT_AUDIT_KIND: Record<CharacterManagementCommand["kind"], string> = {
+  rename: "character_renamed",
+  transferOwnership: "character_ownership_transferred",
+  archive: "character_archived",
+  recover: "character_recovered",
+};
+const MANAGEMENT_AUDIT_SUMMARY: Record<CharacterManagementCommand["kind"], string> = {
+  rename: "Character renamed",
+  transferOwnership: "Character ownership transferred",
+  archive: "Character archived",
+  recover: "Character recovered",
 };
 const LEASE_MS = 60 * 1000;
 const REPLAY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -325,6 +351,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
   const errors = {
     bad_request: (message: string): CharacterError => ({ code: "bad_request", message }),
     not_found: (message: string = NOT_FOUND_MESSAGE): CharacterError => ({ code: "not_found", message }),
+    notFoundPurge: (message: string = NOT_FOUND_MESSAGE): CharacterError => ({
+      code: "not_found",
+      message,
+      cacheDisposition: "purge",
+    }),
     mismatch: (): CharacterError => ({ code: "idempotency_mismatch", message: MISMATCH_MESSAGE }),
     inProgress: (): CharacterError => ({ code: "command_in_progress", message: IN_PROGRESS_MESSAGE }),
     archived: (): CharacterError => ({ code: "conflict", message: ARCHIVED_MESSAGE }),
@@ -849,14 +880,243 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         return { ok: false, error: errors.internal() };
       }
     },
-    async manage() {
-      return { ok: false, error: errors.notImplemented() };
+    async manage(ctx, command) {
+      try {
+        if (!Number.isInteger(command.expectedRevision) || command.expectedRevision < 1) {
+          return { ok: false, error: errors.bad_request("expectedRevision must be a positive integer.") };
+        }
+        if (command.kind === "rename" && command.name.trim().length === 0) {
+          return { ok: false, error: errors.bad_request("name must not be empty.") };
+        }
+
+        const commandKind = MANAGEMENT_COMMAND_KIND[command.kind];
+        const payload =
+          command.kind === "rename"
+            ? { name: command.name }
+            : command.kind === "transferOwnership"
+              ? { toUserId: command.toUserId }
+              : {};
+        const inputHash = hashInput({
+          commandKind,
+          characterId: command.characterId,
+          expectedRevision: command.expectedRevision,
+          ...payload,
+        });
+
+        const claimStartedAt = now();
+        const claimed = await claimExecution(input.pool, {
+          actorId: ctx.actorId,
+          commandKind,
+          idempotencyKey: command.idempotencyKey,
+          inputHash,
+          newExecutionId,
+          now: claimStartedAt,
+          leaseMs: LEASE_MS,
+          replayTtlMs: REPLAY_TTL_MS,
+        });
+
+        if (claimed.status === "mismatch") return { ok: false, error: errors.mismatch() };
+        if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
+        if (claimed.status === "replay") {
+          return replayStoredOutcome(claimed.resultJson);
+        }
+
+        const executionId = claimed.executionId;
+        const replayExpiresAt = new Date(claimStartedAt.getTime() + REPLAY_TTL_MS);
+
+        const snapshot = await repo.openOwnedCharacter(command.characterId, ctx.actorId);
+        if (snapshot === null) {
+          const error = errors.notFoundPurge();
+          await repo.finalizeExecutionError({
+            executionId,
+            resultJson: serializeCommandError(error),
+            expiresAt: replayExpiresAt,
+          });
+          return { ok: false, error };
+        }
+
+        // Management commands never mutate character state, so it is safe to resolve the
+        // projection from the pre-mutation snapshot (immutable pinned version/package).
+        const resolved = await input.runtime.resolve({
+          versionId: snapshot.systemVersionId,
+          entityId: snapshot.entityDefinitionId,
+          state: snapshot.state,
+          intent: { kind: "observe" },
+        });
+        if (!resolved.ok) {
+          const error = mapRuntimeError(resolved.error);
+          if (isFinalizableRuntimeError(resolved.error.code)) {
+            await repo.finalizeExecutionError({
+              executionId,
+              resultJson: serializeCommandError(error),
+              expiresAt: replayExpiresAt,
+            });
+          }
+          return { ok: false, error };
+        }
+
+        const mutation: ManagementMutation =
+          command.kind === "rename"
+            ? { kind: "rename", name: command.name }
+            : command.kind === "transferOwnership"
+              ? { kind: "transferOwnership", toUserId: command.toUserId }
+              : command.kind === "archive"
+                ? { kind: "archive" }
+                : { kind: "recover" };
+
+        const outcome = await repo.applyManagementCommandTx({
+          executionId,
+          characterId: command.characterId,
+          actorId: ctx.actorId,
+          expectedRevision: command.expectedRevision,
+          mutation,
+          activity: {
+            kind: MANAGEMENT_ACTIVITY_KIND[command.kind],
+            payloadJson: payload,
+            requestId: ctx.requestId,
+          },
+          audit: {
+            kind: MANAGEMENT_AUDIT_KIND[command.kind],
+            summary: MANAGEMENT_AUDIT_SUMMARY[command.kind],
+            requestId: ctx.requestId,
+          },
+          resultExpiresAt: replayExpiresAt,
+          buildResult: ({ record }) => {
+            const view = toView(
+              record,
+              {
+                derivedValues: resolved.value.derivedValues,
+                validations: resolved.value.validations,
+                projection: resolved.value.projection,
+                packageChecksum: resolved.value.packageChecksum,
+                changedDefinitionIds: [],
+              },
+              {
+                baseRevision: command.expectedRevision,
+                commandExecutionId: executionId,
+                replayExpiresAt: replayExpiresAt.toISOString(),
+                replayed: false,
+              },
+            );
+            return { ok: true, value: { character: serializeView(view), roll: null } };
+          },
+        });
+
+        if (outcome.kind === "already_completed") {
+          return replayStoredOutcome(outcome.resultJson);
+        }
+        if (outcome.kind === "not_found") {
+          const error = errors.notFoundPurge();
+          await repo.finalizeExecutionError({
+            executionId,
+            resultJson: serializeCommandError(error),
+            expiresAt: replayExpiresAt,
+          });
+          return { ok: false, error };
+        }
+        if (outcome.kind === "invalid_target") {
+          const error = errors.invalid_value("The destination user does not exist.");
+          await repo.finalizeExecutionError({
+            executionId,
+            resultJson: serializeCommandError(error),
+            expiresAt: replayExpiresAt,
+          });
+          return { ok: false, error };
+        }
+        if (outcome.kind === "conflict") {
+          const changedSinceBase = await repo.changedDefinitionIdsSinceRevision(
+            command.characterId,
+            command.expectedRevision,
+          );
+          const activityCursor =
+            changedSinceBase.latestActivity === null ? null : encodeActivityCursor(changedSinceBase.latestActivity);
+          const error = errors.conflict(outcome.latestRevision, changedSinceBase.changedDefinitionIds, activityCursor);
+          await repo.finalizeExecutionError({
+            executionId,
+            resultJson: serializeCommandError(error),
+            expiresAt: replayExpiresAt,
+          });
+          return { ok: false, error };
+        }
+
+        const stored = outcome.resultJson as StoredCommandOutcome;
+        if (!stored.ok) return { ok: false, error: stored.error };
+        const view = deserializeView(stored.value.character);
+        return { ok: true, value: { character: view, roll: stored.value.roll } };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
     },
-    async listActivity() {
-      return { ok: false, error: errors.notImplemented() };
+    async listActivity(ctx, listInput) {
+      try {
+        const limit = Math.trunc(listInput.limit);
+        if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PAGE_LIMIT) {
+          return {
+            ok: false,
+            error: errors.bad_request(`limit must be an integer from 1 through ${MAX_PAGE_LIMIT}.`),
+          };
+        }
+        const cursor = decodeActivityCursor(listInput.cursor);
+        if (listInput.cursor !== null && cursor === null) {
+          return { ok: false, error: errors.bad_request("cursor is malformed.") };
+        }
+
+        const character = await repo.openOwnedCharacter(listInput.characterId, ctx.actorId);
+        if (character === null) return { ok: false, error: errors.notFoundPurge() };
+
+        const rows = await repo.listActivityPage(listInput.characterId, { limit: limit + 1, cursor });
+        const page = rows.slice(0, limit);
+        const nextCursor =
+          rows.length > limit
+            ? encodeActivityCursor({ occurredAtText: page[page.length - 1]!.cursorText, id: page[page.length - 1]!.id })
+            : null;
+
+        return {
+          ok: true,
+          value: {
+            events: page.map((row) => ({
+              id: row.id,
+              characterRevision: row.characterRevision,
+              kind: row.kind,
+              payload: minimizeActivityPayload(row.kind, row.payloadJson),
+              rollId: row.rollId,
+              requestId: row.requestId,
+              occurredAt: row.occurredAt,
+            })),
+            nextCursor,
+          },
+        };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
     },
-    async exportCharacter() {
-      return { ok: false, error: errors.notImplemented() };
+    async exportCharacter(ctx, exportInput) {
+      try {
+        const record = await repo.openOwnedCharacter(exportInput.characterId, ctx.actorId);
+        if (record === null) return { ok: false, error: errors.notFoundPurge() };
+
+        const resolved = await input.runtime.resolve({
+          versionId: record.systemVersionId,
+          entityId: record.entityDefinitionId,
+          state: record.state,
+          intent: { kind: "observe" },
+        });
+        if (!resolved.ok) return { ok: false, error: mapRuntimeError(resolved.error) };
+
+        const document = buildCharacterExportDocument(record, resolved.value.packageChecksum);
+
+        await repo.recordAudit({
+          characterId: record.characterId,
+          actorId: ctx.actorId,
+          kind: "character_exported",
+          summary: "Character exported",
+          requestId: ctx.requestId,
+        });
+
+        return { ok: true, value: document };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
     },
     async previewMigration() {
       return { ok: false, error: errors.notImplemented() };
@@ -870,9 +1130,57 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
   };
 }
 
-function encodeActivityCursor(cursor: { occurredAt: Date; id: string }): string {
-  const payload = JSON.stringify({ occurredAt: cursor.occurredAt.toISOString(), id: cursor.id });
+function encodeActivityCursor(cursor: { occurredAtText: string; id: string }): string {
+  const payload = JSON.stringify({ occurredAt: cursor.occurredAtText, id: cursor.id });
   return Buffer.from(payload, "utf8").toString("base64url");
+}
+
+function decodeActivityCursor(cursor: string | null): { occurredAtText: string; id: string } | null {
+  if (cursor === null) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as {
+      occurredAt: string;
+      id: string;
+    };
+    if (typeof payload.occurredAt !== "string" || typeof payload.id !== "string") return null;
+    const parsed = new Date(payload.occurredAt);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return { occurredAtText: payload.occurredAt, id: payload.id };
+  } catch {
+    return null;
+  }
+}
+
+// Activity pagination must never expose raw state values (or other stored input like action
+// inputs), email, external identity, session, or idempotency keys. Only structural identifiers
+// needed to interpret "what happened" are retained; the underlying write-side payload (in
+// persistence.ts) may include more, but the read-side projection here minimizes it.
+function minimizeActivityPayload(kind: string, payload: unknown): unknown {
+  const record = payload as Record<string, unknown> | null | undefined;
+  if (record === null || record === undefined || typeof record !== "object") return {};
+  switch (kind) {
+    case "character_created":
+      return { entityDefinitionId: record.entityDefinitionId };
+    case "character_field_set":
+      return { fieldId: record.fieldId, changedDefinitionIds: record.changedDefinitionIds ?? [] };
+    case "character_resource_bumped":
+      return {
+        resourceId: record.resourceId,
+        direction: record.direction,
+        changedDefinitionIds: record.changedDefinitionIds ?? [],
+      };
+    case "character_action_executed":
+      return { actionId: record.actionId, changedDefinitionIds: record.changedDefinitionIds ?? [] };
+    case "character_renamed":
+      return { name: record.name };
+    case "character_ownership_transferred":
+      return {};
+    case "character_archived":
+    case "character_recovered":
+      return {};
+    default:
+      return {};
+  }
 }
 
 function encodeCursor(cursor: { updatedAt: Date; characterId: CharacterId }): string {

@@ -21,6 +21,7 @@ import {
   type CharacterPersistenceRepository,
   type CharacterRecord,
 } from "./persistence.js";
+import { claimExecution } from "./idempotency.js";
 
 export type { RequestContext } from "../systems/authoring.js";
 
@@ -29,10 +30,18 @@ export type UserId = string;
 export type ExecutionId = string;
 
 const CREATE_COMMAND_KIND = "character_create";
+const COMMAND_KIND: Record<CharacterCommand["kind"], string> = {
+  setField: "character_set_field",
+  bumpResource: "character_bump_resource",
+  executeAction: "character_execute_action",
+};
+const LEASE_MS = 60 * 1000;
 const REPLAY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_PAGE_LIMIT = 100;
 const NOT_FOUND_MESSAGE = "The requested character does not exist.";
 const MISMATCH_MESSAGE = "This idempotency key was already used with different input.";
+const ARCHIVED_MESSAGE = "Archived characters reject play commands until recovered.";
+const IN_PROGRESS_MESSAGE = "Another request is already processing this idempotency key.";
 
 export type CharacterErrorCode =
   | "bad_request"
@@ -48,6 +57,7 @@ export type CharacterError = {
   message: string;
   latestRevision?: number | null;
   diagnostics?: RuntimeValidation[];
+  changedDefinitionIds?: DefinitionId[];
 };
 
 export type CharacterResult<T> = { ok: true; value: T } | { ok: false; error: CharacterError };
@@ -314,6 +324,14 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     bad_request: (message: string): CharacterError => ({ code: "bad_request", message }),
     not_found: (message: string = NOT_FOUND_MESSAGE): CharacterError => ({ code: "not_found", message }),
     mismatch: (): CharacterError => ({ code: "idempotency_mismatch", message: MISMATCH_MESSAGE }),
+    inProgress: (): CharacterError => ({ code: "command_in_progress", message: IN_PROGRESS_MESSAGE }),
+    archived: (): CharacterError => ({ code: "conflict", message: ARCHIVED_MESSAGE }),
+    conflict: (latestRevision: number, changedDefinitionIds: DefinitionId[]): CharacterError => ({
+      code: "conflict",
+      message: "The character has a newer revision. Retry with the latest revision and a new idempotency key.",
+      latestRevision,
+      changedDefinitionIds,
+    }),
     invalid_value: (message: string, diagnostics?: RuntimeValidation[]): CharacterError => ({
       code: "invalid_value",
       message,
@@ -405,6 +423,27 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       archivedAt: raw.archivedAt === null ? null : new Date(raw.archivedAt),
       createdAt: new Date(raw.createdAt),
       updatedAt: new Date(raw.updatedAt),
+    };
+  }
+
+  type StoredCommandOutcome =
+    | { ok: true; value: { character: unknown; roll: NormalizedRoll | null } }
+    | { ok: false; error: CharacterError };
+
+  function serializeCommandError(error: CharacterError): StoredCommandOutcome {
+    return { ok: false, error };
+  }
+
+  function replayStoredOutcome(resultJson: unknown): CharacterResult<CharacterCommandResult> {
+    const stored = resultJson as StoredCommandOutcome;
+    if (!stored.ok) return { ok: false, error: stored.error };
+    const view = deserializeView(stored.value.character);
+    return {
+      ok: true,
+      value: {
+        character: { ...view, reconciliation: { ...view.reconciliation, replayed: true } },
+        roll: stored.value.roll,
+      },
     };
   }
 
@@ -603,8 +642,169 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       }
     },
 
-    async apply() {
-      return { ok: false, error: errors.notImplemented() };
+    async apply(ctx, command) {
+      try {
+        if (!Number.isInteger(command.expectedRevision) || command.expectedRevision < 1) {
+          return { ok: false, error: errors.bad_request("expectedRevision must be a positive integer.") };
+        }
+
+        if (command.kind === "executeAction") {
+          return { ok: false, error: errors.notImplemented() };
+        }
+
+        const commandKind = COMMAND_KIND[command.kind];
+        const payload =
+          command.kind === "setField"
+            ? { fieldId: command.fieldId, value: command.value }
+            : { resourceId: command.resourceId, direction: command.direction };
+        const inputHash = hashInput({
+          commandKind,
+          characterId: command.characterId,
+          expectedRevision: command.expectedRevision,
+          ...payload,
+        });
+
+        const claimStartedAt = now();
+        const claimed = await claimExecution(input.pool, {
+          actorId: ctx.actorId,
+          commandKind,
+          idempotencyKey: command.idempotencyKey,
+          inputHash,
+          newExecutionId,
+          now: claimStartedAt,
+          leaseMs: LEASE_MS,
+          replayTtlMs: REPLAY_TTL_MS,
+        });
+
+        if (claimed.status === "mismatch") return { ok: false, error: errors.mismatch() };
+        if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
+        if (claimed.status === "replay") {
+          return replayStoredOutcome(claimed.resultJson);
+        }
+
+        const executionId = claimed.executionId;
+        const replayExpiresAt = new Date(claimStartedAt.getTime() + REPLAY_TTL_MS);
+
+        const snapshot = await repo.openOwnedCharacter(command.characterId, ctx.actorId);
+        if (snapshot === null) {
+          const error = errors.not_found();
+          await repo.finalizeExecutionError({
+            executionId,
+            resultJson: serializeCommandError(error),
+            expiresAt: replayExpiresAt,
+          });
+          return { ok: false, error };
+        }
+        if (snapshot.lifecycle === "archived") {
+          const error = errors.archived();
+          await repo.finalizeExecutionError({
+            executionId,
+            resultJson: serializeCommandError(error),
+            expiresAt: replayExpiresAt,
+          });
+          return { ok: false, error };
+        }
+
+        const intent =
+          command.kind === "setField"
+            ? ({ kind: "set", fieldId: command.fieldId, value: command.value } as const)
+            : ({ kind: "bump", resourceId: command.resourceId, direction: command.direction } as const);
+
+        const resolved = await input.runtime.resolve({
+          versionId: snapshot.systemVersionId,
+          entityId: snapshot.entityDefinitionId,
+          state: snapshot.state,
+          intent,
+        });
+        if (!resolved.ok) {
+          const error = mapRuntimeError(resolved.error);
+          await repo.finalizeExecutionError({
+            executionId,
+            resultJson: serializeCommandError(error),
+            expiresAt: replayExpiresAt,
+          });
+          return { ok: false, error };
+        }
+
+        const activityKind = command.kind === "setField" ? "character_field_set" : "character_resource_bumped";
+        const changedDefinitionIds = resolved.value.changedDefinitionIds;
+
+        const outcome = await repo.applyCommandTx({
+          executionId,
+          characterId: command.characterId,
+          actorId: ctx.actorId,
+          expectedRevision: command.expectedRevision,
+          nextState: resolved.value.state,
+          stateChanged: changedDefinitionIds.length > 0,
+          activity: {
+            kind: activityKind,
+            payloadJson: { ...payload, changedDefinitionIds },
+            requestId: ctx.requestId,
+          },
+          resultExpiresAt: replayExpiresAt,
+          buildResult: ({ record }) => {
+            const view = toView(
+              record,
+              {
+                derivedValues: resolved.value.derivedValues,
+                validations: resolved.value.validations,
+                projection: resolved.value.projection,
+                packageChecksum: resolved.value.packageChecksum,
+                changedDefinitionIds,
+              },
+              {
+                baseRevision: command.expectedRevision,
+                commandExecutionId: executionId,
+                replayExpiresAt: replayExpiresAt.toISOString(),
+                replayed: false,
+              },
+            );
+            return { ok: true, value: { character: serializeView(view), roll: null } };
+          },
+        });
+
+        if (outcome.kind === "already_completed") {
+          return replayStoredOutcome(outcome.resultJson);
+        }
+        if (outcome.kind === "not_found") {
+          const error = errors.not_found();
+          await repo.finalizeExecutionError({
+            executionId,
+            resultJson: serializeCommandError(error),
+            expiresAt: replayExpiresAt,
+          });
+          return { ok: false, error };
+        }
+        if (outcome.kind === "archived") {
+          const error = errors.archived();
+          await repo.finalizeExecutionError({
+            executionId,
+            resultJson: serializeCommandError(error),
+            expiresAt: replayExpiresAt,
+          });
+          return { ok: false, error };
+        }
+        if (outcome.kind === "conflict") {
+          const changedSinceBase = await repo.changedDefinitionIdsSinceRevision(
+            command.characterId,
+            command.expectedRevision,
+          );
+          const error = errors.conflict(outcome.latestRevision, changedSinceBase);
+          await repo.finalizeExecutionError({
+            executionId,
+            resultJson: serializeCommandError(error),
+            expiresAt: replayExpiresAt,
+          });
+          return { ok: false, error };
+        }
+
+        const stored = outcome.resultJson as StoredCommandOutcome;
+        if (!stored.ok) return { ok: false, error: stored.error };
+        const view = deserializeView(stored.value.character);
+        return { ok: true, value: { character: view, roll: stored.value.roll } };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
     },
     async manage() {
       return { ok: false, error: errors.notImplemented() };

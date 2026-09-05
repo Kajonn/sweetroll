@@ -460,3 +460,358 @@ describeWithDatabase("Characters (create/list/open)", () => {
     expect(executionResult.rows[0]!.count).toBe(0);
   });
 });
+
+describeWithDatabase("Characters (apply: set/bump)", () => {
+  const schema = `characters_apply_${randomUUID().replaceAll("-", "")}`;
+  let pool: Pool;
+  let authoring: SystemAuthoring;
+  let runtime: SystemRuntime;
+  let characters: Characters;
+
+  beforeAll(async () => {
+    pool = new Pool({
+      connectionString: databaseUrl,
+      application_name: schema,
+      max: 5,
+      onConnect: async (client) => {
+        await client.query(`SET search_path TO ${schema}`);
+      },
+    });
+    const admin = new Client({ connectionString: databaseUrl });
+    await admin.connect();
+    await admin.query(`CREATE SCHEMA ${schema}`);
+    await admin.query(`SET search_path TO ${schema}`);
+    await admin.query(DDL);
+    await admin.end();
+
+    const repo = createSystemPersistenceRepository(pool);
+    authoring = createSystemAuthoringModule({ repo });
+    runtime = createSystemRuntime({
+      loadPackage: createPostgresPublishedPackageLoader(pool),
+      authoritativeRollSecret: "a".repeat(32),
+    });
+    characters = createCharactersModule({
+      pool,
+      runtime,
+      authorizeVersionUse: authoring.authorizeVersionUse,
+    });
+  });
+
+  beforeEach(async () => {
+    await pool.query(`SET search_path TO ${schema}`);
+    await pool.query(
+      "TRUNCATE character_audit_records, character_activity_events, character_command_executions, characters, system_versions, systems, users RESTART IDENTITY CASCADE",
+    );
+  });
+
+  afterAll(async () => {
+    const admin = new Client({ connectionString: databaseUrl });
+    await admin.connect();
+    await admin.query(`DROP SCHEMA ${schema} CASCADE`);
+    await admin.end();
+    await pool.end();
+  });
+
+  const ctx = (actorId: string) => ({ actorId, requestId: randomUUID() });
+
+  async function createUser(displayName: string): Promise<string> {
+    const result = await pool.query<{ id: string }>(
+      "INSERT INTO users (display_name) VALUES ($1) RETURNING id",
+      [displayName],
+    );
+    return result.rows[0]!.id;
+  }
+
+  function repackage(versionId: string): SystemPackageV1 {
+    const unsigned = structuredClone(d20Package) as unknown as UnsignedSystemPackageV1 & { integrity?: unknown };
+    delete unsigned.integrity;
+    unsigned.versionId = versionId;
+    return signSystemPackage(unsigned);
+  }
+
+  async function publishVersion(ownerId: string): Promise<{ systemId: string; versionId: string }> {
+    const systemResult = await pool.query<{ id: string }>(
+      "INSERT INTO systems (owner_id, name, access, lifecycle) VALUES ($1, $2, 'public', 'active') RETURNING id",
+      [ownerId, "D20"],
+    );
+    const systemId = systemResult.rows[0]!.id;
+    const versionId = randomUUID();
+    const packageValue = repackage(versionId);
+    await pool.query(
+      "INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, lifecycle) VALUES ($1, $2, '1.0.0', $3, $4::jsonb, 'published')",
+      [versionId, systemId, packageValue.integrity.checksum, JSON.stringify(packageValue)],
+    );
+    return { systemId, versionId };
+  }
+
+  async function createCharacter(ownerId: string, versionId: string): Promise<CharacterId> {
+    const created = await characters.create(ctx(ownerId), {
+      systemVersionId: versionId,
+      entityDefinitionId: "character",
+      name: "Aria",
+      idempotencyKey: randomUUID(),
+    });
+    if (!created.ok) throw new Error(`unexpected create failure: ${JSON.stringify(created.error)}`);
+    return created.value.characterId;
+  }
+
+  it("sets a field, increments revision, and persists Runtime's complete next state", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    const result = await characters.apply(ctx(owner), {
+      kind: "setField",
+      characterId,
+      fieldId: "ability",
+      value: 15,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(`unexpected: ${JSON.stringify(result.error)}`);
+    expect(result.value.character.revision).toBe(2);
+    expect(result.value.character.state.values.ability).toBe(15);
+    expect(result.value.character.reconciliation.replayed).toBe(false);
+    expect(result.value.character.reconciliation.changedDefinitionIds).toEqual(["ability"]);
+    expect(result.value.roll).toBeNull();
+
+    const activity = await pool.query<{ kind: string; character_revision: number }>(
+      "SELECT kind, character_revision FROM character_activity_events WHERE character_id = $1 ORDER BY character_revision",
+      [characterId],
+    );
+    expect(activity.rows).toEqual([
+      { kind: "character_created", character_revision: 1 },
+      { kind: "character_field_set", character_revision: 2 },
+    ]);
+  });
+
+  it("bumps a resource up and down within bounds and increments revision", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    const bumpDown = await characters.apply(ctx(owner), {
+      kind: "bumpResource",
+      characterId,
+      resourceId: "health",
+      direction: "down",
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(bumpDown.ok).toBe(true);
+    if (!bumpDown.ok) throw new Error("unexpected");
+    expect(bumpDown.value.character.revision).toBe(2);
+    expect(bumpDown.value.character.state.values.health).toEqual({ current: 9, max: 10 });
+
+    const bumpUp = await characters.apply(ctx(owner), {
+      kind: "bumpResource",
+      characterId,
+      resourceId: "health",
+      direction: "up",
+      expectedRevision: 2,
+      idempotencyKey: randomUUID(),
+    });
+    expect(bumpUp.ok).toBe(true);
+    if (!bumpUp.ok) throw new Error("unexpected");
+    expect(bumpUp.value.character.revision).toBe(3);
+    expect(bumpUp.value.character.state.values.health).toEqual({ current: 10, max: 10 });
+  });
+
+  it("rejects a bump beyond bounds and persists no state effect", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    const result = await characters.apply(ctx(owner), {
+      kind: "bumpResource",
+      characterId,
+      resourceId: "health",
+      direction: "up",
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unexpected");
+    expect(result.error.code).toBe("invalid_value");
+
+    const row = await pool.query<{ revision: number }>("SELECT revision FROM characters WHERE id = $1", [characterId]);
+    expect(row.rows[0]!.revision).toBe(1);
+    const activity = await pool.query(
+      "SELECT count(*)::int AS count FROM character_activity_events WHERE character_id = $1 AND kind = 'character_resource_bumped'",
+      [characterId],
+    );
+    expect(activity.rows[0]!.count).toBe(0);
+  });
+
+  it("rejects a set with an invalid value and persists no state effect", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    const result = await characters.apply(ctx(owner), {
+      kind: "setField",
+      characterId,
+      fieldId: "ability",
+      value: 999,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unexpected");
+    expect(result.error.code).toBe("invalid_value");
+
+    const row = await pool.query<{ revision: number }>("SELECT revision FROM characters WHERE id = $1", [characterId]);
+    expect(row.rows[0]!.revision).toBe(1);
+  });
+
+  it("rejects commands against an archived character with conflict", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+    await pool.query("UPDATE characters SET lifecycle = 'archived' WHERE id = $1", [characterId]);
+
+    const result = await characters.apply(ctx(owner), {
+      kind: "setField",
+      characterId,
+      fieldId: "ability",
+      value: 15,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unexpected");
+    expect(result.error.code).toBe("conflict");
+  });
+
+  it("rejects commands from a non-owner as not_found", async () => {
+    const owner = await createUser("Ada");
+    const stranger = await createUser("Bob");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    const result = await characters.apply(ctx(stranger), {
+      kind: "setField",
+      characterId,
+      fieldId: "ability",
+      value: 15,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unexpected");
+    expect(result.error.code).toBe("not_found");
+  });
+
+  it("rejects a stale expectedRevision with conflict and the latest revision", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    const first = await characters.apply(ctx(owner), {
+      kind: "setField",
+      characterId,
+      fieldId: "ability",
+      value: 15,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(first.ok).toBe(true);
+
+    const stale = await characters.apply(ctx(owner), {
+      kind: "setField",
+      characterId,
+      fieldId: "ability",
+      value: 12,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(stale.ok).toBe(false);
+    if (stale.ok) throw new Error("unexpected");
+    expect(stale.error.code).toBe("conflict");
+    expect(stale.error.latestRevision).toBe(2);
+    expect(stale.error.changedDefinitionIds).toEqual(["ability"]);
+  });
+
+  it("replays identical set commands from the idempotency key and rejects changed input", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+    const key = randomUUID();
+
+    const first = await characters.apply(ctx(owner), {
+      kind: "setField",
+      characterId,
+      fieldId: "ability",
+      value: 15,
+      expectedRevision: 1,
+      idempotencyKey: key,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) throw new Error("unexpected");
+
+    const replay = await characters.apply(ctx(owner), {
+      kind: "setField",
+      characterId,
+      fieldId: "ability",
+      value: 15,
+      expectedRevision: 1,
+      idempotencyKey: key,
+    });
+    expect(replay.ok).toBe(true);
+    if (!replay.ok) throw new Error("unexpected");
+    expect(replay.value.character.revision).toBe(2);
+    expect(replay.value.character.reconciliation.replayed).toBe(true);
+    expect(replay.value.character.reconciliation.commandExecutionId).toBe(
+      first.value.character.reconciliation.commandExecutionId,
+    );
+
+    const row = await pool.query<{ revision: number }>("SELECT revision FROM characters WHERE id = $1", [characterId]);
+    expect(row.rows[0]!.revision).toBe(2);
+
+    const mismatch = await characters.apply(ctx(owner), {
+      kind: "setField",
+      characterId,
+      fieldId: "ability",
+      value: 16,
+      expectedRevision: 1,
+      idempotencyKey: key,
+    });
+    expect(mismatch).toEqual({
+      ok: false,
+      error: { code: "idempotency_mismatch", message: "This idempotency key was already used with different input." },
+    });
+  });
+
+  it("allows another actor to use the same idempotency key independently", async () => {
+    const owner = await createUser("Ada");
+    const other = await createUser("Bob");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+    const otherCharacterId = await createCharacter(other, versionId);
+    const key = randomUUID();
+
+    const first = await characters.apply(ctx(owner), {
+      kind: "setField",
+      characterId,
+      fieldId: "ability",
+      value: 15,
+      expectedRevision: 1,
+      idempotencyKey: key,
+    });
+    expect(first.ok).toBe(true);
+
+    const second = await characters.apply(ctx(other), {
+      kind: "setField",
+      characterId: otherCharacterId,
+      fieldId: "ability",
+      value: 12,
+      expectedRevision: 1,
+      idempotencyKey: key,
+    });
+    expect(second.ok).toBe(true);
+    if (!second.ok) throw new Error("unexpected");
+    expect(second.value.character.reconciliation.replayed).toBe(false);
+  });
+});

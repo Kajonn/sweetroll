@@ -72,6 +72,29 @@ export type CharacterPageCursor = {
   characterId: CharacterId;
 };
 
+export type ApplyCommandInput = {
+  executionId: ExecutionId;
+  characterId: CharacterId;
+  actorId: UserId;
+  expectedRevision: number;
+  nextState: RuntimeStateV1;
+  stateChanged: boolean;
+  activity: {
+    kind: string;
+    payloadJson: unknown;
+    requestId: string;
+  };
+  resultExpiresAt: Date;
+  buildResult: (args: { record: CharacterRecord }) => unknown;
+};
+
+export type ApplyCommandOutcome =
+  | { kind: "applied"; record: CharacterRecord; resultJson: unknown }
+  | { kind: "already_completed"; resultJson: unknown }
+  | { kind: "not_found" }
+  | { kind: "archived" }
+  | { kind: "conflict"; latestRevision: number };
+
 export interface CharacterPersistenceRepository {
   loadExecution(input: {
     actorId: UserId;
@@ -87,6 +110,15 @@ export interface CharacterPersistenceRepository {
     ownerId: UserId,
     page: { limit: number; cursor: CharacterPageCursor | null },
   ): Promise<CharacterRecord[]>;
+
+  applyCommandTx(input: ApplyCommandInput): Promise<ApplyCommandOutcome>;
+
+  finalizeExecutionError(input: { executionId: ExecutionId; resultJson: unknown; expiresAt: Date }): Promise<void>;
+
+  changedDefinitionIdsSinceRevision(
+    characterId: CharacterId,
+    sinceRevision: number,
+  ): Promise<DefinitionId[]>;
 }
 
 type CharacterRow = {
@@ -215,6 +247,105 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
               [ownerId, page.cursor.updatedAt, page.cursor.characterId, page.limit],
             );
       return rows.rows.map(toCharacterRecord);
+    },
+
+    async applyCommandTx(input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const execResult = await client.query<{ status: string; result_json: unknown }>(
+          `SELECT status, result_json FROM character_command_executions WHERE execution_id = $1 FOR UPDATE`,
+          [input.executionId],
+        );
+        const execRow = execResult.rows[0];
+        if (execRow === undefined) throw new Error("applyCommandTx: execution row missing");
+        if (execRow.status === "completed") {
+          await client.query("COMMIT");
+          return { kind: "already_completed", resultJson: execRow.result_json };
+        }
+
+        const charResult = await client.query<CharacterRow>(
+          `SELECT id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+             FROM characters WHERE id = $1 FOR UPDATE`,
+          [input.characterId],
+        );
+        const charRow = charResult.rows[0];
+        if (charRow === undefined || charRow.owner_id !== input.actorId) {
+          await client.query("ROLLBACK");
+          return { kind: "not_found" };
+        }
+        if (charRow.lifecycle === "archived") {
+          await client.query("ROLLBACK");
+          return { kind: "archived" };
+        }
+        if (charRow.revision !== input.expectedRevision) {
+          const latestRevision = charRow.revision;
+          await client.query("ROLLBACK");
+          return { kind: "conflict", latestRevision };
+        }
+
+        let updatedRow = charRow;
+        if (input.stateChanged) {
+          const updated = await client.query<CharacterRow>(
+            `UPDATE characters
+                SET state_json = $1::jsonb, revision = revision + 1, updated_at = now()
+              WHERE id = $2
+              RETURNING id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+            [JSON.stringify(input.nextState), input.characterId],
+          );
+          updatedRow = requireRow(updated.rows[0], "applyCommandTx.update");
+        }
+
+        await client.query(
+          `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, request_id)
+           VALUES ($1, $2, $3, $4::jsonb, $5)`,
+          [updatedRow.id, updatedRow.revision, input.activity.kind, JSON.stringify(input.activity.payloadJson), input.activity.requestId],
+        );
+
+        const record = toCharacterRecord(updatedRow);
+        const resultJson = input.buildResult({ record });
+        await client.query(
+          `UPDATE character_command_executions
+              SET status = 'completed', result_json = $1::jsonb, expires_at = $2
+            WHERE execution_id = $3`,
+          [JSON.stringify(resultJson), input.resultExpiresAt, input.executionId],
+        );
+        await client.query("COMMIT");
+        return { kind: "applied", record, resultJson };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async finalizeExecutionError(input) {
+      await pool.query(
+        `UPDATE character_command_executions
+            SET status = 'completed', result_json = $1::jsonb, expires_at = $2
+          WHERE execution_id = $3 AND status = 'pending'`,
+        [JSON.stringify(input.resultJson), input.expiresAt, input.executionId],
+      );
+    },
+
+    async changedDefinitionIdsSinceRevision(characterId, sinceRevision) {
+      const result = await pool.query<{ payload_json: unknown }>(
+        `SELECT payload_json FROM character_activity_events
+          WHERE character_id = $1 AND character_revision > $2
+          ORDER BY character_revision ASC`,
+        [characterId, sinceRevision],
+      );
+      const ids = new Set<DefinitionId>();
+      for (const row of result.rows) {
+        const payload = row.payload_json as { changedDefinitionIds?: unknown };
+        if (Array.isArray(payload?.changedDefinitionIds)) {
+          for (const id of payload.changedDefinitionIds) {
+            if (typeof id === "string") ids.add(id);
+          }
+        }
+      }
+      return [...ids];
     },
   };
 }

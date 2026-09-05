@@ -635,6 +635,8 @@ Every increment must meet all applicable criteria before work begins on the next
 
 **Acceptance demonstration:** Through the documented HTTP interface, create a standalone character from a published reference system, edit fields, bump a resource, execute a roll, replay the command safely, observe a concurrent-write conflict, export the character, and migrate it explicitly to a newer version.
 
+> **I3 implementation design approved 2026-09-05.** I3 completes the currently-placeholder `SystemRuntime` before building Characters in vertical slices. Standalone characters have one transferable owner and fixed owner-only visibility; campaign assignment and multiple-owner rules remain in I6. Offline synchronization replays ordinary idempotent commands rather than introducing a second mutation protocol. Image fields remain null-only until a later increment introduces object storage. See `docs/superpowers/specs/2026-09-05-i3-character-backend-design.md`.
+
 ## 17.6 I4 - Character Sheet frontend
 
 **Tasks:**

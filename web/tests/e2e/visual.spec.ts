@@ -49,6 +49,7 @@ test.describe("visual: sheet preview", () => {
       await page.getByTestId("clone-from-template-d20").click();
       await expect(page.getByTestId("document-editor-header")).toBeVisible();
       await page.getByTestId("document-editor-tab-sheets").click();
+      await page.getByTestId("document-editor-preview-toggle").click();
       const frame = page.getByTestId("preview-frame");
       // PreviewFrame defaults to 360; toggle once to land on 1280 when needed.
       if (width === 1280) {

@@ -574,7 +574,7 @@ Every increment must meet all applicable criteria before work begins on the next
 | **Increment** | **Capability delivered** | **Depends on** | **Exit result** |
 |---------------|--------------------------|----------------|-----------------|
 | I1 - System backend and rules runtime | System definition, validation, evaluation, publishing, and version HTTP interface **(completed 2026-09-04)** | None | A complete system can be created, validated, published, cloned, retrieved, exported, and evaluated through the documented HTTP interface. |
-| I2 - System Builder frontend | No-code system authoring and publishing | I1 | A non-programmer can create and publish a playable system entirely through the web interface. |
+| I2 - System Builder frontend | No-code system authoring and publishing **(completed 2026-09-04)** | I1 | A non-programmer can create and publish a playable system entirely through the web interface. |
 | I3 - Character backend | Runtime character state and commands | I1; I2 validates the package model | A client can create and fully operate a standalone character through the documented HTTP interface. |
 | I4 - Character Sheet frontend | Reusable schema-driven character experience | I3 | A standalone character can be created and played through a responsive web sheet online or offline. |
 | I5 - Standalone Player app | Mobile-first Player PWA around the sheet | I4 | A player can manage and play personal characters in a mobile browser or installed PWA without joining a campaign. |
@@ -615,6 +615,8 @@ Every increment must meet all applicable criteria before work begins on the next
 9. Add browser tests for authoring and publication, accessibility tests, responsive visual regression at 360 and 1280 px, and conflict/recovery tests.
 
 **Acceptance demonstration:** A non-programmer clones a reference template, adds and arranges a field, defines a simple roll, previews both target widths, resolves validation feedback, and publishes a version without direct HTTP or database tools.
+
+> **I2 closed 2026-09-04 (wire-up pass).** All 35 per-task components are now wired into the application: `DevSignInPanel` mounts in `AppShell` when `import.meta.env.MODE === "development"`; `SystemLibrary`, `CreateDraftDialog`, and `CloneFromTemplate` render at `/`; the `DocumentEditor` tabs (`metadata`, `sheets`, `actions`, `validations`, `referenceData`) each route to their dedicated editor (`MetadataEditor`, `SheetEditor`, `RollActionEditor` / `ResourceBumpEditor`, `ValidationEditor`, `ReferenceDataEditor`); `useDraftSync` owns autosave and surfaces the `ConflictBanner` on 409; `PreviewFrame` + `PreviewSheet` + `DiagnosticsDrawer` open behind header toggles; `PublishDialog` opens from the publish button and `VersionHistory` opens from the versions button; the `focus-editor:{path}` event from `DiagnosticsDrawer` resolves to the matching `[data-path]` element inside the editor body. Acceptance demonstration recorded at `docs/acceptance/i2-2026-09-04.md`.
 
 ## 17.5 I3 - Character backend
 

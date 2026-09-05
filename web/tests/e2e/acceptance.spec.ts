@@ -41,7 +41,9 @@ test("acceptance: clone template, edit, preview, publish, breaking-change gate",
   await page.getByTestId(/^validations-add-/).click();
 
   // 6. Open the preview at 360 px then 1280 px; the toggle button is keyed by
+  // data-testid="document-editor-preview-toggle". The frame itself is keyed by
   // data-testid="preview-frame-toggle" and the frame carries data-width.
+  await page.getByTestId("document-editor-preview-toggle").click();
   const frame = page.getByTestId("preview-frame");
   await expect(frame).toHaveAttribute("data-width", "360");
   await page.getByTestId("preview-frame-toggle").click();

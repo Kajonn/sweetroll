@@ -36,7 +36,11 @@ export type DocumentAction =
   | { type: "addEntity"; entity: EntityDefinitionV1 }
   | { type: "removeEntity"; entityId: string }
   | { type: "updateField"; entityId: string; fieldId: string; field: EntityFieldV1 }
-  | { type: "setEntities"; entities: EntityDefinitionV1[] };
+  | { type: "setEntities"; entities: EntityDefinitionV1[] }
+  | { type: "setSheets"; sheets: SheetV1[] }
+  | { type: "setReferenceData"; referenceData: ReferenceDataV1[] }
+  | { type: "setActions"; actions: ActionV1[] }
+  | { type: "setValidations"; validations: ValidationV1[] };
 
 export function blankDocument(): SystemDocumentV1 {
   return {
@@ -86,5 +90,13 @@ export function documentReducer(state: SystemDocumentV1, action: DocumentAction)
     }
     case "setEntities":
       return { ...state, entities: action.entities };
+    case "setSheets":
+      return { ...state, sheets: action.sheets };
+    case "setReferenceData":
+      return { ...state, referenceData: action.referenceData };
+    case "setActions":
+      return { ...state, actions: action.actions };
+    case "setValidations":
+      return { ...state, validations: action.validations };
   }
 }

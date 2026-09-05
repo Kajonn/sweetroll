@@ -105,4 +105,74 @@ describe("documentReducer", () => {
     expect(doc.actions).toEqual([]);
     expect(doc.validations).toEqual([]);
   });
+
+  it("setSheets replaces the sheets collection", () => {
+    const initial: SystemDocumentV1 = {
+      ...blankDocument(),
+      sheets: [
+        {
+          id: "main",
+          label: "Main",
+          targetEntityId: "character",
+          sections: [],
+        },
+      ],
+    };
+    const next = documentReducer(initial, {
+      type: "setSheets",
+      sheets: [
+        {
+          id: "alt",
+          label: "Alt",
+          targetEntityId: "character",
+          sections: [],
+        },
+      ],
+    });
+    expect(next.sheets.map((s) => s.id)).toEqual(["alt"]);
+    expect(next).not.toBe(initial);
+  });
+
+  it("setActions replaces the actions collection", () => {
+    const next = documentReducer(blankDocument(), {
+      type: "setActions",
+      actions: [
+        {
+          id: "atk",
+          label: "Attack",
+          kind: "roll",
+          expressionId: "atk_expr",
+          inputs: [],
+          outputTemplate: "{total}",
+        },
+      ],
+    });
+    expect(next.actions.map((a) => a.id)).toEqual(["atk"]);
+  });
+
+  it("setValidations replaces the validations collection", () => {
+    const next = documentReducer(blankDocument(), {
+      type: "setValidations",
+      validations: [
+        {
+          id: "warn_low_hp",
+          expressionId: "low_hp",
+          severity: "warning",
+          message: "validation.characterHealthLow",
+          targetId: "character",
+        },
+      ],
+    });
+    expect(next.validations.map((v) => v.id)).toEqual(["warn_low_hp"]);
+  });
+
+  it("setReferenceData replaces the referenceData collection", () => {
+    const next = documentReducer(blankDocument(), {
+      type: "setReferenceData",
+      referenceData: [
+        { id: "skills", label: "Skills", records: [] },
+      ],
+    });
+    expect(next.referenceData.map((r) => r.id)).toEqual(["skills"]);
+  });
 });

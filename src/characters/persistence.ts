@@ -129,6 +129,107 @@ export type ApplyManagementCommandOutcome =
   | { kind: "invalid_target" }
   | { kind: "conflict"; latestRevision: number };
 
+export type MigrationPreviewRecord = {
+  previewId: string;
+  characterId: CharacterId;
+  ownerId: UserId;
+  sourceRevision: number;
+  sourceVersionId: VersionId;
+  sourceChecksum: string;
+  targetVersionId: VersionId;
+  targetChecksum: string;
+  mappingJson: unknown;
+  candidateState: RuntimeStateV1;
+  candidateProjection: unknown;
+  warnings: string[];
+  previewChecksum: string;
+  createdAt: Date;
+  expiresAt: Date;
+  consumedAt: Date | null;
+};
+
+export type InsertMigrationPreviewInput = {
+  previewId: string;
+  characterId: CharacterId;
+  ownerId: UserId;
+  sourceRevision: number;
+  sourceVersionId: VersionId;
+  sourceChecksum: string;
+  targetVersionId: VersionId;
+  targetChecksum: string;
+  mappingJson: unknown;
+  candidateState: RuntimeStateV1;
+  candidateProjection: unknown;
+  warnings: string[];
+  previewChecksum: string;
+  expiresAt: Date;
+  audit: { actorId: UserId; kind: string; summary: string; requestId: string };
+};
+
+export type CommitMigrationInput = {
+  executionId: ExecutionId;
+  characterId: CharacterId;
+  actorId: UserId;
+  expectedRevision: number;
+  previewId: string;
+  sourceRevision: number;
+  sourceVersionId: VersionId;
+  sourceChecksum: string;
+  targetVersionId: VersionId;
+  targetChecksum: string;
+  previewChecksum: string;
+  candidateState: RuntimeStateV1;
+  beforeState: RuntimeStateV1;
+  rollbackDeadline: Date;
+  activity: { kind: string; payloadJson: unknown; requestId: string };
+  audit: { actorId: UserId; kind: string; summary: string; requestId: string };
+  resultExpiresAt: Date;
+  buildResult: (args: { record: CharacterRecord }) => unknown;
+};
+
+export type CommitMigrationOutcome =
+  | { kind: "applied"; record: CharacterRecord; resultJson: unknown }
+  | { kind: "already_completed"; resultJson: unknown }
+  | { kind: "not_found" }
+  | { kind: "consumed" }
+  | { kind: "expired" }
+  | { kind: "conflict"; latestRevision: number };
+
+export type MigrationRecord = {
+  migrationId: string;
+  characterId: CharacterId;
+  previewId: string;
+  sourceVersionId: VersionId;
+  targetVersionId: VersionId;
+  beforeState: RuntimeStateV1;
+  afterState: RuntimeStateV1;
+  commitRevision: number;
+  rollbackDeadline: Date;
+  rolledBackAt: Date | null;
+  rollbackRevision: number | null;
+};
+
+export type LoadMigrationInput = { migrationId: string; characterId: CharacterId; actorId: UserId };
+
+export type RollbackMigrationInput = {
+  executionId: ExecutionId;
+  characterId: CharacterId;
+  actorId: UserId;
+  migration: MigrationRecord;
+  sourceVersionId: VersionId;
+  sourceState: RuntimeStateV1;
+  activity: { kind: string; payloadJson: unknown; requestId: string };
+  audit: { actorId: UserId; kind: string; summary: string; requestId: string };
+  resultExpiresAt: Date;
+  buildResult: (args: { record: CharacterRecord }) => unknown;
+};
+
+export type RollbackMigrationOutcome =
+  | { kind: "applied"; record: CharacterRecord; resultJson: unknown }
+  | { kind: "already_completed"; resultJson: unknown }
+  | { kind: "not_found" }
+  | { kind: "conflict" };
+
 export type CharacterActivityRow = {
   id: string;
   characterRevision: number;
@@ -181,6 +282,18 @@ export interface CharacterPersistenceRepository {
   ): Promise<CharacterActivityRow[]>;
 
   recordAudit(input: { characterId: CharacterId; actorId: UserId; kind: string; summary: string; requestId: string }): Promise<void>;
+
+  loadVersionIdentity(versionId: VersionId): Promise<{ systemId: string; checksum: string } | null>;
+
+  insertMigrationPreview(input: InsertMigrationPreviewInput): Promise<MigrationPreviewRecord>;
+
+  loadMigrationPreview(previewId: string): Promise<MigrationPreviewRecord | null>;
+
+  commitMigrationTx(input: CommitMigrationInput): Promise<CommitMigrationOutcome>;
+
+  loadMigration(input: LoadMigrationInput): Promise<MigrationRecord | null>;
+
+  rollbackMigrationTx(input: RollbackMigrationInput): Promise<RollbackMigrationOutcome>;
 }
 
 type CharacterRow = {
@@ -209,6 +322,25 @@ type ExecutionRow = {
   result_json: unknown;
   created_at: Date;
   expires_at: Date;
+};
+
+type MigrationPreviewRow = {
+  id: string;
+  character_id: string;
+  owner_id: string;
+  source_revision: number;
+  source_version_id: string;
+  source_checksum: string;
+  target_version_id: string;
+  target_checksum: string;
+  mapping_json: unknown;
+  candidate_state_json: unknown;
+  candidate_projection_json: unknown;
+  warnings_json: string[];
+  preview_checksum: string;
+  created_at: Date;
+  expires_at: Date;
+  consumed_at: Date | null;
 };
 
 export function createCharacterPersistenceRepository(pool: Pool): CharacterPersistenceRepository {
@@ -607,6 +739,337 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         lastRow === undefined ? null : { id: lastRow.id, occurredAtText: lastRow.occurred_at_cursor };
       return { changedDefinitionIds: [...ids], latestActivity };
     },
+
+    async loadVersionIdentity(versionId) {
+      const result = await pool.query<{ system_id: string; checksum: string }>(
+        `SELECT system_id, checksum FROM system_versions WHERE id = $1`,
+        [versionId],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : { systemId: row.system_id, checksum: row.checksum };
+    },
+
+    async insertMigrationPreview(input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const result = await client.query<MigrationPreviewRow>(
+          `INSERT INTO character_migration_previews
+             (id, character_id, owner_id, source_revision, source_version_id, source_checksum,
+              target_version_id, target_checksum, mapping_json, candidate_state_json,
+              candidate_projection_json, warnings_json, preview_checksum, expires_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13, $14)
+           RETURNING id, character_id, owner_id, source_revision, source_version_id, source_checksum,
+                     target_version_id, target_checksum, mapping_json, candidate_state_json,
+                     candidate_projection_json, warnings_json, preview_checksum, created_at, expires_at, consumed_at`,
+          [
+            input.previewId,
+            input.characterId,
+            input.ownerId,
+            input.sourceRevision,
+            input.sourceVersionId,
+            input.sourceChecksum,
+            input.targetVersionId,
+            input.targetChecksum,
+            JSON.stringify(input.mappingJson),
+            JSON.stringify(input.candidateState),
+            JSON.stringify(input.candidateProjection),
+            JSON.stringify(input.warnings),
+            input.previewChecksum,
+            input.expiresAt,
+          ],
+        );
+        const record = toMigrationPreviewRecord(requireRow(result.rows[0], "insertMigrationPreview"));
+        await client.query(
+          `INSERT INTO character_audit_records (character_id, actor_id, kind, summary, request_id)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [input.characterId, input.audit.actorId, input.audit.kind, input.audit.summary, input.audit.requestId],
+        );
+        await client.query("COMMIT");
+        return record;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async loadMigrationPreview(previewId) {
+      const result = await pool.query<MigrationPreviewRow>(
+        `SELECT id, character_id, owner_id, source_revision, source_version_id, source_checksum,
+                target_version_id, target_checksum, mapping_json, candidate_state_json,
+                candidate_projection_json, warnings_json, preview_checksum, created_at, expires_at, consumed_at
+           FROM character_migration_previews WHERE id = $1`,
+        [previewId],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toMigrationPreviewRecord(row);
+    },
+
+    async commitMigrationTx(input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const execResult = await client.query<{ status: string; result_json: unknown }>(
+          `SELECT status, result_json FROM character_command_executions WHERE execution_id = $1 FOR UPDATE`,
+          [input.executionId],
+        );
+        const execRow = execResult.rows[0];
+        if (execRow === undefined) throw new Error("commitMigrationTx: execution row missing");
+        if (execRow.status === "completed") {
+          await client.query("COMMIT");
+          return { kind: "already_completed", resultJson: execRow.result_json };
+        }
+
+        const previewResult = await client.query<MigrationPreviewRow>(
+          `SELECT id, character_id, owner_id, source_revision, source_version_id, source_checksum,
+                  target_version_id, target_checksum, mapping_json, candidate_state_json,
+                  candidate_projection_json, warnings_json, preview_checksum, created_at, expires_at, consumed_at
+             FROM character_migration_previews WHERE id = $1 FOR UPDATE`,
+          [input.previewId],
+        );
+        const previewRow = previewResult.rows[0];
+        if (previewRow === undefined || previewRow.character_id !== input.characterId) {
+          await client.query("ROLLBACK");
+          return { kind: "not_found" };
+        }
+        if (previewRow.owner_id !== input.actorId) {
+          await client.query("ROLLBACK");
+          return { kind: "not_found" };
+        }
+        if (previewRow.consumed_at !== null) {
+          await client.query("ROLLBACK");
+          return { kind: "consumed" };
+        }
+        if (new Date(previewRow.expires_at).getTime() <= Date.now()) {
+          await client.query("ROLLBACK");
+          return { kind: "expired" };
+        }
+        if (
+          previewRow.source_revision !== input.sourceRevision
+          || previewRow.source_version_id !== input.sourceVersionId
+          || previewRow.source_checksum !== input.sourceChecksum
+          || previewRow.target_version_id !== input.targetVersionId
+          || previewRow.target_checksum !== input.targetChecksum
+          || previewRow.preview_checksum !== input.previewChecksum
+        ) {
+          await client.query("ROLLBACK");
+          return { kind: "consumed" };
+        }
+
+        const charResult = await client.query<CharacterRow>(
+          `SELECT id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+             FROM characters WHERE id = $1 FOR UPDATE`,
+          [input.characterId],
+        );
+        const charRow = charResult.rows[0];
+        if (charRow === undefined || charRow.owner_id !== input.actorId) {
+          await client.query("ROLLBACK");
+          return { kind: "not_found" };
+        }
+        if (charRow.revision !== input.expectedRevision || charRow.revision !== input.sourceRevision) {
+          const latestRevision = charRow.revision;
+          await client.query("ROLLBACK");
+          return { kind: "conflict", latestRevision };
+        }
+
+        const updated = await client.query<CharacterRow>(
+          `UPDATE characters
+              SET system_version_id = $1::uuid, state_json = $2::jsonb, revision = revision + 1, updated_at = now()
+            WHERE id = $3
+            RETURNING id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+          [input.targetVersionId, JSON.stringify(input.candidateState), input.characterId],
+        );
+        const updatedRow = requireRow(updated.rows[0], "commitMigrationTx.update");
+
+        await client.query(
+          `UPDATE character_migration_previews SET consumed_at = now() WHERE id = $1`,
+          [input.previewId],
+        );
+        await client.query(
+          `INSERT INTO character_migrations
+             (id, character_id, preview_id, source_version_id, target_version_id, before_state_json,
+              after_state_json, commit_revision, rollback_deadline, actor_id, request_id)
+           VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11)`,
+          [
+            input.executionId,
+            input.characterId,
+            input.previewId,
+            input.sourceVersionId,
+            input.targetVersionId,
+            JSON.stringify(input.beforeState),
+            JSON.stringify(input.candidateState),
+            updatedRow.revision,
+            input.rollbackDeadline,
+            input.actorId,
+            input.activity.requestId,
+          ],
+        );
+        await client.query(
+          `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, request_id)
+           VALUES ($1, $2, $3, $4::jsonb, $5)`,
+          [updatedRow.id, updatedRow.revision, input.activity.kind, JSON.stringify(input.activity.payloadJson), input.activity.requestId],
+        );
+        await client.query(
+          `INSERT INTO character_audit_records (character_id, actor_id, kind, summary, request_id)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [updatedRow.id, input.audit.actorId, input.audit.kind, input.audit.summary, input.audit.requestId],
+        );
+
+        const record = toCharacterRecord(updatedRow);
+        const resultJson = input.buildResult({ record });
+        await client.query(
+          `UPDATE character_command_executions
+              SET status = 'completed', result_json = $1::jsonb, expires_at = $2
+            WHERE execution_id = $3`,
+          [JSON.stringify(resultJson), input.resultExpiresAt, input.executionId],
+        );
+        await client.query("COMMIT");
+        return { kind: "applied", record, resultJson };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async loadMigration(input) {
+      const result = await pool.query<{
+        id: string;
+        character_id: string;
+        preview_id: string;
+        source_version_id: string;
+        target_version_id: string;
+        before_state_json: unknown;
+        after_state_json: unknown;
+        commit_revision: number;
+        rollback_deadline: Date;
+        rolled_back_at: Date | null;
+        rollback_revision: number | null;
+      }>(
+        `SELECT id, character_id, preview_id, source_version_id, target_version_id, before_state_json,
+                after_state_json, commit_revision, rollback_deadline, rolled_back_at, rollback_revision
+           FROM character_migrations
+          WHERE id = $1 AND character_id = $2 AND actor_id = $3`,
+        [input.migrationId, input.characterId, input.actorId],
+      );
+      const row = result.rows[0];
+      if (row === undefined) return null;
+      return {
+        migrationId: row.id,
+        characterId: row.character_id,
+        previewId: row.preview_id,
+        sourceVersionId: row.source_version_id,
+        targetVersionId: row.target_version_id,
+        beforeState: row.before_state_json as RuntimeStateV1,
+        afterState: row.after_state_json as RuntimeStateV1,
+        commitRevision: row.commit_revision,
+        rollbackDeadline: row.rollback_deadline,
+        rolledBackAt: row.rolled_back_at,
+        rollbackRevision: row.rollback_revision,
+      };
+    },
+
+    async rollbackMigrationTx(input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const execResult = await client.query<{ status: string; result_json: unknown }>(
+          `SELECT status, result_json FROM character_command_executions WHERE execution_id = $1 FOR UPDATE`,
+          [input.executionId],
+        );
+        const execRow = execResult.rows[0];
+        if (execRow === undefined) throw new Error("rollbackMigrationTx: execution row missing");
+        if (execRow.status === "completed") {
+          await client.query("COMMIT");
+          return { kind: "already_completed", resultJson: execRow.result_json };
+        }
+
+        const migrationResult = await client.query<{
+          character_id: string;
+          source_version_id: string;
+          before_state_json: unknown;
+          commit_revision: number;
+          rollback_deadline: Date;
+          rolled_back_at: Date | null;
+        }>(
+          `SELECT character_id, source_version_id, before_state_json, commit_revision, rollback_deadline, rolled_back_at
+             FROM character_migrations WHERE id = $1 FOR UPDATE`,
+          [input.migration.migrationId],
+        );
+        const migrationRow = migrationResult.rows[0];
+        if (migrationRow === undefined || migrationRow.character_id !== input.characterId) {
+          await client.query("ROLLBACK");
+          return { kind: "not_found" };
+        }
+        if (migrationRow.rolled_back_at !== null) {
+          await client.query("ROLLBACK");
+          return { kind: "conflict" };
+        }
+        if (new Date(migrationRow.rollback_deadline).getTime() <= Date.now()) {
+          await client.query("ROLLBACK");
+          return { kind: "conflict" };
+        }
+
+        const charResult = await client.query<CharacterRow>(
+          `SELECT id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+             FROM characters WHERE id = $1 FOR UPDATE`,
+          [input.characterId],
+        );
+        const charRow = charResult.rows[0];
+        if (charRow === undefined || charRow.owner_id !== input.actorId) {
+          await client.query("ROLLBACK");
+          return { kind: "not_found" };
+        }
+        if (charRow.revision !== migrationRow.commit_revision) {
+          await client.query("ROLLBACK");
+          return { kind: "conflict" };
+        }
+
+        const restoredState = migrationRow.before_state_json as RuntimeStateV1;
+        const updated = await client.query<CharacterRow>(
+          `UPDATE characters
+              SET system_version_id = $1::uuid, state_json = $2::jsonb, revision = revision + 1, updated_at = now()
+            WHERE id = $3
+            RETURNING id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+          [migrationRow.source_version_id, JSON.stringify(restoredState), input.characterId],
+        );
+        const updatedRow = requireRow(updated.rows[0], "rollbackMigrationTx.update");
+
+        await client.query(
+          `UPDATE character_migrations SET rollback_revision = $1, rolled_back_at = now() WHERE id = $2`,
+          [updatedRow.revision, input.migration.migrationId],
+        );
+        await client.query(
+          `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, request_id)
+           VALUES ($1, $2, $3, $4::jsonb, $5)`,
+          [updatedRow.id, updatedRow.revision, input.activity.kind, JSON.stringify(input.activity.payloadJson), input.activity.requestId],
+        );
+        await client.query(
+          `INSERT INTO character_audit_records (character_id, actor_id, kind, summary, request_id)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [updatedRow.id, input.audit.actorId, input.audit.kind, input.audit.summary, input.audit.requestId],
+        );
+
+        const record = toCharacterRecord(updatedRow);
+        const resultJson = input.buildResult({ record });
+        await client.query(
+          `UPDATE character_command_executions
+              SET status = 'completed', result_json = $1::jsonb, expires_at = $2
+            WHERE execution_id = $3`,
+          [JSON.stringify(resultJson), input.resultExpiresAt, input.executionId],
+        );
+        await client.query("COMMIT");
+        return { kind: "applied", record, resultJson };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
   };
 }
 
@@ -639,6 +1102,27 @@ function toExecutionRecord(row: ExecutionRow): CharacterExecutionRecord {
     resultJson: row.result_json,
     createdAt: row.created_at,
     expiresAt: row.expires_at,
+  };
+}
+
+function toMigrationPreviewRecord(row: MigrationPreviewRow): MigrationPreviewRecord {
+  return {
+    previewId: row.id,
+    characterId: row.character_id,
+    ownerId: row.owner_id,
+    sourceRevision: row.source_revision,
+    sourceVersionId: row.source_version_id,
+    sourceChecksum: row.source_checksum,
+    targetVersionId: row.target_version_id,
+    targetChecksum: row.target_checksum,
+    mappingJson: row.mapping_json,
+    candidateState: row.candidate_state_json as RuntimeStateV1,
+    candidateProjection: row.candidate_projection_json,
+    warnings: row.warnings_json,
+    previewChecksum: row.preview_checksum,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    consumedAt: row.consumed_at,
   };
 }
 

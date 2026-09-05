@@ -24,6 +24,7 @@ import {
 } from "./persistence.js";
 import { claimExecution } from "./idempotency.js";
 import { buildCharacterExportDocument } from "./export.js";
+import { buildCandidateValues, collectEditableFields } from "./migration.js";
 
 export type { RequestContext } from "../systems/authoring.js";
 
@@ -63,6 +64,10 @@ const MANAGEMENT_AUDIT_SUMMARY: Record<CharacterManagementCommand["kind"], strin
 };
 const LEASE_MS = 60 * 1000;
 const REPLAY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000;
+const ROLLBACK_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const COMMIT_COMMAND_KIND = "character_migration_commit";
+const ROLLBACK_COMMAND_KIND = "character_migration_rollback";
 const MAX_PAGE_LIMIT = 100;
 const NOT_FOUND_MESSAGE = "The requested character does not exist.";
 const MISMATCH_MESSAGE = "This idempotency key was already used with different input.";
@@ -1118,14 +1123,410 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         return { ok: false, error: errors.internal() };
       }
     },
-    async previewMigration() {
-      return { ok: false, error: errors.notImplemented() };
+    async previewMigration(ctx, migrationInput) {
+      try {
+        const character = await repo.openOwnedCharacter(migrationInput.characterId, ctx.actorId);
+        if (character === null) return { ok: false, error: errors.notFoundPurge() };
+
+        const authorized = await input.authorizeVersionUse(ctx, migrationInput.targetVersionId);
+        if (!authorized.ok) return { ok: false, error: errors.not_found() };
+
+        const sourceIdentity = await repo.loadVersionIdentity(character.systemVersionId);
+        if (sourceIdentity === null) return { ok: false, error: errors.not_found() };
+        if (sourceIdentity.systemId !== authorized.value.systemId) {
+          return {
+            ok: false,
+            error: errors.invalid_value(
+              "The target version does not belong to the same system as the character.",
+            ),
+          };
+        }
+
+        const sourceResolved = await input.runtime.resolve({
+          versionId: character.systemVersionId,
+          entityId: character.entityDefinitionId,
+          state: character.state,
+          intent: { kind: "observe" },
+        });
+        if (!sourceResolved.ok) return { ok: false, error: mapRuntimeError(sourceResolved.error) };
+
+        const targetSeed = await input.runtime.resolve({
+          versionId: authorized.value.versionId,
+          entityId: character.entityDefinitionId,
+          intent: { kind: "initialize" },
+        });
+        if (!targetSeed.ok) return { ok: false, error: mapRuntimeError(targetSeed.error) };
+
+        const sourceFields = collectEditableFields(
+          sourceResolved.value.projection,
+          Object.keys(character.state.values),
+        );
+        const targetFields = collectEditableFields(
+          targetSeed.value.projection,
+          Object.keys(targetSeed.value.state.values),
+        );
+
+        const built = buildCandidateValues({
+          sourceState: character.state,
+          sourceFields,
+          targetFields,
+          mappings: migrationInput.mappings ?? {},
+          defaults: migrationInput.defaults ?? {},
+        });
+        if (!built.ok) return { ok: false, error: errors.invalid_value(built.error.message) };
+
+        const candidate = await input.runtime.resolve({
+          versionId: authorized.value.versionId,
+          entityId: character.entityDefinitionId,
+          intent: { kind: "initialize", values: built.values },
+        });
+        if (!candidate.ok) return { ok: false, error: mapRuntimeError(candidate.error) };
+
+        const previewId = newId();
+        const createdAt = now();
+        const expiresAt = new Date(createdAt.getTime() + PREVIEW_TTL_MS);
+        const previewChecksum = hashInput({
+          characterId: character.characterId,
+          sourceRevision: character.revision,
+          sourceVersionId: character.systemVersionId,
+          sourceChecksum: sourceIdentity.checksum,
+          targetVersionId: authorized.value.versionId,
+          targetChecksum: authorized.value.checksum,
+          mappings: migrationInput.mappings ?? {},
+          defaults: migrationInput.defaults ?? {},
+          candidateState: candidate.value.state,
+          candidateProjection: candidate.value.projection,
+          warnings: built.warnings,
+          owner: character.ownerId,
+          expiresAt: expiresAt.toISOString(),
+        });
+
+        await repo.insertMigrationPreview({
+          previewId,
+          characterId: character.characterId,
+          ownerId: character.ownerId,
+          sourceRevision: character.revision,
+          sourceVersionId: character.systemVersionId,
+          sourceChecksum: sourceIdentity.checksum,
+          targetVersionId: authorized.value.versionId,
+          targetChecksum: authorized.value.checksum,
+          mappingJson: { mappings: migrationInput.mappings ?? {}, defaults: migrationInput.defaults ?? {} },
+          candidateState: candidate.value.state,
+          candidateProjection: candidate.value.projection,
+          warnings: built.warnings,
+          previewChecksum,
+          expiresAt,
+          audit: {
+            actorId: ctx.actorId,
+            kind: "character_migration_previewed",
+            summary: "Character migration preview built",
+            requestId: ctx.requestId,
+          },
+        });
+
+        return {
+          ok: true,
+          value: {
+            previewId,
+            characterId: character.characterId,
+            sourceRevision: character.revision,
+            sourceVersionId: character.systemVersionId,
+            targetVersionId: authorized.value.versionId,
+            candidateState: candidate.value.state,
+            candidateProjection: candidate.value.projection,
+            warnings: built.warnings,
+            expiresAt: expiresAt.toISOString(),
+          },
+        };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
     },
-    async commitMigration() {
-      return { ok: false, error: errors.notImplemented() };
+    async commitMigration(ctx, commitInput) {
+      try {
+        if (!Number.isInteger(commitInput.expectedRevision) || commitInput.expectedRevision < 1) {
+          return { ok: false, error: errors.bad_request("expectedRevision must be a positive integer.") };
+        }
+
+        const claimStartedAt = now();
+        const claimed = await claimExecution(input.pool, {
+          actorId: ctx.actorId,
+          commandKind: COMMIT_COMMAND_KIND,
+          idempotencyKey: commitInput.idempotencyKey,
+          inputHash: hashInput({
+            commandKind: COMMIT_COMMAND_KIND,
+            characterId: commitInput.characterId,
+            previewId: commitInput.previewId,
+            expectedRevision: commitInput.expectedRevision,
+          }),
+          newExecutionId,
+          now: claimStartedAt,
+          leaseMs: LEASE_MS,
+          replayTtlMs: REPLAY_TTL_MS,
+        });
+        if (claimed.status === "mismatch") return { ok: false, error: errors.mismatch() };
+        if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
+        if (claimed.status === "replay") return replayStoredOutcome(claimed.resultJson);
+        const executionId = claimed.executionId;
+        const replayExpiresAt = new Date(claimStartedAt.getTime() + REPLAY_TTL_MS);
+
+        const character = await repo.openOwnedCharacter(commitInput.characterId, ctx.actorId);
+        if (character === null) {
+          const error = errors.not_found();
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+        if (character.lifecycle === "archived") {
+          const error = errors.archived();
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+
+        const preview = await repo.loadMigrationPreview(commitInput.previewId);
+        if (preview === null || preview.characterId !== commitInput.characterId || preview.ownerId !== ctx.actorId) {
+          const error = errors.not_found();
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+        if (preview.sourceRevision !== character.revision) {
+          const error = errors.conflict(character.revision, [], null);
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+        if (preview.consumedAt !== null) {
+          const error = errors.conflict(character.revision, [], null);
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+        if (new Date(preview.expiresAt).getTime() <= claimStartedAt.getTime()) {
+          const error = errors.conflict(character.revision, [], null);
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+
+        const observed = await input.runtime.resolve({
+          versionId: preview.targetVersionId,
+          entityId: character.entityDefinitionId,
+          state: preview.candidateState,
+          intent: { kind: "observe" },
+        });
+        if (!observed.ok) {
+          const error = mapRuntimeError(observed.error);
+          if (isFinalizableRuntimeError(observed.error.code)) {
+            await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          }
+          return { ok: false, error };
+        }
+
+        const targetIdentity = await repo.loadVersionIdentity(preview.targetVersionId);
+        if (targetIdentity === null) {
+          const error = errors.not_found();
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+
+        const outcome = await repo.commitMigrationTx({
+          executionId,
+          characterId: commitInput.characterId,
+          actorId: ctx.actorId,
+          expectedRevision: commitInput.expectedRevision,
+          previewId: commitInput.previewId,
+          sourceRevision: preview.sourceRevision,
+          sourceVersionId: preview.sourceVersionId,
+          sourceChecksum: preview.sourceChecksum,
+          targetVersionId: preview.targetVersionId,
+          targetChecksum: preview.targetChecksum,
+          previewChecksum: preview.previewChecksum,
+          candidateState: preview.candidateState,
+          beforeState: character.state,
+          rollbackDeadline: new Date(claimStartedAt.getTime() + ROLLBACK_TTL_MS),
+          activity: {
+            kind: "character_migration_committed",
+            payloadJson: { previewId: commitInput.previewId, targetVersionId: preview.targetVersionId },
+            requestId: ctx.requestId,
+          },
+          audit: {
+            actorId: ctx.actorId,
+            kind: "character_migration_committed",
+            summary: "Character migration committed",
+            requestId: ctx.requestId,
+          },
+          resultExpiresAt: replayExpiresAt,
+          buildResult: ({ record }) => {
+            const view = toView(
+              record,
+              {
+                derivedValues: observed.value.derivedValues,
+                validations: observed.value.validations,
+                projection: observed.value.projection,
+                packageChecksum: observed.value.packageChecksum,
+                changedDefinitionIds: [],
+              },
+              {
+                baseRevision: commitInput.expectedRevision,
+                commandExecutionId: executionId,
+                replayExpiresAt: replayExpiresAt.toISOString(),
+                replayed: false,
+              },
+            );
+            return { ok: true, value: { character: serializeView(view), roll: null } };
+          },
+        });
+
+        if (outcome.kind === "already_completed") return replayStoredOutcome(outcome.resultJson);
+        if (outcome.kind === "not_found") {
+          const error = errors.not_found();
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+        if (outcome.kind === "conflict") {
+          const error = errors.conflict(outcome.latestRevision, [], null);
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+        if (outcome.kind === "consumed" || outcome.kind === "expired") {
+          const error = errors.conflict(character.revision, [], null);
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+
+        const stored = outcome.resultJson as StoredCommandOutcome;
+        if (!stored.ok) return { ok: false, error: stored.error };
+        const view = deserializeView(stored.value.character);
+        return { ok: true, value: { character: view, roll: stored.value.roll } };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
     },
-    async rollbackMigration() {
-      return { ok: false, error: errors.notImplemented() };
+    async rollbackMigration(ctx, rollbackInput) {
+      try {
+        const claimStartedAt = now();
+        const claimed = await claimExecution(input.pool, {
+          actorId: ctx.actorId,
+          commandKind: ROLLBACK_COMMAND_KIND,
+          idempotencyKey: rollbackInput.idempotencyKey,
+          inputHash: hashInput({
+            commandKind: ROLLBACK_COMMAND_KIND,
+            characterId: rollbackInput.characterId,
+            migrationId: rollbackInput.migrationId,
+          }),
+          newExecutionId,
+          now: claimStartedAt,
+          leaseMs: LEASE_MS,
+          replayTtlMs: REPLAY_TTL_MS,
+        });
+        if (claimed.status === "mismatch") return { ok: false, error: errors.mismatch() };
+        if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
+        if (claimed.status === "replay") return replayStoredOutcome(claimed.resultJson);
+        const executionId = claimed.executionId;
+        const replayExpiresAt = new Date(claimStartedAt.getTime() + REPLAY_TTL_MS);
+
+        const migration = await repo.loadMigration({
+          migrationId: rollbackInput.migrationId,
+          characterId: rollbackInput.characterId,
+          actorId: ctx.actorId,
+        });
+        if (migration === null) {
+          const error = errors.not_found();
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+
+        const character = await repo.openOwnedCharacter(rollbackInput.characterId, ctx.actorId);
+        if (character === null) {
+          const error = errors.notFoundPurge();
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+        if (character.revision !== migration.commitRevision) {
+          const error = errors.conflict(character.revision, [], null);
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+        if (migration.rolledBackAt !== null) {
+          const error = errors.conflict(character.revision, [], null);
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+        if (new Date(migration.rollbackDeadline).getTime() <= claimStartedAt.getTime()) {
+          const error = errors.conflict(character.revision, [], null);
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+
+        const restored = await input.runtime.resolve({
+          versionId: migration.sourceVersionId,
+          entityId: character.entityDefinitionId,
+          state: migration.beforeState,
+          intent: { kind: "observe" },
+        });
+        if (!restored.ok) {
+          const error = mapRuntimeError(restored.error);
+          if (isFinalizableRuntimeError(restored.error.code)) {
+            await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          }
+          return { ok: false, error };
+        }
+
+        const outcome = await repo.rollbackMigrationTx({
+          executionId,
+          characterId: rollbackInput.characterId,
+          actorId: ctx.actorId,
+          migration,
+          sourceVersionId: migration.sourceVersionId,
+          sourceState: migration.beforeState,
+          activity: {
+            kind: "character_migration_rolled_back",
+            payloadJson: { migrationId: rollbackInput.migrationId },
+            requestId: ctx.requestId,
+          },
+          audit: {
+            actorId: ctx.actorId,
+            kind: "character_migration_rolled_back",
+            summary: "Character migration rolled back",
+            requestId: ctx.requestId,
+          },
+          resultExpiresAt: replayExpiresAt,
+          buildResult: ({ record }) => {
+            const view = toView(
+              record,
+              {
+                derivedValues: restored.value.derivedValues,
+                validations: restored.value.validations,
+                projection: restored.value.projection,
+                packageChecksum: restored.value.packageChecksum,
+                changedDefinitionIds: [],
+              },
+              {
+                baseRevision: character.revision,
+                commandExecutionId: executionId,
+                replayExpiresAt: replayExpiresAt.toISOString(),
+                replayed: false,
+              },
+            );
+            return { ok: true, value: { character: serializeView(view), roll: null } };
+          },
+        });
+
+        if (outcome.kind === "already_completed") return replayStoredOutcome(outcome.resultJson);
+        if (outcome.kind === "not_found") {
+          const error = errors.not_found();
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+        if (outcome.kind === "conflict") {
+          const error = errors.conflict(character.revision, [], null);
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+
+        const stored = outcome.resultJson as StoredCommandOutcome;
+        if (!stored.ok) return { ok: false, error: stored.error };
+        const view = deserializeView(stored.value.character);
+        return { ok: true, value: { character: view, roll: stored.value.roll } };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
     },
   };
 }

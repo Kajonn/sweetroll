@@ -1,5 +1,7 @@
 export {
   createSystemPersistenceRepository,
+  REFERENCE_TEMPLATES,
+  seedReferenceTemplates,
   type AuditRecord,
   type DraftRecord,
   type DraftSaveResult,
@@ -9,7 +11,9 @@ export {
   type PublishVersionResult,
   type RecordReceiptInput,
   type RecordReceiptResult,
+  type ReferenceTemplate,
   type SaveDraftInput,
+  type SeedReferenceTemplatesResult,
   type SystemId,
   type SystemPersistenceRepository,
   type SystemRecord,

@@ -2,7 +2,10 @@ import { loadConfig, createLogger, createPool } from "../platform/index.js";
 import { createIdentityModule } from "../identity/index.js";
 import { createTestOidcClient } from "../identity/adapters/test.js";
 import { createSystemAuthoringModule } from "../systems/authoring.js";
-import { createSystemPersistenceRepository } from "../systems/implementation/persistence/index.js";
+import {
+  createSystemPersistenceRepository,
+  seedReferenceTemplates,
+} from "../systems/implementation/persistence/index.js";
 import { buildAuthHook } from "../transport/http/auth-hook.js";
 import { buildDevSignInRoutes } from "../transport/http/dev-signin.js";
 import { buildHttpApp, buildIdentityRoutes, buildSystemsRoutes } from "../transport/http/index.js";
@@ -10,6 +13,17 @@ import { buildHttpApp, buildIdentityRoutes, buildSystemsRoutes } from "../transp
 const config = loadConfig();
 const logger = createLogger(config.logLevel);
 const pool = createPool(config.databaseUrl);
+
+// Reference template fixtures are global rows (NULL owner, link) used by
+// CloneFromTemplate. They are inserted by migration 0008 and/or this seed call
+// (idempotent — no-op once the rows are populated).
+const seeded = await seedReferenceTemplates(pool);
+if (seeded.systemsInserted > 0 || seeded.versionsReplaced > 0) {
+  logger.info(
+    { systemsInserted: seeded.systemsInserted, versionsReplaced: seeded.versionsReplaced },
+    "reference templates seeded",
+  );
+}
 
 // Non-production runs seed a deterministic test OIDC client so the dev sign-in
 // route can authenticate. Production runs use an empty map: the production

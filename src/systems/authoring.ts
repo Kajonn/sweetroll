@@ -274,7 +274,12 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
             const version = await repo.loadVersion(input.source.versionId);
             const sourceSystem =
               version === null ? null : await repo.openSystem(version.systemId);
-            if (version === null || sourceSystem === null || sourceSystem.ownerId !== ctx.actorId) {
+            // Template systems (owner_id NULL) are global and clonable by anyone.
+            if (
+              version === null ||
+              sourceSystem === null ||
+              (sourceSystem.ownerId !== null && sourceSystem.ownerId !== ctx.actorId)
+            ) {
               return { ok: false, error: errors.not_found() };
             }
             pkg = version.package as SystemPackageV1;

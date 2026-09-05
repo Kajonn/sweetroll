@@ -1,4 +1,6 @@
-import type { Pool } from "pg";
+import { d20Package, pbta2d6Package, d6SuccessPoolPackage } from "../package/fixtures/index.js";
+import type { SystemPackageV1 } from "../package/schema/index.js";
+import type { Pool, PoolClient } from "pg";
 
 export type SystemId = string;
 export type VersionId = string;
@@ -646,4 +648,83 @@ async function publishVersionImpl(pool: Pool, input: PublishVersionInput): Promi
   } finally {
     client.release();
   }
+}
+
+// ---------------------------------------------------------------------------
+// Reference template seeding
+// ---------------------------------------------------------------------------
+
+export type ReferenceTemplate = {
+  systemId: SystemId;
+  versionId: VersionId;
+  name: string;
+  package: SystemPackageV1;
+};
+
+export const REFERENCE_TEMPLATES: ReadonlyArray<ReferenceTemplate> = [
+  {
+    systemId: "00000000-0000-0000-0000-000000000a01",
+    versionId: "11111111-1111-1111-1111-111111111a01",
+    name: "Template: d20",
+    package: d20Package,
+  },
+  {
+    systemId: "00000000-0000-0000-0000-000000000a02",
+    versionId: "11111111-1111-1111-1111-111111111a02",
+    name: "Template: PbtA 2d6",
+    package: pbta2d6Package,
+  },
+  {
+    systemId: "00000000-0000-0000-0000-000000000a03",
+    versionId: "11111111-1111-1111-1111-111111111a03",
+    name: "Template: d6 success pool",
+    package: d6SuccessPoolPackage,
+  },
+];
+
+export type SeedReferenceTemplatesResult = {
+  systemsInserted: number;
+  versionsReplaced: number;
+};
+
+type SeedRunner = Pick<Pool | PoolClient, "query">;
+
+export async function seedReferenceTemplates(runner: SeedRunner): Promise<SeedReferenceTemplatesResult> {
+  let systemsInserted = 0;
+  let versionsReplaced = 0;
+  for (const tpl of REFERENCE_TEMPLATES) {
+    const inserted = await runner.query<{ id: string }>(
+      `INSERT INTO systems (id, owner_id, name, access, lifecycle, created_at, updated_at)
+       VALUES ($1, NULL, $2, 'link', 'active', now(), now())
+       ON CONFLICT (id) DO NOTHING
+       RETURNING id`,
+      [tpl.systemId, tpl.name],
+    );
+    if ((inserted.rowCount ?? 0) > 0) systemsInserted += 1;
+    const existing = await runner.query<{ id: string; checksum: string; package_json: unknown }>(
+      `SELECT id, checksum, package_json
+         FROM system_versions
+        WHERE id = $1`,
+      [tpl.versionId],
+    );
+    const row = existing.rows[0];
+    if (row === undefined) {
+      await runner.query(
+        `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at)
+         VALUES ($1, $2, '1.0.0', $3, $4::jsonb, 'Template seed', 'active', now())`,
+        [tpl.versionId, tpl.systemId, tpl.package.integrity.checksum, JSON.stringify(tpl.package)],
+      );
+      versionsReplaced += 1;
+      continue;
+    }
+    if (!row.checksum.startsWith("pending:")) continue;
+    await runner.query("DELETE FROM system_versions WHERE id = $1", [tpl.versionId]);
+    await runner.query(
+      `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at)
+       VALUES ($1, $2, '1.0.0', $3, $4::jsonb, 'Template seed', 'active', now())`,
+      [tpl.versionId, tpl.systemId, tpl.package.integrity.checksum, JSON.stringify(tpl.package)],
+    );
+    versionsReplaced += 1;
+  }
+  return { systemsInserted, versionsReplaced };
 }

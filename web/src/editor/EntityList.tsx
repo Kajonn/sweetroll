@@ -22,18 +22,6 @@ export type EntityListProps = {
   onSelectEntity: (id: string | null) => void;
 };
 
-const FIELD_KIND_LABELS: Record<FieldV1["kind"], string> = {
-  text: "text",
-  integer: "integer",
-  decimal: "decimal",
-  boolean: "boolean",
-  singleChoice: "single choice",
-  multiChoice: "multi choice",
-  resource: "resource",
-  computed: "computed",
-  image: "image",
-};
-
 function nextEntityId(existing: EntityListEntity[]): string {
   for (let i = 1; i < 10_000; i++) {
     const candidate = `entity_${i}`;
@@ -156,7 +144,7 @@ function FieldEditorRouter({
     case "computed":
       return (
         <p className={styles.unsupported} data-testid={`field-unsupported-${field.id}`}>
-          {t("editor.entity.landsLater", { kind: FIELD_KIND_LABELS[field.kind] })}
+          {t("editor.entity.landsLater", { kind: t(`editor.fields.kind.${field.kind}`) })}
         </p>
       );
   }
@@ -301,7 +289,7 @@ function EntityDetail({
           />
         </label>
         <div className={styles.detailMeta}>
-          <span className={styles.monoLabel}>id: {entity.id}</span>
+          <span className={styles.monoLabel}>{t("editor.entity.idLabel")} {entity.id}</span>
           <RemoveEntityButton entity={entity} onRemove={onRemove} />
         </div>
       </header>
@@ -325,7 +313,7 @@ function EntityDetail({
           {entity.fields.map((field) => (
             <div key={field.id} className={styles.fieldItem}>
               <div className={styles.fieldHeader}>
-                <span className={styles.fieldKind}>{FIELD_KIND_LABELS[field.kind]}</span>
+                <span className={styles.fieldKind}>{t(`editor.fields.kind.${field.kind}`)}</span>
               </div>
               <FieldEditorRouter field={field} onChange={onFieldChange} />
             </div>

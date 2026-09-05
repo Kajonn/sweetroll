@@ -6,6 +6,10 @@ import { test, expect } from "@playwright/test";
 // web:test:e2e:update` to generate the first baselines; subsequent runs
 // diff against the committed PNGs.
 //
+// Tests that clone the d20 fixture clean up the cloned system afterwards
+// (DELETE /api/systems/:systemId) so the library column stays
+// deterministic and baselines do not drift across runs.
+//
 // Per the design (design_v2.md §17.4 + docs/superpowers/specs/2026-09-04
 // -i2-system-builder-design.md §Visual regression): the spec exercises
 // the library, the document editor with the d20 fixture loaded, the
@@ -14,14 +18,35 @@ import { test, expect } from "@playwright/test";
 
 const WIDTHS = [360, 1280] as const;
 
+// Track systems cloned by these tests so test.afterEach can delete them
+// even when an assertion fails before the in-test cleanup line runs.
+// page.request shares the browser context's cookies (dev sign-in), so the
+// deletes are authorized. Keeps the shared DB deterministic across runs.
+const createdSystemIds: string[] = [];
+test.afterEach(async ({ page }) => {
+  for (const id of createdSystemIds.splice(0)) {
+    await page.request.delete(`/api/systems/${id}`).catch(() => {});
+  }
+});
+
 test.describe("visual: library", () => {
   for (const width of WIDTHS) {
     test(`at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 800 });
       await page.goto("/");
       await page.getByTestId("dev-signin").click();
-      await expect(page.getByTestId("system-library")).toBeVisible();
-      await expect(page).toHaveScreenshot(`library-${width}.png`);
+      // The list can legitimately be empty (deterministic template-only DB),
+      // which gives the <ul> zero height; assert it is attached rather than
+      // visible so the screenshot captures the empty-library state.
+      await expect(page.getByTestId("system-library")).toBeAttached();
+      await expect(page.getByTestId("library-new-system")).toBeVisible();
+      // Mask the footer: StatusBar shows the per-mount random request-id
+      // (by design, I2 task 1 request/error correlation). It is random per
+      // mount and width varies with its hex digits, so it would make this
+      // full-page baseline non-deterministic.
+      await expect(page).toHaveScreenshot(`library-${width}.png`, {
+        mask: [page.getByTestId("status-bar")],
+      });
     });
   }
 });
@@ -35,7 +60,10 @@ test.describe("visual: document editor (d20)", () => {
       await page.getByTestId("clone-from-template-d20").click();
       await expect(page.getByTestId("document-editor-header")).toBeVisible();
       await expect(page.getByTestId("document-editor-name")).toBeVisible();
-      await expect(page).toHaveScreenshot(`document-editor-${width}.png`);
+      createdSystemIds.push(page.url().split("/").pop() ?? "");
+      await expect(page).toHaveScreenshot(`document-editor-${width}.png`, {
+        mask: [page.getByTestId("status-bar")],
+      });
     });
   }
 });
@@ -48,8 +76,9 @@ test.describe("visual: sheet preview", () => {
       await page.getByTestId("dev-signin").click();
       await page.getByTestId("clone-from-template-d20").click();
       await expect(page.getByTestId("document-editor-header")).toBeVisible();
-      await page.getByTestId("document-editor-tab-sheets").click();
+      page.getByTestId("document-editor-tab-sheets").click();
       await page.getByTestId("document-editor-preview-toggle").click();
+      createdSystemIds.push(page.url().split("/").pop() ?? "");
       const frame = page.getByTestId("preview-frame");
       // PreviewFrame defaults to 360; toggle once to land on 1280 when needed.
       if (width === 1280) {
@@ -70,6 +99,7 @@ test.describe("visual: publish dialog", () => {
       await page.getByTestId("clone-from-template-d20").click();
       await expect(page.getByTestId("document-editor-header")).toBeVisible();
       await page.getByTestId("document-editor-publish").click();
+      createdSystemIds.push(page.url().split("/").pop() ?? "");
       const dialog = page.getByTestId("publish-dialog");
       await expect(dialog).toBeVisible();
       await expect(dialog).toHaveScreenshot(`publish-dialog-${width}.png`);

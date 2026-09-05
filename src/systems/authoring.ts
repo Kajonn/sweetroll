@@ -169,6 +169,7 @@ export interface SystemAuthoring {
     input: ListVersionsInput,
   ): Promise<Result<ListVersionsResult>>;
   changeLifecycle(ctx: RequestContext, input: LifecycleChangeInput): Promise<Result<LifecycleResult>>;
+  deleteSystem(ctx: RequestContext, systemId: SystemId): Promise<Result<{ systemId: SystemId }>>;
 }
 
 const SEMANTIC_VERSION_PATTERN = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
@@ -616,6 +617,16 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
             lifecycle: updated.lifecycle,
           },
         };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async deleteSystem(ctx, systemId) {
+      try {
+        const deleted = await repo.deleteOwnedSystem(systemId, ctx.actorId);
+        if (!deleted) return { ok: false, error: errors.not_found() };
+        return { ok: true, value: { systemId } };
       } catch {
         return { ok: false, error: errors.internal() };
       }

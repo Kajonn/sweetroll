@@ -100,7 +100,12 @@ export function PublishDialog({
     });
   };
 
-  const close = () => onOpenChange(false);
+  const close = () => {
+    setPublished(null);
+    setBreakingFindings(null);
+    setAcknowledged(new Set());
+    onOpenChange(false);
+  };
 
   if (published !== null) {
     return (

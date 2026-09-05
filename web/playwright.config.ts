@@ -9,6 +9,13 @@ const repoRoot = resolve(__dirname, "..");
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
+  // The e2e suites share a single dev identity in one Postgres DB. Tests
+  // clone systems and clean them up (DELETE /api/systems/:systemId), but
+  // the library sidebar in full-page visual baselines reflects whatever
+  // concurrent tests have cloned. Run serially so each clone's lifecycle
+  // (create -> snapshot -> delete) completes before the next test reads
+  // the shared state.
+  workers: 1,
   retries: 0,
   snapshotPathTemplate: "{testDir}/../visual/__screenshots__/{testFilePath}/{arg}{ext}",
   use: { baseURL: "http://localhost:5173", trace: "retain-on-failure" },

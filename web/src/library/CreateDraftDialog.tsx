@@ -1,5 +1,6 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 
 import { useCreateDraft, type CreateDraftInput } from "../api/createDraft.js";
 import type { ApiClient } from "../api/client.js";
@@ -25,6 +26,7 @@ export function CreateDraftDialog({
   const [versionId, setVersionId] = useState("");
   const [content, setContent] = useState("");
   const mutation = useCreateDraft(client);
+  const navigate = useNavigate();
 
   const submit = async () => {
     const source: CreateDraftInput["source"] =
@@ -35,7 +37,7 @@ export function CreateDraftDialog({
           : { kind: "import", content };
     const out = await mutation.mutateAsync({ source, idempotencyKey: crypto.randomUUID() });
     onOpenChange(false);
-    location.assign(`/systems/${out.system.systemId}`);
+    await navigate({ to: "/systems/$systemId", params: { systemId: out.system.systemId } });
   };
 
   return (

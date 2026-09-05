@@ -47,7 +47,10 @@ export function createApiClient(input: CreateApiClientInput): ApiClient {
   const f = input.fetch ?? fetch;
   return {
     async fetch(method, path, init) {
-      const url = new URL(input.baseUrl + path);
+      const url = new URL(
+        input.baseUrl + path,
+        typeof document === "undefined" ? undefined : document.baseURI,
+      );
       if (init?.query !== undefined) {
         for (const [k, v] of Object.entries(init.query)) {
           if (v === null || v === undefined) continue;
@@ -61,7 +64,9 @@ export function createApiClient(input: CreateApiClientInput): ApiClient {
         method,
         credentials: "include",
         headers,
-        ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+        ...(init?.body === undefined
+          ? {}
+          : { body: JSON.stringify(init.body), headers: { ...headers, "content-type": "application/json" } }),
       });
       const text = await response.text();
       const parsed: unknown = text.length === 0 ? null : JSON.parse(text);

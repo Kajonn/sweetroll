@@ -44,6 +44,7 @@ export const defaultMessages: MessageTable = {
   "editor.conflict.keepMine": "Keep mine (force save)",
   "editor.conflict.mergeIntoServer": "Merge into server",
   "editor.conflict.dismiss": "Dismiss",
+  "editor.lifecycle.draft": "Draft",
   "editor.lifecycle.active": "Active",
   "editor.lifecycle.archived": "Archived",
   "editor.bodyPlaceholder": "This tab is not yet implemented.",

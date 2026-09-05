@@ -1,6 +1,5 @@
 import { Type, type TSchema } from "@sinclair/typebox";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
-import fp from "fastify-plugin";
 
 import type {
   AppError,
@@ -336,6 +335,20 @@ export const systemsRouteDefinitions: readonly SystemsRouteDefinition[] = [
     },
   },
   {
+    method: "delete",
+    path: "/systems/:systemId",
+    operationId: "delete_systems_systemId",
+    schema: {
+      params: SystemIdParams,
+      response: {
+        "200": Type.Object({ systemId: Type.String({ format: UUID_FORMAT }), requestId: Type.String() }),
+        "401": UnauthorizedEnvelope,
+        "404": ErrorEnvelope,
+        "500": ErrorEnvelope,
+      },
+    },
+  },
+  {
     method: "patch",
     path: "/system-versions/:versionId",
     operationId: "patch_system_versions_versionId",
@@ -378,7 +391,7 @@ export const systemsRouteDefinitions: readonly SystemsRouteDefinition[] = [
 
 export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPluginCallback =
   ({ authoring }) =>
-  fp(async (app) => {
+  async (app) => {
     app.addHook("onSend", async (request, reply) => {
       reply.header("x-request-id", request.id);
     });
@@ -564,6 +577,13 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
         return { lifecycle: result.value, requestId: request.id };
       },
 
+      delete_systems_systemId: async (request, reply) => {
+        const params = request.params as { systemId: string };
+        const result = await authoring.deleteSystem(ctxOf(request), params.systemId);
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { systemId: result.value.systemId, requestId: request.id };
+      },
+
       patch_system_versions_versionId: async (request, reply) => {
         const params = request.params as { versionId: string };
         const body = request.body as { lifecycle?: unknown } | undefined;
@@ -591,4 +611,4 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
     for (const route of systemsRouteDefinitions) {
       app[route.method](route.path, { schema: route.schema }, handlers[route.operationId]!);
     }
-  });
+  };

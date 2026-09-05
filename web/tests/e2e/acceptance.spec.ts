@@ -1,6 +1,16 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect } from "@playwright/test";
 
+// Systems cloned by these tests are deleted in test.afterEach so a failing
+// assertion cannot leave residue in the shared DB (deterministic library
+// baselines). page.request shares the browser context's sign-in cookie.
+const createdSystemIds: string[] = [];
+test.afterEach(async ({ page }) => {
+  for (const id of createdSystemIds.splice(0)) {
+    await page.request.delete(`/api/systems/${id}`).catch(() => {});
+  }
+});
+
 test("acceptance: clone template, edit, preview, publish, breaking-change gate", async ({ page }) => {
   test.setTimeout(120_000);
 
@@ -11,6 +21,8 @@ test("acceptance: clone template, edit, preview, publish, breaking-change gate",
   // 2. Clone the d20 reference fixture. Lands in /systems/{newId} at revision 1.
   await page.getByTestId("clone-from-template-d20").click();
   await expect(page).toHaveURL(/\/systems\/[0-9a-f-]+/);
+  const systemId = page.url().split("/").pop() ?? "";
+  createdSystemIds.push(systemId);
   await expect(page.getByTestId("document-editor-header")).toBeVisible();
   await expect(page.getByTestId("document-editor-lifecycle")).toHaveText(/Draft/);
 
@@ -22,9 +34,10 @@ test("acceptance: clone template, edit, preview, publish, breaking-change gate",
   await page.keyboard.type("Companion Demo");
   await page.getByTestId("document-editor-tab-entities").click();
   await page.getByTestId("entity-list-add").click();
-  const companionRow = page.locator('[data-testid^="entity-row-"]').last();
-  await companionRow.locator('[data-testid^="entity-label-input-"]').fill("Companion");
-  await companionRow.getByTestId(/^entity-add-field-/).click();
+  const companionRow = page.locator('li[data-testid^="entity-row-"]').last();
+  const companionId = (await companionRow.getAttribute("data-testid"))?.replace("entity-row-", "") ?? "";
+  await page.getByTestId(`entity-label-input-${companionId}`).fill("Companion");
+  await page.getByTestId(`entity-add-field-${companionId}`).click();
   // Two fields default to text + integer — tune via the field-kind dropdowns and
   // min/max inputs inside entity-list-detail; the test asserts presence via the
   // version-history side effect rather than inspecting internal field state.
@@ -38,7 +51,12 @@ test("acceptance: clone template, edit, preview, publish, breaking-change gate",
   // free-text message input keyed by validation id; the message key is a product
   // convention enforced by i18n catalogue tests rather than this e2e flow.
   await page.getByTestId("document-editor-tab-validations").click();
+  const lastEditSaved = page.waitForResponse(
+    (r) => r.request().method() === "PUT" && r.url().includes("/api/systems/") && r.url().endsWith("/draft"),
+    { timeout: 15_000 },
+  );
   await page.getByTestId(/^validations-add-/).click();
+  await lastEditSaved;
 
   // 6. Open the preview at 360 px then 1280 px; the toggle button is keyed by
   // data-testid="document-editor-preview-toggle". The frame itself is keyed by
@@ -71,8 +89,13 @@ test("acceptance: clone template, edit, preview, publish, breaking-change gate",
   // returned by the server (publishDialog.tsx:84,188) and block submit until
   // every finding is acknowledged.
   await page.getByTestId("document-editor-tab-entities").click();
-  await companionRow.locator('[data-testid$="-remove"]').click();
+  const deletionSaved = page.waitForResponse(
+    (r) => r.request().method() === "PUT" && r.url().includes("/api/systems/") && r.url().endsWith("/draft"),
+    { timeout: 15_000 },
+  );
+  await page.getByTestId(`entity-row-${companionId}-remove`).click();
   await page.getByTestId("entity-remove-confirm-submit").click();
+  await deletionSaved;
 
   await page.getByTestId("document-editor-publish").click();
   await page.getByTestId("publish-dialog-semver").fill("1.1.0");
@@ -85,9 +108,16 @@ test("acceptance: clone template, edit, preview, publish, breaking-change gate",
   await page.getByTestId("publish-dialog-cancel").click();
   // Restore step (re-add Companion) is exercised here.
   await page.getByTestId("document-editor-tab-entities").click();
+  const restoreSaved = page.waitForResponse(
+    (r) => r.request().method() === "PUT" && r.url().includes("/api/systems/") && r.url().endsWith("/draft"),
+    { timeout: 15_000 },
+  );
   await page.getByTestId("entity-list-add").click();
-  const restoredRow = page.locator('[data-testid^="entity-row-"]').last();
-  await restoredRow.locator('[data-testid^="entity-label-input-"]').fill("Companion");
+  const restoredRow = page.locator('li[data-testid^="entity-row-"]').last();
+  const restoredId = (await restoredRow.getAttribute("data-testid"))?.replace("entity-row-", "") ?? "";
+  await page.getByTestId(`entity-label-input-${restoredId}`).fill("Companion");
+  await page.getByTestId(`entity-add-field-${restoredId}`).click();
+  await restoreSaved;
 
   await page.getByTestId("document-editor-publish").click();
   await page.getByTestId("publish-dialog-semver").fill("1.1.0");
@@ -96,7 +126,8 @@ test("acceptance: clone template, edit, preview, publish, breaking-change gate",
   await expect(page.getByTestId("publish-dialog-success")).toBeVisible();
   await page.getByTestId("publish-dialog-close").click();
 
-  await expect(page.getByTestId("version-history")).toContainText("1.1.0");
+  await page.getByTestId("document-editor-version-history-toggle").click();
+  await expect(page.getByTestId("document-editor-version-history")).toContainText("1.1.0");
 });
 
 test("a11y: library passes axe", async ({ page }) => {

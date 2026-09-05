@@ -25,6 +25,7 @@ export type UseDraftSyncInput = {
   systemId: string;
   debounceMs?: number;
   onAcceptTheirs?: () => void;
+  onSaved?: () => void;
 };
 
 function stableStringify(value: unknown): string {
@@ -70,8 +71,11 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
   const mountedRef = useRef(true);
   const onAcceptTheirsRef = useRef(input.onAcceptTheirs);
   onAcceptTheirsRef.current = input.onAcceptTheirs;
+  const onSavedRef = useRef(input.onSaved);
+  onSavedRef.current = input.onSaved;
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       if (timerRef.current !== null) clearTimeout(timerRef.current);
@@ -92,6 +96,7 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
             lastSavedHashRef.current = hash;
             setStatus("saved");
             setBanner(null);
+            onSavedRef.current?.();
           },
           onError: (err) => {
             if (!mountedRef.current) return;

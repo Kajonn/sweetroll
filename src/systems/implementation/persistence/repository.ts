@@ -165,6 +165,8 @@ export interface SystemPersistenceRepository {
     page: { limit: number; cursor: string | null },
   ): Promise<{ systems: SystemRecord[]; nextCursor: string | null }>;
 
+  deleteOwnedSystem(systemId: SystemId, ownerId: UserId): Promise<boolean>;
+
   publishVersion(input: PublishVersionInput): Promise<PublishVersionResult>;
 }
 
@@ -354,6 +356,15 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
 
     async publishVersion(input) {
       return publishVersionImpl(pool, input);
+    },
+
+    async deleteOwnedSystem(systemId, ownerId) {
+      const result = await pool.query(
+        `DELETE FROM systems
+          WHERE id = $1 AND owner_id = $2`,
+        [systemId, ownerId],
+      );
+      return (result.rowCount ?? 0) > 0;
     },
   };
 }

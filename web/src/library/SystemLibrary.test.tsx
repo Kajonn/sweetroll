@@ -5,6 +5,12 @@ import { describe, expect, it, vi } from "vitest";
 import { createApiClient } from "../api/client.js";
 import { SystemLibrary } from "./SystemLibrary.js";
 
+const { navigateMock } = vi.hoisted(() => ({ navigateMock: vi.fn() }));
+vi.mock("@tanstack/react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+  return { ...actual, useNavigate: () => navigateMock };
+});
+
 describe("SystemLibrary", () => {
   it("renders a row per system", async () => {
     const fetch_ = vi.fn(async () => new Response(JSON.stringify({ systems: [{ systemId: "s1", name: "A", lifecycle: "active", updatedAt: "2026-01-01T00:00:00Z" }, { systemId: "s2", name: "B", lifecycle: "active", updatedAt: "2026-01-02T00:00:00Z" }], nextCursor: null, requestId: "r" }), { status: 200 }));

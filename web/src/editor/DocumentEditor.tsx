@@ -59,7 +59,7 @@ function readActiveTab(): TabId {
 
 export function DocumentEditor({ client, systemId }: { client: ApiClient; systemId: string }) {
   const query = useOpenSystem(client, systemId);
-  const [active] = useState<TabId>(() => readActiveTab());
+  const [active, setActive] = useState<TabId>(() => readActiveTab());
 
   if (query.isPending) {
     return (
@@ -91,6 +91,7 @@ export function DocumentEditor({ client, systemId }: { client: ApiClient; system
       client={client}
       ws={ws}
       active={active}
+      onActiveChange={setActive}
       initialDoc={initialDoc}
       assessment={ws.assessment}
     />
@@ -116,12 +117,14 @@ function DocumentEditorBody({
   client,
   ws,
   active,
+  onActiveChange,
   initialDoc,
   assessment,
 }: {
   client: ApiClient;
   ws: NonNullable<ReturnType<typeof useOpenSystem>["data"]>;
   active: TabId;
+  onActiveChange: (next: TabId) => void;
   initialDoc: SystemDocumentV1;
   assessment: DocumentAssessment;
 }) {
@@ -172,6 +175,9 @@ function DocumentEditorBody({
     onAcceptTheirs: () => {
       queryClient.invalidateQueries({ queryKey: ["system", "open", ws.system.systemId] });
     },
+    onSaved: () => {
+      queryClient.invalidateQueries({ queryKey: ["system", "open", ws.system.systemId] });
+    },
   });
 
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -215,7 +221,7 @@ function DocumentEditorBody({
           {ws.system.name}
         </h1>
         <span className={styles.lifecycle} data-testid="document-editor-lifecycle">
-          {t(`editor.lifecycle.${ws.system.lifecycle}`)}
+          {t(`editor.lifecycle.${ws.draft !== null && ws.versions.length === 0 ? "draft" : ws.system.lifecycle}`)}
         </span>
         <span className={styles.autosave} data-testid="document-editor-autosave">
           <Check aria-hidden size={14} />
@@ -285,6 +291,10 @@ function DocumentEditorBody({
               aria-current={isActive ? "page" : undefined}
               className={isActive ? styles.tabActive : styles.tab}
               data-testid={`document-editor-tab-${tab}`}
+              onClick={(e) => {
+                e.preventDefault();
+                onActiveChange(tab);
+              }}
             >
               {t(`editor.tab.${tab}`)}
             </a>

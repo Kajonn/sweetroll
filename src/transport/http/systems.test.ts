@@ -79,6 +79,7 @@ function makeAuthoring(overrides: Partial<SystemAuthoring> = {}): SystemAuthorin
       ok: true,
       value: { kind: "system", systemId: randomUUID(), lifecycle: "archived" },
     }),
+    deleteSystem: async () => ({ ok: true, value: { systemId: randomUUID() } }),
   };
   return { ...base, ...overrides };
 }
@@ -284,6 +285,42 @@ describe("systems HTTP routes", () => {
     expect(exported.statusCode).toBe(200);
     expect(exported.headers["content-type"]).toContain("application/vnd.sweetroll.system+json");
     expect(exported.json().package.integrity.checksum).toBe(d20Package.integrity.checksum);
+  });
+
+  it("maps DELETE /systems/:systemId to deleteSystem and returns 404 when missing", async () => {
+    let received: string | undefined;
+    const app = await build(
+      makeAuthoring({
+        deleteSystem: async (_ctx, systemId) => {
+          received = systemId;
+          return { ok: true, value: { systemId } };
+        },
+      }),
+    );
+    apps.push(app);
+    const headers = { cookie: "session=t" };
+    const systemId = randomUUID();
+
+    const ok = await app.inject({ method: "DELETE", url: `/systems/${systemId}`, headers });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toEqual({ systemId, requestId: expect.any(String) });
+    expect(received).toBe(systemId);
+
+    const missingApp = await build(
+      makeAuthoring({
+        deleteSystem: async () => ({
+          ok: false,
+          error: { code: "not_found", message: "The requested resource does not exist." },
+        }),
+      }),
+    );
+    apps.push(missingApp);
+    const missing = await missingApp.inject({
+      method: "DELETE",
+      url: `/systems/${randomUUID()}`,
+      headers,
+    });
+    expect(missing.statusCode).toBe(404);
   });
 
   it("maps GET /systems/:systemId/versions to listVersions and returns 404 when missing", async () => {

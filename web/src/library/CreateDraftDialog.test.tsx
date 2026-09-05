@@ -1,12 +1,22 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApiClient } from "../api/client.js";
 import { CreateDraftDialog } from "./CreateDraftDialog.js";
 
+const { navigateMock } = vi.hoisted(() => ({ navigateMock: vi.fn() }));
+vi.mock("@tanstack/react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+  return { ...actual, useNavigate: () => navigateMock };
+});
+
 describe("CreateDraftDialog", () => {
+  beforeEach(() => {
+    navigateMock.mockReset();
+  });
+
   it("posts a blank draft on submit", async () => {
     const fetch_ = vi.fn(async (url: string, init?: RequestInit) => {
       if (url.endsWith("/systems") && init?.method === "POST") {
@@ -41,6 +51,11 @@ describe("CreateDraftDialog", () => {
     );
     await userEvent.click(screen.getByTestId("create-draft-submit"));
     expect(fetch_).toHaveBeenCalledWith(expect.stringContaining("/systems"), expect.objectContaining({ method: "POST" }));
+    await vi.waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith(
+        expect.objectContaining({ to: "/systems/$systemId", params: { systemId: "s1" } }),
+      );
+    });
   });
 
   it("exposes three source radio options", () => {

@@ -15,6 +15,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       "/api": { target: "http://localhost:3000", changeOrigin: true, rewrite: (p) => p.replace(/^\/api/, "") },
+      "/dev": { target: "http://localhost:3000", changeOrigin: true },
     },
   },
   build: { outDir: "dist", sourcemap: true },

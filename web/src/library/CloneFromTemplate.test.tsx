@@ -1,12 +1,21 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApiClient } from "../api/client.js";
 import { CloneFromTemplate } from "./CloneFromTemplate.js";
 
+const { navigateMock } = vi.hoisted(() => ({ navigateMock: vi.fn() }));
+vi.mock("@tanstack/react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+  return { ...actual, useNavigate: () => navigateMock };
+});
+
 describe("CloneFromTemplate", () => {
+  beforeEach(() => {
+    navigateMock.mockReset();
+  });
   it("renders one button per template", () => {
     const client = createApiClient({ baseUrl: "http://x", fetch: vi.fn() as typeof fetch });
     const qc = new QueryClient();
@@ -73,5 +82,10 @@ describe("CloneFromTemplate", () => {
       versionId: "11111111-1111-1111-1111-111111111a01",
     });
     expect(JSON.parse(body).idempotencyKey).toMatch(/^[0-9a-f-]{36}$/i);
+    await vi.waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith(
+        expect.objectContaining({ to: "/systems/$systemId", params: { systemId: "new-system" } }),
+      );
+    });
   });
 });

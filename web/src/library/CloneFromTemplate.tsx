@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 
 import { useCreateDraft } from "../api/createDraft.js";
 import type { ApiClient } from "../api/client.js";
@@ -30,6 +31,7 @@ const TEMPLATES: ReadonlyArray<TemplateSpec> = [
 
 export function CloneFromTemplate({ client }: { client: ApiClient }) {
   const mutation = useCreateDraft(client);
+  const navigate = useNavigate();
   const [pending, setPending] = useState<string | null>(null);
 
   const clone = async (tpl: TemplateSpec) => {
@@ -39,7 +41,7 @@ export function CloneFromTemplate({ client }: { client: ApiClient }) {
         source: { kind: "clone", versionId: tpl.versionId },
         idempotencyKey: crypto.randomUUID(),
       });
-      location.assign(`/systems/${out.system.systemId}`);
+      await navigate({ to: "/systems/$systemId", params: { systemId: out.system.systemId } });
     } catch {
       // mutateAsync rethrows; surface the error via the hook state and let the
       // caller retry. Pending state resets so other templates remain clickable.

@@ -732,6 +732,48 @@ describeWithDatabase("Characters (apply: set/bump)", () => {
     expect(stale.error.code).toBe("conflict");
     expect(stale.error.latestRevision).toBe(2);
     expect(stale.error.changedDefinitionIds).toEqual(["ability"]);
+    expect(stale.error.cacheDisposition).toBe("replace");
+    expect(typeof stale.error.activityCursor).toBe("string");
+    expect(stale.error.activityCursor).not.toBe("");
+  });
+
+  it("does not finalize a transient runtime internal error, leaving the execution reclaimable", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    const flakyRuntime: SystemRuntime = {
+      async resolve() {
+        return { ok: false, error: { code: "internal", message: "Package loading failed." } };
+      },
+    };
+    const flakyCharacters = createCharactersModule({
+      pool,
+      runtime: flakyRuntime,
+      authorizeVersionUse: authoring.authorizeVersionUse,
+    });
+
+    const idempotencyKey = randomUUID();
+    const result = await flakyCharacters.apply(ctx(owner), {
+      kind: "setField",
+      characterId,
+      fieldId: "ability",
+      value: 15,
+      expectedRevision: 1,
+      idempotencyKey,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unexpected");
+    expect(result.error.code).toBe("internal");
+
+    const execution = await pool.query<{ status: string }>(
+      "SELECT status FROM character_command_executions WHERE actor_id = $1 AND idempotency_key = $2",
+      [owner, idempotencyKey],
+    );
+    expect(execution.rows[0]!.status).toBe("pending");
+
+    const row = await pool.query<{ revision: number }>("SELECT revision FROM characters WHERE id = $1", [characterId]);
+    expect(row.rows[0]!.revision).toBe(1);
   });
 
   it("replays identical set commands from the idempotency key and rejects changed input", async () => {

@@ -118,7 +118,7 @@ export interface CharacterPersistenceRepository {
   changedDefinitionIdsSinceRevision(
     characterId: CharacterId,
     sinceRevision: number,
-  ): Promise<DefinitionId[]>;
+  ): Promise<{ changedDefinitionIds: DefinitionId[]; latestActivity: { id: string; occurredAt: Date } | null }>;
 }
 
 type CharacterRow = {
@@ -330,8 +330,8 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
     },
 
     async changedDefinitionIdsSinceRevision(characterId, sinceRevision) {
-      const result = await pool.query<{ payload_json: unknown }>(
-        `SELECT payload_json FROM character_activity_events
+      const result = await pool.query<{ id: string; payload_json: unknown; occurred_at: Date }>(
+        `SELECT id, payload_json, occurred_at FROM character_activity_events
           WHERE character_id = $1 AND character_revision > $2
           ORDER BY character_revision ASC`,
         [characterId, sinceRevision],
@@ -345,7 +345,9 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           }
         }
       }
-      return [...ids];
+      const lastRow = result.rows[result.rows.length - 1];
+      const latestActivity = lastRow === undefined ? null : { id: lastRow.id, occurredAt: lastRow.occurred_at };
+      return { changedDefinitionIds: [...ids], latestActivity };
     },
   };
 }

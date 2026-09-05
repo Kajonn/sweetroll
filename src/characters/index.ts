@@ -58,6 +58,8 @@ export type CharacterError = {
   latestRevision?: number | null;
   diagnostics?: RuntimeValidation[];
   changedDefinitionIds?: DefinitionId[];
+  activityCursor?: string | null;
+  cacheDisposition?: "retain" | "replace" | "purge";
 };
 
 export type CharacterResult<T> = { ok: true; value: T } | { ok: false; error: CharacterError };
@@ -326,11 +328,17 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     mismatch: (): CharacterError => ({ code: "idempotency_mismatch", message: MISMATCH_MESSAGE }),
     inProgress: (): CharacterError => ({ code: "command_in_progress", message: IN_PROGRESS_MESSAGE }),
     archived: (): CharacterError => ({ code: "conflict", message: ARCHIVED_MESSAGE }),
-    conflict: (latestRevision: number, changedDefinitionIds: DefinitionId[]): CharacterError => ({
+    conflict: (
+      latestRevision: number,
+      changedDefinitionIds: DefinitionId[],
+      activityCursor: string | null,
+    ): CharacterError => ({
       code: "conflict",
       message: "The character has a newer revision. Retry with the latest revision and a new idempotency key.",
       latestRevision,
       changedDefinitionIds,
+      activityCursor,
+      cacheDisposition: "replace",
     }),
     invalid_value: (message: string, diagnostics?: RuntimeValidation[]): CharacterError => ({
       code: "invalid_value",
@@ -455,10 +463,29 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       case "invalid_state":
       case "unsupported_field_value":
       case "budget_exceeded":
+      case "invalid_package":
         return errors.invalid_value(error.message);
       default:
         return errors.internal();
     }
+  }
+
+  // Only these runtime error codes are stable/deterministic for the same input and safe to
+  // permanently finalize on the idempotency key. An unmapped code (including the runtime's
+  // `internal` code, which SystemRuntime also uses for transient I/O failures such as package
+  // load errors) must NOT finalize — the execution stays pending/reclaimable so a retry after
+  // the lease expires gets a fresh attempt instead of a permanently baked-in error.
+  const STABLE_RUNTIME_ERROR_CODES = new Set([
+    "not_found",
+    "bad_request",
+    "invalid_state",
+    "unsupported_field_value",
+    "budget_exceeded",
+    "invalid_package",
+  ]);
+
+  function isFinalizableRuntimeError(code: string): boolean {
+    return STABLE_RUNTIME_ERROR_CODES.has(code);
   }
 
   return {
@@ -718,11 +745,13 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         });
         if (!resolved.ok) {
           const error = mapRuntimeError(resolved.error);
-          await repo.finalizeExecutionError({
-            executionId,
-            resultJson: serializeCommandError(error),
-            expiresAt: replayExpiresAt,
-          });
+          if (isFinalizableRuntimeError(resolved.error.code)) {
+            await repo.finalizeExecutionError({
+              executionId,
+              resultJson: serializeCommandError(error),
+              expiresAt: replayExpiresAt,
+            });
+          }
           return { ok: false, error };
         }
 
@@ -789,7 +818,9 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             command.characterId,
             command.expectedRevision,
           );
-          const error = errors.conflict(outcome.latestRevision, changedSinceBase);
+          const activityCursor =
+            changedSinceBase.latestActivity === null ? null : encodeActivityCursor(changedSinceBase.latestActivity);
+          const error = errors.conflict(outcome.latestRevision, changedSinceBase.changedDefinitionIds, activityCursor);
           await repo.finalizeExecutionError({
             executionId,
             resultJson: serializeCommandError(error),
@@ -825,6 +856,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       return { ok: false, error: errors.notImplemented() };
     },
   };
+}
+
+function encodeActivityCursor(cursor: { occurredAt: Date; id: string }): string {
+  const payload = JSON.stringify({ occurredAt: cursor.occurredAt.toISOString(), id: cursor.id });
+  return Buffer.from(payload, "utf8").toString("base64url");
 }
 
 function encodeCursor(cursor: { updatedAt: Date; characterId: CharacterId }): string {

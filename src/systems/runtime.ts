@@ -134,6 +134,7 @@ export type CharacterProjectionElement =
       label: string;
       actionKind: "roll" | "resourceBump";
       inputs: CharacterProjectionActionInput[];
+      validations: RuntimeValidation[];
     };
 
 export type CharacterProjectionSection = {

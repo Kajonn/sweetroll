@@ -26,6 +26,19 @@ export function resolveObservedValues(
   const computedById = new Map(computed.map((field) => [field.id, field]));
   const bindings = buildFieldBindings(entity, state);
   const derivedValues: Record<string, RuntimeScalar> = {};
+  const validations: RuntimeValidation[] = entity.fields.flatMap((field) => {
+    if (field.kind === "computed" || field.kind === "resource" || !field.required) return [];
+    const value = state.values[field.id];
+    const missing = value === null || value === "" || (Array.isArray(value) && value.length === 0);
+    return missing
+      ? [{
+          validationId: `required_${field.id}`,
+          severity: "error" as const,
+          message: `${field.label} is required.`,
+          targetDefinitionId: field.id,
+        }]
+      : [];
+  });
   const complete = new Set<string>();
   let spent = 0;
 
@@ -45,6 +58,14 @@ export function resolveObservedValues(
     if (!result.ok) return invalidPackage(expression.id);
     derivedValues[field.id] = result.result;
     bindings[field.id] = result.result;
+    for (const diagnostic of result.diagnostics) {
+      validations.push({
+        validationId: `arithmetic_${expression.id}`,
+        severity: "error",
+        message: diagnostic.message,
+        targetDefinitionId: field.id,
+      });
+    }
     complete.add(field.id);
     return { ok: true, value: null };
   };
@@ -56,7 +77,14 @@ export function resolveObservedValues(
 
   const ownedTargets = new Set(entity.fields.map((field) => field.id));
   ownedTargets.add(entity.id);
-  const validations: RuntimeValidation[] = [];
+  for (const sheet of packageValue.sheets) {
+    if (sheet.targetEntityId !== entity.id) continue;
+    for (const section of sheet.sections) {
+      for (const element of section.elements) {
+        if (element.kind === "action") ownedTargets.add(element.actionId);
+      }
+    }
+  }
   for (const validation of packageValue.validations) {
     if (!ownedTargets.has(validation.targetId)) continue;
     const expression = expressions.get(validation.expressionId);

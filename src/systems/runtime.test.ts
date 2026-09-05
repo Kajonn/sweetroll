@@ -195,6 +195,7 @@ describe("SystemRuntime contract", () => {
           required: false,
           default: 0,
         }],
+        validations: [],
       },
     ]);
     expect(JSON.stringify(initialized.value)).not.toContain('"ast"');
@@ -301,6 +302,115 @@ describe("SystemRuntime contract", () => {
     expect(resolution.value.projection.sheets[0]?.sections[0]?.elements[2]).toMatchObject({
       kind: "resource",
       validations: resolution.value.validations,
+    });
+  });
+
+  it("reports missing required text, choice, and image values without rejecting state", async () => {
+    const document = validDocument();
+    const entity = document.entities[0]!;
+    const role = entity.fields.find((field) => field.id === "role")!;
+    const talents = entity.fields.find((field) => field.id === "talents")!;
+    const portrait = entity.fields.find((field) => field.id === "portrait")!;
+    if (role.kind !== "singleChoice" || talents.kind !== "multiChoice" || portrait.kind !== "image") {
+      throw new Error("Unexpected fixture fields");
+    }
+    role.required = true;
+    talents.required = true;
+    talents.default = [];
+    portrait.required = true;
+
+    const packageValue = compileRuntimePackage(document);
+    const resolution = await createRuntime(packageValue).resolve({
+      versionId: packageValue.versionId,
+      entityId: "character",
+      intent: { kind: "initialize" },
+    });
+
+    expect(resolution.ok).toBe(true);
+    if (!resolution.ok) return;
+    expect(resolution.value.validations).toEqual([
+      {
+        validationId: "required_name",
+        severity: "error",
+        message: "Name is required.",
+        targetDefinitionId: "name",
+      },
+      {
+        validationId: "required_role",
+        severity: "error",
+        message: "Role is required.",
+        targetDefinitionId: "role",
+      },
+      {
+        validationId: "required_talents",
+        severity: "error",
+        message: "Talents is required.",
+        targetDefinitionId: "talents",
+      },
+      {
+        validationId: "required_portrait",
+        severity: "error",
+        message: "Portrait is required.",
+        targetDefinitionId: "portrait",
+      },
+    ]);
+    expect(resolution.value.state.values).toMatchObject({
+      name: "",
+      role: null,
+      talents: [],
+      portrait: null,
+    });
+  });
+
+  it("evaluates validations targeting actions owned by the requested entity", async () => {
+    const document = validDocument();
+    document.validations = [document.validations[0]!];
+    document.validations[0]!.targetId = "check";
+    document.expressions.find((expression) => expression.id === "health_valid_expr")!.source =
+      "fields.modifier > 0";
+    const packageValue = compileRuntimePackage(document);
+
+    const resolution = await createRuntime(packageValue).resolve({
+      versionId: packageValue.versionId,
+      entityId: "character",
+      intent: { kind: "initialize", values: { name: "Hero" } },
+    });
+
+    expect(resolution.ok).toBe(true);
+    if (!resolution.ok) return;
+    expect(resolution.value.validations).toEqual([{
+      validationId: "health_valid",
+      severity: "error",
+      message: "Health must be non-negative",
+      targetDefinitionId: "check",
+    }]);
+    expect(resolution.value.projection.sheets[0]?.sections[0]?.elements[3]).toMatchObject({
+      kind: "action",
+      actionId: "check",
+      validations: resolution.value.validations,
+    });
+  });
+
+  it("reports computed arithmetic diagnostics while preserving the authored fallback", async () => {
+    const document = validDocument();
+    document.expressions.find((expression) => expression.id === "defense_expr")!.source =
+      "fields.modifier / 0";
+    const packageValue = compileRuntimePackage(document);
+
+    const resolution = await createRuntime(packageValue).resolve({
+      versionId: packageValue.versionId,
+      entityId: "character",
+      intent: { kind: "initialize", values: { name: "Hero" } },
+    });
+
+    expect(resolution.ok).toBe(true);
+    if (!resolution.ok) return;
+    expect(resolution.value.derivedValues.defense).toBe(10);
+    expect(resolution.value.validations).toContainEqual({
+      validationId: "arithmetic_defense_expr",
+      severity: "error",
+      message: "division by zero",
+      targetDefinitionId: "defense",
     });
   });
 

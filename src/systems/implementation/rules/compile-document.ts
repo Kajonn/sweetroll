@@ -78,36 +78,46 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     }
   }
 
-  const computedOwners = new Map<string, string>();
+  const computedOwners = new Map<string, Set<string>>();
   for (const entity of document.entities) {
     for (const field of entity.fields) {
-      if (field.kind === "computed") computedOwners.set(field.expressionId, entity.id);
+      if (field.kind === "computed") addOwner(computedOwners, field.expressionId, entity.id);
     }
   }
-  const validationOwners = new Map(document.validations.map((validation) => {
+  const validationOwners = new Map<string, Set<string>>();
+  for (const validation of document.validations) {
     const owner = fieldOwners.get(validation.targetId)
       ?? (entityEnvironments.has(validation.targetId) ? validation.targetId : undefined)
       ?? actionTargets.get(validation.targetId);
-    return [validation.expressionId, owner];
-  }));
-  const rollActions = new Map(document.actions
-    .filter((action) => action.kind === "roll")
-    .map((action) => [action.expressionId, action]));
+    if (owner !== undefined) addOwner(validationOwners, validation.expressionId, owner);
+  }
+  const rollActions = new Map<string, Array<Extract<SystemDocumentV1["actions"][number], { kind: "roll" }>>>();
+  for (const action of document.actions) {
+    if (action.kind !== "roll") continue;
+    const actions = rollActions.get(action.expressionId) ?? [];
+    actions.push(action);
+    rollActions.set(action.expressionId, actions);
+  }
 
   const compiled: CompiledExpressionBody[] = [];
 
   for (const expr of document.expressions) {
-    const owner = expr.context === "computed"
+    const owners = expr.context === "computed"
       ? computedOwners.get(expr.id)
       : expr.context === "validation"
         ? validationOwners.get(expr.id)
-        : actionTargets.get(rollActions.get(expr.id)?.id ?? "");
+        : new Set(rollActions.get(expr.id)?.map((action) => actionTargets.get(action.id)).filter((owner) => owner !== undefined));
+    const actions = expr.context === "roll" ? rollActions.get(expr.id) ?? [] : [];
+    if ((owners?.size ?? 0) > 1 || actions.length > 1) {
+      return scopeDiagnostic("invalid_expression", expr.id, "Expression cannot be shared across different owners.");
+    }
+    const owner = owners?.values().next().value as string | undefined;
     const entityEnv = owner === undefined ? undefined : entityEnvironments.get(owner);
     const env: ExpressionCompileEnv = {
       fields: entityEnv?.fields ?? {},
       inputs: {},
     };
-    const action = expr.context === "roll" ? rollActions.get(expr.id) : undefined;
+    const action = actions[0];
     if (action !== undefined) {
       for (const actionInput of action.inputs) {
         env.inputs[actionInput.id] = actionInputToValueType(actionInput);
@@ -158,6 +168,12 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
   };
 
   return { ok: true, value: signSystemPackage(unsigned) };
+}
+
+function addOwner(owners: Map<string, Set<string>>, expressionId: string, owner: string): void {
+  const expressionOwners = owners.get(expressionId) ?? new Set<string>();
+  expressionOwners.add(owner);
+  owners.set(expressionId, expressionOwners);
 }
 
 function computedCycle(

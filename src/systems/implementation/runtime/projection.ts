@@ -74,6 +74,7 @@ function projectElement(
       label: action.label,
       actionKind: action.kind,
       inputs: action.kind === "roll" ? action.inputs.map((input) => ({ ...input })) : [],
+      validations: validationsFor(action.id),
     };
   }
 

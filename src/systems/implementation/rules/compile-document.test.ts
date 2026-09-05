@@ -219,6 +219,62 @@ describe("compileDocument", () => {
       }],
     });
   });
+
+  it("rejects a computed expression reused by fields owned by different entities", () => {
+    const document = twoEntityDocument();
+    document.entities[1]!.fields.push({
+      kind: "computed",
+      id: "foe_defense",
+      label: "Defense",
+      valueType: "number",
+      expressionId: "defense_expr",
+    });
+
+    const result = compileDocument(document, opts);
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [{
+        code: "invalid_expression",
+        path: "defense_expr",
+        message: "Expression cannot be shared across different owners.",
+      }],
+    });
+  });
+
+  it("rejects a roll expression reused by different actions", () => {
+    const document = twoEntityDocument();
+    document.actions.push({
+      kind: "roll",
+      id: "foe_check",
+      label: "Foe check",
+      expressionId: "check_expr",
+      inputs: [{
+        id: "bonus",
+        label: "Bonus",
+        valueType: "integer",
+        required: false,
+        default: 0,
+      }],
+      outputTemplate: "Result: {total}",
+    });
+    document.sheets[1]!.sections[0]!.elements.push({
+      kind: "action",
+      id: "foe_check_element",
+      actionId: "foe_check",
+    });
+
+    const result = compileDocument(document, opts);
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [{
+        code: "invalid_expression",
+        path: "check_expr",
+        message: "Expression cannot be shared across different owners.",
+      }],
+    });
+  });
 });
 
 function twoEntityDocument(): SystemDocumentV1 {

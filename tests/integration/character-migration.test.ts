@@ -8,6 +8,7 @@ import {
   type CharacterId,
   type Characters,
 } from "../../src/characters/index.js";
+import { createCharacterPersistenceRepository } from "../../src/characters/persistence.js";
 import { d20Document, d20Package } from "../../src/systems/implementation/package/fixtures/index.js";
 import { compileDocument } from "../../src/systems/implementation/rules/compile-document.js";
 import type { SystemDocumentV1 } from "../../src/systems/implementation/package/schema/index.js";
@@ -279,6 +280,26 @@ describeWithDatabase("Character migration (preview)", () => {
     return versionId;
   }
 
+  function buildTightenedV2Document(): SystemDocumentV1 {
+    const document = buildD20V2Document();
+    const fields = document.entities[0]!.fields;
+    const modifier = fields.find((f) => f.id === "modifier");
+    if (modifier?.kind === "integer") modifier.max = 8;
+    return document;
+  }
+
+  async function publishTightenedV2Version(ownerId: string, systemId: string): Promise<string> {
+    const versionId = randomUUID();
+    const document = buildTightenedV2Document();
+    const compiled = compileDocument(document, { systemId, versionId, semanticVersion: "2.0.0" });
+    if (!compiled.ok) throw new Error(`tightened v2 did not compile: ${JSON.stringify(compiled.diagnostics)}`);
+    await pool.query(
+      "INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, lifecycle) VALUES ($1, $2, '2.0.0', $3, $4::jsonb, 'published')",
+      [versionId, systemId, compiled.value.integrity.checksum, JSON.stringify(compiled.value)],
+    );
+    return versionId;
+  }
+
   async function publishSource(ownerId: string): Promise<{ systemId: string; versionId: string }> {
     const systemResult = await pool.query<{ id: string }>(
       "INSERT INTO systems (owner_id, name, access, lifecycle) VALUES ($1, $2, 'public', 'active') RETURNING id",
@@ -454,6 +475,60 @@ describeWithDatabase("Character migration (preview)", () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("unexpected");
     expect(result.error.code).toBe("not_found");
+  });
+
+  it("rejects a target version whose system access is not public or link as not_found", async () => {
+    const systemOwner = await createUser("Bo");
+    const owner = await createUser("Ada");
+    const { systemId, versionId } = await publishSource(systemOwner);
+    const targetVersionId = await publishV2Version(systemOwner, systemId);
+    const characterId = await createCharacter(owner, versionId);
+
+    // Creating the character above required public access; flip the system to
+    // private so the same owner-of-character no longer authorizes the target.
+    await pool.query("UPDATE systems SET access = 'private' WHERE id = $1", [systemId]);
+
+    const result = await characters.previewMigration(ctx(owner), {
+      characterId,
+      targetVersionId,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unexpected");
+    expect(result.error.code).toBe("not_found");
+  });
+
+  it("reports a tightened field constraint as a warning", async () => {
+    const owner = await createUser("Ada");
+    const { systemId, versionId } = await publishSource(owner);
+    const targetVersionId = await publishTightenedV2Version(owner, systemId);
+    const characterId = await createCharacter(owner, versionId);
+
+    const result = await characters.previewMigration(ctx(owner), {
+      characterId,
+      targetVersionId,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(`unexpected: ${JSON.stringify(result.error)}`);
+    expect(result.value.candidateState.values.modifier).toBe(0);
+    expect(result.value.warnings).toEqual(
+      expect.arrayContaining([`Constraints for field "modifier" changed between source and target.`]),
+    );
+  });
+
+  it("rejects mappings that claim the same target field twice", async () => {
+    const owner = await createUser("Ada");
+    const { systemId, versionId } = await publishSource(owner);
+    const targetVersionId = await publishV2Version(owner, systemId);
+    const characterId = await createCharacter(owner, versionId);
+
+    const result = await characters.previewMigration(ctx(owner), {
+      characterId,
+      targetVersionId,
+      mappings: { ability: "level", modifier: "level" },
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unexpected");
+    expect(result.error.code).toBe("invalid_value");
   });
 });
 
@@ -772,6 +847,135 @@ describeWithDatabase("Character migration (commit)", () => {
     );
     expect(migrations.rows[0]!.count).toBe(1);
   });
+
+  it("rejects committing a preview whose candidate state was tampered after creation", async () => {
+    const owner = await createUser("Ada");
+    const { systemId, versionId } = await publishSource(owner);
+    const targetVersionId = await publishV2Version(owner, systemId);
+    const characterId = await createCharacter(owner, versionId);
+
+    const migrationPreview = await preview(owner, characterId, targetVersionId);
+
+    // Bind the preview to a different (still valid) candidate state via direct SQL,
+    // then verify commit detects the checksum mismatch atomically.
+    await pool.query<unknown>(
+      `UPDATE character_migration_previews
+          SET candidate_state_json = jsonb_set(candidate_state_json, '{values,ability_score}', '12'::jsonb)
+        WHERE id = $1`,
+      [migrationPreview.previewId],
+    );
+
+    const commit = await characters.commitMigration(ctx(owner), {
+      characterId,
+      previewId: migrationPreview.previewId,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(commit.ok).toBe(false);
+    if (commit.ok) throw new Error("unexpected");
+    expect(commit.error.code).toBe("conflict");
+
+    const row = await pool.query<{ revision: number; system_version_id: string; state_json: unknown }>(
+      "SELECT revision, system_version_id, state_json FROM characters WHERE id = $1",
+      [characterId],
+    );
+    expect(row.rows[0]!.revision).toBe(1);
+    expect(row.rows[0]!.system_version_id).toBe(versionId);
+    expect((row.rows[0]!.state_json as { values: Record<string, unknown> }).values.ability).toBe(10);
+  });
+
+  it("rejects committing an expired preview as conflict", async () => {
+    const owner = await createUser("Ada");
+    const { systemId, versionId } = await publishSource(owner);
+    const targetVersionId = await publishV2Version(owner, systemId);
+    const characterId = await createCharacter(owner, versionId);
+
+    const migrationPreview = await preview(owner, characterId, targetVersionId);
+
+    await pool.query(
+      "UPDATE character_migration_previews SET expires_at = now() - interval '1 second' WHERE id = $1",
+      [migrationPreview.previewId],
+    );
+
+    const commit = await characters.commitMigration(ctx(owner), {
+      characterId,
+      previewId: migrationPreview.previewId,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(commit.ok).toBe(false);
+    if (commit.ok) throw new Error("unexpected");
+    expect(commit.error.code).toBe("conflict");
+  });
+
+  it("commits exactly the candidate projection that was previewed", async () => {
+    const owner = await createUser("Ada");
+    const { systemId, versionId } = await publishSource(owner);
+    const targetVersionId = await publishV2Version(owner, systemId);
+    const characterId = await createCharacter(owner, versionId);
+
+    const migrationPreview = await preview(owner, characterId, targetVersionId);
+
+    const commit = await characters.commitMigration(ctx(owner), {
+      characterId,
+      previewId: migrationPreview.previewId,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(commit.ok).toBe(true);
+    if (!commit.ok) throw new Error(`unexpected: ${JSON.stringify(commit.error)}`);
+    expect(commit.value.character.projection).toEqual(migrationPreview.candidateProjection);
+  });
+
+  it("surfaces the locked revision when a commit tx observes an already-consumed preview", async () => {
+    const owner = await createUser("Ada");
+    const { systemId, versionId } = await publishSource(owner);
+    const targetVersionId = await publishV2Version(owner, systemId);
+    const characterId = await createCharacter(owner, versionId);
+
+    const migrationPreview = await preview(owner, characterId, targetVersionId);
+    const first = await characters.commitMigration(ctx(owner), {
+      characterId,
+      previewId: migrationPreview.previewId,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(first.ok).toBe(true);
+
+    const executionId = randomUUID();
+    await pool.query(
+      `INSERT INTO character_command_executions
+         (actor_id, command_kind, idempotency_key, input_hash, character_id, execution_id, status, lease_expires_at, expires_at)
+       VALUES ($1, 'character_migration_commit', $2, 'x', $3, $4, 'pending', now() + interval '1 minute', now() + interval '1 day')`,
+      [owner, randomUUID(), characterId, executionId],
+    );
+
+    const repo = createCharacterPersistenceRepository(pool);
+    const outcome = await repo.commitMigrationTx({
+      executionId,
+      characterId,
+      actorId: owner,
+      expectedRevision: 2,
+      previewId: migrationPreview.previewId,
+      sourceRevision: 1,
+      sourceVersionId: versionId,
+      sourceChecksum: "",
+      targetVersionId,
+      targetChecksum: "",
+      previewChecksum: "",
+      candidateState: { values: {} },
+      beforeState: { values: {} },
+      rollbackDeadline: new Date(),
+      now: new Date(),
+      activity: { kind: "character_migration_committed", payloadJson: {}, requestId: randomUUID() },
+      audit: { actorId: owner, kind: "character_migration_committed", summary: "x", requestId: randomUUID() },
+      resultExpiresAt: new Date(),
+      buildResult: () => ({}),
+    });
+
+    expect(outcome.kind).toBe("consumed");
+    if (outcome.kind === "consumed") expect(outcome.latestRevision).toBe(2);
+  });
 });
 
 describeWithDatabase("Character migration (rollback)", () => {
@@ -1048,5 +1252,55 @@ describeWithDatabase("Character migration (rollback)", () => {
     expect(rollback.ok).toBe(false);
     if (rollback.ok) throw new Error("unexpected");
     expect(rollback.error.code).toBe("conflict");
+  });
+
+  it("surfaces the locked revision when a rollback tx observes a past-deadline migration as conflict", async () => {
+    const owner = await createUser("Ada");
+    const { systemId, versionId } = await publishSource(owner);
+    const targetVersionId = await publishV2Version(owner, systemId);
+    const characterId = await createCharacter(owner, versionId);
+
+    const migrationPreview = await preview(owner, characterId, targetVersionId);
+    const commit = await commitMigration(characters, owner, characterId, migrationPreview.previewId);
+    if (!commit.ok) throw new Error(`unexpected commit: ${JSON.stringify(commit.error)}`);
+
+    const migrationId = (
+      await pool.query<{ id: string }>("SELECT id FROM character_migrations WHERE preview_id = $1", [
+        migrationPreview.previewId,
+      ])
+    ).rows[0]!.id;
+
+    await pool.query("UPDATE character_migrations SET rollback_deadline = now() - interval '1 second' WHERE id = $1", [
+      migrationId,
+    ]);
+
+    const executionId = randomUUID();
+    await pool.query(
+      `INSERT INTO character_command_executions
+         (actor_id, command_kind, idempotency_key, input_hash, character_id, execution_id, status, lease_expires_at, expires_at)
+       VALUES ($1, 'character_migration_rollback', $2, 'x', $3, $4, 'pending', now() + interval '1 minute', now() + interval '1 day')`,
+      [owner, randomUUID(), characterId, executionId],
+    );
+
+    const repo = createCharacterPersistenceRepository(pool);
+    const migrationRecord = await repo.loadMigration({ migrationId, characterId, actorId: owner });
+    if (migrationRecord === null) throw new Error("migration record missing");
+
+    const outcome = await repo.rollbackMigrationTx({
+      executionId,
+      characterId,
+      actorId: owner,
+      migration: migrationRecord,
+      sourceVersionId: migrationRecord.sourceVersionId,
+      sourceState: migrationRecord.beforeState,
+      now: new Date(),
+      activity: { kind: "character_migration_rolled_back", payloadJson: {}, requestId: randomUUID() },
+      audit: { actorId: owner, kind: "character_migration_rolled_back", summary: "x", requestId: randomUUID() },
+      resultExpiresAt: new Date(),
+      buildResult: () => ({}),
+    });
+
+    expect(outcome.kind).toBe("conflict");
+    if (outcome.kind === "conflict") expect(outcome.latestRevision).toBe(2);
   });
 });

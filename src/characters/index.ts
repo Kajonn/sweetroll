@@ -1340,6 +1340,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           candidateState: preview.candidateState,
           beforeState: character.state,
           rollbackDeadline: new Date(claimStartedAt.getTime() + ROLLBACK_TTL_MS),
+          now: claimStartedAt,
           activity: {
             kind: "character_migration_committed",
             payloadJson: { previewId: commitInput.previewId, targetVersionId: preview.targetVersionId },
@@ -1385,7 +1386,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           return { ok: false, error };
         }
         if (outcome.kind === "consumed" || outcome.kind === "expired") {
-          const error = errors.conflict(character.revision, [], null);
+          const error = errors.conflict(outcome.latestRevision, [], null);
           await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
           return { ok: false, error };
         }
@@ -1475,6 +1476,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           migration,
           sourceVersionId: migration.sourceVersionId,
           sourceState: migration.beforeState,
+          now: claimStartedAt,
           activity: {
             kind: "character_migration_rolled_back",
             payloadJson: { migrationId: rollbackInput.migrationId },
@@ -1515,7 +1517,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           return { ok: false, error };
         }
         if (outcome.kind === "conflict") {
-          const error = errors.conflict(character.revision, [], null);
+          const error = errors.conflict(outcome.latestRevision, [], null);
           await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
           return { ok: false, error };
         }

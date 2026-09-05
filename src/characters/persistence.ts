@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 
+import { hashInput } from "../systems/implementation/authoring/assess.js";
 import type { DefinitionId, NormalizedRoll, RuntimeStateV1, VersionId } from "../systems/runtime.js";
 
 export type CharacterId = string;
@@ -181,6 +182,7 @@ export type CommitMigrationInput = {
   candidateState: RuntimeStateV1;
   beforeState: RuntimeStateV1;
   rollbackDeadline: Date;
+  now: Date;
   activity: { kind: string; payloadJson: unknown; requestId: string };
   audit: { actorId: UserId; kind: string; summary: string; requestId: string };
   resultExpiresAt: Date;
@@ -191,8 +193,8 @@ export type CommitMigrationOutcome =
   | { kind: "applied"; record: CharacterRecord; resultJson: unknown }
   | { kind: "already_completed"; resultJson: unknown }
   | { kind: "not_found" }
-  | { kind: "consumed" }
-  | { kind: "expired" }
+  | { kind: "consumed"; latestRevision: number }
+  | { kind: "expired"; latestRevision: number }
   | { kind: "conflict"; latestRevision: number };
 
 export type MigrationRecord = {
@@ -218,6 +220,7 @@ export type RollbackMigrationInput = {
   migration: MigrationRecord;
   sourceVersionId: VersionId;
   sourceState: RuntimeStateV1;
+  now: Date;
   activity: { kind: string; payloadJson: unknown; requestId: string };
   audit: { actorId: UserId; kind: string; summary: string; requestId: string };
   resultExpiresAt: Date;
@@ -228,7 +231,7 @@ export type RollbackMigrationOutcome =
   | { kind: "applied"; record: CharacterRecord; resultJson: unknown }
   | { kind: "already_completed"; resultJson: unknown }
   | { kind: "not_found" }
-  | { kind: "conflict" };
+  | { kind: "conflict"; latestRevision: number };
 
 export type CharacterActivityRow = {
   id: string;
@@ -838,25 +841,6 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           await client.query("ROLLBACK");
           return { kind: "not_found" };
         }
-        if (previewRow.consumed_at !== null) {
-          await client.query("ROLLBACK");
-          return { kind: "consumed" };
-        }
-        if (new Date(previewRow.expires_at).getTime() <= Date.now()) {
-          await client.query("ROLLBACK");
-          return { kind: "expired" };
-        }
-        if (
-          previewRow.source_revision !== input.sourceRevision
-          || previewRow.source_version_id !== input.sourceVersionId
-          || previewRow.source_checksum !== input.sourceChecksum
-          || previewRow.target_version_id !== input.targetVersionId
-          || previewRow.target_checksum !== input.targetChecksum
-          || previewRow.preview_checksum !== input.previewChecksum
-        ) {
-          await client.query("ROLLBACK");
-          return { kind: "consumed" };
-        }
 
         const charResult = await client.query<CharacterRow>(
           `SELECT id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
@@ -868,8 +852,50 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           await client.query("ROLLBACK");
           return { kind: "not_found" };
         }
-        if (charRow.revision !== input.expectedRevision || charRow.revision !== input.sourceRevision) {
-          const latestRevision = charRow.revision;
+        const latestRevision = charRow.revision;
+
+        if (previewRow.consumed_at !== null) {
+          await client.query("ROLLBACK");
+          return { kind: "consumed", latestRevision };
+        }
+        if (new Date(previewRow.expires_at).getTime() <= input.now.getTime()) {
+          await client.query("ROLLBACK");
+          return { kind: "expired", latestRevision };
+        }
+
+        // Recompute the preview checksum over the stored bound fields exactly as
+        // the preview did. Any tampering of the materialized bindings (candidate
+        // state/projection, mappings/defaults, version identities, owner, expiry)
+        // fails the atomic pre-condition instead of committing a mutated candidate.
+        const storedMappings = previewRow.mapping_json as {
+          mappings: Record<DefinitionId, DefinitionId>;
+          defaults: Record<DefinitionId, unknown>;
+        };
+        const recomputedChecksum = hashInput({
+          characterId: previewRow.character_id,
+          sourceRevision: previewRow.source_revision,
+          sourceVersionId: previewRow.source_version_id,
+          sourceChecksum: previewRow.source_checksum,
+          targetVersionId: previewRow.target_version_id,
+          targetChecksum: previewRow.target_checksum,
+          mappings: storedMappings.mappings,
+          defaults: storedMappings.defaults,
+          candidateState: previewRow.candidate_state_json,
+          candidateProjection: previewRow.candidate_projection_json,
+          warnings: previewRow.warnings_json,
+          owner: previewRow.owner_id,
+          expiresAt: new Date(previewRow.expires_at).toISOString(),
+        });
+        if (recomputedChecksum !== previewRow.preview_checksum) {
+          await client.query("ROLLBACK");
+          return { kind: "consumed", latestRevision };
+        }
+
+        if (
+          charRow.revision !== input.expectedRevision
+          || charRow.revision !== input.sourceRevision
+          || charRow.system_version_id !== previewRow.source_version_id
+        ) {
           await client.query("ROLLBACK");
           return { kind: "conflict", latestRevision };
         }
@@ -1004,14 +1030,6 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           await client.query("ROLLBACK");
           return { kind: "not_found" };
         }
-        if (migrationRow.rolled_back_at !== null) {
-          await client.query("ROLLBACK");
-          return { kind: "conflict" };
-        }
-        if (new Date(migrationRow.rollback_deadline).getTime() <= Date.now()) {
-          await client.query("ROLLBACK");
-          return { kind: "conflict" };
-        }
 
         const charResult = await client.query<CharacterRow>(
           `SELECT id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
@@ -1023,9 +1041,19 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           await client.query("ROLLBACK");
           return { kind: "not_found" };
         }
+        const latestRevision = charRow.revision;
+
+        if (migrationRow.rolled_back_at !== null) {
+          await client.query("ROLLBACK");
+          return { kind: "conflict", latestRevision };
+        }
+        if (new Date(migrationRow.rollback_deadline).getTime() <= input.now.getTime()) {
+          await client.query("ROLLBACK");
+          return { kind: "conflict", latestRevision };
+        }
         if (charRow.revision !== migrationRow.commit_revision) {
           await client.query("ROLLBACK");
-          return { kind: "conflict" };
+          return { kind: "conflict", latestRevision };
         }
 
         const restoredState = migrationRow.before_state_json as RuntimeStateV1;

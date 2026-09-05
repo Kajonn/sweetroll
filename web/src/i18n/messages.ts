@@ -313,4 +313,11 @@ export const defaultMessages: MessageTable = {
   "versionHistory.lifecycle.active": "Active",
   "versionHistory.lifecycle.deprecated": "Deprecated",
   "versionHistory.unknownDate": "Unknown date",
+  "templates.title": "Clone from template",
+  "templates.loading": "Loading templates…",
+  "templates.error": "Failed to load templates.",
+  "templates.empty": "No templates are available.",
+  "templates.clone": "Clone",
+  "templates.cloning": "Cloning…",
+  "templates.clone.error": "Could not clone {template}.",
 };

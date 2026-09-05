@@ -24,6 +24,7 @@ describe("buildOpenApiDocument", () => {
       "/systems/{systemId}/preview",
       "/systems/{systemId}/publish",
       "/systems/{systemId}/versions",
+      "/templates",
     ]);
     const paths = doc.paths ?? {};
     for (const path of Object.keys(paths)) {

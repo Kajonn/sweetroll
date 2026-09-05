@@ -63,6 +63,17 @@ const UnauthorizedEnvelope = Type.Object({
   requestId: Type.String(),
 });
 
+const TemplateDto = Type.Object({
+  templateId: Type.String(),
+  label: Type.String(),
+  versionId: Type.String({ format: UUID_FORMAT }),
+});
+
+const ListTemplatesResponseDto = Type.Object({
+  templates: Type.Array(TemplateDto),
+  requestId: Type.String(),
+});
+
 const SystemSummaryDto = Type.Object({
   systemId: Type.String({ format: UUID_FORMAT }),
   name: Type.String(),
@@ -194,6 +205,18 @@ export type SystemsRouteDefinition = {
 };
 
 export const systemsRouteDefinitions: readonly SystemsRouteDefinition[] = [
+  {
+    method: "get",
+    path: "/templates",
+    operationId: "get_templates",
+    schema: {
+      response: {
+        "200": ListTemplatesResponseDto,
+        "401": UnauthorizedEnvelope,
+        "500": ErrorEnvelope,
+      },
+    },
+  },
   {
     method: "post",
     path: "/systems",
@@ -409,6 +432,26 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
 
     type Handler = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown> | unknown;
     const handlers: Record<string, Handler> = {
+      get_templates: async (request) => ({
+        templates: [
+          {
+            templateId: "d20",
+            label: "d20 sample",
+            versionId: "11111111-1111-1111-1111-111111111a01",
+          },
+          {
+            templateId: "pbta2d6",
+            label: "PbtA 2d6 sample",
+            versionId: "11111111-1111-1111-1111-111111111a02",
+          },
+          {
+            templateId: "d6success",
+            label: "d6 success pool sample",
+            versionId: "11111111-1111-1111-1111-111111111a03",
+          },
+        ],
+        requestId: request.id,
+      }),
       post_systems: async (request, reply) => {
         const body = request.body as { source?: unknown; idempotencyKey?: unknown } | undefined;
         if (

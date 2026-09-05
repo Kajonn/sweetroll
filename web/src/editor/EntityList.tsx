@@ -6,6 +6,7 @@ import type { FieldV1 } from "../state/documentFieldTypes.js";
 import { BooleanFieldEditor } from "./fields/BooleanFieldEditor.js";
 import { ChoiceFieldEditor } from "./fields/ChoiceFieldEditor.js";
 import { ImageFieldEditor } from "./fields/ImageFieldEditor.js";
+import { ResourceFieldEditor } from "./fields/ResourceFieldEditor.js";
 import { ScalarFieldEditor } from "./fields/ScalarFieldEditor.js";
 import styles from "./EntityList.module.css";
 
@@ -141,6 +142,7 @@ function FieldEditorRouter({
     case "image":
       return <ImageFieldEditor field={field} onChange={onChange} />;
     case "resource":
+      return <ResourceFieldEditor field={field} onChange={onChange} />;
     case "computed":
       return (
         <p className={styles.unsupported} data-testid={`field-unsupported-${field.id}`}>

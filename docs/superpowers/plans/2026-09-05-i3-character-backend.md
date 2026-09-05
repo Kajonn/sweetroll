@@ -795,7 +795,7 @@ Parameterize create/observe/set/bump/action for d20, PbtA, and d6 success pool. 
 
 - [ ] **Step 4: Add bounded session-burst test**
 
-Create 50 characters, then issue a deterministic mix of 500 reads, 200 bumps on distinct characters/revisions, and 200 roll actions with unique keys using a pool sized for concurrency. Assert no lost/duplicate effects and record p95; fail when local p95 exceeds 300 ms for commands or 500 ms for reads under the documented local test profile.
+Create 50 characters, then issue a deterministic mix of 500 reads, 200 bumps on distinct characters/revisions, and 200 roll actions with unique keys using a pool sized for concurrency. Assert no lost/duplicate effects and record p95; fail when local p95 exceeds 300 ms for ordinary reads/writes or 500 ms for bounded rule actions under the documented local test profile.
 
 - [ ] **Step 5: Run acceptance and load tests red, then fix only discovered I3 defects**
 

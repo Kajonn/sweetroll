@@ -362,6 +362,37 @@ describe("SystemRuntime contract", () => {
     expect(a.value.roll?.dice).not.toEqual(b.value.roll?.dice);
   });
 
+  it.each([
+    ["dice count", d6SuccessPoolPackage, "test_pool", { bonus_dice: 1 }, { dicePerRoll: 2 }],
+    ["sides per die", d20Package, "check", { bonus: 0 }, { sidesPerDie: 6 }],
+  ])("returns budget_exceeded without a partial roll when the effective %s limit is exhausted", async (
+    _limit,
+    compiled,
+    actionId,
+    inputs,
+    limit,
+  ) => {
+    const { integrity: _integrity, ...unsigned } = compiled;
+    const packageValue = signSystemPackage({
+      ...unsigned,
+      effectiveLimits: { ...compiled.effectiveLimits, ...limit },
+    });
+    const runtime = createRuntime(packageValue);
+    const initialized = await initialize(runtime, packageValue);
+
+    const result = await runtime.resolve({
+      versionId: packageValue.versionId,
+      entityId: "character",
+      state: initialized.state,
+      intent: { kind: "action", actionId, inputs, executionId: "exec-limit" },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: { code: "budget_exceeded", message: "Runtime evaluation budget exceeded." },
+    });
+  });
+
   it("validates action ownership and typed inputs", async () => {
     const runtime = createRuntime(d20Package);
     const initialized = await initialize(runtime, d20Package);

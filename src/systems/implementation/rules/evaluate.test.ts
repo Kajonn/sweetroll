@@ -61,21 +61,28 @@ describe("evaluate", () => {
     expect(up.ok && up.result).toBe(3);
   });
 
-  it("falls back when a dynamic dice count exceeds the dice-per-roll ceiling", () => {
+  it("fails when a dynamic dice count exceeds the dice-per-roll ceiling", () => {
     const r = evaluate(compile("dice(101, 6)"), { fields: {}, inputs: {} });
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.result).toBe(0);
-    expect(r.diagnostics.some((d) => d.code === "arithmetic_failure")).toBe(true);
-    expect(r.roll!.dice).toEqual([]);
+    expect(r).toEqual({
+      ok: false,
+      diagnostics: [{
+        code: "budget_exceeded",
+        path: "dice(101, 6)",
+        message: "dice count 101 exceeds the 100-die-per-roll limit",
+      }],
+    });
   });
 
-  it("falls back when die sides exceed the sides-per-die ceiling", () => {
+  it("fails when die sides exceed the sides-per-die ceiling", () => {
     const r = evaluate(compile("dice(2, 1001)"), { fields: {}, inputs: {} });
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.result).toBe(0);
-    expect(r.diagnostics.some((d) => d.code === "arithmetic_failure")).toBe(true);
+    expect(r).toEqual({
+      ok: false,
+      diagnostics: [{
+        code: "budget_exceeded",
+        path: "dice(2, 1001)",
+        message: "die sides 1001 exceed the 1000-side-per-die limit",
+      }],
+    });
   });
 
   it("resolves equal definition IDs independently by reference scope", () => {
@@ -106,11 +113,32 @@ describe("evaluate", () => {
       { dicePerRoll: 2, sidesPerDie: 6 },
     );
 
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.result).toBe(0);
-    expect(r.roll?.dice).toEqual([]);
-    expect(r.diagnostics[0]?.message).toBe("dice count 3 exceeds the 2-die-per-roll limit");
+    expect(r).toEqual({
+      ok: false,
+      diagnostics: [{
+        code: "budget_exceeded",
+        path: "dice(3, 6)",
+        message: "dice count 3 exceeds the 2-die-per-roll limit",
+      }],
+    });
+  });
+
+  it("enforces an effective sides limit below the platform ceiling", () => {
+    const r = evaluate(
+      compile("dice(1, 20)"),
+      { fields: {}, inputs: {} },
+      seqRng([0.1]),
+      { dicePerRoll: 1, sidesPerDie: 6 },
+    );
+
+    expect(r).toEqual({
+      ok: false,
+      diagnostics: [{
+        code: "budget_exceeded",
+        path: "d20",
+        message: "die sides 20 exceed the 6-side-per-die limit",
+      }],
+    });
   });
 
   it("enforces the effective dice limit across the complete expression", () => {
@@ -121,9 +149,13 @@ describe("evaluate", () => {
       { dicePerRoll: 3, sidesPerDie: 6 },
     );
 
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.result).toBe(0);
-    expect(r.diagnostics[0]?.message).toBe("dice count 4 exceeds the 3-die-per-roll limit");
+    expect(r).toEqual({
+      ok: false,
+      diagnostics: [{
+        code: "budget_exceeded",
+        path: "dice(2, 6) + dice(2, 6)",
+        message: "dice count 4 exceeds the 3-die-per-roll limit",
+      }],
+    });
   });
 });

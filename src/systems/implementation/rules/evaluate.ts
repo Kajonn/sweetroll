@@ -20,7 +20,11 @@ export type EvaluationLimits = {
   sidesPerDie: number;
 };
 
-export type RuntimeDiagnostic = { code: "arithmetic_failure"; path: string; message: string };
+export type RuntimeDiagnostic = {
+  code: "arithmetic_failure" | "budget_exceeded";
+  path: string;
+  message: string;
+};
 
 export type DieResult = { sides: number; value: number; kept: boolean };
 
@@ -45,6 +49,11 @@ function fail(ctx: Ctx, message: string): undefined {
   return undefined;
 }
 
+function budgetExceeded(ctx: Ctx, message: string): undefined {
+  ctx.diagnostics.push({ code: "budget_exceeded", path: ctx.expression, message });
+  return undefined;
+}
+
 function num(v: ScalarValue): number | undefined {
   return typeof v === "number" ? v : undefined;
 }
@@ -60,12 +69,10 @@ function isNonNegativeInteger(v: number): boolean {
 function rollDice(count: number, sides: number, ctx: Ctx): DieResult[] | undefined {
   const totalDice = ctx.dice.length + count;
   if (totalDice > ctx.limits.dicePerRoll) {
-    fail(ctx, `dice count ${totalDice} exceeds the ${ctx.limits.dicePerRoll}-die-per-roll limit`);
-    return undefined;
+    return budgetExceeded(ctx, `dice count ${totalDice} exceeds the ${ctx.limits.dicePerRoll}-die-per-roll limit`);
   }
   if (sides > ctx.limits.sidesPerDie) {
-    fail(ctx, `die sides ${sides} exceed the ${ctx.limits.sidesPerDie}-side-per-die limit`);
-    return undefined;
+    return budgetExceeded(ctx, `die sides ${sides} exceed the ${ctx.limits.sidesPerDie}-side-per-die limit`);
   }
   const dice: DieResult[] = [];
   for (let i = 0; i < count; i++) {
@@ -284,6 +291,9 @@ export function evaluate(
   };
   const value = evalNode(compiled.ast, ctx);
   if (value === undefined) {
+    if (ctx.diagnostics.some((diagnostic) => diagnostic.code === "budget_exceeded")) {
+      return { ok: false, diagnostics: ctx.diagnostics };
+    }
     const diagnostics = ctx.diagnostics.length > 0
       ? ctx.diagnostics
       : [{ code: "arithmetic_failure" as const, path: expression, message: "evaluation failed" }];

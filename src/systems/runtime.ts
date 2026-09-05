@@ -335,7 +335,12 @@ export function createSystemRuntime(input: {
           createDeterministicRng(input.authoritativeRollSecret, pendingRoll.executionId),
           packageValue.effectiveLimits,
         );
-        if (!evaluated.ok || evaluated.roll === null) return invalidPackage(expression.id);
+        if (!evaluated.ok) {
+          return evaluated.diagnostics.some((diagnostic) => diagnostic.code === "budget_exceeded")
+            ? budgetExceeded()
+            : invalidPackage(expression.id);
+        }
+        if (evaluated.roll === null) return invalidPackage(expression.id);
         roll = {
           actionId: pendingRoll.actionId,
           expression: evaluated.roll.expression,
@@ -448,6 +453,13 @@ function unsupportedImage(definitionId: string): RuntimeResult<never> {
       message: "Image field values are not supported.",
       definitionId,
     },
+  };
+}
+
+function budgetExceeded(): RuntimeResult<never> {
+  return {
+    ok: false,
+    error: { code: "budget_exceeded", message: "Runtime evaluation budget exceeded." },
   };
 }
 

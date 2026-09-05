@@ -8,7 +8,13 @@ import {
   type CharacterId,
   type Characters,
 } from "../../src/characters/index.js";
-import { d20Package } from "../../src/systems/implementation/package/fixtures/index.js";
+import {
+  d20Document,
+  d20Package,
+  d6SuccessPoolPackage,
+  pbta2d6Package,
+} from "../../src/systems/implementation/package/fixtures/index.js";
+import { compileDocument } from "../../src/systems/implementation/rules/compile-document.js";
 import { createPostgresPublishedPackageLoader } from "../../src/systems/implementation/runtime/package-loader.js";
 import { signSystemPackage } from "../../src/systems/implementation/package/canonical.js";
 import type {
@@ -82,13 +88,28 @@ const DDL = `
     expires_at            timestamptz NOT NULL,
     UNIQUE (actor_id, command_kind, idempotency_key)
   );
+  CREATE TABLE character_rolls (
+    id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id       uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
+    actor_id           uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    action_id          text NOT NULL,
+    execution_id       uuid NOT NULL UNIQUE,
+    expression         text NOT NULL,
+    dice_json          jsonb NOT NULL,
+    bindings_json      jsonb NOT NULL,
+    total              double precision NOT NULL,
+    rendered_output    text NOT NULL,
+    audience           text NOT NULL DEFAULT 'owner_only' CHECK (audience = 'owner_only'),
+    request_id         text NOT NULL,
+    occurred_at        timestamptz NOT NULL DEFAULT now()
+  );
   CREATE TABLE character_activity_events (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     character_id       uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
     character_revision integer NOT NULL CHECK (character_revision >= 1),
     kind               text NOT NULL,
     payload_json       jsonb NOT NULL,
-    roll_id            uuid,
+    roll_id            uuid REFERENCES character_rolls(id) ON DELETE RESTRICT,
     request_id         text NOT NULL,
     occurred_at        timestamptz NOT NULL DEFAULT now()
   );
@@ -144,7 +165,7 @@ describeWithDatabase("Characters (create/list/open)", () => {
   beforeEach(async () => {
     await pool.query(`SET search_path TO ${schema}`);
     await pool.query(
-      "TRUNCATE character_audit_records, character_activity_events, character_command_executions, characters, system_versions, systems, users RESTART IDENTITY CASCADE",
+      "TRUNCATE character_audit_records, character_activity_events, character_rolls, character_command_executions, characters, system_versions, systems, users RESTART IDENTITY CASCADE",
     );
   });
 
@@ -500,7 +521,7 @@ describeWithDatabase("Characters (apply: set/bump)", () => {
   beforeEach(async () => {
     await pool.query(`SET search_path TO ${schema}`);
     await pool.query(
-      "TRUNCATE character_audit_records, character_activity_events, character_command_executions, characters, system_versions, systems, users RESTART IDENTITY CASCADE",
+      "TRUNCATE character_audit_records, character_activity_events, character_rolls, character_command_executions, characters, system_versions, systems, users RESTART IDENTITY CASCADE",
     );
   });
 
@@ -857,3 +878,436 @@ describeWithDatabase("Characters (apply: set/bump)", () => {
     expect(second.value.character.reconciliation.replayed).toBe(false);
   });
 });
+
+describeWithDatabase("Characters (apply: executeAction)", () => {
+  const schema = `characters_action_${randomUUID().replaceAll("-", "")}`;
+  let pool: Pool;
+  let authoring: SystemAuthoring;
+  let runtime: SystemRuntime;
+  let characters: Characters;
+
+  beforeAll(async () => {
+    pool = new Pool({
+      connectionString: databaseUrl,
+      application_name: schema,
+      max: 8,
+      onConnect: async (client) => {
+        await client.query(`SET search_path TO ${schema}`);
+      },
+    });
+    const admin = new Client({ connectionString: databaseUrl });
+    await admin.connect();
+    await admin.query(`CREATE SCHEMA ${schema}`);
+    await admin.query(`SET search_path TO ${schema}`);
+    await admin.query(DDL);
+    await admin.end();
+
+    const repo = createSystemPersistenceRepository(pool);
+    authoring = createSystemAuthoringModule({ repo });
+    runtime = createSystemRuntime({
+      loadPackage: createPostgresPublishedPackageLoader(pool),
+      authoritativeRollSecret: "a".repeat(32),
+    });
+    characters = createCharactersModule({
+      pool,
+      runtime,
+      authorizeVersionUse: authoring.authorizeVersionUse,
+    });
+  });
+
+  beforeEach(async () => {
+    await pool.query(`SET search_path TO ${schema}`);
+    await pool.query(
+      "TRUNCATE character_audit_records, character_activity_events, character_rolls, character_command_executions, characters, system_versions, systems, users RESTART IDENTITY CASCADE",
+    );
+  });
+
+  afterAll(async () => {
+    const admin = new Client({ connectionString: databaseUrl });
+    await admin.connect();
+    await admin.query(`DROP SCHEMA ${schema} CASCADE`);
+    await admin.end();
+    await pool.end();
+  });
+
+  const ctx = (actorId: string) => ({ actorId, requestId: randomUUID() });
+
+  async function createUser(displayName: string): Promise<string> {
+    const result = await pool.query<{ id: string }>(
+      "INSERT INTO users (display_name) VALUES ($1) RETURNING id",
+      [displayName],
+    );
+    return result.rows[0]!.id;
+  }
+
+  function repackage(basePackage: SystemPackageV1, versionId: string): SystemPackageV1 {
+    const unsigned = structuredClone(basePackage) as unknown as UnsignedSystemPackageV1 & { integrity?: unknown };
+    delete unsigned.integrity;
+    unsigned.versionId = versionId;
+    return signSystemPackage(unsigned);
+  }
+
+  async function publishVersion(
+    ownerId: string,
+    basePackage: SystemPackageV1 = d20Package,
+  ): Promise<{ systemId: string; versionId: string }> {
+    const systemResult = await pool.query<{ id: string }>(
+      "INSERT INTO systems (owner_id, name, access, lifecycle) VALUES ($1, $2, 'public', 'active') RETURNING id",
+      [ownerId, "System"],
+    );
+    const systemId = systemResult.rows[0]!.id;
+    const versionId = randomUUID();
+    const packageValue = repackage(basePackage, versionId);
+    await pool.query(
+      "INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, lifecycle) VALUES ($1, $2, '1.0.0', $3, $4::jsonb, 'published')",
+      [versionId, systemId, packageValue.integrity.checksum, JSON.stringify(packageValue)],
+    );
+    return { systemId, versionId };
+  }
+
+  async function createCharacter(ownerId: string, versionId: string): Promise<CharacterId> {
+    const created = await characters.create(ctx(ownerId), {
+      systemVersionId: versionId,
+      entityDefinitionId: "character",
+      name: "Aria",
+      idempotencyKey: randomUUID(),
+    });
+    if (!created.ok) throw new Error(`unexpected create failure: ${JSON.stringify(created.error)}`);
+    return created.value.characterId;
+  }
+
+  function buildD20ActionableCombatPackage(versionId: string): SystemPackageV1 {
+    const document = structuredClone(d20Document);
+    document.sheets[0]!.sections[2]!.elements.push({ kind: "action", id: "damage_element", actionId: "damage" });
+    const result = compileDocument(document, {
+      systemId: "a0000000-0000-5000-8000-000000000001",
+      versionId,
+      semanticVersion: "1.0.0",
+    });
+    if (!result.ok) throw new Error(`Fixture did not compile: ${JSON.stringify(result.diagnostics)}`);
+    return result.value;
+  }
+
+  async function publishActionableCombatVersion(ownerId: string): Promise<{ systemId: string; versionId: string }> {
+    const systemResult = await pool.query<{ id: string }>(
+      "INSERT INTO systems (owner_id, name, access, lifecycle) VALUES ($1, $2, 'public', 'active') RETURNING id",
+      [ownerId, "System"],
+    );
+    const systemId = systemResult.rows[0]!.id;
+    const versionId = randomUUID();
+    const packageValue = buildD20ActionableCombatPackage(versionId);
+    await pool.query(
+      "INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, lifecycle) VALUES ($1, $2, '1.0.0', $3, $4::jsonb, 'published')",
+      [versionId, systemId, packageValue.integrity.checksum, JSON.stringify(packageValue)],
+    );
+    return { systemId, versionId };
+  }
+
+  it("executes a d20 check roll action, persists the roll, and leaves revision unchanged", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner, d20Package);
+    const characterId = await createCharacter(owner, versionId);
+
+    const result = await characters.apply(ctx(owner), {
+      kind: "executeAction",
+      characterId,
+      actionId: "check",
+      inputs: { bonus: 2 },
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(`unexpected: ${JSON.stringify(result.error)}`);
+    expect(result.value.character.revision).toBe(1);
+    expect(result.value.roll).not.toBeNull();
+    const roll = result.value.roll!;
+    expect(roll.actionId).toBe("check");
+    expect(roll.expression).toBe("d20 + fields.modifier + inputs.bonus");
+    expect(roll.dice).toHaveLength(1);
+    expect(roll.dice[0]!.sides).toBe(20);
+    expect(roll.bindings).toEqual(
+      expect.arrayContaining([
+        { scope: "fields", definitionId: "modifier", value: 0 },
+        { scope: "inputs", definitionId: "bonus", value: 2 },
+      ]),
+    );
+    expect(roll.total).toBe(roll.dice[0]!.value + 0 + 2);
+    expect(roll.output).toBe(`Result: ${roll.total}`);
+
+    const rollRow = await pool.query<{
+      character_id: string;
+      actor_id: string;
+      action_id: string;
+      audience: string;
+      request_id: string;
+      total: number;
+    }>("SELECT character_id, actor_id, action_id, audience, request_id, total FROM character_rolls WHERE character_id = $1", [
+      characterId,
+    ]);
+    expect(rollRow.rows).toHaveLength(1);
+    expect(rollRow.rows[0]).toMatchObject({
+      character_id: characterId,
+      actor_id: owner,
+      action_id: "check",
+      audience: "owner_only",
+      total: roll.total,
+    });
+
+    const activity = await pool.query<{ kind: string; roll_id: string | null; request_id: string }>(
+      "SELECT kind, roll_id, request_id FROM character_activity_events WHERE character_id = $1 AND kind = 'character_action_executed'",
+      [characterId],
+    );
+    expect(activity.rows).toHaveLength(1);
+    expect(activity.rows[0]!.roll_id).not.toBeNull();
+
+    const row = await pool.query<{ revision: number }>("SELECT revision FROM characters WHERE id = $1", [characterId]);
+    expect(row.rows[0]!.revision).toBe(1);
+  });
+
+  it("executes a PbtA 2d6 move action and persists normalized dice/bindings", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner, pbta2d6Package);
+    const characterId = await createCharacter(owner, versionId);
+
+    const result = await characters.apply(ctx(owner), {
+      kind: "executeAction",
+      characterId,
+      actionId: "make_move",
+      inputs: { forward: 1 },
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(`unexpected: ${JSON.stringify(result.error)}`);
+    expect(result.value.character.revision).toBe(1);
+    const roll = result.value.roll!;
+    expect(roll.actionId).toBe("make_move");
+    expect(roll.dice).toHaveLength(2);
+    expect(roll.dice.every((die) => die.sides === 6)).toBe(true);
+    expect(roll.total).toBe(roll.dice.reduce((sum, die) => sum + die.value, 0) + 0 + 1);
+  });
+
+  it("executes a d6 success pool action and persists normalized dice/bindings", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner, d6SuccessPoolPackage);
+    const characterId = await createCharacter(owner, versionId);
+
+    const result = await characters.apply(ctx(owner), {
+      kind: "executeAction",
+      characterId,
+      actionId: "test_pool",
+      inputs: { bonus_dice: 1 },
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(`unexpected: ${JSON.stringify(result.error)}`);
+    expect(result.value.character.revision).toBe(1);
+    const roll = result.value.roll!;
+    expect(roll.actionId).toBe("test_pool");
+    // attribute(1) + skill(1) + bonus_dice(1) = 3 dice
+    expect(roll.dice).toHaveLength(3);
+    expect(roll.dice.every((die) => die.sides === 6)).toBe(true);
+  });
+
+  it("executes a resource-bump action, persists no roll, and increments revision", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishActionableCombatVersion(owner);
+    const characterId = await createCharacter(owner, versionId);
+
+    const result = await characters.apply(ctx(owner), {
+      kind: "executeAction",
+      characterId,
+      actionId: "damage",
+      inputs: {},
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(`unexpected: ${JSON.stringify(result.error)}`);
+    expect(result.value.roll).toBeNull();
+    expect(result.value.character.revision).toBe(2);
+    expect(result.value.character.state.values.health).toEqual({ current: 9, max: 10 });
+
+    const rollCount = await pool.query("SELECT count(*)::int AS count FROM character_rolls WHERE character_id = $1", [
+      characterId,
+    ]);
+    expect(rollCount.rows[0]!.count).toBe(0);
+
+    const activity = await pool.query<{ kind: string; roll_id: string | null }>(
+      "SELECT kind, roll_id FROM character_activity_events WHERE character_id = $1 AND kind = 'character_action_executed'",
+      [characterId],
+    );
+    expect(activity.rows).toHaveLength(1);
+    expect(activity.rows[0]!.roll_id).toBeNull();
+  });
+
+  it("replays an identical action from the idempotency key with identical dice and exactly one roll/activity row", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner, d20Package);
+    const characterId = await createCharacter(owner, versionId);
+    const key = randomUUID();
+
+    const first = await characters.apply(ctx(owner), {
+      kind: "executeAction",
+      characterId,
+      actionId: "check",
+      inputs: { bonus: 2 },
+      expectedRevision: 1,
+      idempotencyKey: key,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) throw new Error("unexpected");
+
+    const replay = await characters.apply(ctx(owner), {
+      kind: "executeAction",
+      characterId,
+      actionId: "check",
+      inputs: { bonus: 2 },
+      expectedRevision: 1,
+      idempotencyKey: key,
+    });
+    expect(replay.ok).toBe(true);
+    if (!replay.ok) throw new Error("unexpected");
+    expect(replay.value.character.reconciliation.replayed).toBe(true);
+    expect(replay.value.roll).toEqual(first.value.roll);
+
+    const rollCount = await pool.query("SELECT count(*)::int AS count FROM character_rolls WHERE character_id = $1", [
+      characterId,
+    ]);
+    expect(rollCount.rows[0]!.count).toBe(1);
+    const activityCount = await pool.query(
+      "SELECT count(*)::int AS count FROM character_activity_events WHERE character_id = $1 AND kind = 'character_action_executed'",
+      [characterId],
+    );
+    expect(activityCount.rows[0]!.count).toBe(1);
+  });
+
+  it("rolls back state, roll, activity, and execution completion when the roll insert fails", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner, d20Package);
+    const characterId = await createCharacter(owner, versionId);
+
+    const failingPool = {
+      connect: async () => {
+        const client = await pool.connect();
+        const originalQuery = client.query.bind(client);
+        const originalRelease = client.release.bind(client);
+        let attempted = false;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (client as any).query = (...args: unknown[]) => {
+          const text = typeof args[0] === "string" ? args[0] : (args[0] as { text?: string })?.text;
+          if (typeof text === "string" && text.includes("INSERT INTO character_rolls") && !attempted) {
+            attempted = true;
+            return Promise.reject(new Error("injected roll insert failure"));
+          }
+          return originalQuery(...(args as Parameters<typeof originalQuery>));
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (client as any).release = (...args: unknown[]) => {
+          (client as any).query = originalQuery;
+          return originalRelease(...(args as Parameters<typeof originalRelease>));
+        };
+        return client;
+      },
+      query: pool.query.bind(pool),
+    } as unknown as Pool;
+
+    const failingCharacters = createCharactersModule({
+      pool: failingPool,
+      runtime,
+      authorizeVersionUse: authoring.authorizeVersionUse,
+    });
+
+    const idempotencyKey = randomUUID();
+    const result = await failingCharacters.apply(ctx(owner), {
+      kind: "executeAction",
+      characterId,
+      actionId: "check",
+      inputs: { bonus: 2 },
+      expectedRevision: 1,
+      idempotencyKey,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unexpected");
+    expect(result.error.code).toBe("internal");
+
+    const rollCount = await pool.query("SELECT count(*)::int AS count FROM character_rolls WHERE character_id = $1", [
+      characterId,
+    ]);
+    expect(rollCount.rows[0]!.count).toBe(0);
+    const activityCount = await pool.query(
+      "SELECT count(*)::int AS count FROM character_activity_events WHERE character_id = $1 AND kind = 'character_action_executed'",
+      [characterId],
+    );
+    expect(activityCount.rows[0]!.count).toBe(0);
+    const row = await pool.query<{ revision: number }>("SELECT revision FROM characters WHERE id = $1", [characterId]);
+    expect(row.rows[0]!.revision).toBe(1);
+    const execution = await pool.query<{ status: string }>(
+      "SELECT status FROM character_command_executions WHERE actor_id = $1 AND idempotency_key = $2",
+      [owner, idempotencyKey],
+    );
+    expect(execution.rows[0]!.status).toBe("pending");
+  });
+
+  it("replays a restart-safe result from a second Runtime/Characters instance without invoking RNG again", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishVersion(owner, d20Package);
+    const characterId = await createCharacter(owner, versionId);
+    const key = randomUUID();
+
+    const first = await characters.apply(ctx(owner), {
+      kind: "executeAction",
+      characterId,
+      actionId: "check",
+      inputs: { bonus: 2 },
+      expectedRevision: 1,
+      idempotencyKey: key,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) throw new Error("unexpected");
+
+    // A second runtime/module instance with the same secret and database, but whose
+    // runtime and execution-ID generator would produce different/incompatible output
+    // if actually invoked. A correct replay must never call either.
+    const throwingRuntime: SystemRuntime = {
+      async resolve() {
+        throw new Error("RNG-backed resolve must not be invoked on replay");
+      },
+    };
+    const secondInstanceCharacters = createCharactersModule({
+      pool,
+      runtime: throwingRuntime,
+      authorizeVersionUse: authoring.authorizeVersionUse,
+      newExecutionId: () => "00000000-0000-4000-8000-000000000099",
+    });
+
+    const replay = await secondInstanceCharacters.apply(ctx(owner), {
+      kind: "executeAction",
+      characterId,
+      actionId: "check",
+      inputs: { bonus: 2 },
+      expectedRevision: 1,
+      idempotencyKey: key,
+    });
+
+    expect(replay.ok).toBe(true);
+    if (!replay.ok) throw new Error("unexpected");
+    expect(replay.value.character.reconciliation.replayed).toBe(true);
+    expect(replay.value.character.reconciliation.commandExecutionId).toBe(
+      first.value.character.reconciliation.commandExecutionId,
+    );
+    expect(replay.value.character.reconciliation.commandExecutionId).not.toBe("00000000-0000-4000-8000-000000000099");
+    expect(replay.value.roll).toEqual(first.value.roll);
+
+    const rollCount = await pool.query("SELECT count(*)::int AS count FROM character_rolls WHERE character_id = $1", [
+      characterId,
+    ]);
+    expect(rollCount.rows[0]!.count).toBe(1);
+  });
+});
+

@@ -675,15 +675,13 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           return { ok: false, error: errors.bad_request("expectedRevision must be a positive integer.") };
         }
 
-        if (command.kind === "executeAction") {
-          return { ok: false, error: errors.notImplemented() };
-        }
-
         const commandKind = COMMAND_KIND[command.kind];
         const payload =
           command.kind === "setField"
             ? { fieldId: command.fieldId, value: command.value }
-            : { resourceId: command.resourceId, direction: command.direction };
+            : command.kind === "bumpResource"
+              ? { resourceId: command.resourceId, direction: command.direction }
+              : { actionId: command.actionId, inputs: command.inputs };
         const inputHash = hashInput({
           commandKind,
           characterId: command.characterId,
@@ -735,7 +733,14 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const intent =
           command.kind === "setField"
             ? ({ kind: "set", fieldId: command.fieldId, value: command.value } as const)
-            : ({ kind: "bump", resourceId: command.resourceId, direction: command.direction } as const);
+            : command.kind === "bumpResource"
+              ? ({ kind: "bump", resourceId: command.resourceId, direction: command.direction } as const)
+              : ({
+                  kind: "action",
+                  actionId: command.actionId,
+                  inputs: command.inputs,
+                  executionId,
+                } as const);
 
         const resolved = await input.runtime.resolve({
           versionId: snapshot.systemVersionId,
@@ -755,8 +760,14 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           return { ok: false, error };
         }
 
-        const activityKind = command.kind === "setField" ? "character_field_set" : "character_resource_bumped";
+        const activityKind =
+          command.kind === "setField"
+            ? "character_field_set"
+            : command.kind === "bumpResource"
+              ? "character_resource_bumped"
+              : "character_action_executed";
         const changedDefinitionIds = resolved.value.changedDefinitionIds;
+        const roll = resolved.value.roll;
 
         const outcome = await repo.applyCommandTx({
           executionId,
@@ -765,6 +776,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           expectedRevision: command.expectedRevision,
           nextState: resolved.value.state,
           stateChanged: changedDefinitionIds.length > 0,
+          roll,
           activity: {
             kind: activityKind,
             payloadJson: { ...payload, changedDefinitionIds },
@@ -788,7 +800,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
                 replayed: false,
               },
             );
-            return { ok: true, value: { character: serializeView(view), roll: null } };
+            return { ok: true, value: { character: serializeView(view), roll } };
           },
         });
 

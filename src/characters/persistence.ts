@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 
-import type { DefinitionId, RuntimeStateV1, VersionId } from "../systems/runtime.js";
+import type { DefinitionId, NormalizedRoll, RuntimeStateV1, VersionId } from "../systems/runtime.js";
 
 export type CharacterId = string;
 export type UserId = string;
@@ -79,6 +79,7 @@ export type ApplyCommandInput = {
   expectedRevision: number;
   nextState: RuntimeStateV1;
   stateChanged: boolean;
+  roll: NormalizedRoll | null;
   activity: {
     kind: string;
     payloadJson: unknown;
@@ -296,10 +297,40 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           updatedRow = requireRow(updated.rows[0], "applyCommandTx.update");
         }
 
+        let rollId: string | null = null;
+        if (input.roll !== null) {
+          const insertedRoll = await client.query<{ id: string }>(
+            `INSERT INTO character_rolls
+               (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id)
+             VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, 'owner_only', $10)
+             RETURNING id`,
+            [
+              updatedRow.id,
+              input.actorId,
+              input.roll.actionId,
+              input.executionId,
+              input.roll.expression,
+              JSON.stringify(input.roll.dice),
+              JSON.stringify(input.roll.bindings),
+              input.roll.total,
+              input.roll.output,
+              input.activity.requestId,
+            ],
+          );
+          rollId = requireRow(insertedRoll.rows[0], "applyCommandTx.roll").id;
+        }
+
         await client.query(
-          `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, request_id)
-           VALUES ($1, $2, $3, $4::jsonb, $5)`,
-          [updatedRow.id, updatedRow.revision, input.activity.kind, JSON.stringify(input.activity.payloadJson), input.activity.requestId],
+          `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, roll_id, request_id)
+           VALUES ($1, $2, $3, $4::jsonb, $5, $6)`,
+          [
+            updatedRow.id,
+            updatedRow.revision,
+            input.activity.kind,
+            JSON.stringify(input.activity.payloadJson),
+            rollId,
+            input.activity.requestId,
+          ],
         );
 
         const record = toCharacterRecord(updatedRow);

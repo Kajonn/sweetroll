@@ -79,13 +79,28 @@ const DDL = `
     expires_at            timestamptz NOT NULL,
     UNIQUE (actor_id, command_kind, idempotency_key)
   );
+  CREATE TABLE character_rolls (
+    id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id       uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
+    actor_id           uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    action_id          text NOT NULL,
+    execution_id       uuid NOT NULL UNIQUE,
+    expression         text NOT NULL,
+    dice_json          jsonb NOT NULL,
+    bindings_json      jsonb NOT NULL,
+    total              double precision NOT NULL,
+    rendered_output    text NOT NULL,
+    audience           text NOT NULL DEFAULT 'owner_only' CHECK (audience = 'owner_only'),
+    request_id         text NOT NULL,
+    occurred_at        timestamptz NOT NULL DEFAULT now()
+  );
   CREATE TABLE character_activity_events (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     character_id       uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
     character_revision integer NOT NULL CHECK (character_revision >= 1),
     kind               text NOT NULL,
     payload_json       jsonb NOT NULL,
-    roll_id            uuid,
+    roll_id            uuid REFERENCES character_rolls(id) ON DELETE RESTRICT,
     request_id         text NOT NULL,
     occurred_at        timestamptz NOT NULL DEFAULT now()
   );
@@ -142,7 +157,7 @@ describeWithDatabase("Character command concurrency", () => {
   beforeEach(async () => {
     await pool.query(`SET search_path TO ${schema}`);
     await pool.query(
-      "TRUNCATE character_audit_records, character_activity_events, character_command_executions, characters, system_versions, systems, users RESTART IDENTITY CASCADE",
+      "TRUNCATE character_audit_records, character_activity_events, character_rolls, character_command_executions, characters, system_versions, systems, users RESTART IDENTITY CASCADE",
     );
   });
 

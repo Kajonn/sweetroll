@@ -480,7 +480,7 @@ Expose a versioned REST HTTP interface described by OpenAPI. Use resource-orient
 
 | **Area**   | **Representative endpoints**                                                                                                            |
 |------------|-----------------------------------------------------------------------------------------------------------------------------------------|
-| Systems    | POST/GET /systems; GET /systems/{id}; PUT /systems/{id}/draft; POST /systems/{id}/preview; POST /systems/{id}/publish; PATCH /systems/{id} |
+| Systems    | POST/GET /systems; GET /systems/{id}; GET /systems/{id}/versions; PUT /systems/{id}/draft; POST /systems/{id}/preview; POST /systems/{id}/publish; PATCH /systems/{id} |
 | Versions   | GET/PATCH /system-versions/{id}; GET /system-versions/{id}/export                                                                        |
 | Templates  | GET /templates; create a system with a version source to clone a template                                                               |
 | Campaigns  | POST /campaigns; GET/PATCH /campaigns/{id}; POST /campaigns/{id}/invitations; DELETE /campaigns/{id}/members/{memberId}                 |

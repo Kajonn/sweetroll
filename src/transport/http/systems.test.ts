@@ -74,6 +74,7 @@ function makeAuthoring(overrides: Partial<SystemAuthoring> = {}): SystemAuthorin
       } satisfies PublishedVersion,
     }),
     exportVersion: async () => ({ ok: true, value: d20Export }),
+    listVersions: async () => ({ ok: true, value: { versions: [] } }),
     changeLifecycle: async () => ({
       ok: true,
       value: { kind: "system", systemId: randomUUID(), lifecycle: "archived" },
@@ -283,5 +284,41 @@ describe("systems HTTP routes", () => {
     expect(exported.statusCode).toBe(200);
     expect(exported.headers["content-type"]).toContain("application/vnd.sweetroll.system+json");
     expect(exported.json().package.integrity.checksum).toBe(d20Package.integrity.checksum);
+  });
+
+  it("maps GET /systems/:systemId/versions to listVersions and returns 404 when missing", async () => {
+    let received: unknown;
+    const app = await build(
+      makeAuthoring({
+        listVersions: async (_ctx, input) => {
+          received = input;
+          return { ok: true, value: { versions: [] } };
+        },
+      }),
+    );
+    apps.push(app);
+    const headers = { cookie: "session=t" };
+    const systemId = randomUUID();
+
+    const ok = await app.inject({ method: "GET", url: `/systems/${systemId}/versions`, headers });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toEqual({ versions: [], requestId: expect.any(String) });
+    expect(received).toEqual({ systemId });
+
+    const missingApp = await build(
+      makeAuthoring({
+        listVersions: async () => ({
+          ok: false,
+          error: { code: "not_found", message: "The requested resource does not exist." },
+        }),
+      }),
+    );
+    apps.push(missingApp);
+    const missing = await missingApp.inject({
+      method: "GET",
+      url: `/systems/${randomUUID()}/versions`,
+      headers,
+    });
+    expect(missing.statusCode).toBe(404);
   });
 });

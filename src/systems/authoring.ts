@@ -109,6 +109,14 @@ export type PublishedVersion = {
 
 export type ExportedPackage = SystemExportV1;
 
+export type ListVersionsInput = {
+  systemId: SystemId;
+};
+
+export type ListVersionsResult = {
+  versions: VersionSummary[];
+};
+
 export type CreateDraftSource =
   | { kind: "blank"; name: string }
   | { kind: "clone"; versionId: VersionId }
@@ -156,6 +164,10 @@ export interface SystemAuthoring {
   previewDraft(ctx: RequestContext, input: PreviewDraftInput): Promise<Result<PreviewSnapshot>>;
   publish(ctx: RequestContext, input: PublishDraftInput): Promise<Result<PublishedVersion>>;
   exportVersion(ctx: RequestContext, versionId: VersionId): Promise<Result<ExportedPackage>>;
+  listVersions(
+    ctx: RequestContext,
+    input: ListVersionsInput,
+  ): Promise<Result<ListVersionsResult>>;
   changeLifecycle(ctx: RequestContext, input: LifecycleChangeInput): Promise<Result<LifecycleResult>>;
 }
 
@@ -547,6 +559,17 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           package: version.package as SystemPackageV1,
         };
         return { ok: true, value: exported };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async listVersions(ctx, input) {
+      try {
+        const system = await authorizeOwner(input.systemId, ctx.actorId);
+        if (system === null) return { ok: false, error: errors.not_found() };
+        const versions = await repo.listVersions(input.systemId);
+        return { ok: true, value: { versions: versions.map(summarizeVersion) } };
       } catch {
         return { ok: false, error: errors.internal() };
       }

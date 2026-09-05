@@ -36,6 +36,22 @@ export interface paths {
         patch: operations["patch_systems_systemId"];
         trace?: never;
     };
+    "/systems/{systemId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_systems_systemId_versions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/systems/{systemId}/draft": {
         parameters: {
             query?: never;
@@ -608,6 +624,96 @@ export interface operations {
                                 message: string;
                             }[];
                         };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_systems_systemId_versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                systemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        versions: {
+                            /** Format: uuid */
+                            versionId: string;
+                            /** Format: uuid */
+                            systemId: string;
+                            semanticVersion: string;
+                            checksum: string;
+                            releaseNotes: string;
+                            lifecycle: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                        }[];
                         requestId: string;
                     };
                 };

@@ -239,6 +239,23 @@ export const systemsRouteDefinitions: readonly SystemsRouteDefinition[] = [
     },
   },
   {
+    method: "get",
+    path: "/systems/:systemId/versions",
+    operationId: "get_systems_systemId_versions",
+    schema: {
+      params: SystemIdParams,
+      response: {
+        "200": Type.Object({
+          versions: Type.Array(VersionSummaryDto),
+          requestId: Type.String(),
+        }),
+        "401": UnauthorizedEnvelope,
+        "404": ErrorEnvelope,
+        "500": ErrorEnvelope,
+      },
+    },
+  },
+  {
     method: "put",
     path: "/systems/:systemId/draft",
     operationId: "put_systems_draft",
@@ -427,6 +444,13 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
         const result = await authoring.open(ctxOf(request), params.systemId);
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { workspace: result.value, requestId: request.id };
+      },
+
+      get_systems_systemId_versions: async (request, reply) => {
+        const params = request.params as { systemId: string };
+        const result = await authoring.listVersions(ctxOf(request), { systemId: params.systemId });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { versions: result.value.versions, requestId: request.id };
       },
 
       put_systems_draft: async (request, reply) => {

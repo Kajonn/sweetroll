@@ -2,13 +2,21 @@ import { loadConfig, createLogger, createPool } from "../platform/index.js";
 import { createIdentityModule } from "../identity/index.js";
 import { createTestOidcClient } from "../identity/adapters/test.js";
 import { createSystemAuthoringModule } from "../systems/authoring.js";
+import { createCharactersModule } from "../characters/index.js";
 import {
   createSystemPersistenceRepository,
   seedReferenceTemplates,
 } from "../systems/implementation/persistence/index.js";
+import { createSystemRuntime } from "../systems/runtime.js";
+import { createPostgresPublishedPackageLoader } from "../systems/implementation/runtime/package-loader.js";
 import { buildAuthHook } from "../transport/http/auth-hook.js";
 import { buildDevSignInRoutes } from "../transport/http/dev-signin.js";
-import { buildHttpApp, buildIdentityRoutes, buildSystemsRoutes } from "../transport/http/index.js";
+import {
+  buildCharactersRoutes,
+  buildHttpApp,
+  buildIdentityRoutes,
+  buildSystemsRoutes,
+} from "../transport/http/index.js";
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel);
@@ -44,6 +52,17 @@ const authoring = createSystemAuthoringModule({
   repo: createSystemPersistenceRepository(pool),
 });
 
+const runtime = createSystemRuntime({
+  loadPackage: createPostgresPublishedPackageLoader(pool),
+  authoritativeRollSecret: config.authoritativeRollSecret,
+});
+
+const characters = createCharactersModule({
+  pool,
+  runtime,
+  authorizeVersionUse: authoring.authorizeVersionUse,
+});
+
 const app = buildHttpApp({
   logger,
   pool,
@@ -57,6 +76,7 @@ const app = buildHttpApp({
 
 void app.register(buildIdentityRoutes());
 void app.register(buildSystemsRoutes({ authoring }));
+void app.register(buildCharactersRoutes({ characters }));
 void app.register(
   buildDevSignInRoutes({
     identity,

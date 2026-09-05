@@ -1,0 +1,885 @@
+import { randomUUID } from "node:crypto";
+
+import cookiePlugin from "@fastify/cookie";
+import Fastify from "fastify";
+import pino from "pino";
+import { afterAll, describe, expect, it } from "vitest";
+
+import { d20Package } from "../../systems/implementation/package/fixtures/index.js";
+import type {
+  CharacterCommandResult,
+  CharacterError,
+  CharacterExportV1,
+  CharacterMigrationPreview,
+  CharacterView,
+  Characters,
+} from "../../characters/index.js";
+import type { AuthContext, Identity } from "../../identity/index.js";
+import type { CharacterProjectionV1 } from "../../systems/runtime.js";
+import { buildAuthHook } from "./auth-hook.js";
+import { buildCharactersRoutes } from "./characters.js";
+
+const actorId = randomUUID();
+
+const fakeIdentity: Identity = {
+  completeSignIn: async () => {
+    throw new Error("not used");
+  },
+  resolveSession: async (): Promise<AuthContext> => ({
+    state: "authenticated",
+    actorId,
+    sessionId: randomUUID(),
+  }),
+  signOut: async () => ({ ok: true, value: undefined }),
+} as unknown as Identity;
+
+const cookie = { cookie: "session=t" };
+const mutationHeader = { "Idempotency-Key": "key-1" };
+
+const apps: ReturnType<typeof Fastify>[] = [];
+
+function makeProjection(versionId: string): CharacterProjectionV1 {
+  return {
+    projectionVersion: "1.0",
+    systemId: randomUUID(),
+    versionId,
+    packageChecksum: d20Package.integrity.checksum,
+    entityId: "character",
+    entityLabel: "Character",
+    sheets: [
+      {
+        id: "character_sheet",
+        label: "Character",
+        sections: [
+          {
+            id: "basics",
+            label: "Basics",
+            elements: [
+              { kind: "heading", id: "basics_heading", text: "Basics", level: 2 },
+              {
+                kind: "field",
+                id: "ancestry_element",
+                fieldId: "ancestry",
+                label: "Ancestry",
+                fieldKind: "singleChoice",
+                value: null,
+                editable: true,
+                constraints: {},
+                validations: [],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    derivedValues: {},
+    validations: [],
+  };
+}
+
+function characterView(overrides: Partial<CharacterView> = {}): CharacterView {
+  const characterId = randomUUID();
+  const systemVersionId = randomUUID();
+  return {
+    characterId,
+    ownerId: actorId,
+    name: "Aria",
+    systemVersionId,
+    entityDefinitionId: "character",
+    revision: 1,
+    lifecycle: "active",
+    archivedAt: null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    state: { schemaVersion: "1.0", values: { ability: 10 } },
+    derivedValues: { defense: 0 },
+    validations: [],
+    projection: makeProjection(systemVersionId),
+    reconciliation: {
+      characterId,
+      baseRevision: null,
+      revision: 1,
+      packageChecksum: d20Package.integrity.checksum,
+      projectionVersion: "1.0",
+      commandExecutionId: randomUUID(),
+      replayExpiresAt: "2026-09-06T00:00:00.000Z",
+      replayed: false,
+      changedDefinitionIds: [],
+      activityCursor: null,
+      cacheDisposition: "retain",
+    },
+    ...overrides,
+  };
+}
+
+function commandResult(): CharacterCommandResult {
+  return { character: characterView(), roll: null };
+}
+
+function characterExport(): CharacterExportV1 {
+  return {
+    schemaVersion: "1.0",
+    mediaType: "application/vnd.sweetroll.character+json;version=1",
+    characterId: randomUUID(),
+    name: "Aria",
+    entityDefinitionId: "character",
+    lifecycle: "active",
+    createdAt: "1970-01-01T00:00:00.000Z",
+    updatedAt: "1970-01-01T00:00:00.000Z",
+    systemVersionId: randomUUID(),
+    packageChecksum: d20Package.integrity.checksum,
+    revision: 1,
+    state: { schemaVersion: "1.0", values: { ability: 10 } },
+    migrationLineage: [],
+  };
+}
+
+function migrationPreview(): CharacterMigrationPreview {
+  const targetVersionId = randomUUID();
+  return {
+    previewId: randomUUID(),
+    characterId: randomUUID(),
+    sourceRevision: 1,
+    sourceVersionId: randomUUID(),
+    targetVersionId,
+    candidateState: { schemaVersion: "1.0", values: {} },
+    candidateProjection: makeProjection(targetVersionId),
+    warnings: [],
+    expiresAt: "2026-09-06T00:00:00.000Z",
+  };
+}
+
+function makeCharacters(overrides: Partial<Characters> = {}): Characters {
+  const base: Characters = {
+    create: async () => ({ ok: true, value: characterView() }),
+    list: async () => ({ ok: true, value: { characters: [], nextCursor: null } }),
+    open: async () => ({ ok: true, value: characterView() }),
+    apply: async () => ({ ok: true, value: commandResult() }),
+    manage: async () => ({ ok: true, value: commandResult() }),
+    listActivity: async () => ({ ok: true, value: { events: [], nextCursor: null } }),
+    exportCharacter: async () => ({ ok: true, value: characterExport() }),
+    previewMigration: async () => ({ ok: true, value: migrationPreview() }),
+    commitMigration: async () => ({ ok: true, value: commandResult() }),
+    rollbackMigration: async () => ({ ok: true, value: commandResult() }),
+  };
+  return { ...base, ...overrides };
+}
+
+async function build(characters: Characters, anonymous = false): Promise<ReturnType<typeof Fastify>> {
+  const app = Fastify({ genReqId: () => randomUUID(), loggerInstance: pino({ enabled: false }) });
+  await app.register(cookiePlugin);
+  await app.register(
+    buildAuthHook({
+      identity: anonymous
+        ? ({ ...fakeIdentity, resolveSession: async () => ({ state: "anonymous" }) } as unknown as Identity)
+        : fakeIdentity,
+      cookieName: "session",
+      secure: true,
+      maxAgeSeconds: 3600,
+    }),
+  );
+  await app.register(buildCharactersRoutes({ characters }));
+  await app.ready();
+  apps.push(app);
+  return app;
+}
+
+const eTag = `"1-${d20Package.integrity.checksum}-1.0"`;
+
+describe("character HTTP routes", () => {
+  afterAll(async () => {
+    for (const app of apps) await app.close();
+  });
+
+  it("rejects unauthenticated requests with 401 on every route", async () => {
+    const app = await build(makeCharacters(), true);
+    const routes: Array<{ method: "get" | "post" | "patch"; url: string; payload?: unknown }> = [
+      { method: "post", url: "/characters", payload: { systemVersionId: randomUUID(), entityDefinitionId: "character", name: "Aria" } },
+      { method: "get", url: "/characters" },
+      { method: "get", url: `/characters/${randomUUID()}` },
+      { method: "post", url: `/characters/${randomUUID()}/fields/ability/set`, payload: { value: 12, expectedRevision: 1 } },
+      { method: "post", url: `/characters/${randomUUID()}/resources/health/bump`, payload: { direction: "up", expectedRevision: 1 } },
+      { method: "post", url: `/characters/${randomUUID()}/actions/check`, payload: { inputs: {}, expectedRevision: 1 } },
+      { method: "patch", url: `/characters/${randomUUID()}`, payload: { command: "archive", expectedRevision: 1 } },
+      { method: "post", url: `/characters/${randomUUID()}/ownership-transfer`, payload: { toUserId: randomUUID(), expectedRevision: 1 } },
+      { method: "get", url: `/characters/${randomUUID()}/activity` },
+      { method: "post", url: `/characters/${randomUUID()}/exports` },
+      { method: "post", url: `/characters/${randomUUID()}/migration-previews`, payload: { targetVersionId: randomUUID() } },
+      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/commit`, payload: { expectedRevision: 1 } },
+      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/rollback`, payload: {} },
+    ];
+
+    for (const route of routes) {
+      const response = await app.inject({
+        method: route.method,
+        url: route.url,
+        headers: { ...cookie, ...mutationHeader },
+        ...(route.payload === undefined ? {} : { payload: route.payload }),
+      });
+      expect(response.statusCode, `${route.method} ${route.url}`).toBe(401);
+      expect((response.json() as { error: { code: string } }).error.code).toBe("unauthorized");
+      expect(response.headers["x-request-id"]).toBeDefined();
+    }
+  });
+
+  it("maps POST /characters to create and requires Idempotency-Key", async () => {
+    let received: unknown;
+    const app = await build(
+      makeCharacters({
+        create: async (_ctx, input) => {
+          received = input;
+          return { ok: true, value: characterView() };
+        },
+      }),
+    );
+    const systemVersionId = randomUUID();
+    const response = await app.inject({
+      method: "POST",
+      url: "/characters",
+      headers: { ...cookie, ...mutationHeader },
+      payload: {
+        systemVersionId,
+        entityDefinitionId: "character",
+        name: "Aria",
+        initialValues: { ability: 12 },
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual({ character: expect.any(Object), requestId: expect.any(String) });
+    expect(response.json().character.reconciliation).toMatchObject({
+      revision: 1,
+      projectionVersion: "1.0",
+      replayed: false,
+      cacheDisposition: "retain",
+    });
+    expect(received).toEqual({
+      systemVersionId,
+      entityDefinitionId: "character",
+      name: "Aria",
+      initialValues: { ability: 12 },
+      idempotencyKey: "key-1",
+    });
+
+    const missing = await app.inject({
+      method: "POST",
+      url: "/characters",
+      headers: cookie,
+      payload: { systemVersionId, entityDefinitionId: "character", name: "Aria" },
+    });
+    expect(missing.statusCode).toBe(400);
+    expect(missing.json().error.code).toBe("bad_request");
+  });
+
+  it("maps GET /characters to list and validates limit", async () => {
+    let received: unknown;
+    const app = await build(
+      makeCharacters({
+        list: async (_ctx, input) => {
+          received = input;
+          return { ok: true, value: { characters: [], nextCursor: null } };
+        },
+      }),
+    );
+    const ok = await app.inject({ method: "GET", url: "/characters?limit=5&cursor=abc", headers: cookie });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.headers["cache-control"]).toBe("private");
+    expect(ok.json()).toEqual({ characters: [], nextCursor: null, requestId: expect.any(String) });
+    expect(received).toEqual({ limit: 5, cursor: "abc" });
+
+    const bad = await app.inject({ method: "GET", url: "/characters?limit=999", headers: cookie });
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json().error.code).toBe("bad_request");
+  });
+
+  it("maps GET /characters/:characterId to open and emits private cache headers", async () => {
+    let received: string | undefined;
+    const app = await build(
+      makeCharacters({
+        open: async (_ctx, characterId) => {
+          received = characterId;
+          return { ok: true, value: characterView() };
+        },
+      }),
+    );
+    const id = randomUUID();
+    const response = await app.inject({ method: "GET", url: `/characters/${id}`, headers: cookie });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("private");
+    expect(response.headers["etag"]).toBe(eTag);
+    expect(response.headers["x-resource-revision"]).toBe("1");
+    expect(response.json().character.reconciliation).toMatchObject({
+      revision: 1,
+      projectionVersion: "1.0",
+      activityCursor: null,
+      cacheDisposition: "retain",
+    });
+    expect(response.json().requestId).toBeTypeOf("string");
+    expect(received).toBe(id);
+  });
+
+  it("maps field set to apply with direct setField input", async () => {
+    let received: unknown;
+    const app = await build(
+      makeCharacters({
+        apply: async (_ctx, input) => {
+          received = input;
+          return { ok: true, value: commandResult() };
+        },
+      }),
+    );
+    const id = randomUUID();
+    const response = await app.inject({
+      method: "POST",
+      url: `/characters/${id}/fields/ability/set`,
+      headers: { ...cookie, ...mutationHeader },
+      payload: { value: 14, expectedRevision: 2 },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ result: { character: expect.any(Object), roll: null }, requestId: expect.any(String) });
+    expect(received).toEqual({
+      kind: "setField",
+      characterId: id,
+      fieldId: "ability",
+      value: 14,
+      expectedRevision: 2,
+      idempotencyKey: "key-1",
+    });
+  });
+
+  it("maps resource bump to apply with direct bumpResource input", async () => {
+    let received: unknown;
+    const app = await build(
+      makeCharacters({
+        apply: async (_ctx, input) => {
+          received = input;
+          return { ok: true, value: commandResult() };
+        },
+      }),
+    );
+    const id = randomUUID();
+    const response = await app.inject({
+      method: "POST",
+      url: `/characters/${id}/resources/health/bump`,
+      headers: { ...cookie, ...mutationHeader },
+      payload: { direction: "down", expectedRevision: 3 },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(received).toEqual({
+      kind: "bumpResource",
+      characterId: id,
+      resourceId: "health",
+      direction: "down",
+      expectedRevision: 3,
+      idempotencyKey: "key-1",
+    });
+  });
+
+  it("maps action execution to apply and defaults inputs", async () => {
+    let received: unknown;
+    const app = await build(
+      makeCharacters({
+        apply: async (_ctx, input) => {
+          received = input;
+          return { ok: true, value: commandResult() };
+        },
+      }),
+    );
+    const id = randomUUID();
+    const response = await app.inject({
+      method: "POST",
+      url: `/characters/${id}/actions/check`,
+      headers: { ...cookie, ...mutationHeader },
+      payload: { expectedRevision: 1 },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(received).toEqual({
+      kind: "executeAction",
+      characterId: id,
+      actionId: "check",
+      inputs: {},
+      expectedRevision: 1,
+      idempotencyKey: "key-1",
+    });
+  });
+
+  it("maps PATCH /characters/:characterId to manage for rename/archive/recover", async () => {
+    const seen: unknown[] = [];
+    const app = await build(
+      makeCharacters({
+        manage: async (_ctx, input) => {
+          seen.push(input);
+          return { ok: true, value: commandResult() };
+        },
+      }),
+    );
+    const id = randomUUID();
+    const rename = await app.inject({
+      method: "PATCH",
+      url: `/characters/${id}`,
+      headers: { ...cookie, ...mutationHeader },
+      payload: { command: "rename", name: "Renamed", expectedRevision: 1 },
+    });
+    expect(rename.statusCode).toBe(200);
+    expect(rename.json()).toEqual({ result: { character: expect.any(Object), roll: null }, requestId: expect.any(String) });
+
+    const archive = await app.inject({
+      method: "PATCH",
+      url: `/characters/${id}`,
+      headers: { ...cookie, ...mutationHeader },
+      payload: { command: "archive", expectedRevision: 1 },
+    });
+    expect(archive.statusCode).toBe(200);
+
+    const recover = await app.inject({
+      method: "PATCH",
+      url: `/characters/${id}`,
+      headers: { ...cookie, ...mutationHeader },
+      payload: { command: "recover", expectedRevision: 1 },
+    });
+    expect(recover.statusCode).toBe(200);
+
+    expect(seen).toEqual([
+      { kind: "rename", characterId: id, name: "Renamed", expectedRevision: 1, idempotencyKey: "key-1" },
+      { kind: "archive", characterId: id, expectedRevision: 1, idempotencyKey: "key-1" },
+      { kind: "recover", characterId: id, expectedRevision: 1, idempotencyKey: "key-1" },
+    ]);
+
+    const bad = await app.inject({
+      method: "PATCH",
+      url: `/characters/${id}`,
+      headers: { ...cookie, ...mutationHeader },
+      payload: { command: "wat", expectedRevision: 1 },
+    });
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json().error.code).toBe("bad_request");
+  });
+
+  it("maps ownership transfer to manage with direct transferOwnership input", async () => {
+    let received: unknown;
+    const app = await build(
+      makeCharacters({
+        manage: async (_ctx, input) => {
+          received = input;
+          return { ok: true, value: commandResult() };
+        },
+      }),
+    );
+    const id = randomUUID();
+    const toUserId = randomUUID();
+    const response = await app.inject({
+      method: "POST",
+      url: `/characters/${id}/ownership-transfer`,
+      headers: { ...cookie, ...mutationHeader },
+      payload: { toUserId, expectedRevision: 1 },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(received).toEqual({
+      kind: "transferOwnership",
+      characterId: id,
+      toUserId,
+      expectedRevision: 1,
+      idempotencyKey: "key-1",
+    });
+  });
+
+  it("maps activity listing with limit/cursor and emits private cache", async () => {
+    let received: unknown;
+    const app = await build(
+      makeCharacters({
+        listActivity: async (_ctx, input) => {
+          received = input;
+          return {
+            ok: true,
+            value: {
+              events: [
+                {
+                  id: randomUUID(),
+                  characterRevision: 1,
+                  kind: "character_field_set",
+                  payload: { fieldId: "ability", changedDefinitionIds: ["ability"] },
+                  rollId: null,
+                  requestId: randomUUID(),
+                  occurredAt: new Date(0),
+                },
+              ],
+              nextCursor: null,
+            },
+          };
+        },
+      }),
+    );
+    const id = randomUUID();
+    const response = await app.inject({ method: "GET", url: `/characters/${id}/activity?limit=3`, headers: cookie });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("private");
+    expect(response.json().events).toHaveLength(1);
+    expect(response.json().events[0]).toMatchObject({
+      kind: "character_field_set",
+      payload: { fieldId: "ability" },
+      occurredAt: "1970-01-01T00:00:00.000Z",
+    });
+    expect(received).toEqual({ characterId: id, limit: 3, cursor: null });
+  });
+
+  it("maps exports to exportCharacter with vendor media type and cache headers", async () => {
+    let received: unknown;
+    const app = await build(
+      makeCharacters({
+        exportCharacter: async (_ctx, input) => {
+          received = input;
+          return { ok: true, value: characterExport() };
+        },
+      }),
+    );
+    const id = randomUUID();
+    const response = await app.inject({ method: "POST", url: `/characters/${id}/exports`, headers: cookie });
+    expect(response.statusCode).toBe(200);
+    expect(received).toEqual({ characterId: id });
+    expect(response.headers["content-type"]).toContain("application/vnd.sweetroll.character+json;version=1");
+    expect(response.headers["cache-control"]).toBe("private");
+    expect(response.headers["etag"]).toBe(eTag);
+    expect(response.headers["x-resource-revision"]).toBe("1");
+    const body = response.json() as CharacterExportV1;
+    expect(body.mediaType).toBe("application/vnd.sweetroll.character+json;version=1");
+    expect(body.characterId).toBeTypeOf("string");
+    expect(body.migrationLineage).toEqual([]);
+  });
+
+  it("maps migration preview to previewMigration returning 201", async () => {
+    let received: unknown;
+    const app = await build(
+      makeCharacters({
+        previewMigration: async (_ctx, input) => {
+          received = input;
+          return { ok: true, value: migrationPreview() };
+        },
+      }),
+    );
+    const id = randomUUID();
+    const targetVersionId = randomUUID();
+    const response = await app.inject({
+      method: "POST",
+      url: `/characters/${id}/migration-previews`,
+      headers: cookie,
+      payload: { targetVersionId, mappings: { ability: "strength" }, defaults: { ancestry: "human" } },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json().preview).toMatchObject({ sourceRevision: 1, warnings: [] });
+    expect(response.json().preview.candidateProjection).toMatchObject({ entityLabel: "Character" });
+    expect(response.json().requestId).toBeTypeOf("string");
+    expect(received).toEqual({
+      characterId: id,
+      targetVersionId,
+      mappings: { ability: "strength" },
+      defaults: { ancestry: "human" },
+    });
+  });
+
+  it("maps migration commit to commitMigration", async () => {
+    let received: unknown;
+    const app = await build(
+      makeCharacters({
+        commitMigration: async (_ctx, input) => {
+          received = input;
+          return { ok: true, value: commandResult() };
+        },
+      }),
+    );
+    const id = randomUUID();
+    const previewId = randomUUID();
+    const response = await app.inject({
+      method: "POST",
+      url: `/characters/${id}/migrations/${previewId}/commit`,
+      headers: { ...cookie, ...mutationHeader },
+      payload: { expectedRevision: 4 },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(received).toEqual({
+      characterId: id,
+      previewId,
+      expectedRevision: 4,
+      idempotencyKey: "key-1",
+    });
+  });
+
+  it("maps migration rollback to rollbackMigration", async () => {
+    let received: unknown;
+    const app = await build(
+      makeCharacters({
+        rollbackMigration: async (_ctx, input) => {
+          received = input;
+          return { ok: true, value: commandResult() };
+        },
+      }),
+    );
+    const id = randomUUID();
+    const migrationId = randomUUID();
+    const response = await app.inject({
+      method: "POST",
+      url: `/characters/${id}/migrations/${migrationId}/rollback`,
+      headers: { ...cookie, ...mutationHeader },
+      payload: {},
+    });
+    expect(response.statusCode).toBe(200);
+    expect(received).toEqual({ characterId: id, migrationId, idempotencyKey: "key-1" });
+  });
+
+  it("rejects malformed payloads with 400", async () => {
+    const app = await build(makeCharacters());
+    const noName = await app.inject({
+      method: "POST",
+      url: "/characters",
+      headers: { ...cookie, ...mutationHeader },
+      payload: { systemVersionId: randomUUID(), entityDefinitionId: "character" },
+    });
+    expect(noName.statusCode).toBe(400);
+    expect(noName.json().error.code).toBe("bad_request");
+
+    const badDirection = await app.inject({
+      method: "POST",
+      url: `/characters/${randomUUID()}/resources/health/bump`,
+      headers: { ...cookie, ...mutationHeader },
+      payload: { direction: "sideways", expectedRevision: 1 },
+    });
+    expect(badDirection.statusCode).toBe(400);
+
+    const badRevision = await app.inject({
+      method: "POST",
+      url: `/characters/${randomUUID()}/migrations/${randomUUID()}/commit`,
+      headers: { ...cookie, ...mutationHeader },
+      payload: { expectedRevision: "abc" },
+    });
+    expect(badRevision.statusCode).toBe(400);
+  });
+
+  it("maps inaccessible characters to 404 with purge reconciliation on every route", async () => {
+    const notFound = async (): Promise<{ ok: false; error: CharacterError }> => ({
+      ok: false,
+      error: { code: "not_found", message: "The requested character does not exist." },
+    });
+    const app = await build(
+      makeCharacters({
+        create: notFound,
+        list: notFound,
+        open: notFound,
+        apply: notFound,
+        manage: notFound,
+        listActivity: notFound,
+        exportCharacter: notFound,
+        previewMigration: notFound,
+        commitMigration: notFound,
+        rollbackMigration: notFound,
+      }),
+    );
+    const routes: Array<{ method: "get" | "post" | "patch"; url: string; payload?: unknown }> = [
+      { method: "post", url: "/characters", payload: { systemVersionId: randomUUID(), entityDefinitionId: "character", name: "Aria" } },
+      { method: "get", url: "/characters" },
+      { method: "get", url: `/characters/${randomUUID()}` },
+      { method: "post", url: `/characters/${randomUUID()}/fields/ability/set`, payload: { value: 12, expectedRevision: 1 } },
+      { method: "post", url: `/characters/${randomUUID()}/resources/health/bump`, payload: { direction: "up", expectedRevision: 1 } },
+      { method: "post", url: `/characters/${randomUUID()}/actions/check`, payload: { inputs: {}, expectedRevision: 1 } },
+      { method: "patch", url: `/characters/${randomUUID()}`, payload: { command: "archive", expectedRevision: 1 } },
+      { method: "post", url: `/characters/${randomUUID()}/ownership-transfer`, payload: { toUserId: randomUUID(), expectedRevision: 1 } },
+      { method: "get", url: `/characters/${randomUUID()}/activity` },
+      { method: "post", url: `/characters/${randomUUID()}/exports` },
+      { method: "post", url: `/characters/${randomUUID()}/migration-previews`, payload: { targetVersionId: randomUUID() } },
+      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/commit`, payload: { expectedRevision: 1 } },
+      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/rollback`, payload: {} },
+    ];
+
+    for (const route of routes) {
+      const response = await app.inject({
+        method: route.method,
+        url: route.url,
+        headers: { ...cookie, ...mutationHeader },
+        ...(route.payload === undefined ? {} : { payload: route.payload }),
+      });
+      expect(response.statusCode, `${route.method} ${route.url}`).toBe(404);
+      const body = response.json() as { error: CharacterError; requestId: string };
+      expect(body.error.code).toBe("not_found");
+      expect(body.error.cacheDisposition).toBe("purge");
+      expect(body.error).not.toHaveProperty("characterId");
+      expect(body.requestId).toBeTypeOf("string");
+    }
+  });
+
+  it("returns 409 with the reconciliation payload for conflicts", async () => {
+    const conflict: CharacterError = {
+      code: "conflict",
+      message: "The character has a newer revision.",
+      latestRevision: 7,
+      changedDefinitionIds: ["ability"],
+      activityCursor: "dG9rZW4",
+      cacheDisposition: "replace",
+    };
+    const app = await build(
+      makeCharacters({
+        create: async () => ({ ok: false, error: { code: "idempotency_mismatch", message: "This idempotency key was already used with different input." } }),
+        apply: async () => ({ ok: false, error: conflict }),
+        manage: async () => ({ ok: false, error: conflict }),
+        commitMigration: async () => ({ ok: false, error: conflict }),
+        rollbackMigration: async () => ({ ok: false, error: conflict }),
+      }),
+    );
+    const headers = { ...cookie, ...mutationHeader };
+    const conflictUrl = `/characters/${randomUUID()}/fields/ability/set`;
+
+    const set = await app.inject({ method: "POST", url: conflictUrl, headers, payload: { value: 1, expectedRevision: 1 } });
+    expect(set.statusCode).toBe(409);
+    expect(set.json().error).toMatchObject({
+      code: "conflict",
+      latestRevision: 7,
+      changedDefinitionIds: ["ability"],
+      activityCursor: "dG9rZW4",
+      cacheDisposition: "replace",
+    });
+
+    const mismatch = await app.inject({
+      method: "POST",
+      url: "/characters",
+      headers,
+      payload: { systemVersionId: randomUUID(), entityDefinitionId: "character", name: "Aria" },
+    });
+    expect(mismatch.statusCode).toBe(409);
+    expect(mismatch.json().error.code).toBe("idempotency_mismatch");
+
+    const transfer = await app.inject({
+      method: "POST",
+      url: `/characters/${randomUUID()}/ownership-transfer`,
+      headers,
+      payload: { toUserId: randomUUID(), expectedRevision: 1 },
+    });
+    expect(transfer.statusCode).toBe(409);
+
+    const commit = await app.inject({
+      method: "POST",
+      url: `/characters/${randomUUID()}/migrations/${randomUUID()}/commit`,
+      headers,
+      payload: { expectedRevision: 1 },
+    });
+    expect(commit.statusCode).toBe(409);
+    expect(commit.json().error.cacheDisposition).toBe("replace");
+
+    const rollback = await app.inject({
+      method: "POST",
+      url: `/characters/${randomUUID()}/migrations/${randomUUID()}/rollback`,
+      headers,
+      payload: {},
+    });
+    expect(rollback.statusCode).toBe(409);
+  });
+
+  it("maps command_in_progress to 409", async () => {
+    const app = await build(
+      makeCharacters({
+        apply: async () => ({
+          ok: false,
+          error: { code: "command_in_progress", message: "Another request is already processing this idempotency key." },
+        }),
+      }),
+    );
+    const response = await app.inject({
+      method: "POST",
+      url: `/characters/${randomUUID()}/resources/health/bump`,
+      headers: { ...cookie, ...mutationHeader },
+      payload: { direction: "up", expectedRevision: 1 },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe("command_in_progress");
+  });
+
+  it("maps runtime-invalid module errors to 422 with diagnostics", async () => {
+    const app = await build(
+      makeCharacters({
+        apply: async () => ({
+          ok: false,
+          error: {
+            code: "invalid_value",
+            message: "Field value is invalid.",
+            diagnostics: [
+              {
+                validationId: "ability_valid_expr",
+                severity: "error",
+                message: "Ability score must be between 3 and 18",
+                targetDefinitionId: "ability",
+              },
+            ],
+          },
+        }),
+        previewMigration: async () => ({ ok: false, error: { code: "invalid_value", message: "Mappings conflict." } }),
+      }),
+    );
+    const id = randomUUID();
+    const set = await app.inject({
+      method: "POST",
+      url: `/characters/${id}/fields/ability/set`,
+      headers: { ...cookie, ...mutationHeader },
+      payload: { value: 99, expectedRevision: 1 },
+    });
+    expect(set.statusCode).toBe(422);
+    expect(set.json().error.code).toBe("invalid_value");
+    expect(set.json().error.diagnostics).toHaveLength(1);
+
+    const preview = await app.inject({
+      method: "POST",
+      url: `/characters/${id}/migration-previews`,
+      headers: cookie,
+      payload: { targetVersionId: randomUUID() },
+    });
+    expect(preview.statusCode).toBe(422);
+    expect(preview.json().error.code).toBe("invalid_value");
+    expect(preview.json().error).not.toHaveProperty("diagnostics");
+  });
+
+  it("maps internal module errors to temporary 503", async () => {
+    const app = await build(
+      makeCharacters({
+        open: async () => ({ ok: false, error: { code: "internal", message: "An internal error occurred." } }),
+      }),
+    );
+    const response = await app.inject({ method: "GET", url: `/characters/${randomUUID()}`, headers: cookie });
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error.code).toBe("internal");
+    expect(response.json().requestId).toBeTypeOf("string");
+  });
+
+  it("feeds conflict activityCursor back into listActivity cursor", async () => {
+    const cursor = "eyJjIjo0Mn0";
+    let captured: string | null | undefined;
+    const id = randomUUID();
+    const app = await build(
+      makeCharacters({
+        apply: async () => ({
+          ok: false,
+          error: {
+            code: "conflict",
+            message: "stale",
+            latestRevision: 3,
+            changedDefinitionIds: ["ability"],
+            activityCursor: cursor,
+            cacheDisposition: "replace",
+          },
+        }),
+        listActivity: async (_ctx, input) => {
+          captured = input.cursor;
+          return { ok: true, value: { events: [], nextCursor: null } };
+        },
+      }),
+    );
+    const conflict = await app.inject({
+      method: "POST",
+      url: `/characters/${id}/fields/ability/set`,
+      headers: { ...cookie, ...mutationHeader },
+      payload: { value: 1, expectedRevision: 1 },
+    });
+    expect(conflict.statusCode).toBe(409);
+    expect(conflict.json().error.activityCursor).toBe(cursor);
+
+    await app.inject({
+      method: "GET",
+      url: `/characters/${id}/activity?cursor=${encodeURIComponent(cursor)}`,
+      headers: cookie,
+    });
+    expect(captured).toBe(cursor);
+  });
+});

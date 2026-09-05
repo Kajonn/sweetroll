@@ -1,9 +1,10 @@
 import type { FastifyInstance } from "fastify";
 
+import { charactersRouteDefinitions, type CharactersRouteDefinition } from "./characters.js";
 import { identityRouteDefinitions, type IdentityRouteDefinition } from "./identity.js";
 import { systemsRouteDefinitions, type SystemsRouteDefinition } from "./systems.js";
 
-type RouteDefinition = SystemsRouteDefinition | IdentityRouteDefinition;
+type RouteDefinition = SystemsRouteDefinition | IdentityRouteDefinition | CharactersRouteDefinition;
 
 export type OpenApiDocument = {
   openapi: "3.1.0";
@@ -16,7 +17,7 @@ export type OpenApiOperation = {
   operationId: string;
   requestBody?: { content: { "application/json": { schema: unknown } } };
   parameters: OpenApiParameter[];
-  responses: Record<string, { description?: string; content?: { "application/json": { schema: unknown } } }>;
+  responses: Record<string, { description?: string; content?: Record<string, { schema: unknown }> }>;
 };
 
 export type OpenApiParameter = {
@@ -54,13 +55,22 @@ function pathParametersFromSchema(schema: Record<string, unknown> | undefined): 
 
 function responseMapFromSchema(
   schema: Record<string, unknown> | undefined,
-): Record<string, { description?: string; content?: { "application/json": { schema: unknown } } }> {
+): Record<string, { description?: string; content?: Record<string, { schema: unknown }> }> {
   if (schema === undefined) return {};
-  const out: Record<string, { description?: string; content?: { "application/json": { schema: unknown } } }> = {};
+  const out: Record<string, { description?: string; content?: Record<string, { schema: unknown }> }> = {};
   for (const [status, value] of Object.entries(schema)) {
-    out[status] = {
-      content: { "application/json": { schema: value as unknown } },
-    };
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value) &&
+      "schema" in value &&
+      (value as { schema?: unknown }).schema !== undefined
+    ) {
+      const spec = value as { schema: unknown; mediaType?: string };
+      out[status] = { content: { [spec.mediaType ?? "application/json"]: { schema: spec.schema } } };
+    } else {
+      out[status] = { content: { "application/json": { schema: value } } };
+    }
   }
   return out;
 }
@@ -87,7 +97,11 @@ function definitionToOperation(definition: RouteDefinition): OpenApiOperation {
 
 export function buildOpenApiDocument(_app: FastifyInstance): OpenApiDocument {
   const paths: Record<string, Record<string, OpenApiOperation>> = {};
-  const routeDefinitions: readonly RouteDefinition[] = [...systemsRouteDefinitions, ...identityRouteDefinitions];
+  const routeDefinitions: readonly RouteDefinition[] = [
+    ...systemsRouteDefinitions,
+    ...identityRouteDefinitions,
+    ...charactersRouteDefinitions,
+  ];
   for (const definition of routeDefinitions) {
     const path = toOpenApiPath(definition.path);
     paths[path] ??= {};

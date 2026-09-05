@@ -164,6 +164,182 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/characters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_characters"];
+        put?: never;
+        post: operations["post_characters"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_characters_characterId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["patch_characters_characterId"];
+        trace?: never;
+    };
+    "/characters/{characterId}/fields/{fieldId}/set": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_characters_characterId_fields_fieldId_set"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/resources/{resourceId}/bump": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_characters_characterId_resources_resourceId_bump"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/actions/{actionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_characters_characterId_actions_actionId"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/ownership-transfer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_characters_characterId_ownership_transfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_characters_characterId_activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_characters_characterId_exports"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/migration-previews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_characters_characterId_migration_previews"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/migrations/{previewId}/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_characters_characterId_migrations_previewId_commit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/migrations/{migrationId}/rollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_characters_characterId_migrations_migrationId_rollback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1546,7 +1722,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
+                    "application/vnd.sweetroll.system+json;version=1": {
                         schemaVersion: string;
                         mediaType: string;
                         exportedAt: string;
@@ -1635,6 +1811,3550 @@ export interface operations {
                     } | {
                         /** @constant */
                         state: "anonymous";
+                    };
+                };
+            };
+        };
+    };
+    get_characters: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        characters: {
+                            /** Format: uuid */
+                            characterId: string;
+                            name: string;
+                            entityDefinitionId: string;
+                            /** Format: uuid */
+                            systemVersionId: string;
+                            revision: number;
+                            lifecycle: "active" | "archived";
+                            /** Format: date-time */
+                            updatedAt: string;
+                        }[];
+                        nextCursor: string | null;
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_characters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    systemVersionId: string;
+                    entityDefinitionId: string;
+                    name: string;
+                    initialValues?: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        character: {
+                            /** Format: uuid */
+                            characterId: string;
+                            /** Format: uuid */
+                            ownerId: string;
+                            name: string;
+                            /** Format: uuid */
+                            systemVersionId: string;
+                            entityDefinitionId: string;
+                            revision: number;
+                            lifecycle: "active" | "archived";
+                            archivedAt: string | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                            state: {
+                                /** @constant */
+                                schemaVersion: "1.0";
+                                values: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                            derivedValues: {
+                                [key: string]: string | number | boolean | null;
+                            };
+                            validations: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            projection: {
+                                /** @constant */
+                                projectionVersion: "1.0";
+                                /** Format: uuid */
+                                systemId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                                packageChecksum: string;
+                                entityId: string;
+                                entityLabel: string;
+                                sheets: {
+                                    id: string;
+                                    label: string;
+                                    sections: {
+                                        id: string;
+                                        label: string;
+                                        elements: ({
+                                            /** @constant */
+                                            kind: "heading";
+                                            id: string;
+                                            text: string;
+                                            level: 2 | 3;
+                                        } | {
+                                            /** @constant */
+                                            kind: "field";
+                                            id: string;
+                                            fieldId: string;
+                                            label: string;
+                                            fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                            value: string | number | boolean | null | string[];
+                                            editable: boolean;
+                                            constraints: {
+                                                required?: boolean;
+                                                min?: number;
+                                                max?: number;
+                                                step?: number;
+                                                minLength?: number;
+                                                maxLength?: number;
+                                                options?: {
+                                                    id: string;
+                                                    label: string;
+                                                }[];
+                                            };
+                                            validations: {
+                                                validationId: string;
+                                                severity: "error" | "warning";
+                                                message: string;
+                                                targetDefinitionId: string;
+                                            }[];
+                                        } | {
+                                            /** @constant */
+                                            kind: "resource";
+                                            id: string;
+                                            resourceId: string;
+                                            label: string;
+                                            value: {
+                                                current: number;
+                                                max: number;
+                                            };
+                                            min: number;
+                                            max: number;
+                                            step: number;
+                                            resetTo: "min" | "max";
+                                            validations: {
+                                                validationId: string;
+                                                severity: "error" | "warning";
+                                                message: string;
+                                                targetDefinitionId: string;
+                                            }[];
+                                        } | {
+                                            /** @constant */
+                                            kind: "action";
+                                            id: string;
+                                            actionId: string;
+                                            label: string;
+                                            actionKind: "roll" | "resourceBump";
+                                            inputs: {
+                                                id: string;
+                                                label: string;
+                                                valueType: "integer" | "decimal" | "boolean" | "text";
+                                                required: boolean;
+                                                default: string | number | boolean | null;
+                                            }[];
+                                            validations: {
+                                                validationId: string;
+                                                severity: "error" | "warning";
+                                                message: string;
+                                                targetDefinitionId: string;
+                                            }[];
+                                        })[];
+                                    }[];
+                                }[];
+                                derivedValues: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                            };
+                            reconciliation: {
+                                /** Format: uuid */
+                                characterId: string;
+                                baseRevision: number | null;
+                                revision: number;
+                                packageChecksum: string;
+                                /** @constant */
+                                projectionVersion: "1.0";
+                                commandExecutionId: string;
+                                /** Format: date-time */
+                                replayExpiresAt: string;
+                                replayed: boolean;
+                                changedDefinitionIds: string[];
+                                activityCursor: string | null;
+                                cacheDisposition: "retain" | "replace" | "purge";
+                            };
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_characters_characterId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        character: {
+                            /** Format: uuid */
+                            characterId: string;
+                            /** Format: uuid */
+                            ownerId: string;
+                            name: string;
+                            /** Format: uuid */
+                            systemVersionId: string;
+                            entityDefinitionId: string;
+                            revision: number;
+                            lifecycle: "active" | "archived";
+                            archivedAt: string | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                            state: {
+                                /** @constant */
+                                schemaVersion: "1.0";
+                                values: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                            derivedValues: {
+                                [key: string]: string | number | boolean | null;
+                            };
+                            validations: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            projection: {
+                                /** @constant */
+                                projectionVersion: "1.0";
+                                /** Format: uuid */
+                                systemId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                                packageChecksum: string;
+                                entityId: string;
+                                entityLabel: string;
+                                sheets: {
+                                    id: string;
+                                    label: string;
+                                    sections: {
+                                        id: string;
+                                        label: string;
+                                        elements: ({
+                                            /** @constant */
+                                            kind: "heading";
+                                            id: string;
+                                            text: string;
+                                            level: 2 | 3;
+                                        } | {
+                                            /** @constant */
+                                            kind: "field";
+                                            id: string;
+                                            fieldId: string;
+                                            label: string;
+                                            fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                            value: string | number | boolean | null | string[];
+                                            editable: boolean;
+                                            constraints: {
+                                                required?: boolean;
+                                                min?: number;
+                                                max?: number;
+                                                step?: number;
+                                                minLength?: number;
+                                                maxLength?: number;
+                                                options?: {
+                                                    id: string;
+                                                    label: string;
+                                                }[];
+                                            };
+                                            validations: {
+                                                validationId: string;
+                                                severity: "error" | "warning";
+                                                message: string;
+                                                targetDefinitionId: string;
+                                            }[];
+                                        } | {
+                                            /** @constant */
+                                            kind: "resource";
+                                            id: string;
+                                            resourceId: string;
+                                            label: string;
+                                            value: {
+                                                current: number;
+                                                max: number;
+                                            };
+                                            min: number;
+                                            max: number;
+                                            step: number;
+                                            resetTo: "min" | "max";
+                                            validations: {
+                                                validationId: string;
+                                                severity: "error" | "warning";
+                                                message: string;
+                                                targetDefinitionId: string;
+                                            }[];
+                                        } | {
+                                            /** @constant */
+                                            kind: "action";
+                                            id: string;
+                                            actionId: string;
+                                            label: string;
+                                            actionKind: "roll" | "resourceBump";
+                                            inputs: {
+                                                id: string;
+                                                label: string;
+                                                valueType: "integer" | "decimal" | "boolean" | "text";
+                                                required: boolean;
+                                                default: string | number | boolean | null;
+                                            }[];
+                                            validations: {
+                                                validationId: string;
+                                                severity: "error" | "warning";
+                                                message: string;
+                                                targetDefinitionId: string;
+                                            }[];
+                                        })[];
+                                    }[];
+                                }[];
+                                derivedValues: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                            };
+                            reconciliation: {
+                                /** Format: uuid */
+                                characterId: string;
+                                baseRevision: number | null;
+                                revision: number;
+                                packageChecksum: string;
+                                /** @constant */
+                                projectionVersion: "1.0";
+                                commandExecutionId: string;
+                                /** Format: date-time */
+                                replayExpiresAt: string;
+                                replayed: boolean;
+                                changedDefinitionIds: string[];
+                                activityCursor: string | null;
+                                cacheDisposition: "retain" | "replace" | "purge";
+                            };
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    patch_characters_characterId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @constant */
+                    command: "rename";
+                    name: string;
+                    expectedRevision: number;
+                } | {
+                    /** @constant */
+                    command: "archive";
+                    expectedRevision: number;
+                } | {
+                    /** @constant */
+                    command: "recover";
+                    expectedRevision: number;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        result: {
+                            character: {
+                                /** Format: uuid */
+                                characterId: string;
+                                /** Format: uuid */
+                                ownerId: string;
+                                name: string;
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                entityDefinitionId: string;
+                                revision: number;
+                                lifecycle: "active" | "archived";
+                                archivedAt: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                                state: {
+                                    /** @constant */
+                                    schemaVersion: "1.0";
+                                    values: {
+                                        [key: string]: unknown;
+                                    };
+                                };
+                                derivedValues: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                                projection: {
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    entityId: string;
+                                    entityLabel: string;
+                                    sheets: {
+                                        id: string;
+                                        label: string;
+                                        sections: {
+                                            id: string;
+                                            label: string;
+                                            elements: ({
+                                                /** @constant */
+                                                kind: "heading";
+                                                id: string;
+                                                text: string;
+                                                level: 2 | 3;
+                                            } | {
+                                                /** @constant */
+                                                kind: "field";
+                                                id: string;
+                                                fieldId: string;
+                                                label: string;
+                                                fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                                value: string | number | boolean | null | string[];
+                                                editable: boolean;
+                                                constraints: {
+                                                    required?: boolean;
+                                                    min?: number;
+                                                    max?: number;
+                                                    step?: number;
+                                                    minLength?: number;
+                                                    maxLength?: number;
+                                                    options?: {
+                                                        id: string;
+                                                        label: string;
+                                                    }[];
+                                                };
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "resource";
+                                                id: string;
+                                                resourceId: string;
+                                                label: string;
+                                                value: {
+                                                    current: number;
+                                                    max: number;
+                                                };
+                                                min: number;
+                                                max: number;
+                                                step: number;
+                                                resetTo: "min" | "max";
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "action";
+                                                id: string;
+                                                actionId: string;
+                                                label: string;
+                                                actionKind: "roll" | "resourceBump";
+                                                inputs: {
+                                                    id: string;
+                                                    label: string;
+                                                    valueType: "integer" | "decimal" | "boolean" | "text";
+                                                    required: boolean;
+                                                    default: string | number | boolean | null;
+                                                }[];
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            })[];
+                                        }[];
+                                    }[];
+                                    derivedValues: {
+                                        [key: string]: string | number | boolean | null;
+                                    };
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                };
+                                reconciliation: {
+                                    /** Format: uuid */
+                                    characterId: string;
+                                    baseRevision: number | null;
+                                    revision: number;
+                                    packageChecksum: string;
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    commandExecutionId: string;
+                                    /** Format: date-time */
+                                    replayExpiresAt: string;
+                                    replayed: boolean;
+                                    changedDefinitionIds: string[];
+                                    activityCursor: string | null;
+                                    cacheDisposition: "retain" | "replace" | "purge";
+                                };
+                            };
+                            roll: {
+                                actionId: string;
+                                expression: string;
+                                dice: {
+                                    sides: number;
+                                    value: number;
+                                    kept: boolean;
+                                }[];
+                                bindings: {
+                                    scope: "fields" | "inputs";
+                                    definitionId: string;
+                                    value: string | number | boolean | null;
+                                }[];
+                                total: number;
+                                output: string;
+                            } | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_characters_characterId_fields_fieldId_set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                fieldId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    value: unknown;
+                    expectedRevision: number;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        result: {
+                            character: {
+                                /** Format: uuid */
+                                characterId: string;
+                                /** Format: uuid */
+                                ownerId: string;
+                                name: string;
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                entityDefinitionId: string;
+                                revision: number;
+                                lifecycle: "active" | "archived";
+                                archivedAt: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                                state: {
+                                    /** @constant */
+                                    schemaVersion: "1.0";
+                                    values: {
+                                        [key: string]: unknown;
+                                    };
+                                };
+                                derivedValues: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                                projection: {
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    entityId: string;
+                                    entityLabel: string;
+                                    sheets: {
+                                        id: string;
+                                        label: string;
+                                        sections: {
+                                            id: string;
+                                            label: string;
+                                            elements: ({
+                                                /** @constant */
+                                                kind: "heading";
+                                                id: string;
+                                                text: string;
+                                                level: 2 | 3;
+                                            } | {
+                                                /** @constant */
+                                                kind: "field";
+                                                id: string;
+                                                fieldId: string;
+                                                label: string;
+                                                fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                                value: string | number | boolean | null | string[];
+                                                editable: boolean;
+                                                constraints: {
+                                                    required?: boolean;
+                                                    min?: number;
+                                                    max?: number;
+                                                    step?: number;
+                                                    minLength?: number;
+                                                    maxLength?: number;
+                                                    options?: {
+                                                        id: string;
+                                                        label: string;
+                                                    }[];
+                                                };
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "resource";
+                                                id: string;
+                                                resourceId: string;
+                                                label: string;
+                                                value: {
+                                                    current: number;
+                                                    max: number;
+                                                };
+                                                min: number;
+                                                max: number;
+                                                step: number;
+                                                resetTo: "min" | "max";
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "action";
+                                                id: string;
+                                                actionId: string;
+                                                label: string;
+                                                actionKind: "roll" | "resourceBump";
+                                                inputs: {
+                                                    id: string;
+                                                    label: string;
+                                                    valueType: "integer" | "decimal" | "boolean" | "text";
+                                                    required: boolean;
+                                                    default: string | number | boolean | null;
+                                                }[];
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            })[];
+                                        }[];
+                                    }[];
+                                    derivedValues: {
+                                        [key: string]: string | number | boolean | null;
+                                    };
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                };
+                                reconciliation: {
+                                    /** Format: uuid */
+                                    characterId: string;
+                                    baseRevision: number | null;
+                                    revision: number;
+                                    packageChecksum: string;
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    commandExecutionId: string;
+                                    /** Format: date-time */
+                                    replayExpiresAt: string;
+                                    replayed: boolean;
+                                    changedDefinitionIds: string[];
+                                    activityCursor: string | null;
+                                    cacheDisposition: "retain" | "replace" | "purge";
+                                };
+                            };
+                            roll: {
+                                actionId: string;
+                                expression: string;
+                                dice: {
+                                    sides: number;
+                                    value: number;
+                                    kept: boolean;
+                                }[];
+                                bindings: {
+                                    scope: "fields" | "inputs";
+                                    definitionId: string;
+                                    value: string | number | boolean | null;
+                                }[];
+                                total: number;
+                                output: string;
+                            } | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_characters_characterId_resources_resourceId_bump: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                resourceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    direction: "up" | "down";
+                    expectedRevision: number;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        result: {
+                            character: {
+                                /** Format: uuid */
+                                characterId: string;
+                                /** Format: uuid */
+                                ownerId: string;
+                                name: string;
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                entityDefinitionId: string;
+                                revision: number;
+                                lifecycle: "active" | "archived";
+                                archivedAt: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                                state: {
+                                    /** @constant */
+                                    schemaVersion: "1.0";
+                                    values: {
+                                        [key: string]: unknown;
+                                    };
+                                };
+                                derivedValues: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                                projection: {
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    entityId: string;
+                                    entityLabel: string;
+                                    sheets: {
+                                        id: string;
+                                        label: string;
+                                        sections: {
+                                            id: string;
+                                            label: string;
+                                            elements: ({
+                                                /** @constant */
+                                                kind: "heading";
+                                                id: string;
+                                                text: string;
+                                                level: 2 | 3;
+                                            } | {
+                                                /** @constant */
+                                                kind: "field";
+                                                id: string;
+                                                fieldId: string;
+                                                label: string;
+                                                fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                                value: string | number | boolean | null | string[];
+                                                editable: boolean;
+                                                constraints: {
+                                                    required?: boolean;
+                                                    min?: number;
+                                                    max?: number;
+                                                    step?: number;
+                                                    minLength?: number;
+                                                    maxLength?: number;
+                                                    options?: {
+                                                        id: string;
+                                                        label: string;
+                                                    }[];
+                                                };
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "resource";
+                                                id: string;
+                                                resourceId: string;
+                                                label: string;
+                                                value: {
+                                                    current: number;
+                                                    max: number;
+                                                };
+                                                min: number;
+                                                max: number;
+                                                step: number;
+                                                resetTo: "min" | "max";
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "action";
+                                                id: string;
+                                                actionId: string;
+                                                label: string;
+                                                actionKind: "roll" | "resourceBump";
+                                                inputs: {
+                                                    id: string;
+                                                    label: string;
+                                                    valueType: "integer" | "decimal" | "boolean" | "text";
+                                                    required: boolean;
+                                                    default: string | number | boolean | null;
+                                                }[];
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            })[];
+                                        }[];
+                                    }[];
+                                    derivedValues: {
+                                        [key: string]: string | number | boolean | null;
+                                    };
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                };
+                                reconciliation: {
+                                    /** Format: uuid */
+                                    characterId: string;
+                                    baseRevision: number | null;
+                                    revision: number;
+                                    packageChecksum: string;
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    commandExecutionId: string;
+                                    /** Format: date-time */
+                                    replayExpiresAt: string;
+                                    replayed: boolean;
+                                    changedDefinitionIds: string[];
+                                    activityCursor: string | null;
+                                    cacheDisposition: "retain" | "replace" | "purge";
+                                };
+                            };
+                            roll: {
+                                actionId: string;
+                                expression: string;
+                                dice: {
+                                    sides: number;
+                                    value: number;
+                                    kept: boolean;
+                                }[];
+                                bindings: {
+                                    scope: "fields" | "inputs";
+                                    definitionId: string;
+                                    value: string | number | boolean | null;
+                                }[];
+                                total: number;
+                                output: string;
+                            } | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_characters_characterId_actions_actionId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                actionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    inputs?: {
+                        [key: string]: unknown;
+                    };
+                    expectedRevision: number;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        result: {
+                            character: {
+                                /** Format: uuid */
+                                characterId: string;
+                                /** Format: uuid */
+                                ownerId: string;
+                                name: string;
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                entityDefinitionId: string;
+                                revision: number;
+                                lifecycle: "active" | "archived";
+                                archivedAt: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                                state: {
+                                    /** @constant */
+                                    schemaVersion: "1.0";
+                                    values: {
+                                        [key: string]: unknown;
+                                    };
+                                };
+                                derivedValues: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                                projection: {
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    entityId: string;
+                                    entityLabel: string;
+                                    sheets: {
+                                        id: string;
+                                        label: string;
+                                        sections: {
+                                            id: string;
+                                            label: string;
+                                            elements: ({
+                                                /** @constant */
+                                                kind: "heading";
+                                                id: string;
+                                                text: string;
+                                                level: 2 | 3;
+                                            } | {
+                                                /** @constant */
+                                                kind: "field";
+                                                id: string;
+                                                fieldId: string;
+                                                label: string;
+                                                fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                                value: string | number | boolean | null | string[];
+                                                editable: boolean;
+                                                constraints: {
+                                                    required?: boolean;
+                                                    min?: number;
+                                                    max?: number;
+                                                    step?: number;
+                                                    minLength?: number;
+                                                    maxLength?: number;
+                                                    options?: {
+                                                        id: string;
+                                                        label: string;
+                                                    }[];
+                                                };
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "resource";
+                                                id: string;
+                                                resourceId: string;
+                                                label: string;
+                                                value: {
+                                                    current: number;
+                                                    max: number;
+                                                };
+                                                min: number;
+                                                max: number;
+                                                step: number;
+                                                resetTo: "min" | "max";
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "action";
+                                                id: string;
+                                                actionId: string;
+                                                label: string;
+                                                actionKind: "roll" | "resourceBump";
+                                                inputs: {
+                                                    id: string;
+                                                    label: string;
+                                                    valueType: "integer" | "decimal" | "boolean" | "text";
+                                                    required: boolean;
+                                                    default: string | number | boolean | null;
+                                                }[];
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            })[];
+                                        }[];
+                                    }[];
+                                    derivedValues: {
+                                        [key: string]: string | number | boolean | null;
+                                    };
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                };
+                                reconciliation: {
+                                    /** Format: uuid */
+                                    characterId: string;
+                                    baseRevision: number | null;
+                                    revision: number;
+                                    packageChecksum: string;
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    commandExecutionId: string;
+                                    /** Format: date-time */
+                                    replayExpiresAt: string;
+                                    replayed: boolean;
+                                    changedDefinitionIds: string[];
+                                    activityCursor: string | null;
+                                    cacheDisposition: "retain" | "replace" | "purge";
+                                };
+                            };
+                            roll: {
+                                actionId: string;
+                                expression: string;
+                                dice: {
+                                    sides: number;
+                                    value: number;
+                                    kept: boolean;
+                                }[];
+                                bindings: {
+                                    scope: "fields" | "inputs";
+                                    definitionId: string;
+                                    value: string | number | boolean | null;
+                                }[];
+                                total: number;
+                                output: string;
+                            } | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_characters_characterId_ownership_transfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    toUserId: string;
+                    expectedRevision: number;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        result: {
+                            character: {
+                                /** Format: uuid */
+                                characterId: string;
+                                /** Format: uuid */
+                                ownerId: string;
+                                name: string;
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                entityDefinitionId: string;
+                                revision: number;
+                                lifecycle: "active" | "archived";
+                                archivedAt: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                                state: {
+                                    /** @constant */
+                                    schemaVersion: "1.0";
+                                    values: {
+                                        [key: string]: unknown;
+                                    };
+                                };
+                                derivedValues: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                                projection: {
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    entityId: string;
+                                    entityLabel: string;
+                                    sheets: {
+                                        id: string;
+                                        label: string;
+                                        sections: {
+                                            id: string;
+                                            label: string;
+                                            elements: ({
+                                                /** @constant */
+                                                kind: "heading";
+                                                id: string;
+                                                text: string;
+                                                level: 2 | 3;
+                                            } | {
+                                                /** @constant */
+                                                kind: "field";
+                                                id: string;
+                                                fieldId: string;
+                                                label: string;
+                                                fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                                value: string | number | boolean | null | string[];
+                                                editable: boolean;
+                                                constraints: {
+                                                    required?: boolean;
+                                                    min?: number;
+                                                    max?: number;
+                                                    step?: number;
+                                                    minLength?: number;
+                                                    maxLength?: number;
+                                                    options?: {
+                                                        id: string;
+                                                        label: string;
+                                                    }[];
+                                                };
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "resource";
+                                                id: string;
+                                                resourceId: string;
+                                                label: string;
+                                                value: {
+                                                    current: number;
+                                                    max: number;
+                                                };
+                                                min: number;
+                                                max: number;
+                                                step: number;
+                                                resetTo: "min" | "max";
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "action";
+                                                id: string;
+                                                actionId: string;
+                                                label: string;
+                                                actionKind: "roll" | "resourceBump";
+                                                inputs: {
+                                                    id: string;
+                                                    label: string;
+                                                    valueType: "integer" | "decimal" | "boolean" | "text";
+                                                    required: boolean;
+                                                    default: string | number | boolean | null;
+                                                }[];
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            })[];
+                                        }[];
+                                    }[];
+                                    derivedValues: {
+                                        [key: string]: string | number | boolean | null;
+                                    };
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                };
+                                reconciliation: {
+                                    /** Format: uuid */
+                                    characterId: string;
+                                    baseRevision: number | null;
+                                    revision: number;
+                                    packageChecksum: string;
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    commandExecutionId: string;
+                                    /** Format: date-time */
+                                    replayExpiresAt: string;
+                                    replayed: boolean;
+                                    changedDefinitionIds: string[];
+                                    activityCursor: string | null;
+                                    cacheDisposition: "retain" | "replace" | "purge";
+                                };
+                            };
+                            roll: {
+                                actionId: string;
+                                expression: string;
+                                dice: {
+                                    sides: number;
+                                    value: number;
+                                    kept: boolean;
+                                }[];
+                                bindings: {
+                                    scope: "fields" | "inputs";
+                                    definitionId: string;
+                                    value: string | number | boolean | null;
+                                }[];
+                                total: number;
+                                output: string;
+                            } | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_characters_characterId_activity: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                characterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        events: {
+                            id: string;
+                            characterRevision: number;
+                            kind: string;
+                            payload: {
+                                [key: string]: unknown;
+                            };
+                            rollId: string | null;
+                            requestId: string;
+                            /** Format: date-time */
+                            occurredAt: string;
+                        }[];
+                        nextCursor: string | null;
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_characters_characterId_exports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.sweetroll.character+json;version=1": {
+                        /** @constant */
+                        schemaVersion: "1.0";
+                        /** @constant */
+                        mediaType: "application/vnd.sweetroll.character+json;version=1";
+                        /** Format: uuid */
+                        characterId: string;
+                        name: string;
+                        entityDefinitionId: string;
+                        lifecycle: "active" | "archived";
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        /** Format: uuid */
+                        systemVersionId: string;
+                        packageChecksum: string;
+                        revision: number;
+                        state: {
+                            /** @constant */
+                            schemaVersion: "1.0";
+                            values: {
+                                [key: string]: unknown;
+                            };
+                        };
+                        migrationLineage: {
+                            /** Format: uuid */
+                            fromVersionId: string;
+                            /** Format: uuid */
+                            toVersionId: string;
+                            /** Format: date-time */
+                            committedAt: string;
+                        }[];
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_characters_characterId_migration_previews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    targetVersionId: string;
+                    mappings?: {
+                        [key: string]: unknown;
+                    };
+                    defaults?: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        preview: {
+                            previewId: string;
+                            /** Format: uuid */
+                            characterId: string;
+                            sourceRevision: number;
+                            /** Format: uuid */
+                            sourceVersionId: string;
+                            /** Format: uuid */
+                            targetVersionId: string;
+                            candidateState: {
+                                /** @constant */
+                                schemaVersion: "1.0";
+                                values: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                            candidateProjection: {
+                                /** @constant */
+                                projectionVersion: "1.0";
+                                /** Format: uuid */
+                                systemId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                                packageChecksum: string;
+                                entityId: string;
+                                entityLabel: string;
+                                sheets: {
+                                    id: string;
+                                    label: string;
+                                    sections: {
+                                        id: string;
+                                        label: string;
+                                        elements: ({
+                                            /** @constant */
+                                            kind: "heading";
+                                            id: string;
+                                            text: string;
+                                            level: 2 | 3;
+                                        } | {
+                                            /** @constant */
+                                            kind: "field";
+                                            id: string;
+                                            fieldId: string;
+                                            label: string;
+                                            fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                            value: string | number | boolean | null | string[];
+                                            editable: boolean;
+                                            constraints: {
+                                                required?: boolean;
+                                                min?: number;
+                                                max?: number;
+                                                step?: number;
+                                                minLength?: number;
+                                                maxLength?: number;
+                                                options?: {
+                                                    id: string;
+                                                    label: string;
+                                                }[];
+                                            };
+                                            validations: {
+                                                validationId: string;
+                                                severity: "error" | "warning";
+                                                message: string;
+                                                targetDefinitionId: string;
+                                            }[];
+                                        } | {
+                                            /** @constant */
+                                            kind: "resource";
+                                            id: string;
+                                            resourceId: string;
+                                            label: string;
+                                            value: {
+                                                current: number;
+                                                max: number;
+                                            };
+                                            min: number;
+                                            max: number;
+                                            step: number;
+                                            resetTo: "min" | "max";
+                                            validations: {
+                                                validationId: string;
+                                                severity: "error" | "warning";
+                                                message: string;
+                                                targetDefinitionId: string;
+                                            }[];
+                                        } | {
+                                            /** @constant */
+                                            kind: "action";
+                                            id: string;
+                                            actionId: string;
+                                            label: string;
+                                            actionKind: "roll" | "resourceBump";
+                                            inputs: {
+                                                id: string;
+                                                label: string;
+                                                valueType: "integer" | "decimal" | "boolean" | "text";
+                                                required: boolean;
+                                                default: string | number | boolean | null;
+                                            }[];
+                                            validations: {
+                                                validationId: string;
+                                                severity: "error" | "warning";
+                                                message: string;
+                                                targetDefinitionId: string;
+                                            }[];
+                                        })[];
+                                    }[];
+                                }[];
+                                derivedValues: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                            };
+                            warnings: string[];
+                            /** Format: date-time */
+                            expiresAt: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_characters_characterId_migrations_previewId_commit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                previewId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    expectedRevision: number;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        result: {
+                            character: {
+                                /** Format: uuid */
+                                characterId: string;
+                                /** Format: uuid */
+                                ownerId: string;
+                                name: string;
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                entityDefinitionId: string;
+                                revision: number;
+                                lifecycle: "active" | "archived";
+                                archivedAt: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                                state: {
+                                    /** @constant */
+                                    schemaVersion: "1.0";
+                                    values: {
+                                        [key: string]: unknown;
+                                    };
+                                };
+                                derivedValues: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                                projection: {
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    entityId: string;
+                                    entityLabel: string;
+                                    sheets: {
+                                        id: string;
+                                        label: string;
+                                        sections: {
+                                            id: string;
+                                            label: string;
+                                            elements: ({
+                                                /** @constant */
+                                                kind: "heading";
+                                                id: string;
+                                                text: string;
+                                                level: 2 | 3;
+                                            } | {
+                                                /** @constant */
+                                                kind: "field";
+                                                id: string;
+                                                fieldId: string;
+                                                label: string;
+                                                fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                                value: string | number | boolean | null | string[];
+                                                editable: boolean;
+                                                constraints: {
+                                                    required?: boolean;
+                                                    min?: number;
+                                                    max?: number;
+                                                    step?: number;
+                                                    minLength?: number;
+                                                    maxLength?: number;
+                                                    options?: {
+                                                        id: string;
+                                                        label: string;
+                                                    }[];
+                                                };
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "resource";
+                                                id: string;
+                                                resourceId: string;
+                                                label: string;
+                                                value: {
+                                                    current: number;
+                                                    max: number;
+                                                };
+                                                min: number;
+                                                max: number;
+                                                step: number;
+                                                resetTo: "min" | "max";
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "action";
+                                                id: string;
+                                                actionId: string;
+                                                label: string;
+                                                actionKind: "roll" | "resourceBump";
+                                                inputs: {
+                                                    id: string;
+                                                    label: string;
+                                                    valueType: "integer" | "decimal" | "boolean" | "text";
+                                                    required: boolean;
+                                                    default: string | number | boolean | null;
+                                                }[];
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            })[];
+                                        }[];
+                                    }[];
+                                    derivedValues: {
+                                        [key: string]: string | number | boolean | null;
+                                    };
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                };
+                                reconciliation: {
+                                    /** Format: uuid */
+                                    characterId: string;
+                                    baseRevision: number | null;
+                                    revision: number;
+                                    packageChecksum: string;
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    commandExecutionId: string;
+                                    /** Format: date-time */
+                                    replayExpiresAt: string;
+                                    replayed: boolean;
+                                    changedDefinitionIds: string[];
+                                    activityCursor: string | null;
+                                    cacheDisposition: "retain" | "replace" | "purge";
+                                };
+                            };
+                            roll: {
+                                actionId: string;
+                                expression: string;
+                                dice: {
+                                    sides: number;
+                                    value: number;
+                                    kept: boolean;
+                                }[];
+                                bindings: {
+                                    scope: "fields" | "inputs";
+                                    definitionId: string;
+                                    value: string | number | boolean | null;
+                                }[];
+                                total: number;
+                                output: string;
+                            } | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_characters_characterId_migrations_migrationId_rollback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                migrationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        result: {
+                            character: {
+                                /** Format: uuid */
+                                characterId: string;
+                                /** Format: uuid */
+                                ownerId: string;
+                                name: string;
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                entityDefinitionId: string;
+                                revision: number;
+                                lifecycle: "active" | "archived";
+                                archivedAt: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                                state: {
+                                    /** @constant */
+                                    schemaVersion: "1.0";
+                                    values: {
+                                        [key: string]: unknown;
+                                    };
+                                };
+                                derivedValues: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                                projection: {
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    entityId: string;
+                                    entityLabel: string;
+                                    sheets: {
+                                        id: string;
+                                        label: string;
+                                        sections: {
+                                            id: string;
+                                            label: string;
+                                            elements: ({
+                                                /** @constant */
+                                                kind: "heading";
+                                                id: string;
+                                                text: string;
+                                                level: 2 | 3;
+                                            } | {
+                                                /** @constant */
+                                                kind: "field";
+                                                id: string;
+                                                fieldId: string;
+                                                label: string;
+                                                fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                                value: string | number | boolean | null | string[];
+                                                editable: boolean;
+                                                constraints: {
+                                                    required?: boolean;
+                                                    min?: number;
+                                                    max?: number;
+                                                    step?: number;
+                                                    minLength?: number;
+                                                    maxLength?: number;
+                                                    options?: {
+                                                        id: string;
+                                                        label: string;
+                                                    }[];
+                                                };
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "resource";
+                                                id: string;
+                                                resourceId: string;
+                                                label: string;
+                                                value: {
+                                                    current: number;
+                                                    max: number;
+                                                };
+                                                min: number;
+                                                max: number;
+                                                step: number;
+                                                resetTo: "min" | "max";
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "action";
+                                                id: string;
+                                                actionId: string;
+                                                label: string;
+                                                actionKind: "roll" | "resourceBump";
+                                                inputs: {
+                                                    id: string;
+                                                    label: string;
+                                                    valueType: "integer" | "decimal" | "boolean" | "text";
+                                                    required: boolean;
+                                                    default: string | number | boolean | null;
+                                                }[];
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            })[];
+                                        }[];
+                                    }[];
+                                    derivedValues: {
+                                        [key: string]: string | number | boolean | null;
+                                    };
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                };
+                                reconciliation: {
+                                    /** Format: uuid */
+                                    characterId: string;
+                                    baseRevision: number | null;
+                                    revision: number;
+                                    packageChecksum: string;
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    commandExecutionId: string;
+                                    /** Format: date-time */
+                                    replayExpiresAt: string;
+                                    replayed: boolean;
+                                    changedDefinitionIds: string[];
+                                    activityCursor: string | null;
+                                    cacheDisposition: "retain" | "replace" | "purge";
+                                };
+                            };
+                            roll: {
+                                actionId: string;
+                                expression: string;
+                                dice: {
+                                    sides: number;
+                                    value: number;
+                                    kept: boolean;
+                                }[];
+                                bindings: {
+                                    scope: "fields" | "inputs";
+                                    definitionId: string;
+                                    value: string | number | boolean | null;
+                                }[];
+                                total: number;
+                                output: string;
+                            } | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
                     };
                 };
             };

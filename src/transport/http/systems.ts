@@ -191,11 +191,12 @@ const ErrorResponses = {
 };
 
 type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
+export type RouteResponse = TSchema | { schema: TSchema; mediaType?: string };
 type RouteSchema = {
   body?: TSchema;
   params?: TSchema;
   querystring?: TSchema;
-  response?: Record<string, TSchema>;
+  response?: Record<string, RouteResponse>;
 };
 export type SystemsRouteDefinition = {
   method: HttpMethod;
@@ -373,12 +374,15 @@ export const systemsRouteDefinitions: readonly SystemsRouteDefinition[] = [
     schema: {
       params: VersionIdParams,
       response: {
-        "200": Type.Object({
-          schemaVersion: Type.String(),
-          mediaType: Type.String(),
-          exportedAt: Type.String(),
-          package: Type.Object({}, { additionalProperties: true }),
-        }),
+        "200": {
+          schema: Type.Object({
+            schemaVersion: Type.String(),
+            mediaType: Type.String(),
+            exportedAt: Type.String(),
+            package: Type.Object({}, { additionalProperties: true }),
+          }),
+          mediaType: "application/vnd.sweetroll.system+json;version=1",
+        },
         "401": UnauthorizedEnvelope,
         "404": ErrorEnvelope,
         "500": ErrorEnvelope,
@@ -619,6 +623,17 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
     };
 
     for (const route of systemsRouteDefinitions) {
-      app[route.method](route.path, { schema: route.schema }, handlers[route.operationId]!);
+      const response = toFastifyResponses(route.schema.response);
+      const schema = response === undefined ? route.schema : { ...route.schema, response };
+      app[route.method](route.path, { schema }, handlers[route.operationId]!);
     }
   };
+
+function toFastifyResponses(response: Record<string, RouteResponse> | undefined): Record<string, TSchema> | undefined {
+  if (response === undefined) return undefined;
+  const out: Record<string, TSchema> = {};
+  for (const [status, value] of Object.entries(response)) {
+    out[status] = "schema" in value ? value.schema : value;
+  }
+  return out;
+}

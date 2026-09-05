@@ -1,10 +1,18 @@
 import { Check } from "lucide-react";
-import { useState } from "react";
+import { useReducer, useState } from "react";
 
 import type { ApiClient } from "../api/client.js";
 import { useOpenSystem } from "../api/openSystem.js";
 import { t } from "../i18n/index.js";
+import {
+  blankDocument,
+  documentReducer,
+  type DocumentAction,
+  type EntityDefinitionV1,
+  type SystemDocumentV1,
+} from "../state/documentReducer.js";
 import styles from "./DocumentEditor.module.css";
+import { EntityList, type EntityListEntity } from "./EntityList.js";
 
 type TabId = "metadata" | "entities" | "sheets" | "actions" | "validations" | "referenceData";
 
@@ -54,6 +62,29 @@ export function DocumentEditor({ client, systemId }: { client: ApiClient; system
   if (query.data === undefined) return null;
 
   const ws = query.data;
+  const initialDoc: SystemDocumentV1 =
+    ws.draft?.document !== undefined
+      ? (ws.draft.document as SystemDocumentV1)
+      : blankDocument();
+  return (
+    <DocumentEditorBody ws={ws} active={active} initialDoc={initialDoc} />
+  );
+}
+
+function DocumentEditorBody({
+  ws,
+  active,
+  initialDoc,
+}: {
+  ws: NonNullable<ReturnType<typeof useOpenSystem>["data"]>;
+  active: TabId;
+  initialDoc: SystemDocumentV1;
+}) {
+  const [document, dispatch] = useReducer(documentReducer, initialDoc);
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(
+    initialDoc.entities[0]?.id ?? null,
+  );
+
   return (
     <section className={styles.container}>
       <header className={styles.header} data-testid="document-editor-header">
@@ -91,8 +122,48 @@ export function DocumentEditor({ client, systemId }: { client: ApiClient; system
         })}
       </nav>
       <main className={styles.body} data-testid={`document-editor-body-${active}`}>
-        <p className={styles.placeholder}>{t("editor.bodyPlaceholder")}</p>
+        {active === "entities" ? (
+          <EntitiesTab
+            entities={document.entities}
+            selectedEntityId={selectedEntityId}
+            onSelectEntity={setSelectedEntityId}
+            dispatch={dispatch}
+          />
+        ) : (
+          <p className={styles.placeholder}>{t("editor.bodyPlaceholder")}</p>
+        )}
       </main>
     </section>
+  );
+}
+
+function EntitiesTab({
+  entities,
+  selectedEntityId,
+  onSelectEntity,
+  dispatch,
+}: {
+  entities: EntityDefinitionV1[];
+  selectedEntityId: string | null;
+  onSelectEntity: (id: string | null) => void;
+  dispatch: React.Dispatch<DocumentAction>;
+}) {
+  const entityList: EntityListEntity[] = entities.map((entity) => ({
+    id: entity.id,
+    label: entity.label,
+    fields: entity.fields as unknown as EntityListEntity["fields"],
+  }));
+  return (
+    <EntityList
+      entities={entityList}
+      selectedEntityId={selectedEntityId}
+      onSelectEntity={onSelectEntity}
+      onChange={(next) => {
+        dispatch({
+          type: "setEntities",
+          entities: next as unknown as EntityDefinitionV1[],
+        });
+      }}
+    />
   );
 }

@@ -35,7 +35,8 @@ export type DocumentAction =
   | { type: "setMetadata"; patch: SystemMetadataPatch }
   | { type: "addEntity"; entity: EntityDefinitionV1 }
   | { type: "removeEntity"; entityId: string }
-  | { type: "updateField"; entityId: string; fieldId: string; field: EntityFieldV1 };
+  | { type: "updateField"; entityId: string; fieldId: string; field: EntityFieldV1 }
+  | { type: "setEntities"; entities: EntityDefinitionV1[] };
 
 export function blankDocument(): SystemDocumentV1 {
   return {
@@ -83,5 +84,7 @@ export function documentReducer(state: SystemDocumentV1, action: DocumentAction)
       if (!mutated) return state;
       return { ...state, entities };
     }
+    case "setEntities":
+      return { ...state, entities: action.entities };
   }
 }

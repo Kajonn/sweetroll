@@ -1,3 +1,4 @@
+import { t } from "../../i18n/index.js";
 import type { BooleanFieldV1, FieldV1 } from "../../state/documentFieldTypes.js";
 import { DefinitionIdInput } from "./DefinitionIdInput.js";
 import styles from "./FieldEditor.module.css";
@@ -22,7 +23,7 @@ export function BooleanFieldEditor({
   if (!isBoolean(field)) {
     return (
       <p className={styles.unsupported} data-testid="boolean-field-unsupported">
-        Unsupported boolean kind: {field.kind}
+        {t("editor.fields.unsupported.boolean", { kind: field.kind })}
       </p>
     );
   }
@@ -41,7 +42,7 @@ export function BooleanFieldEditor({
       </div>
       <div className={styles.row}>
         <label className={styles.field} htmlFor={`boolean-field-label-${field.id}`}>
-          Label
+          {t("editor.fields.label")}
           <input
             id={`boolean-field-label-${field.id}`}
             type="text"
@@ -60,16 +61,16 @@ export function BooleanFieldEditor({
             data-testid={`boolean-field-required-${field.id}`}
             disabled={disabled}
           />
-          Required
+          {t("editor.fields.required")}
         </label>
       </div>
       <div className={styles.row}>
         <fieldset className={styles.options} disabled={disabled}>
-          <legend>Default</legend>
+          <legend>{t("editor.fields.default")}</legend>
           {(
             [
-              { value: true, label: "True" },
-              { value: false, label: "False" },
+              { value: true, label: t("editor.fields.boolean.true") },
+              { value: false, label: t("editor.fields.boolean.false") },
             ] as const
           ).map((opt) => (
             <label key={opt.label} className={styles.checkbox}>

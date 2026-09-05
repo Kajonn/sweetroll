@@ -1,3 +1,4 @@
+import { t } from "../../i18n/index.js";
 import type {
   ChoiceOptionV1,
   FieldV1,
@@ -37,7 +38,7 @@ export function ChoiceFieldEditor({
   if (!isChoice(field)) {
     return (
       <p className={styles.unsupported} data-testid="choice-field-unsupported">
-        Unsupported choice kind: {field.kind}
+        {t("editor.fields.unsupported.choice", { kind: field.kind })}
       </p>
     );
   }
@@ -83,7 +84,7 @@ export function ChoiceFieldEditor({
       </div>
       <div className={styles.row}>
         <label className={styles.field} htmlFor={`choice-field-label-${field.id}`}>
-          Label
+          {t("editor.fields.label")}
           <input
             id={`choice-field-label-${field.id}`}
             type="text"
@@ -102,12 +103,17 @@ export function ChoiceFieldEditor({
             data-testid={`choice-field-required-${field.id}`}
             disabled={disabled}
           />
-          Required
+          {t("editor.fields.required")}
         </label>
       </div>
       <div className={styles.row}>
         <fieldset className={styles.options} disabled={disabled}>
-          <legend>Options</legend>
+          <legend>{t("editor.fields.options")}</legend>
+          {field.options.length === 0 && (
+            <p className={styles.placeholder} data-testid={`choice-field-options-empty-${field.id}`}>
+              {t("editor.fields.options.placeholder")}
+            </p>
+          )}
           {field.options.map((opt, i) => (
             <div key={`${opt.id}-${i}`} className={styles.optionsRow} data-testid={`choice-field-option-${i}-${field.id}`}>
               {field.kind === "singleChoice" ? (
@@ -118,7 +124,7 @@ export function ChoiceFieldEditor({
                   onChange={() =>
                     onChange({ ...field, default: opt.id } as SingleChoiceFieldV1)
                   }
-                  aria-label={`Default option ${opt.label}`}
+                  aria-label={t("editor.fields.options.defaultOptionAria", { label: opt.label })}
                   data-testid={`choice-field-default-radio-${i}-${field.id}`}
                 />
               ) : (
@@ -134,7 +140,7 @@ export function ChoiceFieldEditor({
                       default: Array.from(set),
                     } as MultiChoiceFieldV1);
                   }}
-                  aria-label={`Default option ${opt.label}`}
+                  aria-label={t("editor.fields.options.defaultOptionAria", { label: opt.label })}
                   data-testid={`choice-field-default-checkbox-${i}-${field.id}`}
                 />
               )}
@@ -143,18 +149,18 @@ export function ChoiceFieldEditor({
                 value={opt.label}
                 maxLength={120}
                 onChange={(e) => updateOption(i, { label: e.target.value })}
-                aria-label="Option label"
+                aria-label={t("editor.fields.options.optionLabel")}
                 data-testid={`choice-field-option-label-${i}-${field.id}`}
                 disabled={disabled}
               />
               <button
                 type="button"
                 onClick={() => removeOption(i)}
-                aria-label={`Remove option ${opt.label}`}
+                aria-label={t("editor.fields.options.removeOptionAria", { label: opt.label })}
                 data-testid={`choice-field-option-remove-${i}-${field.id}`}
                 disabled={disabled}
               >
-                Remove
+                {t("editor.fields.options.removeOption")}
               </button>
             </div>
           ))}
@@ -165,7 +171,7 @@ export function ChoiceFieldEditor({
             data-testid={`choice-field-add-option-${field.id}`}
             disabled={disabled}
           >
-            + Add option
+            {t("editor.fields.options.addOption")}
           </button>
         </fieldset>
       </div>

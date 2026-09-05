@@ -43,7 +43,7 @@ function nextEntityId(existing: EntityListEntity[]): string {
 }
 
 function defaultLabel(existing: EntityListEntity[]): string {
-  const base = "Entity";
+  const base = t("editor.entity.defaultLabel");
   if (!existing.some((e) => e.label === base)) return base;
   for (let i = 2; i < 10_000; i++) {
     const candidate = `${base} ${i}`;
@@ -58,7 +58,7 @@ function defaultField(kind: FieldV1["kind"]): FieldV1 {
       return {
         kind: "text",
         id: "name",
-        label: "Name",
+        label: t("editor.entity.fieldKind.text"),
         default: "",
         required: false,
         minLength: 0,
@@ -68,7 +68,7 @@ function defaultField(kind: FieldV1["kind"]): FieldV1 {
       return {
         kind: "integer",
         id: "level",
-        label: "Level",
+        label: t("editor.entity.fieldKind.integer"),
         default: 0,
         required: false,
         min: 0,
@@ -79,7 +79,7 @@ function defaultField(kind: FieldV1["kind"]): FieldV1 {
       return {
         kind: "decimal",
         id: "weight",
-        label: "Weight",
+        label: t("editor.entity.fieldKind.decimal"),
         default: 0,
         required: false,
         min: 0,
@@ -90,7 +90,7 @@ function defaultField(kind: FieldV1["kind"]): FieldV1 {
       return {
         kind: "boolean",
         id: "active",
-        label: "Active",
+        label: t("editor.entity.fieldKind.boolean"),
         default: false,
         required: false,
       };
@@ -98,7 +98,7 @@ function defaultField(kind: FieldV1["kind"]): FieldV1 {
       return {
         kind: "singleChoice",
         id: "category",
-        label: "Category",
+        label: t("editor.entity.fieldKind.singleChoice"),
         required: false,
         default: null,
         options: [],
@@ -107,7 +107,7 @@ function defaultField(kind: FieldV1["kind"]): FieldV1 {
       return {
         kind: "multiChoice",
         id: "tags",
-        label: "Tags",
+        label: t("editor.entity.fieldKind.multiChoice"),
         required: false,
         default: [],
         options: [],
@@ -116,7 +116,7 @@ function defaultField(kind: FieldV1["kind"]): FieldV1 {
       return {
         kind: "image",
         id: "portrait",
-        label: "Portrait",
+        label: t("editor.entity.fieldKind.image"),
         required: false,
       };
     case "resource":
@@ -124,7 +124,7 @@ function defaultField(kind: FieldV1["kind"]): FieldV1 {
       return {
         kind: "text",
         id: "placeholder",
-        label: "Placeholder",
+        label: t("editor.entity.fieldKind.placeholder"),
         default: "",
         required: false,
         minLength: 0,
@@ -156,7 +156,7 @@ function FieldEditorRouter({
     case "computed":
       return (
         <p className={styles.unsupported} data-testid={`field-unsupported-${field.id}`}>
-          Editor for {FIELD_KIND_LABELS[field.kind]} fields lands in a later task.
+          {t("editor.entity.landsLater", { kind: FIELD_KIND_LABELS[field.kind] })}
         </p>
       );
   }
@@ -199,7 +199,7 @@ export function EntityList({
     for (let i = 1; entity.fields.some((f) => f.id === id); i++) id = `${baseId}_${i}`;
     const field = defaultField("text");
     field.id = id;
-    field.label = "Field";
+    field.label = t("editor.entity.newFieldLabel");
     replaceEntity(entityId, { fields: [...entity.fields, field] });
   };
 
@@ -225,6 +225,10 @@ export function EntityList({
           <ul className={styles.entityList}>
             {entities.map((entity) => {
               const isSelected = entity.id === selectedEntityId;
+              const countLabel =
+                entity.fields.length === 1
+                  ? t("editor.entity.field")
+                  : t("editor.entity.fields");
               return (
                 <li
                   key={entity.id}
@@ -241,7 +245,7 @@ export function EntityList({
                   >
                     <span className={styles.entityLabel}>{entity.label}</span>
                     <span className={styles.entityMeta}>
-                      {entity.fields.length} {entity.fields.length === 1 ? "field" : "fields"}
+                      {entity.fields.length} {countLabel}
                     </span>
                   </button>
                 </li>
@@ -345,7 +349,7 @@ function RemoveEntityButton({
         <button
           type="button"
           className={styles.removeButton}
-          aria-label={`Remove ${entity.label}`}
+          aria-label={t("editor.entity.removeAria", { label: entity.label })}
           data-testid={`entity-row-${entity.id}-remove`}
         >
           {t("editor.entities.removeConfirm.confirm")}

@@ -1,3 +1,4 @@
+import { t } from "../../i18n/index.js";
 import type { FieldV1, ImageFieldV1 } from "../../state/documentFieldTypes.js";
 import { DefinitionIdInput } from "./DefinitionIdInput.js";
 import styles from "./FieldEditor.module.css";
@@ -22,7 +23,7 @@ export function ImageFieldEditor({
   if (!isImage(field)) {
     return (
       <p className={styles.unsupported} data-testid="image-field-unsupported">
-        Unsupported image kind: {field.kind}
+        {t("editor.fields.unsupported.image", { kind: field.kind })}
       </p>
     );
   }
@@ -41,7 +42,7 @@ export function ImageFieldEditor({
       </div>
       <div className={styles.row}>
         <label className={styles.field} htmlFor={`image-field-label-${field.id}`}>
-          Label
+          {t("editor.fields.label")}
           <input
             id={`image-field-label-${field.id}`}
             type="text"
@@ -60,12 +61,29 @@ export function ImageFieldEditor({
             data-testid={`image-field-required-${field.id}`}
             disabled={disabled}
           />
-          Required
+          {t("editor.fields.required")}
+        </label>
+      </div>
+      <div className={styles.row}>
+        <label className={styles.field} htmlFor={`image-field-url-${field.id}`}>
+          {t("editor.fields.image.urlLabel")}
+          <input
+            id={`image-field-url-${field.id}`}
+            type="text"
+            value=""
+            placeholder="https://"
+            onChange={() => {}}
+            data-testid={`image-field-url-${field.id}`}
+            disabled
+          />
         </label>
       </div>
       <div className={styles.imagePreview} data-testid={`image-field-preview-${field.id}`}>
         {field.label || field.id}
       </div>
+      <p className={styles.hint} data-testid={`image-field-hint-${field.id}`}>
+        {t("editor.fields.image.placeholder")}
+      </p>
     </section>
   );
 }

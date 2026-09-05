@@ -1,3 +1,4 @@
+import { t } from "../../i18n/index.js";
 import type {
   DecimalFieldV1,
   FieldV1,
@@ -43,7 +44,7 @@ export function ScalarFieldEditor({
         </div>
         <div className={styles.row}>
           <label className={styles.field} htmlFor={`scalar-field-label-${field.id}`}>
-            Label
+            {t("editor.fields.label")}
             <input
               id={`scalar-field-label-${field.id}`}
               type="text"
@@ -62,12 +63,12 @@ export function ScalarFieldEditor({
               data-testid={`scalar-field-required-${field.id}`}
               disabled={disabled}
             />
-            Required
+            {t("editor.fields.required")}
           </label>
         </div>
         <div className={styles.row}>
           <label className={styles.field}>
-            Default
+            {t("editor.fields.default")}
             <input
               type="text"
               value={field.default}
@@ -78,7 +79,7 @@ export function ScalarFieldEditor({
             />
           </label>
           <label className={styles.field}>
-            Min length
+            {t("editor.fields.minLength")}
             <input
               type="number"
               value={field.minLength}
@@ -88,7 +89,7 @@ export function ScalarFieldEditor({
             />
           </label>
           <label className={styles.field}>
-            Max length
+            {t("editor.fields.maxLength")}
             <input
               type="number"
               value={field.maxLength}
@@ -117,7 +118,7 @@ export function ScalarFieldEditor({
         </div>
         <div className={styles.row}>
           <label className={styles.field} htmlFor={`scalar-field-label-${field.id}`}>
-            Label
+            {t("editor.fields.label")}
             <input
               id={`scalar-field-label-${field.id}`}
               type="text"
@@ -136,12 +137,12 @@ export function ScalarFieldEditor({
               data-testid={`scalar-field-required-${field.id}`}
               disabled={disabled}
             />
-            Required
+            {t("editor.fields.required")}
           </label>
         </div>
         <div className={styles.row}>
           <label className={styles.field}>
-            Default
+            {t("editor.fields.default")}
             <input
               type="number"
               step={field.step}
@@ -152,7 +153,7 @@ export function ScalarFieldEditor({
             />
           </label>
           <label className={styles.field}>
-            Min
+            {t("editor.fields.min")}
             <input
               type="number"
               step={field.step}
@@ -163,7 +164,7 @@ export function ScalarFieldEditor({
             />
           </label>
           <label className={styles.field}>
-            Max
+            {t("editor.fields.max")}
             <input
               type="number"
               step={field.step}
@@ -174,7 +175,7 @@ export function ScalarFieldEditor({
             />
           </label>
           <label className={styles.field}>
-            Step
+            {t("editor.fields.step")}
             <input
               type="number"
               value={field.step}
@@ -190,7 +191,7 @@ export function ScalarFieldEditor({
   }
   return (
     <p className={styles.unsupported} data-testid="scalar-field-unsupported">
-      Unsupported scalar kind: {field.kind}
+      {t("editor.fields.unsupported.scalar", { kind: field.kind })}
     </p>
   );
 }

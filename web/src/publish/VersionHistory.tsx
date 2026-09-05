@@ -5,6 +5,7 @@ import { CheckCircle2, Download, GitBranch, XCircle } from "lucide-react";
 import { useCreateDraft } from "../api/createDraft.js";
 import { ApiError, type ApiClient } from "../api/client.js";
 import { useDeprecateVersion } from "../api/deprecateVersion.js";
+import { useExportVersion } from "../api/exportVersion.js";
 import { useListVersions } from "../api/listVersions.js";
 import type { VersionSummary } from "../api/server.js";
 import { t } from "../i18n/index.js";
@@ -28,6 +29,7 @@ export function VersionHistory({ client, systemId }: { client: ApiClient; system
   const versions = useListVersions(client, systemId);
   const deprecate = useDeprecateVersion(client);
   const createDraft = useCreateDraft(client);
+  const exportVersion = useExportVersion(client);
   const [pendingExport, setPendingExport] = useState<string | null>(null);
   const [pendingClone, setPendingClone] = useState<string | null>(null);
   const [pendingDeprecate, setPendingDeprecate] = useState<VersionSummary | null>(null);
@@ -38,16 +40,10 @@ export function VersionHistory({ client, systemId }: { client: ApiClient; system
     setExportError(null);
     setPendingExport(version.versionId);
     try {
-      const blob = await client.fetch<unknown>("GET", `/system-versions/${version.versionId}/export`);
-      const text = JSON.stringify(blob, null, 2);
-      const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${version.semanticVersion}.sweetroll.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      await exportVersion.mutateAsync({
+        versionId: version.versionId,
+        filename: `${version.semanticVersion}.sweetroll.json`,
+      });
     } catch {
       setExportError(version.versionId);
     } finally {

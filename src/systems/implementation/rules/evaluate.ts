@@ -4,6 +4,22 @@ import { renderExpression } from "./render.js";
 
 export type Rng = () => number;
 
+export type EvaluationBindings = {
+  fields: Record<string, ScalarValue>;
+  inputs: Record<string, ScalarValue>;
+};
+
+export type EvaluationBinding = {
+  scope: "fields" | "inputs";
+  definitionId: string;
+  value: ScalarValue;
+};
+
+export type EvaluationLimits = {
+  dicePerRoll: number;
+  sidesPerDie: number;
+};
+
 export type RuntimeDiagnostic = { code: "arithmetic_failure"; path: string; message: string };
 
 export type DieResult = { sides: number; value: number; kept: boolean };
@@ -11,11 +27,13 @@ export type DieResult = { sides: number; value: number; kept: boolean };
 export type RollResult = { total: number; dice: DieResult[]; expression: string };
 
 export type EvalResult =
-  | { ok: true; roll: RollResult | null; result: ScalarValue; diagnostics: RuntimeDiagnostic[] }
+  | { ok: true; roll: RollResult | null; result: ScalarValue; diagnostics: RuntimeDiagnostic[]; bindings: EvaluationBinding[] }
   | { ok: false; diagnostics: RuntimeDiagnostic[] };
 
 type Ctx = {
-  bindings: Record<string, ScalarValue>;
+  bindings: EvaluationBindings;
+  bindingTrace: EvaluationBinding[];
+  limits: EvaluationLimits;
   rng: Rng;
   dice: DieResult[];
   diagnostics: RuntimeDiagnostic[];
@@ -40,12 +58,13 @@ function isNonNegativeInteger(v: number): boolean {
 }
 
 function rollDice(count: number, sides: number, ctx: Ctx): DieResult[] | undefined {
-  if (count > PACKAGE_LIMITS.dicePerRoll) {
-    fail(ctx, `dice count ${count} exceeds the ${PACKAGE_LIMITS.dicePerRoll}-die-per-roll limit`);
+  const totalDice = ctx.dice.length + count;
+  if (totalDice > ctx.limits.dicePerRoll) {
+    fail(ctx, `dice count ${totalDice} exceeds the ${ctx.limits.dicePerRoll}-die-per-roll limit`);
     return undefined;
   }
-  if (sides > PACKAGE_LIMITS.sidesPerDie) {
-    fail(ctx, `die sides ${sides} exceed the ${PACKAGE_LIMITS.sidesPerDie}-side-per-die limit`);
+  if (sides > ctx.limits.sidesPerDie) {
+    fail(ctx, `die sides ${sides} exceed the ${ctx.limits.sidesPerDie}-side-per-die limit`);
     return undefined;
   }
   const dice: DieResult[] = [];
@@ -88,8 +107,9 @@ function evalNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined {
     case "booleanLiteral":
       return node.value;
     case "reference": {
-      const val = ctx.bindings[node.id];
+      const val = ctx.bindings[node.scope][node.id];
       if (val === undefined || val === null) return fail(ctx, `missing reference ${node.scope}.${node.id}`);
+      ctx.bindingTrace.push({ scope: node.scope, definitionId: node.id, value: val });
       return val;
     }
     case "unary": {
@@ -248,11 +268,20 @@ function evalNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined {
 
 export function evaluate(
   compiled: CompiledExpressionV1,
-  bindings: Record<string, ScalarValue>,
+  bindings: EvaluationBindings,
   rng?: Rng,
+  limits: EvaluationLimits = PACKAGE_LIMITS,
 ): EvalResult {
   const expression = renderExpression(compiled.ast);
-  const ctx: Ctx = { bindings, rng: rng ?? Math.random, dice: [], diagnostics: [], expression };
+  const ctx: Ctx = {
+    bindings,
+    bindingTrace: [],
+    limits,
+    rng: rng ?? Math.random,
+    dice: [],
+    diagnostics: [],
+    expression,
+  };
   const value = evalNode(compiled.ast, ctx);
   if (value === undefined) {
     const diagnostics = ctx.diagnostics.length > 0
@@ -261,10 +290,10 @@ export function evaluate(
     const roll = containsRoll(compiled.ast)
       ? { total: num(compiled.fallback) ?? 0, dice: ctx.dice, expression }
       : null;
-    return { ok: true, result: compiled.fallback, roll, diagnostics };
+    return { ok: true, result: compiled.fallback, roll, diagnostics, bindings: ctx.bindingTrace };
   }
   const roll = containsRoll(compiled.ast)
     ? { total: num(value) ?? 0, dice: ctx.dice, expression }
     : null;
-  return { ok: true, result: value, roll, diagnostics: ctx.diagnostics };
+  return { ok: true, result: value, roll, diagnostics: ctx.diagnostics, bindings: ctx.bindingTrace };
 }

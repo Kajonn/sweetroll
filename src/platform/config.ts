@@ -5,6 +5,7 @@ export type LogLevel = (typeof LOG_LEVELS)[number];
 export type NodeEnv = "development" | "production" | "test";
 
 export type AppConfig = {
+  authoritativeRollSecret: string;
   cookieSecure: boolean;
   databaseUrl: string;
   host: string;
@@ -43,7 +44,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error("NODE_ENV must be development, production, or test");
   }
 
+  const authoritativeRollSecret = env.AUTHORITATIVE_ROLL_SECRET ?? "";
+  if (nodeEnvRaw !== "test" && authoritativeRollSecret.length === 0) {
+    throw new Error("AUTHORITATIVE_ROLL_SECRET is required outside tests");
+  }
+  if (nodeEnvRaw !== "test" && Buffer.byteLength(authoritativeRollSecret, "utf8") < 32) {
+    throw new Error("AUTHORITATIVE_ROLL_SECRET must be at least 32 UTF-8 bytes");
+  }
+
   return {
+    authoritativeRollSecret,
     cookieSecure,
     databaseUrl,
     host: env.HOST ?? "0.0.0.0",

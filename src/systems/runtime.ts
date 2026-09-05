@@ -1,7 +1,10 @@
 import { PublishedPackageCorruptError, type PublishedPackageLoader } from "./implementation/runtime/package-loader.js";
 import { buildCharacterProjection } from "./implementation/runtime/projection.js";
 import { resolveObservedValues } from "./implementation/runtime/resolve.js";
-import { decodeRuntimeState, initializeState } from "./implementation/runtime/state.js";
+import { createDeterministicRng } from "./implementation/runtime/deterministic-rng.js";
+import { buildFieldBindings, decodeRuntimeState, initializeState } from "./implementation/runtime/state.js";
+import { evaluate } from "./implementation/rules/evaluate.js";
+import type { ActionInputV1, EntityDefinitionV1, SystemPackageV1 } from "./implementation/package/schema/index.js";
 
 export type VersionId = string;
 export type DefinitionId = string;
@@ -199,8 +202,8 @@ export function createSystemRuntime(input: {
   loadPackage: PublishedPackageLoader;
   authoritativeRollSecret: string;
 }): SystemRuntime {
-  if (input.authoritativeRollSecret.length === 0) {
-    throw new Error("Authoritative roll secret must not be empty.");
+  if (Buffer.byteLength(input.authoritativeRollSecret, "utf8") < 32) {
+    throw new Error("Authoritative roll secret must be at least 32 UTF-8 bytes.");
   }
 
   return {
@@ -230,6 +233,14 @@ export function createSystemRuntime(input: {
       }
 
       let stateResult: RuntimeResult<RuntimeStateV1>;
+      let changedDefinitionIds: DefinitionId[] = [];
+      let pendingRoll: {
+        actionId: DefinitionId;
+        expressionId: DefinitionId;
+        inputs: Record<DefinitionId, RuntimeScalar>;
+        executionId: CommandExecutionId;
+        outputTemplate: string;
+      } | null = null;
       if (request.intent.kind === "initialize") {
         if (request.state !== undefined) {
           return { ok: false, error: { code: "bad_request", message: "Initialize does not accept existing state." } };
@@ -241,12 +252,99 @@ export function createSystemRuntime(input: {
         }
         stateResult = decodeRuntimeState(entity, request.state);
       } else {
-        return { ok: false, error: { code: "bad_request", message: "Runtime intent is not implemented." } };
+        if (request.state === undefined) {
+          return { ok: false, error: { code: "bad_request", message: "Runtime command requires state." } };
+        }
+        stateResult = decodeRuntimeState(entity, request.state);
+        if (!stateResult.ok) return stateResult;
+
+        if (request.intent.kind === "set") {
+          const fieldId = request.intent.fieldId;
+          const field = entity.fields.find((candidate) => candidate.id === fieldId);
+          if (field === undefined || field.kind === "computed" || field.kind === "resource") {
+            return badRequest("Field is not editable.", request.intent.fieldId);
+          }
+          if (field.kind === "image" && request.intent.value !== null) {
+            return unsupportedImage(field.id);
+          }
+          const nextState = structuredClone(stateResult.value);
+          nextState.values[field.id] = request.intent.value as RuntimeStoredValue;
+          const decoded = decodeRuntimeState(entity, nextState);
+          if (!decoded.ok) return badRequest("Field value is invalid.", field.id);
+          changedDefinitionIds = sameValue(stateResult.value.values[field.id]!, decoded.value.values[field.id]!)
+            ? []
+            : [field.id];
+          stateResult = decoded;
+        } else if (request.intent.kind === "bump") {
+          const bumped = changeResource(
+            entity,
+            stateResult.value,
+            request.intent.resourceId,
+            request.intent.direction === "up" ? 1 : -1,
+          );
+          if (!bumped.ok) return bumped;
+          stateResult = { ok: true, value: bumped.value };
+          changedDefinitionIds = [request.intent.resourceId];
+        } else {
+          const action = findOwnedAction(packageValue, entity.id, request.intent.actionId);
+          if (action === undefined) return badRequest("Action does not belong to the entity.", request.intent.actionId);
+          if (action.kind === "resourceBump") {
+            if (Object.keys(request.intent.inputs).length > 0) {
+              const definitionId = Object.keys(request.intent.inputs)[0]!;
+              return badRequest("Resource actions do not accept inputs.", definitionId);
+            }
+            const resource = entity.fields.find((field) => field.id === action.resourceId);
+            if (resource?.kind !== "resource") return invalidPackage(action.resourceId);
+            const current = stateResult.value.values[resource.id] as RuntimeResourceValue;
+            const target = action.operation.kind === "reset"
+              ? resource.resetTo === "max" ? current.max : resource.min
+              : current.current + action.operation.amount;
+            const changed = target !== current.current;
+            const nextState = structuredClone(stateResult.value);
+            nextState.values[resource.id] = { current: target, max: current.max };
+            const decoded = decodeRuntimeState(entity, nextState);
+            if (!decoded.ok) return badRequest("Resource action exceeds its bounds.", resource.id);
+            stateResult = decoded;
+            changedDefinitionIds = changed ? [resource.id] : [];
+          } else {
+            const actionInputs = decodeActionInputs(action.inputs, request.intent.inputs);
+            if (!actionInputs.ok) return actionInputs;
+            pendingRoll = {
+              actionId: action.id,
+              expressionId: action.expressionId,
+              inputs: actionInputs.value,
+              executionId: request.intent.executionId,
+              outputTemplate: action.outputTemplate,
+            };
+          }
+        }
       }
       if (!stateResult.ok) return stateResult;
 
       const observed = resolveObservedValues(packageValue, entity, stateResult.value);
       if (!observed.ok) return observed;
+      let roll: NormalizedRoll | null = null;
+      if (pendingRoll !== null) {
+        const expression = packageValue.expressions.find((candidate) => candidate.id === pendingRoll.expressionId);
+        if (expression === undefined || expression.context !== "roll") return invalidPackage(pendingRoll.expressionId);
+        const fields = buildFieldBindings(entity, stateResult.value);
+        Object.assign(fields, observed.value.derivedValues);
+        const evaluated = evaluate(
+          expression,
+          { fields, inputs: pendingRoll.inputs },
+          createDeterministicRng(input.authoritativeRollSecret, pendingRoll.executionId),
+          packageValue.effectiveLimits,
+        );
+        if (!evaluated.ok || evaluated.roll === null) return invalidPackage(expression.id);
+        roll = {
+          actionId: pendingRoll.actionId,
+          expression: evaluated.roll.expression,
+          dice: evaluated.roll.dice,
+          bindings: evaluated.bindings,
+          total: evaluated.roll.total,
+          output: pendingRoll.outputTemplate.split("{total}").join(String(evaluated.roll.total)),
+        };
+      }
       const projection = buildCharacterProjection({
         packageValue,
         entity,
@@ -262,11 +360,104 @@ export function createSystemRuntime(input: {
           state: stateResult.value,
           derivedValues: observed.value.derivedValues,
           validations: observed.value.validations,
-          changedDefinitionIds: [],
-          roll: null,
+          changedDefinitionIds,
+          roll,
           projection,
         },
       };
+    },
+  };
+}
+
+function findOwnedAction(packageValue: SystemPackageV1, entityId: string, actionId: string) {
+  const owned = packageValue.sheets
+    .filter((sheet) => sheet.targetEntityId === entityId)
+    .some((sheet) => sheet.sections.some((section) =>
+      section.elements.some((element) => element.kind === "action" && element.actionId === actionId)
+    ));
+  return owned ? packageValue.actions.find((action) => action.id === actionId) : undefined;
+}
+
+function decodeActionInputs(
+  definitions: ActionInputV1[],
+  supplied: Record<string, unknown>,
+): RuntimeResult<Record<string, RuntimeScalar>> {
+  const byId = new Map(definitions.map((definition) => [definition.id, definition]));
+  for (const id of Object.keys(supplied)) {
+    if (!byId.has(id)) return badRequest("Action input is unknown.", id);
+  }
+  const values: Record<string, RuntimeScalar> = {};
+  for (const definition of definitions) {
+    if (definition.required && !Object.hasOwn(supplied, definition.id)) {
+      return badRequest("Required action input is missing.", definition.id);
+    }
+    const value = Object.hasOwn(supplied, definition.id) ? supplied[definition.id] : definition.default;
+    if (!validActionInput(definition, value)) return badRequest("Action input value is invalid.", definition.id);
+    values[definition.id] = value as RuntimeScalar;
+  }
+  return { ok: true, value: values };
+}
+
+function validActionInput(definition: ActionInputV1, value: unknown): boolean {
+  switch (definition.valueType) {
+    case "integer":
+      return Number.isInteger(value);
+    case "decimal":
+      return typeof value === "number" && Number.isFinite(value);
+    case "boolean":
+      return typeof value === "boolean";
+    case "text":
+      return typeof value === "string";
+  }
+}
+
+function changeResource(
+  entity: EntityDefinitionV1,
+  state: RuntimeStateV1,
+  resourceId: string,
+  direction: 1 | -1,
+): RuntimeResult<RuntimeStateV1> {
+  const resource = entity.fields.find((field) => field.id === resourceId);
+  if (resource?.kind !== "resource") return badRequest("Resource does not belong to the entity.", resourceId);
+  const current = state.values[resource.id] as RuntimeResourceValue;
+  const nextState = structuredClone(state);
+  nextState.values[resource.id] = {
+    current: current.current + direction * resource.step,
+    max: current.max,
+  };
+  const decoded = decodeRuntimeState(entity, nextState);
+  return decoded.ok ? decoded : badRequest("Resource bump exceeds its bounds.", resource.id);
+}
+
+function sameValue(left: RuntimeStoredValue, right: RuntimeStoredValue): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function badRequest(message: string, definitionId?: string): RuntimeResult<never> {
+  return {
+    ok: false,
+    error: { code: "bad_request", message, ...(definitionId === undefined ? {} : { definitionId }) },
+  };
+}
+
+function unsupportedImage(definitionId: string): RuntimeResult<never> {
+  return {
+    ok: false,
+    error: {
+      code: "unsupported_field_value",
+      message: "Image field values are not supported.",
+      definitionId,
+    },
+  };
+}
+
+function invalidPackage(definitionId: string): RuntimeResult<never> {
+  return {
+    ok: false,
+    error: {
+      code: "invalid_package",
+      message: "Published package runtime references are invalid.",
+      definitionId,
     },
   };
 }

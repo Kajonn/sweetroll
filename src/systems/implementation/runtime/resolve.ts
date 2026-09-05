@@ -24,7 +24,7 @@ export function resolveObservedValues(
   const expressions = new Map(packageValue.expressions.map((expression) => [expression.id, expression]));
   const computed = entity.fields.filter((field) => field.kind === "computed");
   const computedById = new Map(computed.map((field) => [field.id, field]));
-  const bindings = buildFieldBindings(entity, state);
+  const bindings = { fields: buildFieldBindings(entity, state), inputs: {} };
   const derivedValues: Record<string, RuntimeScalar> = {};
   const validations: RuntimeValidation[] = entity.fields.flatMap((field) => {
     if (field.kind === "computed" || field.kind === "resource" || !field.required) return [];
@@ -57,7 +57,7 @@ export function resolveObservedValues(
     const result = evaluate(expression, bindings);
     if (!result.ok) return invalidPackage(expression.id);
     derivedValues[field.id] = result.result;
-    bindings[field.id] = result.result;
+    bindings.fields[field.id] = result.result;
     for (const diagnostic of result.diagnostics) {
       validations.push({
         validationId: `arithmetic_${expression.id}`,

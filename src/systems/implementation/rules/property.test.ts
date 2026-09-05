@@ -97,7 +97,7 @@ describe("property: determinism", () => {
     for (let i = 0; i < N; i++) {
       const ast = gen.next();
       const expr = compileExpr(ast, "number");
-      const bindings = { a: 3, b: 7, mod: -2 };
+      const bindings = { fields: { a: 3, b: 7, mod: -2 }, inputs: {} };
       const rng1 = createLcg(1000 + i);
       const rng2 = createLcg(1000 + i);
 
@@ -153,7 +153,7 @@ describe("property: round-trip (d6SuccessPool fixtures)", () => {
 describe("property: determinism (d20 check_expr)", () => {
   it("same rng seed produces identical dice and total", () => {
     const checkExpr = d20Package.expressions.find((e) => e.id === "check_expr")!;
-    const bindings = { modifier: 3, bonus: 1 };
+    const bindings = { fields: { modifier: 3 }, inputs: { bonus: 1 } };
 
     const r1 = evaluate(checkExpr, bindings, seqRng([0.5, 0.1, 0.9]));
     const r2 = evaluate(checkExpr, bindings, seqRng([0.5, 0.1, 0.9]));
@@ -168,7 +168,7 @@ describe("property: determinism (d20 check_expr)", () => {
 
   it("different rng seeds produce different results (high probability)", () => {
     const checkExpr = d20Package.expressions.find((e) => e.id === "check_expr")!;
-    const bindings = { modifier: 3, bonus: 1 };
+    const bindings = { fields: { modifier: 3 }, inputs: { bonus: 1 } };
 
     const r1 = evaluate(checkExpr, bindings, seqRng([0.01, 0.01, 0.01]));
     const r2 = evaluate(checkExpr, bindings, seqRng([0.99, 0.99, 0.99]));

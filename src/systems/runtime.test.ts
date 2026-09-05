@@ -3,7 +3,12 @@ import type { Pool } from "pg";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import { signSystemPackage } from "./implementation/package/canonical.js";
-import { d20Package } from "./implementation/package/fixtures/index.js";
+import {
+  d20Document,
+  d20Package,
+  d6SuccessPoolPackage,
+  pbta2d6Package,
+} from "./implementation/package/fixtures/index.js";
 import { validDocument } from "./implementation/package/schema/test-values.js";
 import type { SystemDocumentV1, SystemPackageV1 } from "./implementation/package/schema/index.js";
 import { compileDocument } from "./implementation/rules/compile-document.js";
@@ -211,6 +216,213 @@ describe("SystemRuntime contract", () => {
 
     expect(observed).toEqual(initialized);
     expect(state).toEqual(before);
+  });
+
+  it.each([
+    [d20Package, "ability", 12, { defense: 10 }],
+    [pbta2d6Package, "move_stat", 2, { current_penalty: 0 }],
+    [d6SuccessPoolPackage, "attribute", 3, { pool_size: 4 }],
+  ])("sets an editable field and rebuilds complete output for $name", async (packageValue, fieldId, value, derivedValues) => {
+    const runtime = createRuntime(packageValue);
+    const initialized = await initialize(runtime, packageValue);
+
+    const result = await runtime.resolve({
+      versionId: packageValue.versionId,
+      entityId: "character",
+      state: initialized.state,
+      intent: { kind: "set", fieldId, value },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.state.values[fieldId]).toBe(value);
+    expect(result.value.derivedValues).toEqual(derivedValues);
+    expect(result.value.changedDefinitionIds).toEqual([fieldId]);
+    expect(result.value.roll).toBeNull();
+    expect(result.value.projection.derivedValues).toEqual(derivedValues);
+  });
+
+  it("rejects computed writes and preserves null-only image storage", async () => {
+    const packageValue = compileRuntimePackage(allFieldDocument());
+    const runtime = createRuntime(packageValue);
+    const initialized = await initialize(runtime, packageValue);
+
+    await expect(runtime.resolve({
+      versionId: packageValue.versionId,
+      entityId: "character",
+      state: initialized.state,
+      intent: { kind: "set", fieldId: "defense", value: 11 },
+    })).resolves.toMatchObject({ ok: false, error: { code: "bad_request", definitionId: "defense" } });
+    await expect(runtime.resolve({
+      versionId: packageValue.versionId,
+      entityId: "character",
+      state: initialized.state,
+      intent: { kind: "set", fieldId: "portrait", value: "image-key" },
+    })).resolves.toEqual({
+      ok: false,
+      error: {
+        code: "unsupported_field_value",
+        message: "Image field values are not supported.",
+        definitionId: "portrait",
+      },
+    });
+  });
+
+  it.each([
+    [d20Package, "health", "down" as const, 9],
+    [pbta2d6Package, "harm", "up" as const, 1],
+    [d6SuccessPoolPackage, "stress", "up" as const, 1],
+  ])("bumps package resources by their authored step for $name", async (packageValue, resourceId, direction, current) => {
+    const runtime = createRuntime(packageValue);
+    const initialized = await initialize(runtime, packageValue);
+
+    const result = await runtime.resolve({
+      versionId: packageValue.versionId,
+      entityId: "character",
+      state: initialized.state,
+      intent: { kind: "bump", resourceId, direction },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.state.values[resourceId]).toMatchObject({ current });
+    expect(result.value.changedDefinitionIds).toEqual([resourceId]);
+  });
+
+  it("rejects resource bumps beyond current bounds instead of clamping", async () => {
+    const runtime = createRuntime(pbta2d6Package);
+    const initialized = await initialize(runtime, pbta2d6Package);
+
+    const result = await runtime.resolve({
+      versionId: pbta2d6Package.versionId,
+      entityId: "character",
+      state: initialized.state,
+      intent: { kind: "bump", resourceId: "harm", direction: "down" },
+    });
+
+    expect(result).toMatchObject({ ok: false, error: { code: "bad_request", definitionId: "harm" } });
+  });
+
+  it.each([
+    [d20Package, "check", { bonus: 2 }, "Result: "],
+    [pbta2d6Package, "make_move", { forward: 1 }, "Result: "],
+    [d6SuccessPoolPackage, "test_pool", { bonus_dice: 1 }, "Successes: "],
+  ])("executes deterministic roll actions without mutating state for $name", async (packageValue, actionId, inputs, outputPrefix) => {
+    const runtime = createRuntime(packageValue);
+    const initialized = await initialize(runtime, packageValue);
+    const state = structuredClone(initialized.state);
+    const before = structuredClone(state);
+    const request = {
+      versionId: packageValue.versionId,
+      entityId: "character",
+      state,
+      intent: { kind: "action" as const, actionId, inputs, executionId: "exec-a" },
+    };
+
+    const first = await runtime.resolve(request);
+    const replay = await runtime.resolve(request);
+
+    expect(first).toEqual(replay);
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(first.value.state).toEqual(before);
+    expect(state).toEqual(before);
+    expect(first.value.changedDefinitionIds).toEqual([]);
+    expect(first.value.roll).toMatchObject({ actionId, output: expect.stringMatching(`^${outputPrefix}`) });
+    expect(first.value.roll?.dice.length).toBeGreaterThan(0);
+  });
+
+  it("returns normalized scoped bindings and changes dice for a different execution ID", async () => {
+    const runtime = createRuntime(d6SuccessPoolPackage);
+    const initialized = await initialize(runtime, d6SuccessPoolPackage);
+    const execute = (executionId: string) => runtime.resolve({
+      versionId: d6SuccessPoolPackage.versionId,
+      entityId: "character",
+      state: initialized.state,
+      intent: { kind: "action", actionId: "test_pool", inputs: { bonus_dice: 6 }, executionId },
+    });
+
+    const a = await execute("exec-a");
+    const b = await execute("exec-b");
+
+    expect(a.ok && b.ok).toBe(true);
+    if (!a.ok || !b.ok) return;
+    expect(a.value.roll).toEqual({
+      actionId: "test_pool",
+      expression: "countSuccesses(dice(fields.attribute + fields.skill + inputs.bonus_dice, 6), 6)",
+      dice: [4, 4, 3, 5, 3, 4, 6, 3].map((value) => ({ sides: 6, value, kept: true })),
+      bindings: [
+        { scope: "fields", definitionId: "attribute", value: 1 },
+        { scope: "fields", definitionId: "skill", value: 1 },
+        { scope: "inputs", definitionId: "bonus_dice", value: 6 },
+      ],
+      total: 1,
+      output: "Successes: 1",
+    });
+    expect(a.value.roll?.dice).not.toEqual(b.value.roll?.dice);
+  });
+
+  it("validates action ownership and typed inputs", async () => {
+    const runtime = createRuntime(d20Package);
+    const initialized = await initialize(runtime, d20Package);
+    const execute = (actionId: string, inputs: Record<string, unknown>) => runtime.resolve({
+      versionId: d20Package.versionId,
+      entityId: "character",
+      state: initialized.state,
+      intent: { kind: "action", actionId, inputs, executionId: "exec-a" },
+    });
+
+    await expect(execute("check", { bonus: "two" })).resolves.toMatchObject({
+      ok: false,
+      error: { code: "bad_request", definitionId: "bonus" },
+    });
+    await expect(execute("check", { bonus: 1, extra: 2 })).resolves.toMatchObject({
+      ok: false,
+      error: { code: "bad_request", definitionId: "extra" },
+    });
+    await expect(execute("heal", {})).resolves.toMatchObject({
+      ok: false,
+      error: { code: "bad_request", definitionId: "heal" },
+    });
+  });
+
+  it("executes owned resource delta and reset actions without a roll", async () => {
+    const document = structuredClone(d20Document);
+    document.sheets[0]!.sections[2]!.elements.push(
+      { kind: "action", id: "damage_element", actionId: "damage" },
+      { kind: "action", id: "heal_element", actionId: "heal" },
+    );
+    document.actions.push({
+      kind: "resourceBump",
+      id: "rest",
+      label: "Rest",
+      resourceId: "health",
+      operation: { kind: "reset" },
+    });
+    document.sheets[0]!.sections[2]!.elements.push({ kind: "action", id: "rest_element", actionId: "rest" });
+    const packageValue = compileRuntimePackage(document);
+    const runtime = createRuntime(packageValue);
+    const initialized = await initialize(runtime, packageValue);
+    const execute = (state: RuntimeResolution["state"], actionId: string) => runtime.resolve({
+      versionId: packageValue.versionId,
+      entityId: "character",
+      state,
+      intent: { kind: "action", actionId, inputs: {}, executionId: `exec-${actionId}` },
+    });
+
+    const damaged = await execute(initialized.state, "damage");
+    expect(damaged.ok).toBe(true);
+    if (!damaged.ok) return;
+    expect(damaged.value.state.values.health).toEqual({ current: 9, max: 10 });
+    expect(damaged.value.changedDefinitionIds).toEqual(["health"]);
+    expect(damaged.value.roll).toBeNull();
+
+    const reset = await execute(damaged.value.state, "rest");
+    expect(reset.ok).toBe(true);
+    if (!reset.ok) return;
+    expect(reset.value.state.values.health).toEqual({ current: 10, max: 10 });
+    expect(reset.value.changedDefinitionIds).toEqual(["health"]);
+    expect(reset.value.roll).toBeNull();
   });
 
   it.each([
@@ -437,12 +649,12 @@ describe("SystemRuntime contract", () => {
   it("maps missing and corrupt packages and validates the authoritative secret", async () => {
     expect(() => createSystemRuntime({
       loadPackage: async () => null,
-      authoritativeRollSecret: "",
-    })).toThrow("Authoritative roll secret must not be empty.");
+      authoritativeRollSecret: "short",
+    })).toThrow("Authoritative roll secret must be at least 32 UTF-8 bytes.");
 
     const missing = createSystemRuntime({
       loadPackage: async () => null,
-      authoritativeRollSecret: "runtime-test-secret",
+      authoritativeRollSecret: "0123456789abcdef0123456789abcdef",
     });
     await expect(missing.resolve({
       versionId: "00000000-0000-4000-8000-000000000099",
@@ -454,7 +666,7 @@ describe("SystemRuntime contract", () => {
       loadPackage: async () => {
         throw new PublishedPackageCorruptError("00000000-0000-4000-8000-000000000099");
       },
-      authoritativeRollSecret: "runtime-test-secret",
+      authoritativeRollSecret: "0123456789abcdef0123456789abcdef",
     });
     await expect(corrupt.resolve({
       versionId: "00000000-0000-4000-8000-000000000099",
@@ -552,7 +764,7 @@ function compileRuntimePackage(document: SystemDocumentV1): SystemPackageV1 {
 function createRuntime(packageValue: SystemPackageV1): SystemRuntime {
   return createSystemRuntime({
     loadPackage: createFixturePublishedPackageLoader([packageValue]),
-    authoritativeRollSecret: "runtime-test-secret",
+    authoritativeRollSecret: "0123456789abcdef0123456789abcdef",
   });
 }
 
@@ -560,10 +772,13 @@ async function initialize(
   runtime: SystemRuntime,
   packageValue: SystemPackageV1,
 ): Promise<RuntimeResolution> {
+  const hasName = packageValue.entities
+    .find((entity) => entity.id === "character")
+    ?.fields.some((field) => field.id === "name");
   const result = await runtime.resolve({
     versionId: packageValue.versionId,
     entityId: "character",
-    intent: { kind: "initialize", values: { name: "Hero" } },
+    intent: { kind: "initialize", ...(hasName ? { values: { name: "Hero" } } : {}) },
   });
   if (!result.ok) throw new Error(`Initialization failed: ${result.error.code}`);
   return result.value;

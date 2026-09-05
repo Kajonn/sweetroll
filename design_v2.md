@@ -348,7 +348,7 @@ Redis, object storage for package exports, a message broker, microservices, and 
 | **Module or Adapter** | **Interface and ownership** |
 |-----------------------|-----------------------------|
 | Identity Module | Resolves external identities into local users and sessions. Owns users, external identities, sessions, and account lifecycle. Its implementation uses the OIDC port. |
-| SystemAuthoring Module | Creates, opens, lists, saves, previews, publishes, exports, and changes lifecycle. Owns systems, drafts, versions, preview snapshots, authoring idempotency receipts, and system audit records. |
+| SystemAuthoring Module | Creates, opens, lists, saves, previews, publishes, exports, changes lifecycle, and deletes. Owns systems, drafts, versions, preview snapshots, authoring idempotency receipts, and system audit records. |
 | SystemRuntime Module | Resolves an immutable version, state, and intent into a complete validated next state and render projection. Owns no mutable data and produces no persistence side effects. |
 | HTTP Adapter | Maps versioned REST routes to one Module call each. Owns wire formats, request-size checks, authentication context creation, and stable HTTP error mapping, but no business ordering. |
 | OIDC Adapter | Satisfies the Identity Module's external port. Provider tokens and claims never enter Systems Interfaces. |
@@ -380,6 +380,7 @@ interface SystemAuthoring {
   publish(ctx: RequestContext, input: PublishDraft): Promise<Result<PublishedVersion>>;
   exportVersion(ctx: RequestContext, versionId: VersionId): Promise<Result<ExportedPackage>>;
   changeLifecycle(ctx: RequestContext, input: LifecycleChange): Promise<Result<LifecycleResult>>;
+  deleteSystem(ctx: RequestContext, systemId: SystemId): Promise<Result<{ systemId: SystemId }>>;
 }
 
 interface SystemRuntime {
@@ -480,7 +481,7 @@ Expose a versioned REST HTTP interface described by OpenAPI. Use resource-orient
 
 | **Area**   | **Representative endpoints**                                                                                                            |
 |------------|-----------------------------------------------------------------------------------------------------------------------------------------|
-| Systems    | POST/GET /systems; GET /systems/{id}; GET /systems/{id}/versions; PUT /systems/{id}/draft; POST /systems/{id}/preview; POST /systems/{id}/publish; PATCH /systems/{id} |
+| Systems    | POST/GET /systems; GET /systems/{id}; GET /systems/{id}/versions; PUT /systems/{id}/draft; POST /systems/{id}/preview; POST /systems/{id}/publish; PATCH /systems/{id}; DELETE /systems/{id} |
 | Versions   | GET/PATCH /system-versions/{id}; GET /system-versions/{id}/export                                                                        |
 | Templates  | GET /templates; create a system with a version source to clone a template                                                               |
 | Campaigns  | POST /campaigns; GET/PATCH /campaigns/{id}; POST /campaigns/{id}/invitations; DELETE /campaigns/{id}/members/{memberId}                 |

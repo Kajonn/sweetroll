@@ -1,15 +1,28 @@
 export type ApiErrorCode = string;
 
+export type ApiDiagnostic = { code: string; path: string; message: string };
+
 export class ApiError extends Error {
   readonly code: ApiErrorCode;
   readonly status: number;
   readonly requestId: string;
+  readonly latestRevision: number | null;
+  readonly diagnostics: ReadonlyArray<ApiDiagnostic>;
 
-  constructor(input: { code: ApiErrorCode; message: string; status: number; requestId: string }) {
+  constructor(input: {
+    code: ApiErrorCode;
+    message: string;
+    status: number;
+    requestId: string;
+    latestRevision: number | null;
+    diagnostics: ReadonlyArray<ApiDiagnostic>;
+  }) {
     super(input.message);
     this.code = input.code;
     this.status = input.status;
     this.requestId = input.requestId;
+    this.latestRevision = input.latestRevision;
+    this.diagnostics = input.diagnostics;
   }
 }
 
@@ -53,12 +66,23 @@ export function createApiClient(input: CreateApiClientInput): ApiClient {
       const text = await response.text();
       const parsed: unknown = text.length === 0 ? null : JSON.parse(text);
       if (!response.ok) {
-        const env = parsed as { error?: { code?: string; message?: string }; requestId?: string } | null;
+        const env = parsed as {
+          error?: {
+            code?: string;
+            message?: string;
+            latestRevision?: number | null;
+            diagnostics?: ReadonlyArray<ApiDiagnostic>;
+          };
+          requestId?: string;
+        } | null;
+        const err = env?.error;
         throw new ApiError({
-          code: env?.error?.code ?? `http_${response.status}`,
-          message: env?.error?.message ?? response.statusText,
+          code: err?.code ?? `http_${response.status}`,
+          message: err?.message ?? response.statusText,
           status: response.status,
           requestId: env?.requestId ?? requestId,
+          latestRevision: err?.latestRevision ?? null,
+          diagnostics: err?.diagnostics ?? [],
         });
       }
       return parsed as never;

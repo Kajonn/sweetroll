@@ -22,7 +22,8 @@ const STATUS_BY_CODE: Record<CharacterError["code"], number> = {
   idempotency_mismatch: 409,
   command_in_progress: 409,
   invalid_value: 422,
-  internal: 503,
+  internal: 500,
+  temporarily_unavailable: 503,
 };
 
 const badRequest = (message: string): CharacterError => ({ code: "bad_request", message });
@@ -281,6 +282,7 @@ const ErrorResponses = {
   "404": CharacterErrorEnvelope,
   "409": CharacterErrorEnvelope,
   "422": CharacterErrorEnvelope,
+  "500": CharacterErrorEnvelope,
   "503": CharacterErrorEnvelope,
 };
 
@@ -293,6 +295,7 @@ const CreateCharacterBody = Type.Object({
   entityDefinitionId: Type.String({ minLength: 1 }),
   name: Type.String({ minLength: 1 }),
   initialValues: Type.Optional(Type.Object({}, { additionalProperties: true })),
+  idempotencyKey: Type.String({ minLength: 1 }),
 });
 
 const ListCharactersQuery = Type.Object({
@@ -325,27 +328,40 @@ const RollbackMigrationParams = Type.Object({
 const SetFieldBody = Type.Object({
   value: Type.Unknown(),
   expectedRevision: Type.Integer(),
+  idempotencyKey: Type.String({ minLength: 1 }),
 });
 const BumpResourceBody = Type.Object({
   direction: Type.Union([Type.Literal("up"), Type.Literal("down")]),
   expectedRevision: Type.Integer(),
+  idempotencyKey: Type.String({ minLength: 1 }),
 });
 const ExecuteActionBody = Type.Object({
   inputs: Type.Optional(Type.Object({}, { additionalProperties: true })),
   expectedRevision: Type.Integer(),
+  idempotencyKey: Type.String({ minLength: 1 }),
 });
 const ManageCharacterBody = Type.Union([
   Type.Object({
     command: Type.Literal("rename"),
     name: Type.String({ minLength: 1 }),
     expectedRevision: Type.Integer(),
+    idempotencyKey: Type.String({ minLength: 1 }),
   }),
-  Type.Object({ command: Type.Literal("archive"), expectedRevision: Type.Integer() }),
-  Type.Object({ command: Type.Literal("recover"), expectedRevision: Type.Integer() }),
+  Type.Object({
+    command: Type.Literal("archive"),
+    expectedRevision: Type.Integer(),
+    idempotencyKey: Type.String({ minLength: 1 }),
+  }),
+  Type.Object({
+    command: Type.Literal("recover"),
+    expectedRevision: Type.Integer(),
+    idempotencyKey: Type.String({ minLength: 1 }),
+  }),
 ]);
 const TransferOwnershipBody = Type.Object({
   toUserId: Type.String({ format: UUID_FORMAT }),
   expectedRevision: Type.Integer(),
+  idempotencyKey: Type.String({ minLength: 1 }),
 });
 const CreateMigrationPreviewBody = Type.Object({
   targetVersionId: Type.String({ format: UUID_FORMAT }),
@@ -354,8 +370,11 @@ const CreateMigrationPreviewBody = Type.Object({
 });
 const CommitMigrationBody = Type.Object({
   expectedRevision: Type.Integer(),
+  idempotencyKey: Type.String({ minLength: 1 }),
 });
-const RollbackMigrationBody = Type.Object({});
+const RollbackMigrationBody = Type.Object({
+  idempotencyKey: Type.String({ minLength: 1 }),
+});
 
 type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 export type RouteResponse = TSchema | { schema: TSchema; mediaType?: string };
@@ -399,6 +418,7 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
         }),
         "400": CharacterErrorEnvelope,
         "401": UnauthorizedEnvelope,
+        "500": CharacterErrorEnvelope,
         "503": CharacterErrorEnvelope,
       },
     },
@@ -413,6 +433,7 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
         "200": Type.Object({ character: CharacterViewDto, requestId: Type.String() }),
         "401": UnauthorizedEnvelope,
         "404": CharacterErrorEnvelope,
+        "500": CharacterErrorEnvelope,
         "503": CharacterErrorEnvelope,
       },
     },
@@ -498,6 +519,7 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
         "400": CharacterErrorEnvelope,
         "401": UnauthorizedEnvelope,
         "404": CharacterErrorEnvelope,
+        "500": CharacterErrorEnvelope,
         "503": CharacterErrorEnvelope,
       },
     },
@@ -512,6 +534,7 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
         "200": { schema: CharacterExportDto, mediaType: "application/vnd.sweetroll.character+json;version=1" },
         "401": UnauthorizedEnvelope,
         "404": CharacterErrorEnvelope,
+        "500": CharacterErrorEnvelope,
         "503": CharacterErrorEnvelope,
       },
     },
@@ -613,11 +636,6 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
       requestId: request.id,
     });
 
-    const idempotencyKeyOf = (request: FastifyRequest): string | undefined => {
-      const header = request.headers["idempotency-key"];
-      return typeof header === "string" && header.length > 0 ? header : undefined;
-    };
-
     const sendError = (reply: FastifyReply, error: CharacterError, requestId: string) => {
       // The wire contract requires purge on EVERY inaccessible-character response. The
       // module's legacy play-path (open/apply/create) misses the flag, so the adapter
@@ -675,22 +693,19 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
     type Handler = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown> | unknown;
     const handlers: Record<string, Handler> = {
       post_characters: async (request, reply) => {
-        const idempotencyKey = idempotencyKeyOf(request);
-        if (idempotencyKey === undefined) {
-          return sendError(reply, badRequest("Idempotency-Key header is required."), request.id);
-        }
         const body = request.body as {
           systemVersionId: string;
           entityDefinitionId: string;
           name: string;
           initialValues?: Record<string, unknown>;
+          idempotencyKey: string;
         };
         const result = await characters.create(ctxOf(request), {
           systemVersionId: body.systemVersionId,
           entityDefinitionId: body.entityDefinitionId,
           name: body.name,
           ...(body.initialValues === undefined ? {} : { initialValues: body.initialValues }),
-          idempotencyKey,
+          idempotencyKey: body.idempotencyKey,
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return reply.code(201).send({ character: toCharacterDto(result.value), requestId: request.id });
@@ -729,18 +744,14 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
 
       post_characters_characterId_fields_fieldId_set: async (request, reply) => {
         const params = request.params as { characterId: string; fieldId: string };
-        const idempotencyKey = idempotencyKeyOf(request);
-        if (idempotencyKey === undefined) {
-          return sendError(reply, badRequest("Idempotency-Key header is required."), request.id);
-        }
-        const body = request.body as { value: unknown; expectedRevision: number };
+        const body = request.body as { value: unknown; expectedRevision: number; idempotencyKey: string };
         const command: CharacterCommand = {
           kind: "setField",
           characterId: params.characterId,
           fieldId: params.fieldId,
           value: body.value,
           expectedRevision: body.expectedRevision,
-          idempotencyKey,
+          idempotencyKey: body.idempotencyKey,
         };
         const result = await characters.apply(ctxOf(request), command);
         if (!result.ok) return sendError(reply, result.error, request.id);
@@ -749,18 +760,18 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
 
       post_characters_characterId_resources_resourceId_bump: async (request, reply) => {
         const params = request.params as { characterId: string; resourceId: string };
-        const idempotencyKey = idempotencyKeyOf(request);
-        if (idempotencyKey === undefined) {
-          return sendError(reply, badRequest("Idempotency-Key header is required."), request.id);
-        }
-        const body = request.body as { direction: "up" | "down"; expectedRevision: number };
+        const body = request.body as {
+          direction: "up" | "down";
+          expectedRevision: number;
+          idempotencyKey: string;
+        };
         const command: CharacterCommand = {
           kind: "bumpResource",
           characterId: params.characterId,
           resourceId: params.resourceId,
           direction: body.direction,
           expectedRevision: body.expectedRevision,
-          idempotencyKey,
+          idempotencyKey: body.idempotencyKey,
         };
         const result = await characters.apply(ctxOf(request), command);
         if (!result.ok) return sendError(reply, result.error, request.id);
@@ -769,18 +780,18 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
 
       post_characters_characterId_actions_actionId: async (request, reply) => {
         const params = request.params as { characterId: string; actionId: string };
-        const idempotencyKey = idempotencyKeyOf(request);
-        if (idempotencyKey === undefined) {
-          return sendError(reply, badRequest("Idempotency-Key header is required."), request.id);
-        }
-        const body = request.body as { inputs?: Record<string, unknown>; expectedRevision: number };
+        const body = request.body as {
+          inputs?: Record<string, unknown>;
+          expectedRevision: number;
+          idempotencyKey: string;
+        };
         const command: CharacterCommand = {
           kind: "executeAction",
           characterId: params.characterId,
           actionId: params.actionId,
           inputs: body.inputs ?? {},
           expectedRevision: body.expectedRevision,
-          idempotencyKey,
+          idempotencyKey: body.idempotencyKey,
         };
         const result = await characters.apply(ctxOf(request), command);
         if (!result.ok) return sendError(reply, result.error, request.id);
@@ -789,14 +800,11 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
 
       patch_characters_characterId: async (request, reply) => {
         const params = request.params as { characterId: string };
-        const idempotencyKey = idempotencyKeyOf(request);
-        if (idempotencyKey === undefined) {
-          return sendError(reply, badRequest("Idempotency-Key header is required."), request.id);
-        }
         const body = request.body as {
           command: "rename" | "archive" | "recover";
           name?: string;
           expectedRevision: number;
+          idempotencyKey: string;
         };
         const command: CharacterManagementCommand =
           body.command === "rename"
@@ -805,20 +813,20 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
                 characterId: params.characterId,
                 name: body.name as string,
                 expectedRevision: body.expectedRevision,
-                idempotencyKey,
+                idempotencyKey: body.idempotencyKey,
               }
             : body.command === "archive"
               ? {
                   kind: "archive",
                   characterId: params.characterId,
                   expectedRevision: body.expectedRevision,
-                  idempotencyKey,
+                  idempotencyKey: body.idempotencyKey,
                 }
               : {
                   kind: "recover",
                   characterId: params.characterId,
                   expectedRevision: body.expectedRevision,
-                  idempotencyKey,
+                  idempotencyKey: body.idempotencyKey,
                 };
         const result = await characters.manage(ctxOf(request), command);
         if (!result.ok) return sendError(reply, result.error, request.id);
@@ -827,17 +835,13 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
 
       post_characters_characterId_ownership_transfer: async (request, reply) => {
         const params = request.params as { characterId: string };
-        const idempotencyKey = idempotencyKeyOf(request);
-        if (idempotencyKey === undefined) {
-          return sendError(reply, badRequest("Idempotency-Key header is required."), request.id);
-        }
-        const body = request.body as { toUserId: string; expectedRevision: number };
+        const body = request.body as { toUserId: string; expectedRevision: number; idempotencyKey: string };
         const command: CharacterManagementCommand = {
           kind: "transferOwnership",
           characterId: params.characterId,
           toUserId: body.toUserId,
           expectedRevision: body.expectedRevision,
-          idempotencyKey,
+          idempotencyKey: body.idempotencyKey,
         };
         const result = await characters.manage(ctxOf(request), command);
         if (!result.ok) return sendError(reply, result.error, request.id);
@@ -897,16 +901,12 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
 
       post_characters_characterId_migrations_previewId_commit: async (request, reply) => {
         const params = request.params as { characterId: string; previewId: string };
-        const idempotencyKey = idempotencyKeyOf(request);
-        if (idempotencyKey === undefined) {
-          return sendError(reply, badRequest("Idempotency-Key header is required."), request.id);
-        }
-        const body = request.body as { expectedRevision: number };
+        const body = request.body as { expectedRevision: number; idempotencyKey: string };
         const result = await characters.commitMigration(ctxOf(request), {
           characterId: params.characterId,
           previewId: params.previewId,
           expectedRevision: body.expectedRevision,
-          idempotencyKey,
+          idempotencyKey: body.idempotencyKey,
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { result: toCommandResultDto(result.value), requestId: request.id };
@@ -914,14 +914,11 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
 
       post_characters_characterId_migrations_migrationId_rollback: async (request, reply) => {
         const params = request.params as { characterId: string; migrationId: string };
-        const idempotencyKey = idempotencyKeyOf(request);
-        if (idempotencyKey === undefined) {
-          return sendError(reply, badRequest("Idempotency-Key header is required."), request.id);
-        }
+        const body = request.body as { idempotencyKey: string };
         const result = await characters.rollbackMigration(ctxOf(request), {
           characterId: params.characterId,
           migrationId: params.migrationId,
-          idempotencyKey,
+          idempotencyKey: body.idempotencyKey,
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { result: toCommandResultDto(result.value), requestId: request.id };

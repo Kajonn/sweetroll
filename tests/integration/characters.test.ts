@@ -759,7 +759,7 @@ describeWithDatabase("Characters (apply: set/bump)", () => {
     expect(stale.error.activityCursor).not.toBe("");
   });
 
-  it("does not finalize a transient runtime internal error, leaving the execution reclaimable", async () => {
+  it("does not finalize a transient runtime failure, leaving the execution reclaimable", async () => {
     const owner = await createUser("Ada");
     const { versionId } = await publishVersion(owner);
     const characterId = await createCharacter(owner, versionId);
@@ -786,7 +786,7 @@ describeWithDatabase("Characters (apply: set/bump)", () => {
     });
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("unexpected");
-    expect(result.error.code).toBe("internal");
+    expect(result.error.code).toBe("temporarily_unavailable");
 
     const execution = await pool.query<{ status: string }>(
       "SELECT status FROM character_command_executions WHERE actor_id = $1 AND idempotency_key = $2",

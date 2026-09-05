@@ -81,7 +81,8 @@ export type CharacterErrorCode =
   | "idempotency_mismatch"
   | "command_in_progress"
   | "invalid_value"
-  | "internal";
+  | "internal"
+  | "temporarily_unavailable";
 
 export type CharacterError = {
   code: CharacterErrorCode;
@@ -382,9 +383,9 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       ...(diagnostics === undefined ? {} : { diagnostics }),
     }),
     internal: (): CharacterError => ({ code: "internal", message: "An internal error occurred." }),
-    notImplemented: (): CharacterError => ({
-      code: "internal",
-      message: "This Characters capability is not implemented yet.",
+    temporarilyUnavailable: (): CharacterError => ({
+      code: "temporarily_unavailable",
+      message: "A temporary infrastructure failure occurred.",
     }),
   };
 
@@ -502,7 +503,10 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       case "invalid_package":
         return errors.invalid_value(error.message);
       default:
-        return errors.internal();
+        // Unrecognized/transient runtime codes (including the runtime's `internal`,
+        // which SystemRuntime uses for temporary I/O failures such as package-load
+        // errors) become temporarily_unavailable, not programmer-error internals.
+        return errors.temporarilyUnavailable();
     }
   }
 

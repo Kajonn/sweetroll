@@ -34,7 +34,6 @@ const fakeIdentity: Identity = {
 } as unknown as Identity;
 
 const cookie = { cookie: "session=t" };
-const mutationHeader = { "Idempotency-Key": "key-1" };
 
 const apps: ReturnType<typeof Fastify>[] = [];
 
@@ -194,26 +193,26 @@ describe("character HTTP routes", () => {
   it("rejects unauthenticated requests with 401 on every route", async () => {
     const app = await build(makeCharacters(), true);
     const routes: Array<{ method: "get" | "post" | "patch"; url: string; payload?: unknown }> = [
-      { method: "post", url: "/characters", payload: { systemVersionId: randomUUID(), entityDefinitionId: "character", name: "Aria" } },
+      { method: "post", url: "/characters", payload: { systemVersionId: randomUUID(), entityDefinitionId: "character", name: "Aria", idempotencyKey: "key-1" } },
       { method: "get", url: "/characters" },
       { method: "get", url: `/characters/${randomUUID()}` },
-      { method: "post", url: `/characters/${randomUUID()}/fields/ability/set`, payload: { value: 12, expectedRevision: 1 } },
-      { method: "post", url: `/characters/${randomUUID()}/resources/health/bump`, payload: { direction: "up", expectedRevision: 1 } },
-      { method: "post", url: `/characters/${randomUUID()}/actions/check`, payload: { inputs: {}, expectedRevision: 1 } },
-      { method: "patch", url: `/characters/${randomUUID()}`, payload: { command: "archive", expectedRevision: 1 } },
-      { method: "post", url: `/characters/${randomUUID()}/ownership-transfer`, payload: { toUserId: randomUUID(), expectedRevision: 1 } },
+      { method: "post", url: `/characters/${randomUUID()}/fields/ability/set`, payload: { value: 12, expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "post", url: `/characters/${randomUUID()}/resources/health/bump`, payload: { direction: "up", expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "post", url: `/characters/${randomUUID()}/actions/check`, payload: { inputs: {}, expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "patch", url: `/characters/${randomUUID()}`, payload: { command: "archive", expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "post", url: `/characters/${randomUUID()}/ownership-transfer`, payload: { toUserId: randomUUID(), expectedRevision: 1, idempotencyKey: "key-1" } },
       { method: "get", url: `/characters/${randomUUID()}/activity` },
       { method: "post", url: `/characters/${randomUUID()}/exports` },
       { method: "post", url: `/characters/${randomUUID()}/migration-previews`, payload: { targetVersionId: randomUUID() } },
-      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/commit`, payload: { expectedRevision: 1 } },
-      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/rollback`, payload: {} },
+      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/commit`, payload: { expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/rollback`, payload: { idempotencyKey: "key-1" } },
     ];
 
     for (const route of routes) {
       const response = await app.inject({
         method: route.method,
         url: route.url,
-        headers: { ...cookie, ...mutationHeader },
+        headers: cookie,
         ...(route.payload === undefined ? {} : { payload: route.payload }),
       });
       expect(response.statusCode, `${route.method} ${route.url}`).toBe(401);
@@ -222,7 +221,7 @@ describe("character HTTP routes", () => {
     }
   });
 
-  it("maps POST /characters to create and requires Idempotency-Key", async () => {
+  it("maps POST /characters to create and requires an idempotencyKey in the body", async () => {
     let received: unknown;
     const app = await build(
       makeCharacters({
@@ -236,12 +235,13 @@ describe("character HTTP routes", () => {
     const response = await app.inject({
       method: "POST",
       url: "/characters",
-      headers: { ...cookie, ...mutationHeader },
+      headers: cookie,
       payload: {
         systemVersionId,
         entityDefinitionId: "character",
         name: "Aria",
         initialValues: { ability: 12 },
+        idempotencyKey: "key-1",
       },
     });
     expect(response.statusCode).toBe(201);
@@ -268,6 +268,20 @@ describe("character HTTP routes", () => {
     });
     expect(missing.statusCode).toBe(400);
     expect(missing.json().error.code).toBe("bad_request");
+
+    const differentKey = await app.inject({
+      method: "POST",
+      url: "/characters",
+      headers: cookie,
+      payload: {
+        systemVersionId,
+        entityDefinitionId: "character",
+        name: "Aria",
+        idempotencyKey: "key-2",
+      },
+    });
+    expect(differentKey.statusCode).toBe(201);
+    expect(received).toMatchObject({ idempotencyKey: "key-2" });
   });
 
   it("maps GET /characters to list and validates limit", async () => {
@@ -331,8 +345,8 @@ describe("character HTTP routes", () => {
     const response = await app.inject({
       method: "POST",
       url: `/characters/${id}/fields/ability/set`,
-      headers: { ...cookie, ...mutationHeader },
-      payload: { value: 14, expectedRevision: 2 },
+      headers: cookie,
+      payload: { value: 14, expectedRevision: 2, idempotencyKey: "key-1" },
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ result: { character: expect.any(Object), roll: null }, requestId: expect.any(String) });
@@ -360,8 +374,8 @@ describe("character HTTP routes", () => {
     const response = await app.inject({
       method: "POST",
       url: `/characters/${id}/resources/health/bump`,
-      headers: { ...cookie, ...mutationHeader },
-      payload: { direction: "down", expectedRevision: 3 },
+      headers: cookie,
+      payload: { direction: "down", expectedRevision: 3, idempotencyKey: "key-1" },
     });
     expect(response.statusCode).toBe(200);
     expect(received).toEqual({
@@ -388,8 +402,8 @@ describe("character HTTP routes", () => {
     const response = await app.inject({
       method: "POST",
       url: `/characters/${id}/actions/check`,
-      headers: { ...cookie, ...mutationHeader },
-      payload: { expectedRevision: 1 },
+      headers: cookie,
+      payload: { expectedRevision: 1, idempotencyKey: "key-1" },
     });
     expect(response.statusCode).toBe(200);
     expect(received).toEqual({
@@ -416,8 +430,8 @@ describe("character HTTP routes", () => {
     const rename = await app.inject({
       method: "PATCH",
       url: `/characters/${id}`,
-      headers: { ...cookie, ...mutationHeader },
-      payload: { command: "rename", name: "Renamed", expectedRevision: 1 },
+      headers: cookie,
+      payload: { command: "rename", name: "Renamed", expectedRevision: 1, idempotencyKey: "key-1" },
     });
     expect(rename.statusCode).toBe(200);
     expect(rename.json()).toEqual({ result: { character: expect.any(Object), roll: null }, requestId: expect.any(String) });
@@ -425,16 +439,16 @@ describe("character HTTP routes", () => {
     const archive = await app.inject({
       method: "PATCH",
       url: `/characters/${id}`,
-      headers: { ...cookie, ...mutationHeader },
-      payload: { command: "archive", expectedRevision: 1 },
+      headers: cookie,
+      payload: { command: "archive", expectedRevision: 1, idempotencyKey: "key-1" },
     });
     expect(archive.statusCode).toBe(200);
 
     const recover = await app.inject({
       method: "PATCH",
       url: `/characters/${id}`,
-      headers: { ...cookie, ...mutationHeader },
-      payload: { command: "recover", expectedRevision: 1 },
+      headers: cookie,
+      payload: { command: "recover", expectedRevision: 1, idempotencyKey: "key-1" },
     });
     expect(recover.statusCode).toBe(200);
 
@@ -447,8 +461,8 @@ describe("character HTTP routes", () => {
     const bad = await app.inject({
       method: "PATCH",
       url: `/characters/${id}`,
-      headers: { ...cookie, ...mutationHeader },
-      payload: { command: "wat", expectedRevision: 1 },
+      headers: cookie,
+      payload: { command: "wat", expectedRevision: 1, idempotencyKey: "key-1" },
     });
     expect(bad.statusCode).toBe(400);
     expect(bad.json().error.code).toBe("bad_request");
@@ -469,8 +483,8 @@ describe("character HTTP routes", () => {
     const response = await app.inject({
       method: "POST",
       url: `/characters/${id}/ownership-transfer`,
-      headers: { ...cookie, ...mutationHeader },
-      payload: { toUserId, expectedRevision: 1 },
+      headers: cookie,
+      payload: { toUserId, expectedRevision: 1, idempotencyKey: "key-1" },
     });
     expect(response.statusCode).toBe(200);
     expect(received).toEqual({
@@ -590,8 +604,8 @@ describe("character HTTP routes", () => {
     const response = await app.inject({
       method: "POST",
       url: `/characters/${id}/migrations/${previewId}/commit`,
-      headers: { ...cookie, ...mutationHeader },
-      payload: { expectedRevision: 4 },
+      headers: cookie,
+      payload: { expectedRevision: 4, idempotencyKey: "key-1" },
     });
     expect(response.statusCode).toBe(200);
     expect(received).toEqual({
@@ -617,8 +631,8 @@ describe("character HTTP routes", () => {
     const response = await app.inject({
       method: "POST",
       url: `/characters/${id}/migrations/${migrationId}/rollback`,
-      headers: { ...cookie, ...mutationHeader },
-      payload: {},
+      headers: cookie,
+      payload: { idempotencyKey: "key-1" },
     });
     expect(response.statusCode).toBe(200);
     expect(received).toEqual({ characterId: id, migrationId, idempotencyKey: "key-1" });
@@ -629,8 +643,8 @@ describe("character HTTP routes", () => {
     const noName = await app.inject({
       method: "POST",
       url: "/characters",
-      headers: { ...cookie, ...mutationHeader },
-      payload: { systemVersionId: randomUUID(), entityDefinitionId: "character" },
+      headers: cookie,
+      payload: { systemVersionId: randomUUID(), entityDefinitionId: "character", idempotencyKey: "key-1" },
     });
     expect(noName.statusCode).toBe(400);
     expect(noName.json().error.code).toBe("bad_request");
@@ -638,18 +652,27 @@ describe("character HTTP routes", () => {
     const badDirection = await app.inject({
       method: "POST",
       url: `/characters/${randomUUID()}/resources/health/bump`,
-      headers: { ...cookie, ...mutationHeader },
-      payload: { direction: "sideways", expectedRevision: 1 },
+      headers: cookie,
+      payload: { direction: "sideways", expectedRevision: 1, idempotencyKey: "key-1" },
     });
     expect(badDirection.statusCode).toBe(400);
 
     const badRevision = await app.inject({
       method: "POST",
       url: `/characters/${randomUUID()}/migrations/${randomUUID()}/commit`,
-      headers: { ...cookie, ...mutationHeader },
-      payload: { expectedRevision: "abc" },
+      headers: cookie,
+      payload: { expectedRevision: "abc", idempotencyKey: "key-1" },
     });
     expect(badRevision.statusCode).toBe(400);
+
+    const noKey = await app.inject({
+      method: "POST",
+      url: `/characters/${randomUUID()}/fields/ability/set`,
+      headers: cookie,
+      payload: { value: 12, expectedRevision: 1 },
+    });
+    expect(noKey.statusCode).toBe(400);
+    expect(noKey.json().error.code).toBe("bad_request");
   });
 
   it("maps inaccessible characters to 404 with purge reconciliation on every route", async () => {
@@ -672,26 +695,26 @@ describe("character HTTP routes", () => {
       }),
     );
     const routes: Array<{ method: "get" | "post" | "patch"; url: string; payload?: unknown }> = [
-      { method: "post", url: "/characters", payload: { systemVersionId: randomUUID(), entityDefinitionId: "character", name: "Aria" } },
+      { method: "post", url: "/characters", payload: { systemVersionId: randomUUID(), entityDefinitionId: "character", name: "Aria", idempotencyKey: "key-1" } },
       { method: "get", url: "/characters" },
       { method: "get", url: `/characters/${randomUUID()}` },
-      { method: "post", url: `/characters/${randomUUID()}/fields/ability/set`, payload: { value: 12, expectedRevision: 1 } },
-      { method: "post", url: `/characters/${randomUUID()}/resources/health/bump`, payload: { direction: "up", expectedRevision: 1 } },
-      { method: "post", url: `/characters/${randomUUID()}/actions/check`, payload: { inputs: {}, expectedRevision: 1 } },
-      { method: "patch", url: `/characters/${randomUUID()}`, payload: { command: "archive", expectedRevision: 1 } },
-      { method: "post", url: `/characters/${randomUUID()}/ownership-transfer`, payload: { toUserId: randomUUID(), expectedRevision: 1 } },
+      { method: "post", url: `/characters/${randomUUID()}/fields/ability/set`, payload: { value: 12, expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "post", url: `/characters/${randomUUID()}/resources/health/bump`, payload: { direction: "up", expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "post", url: `/characters/${randomUUID()}/actions/check`, payload: { inputs: {}, expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "patch", url: `/characters/${randomUUID()}`, payload: { command: "archive", expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "post", url: `/characters/${randomUUID()}/ownership-transfer`, payload: { toUserId: randomUUID(), expectedRevision: 1, idempotencyKey: "key-1" } },
       { method: "get", url: `/characters/${randomUUID()}/activity` },
       { method: "post", url: `/characters/${randomUUID()}/exports` },
       { method: "post", url: `/characters/${randomUUID()}/migration-previews`, payload: { targetVersionId: randomUUID() } },
-      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/commit`, payload: { expectedRevision: 1 } },
-      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/rollback`, payload: {} },
+      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/commit`, payload: { expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/rollback`, payload: { idempotencyKey: "key-1" } },
     ];
 
     for (const route of routes) {
       const response = await app.inject({
         method: route.method,
         url: route.url,
-        headers: { ...cookie, ...mutationHeader },
+        headers: cookie,
         ...(route.payload === undefined ? {} : { payload: route.payload }),
       });
       expect(response.statusCode, `${route.method} ${route.url}`).toBe(404);
@@ -721,10 +744,10 @@ describe("character HTTP routes", () => {
         rollbackMigration: async () => ({ ok: false, error: conflict }),
       }),
     );
-    const headers = { ...cookie, ...mutationHeader };
+    const headers = cookie;
     const conflictUrl = `/characters/${randomUUID()}/fields/ability/set`;
 
-    const set = await app.inject({ method: "POST", url: conflictUrl, headers, payload: { value: 1, expectedRevision: 1 } });
+    const set = await app.inject({ method: "POST", url: conflictUrl, headers, payload: { value: 1, expectedRevision: 1, idempotencyKey: "key-1" } });
     expect(set.statusCode).toBe(409);
     expect(set.json().error).toMatchObject({
       code: "conflict",
@@ -738,7 +761,7 @@ describe("character HTTP routes", () => {
       method: "POST",
       url: "/characters",
       headers,
-      payload: { systemVersionId: randomUUID(), entityDefinitionId: "character", name: "Aria" },
+      payload: { systemVersionId: randomUUID(), entityDefinitionId: "character", name: "Aria", idempotencyKey: "key-1" },
     });
     expect(mismatch.statusCode).toBe(409);
     expect(mismatch.json().error.code).toBe("idempotency_mismatch");
@@ -747,7 +770,7 @@ describe("character HTTP routes", () => {
       method: "POST",
       url: `/characters/${randomUUID()}/ownership-transfer`,
       headers,
-      payload: { toUserId: randomUUID(), expectedRevision: 1 },
+      payload: { toUserId: randomUUID(), expectedRevision: 1, idempotencyKey: "key-1" },
     });
     expect(transfer.statusCode).toBe(409);
 
@@ -755,7 +778,7 @@ describe("character HTTP routes", () => {
       method: "POST",
       url: `/characters/${randomUUID()}/migrations/${randomUUID()}/commit`,
       headers,
-      payload: { expectedRevision: 1 },
+      payload: { expectedRevision: 1, idempotencyKey: "key-1" },
     });
     expect(commit.statusCode).toBe(409);
     expect(commit.json().error.cacheDisposition).toBe("replace");
@@ -764,7 +787,7 @@ describe("character HTTP routes", () => {
       method: "POST",
       url: `/characters/${randomUUID()}/migrations/${randomUUID()}/rollback`,
       headers,
-      payload: {},
+      payload: { idempotencyKey: "key-1" },
     });
     expect(rollback.statusCode).toBe(409);
   });
@@ -781,8 +804,8 @@ describe("character HTTP routes", () => {
     const response = await app.inject({
       method: "POST",
       url: `/characters/${randomUUID()}/resources/health/bump`,
-      headers: { ...cookie, ...mutationHeader },
-      payload: { direction: "up", expectedRevision: 1 },
+      headers: cookie,
+      payload: { direction: "up", expectedRevision: 1, idempotencyKey: "key-1" },
     });
     expect(response.statusCode).toBe(409);
     expect(response.json().error.code).toBe("command_in_progress");
@@ -813,8 +836,8 @@ describe("character HTTP routes", () => {
     const set = await app.inject({
       method: "POST",
       url: `/characters/${id}/fields/ability/set`,
-      headers: { ...cookie, ...mutationHeader },
-      payload: { value: 99, expectedRevision: 1 },
+      headers: cookie,
+      payload: { value: 99, expectedRevision: 1, idempotencyKey: "key-1" },
     });
     expect(set.statusCode).toBe(422);
     expect(set.json().error.code).toBe("invalid_value");
@@ -831,15 +854,30 @@ describe("character HTTP routes", () => {
     expect(preview.json().error).not.toHaveProperty("diagnostics");
   });
 
-  it("maps internal module errors to temporary 503", async () => {
+  it("maps genuine catch-block internal module errors to 500", async () => {
     const app = await build(
       makeCharacters({
         open: async () => ({ ok: false, error: { code: "internal", message: "An internal error occurred." } }),
       }),
     );
     const response = await app.inject({ method: "GET", url: `/characters/${randomUUID()}`, headers: cookie });
-    expect(response.statusCode).toBe(503);
+    expect(response.statusCode).toBe(500);
     expect(response.json().error.code).toBe("internal");
+    expect(response.json().requestId).toBeTypeOf("string");
+  });
+
+  it("maps temporary infrastructure failures to 503", async () => {
+    const app = await build(
+      makeCharacters({
+        open: async () => ({
+          ok: false,
+          error: { code: "temporarily_unavailable", message: "A temporary infrastructure failure occurred." },
+        }),
+      }),
+    );
+    const response = await app.inject({ method: "GET", url: `/characters/${randomUUID()}`, headers: cookie });
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error.code).toBe("temporarily_unavailable");
     expect(response.json().requestId).toBeTypeOf("string");
   });
 
@@ -869,8 +907,8 @@ describe("character HTTP routes", () => {
     const conflict = await app.inject({
       method: "POST",
       url: `/characters/${id}/fields/ability/set`,
-      headers: { ...cookie, ...mutationHeader },
-      payload: { value: 1, expectedRevision: 1 },
+      headers: cookie,
+      payload: { value: 1, expectedRevision: 1, idempotencyKey: "key-1" },
     });
     expect(conflict.statusCode).toBe(409);
     expect(conflict.json().error.activityCursor).toBe(cursor);
@@ -881,5 +919,28 @@ describe("character HTTP routes", () => {
       headers: cookie,
     });
     expect(captured).toBe(cursor);
+  });
+
+  it("uses the server-generated request id for the context and ignores client request-id headers", async () => {
+    const clientRequestId = "client-supplied-request-id";
+    let receivedCtx: { actorId: string; requestId: string } | undefined;
+    const app = await build(
+      makeCharacters({
+        open: async (ctx) => {
+          receivedCtx = ctx;
+          return { ok: true, value: characterView() };
+        },
+      }),
+    );
+    const response = await app.inject({
+      method: "GET",
+      url: `/characters/${randomUUID()}`,
+      headers: { ...cookie, ...{ "request-id": clientRequestId, "x-request-id": clientRequestId } },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().requestId).toBeTypeOf("string");
+    expect(response.json().requestId).not.toBe(clientRequestId);
+    expect(receivedCtx?.requestId).toBe(response.json().requestId);
+    expect(receivedCtx?.actorId).toBe(actorId);
   });
 });

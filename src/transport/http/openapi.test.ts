@@ -62,4 +62,22 @@ describe("buildOpenApiDocument", () => {
     expect(systemExport?.responses?.["200"]?.content?.["application/vnd.sweetroll.system+json;version=1"]).toBeDefined();
     expect(systemExport?.responses?.["200"]?.content?.["application/json"]).toBeUndefined();
   });
+
+  it("declares idempotencyKey in character mutation request bodies", async () => {
+    const doc = buildOpenApiDocument(Fastify());
+    const paths = doc.paths ?? {};
+
+    const create = paths["/characters"]?.post;
+    const createSchema = create?.requestBody?.content?.["application/json"]?.schema as
+      | { required?: string[]; properties?: Record<string, unknown> }
+      | undefined;
+    expect(createSchema?.required).toContain("idempotencyKey");
+    expect((createSchema?.properties ?? {})["idempotencyKey"]).toMatchObject({ type: "string" });
+
+    const setField = paths["/characters/{characterId}/fields/{fieldId}/set"]?.post;
+    const setFieldSchema = setField?.requestBody?.content?.["application/json"]?.schema as
+      | { required?: string[]; properties?: Record<string, unknown> }
+      | undefined;
+    expect(setFieldSchema?.required).toContain("idempotencyKey");
+  });
 });

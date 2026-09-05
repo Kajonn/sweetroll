@@ -1,0 +1,120 @@
+.field {
+  display: grid;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.field label.field,
+.field .field {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  font-weight: 500;
+  flex: 1 1 140px;
+  min-width: 140px;
+}
+
+.field input[type="text"],
+.field input[type="number"],
+.field select,
+.field textarea {
+  font: inherit;
+  color: var(--color-fg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  width: 100%;
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-fg);
+}
+
+.unsupported {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-warning-fg, #92400e);
+}
+
+.options {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-fg);
+  width: 100%;
+}
+
+.optionsRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.optionsRow > input[type="text"] {
+  flex: 1;
+}
+
+.optionsRow > button {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.optionsRow > button:hover {
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.addOption {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.addOption:hover {
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.imagePreview {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-muted);
+  font-size: 13px;
+  background: var(--color-surface);
+}

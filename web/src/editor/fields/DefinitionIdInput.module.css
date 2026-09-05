@@ -1,0 +1,115 @@
+.field {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+.label {
+  font-weight: 500;
+  color: var(--color-fg);
+}
+
+.input {
+  font: inherit;
+  font-family: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+  color: var(--color-fg);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--color-error, #dc2626);
+}
+
+.error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-error, #dc2626);
+}
+
+.references {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-warning-fg, #92400e);
+}
+
+.dialogOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 23, 23, 0.45);
+  z-index: 1000;
+}
+
+.dialogContent {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: min(440px, calc(100vw - 32px));
+  box-shadow: 0 12px 32px rgba(23, 23, 23, 0.2);
+  z-index: 1001;
+  display: grid;
+  gap: 16px;
+}
+
+.dialogTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.dialogBody {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dialogCancel,
+.dialogConfirm {
+  font: inherit;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.dialogCancel {
+  background: transparent;
+  color: var(--color-fg);
+  border-color: var(--color-border);
+}
+
+.dialogCancel:hover {
+  background: var(--color-bg);
+}
+
+.dialogConfirm {
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  border-color: var(--color-accent);
+}
+
+.dialogConfirm:hover {
+  filter: brightness(0.95);
+}

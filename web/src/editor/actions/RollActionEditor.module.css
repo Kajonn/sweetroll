@@ -1,0 +1,217 @@
+.layout {
+  display: grid;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  font-weight: 500;
+  flex: 1 1 140px;
+  min-width: 140px;
+}
+
+.field input[type="text"],
+.field input[type="number"],
+.field select,
+.field textarea {
+  font: inherit;
+  color: var(--color-fg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  width: 100%;
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.inputsList {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.inputItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 110px 80px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+@media (max-width: 720px) {
+  .inputItem {
+    grid-template-columns: 1fr;
+  }
+}
+
+.removeButton {
+  font: inherit;
+  color: var(--color-fg-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.removeButton:not(:disabled):hover {
+  background: var(--color-bg);
+  color: var(--color-error, #dc2626);
+}
+
+.removeButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.addButton {
+  justify-self: start;
+  font: inherit;
+  color: var(--color-fg-muted);
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.addButton:not(:disabled):hover {
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.addButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tryItRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tryItButton {
+  font: inherit;
+  color: var(--color-bg);
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.tryItButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tryItButton:not(:disabled):hover {
+  filter: brightness(0.95);
+}
+
+.resultSheet {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: 13px;
+  color: var(--color-fg);
+}
+
+.resultSheet h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.resultRow {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.resultLabel {
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  font-weight: 500;
+}
+
+.diceList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diceChip {
+  font-family: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+
+.diceChip[data-kept="false"] {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.diagnosticList {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diagnosticItem {
+  padding: 6px 8px;
+  border: 1px solid var(--color-error, #dc2626);
+  border-radius: var(--radius-sm);
+  background: rgba(220, 38, 38, 0.06);
+  font-size: 12px;
+  color: var(--color-fg);
+  font-family: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+}
+
+.formatted {
+  font-family: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  white-space: pre-wrap;
+}

@@ -14,6 +14,10 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "baseUrl": ".",
+    "paths": {
+      "@sweetroll/rules": ["../src/systems/implementation/rules/index.ts"]
+    },
     "types": ["vite/client", "@testing-library/jest-dom"]
   },
   "include": ["src", "tests"]

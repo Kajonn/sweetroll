@@ -635,7 +635,7 @@ Every increment must meet all applicable criteria before work begins on the next
 
 **Acceptance demonstration:** Through the documented HTTP interface, create a standalone character from a published reference system, edit fields, bump a resource, execute a roll, replay the command safely, observe a concurrent-write conflict, export the character, and migrate it explicitly to a newer version.
 
-> **I3 implementation design approved 2026-09-05.** I3 completes the currently-placeholder `SystemRuntime` before building Characters in vertical slices. Standalone characters have one transferable owner and fixed owner-only visibility; campaign assignment and multiple-owner rules remain in I6. Offline synchronization replays ordinary idempotent commands rather than introducing a second mutation protocol. Image fields remain null-only until a later increment introduces object storage. See `docs/superpowers/specs/2026-09-05-i3-character-backend-design.md`.
+> **I3 closed 2026-09-05; merged to main at `62a482f`.** Production `SystemRuntime` and the standalone Characters backend are implemented, with HTTP acceptance, offline replay, concurrency, migration, and load verification recorded in `docs/acceptance/i3-2026-09-05.md`. Standalone characters have one transferable owner and fixed owner-only visibility; campaign assignment and multiple-owner rules remain in I6. Offline synchronization replays ordinary idempotent commands rather than introducing a second mutation protocol. Image fields remain null-only until a later increment introduces object storage. See `docs/superpowers/specs/2026-09-05-i3-character-backend-design.md`. This status note was reconciled on 2026-09-06; I4 scope is unchanged.
 
 ## 17.6 I4 - Character Sheet frontend
 
@@ -651,6 +651,8 @@ Every increment must meet all applicable criteria before work begins on the next
 8. Add UI, accessibility, offline, browser, and responsive visual tests at 360 and 1280 px for all reference systems.
 
 **Acceptance demonstration:** From a 360 px viewport, create and use a standalone character, go offline, read and update the sheet, reconnect without duplicate resource changes, resolve a simulated conflict, and export the final state.
+
+> **I4 design decisions approved 2026-09-06; implementation pending.** Queue field edits and direct resource bumps offline, with explicit conflict recovery and one editing/synchronizing tab per character. Cache account-scoped projections and immutable command attempts in IndexedDB. Fully offline reopening of previously opened sheets includes minimal application-asset service-worker caching in I4; installation and the Player PWA shell remain I5. Actions and lifecycle/migration/export initiation require connectivity. Required fields omitted from authored sheets receive backend completion metadata; authorized creation metadata and existing sign-out operation HTTP wiring are explicit prerequisites. See `docs/superpowers/specs/2026-09-06-i4-character-sheet-design.md`.
 
 ## 17.7 I5 - Standalone Player app
 

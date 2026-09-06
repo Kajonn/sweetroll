@@ -74,7 +74,14 @@ const app = buildHttpApp({
   }),
 });
 
-void app.register(buildIdentityRoutes());
+void app.register(
+  buildIdentityRoutes({
+    identity,
+    cookieName: config.sessionCookieName,
+    secure: config.cookieSecure,
+    allowedOrigins: config.allowedOrigins,
+  }),
+);
 void app.register(buildSystemsRoutes({ authoring }));
 void app.register(buildCharactersRoutes({ characters }));
 void app.register(

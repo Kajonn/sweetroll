@@ -9,6 +9,7 @@ import { SystemExportV1Schema } from "../src/systems/implementation/package/sche
 import { SystemPackageV1Schema } from "../src/systems/implementation/package/schema/package.js";
 import { d20Export } from "../src/systems/implementation/package/fixtures/d20.js";
 import type { Characters } from "../src/characters/index.js";
+import type { Identity } from "../src/identity/index.js";
 import { buildCharactersRoutes } from "../src/transport/http/characters.js";
 import { buildIdentityRoutes } from "../src/transport/http/identity.js";
 import { buildOpenApiDocument } from "../src/transport/http/openapi.js";
@@ -48,7 +49,14 @@ for (const [relativePath, value] of outputs) {
 
 async function emitOpenApi(): Promise<void> {
   const app = Fastify({ logger: false });
-  void app.register(buildIdentityRoutes());
+  const identity: Identity = {
+    completeSignIn: async () => {
+      throw new Error("not used");
+    },
+    resolveSession: async () => ({ state: "anonymous" }),
+    signOut: async () => ({ ok: true, value: undefined }),
+  };
+  void app.register(buildIdentityRoutes({ identity, cookieName: "session", secure: true }));
   void app.register(buildSystemsRoutes({ authoring: {} as SystemAuthoring }));
   void app.register(buildCharactersRoutes({ characters: {} as Characters }));
   await app.ready();

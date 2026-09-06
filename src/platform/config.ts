@@ -5,6 +5,7 @@ export type LogLevel = (typeof LOG_LEVELS)[number];
 export type NodeEnv = "development" | "production" | "test";
 
 export type AppConfig = {
+  allowedOrigins: string[];
   authoritativeRollSecret: string;
   cookieSecure: boolean;
   databaseUrl: string;
@@ -39,6 +40,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 
   const cookieSecure = env.COOKIE_SECURE === "true";
 
+  const allowedOrigins = (env.ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+
   const nodeEnvRaw = env.NODE_ENV ?? "development";
   if (nodeEnvRaw !== "development" && nodeEnvRaw !== "production" && nodeEnvRaw !== "test") {
     throw new Error("NODE_ENV must be development, production, or test");
@@ -53,6 +59,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
 
   return {
+    allowedOrigins,
     authoritativeRollSecret,
     cookieSecure,
     databaseUrl,

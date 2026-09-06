@@ -2,16 +2,25 @@ import { describe, expect, it } from "vitest";
 import Fastify from "fastify";
 
 import type { Characters } from "../../characters/index.js";
+import type { Identity } from "../../identity/index.js";
 import { buildCharactersRoutes } from "./characters.js";
 import { buildIdentityRoutes } from "./identity.js";
 import { buildOpenApiDocument } from "./openapi.js";
 import { buildSystemsRoutes } from "./systems.js";
 import type { SystemAuthoring } from "../../systems/authoring.js";
 
+const testIdentity: Identity = {
+  completeSignIn: async () => {
+    throw new Error("not used");
+  },
+  resolveSession: async () => ({ state: "anonymous" }),
+  signOut: async () => ({ ok: true, value: undefined }),
+};
+
 describe("buildOpenApiDocument", () => {
   it("emits an OpenAPI 3.1 document with every systems and character route", async () => {
     const app = Fastify();
-    void app.register(buildIdentityRoutes());
+    void app.register(buildIdentityRoutes({ identity: testIdentity, cookieName: "session", secure: true }));
     void app.register(buildSystemsRoutes({ authoring: {} as SystemAuthoring }));
     void app.register(buildCharactersRoutes({ characters: {} as Characters }));
     await app.ready();
@@ -31,6 +40,7 @@ describe("buildOpenApiDocument", () => {
       "/characters/{characterId}/ownership-transfer",
       "/characters/{characterId}/resources/{resourceId}/bump",
       "/me",
+      "/signout",
       "/system-versions/{versionId}",
       "/system-versions/{versionId}/export",
       "/systems",

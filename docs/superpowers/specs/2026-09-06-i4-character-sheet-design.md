@@ -121,7 +121,7 @@ Install a complete versioned asset cache before claiming readiness. Mark a chara
 
 Do not force a new worker with skipWaiting during active sessions. Let normal worker lifecycle keep open clients on a coherent build; activate updates after old clients close. Remove obsolete asset caches only when no old build clients require them. New clients migrate IndexedDB transactionally, preserve frozen attempts and fail read-only on unsupported/corrupt versions rather than deleting pending edits. Test an update while writes are queued.
 
-Production serving must support same-origin `/api` forwarding and SPA navigation fallback. The Vite development proxy is not a production deployment configuration. Provide an explicit preview-test configuration with the same forwarding; no public deployment or hosting platform is added by I4.
+Production serving must support same-origin `/api` forwarding and SPA navigation fallback. The Vite development proxy is not a production deployment configuration. Provide an explicit preview-test configuration with the same forwarding; no public deployment or hosting platform is added by I4. Development and preview proxies forward `/api` and `/dev` without rewriting the Host header so the backend's same-origin check compares the browser Origin against the host the browser actually used; deployments that rewrite the Host header explicitly allow additional origins via the `ALLOWED_ORIGINS` configuration list.
 
 ## Verification and Acceptance
 

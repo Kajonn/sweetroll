@@ -6,6 +6,7 @@ describe("loadConfig", () => {
   it("loads explicit settings", () => {
     expect(
       loadConfig({
+        ALLOWED_ORIGINS: "https://app.example.com, https://preview.example.com",
         COOKIE_SECURE: "true",
         AUTHORITATIVE_ROLL_SECRET: "0123456789abcdef0123456789abcdef",
         DATABASE_URL: "postgres://sweetroll:secret@db:5432/sweetroll",
@@ -17,6 +18,7 @@ describe("loadConfig", () => {
         SESSION_TTL_DAYS: "7",
       }),
     ).toEqual({
+      allowedOrigins: ["https://app.example.com", "https://preview.example.com"],
       cookieSecure: true,
       authoritativeRollSecret: "0123456789abcdef0123456789abcdef",
       databaseUrl: "postgres://sweetroll:secret@db:5432/sweetroll",
@@ -34,6 +36,7 @@ describe("loadConfig", () => {
       AUTHORITATIVE_ROLL_SECRET: "0123456789abcdef0123456789abcdef",
       DATABASE_URL: "postgres://localhost/sweetroll",
     })).toEqual({
+      allowedOrigins: [],
       cookieSecure: false,
       authoritativeRollSecret: "0123456789abcdef0123456789abcdef",
       databaseUrl: "postgres://localhost/sweetroll",

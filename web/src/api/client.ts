@@ -102,65 +102,78 @@ export function createApiClient(input: CreateApiClientInput): ApiClient {
       const headers: Record<string, string> = { accept: "application/json", ...(init?.headers ?? {}) };
       const requestId = crypto.randomUUID();
       headers["x-request-id"] = requestId;
-      const response = await f(url.toString(), {
-        method,
-        credentials: "include",
-        headers,
-        ...(init?.body === undefined
-          ? {}
-          : { body: JSON.stringify(init.body), headers: { ...headers, "content-type": "application/json" } }),
+      const controller = new AbortController();
+      let timer: ReturnType<typeof setTimeout>;
+      const timeout = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new Error("Request timed out."));
+        }, 30_000);
       });
-      const text = await response.text();
-      let parsed: unknown = null;
-      if (text.length > 0) {
-        try {
-          parsed = JSON.parse(text);
-        } catch {
-          if (response.ok) {
-            // A 2xx whose body did not parse is an uncertain mutation outcome,
-            // never a silent success. Surface it as an error so callers retain
-            // the exact frozen request instead of issuing a fresh key.
-            throw new ApiError({
-              code: "malformed_response",
-              message: "The server returned an unparseable response.",
-              status: response.status,
-              requestId,
-              latestRevision: null,
-              diagnostics: [],
-            });
+      try {
+        const response = await Promise.race([f(url.toString(), {
+          signal: controller.signal,
+          method,
+          credentials: "include",
+          headers,
+          ...(init?.body === undefined
+            ? {}
+            : { body: JSON.stringify(init.body), headers: { ...headers, "content-type": "application/json" } }),
+        }), timeout]);
+        const text = await Promise.race([response.text(), timeout]);
+        let parsed: unknown = null;
+        if (text.length > 0) {
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            if (response.ok) {
+              // A 2xx whose body did not parse is an uncertain mutation outcome,
+              // never a silent success. Surface it as an error so callers retain
+              // the exact frozen request instead of issuing a fresh key.
+              throw new ApiError({
+                code: "malformed_response",
+                message: "The server returned an unparseable response.",
+                status: response.status,
+                requestId,
+                latestRevision: null,
+                diagnostics: [],
+              });
+            }
+            parsed = null;
           }
-          parsed = null;
         }
+        if (!response.ok) {
+          const env = parsed as {
+            error?: {
+              code?: string;
+              message?: string;
+              latestRevision?: number | null;
+              diagnostics?: ReadonlyArray<Record<string, unknown>>;
+              changedDefinitionIds?: string[] | null;
+              activityCursor?: string | null;
+              cacheDisposition?: CacheDisposition | null;
+            };
+            requestId?: string;
+          } | null;
+          const err = env?.error;
+          const { authoring, runtime } = splitDiagnostics(err?.diagnostics);
+          throw new ApiError({
+            code: err?.code ?? `http_${response.status}`,
+            message: err?.message ?? response.statusText,
+            status: response.status,
+            requestId: env?.requestId ?? requestId,
+            latestRevision: err?.latestRevision ?? null,
+            diagnostics: authoring,
+            runtimeDiagnostics: runtime,
+            changedDefinitionIds: err?.changedDefinitionIds ?? [],
+            activityCursor: err?.activityCursor ?? null,
+            cacheDisposition: err?.cacheDisposition ?? null,
+          });
+        }
+        return parsed as never;
+      } finally {
+        clearTimeout(timer!);
       }
-      if (!response.ok) {
-        const env = parsed as {
-          error?: {
-            code?: string;
-            message?: string;
-            latestRevision?: number | null;
-            diagnostics?: ReadonlyArray<Record<string, unknown>>;
-            changedDefinitionIds?: string[] | null;
-            activityCursor?: string | null;
-            cacheDisposition?: CacheDisposition | null;
-          };
-          requestId?: string;
-        } | null;
-        const err = env?.error;
-        const { authoring, runtime } = splitDiagnostics(err?.diagnostics);
-        throw new ApiError({
-          code: err?.code ?? `http_${response.status}`,
-          message: err?.message ?? response.statusText,
-          status: response.status,
-          requestId: env?.requestId ?? requestId,
-          latestRevision: err?.latestRevision ?? null,
-          diagnostics: authoring,
-          runtimeDiagnostics: runtime,
-          changedDefinitionIds: err?.changedDefinitionIds ?? [],
-          activityCursor: err?.activityCursor ?? null,
-          cacheDisposition: err?.cacheDisposition ?? null,
-        });
-      }
-      return parsed as never;
     },
   };
 }

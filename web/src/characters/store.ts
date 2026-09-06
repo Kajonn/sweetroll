@@ -39,7 +39,7 @@ export type CharacterStore = {
   deleteOnlineAttempt(actorId: string, attemptId: string): Promise<void>;
   deleteOnlineAttemptsForCharacter(actorId: string, characterId: string): Promise<void>;
 
-  setLastAccount(actorId: string): Promise<void>;
+  setLastAccount(actorId: string, expectedAccount?: string | null): Promise<boolean>;
   readLastAccount(): Promise<string | null>;
   setPendingLogout(actorId: string): Promise<void>;
   readPendingLogout(): Promise<string | null>;
@@ -226,11 +226,9 @@ function deleteByPrefix(tx: IDBTransaction, store: string, prefix: string[]): Pr
 export async function openCharacterStore(name: string): Promise<CharacterStore> {
   const db = await openDatabase(name);
 
-  const getCharacterRecord = (actorId: string, characterId: string): Promise<CharacterRecord | undefined> => {
-    return openTx(db, [CHAR], "readonly", (tx) =>
-      getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]),
-    );
-  };
+  // Account tombstones also protect GETs begun before any character row existed.
+  const accountGeneration = async (tx: IDBTransaction, actorId: string) =>
+    (await getRequest<{ generation: number }>(tx, LAST_ACCOUNT, `generation:${actorId}`))?.generation ?? 0;
 
   async function deleteOnlineAttemptsForCharacter(tx: IDBTransaction, actorId: string, characterId: string): Promise<void> {
     const attempts = await collectByKey<OnlineAttempt>(
@@ -247,25 +245,23 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
 
   return {
     async read(actorId, characterId) {
-      const [record, entries] = await Promise.all([
-        getCharacterRecord(actorId, characterId),
-        openTx(db, [QUEUE], "readonly", (tx) => {
-          const keyRange = IDBKeyRange.bound(
-            [actorId, characterId, Number.MIN_SAFE_INTEGER],
-            [actorId, characterId, Number.MAX_SAFE_INTEGER],
-          );
-          return collectByIndex<QueueEntry>(tx, QUEUE, "by-seq", keyRange);
-        }),
-      ]);
-      return {
-        confirmed: record?.confirmed ?? null,
-        entries,
-        generation: record?.generation ?? 0,
-      };
+      return openTx(db, [CHAR, QUEUE, LAST_ACCOUNT], "readonly", async tx => {
+        const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
+        const keyRange = IDBKeyRange.bound(
+          [actorId, characterId, Number.MIN_SAFE_INTEGER],
+          [actorId, characterId, Number.MAX_SAFE_INTEGER],
+        );
+        const entries = await collectByIndex<QueueEntry>(tx, QUEUE, "by-seq", keyRange);
+        return {
+          confirmed: record?.confirmed ?? null,
+          entries,
+          generation: record?.generation ?? await accountGeneration(tx, actorId),
+        };
+      });
     },
 
     async enqueue(entry) {
-      await openTx(db, [CHAR, QUEUE], "readwrite", async (tx) => {
+      await openTx(db, [CHAR, QUEUE, LAST_ACCOUNT], "readwrite", async (tx) => {
         const key: IDBValidKey = [entry.actorId, entry.characterId];
         const existing = await getRequest<CharacterRecord>(tx, CHAR, key);
         if (!existing) {
@@ -273,7 +269,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
             actorId: entry.actorId,
             characterId: entry.characterId,
             confirmed: null,
-            generation: 0,
+            generation: await accountGeneration(tx, entry.actorId),
           } satisfies CharacterRecord);
         }
         await putRequest(tx, QUEUE, entry);
@@ -295,7 +291,9 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
     },
 
     async acknowledge(actorId, characterId, entryId, character, generation) {
-      await openTx(db, [CHAR, QUEUE], "readwrite", async (tx) => {
+      await openTx(db, [CHAR, QUEUE, LAST_ACCOUNT], "readwrite", async (tx) => {
+        const account = await getRequest<{ actorId: string }>(tx, LAST_ACCOUNT, "last");
+        if (account && account.actorId !== actorId) throw new Error("stale acknowledgment: account changed");
         const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
         if (!record || record.generation !== generation) {
           throw new Error("stale acknowledgment: generation changed");
@@ -323,9 +321,11 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
     },
 
     async confirmSnapshot(actorId, characterId, character, generation) {
-      await openTx(db, [CHAR], "readwrite", async (tx) => {
+      await openTx(db, [CHAR, LAST_ACCOUNT], "readwrite", async (tx) => {
+        const account = await getRequest<{ actorId: string }>(tx, LAST_ACCOUNT, "last");
+        if (account && account.actorId !== actorId) throw new Error("stale snapshot confirm: account changed");
         const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
-        if (record && record.generation !== generation) {
+        if ((record?.generation ?? await accountGeneration(tx, actorId)) !== generation) {
           throw new Error("stale snapshot confirm: generation changed");
         }
         const fresh = record ?? {
@@ -355,13 +355,13 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
     },
 
     async purgeCharacter(actorId, characterId) {
-      await openTx(db, [CHAR, QUEUE, ATTEMPTS], "readwrite", async (tx) => {
-        const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
-        if (record) {
-          record.confirmed = null;
-          record.generation += 1;
-          await putRequest(tx, CHAR, record);
-        }
+      await openTx(db, [CHAR, QUEUE, ATTEMPTS, LAST_ACCOUNT], "readwrite", async (tx) => {
+        const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]) ?? {
+          actorId, characterId, confirmed: null, generation: await accountGeneration(tx, actorId),
+        };
+        record.confirmed = null;
+        record.generation += 1;
+        await putRequest(tx, CHAR, record);
         await deleteByPrefix(tx, QUEUE, [actorId, characterId]);
         await deleteOnlineAttemptsForCharacter(tx, actorId, characterId);
       });
@@ -369,6 +369,9 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
 
     async clearAccount(actorId) {
       await openTx(db, [CHAR, QUEUE, ATTEMPTS, LAST_ACCOUNT], "readwrite", async (tx) => {
+        await putRequest(tx, LAST_ACCOUNT, {
+          key: `generation:${actorId}`, generation: await accountGeneration(tx, actorId) + 1,
+        });
         const characters = await collectByKey<CharacterRecord>(
           tx,
           CHAR,
@@ -422,10 +425,15 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
       );
     },
 
-    async setLastAccount(actorId) {
-      await openTx(db, [LAST_ACCOUNT], "readwrite", (tx) =>
-        putRequest(tx, LAST_ACCOUNT, { key: "last", actorId }),
-      );
+    async setLastAccount(actorId, expectedAccount) {
+      return openTx(db, [LAST_ACCOUNT], "readwrite", async tx => {
+        const current = (await getRequest<{ actorId: string }>(tx, LAST_ACCOUNT, "last"))?.actorId ?? null;
+        if (expectedAccount !== undefined && current !== expectedAccount && current !== actorId) {
+          throw new Error("stale account confirmation");
+        }
+        await putRequest(tx, LAST_ACCOUNT, { key: "last", actorId });
+        return current !== actorId;
+      });
     },
 
     async readLastAccount() {

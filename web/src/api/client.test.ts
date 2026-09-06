@@ -3,6 +3,25 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiError, createApiClient } from "./client.js";
 
 describe("createApiClient", () => {
+  it.each(["fetch", "body"])("bounds a hanging %s with an abort without changing the request body", async stage => {
+    vi.useFakeTimers();
+    try {
+      let signal: AbortSignal | undefined;
+      let body: BodyInit | null | undefined;
+      const client = createApiClient({ baseUrl: "http://api", fetch: async (_url, init) => {
+        signal = init?.signal as AbortSignal;
+        body = init?.body;
+        if (stage === "fetch") return new Promise<Response>(() => {});
+        return { text: () => new Promise(() => {}), ok: true } as Response;
+      } });
+      const result = expect(client.fetch("POST", "/hang", { body: { idempotencyKey: "frozen" } })).rejects.toThrow(/timed out/i);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await result;
+      expect(signal?.aborted).toBe(true);
+      expect(body).toBe(JSON.stringify({ idempotencyKey: "frozen" }));
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
   it("returns parsed JSON on 2xx", async () => {
     const fetch_ = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "x-request-id": "req-1" } }));
     const client = createApiClient({ baseUrl: "http://api", fetch: fetch_ as typeof fetch });

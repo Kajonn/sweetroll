@@ -4,7 +4,7 @@ import { t } from "../i18n/index.js";
 
 import styles from "./DevSignInPanel.module.css";
 
-export function DevSignInPanel({ onSignedIn }: { onSignedIn: () => void }) {
+export function DevSignInPanel({ onSignedIn }: { onSignedIn: () => void | Promise<void> }) {
   const [code, setCode] = useState("code-dev");
   const [pending, setPending] = useState(false);
   return (
@@ -22,7 +22,7 @@ export function DevSignInPanel({ onSignedIn }: { onSignedIn: () => void }) {
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ code, redirectUri: window.location.origin + "/cb" }),
           });
-          if (res.ok) onSignedIn();
+          if (res.ok) await onSignedIn();
         } finally {
           setPending(false);
         }

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { HelpCircle } from "lucide-react";
 
 import { t } from "../i18n/index.js";
@@ -8,6 +8,9 @@ import { ShortcutHelp } from "./ShortcutHelp.js";
 import { StatusBar } from "./StatusBar.js";
 import { useShortcut } from "./useShortcut.js";
 import styles from "./AppShell.module.css";
+import { createApiClient } from "../api/client.js";
+import { createIdentityGate, type IdentityGate } from "../characters/identity.js";
+import { openCharacterStore } from "../characters/store.js";
 
 export type AuthState =
   | { state: "loading" }
@@ -16,6 +19,8 @@ export type AuthState =
 
 const AuthContext = createContext<AuthState>({ state: "loading" });
 export const useAuth = (): AuthState => useContext(AuthContext);
+const IdentityContext = createContext<IdentityGate | null>(null);
+export const useIdentity = () => useContext(IdentityContext);
 
 const isDevMode = (): boolean => {
   if (typeof import.meta === "undefined") return false;
@@ -27,40 +32,71 @@ export function AuthProvider({ initial, children }: { initial: AuthState; childr
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const [online] = useState(true);
+  const [online, setOnline] = useState(navigator.onLine);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [auth, setAuth] = useState<AuthState>(() =>
-    isDevMode() ? { state: "anonymous" } : { state: "authenticated", userId: "dev" },
-  );
+  const [auth, setAuth] = useState<AuthState>({ state: "loading" });
+  const [identity, setIdentity] = useState<IdentityGate | null>(null);
+  const [logoutStatus, setLogoutStatus] = useState<"pending" | "complete" | "error" | null>(null);
+  useEffect(() => {
+    let disposed = false;
+    let cleanup = () => {};
+    void openCharacterStore("sweetroll-characters").then(store => {
+      if (disposed) { void store.close(); return; }
+      const gate = createIdentityGate({ store, client: createApiClient({ baseUrl: "/api" }) });
+      setIdentity(gate);
+      const update = () => {
+        const snapshot = gate.getSnapshot();
+        if (snapshot.pendingLogout) setLogoutStatus("pending");
+        else setLogoutStatus(previous => previous === "pending" ? "complete" : previous);
+        setAuth(snapshot.actorId ? { state: "authenticated", userId: snapshot.actorId } : { state: "anonymous" });
+        setOnline(navigator.onLine);
+      };
+      const unsubscribe = gate.subscribe(update);
+      cleanup = () => { unsubscribe(); gate.dispose(); void store.close(); };
+      void gate.refresh();
+    }).catch(() => { if (!disposed) setAuth({ state: "anonymous" }); });
+    return () => { disposed = true; cleanup(); };
+  }, []);
   const requestId = useMemo(() => (typeof crypto !== "undefined" ? crypto.randomUUID() : "req"), []);
   useShortcut("?", () => setHelpOpen(true));
-  const markSignedIn = useCallback(() => {
-    setAuth({ state: "authenticated", userId: "dev" });
-  }, []);
+  const markSignedIn = async () => { await identity?.refresh(); };
+  const signOut = async () => {
+    if (!identity || !window.confirm(t("shell.signOut.confirm"))) return;
+    try { await identity.signOut(); }
+    catch { setLogoutStatus("error"); }
+  };
   return (
-    <div className={styles.shell}>
-      <header role="banner" data-testid="app-header" className={styles.header}>
-        <span>Sweetroll</span>
-        <button
-          type="button"
-          aria-label={t("shortcutHelp.open")}
-          className={styles.helpButton}
-          onClick={() => setHelpOpen(true)}
-        >
-          <HelpCircle aria-hidden size={18} />
-        </button>
-      </header>
-      <ErrorBoundary>
-        <main role="main" className={styles.main}>
-          {auth.state === "anonymous" && isDevMode() ? (
-            <DevSignInPanel onSignedIn={markSignedIn} />
-          ) : (
-            children
-          )}
-        </main>
-      </ErrorBoundary>
-      <StatusBar requestId={requestId} online={online} />
-      <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
-    </div>
+    <IdentityContext.Provider value={identity}>
+      <AuthProvider initial={auth}>
+        <div className={styles.shell}>
+          <header role="banner" data-testid="app-header" className={styles.header}>
+            <span>Sweetroll</span>
+            {auth.state === "authenticated" && (
+              <button type="button" onClick={() => { void signOut(); }}>{t("shell.signOut.button")}</button>
+            )}
+            {logoutStatus && <span role="status">{t(`shell.signOut.${logoutStatus}`)}</span>}
+            <button
+              type="button"
+              aria-label={t("shortcutHelp.open")}
+              className={styles.helpButton}
+              onClick={() => setHelpOpen(true)}
+            >
+              <HelpCircle aria-hidden size={18} />
+            </button>
+          </header>
+          <ErrorBoundary>
+            <main role="main" className={styles.main}>
+              {auth.state === "anonymous" && isDevMode() ? (
+                <DevSignInPanel onSignedIn={markSignedIn} />
+              ) : (
+                children
+              )}
+            </main>
+          </ErrorBoundary>
+          <StatusBar requestId={requestId} online={online} />
+          <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
+        </div>
+      </AuthProvider>
+    </IdentityContext.Provider>
   );
 }

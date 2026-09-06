@@ -1,6 +1,11 @@
 export type MessageTable = Record<string, string>;
 
 export const defaultMessages: MessageTable = {
+  "shell.signOut.button": "Sign out",
+  "shell.signOut.confirm": "Sign out and clear this account's cached characters and unsynchronized edits? Unsynchronized edits will be lost.",
+  "shell.signOut.pending": "Local data hidden; server sign-out is pending. Reconnect to finish signing out.",
+  "shell.signOut.complete": "Signed out.",
+  "shell.signOut.error": "Data is hidden, but local sign-out could not be saved. Retry before closing this page.",
   "library.title": "Library",
   "library.listAriaLabel": "Systems",
   "library.loadMore": "Load more",

@@ -28,6 +28,102 @@ beforeEach(() => {
 const ARM = "00000000-0000-4000-8000-000000000000";
 const EVER = "2026-09-06T00:00:00.000Z";
 
+it("reports a failed initial store read without rejecting the observable session lifecycle", async () => {
+  const { session, store } = await makeHarness();
+  vi.spyOn(store, "read").mockRejectedValue(new Error("storage unavailable"));
+  await expect(session.open()).resolves.toBeUndefined();
+  expect(session.getSnapshot().phase).toBe("storage-error");
+  session.dispose(); await store.close();
+});
+
+it("keeps snapshots stable and hides cached data on account switch", async () => {
+  const { session, api, identity, store } = await makeHarness();
+  api.scriptOpenView(viewFor("char-1", 1));
+  await session.open();
+  expect(session.getSnapshot()).toBe(session.getSnapshot());
+  identity.actorId = "other";
+  identity.generationCounter++;
+  identity.signal();
+  expect(session.getSnapshot().confirmed).toBeNull();
+  await expect(session.setField("name", "leak")).rejects.toThrow();
+  session.dispose(); await store.close();
+});
+
+it("hides private validation details when the account changes", async () => {
+  const { session, api, identity, store } = await makeHarness();
+  api.scriptOpenView(viewFor("char-1", 1)); await session.open();
+  api.scriptSend(async () => ({ error: new ApiError({ status: 422, code: "invalid_value", message: "private character detail", requestId: "r", latestRevision: null, diagnostics: [] }) }));
+  await session.setField("name", "Briar"); await session.whenIdle();
+  expect(session.getSnapshot().error?.message).toBe("private character detail");
+  identity.actorId = "other"; identity.generationCounter++; identity.signal();
+  expect(session.getSnapshot().error).toBeNull();
+  session.dispose(); await store.close();
+});
+
+it("ignores late success after identity changes without modifying the frozen attempt", async () => {
+  const { session, api, identity, store } = await makeHarness();
+  api.scriptOpenView(viewFor("char-1", 1));
+  await session.open();
+  const pending = deferredEnvelope();
+  api.scriptSend(() => pending.promise);
+  await session.setField("name", "Briar");
+  await vi.waitFor(() => expect(api.sent).toHaveLength(1));
+  const before = await store.read(ARM, "char-1");
+  identity.actorId = "other"; identity.generationCounter++; identity.signal();
+  pending.release(viewFor("char-1", 2));
+  await session.whenIdle();
+  expect(await store.read(ARM, "char-1")).toEqual(before);
+  expect(session.getSnapshot().confirmed).toBeNull();
+  session.dispose(); await store.close();
+});
+
+it("checks identity again after persisting a frozen attempt, before sending", async () => {
+  const { session, api, identity, store } = await makeHarness();
+  api.scriptOpenView(viewFor("char-1", 1)); await session.open();
+  const freeze = store.freeze.bind(store);
+  vi.spyOn(store, "freeze").mockImplementation(async (...args) => {
+    await freeze(...args);
+    identity.actorId = "other"; identity.generationCounter++; identity.signal();
+  });
+  await session.setField("name", "Briar"); await session.whenIdle();
+  expect(api.sent).toEqual([]);
+  expect((await store.read(ARM, "char-1")).entries[0]?.attempt).not.toBeNull();
+  expect(session.getSnapshot().confirmed).toBeNull();
+  session.dispose(); await store.close();
+});
+
+it.each([401, 404, 409])("ignores late %s errors after account switch without purge or refresh", async status => {
+  const { session, api, identity, store } = await makeHarness();
+  api.scriptOpenView(viewFor("char-1", 1)); await session.open();
+  let reject!: (error: Error) => void;
+  api.scriptSend(() => new Promise((_resolve, fail) => { reject = fail; }));
+  await session.setField("name", "Briar");
+  await vi.waitFor(() => expect(api.sent).toHaveLength(1));
+  const before = await store.read(ARM, "char-1");
+  const open = vi.spyOn(api, "open");
+  identity.actorId = "other"; identity.generationCounter++; identity.signal();
+  reject(new ApiError({ status, code: "error", message: "private", cacheDisposition: "purge", requestId: "r", latestRevision: null, diagnostics: [] }));
+  await session.whenIdle();
+  expect(await store.read(ARM, "char-1")).toEqual(before);
+  expect(open).not.toHaveBeenCalled();
+  expect(session.getSnapshot().confirmed).toBeNull();
+  session.dispose(); await store.close();
+});
+
+it("ignores a late initial GET after account switch", async () => {
+  const { session, api, identity, store } = await makeHarness();
+  let finish!: (value: OpenCharacterResponse) => void;
+  api.setOpenFallback(() => new Promise(resolve => { finish = resolve; }));
+  const opening = session.open();
+  await vi.waitFor(() => expect(finish).toBeDefined());
+  identity.actorId = "other"; identity.generationCounter++; identity.signal();
+  finish({ character: viewFor("char-1", 1), requestId: "r" });
+  await opening;
+  expect((await store.read(ARM, "char-1")).confirmed).toBeNull();
+  expect(session.getSnapshot().confirmed).toBeNull();
+  session.dispose(); await store.close();
+});
+
 function viewFor(characterId: string, revision: number, overrides: Partial<CharacterView> = {}): CharacterView {
   return makeView({ characterId, revision, ...overrides });
 }
@@ -111,6 +207,7 @@ class FakeIdentity implements IdentityPort {
   getGeneration() {
     return this.generationCounter;
   }
+  async isCurrent() { return true; }
   subscribe(listener: () => void) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);

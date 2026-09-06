@@ -28,18 +28,20 @@ export type BlockingError = {
 };
 
 /**
- * Identity port. The browser adapter (Task 6) plugs into real auth state.
+ * Identity port. The browser adapter plugs into real auth state.
  * The session only ever sends commands while the current authenticated
  * actor matches this session's actor and the identity generation is
  * unchanged (identity switches tombstone every in-flight send).
  */
 export type IdentityPort = {
-  /** Current authenticated actor id, or null when unauthenticated/offline. */
+  /** Verified actor, last confirmed offline actor, or null without a cache identity. */
   getActorId(): string | null;
   /** True when a live authenticated session is available. */
   isOnline(): boolean;
   /** Identity generation; any change invalidates all in-flight sends. */
   getGeneration(): number;
+  /** Recheck the durable account/barrier even if a cross-tab invalidation is delayed. */
+  isCurrent(): Promise<boolean>;
   /** Auth-state change notification. */
   subscribe(listener: () => void): () => void;
 };
@@ -62,6 +64,11 @@ export type CoordinationPort = {
   letGo(): void;
   /** Broadcast ownership changes / invalidation events. */
   subscribe(listener: (event: CoordinationEvent) => void): () => void;
+  /** Browser ownership release must await this callback before ending its Web Lock. */
+  setQuiesce?(callback: () => Promise<void>): void;
+  invalidate?(): void;
+  dispose?(): void;
+  requestTakeover?(): Promise<boolean>;
 };
 
 export type CharacterSnapshot = {
@@ -151,6 +158,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   let draining = false;
   let initialized = false;
   let opening: Promise<void> | null = null;
+  let recovering: Promise<void> | null = null;
   let needsFresh = true;
   let conflictRefreshPending = false;
   let conflictMinimumRevision = 0;
@@ -164,18 +172,27 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   };
 
   const emit = () => {
+    cachedSnapshot = null;
     const snapshot = getSnapshot();
     for (const listener of [...listeners]) listener(snapshot);
   };
 
+  let cachedSnapshot: CharacterSnapshot | null = null;
+  function identityMatches(): boolean {
+    return !disposed && identity.getActorId() === actorId && identity.getGeneration() === identityGeneration;
+  }
+  async function identityIsCurrent(): Promise<boolean> {
+    return identityMatches() && await identity.isCurrent() && identityMatches();
+  }
   function getSnapshot(): CharacterSnapshot {
-    return {
+    const visible = identityMatches();
+    return cachedSnapshot ??= {
       phase,
-      confirmed,
-      tentative: computeTentative(),
-      entries: entries.filter((e) => !entryWrites.has(e.id)).map((e) => ({ ...e })),
-      editing: { ...editing },
-      error: error ? { ...error } : null,
+      confirmed: visible ? confirmed : null,
+      tentative: visible ? computeTentative() : null,
+      entries: visible ? entries.filter((e) => !entryWrites.has(e.id)).map((e) => ({ ...e })) : [],
+      editing: { ...editing, owned: visible && editing.owned },
+      error: visible && error ? { ...error } : null,
     };
   }
 
@@ -218,8 +235,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   function assertMutationAllowed() {
     if (disposed) throw new Error("Session closed.");
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
     if (error) throw structuredError(error.message, error.kind, error.details);
-    if (!editing.owned) throw structuredError("Another tab is editing this character.", "conflict");
+    if (!editing.owned || !coordination.isOwner()) throw structuredError("Editing requires ownership of a supported browser Web Lock.", "conflict");
     if (!confirmed) throw new Error("Cannot edit until the character is loaded.");
   }
 
@@ -258,6 +276,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     scheduleDrain();
     try {
       await store.enqueue(entry);
+      coordination.invalidate?.();
     } catch (storageErr) {
       rejectWrite(storageErr);
       entryWrites.delete(entry.id);
@@ -324,6 +343,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (err.cacheDisposition === "purge") {
       try {
         await store.purgeCharacter(actorId, characterId);
+        coordination.invalidate?.();
       } catch {
         // never surface private character contents
       }
@@ -354,10 +374,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   async function fetchLatestForConflict(latestRevision: number | null = null): Promise<void> {
+    if (!await identityIsCurrent() || !isConnected() || !coordination.isOwner()) return;
     conflictRefreshPending = true;
     conflictMinimumRevision = Math.max(conflictMinimumRevision, latestRevision ?? 0);
     try {
       const envelope = await api.open(characterId);
+      if (!await identityIsCurrent()) return;
       const server = envelope.character;
       const local = confirmed;
       if (server.reconciliation.revision < Math.max(local?.reconciliation.revision ?? 0, conflictMinimumRevision)) {
@@ -368,6 +390,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       await reconcile(server);
       if (error === null || error.kind === "conflict") conflictRefreshPending = false;
     } catch (err) {
+      if (!await identityIsCurrent()) return;
       await handleOpenError(err);
       return;
     }
@@ -427,7 +450,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       }
     }
     let current = entry;
-    if (!isConnected() || !editing.owned || disposed) {
+    if (!isConnected() || !editing.owned || !coordination.isOwner() || disposed) {
       refreshPhase();
       return "blocked";
     }
@@ -454,7 +477,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       setBlocked("expired-attempt", "This change is older than the server's replay window. Review it manually before continuing.");
       return "blocked";
     }
-    if (!isConnected() || !editing.owned || disposed) {
+    if (!await identityIsCurrent() || !isConnected() || !editing.owned || !coordination.isOwner() || disposed) {
       refreshPhase();
       emit();
       return "blocked";
@@ -467,12 +490,14 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     try {
       response = await api.send(attempt);
     } catch (err) {
+      if (!await identityIsCurrent()) return "blocked";
       if (err instanceof ApiError && err.status === 404) {
         await handleNotFound(err);
         return "blocked";
       }
       return await handleSendError(err);
     }
+    if (!await identityIsCurrent()) return "blocked";
     const character = response?.result?.character;
     if (!character) {
       phase = "uncertain";
@@ -483,8 +508,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     try {
       await store.acknowledge(actorId, characterId, current.id, character, generationAtSend);
     } catch (err) {
+      if (!await identityIsCurrent()) return "blocked";
       return handleAckError(err);
     }
+    if (!identityMatches()) return "blocked";
+    coordination.invalidate?.();
     confirmed = character;
     generation += 1;
     transientFailures = 0;
@@ -561,12 +589,14 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   async function reconcileFresh() {
-    if (!isConnected() || isBlocked() || disposed) return;
+    if (!await identityIsCurrent() || !isConnected() || isBlocked() || disposed || !coordination.isOwner()) return;
     let server: CharacterView;
     try {
       const envelope = await api.open(characterId);
+      if (!await identityIsCurrent()) return;
       server = envelope.character;
     } catch (err) {
+      if (!await identityIsCurrent()) return;
       await handleOpenError(err);
       return;
     }
@@ -589,6 +619,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   async function reconcile(server: CharacterView) {
+    if (!identityMatches()) return;
     const local = confirmed;
     if (local && server.reconciliation.revision < local.reconciliation.revision) {
       setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.");
@@ -600,9 +631,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (!local || drifted || !projectionsEqual(server.projection, local.projection)) {
       try {
         await store.confirmSnapshot(actorId, characterId, server, generation);
+        if (!identityMatches()) return;
+        coordination.invalidate?.();
         confirmed = server;
         generation += 1;
       } catch (err) {
+        if (!await identityIsCurrent()) return;
         await handleAckError(err);
         return;
       }
@@ -632,12 +666,14 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   async function resolveConflict(input: { mode: "discard" | "reapply"; selectedIds: string[] }): Promise<void> {
     if (disposed) return;
+    if (!identityMatches() || !editing.owned || !coordination.isOwner()) throw new Error("Editing ownership required.");
     if (draining || conflictRefreshPending || !error || !["conflict", "invalid", "expired-attempt"].includes(error.kind)) {
       throw new Error("Resolve the blocking error and refresh current state before reviewing intentions.");
     }
     const selected = new Set(input.selectedIds);
     if (input.mode === "discard") {
       await store.retireEntries(actorId, characterId, input.selectedIds, generation);
+      if (!identityMatches()) return;
       generation += 1;
       const remaining = entries.filter((e) => !selected.has(e.id));
       for (const entry of entries) {
@@ -649,14 +685,17 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       entries = remaining;
     } else {
       await store.retireEntries(actorId, characterId, input.selectedIds, generation);
+      if (!identityMatches()) return;
       generation += 1;
       const rebuilt: QueueEntry[] = [];
       for (const entry of entries) {
+        if (!identityMatches()) return;
         if (selected.has(entry.id)) {
           const replica = newEntry(entry.intent);
           replica.baseRevision = confirmed!.reconciliation.revision;
           replica.sequence = entry.sequence;
           await store.enqueue(replica);
+          if (!identityMatches()) return;
           rebuilt.push(replica);
           resolveFreezeWaiter(entry.id);
           entryWrites.delete(entry.id);
@@ -669,17 +708,23 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     error = null;
     needsFresh = false;
+    coordination.invalidate?.();
     emit();
     scheduleDrain();
   }
 
   function open(): Promise<void> {
-    opening ??= initialize();
+    opening ??= initialize().catch(() => {
+      if (!identityMatches()) return;
+      setBlocked("storage-error", "Could not load local character state.");
+      emit();
+    });
     return opening;
   }
 
   async function initialize(): Promise<void> {
     const loaded = await store.read(actorId, characterId);
+    if (!identityMatches()) return;
     confirmed = loaded.confirmed;
     entries = loaded.entries;
     generation = loaded.generation;
@@ -694,14 +739,37 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   async function requestEditing(): Promise<boolean> {
-    const wasOwner = editing.owned;
-    const granted = await coordination.requestEditing();
-    editing = { owned: granted, owner: null };
-    if (granted && !wasOwner) needsFresh = true;
+    if (!identityMatches()) return false;
+    if (editing.owned && coordination.isOwner()) return true;
+    const granted = await (initialized && coordination.requestTakeover ? coordination.requestTakeover() : coordination.requestEditing());
+    if (granted) await reloadOwned();
     emit();
     if (granted) scheduleDrain();
     return granted;
   }
+
+  let reloading: Promise<void> | null = null;
+  function reloadOwned(): Promise<void> {
+    return reloading ??= (async () => {
+      const loaded = await store.read(actorId, characterId);
+      if (!identityMatches() || !coordination.isOwner()) return;
+      confirmed = loaded.confirmed; entries = loaded.entries; generation = loaded.generation;
+      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), 0);
+      editing = { owned: true, owner: null }; needsFresh = true;
+      emit(); scheduleDrain();
+    })().catch(() => {
+      if (!identityMatches()) return;
+      editing = { owned: false, owner: null };
+      setBlocked("storage-error", "Could not load local character state.");
+      coordination.letGo(); emit();
+    }).finally(() => { reloading = null; });
+  }
+
+  coordination.setQuiesce?.(async () => {
+    if (draining) await new Promise<void>(resolve => idleWaiters.push(resolve));
+    if (recovering) await Promise.allSettled([recovering]);
+    await Promise.allSettled([...entryWrites.values()]);
+  });
 
   function dispose() {
     if (disposed) return;
@@ -713,14 +781,19 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     unsubscribeIdentity?.();
     unsubscribeCoordination?.();
     coordination.letGo();
+    coordination.dispose?.();
     for (const waiter of freezeWaiters.values()) waiter.reject(new Error("Session closed."));
     freezeWaiters.clear();
-    resolveIdle();
+    if (!draining) resolveIdle();
     emit();
   }
 
   const unsubscribeIdentity = identity.subscribe(() => {
     if (disposed) return;
+    if (!identityMatches()) {
+      confirmed = null; entries = []; error = null; editing = { owned: false, owner: null };
+      coordination.letGo();
+    }
     if (!isConnected()) needsFresh = true;
     if (isConnected() && (error?.kind === "reauthenticate" || error?.kind === "network-unavailable")) {
       error = null;
@@ -736,12 +809,25 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   const unsubscribeCoordination = coordination.subscribe((event) => {
     if (disposed) return;
     if (event.type === "ownership-changed") {
-      editing = { owned: event.owned, owner: event.owner ?? null };
+      if (event.owned) { void reloadOwned(); return; }
+      editing = { owned: false, owner: event.owner ?? null };
       if (!event.owned && retryTimer !== null) {
         clearTimeout(retryTimer);
         retryTimer = null;
       }
       emit();
+    }
+    if (event.type === "invalidate" && event.characterId === characterId) {
+      void store.read(actorId, characterId).then(loaded => {
+        if (!identityMatches()) return;
+        if (editing.owned && (loaded.confirmed !== null || loaded.generation <= generation)) return;
+        confirmed = loaded.confirmed; entries = loaded.entries; generation = loaded.generation;
+        if (confirmed === null) setBlocked("purged", "This character is no longer available.");
+        emit();
+      }).catch(() => {
+        if (!identityMatches()) return;
+        setBlocked("storage-error", "Could not reload local character state."); emit();
+      });
     }
   });
 
@@ -778,7 +864,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         }),
       );
     },
-    resolveConflict,
+    resolveConflict(input) {
+      if (recovering) return Promise.reject(new Error("Conflict recovery is already in progress."));
+      recovering = resolveConflict(input).finally(() => { recovering = null; });
+      return recovering;
+    },
     requestEditing,
     whenIdle(): Promise<void> {
       if (!draining && retryTimer === null) return Promise.resolve();

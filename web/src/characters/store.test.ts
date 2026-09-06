@@ -6,6 +6,38 @@ import type { OnlineAttempt } from "./store.js";
 let counter = 0;
 let dbName = "sweetroll-test-store";
 
+it("account clearing tombstones even a first GET without a stored character", async () => {
+  const store = await openCharacterStore(crypto.randomUUID());
+  const before = await store.read("a", "never-cached");
+  await store.clearAccount("a");
+  await expect(store.confirmSnapshot("a", "never-cached", makeView("never-cached", 1), before.generation)).rejects.toThrow(/stale/);
+  const after = await store.read("a", "never-cached");
+  expect(after.confirmed).toBeNull();
+  await store.confirmSnapshot("a", "never-cached", makeView("never-cached", 1), after.generation);
+  expect((await store.read("a", "never-cached")).confirmed).not.toBeNull();
+  await store.close();
+});
+
+it("purging an unopened character tombstones late first GET responses", async () => {
+  const store = await openCharacterStore(crypto.randomUUID());
+  const before = await store.read("a", "c");
+  await store.purgeCharacter("a", "c");
+  await expect(store.confirmSnapshot("a", "c", makeView("c", 1), before.generation)).rejects.toThrow(/stale/);
+  await store.close();
+});
+
+it("checks the account marker inside snapshot/acknowledgment transactions", async () => {
+  const store = await openCharacterStore(crypto.randomUUID());
+  await store.setLastAccount("a");
+  await store.confirmSnapshot("a", "c", makeView("c", 1), 0);
+  const before = await store.read("a", "c");
+  await store.setLastAccount("b");
+  await expect(store.acknowledge("a", "c", "entry", makeView("c", 2), before.generation)).rejects.toThrow(/stale/);
+  await expect(store.confirmSnapshot("a", "c", makeView("c", 2), before.generation)).rejects.toThrow(/stale/);
+  expect(await store.read("a", "c")).toEqual(before);
+  await store.close();
+});
+
 beforeEach(() => {
   counter += 1;
   dbName = `sweetroll-test-store-${counter}`;

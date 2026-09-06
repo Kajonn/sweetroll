@@ -82,6 +82,7 @@ describe("SystemRuntime contract", () => {
       packageChecksum: packageValue.integrity.checksum,
       entityId: "character",
       entityLabel: "Character",
+      completionFields: [],
       derivedValues: { defense: 10 },
       validations: [],
     });
@@ -216,6 +217,53 @@ describe("SystemRuntime contract", () => {
 
     expect(observed).toEqual(initialized);
     expect(state).toEqual(before);
+  });
+
+  it("keeps omitted required editable fields in completion metadata after completion", async () => {
+    const document = allFieldDocument();
+    document.entities[0]!.fields.push({
+      kind: "text", id: "unlisted-name", label: "Unlisted name", required: true,
+      default: "", minLength: 1, maxLength: 120,
+    });
+    const portrait = document.entities[0]!.fields.find(field => field.id === "portrait")!;
+    if (portrait.kind !== "image") throw new Error("Unexpected fixture");
+    portrait.required = true;
+    document.sheets[0]!.sections[0]!.elements = document.sheets[0]!.sections[0]!.elements
+      .filter(element => element.id !== "portrait_element" && element.id !== "defense_element");
+    document.sheets.push({
+      id: "second_sheet", label: "Second", targetEntityId: "character",
+      sections: [{ id: "second_section", label: "Second", elements: [
+        { kind: "field", id: "second_name", fieldId: "name" },
+      ] }],
+    });
+    const packageValue = compileRuntimePackage(document);
+    // The brief's hyphenated ID is injected at the loader seam; published IDs use underscores.
+    const runtime = createSystemRuntime({
+      loadPackage: async () => packageValue,
+      authoritativeRollSecret: "0123456789abcdef0123456789abcdef",
+    });
+    const initialized = await initialize(runtime, packageValue);
+    const projection = initialized.projection;
+    expect(projection.projectionVersion).toBe("1.0");
+    expect(projection.completionFields?.map(field => field.fieldId)).toEqual(["unlisted-name"]);
+    expect(projection.completionFields?.[0]).toMatchObject({
+      kind: "field", fieldKind: "text", label: "Unlisted name", value: "", editable: true,
+      constraints: { required: true, minLength: 1, maxLength: 120 },
+      validations: [{ targetDefinitionId: "unlisted-name" }],
+    });
+    expect(projection.validations).toContainEqual(expect.objectContaining({ targetDefinitionId: "portrait" }));
+    const completed = await runtime.resolve({
+      versionId: packageValue.versionId, entityId: "character", state: initialized.state,
+      intent: { kind: "set", fieldId: "unlisted-name", value: "Hero" },
+    });
+    if (!completed.ok) throw new Error(completed.error.code);
+    const observed = await runtime.resolve({
+      versionId: packageValue.versionId, entityId: "character", state: completed.value.state,
+      intent: { kind: "observe" },
+    });
+    if (!observed.ok) throw new Error(observed.error.code);
+    expect(observed.value.projection.completionFields?.map(field => field.fieldId)).toEqual(["unlisted-name"]);
+    expect(observed.value.projection.completionFields?.[0]).toMatchObject({ value: "Hero", validations: [] });
   });
 
   it.each([

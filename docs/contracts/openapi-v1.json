@@ -4414,6 +4414,175 @@
                             "entityLabel": {
                               "type": "string"
                             },
+                            "completionFields": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "kind",
+                                  "id",
+                                  "fieldId",
+                                  "label",
+                                  "fieldKind",
+                                  "value",
+                                  "editable",
+                                  "constraints",
+                                  "validations"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "const": "field",
+                                    "type": "string"
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "fieldId": {
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "fieldKind": {
+                                    "anyOf": [
+                                      {
+                                        "const": "text",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "integer",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "decimal",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "boolean",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "singleChoice",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "multiChoice",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "computed",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "image",
+                                        "type": "string"
+                                      }
+                                    ]
+                                  },
+                                  "value": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "null"
+                                      },
+                                      {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  "editable": {
+                                    "type": "boolean"
+                                  },
+                                  "constraints": {
+                                    "type": "object",
+                                    "properties": {
+                                      "required": {
+                                        "type": "boolean"
+                                      },
+                                      "min": {
+                                        "type": "number"
+                                      },
+                                      "max": {
+                                        "type": "number"
+                                      },
+                                      "step": {
+                                        "type": "number"
+                                      },
+                                      "minLength": {
+                                        "type": "integer"
+                                      },
+                                      "maxLength": {
+                                        "type": "integer"
+                                      },
+                                      "options": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "id",
+                                            "label"
+                                          ],
+                                          "properties": {
+                                            "id": {
+                                              "type": "string"
+                                            },
+                                            "label": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "validations": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "validationId",
+                                        "severity",
+                                        "message",
+                                        "targetDefinitionId"
+                                      ],
+                                      "properties": {
+                                        "validationId": {
+                                          "type": "string"
+                                        },
+                                        "severity": {
+                                          "anyOf": [
+                                            {
+                                              "const": "error",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "warning",
+                                              "type": "string"
+                                            }
+                                          ]
+                                        },
+                                        "message": {
+                                          "type": "string"
+                                        },
+                                        "targetDefinitionId": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
                             "sheets": {
                               "type": "array",
                               "items": {
@@ -6416,6 +6585,175 @@
                             "entityLabel": {
                               "type": "string"
                             },
+                            "completionFields": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "kind",
+                                  "id",
+                                  "fieldId",
+                                  "label",
+                                  "fieldKind",
+                                  "value",
+                                  "editable",
+                                  "constraints",
+                                  "validations"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "const": "field",
+                                    "type": "string"
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "fieldId": {
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "fieldKind": {
+                                    "anyOf": [
+                                      {
+                                        "const": "text",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "integer",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "decimal",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "boolean",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "singleChoice",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "multiChoice",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "computed",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "image",
+                                        "type": "string"
+                                      }
+                                    ]
+                                  },
+                                  "value": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "null"
+                                      },
+                                      {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  "editable": {
+                                    "type": "boolean"
+                                  },
+                                  "constraints": {
+                                    "type": "object",
+                                    "properties": {
+                                      "required": {
+                                        "type": "boolean"
+                                      },
+                                      "min": {
+                                        "type": "number"
+                                      },
+                                      "max": {
+                                        "type": "number"
+                                      },
+                                      "step": {
+                                        "type": "number"
+                                      },
+                                      "minLength": {
+                                        "type": "integer"
+                                      },
+                                      "maxLength": {
+                                        "type": "integer"
+                                      },
+                                      "options": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "id",
+                                            "label"
+                                          ],
+                                          "properties": {
+                                            "id": {
+                                              "type": "string"
+                                            },
+                                            "label": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "validations": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "validationId",
+                                        "severity",
+                                        "message",
+                                        "targetDefinitionId"
+                                      ],
+                                      "properties": {
+                                        "validationId": {
+                                          "type": "string"
+                                        },
+                                        "severity": {
+                                          "anyOf": [
+                                            {
+                                              "const": "error",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "warning",
+                                              "type": "string"
+                                            }
+                                          ]
+                                        },
+                                        "message": {
+                                          "type": "string"
+                                        },
+                                        "targetDefinitionId": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
                             "sheets": {
                               "type": "array",
                               "items": {
@@ -7702,6 +8040,175 @@
                                 },
                                 "entityLabel": {
                                   "type": "string"
+                                },
+                                "completionFields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "kind",
+                                      "id",
+                                      "fieldId",
+                                      "label",
+                                      "fieldKind",
+                                      "value",
+                                      "editable",
+                                      "constraints",
+                                      "validations"
+                                    ],
+                                    "properties": {
+                                      "kind": {
+                                        "const": "field",
+                                        "type": "string"
+                                      },
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "fieldId": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "fieldKind": {
+                                        "anyOf": [
+                                          {
+                                            "const": "text",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "integer",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "decimal",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "boolean",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "singleChoice",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "multiChoice",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "computed",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "image",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      "editable": {
+                                        "type": "boolean"
+                                      },
+                                      "constraints": {
+                                        "type": "object",
+                                        "properties": {
+                                          "required": {
+                                            "type": "boolean"
+                                          },
+                                          "min": {
+                                            "type": "number"
+                                          },
+                                          "max": {
+                                            "type": "number"
+                                          },
+                                          "step": {
+                                            "type": "number"
+                                          },
+                                          "minLength": {
+                                            "type": "integer"
+                                          },
+                                          "maxLength": {
+                                            "type": "integer"
+                                          },
+                                          "options": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "required": [
+                                                "id",
+                                                "label"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "type": "string"
+                                                },
+                                                "label": {
+                                                  "type": "string"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "validations": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "validationId",
+                                            "severity",
+                                            "message",
+                                            "targetDefinitionId"
+                                          ],
+                                          "properties": {
+                                            "validationId": {
+                                              "type": "string"
+                                            },
+                                            "severity": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "error",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "warning",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            },
+                                            "message": {
+                                              "type": "string"
+                                            },
+                                            "targetDefinitionId": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
                                 },
                                 "sheets": {
                                   "type": "array",
@@ -9376,6 +9883,175 @@
                                 },
                                 "entityLabel": {
                                   "type": "string"
+                                },
+                                "completionFields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "kind",
+                                      "id",
+                                      "fieldId",
+                                      "label",
+                                      "fieldKind",
+                                      "value",
+                                      "editable",
+                                      "constraints",
+                                      "validations"
+                                    ],
+                                    "properties": {
+                                      "kind": {
+                                        "const": "field",
+                                        "type": "string"
+                                      },
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "fieldId": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "fieldKind": {
+                                        "anyOf": [
+                                          {
+                                            "const": "text",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "integer",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "decimal",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "boolean",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "singleChoice",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "multiChoice",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "computed",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "image",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      "editable": {
+                                        "type": "boolean"
+                                      },
+                                      "constraints": {
+                                        "type": "object",
+                                        "properties": {
+                                          "required": {
+                                            "type": "boolean"
+                                          },
+                                          "min": {
+                                            "type": "number"
+                                          },
+                                          "max": {
+                                            "type": "number"
+                                          },
+                                          "step": {
+                                            "type": "number"
+                                          },
+                                          "minLength": {
+                                            "type": "integer"
+                                          },
+                                          "maxLength": {
+                                            "type": "integer"
+                                          },
+                                          "options": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "required": [
+                                                "id",
+                                                "label"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "type": "string"
+                                                },
+                                                "label": {
+                                                  "type": "string"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "validations": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "validationId",
+                                            "severity",
+                                            "message",
+                                            "targetDefinitionId"
+                                          ],
+                                          "properties": {
+                                            "validationId": {
+                                              "type": "string"
+                                            },
+                                            "severity": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "error",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "warning",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            },
+                                            "message": {
+                                              "type": "string"
+                                            },
+                                            "targetDefinitionId": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
                                 },
                                 "sheets": {
                                   "type": "array",
@@ -11062,6 +11738,175 @@
                                 "entityLabel": {
                                   "type": "string"
                                 },
+                                "completionFields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "kind",
+                                      "id",
+                                      "fieldId",
+                                      "label",
+                                      "fieldKind",
+                                      "value",
+                                      "editable",
+                                      "constraints",
+                                      "validations"
+                                    ],
+                                    "properties": {
+                                      "kind": {
+                                        "const": "field",
+                                        "type": "string"
+                                      },
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "fieldId": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "fieldKind": {
+                                        "anyOf": [
+                                          {
+                                            "const": "text",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "integer",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "decimal",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "boolean",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "singleChoice",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "multiChoice",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "computed",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "image",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      "editable": {
+                                        "type": "boolean"
+                                      },
+                                      "constraints": {
+                                        "type": "object",
+                                        "properties": {
+                                          "required": {
+                                            "type": "boolean"
+                                          },
+                                          "min": {
+                                            "type": "number"
+                                          },
+                                          "max": {
+                                            "type": "number"
+                                          },
+                                          "step": {
+                                            "type": "number"
+                                          },
+                                          "minLength": {
+                                            "type": "integer"
+                                          },
+                                          "maxLength": {
+                                            "type": "integer"
+                                          },
+                                          "options": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "required": [
+                                                "id",
+                                                "label"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "type": "string"
+                                                },
+                                                "label": {
+                                                  "type": "string"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "validations": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "validationId",
+                                            "severity",
+                                            "message",
+                                            "targetDefinitionId"
+                                          ],
+                                          "properties": {
+                                            "validationId": {
+                                              "type": "string"
+                                            },
+                                            "severity": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "error",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "warning",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            },
+                                            "message": {
+                                              "type": "string"
+                                            },
+                                            "targetDefinitionId": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
                                 "sheets": {
                                   "type": "array",
                                   "items": {
@@ -12739,6 +13584,175 @@
                                 "entityLabel": {
                                   "type": "string"
                                 },
+                                "completionFields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "kind",
+                                      "id",
+                                      "fieldId",
+                                      "label",
+                                      "fieldKind",
+                                      "value",
+                                      "editable",
+                                      "constraints",
+                                      "validations"
+                                    ],
+                                    "properties": {
+                                      "kind": {
+                                        "const": "field",
+                                        "type": "string"
+                                      },
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "fieldId": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "fieldKind": {
+                                        "anyOf": [
+                                          {
+                                            "const": "text",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "integer",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "decimal",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "boolean",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "singleChoice",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "multiChoice",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "computed",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "image",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      "editable": {
+                                        "type": "boolean"
+                                      },
+                                      "constraints": {
+                                        "type": "object",
+                                        "properties": {
+                                          "required": {
+                                            "type": "boolean"
+                                          },
+                                          "min": {
+                                            "type": "number"
+                                          },
+                                          "max": {
+                                            "type": "number"
+                                          },
+                                          "step": {
+                                            "type": "number"
+                                          },
+                                          "minLength": {
+                                            "type": "integer"
+                                          },
+                                          "maxLength": {
+                                            "type": "integer"
+                                          },
+                                          "options": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "required": [
+                                                "id",
+                                                "label"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "type": "string"
+                                                },
+                                                "label": {
+                                                  "type": "string"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "validations": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "validationId",
+                                            "severity",
+                                            "message",
+                                            "targetDefinitionId"
+                                          ],
+                                          "properties": {
+                                            "validationId": {
+                                              "type": "string"
+                                            },
+                                            "severity": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "error",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "warning",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            },
+                                            "message": {
+                                              "type": "string"
+                                            },
+                                            "targetDefinitionId": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
                                 "sheets": {
                                   "type": "array",
                                   "items": {
@@ -14406,6 +15420,175 @@
                                 },
                                 "entityLabel": {
                                   "type": "string"
+                                },
+                                "completionFields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "kind",
+                                      "id",
+                                      "fieldId",
+                                      "label",
+                                      "fieldKind",
+                                      "value",
+                                      "editable",
+                                      "constraints",
+                                      "validations"
+                                    ],
+                                    "properties": {
+                                      "kind": {
+                                        "const": "field",
+                                        "type": "string"
+                                      },
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "fieldId": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "fieldKind": {
+                                        "anyOf": [
+                                          {
+                                            "const": "text",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "integer",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "decimal",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "boolean",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "singleChoice",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "multiChoice",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "computed",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "image",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      "editable": {
+                                        "type": "boolean"
+                                      },
+                                      "constraints": {
+                                        "type": "object",
+                                        "properties": {
+                                          "required": {
+                                            "type": "boolean"
+                                          },
+                                          "min": {
+                                            "type": "number"
+                                          },
+                                          "max": {
+                                            "type": "number"
+                                          },
+                                          "step": {
+                                            "type": "number"
+                                          },
+                                          "minLength": {
+                                            "type": "integer"
+                                          },
+                                          "maxLength": {
+                                            "type": "integer"
+                                          },
+                                          "options": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "required": [
+                                                "id",
+                                                "label"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "type": "string"
+                                                },
+                                                "label": {
+                                                  "type": "string"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "validations": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "validationId",
+                                            "severity",
+                                            "message",
+                                            "targetDefinitionId"
+                                          ],
+                                          "properties": {
+                                            "validationId": {
+                                              "type": "string"
+                                            },
+                                            "severity": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "error",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "warning",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            },
+                                            "message": {
+                                              "type": "string"
+                                            },
+                                            "targetDefinitionId": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
                                 },
                                 "sheets": {
                                   "type": "array",
@@ -17059,6 +18242,175 @@
                             "entityLabel": {
                               "type": "string"
                             },
+                            "completionFields": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "kind",
+                                  "id",
+                                  "fieldId",
+                                  "label",
+                                  "fieldKind",
+                                  "value",
+                                  "editable",
+                                  "constraints",
+                                  "validations"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "const": "field",
+                                    "type": "string"
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "fieldId": {
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "fieldKind": {
+                                    "anyOf": [
+                                      {
+                                        "const": "text",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "integer",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "decimal",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "boolean",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "singleChoice",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "multiChoice",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "computed",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "image",
+                                        "type": "string"
+                                      }
+                                    ]
+                                  },
+                                  "value": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "null"
+                                      },
+                                      {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  "editable": {
+                                    "type": "boolean"
+                                  },
+                                  "constraints": {
+                                    "type": "object",
+                                    "properties": {
+                                      "required": {
+                                        "type": "boolean"
+                                      },
+                                      "min": {
+                                        "type": "number"
+                                      },
+                                      "max": {
+                                        "type": "number"
+                                      },
+                                      "step": {
+                                        "type": "number"
+                                      },
+                                      "minLength": {
+                                        "type": "integer"
+                                      },
+                                      "maxLength": {
+                                        "type": "integer"
+                                      },
+                                      "options": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "id",
+                                            "label"
+                                          ],
+                                          "properties": {
+                                            "id": {
+                                              "type": "string"
+                                            },
+                                            "label": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "validations": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "validationId",
+                                        "severity",
+                                        "message",
+                                        "targetDefinitionId"
+                                      ],
+                                      "properties": {
+                                        "validationId": {
+                                          "type": "string"
+                                        },
+                                        "severity": {
+                                          "anyOf": [
+                                            {
+                                              "const": "error",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "warning",
+                                              "type": "string"
+                                            }
+                                          ]
+                                        },
+                                        "message": {
+                                          "type": "string"
+                                        },
+                                        "targetDefinitionId": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
                             "sheets": {
                               "type": "array",
                               "items": {
@@ -18556,6 +19908,175 @@
                                 },
                                 "entityLabel": {
                                   "type": "string"
+                                },
+                                "completionFields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "kind",
+                                      "id",
+                                      "fieldId",
+                                      "label",
+                                      "fieldKind",
+                                      "value",
+                                      "editable",
+                                      "constraints",
+                                      "validations"
+                                    ],
+                                    "properties": {
+                                      "kind": {
+                                        "const": "field",
+                                        "type": "string"
+                                      },
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "fieldId": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "fieldKind": {
+                                        "anyOf": [
+                                          {
+                                            "const": "text",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "integer",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "decimal",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "boolean",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "singleChoice",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "multiChoice",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "computed",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "image",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      "editable": {
+                                        "type": "boolean"
+                                      },
+                                      "constraints": {
+                                        "type": "object",
+                                        "properties": {
+                                          "required": {
+                                            "type": "boolean"
+                                          },
+                                          "min": {
+                                            "type": "number"
+                                          },
+                                          "max": {
+                                            "type": "number"
+                                          },
+                                          "step": {
+                                            "type": "number"
+                                          },
+                                          "minLength": {
+                                            "type": "integer"
+                                          },
+                                          "maxLength": {
+                                            "type": "integer"
+                                          },
+                                          "options": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "required": [
+                                                "id",
+                                                "label"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "type": "string"
+                                                },
+                                                "label": {
+                                                  "type": "string"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "validations": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "validationId",
+                                            "severity",
+                                            "message",
+                                            "targetDefinitionId"
+                                          ],
+                                          "properties": {
+                                            "validationId": {
+                                              "type": "string"
+                                            },
+                                            "severity": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "error",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "warning",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            },
+                                            "message": {
+                                              "type": "string"
+                                            },
+                                            "targetDefinitionId": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
                                 },
                                 "sheets": {
                                   "type": "array",
@@ -20224,6 +21745,175 @@
                                 },
                                 "entityLabel": {
                                   "type": "string"
+                                },
+                                "completionFields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "kind",
+                                      "id",
+                                      "fieldId",
+                                      "label",
+                                      "fieldKind",
+                                      "value",
+                                      "editable",
+                                      "constraints",
+                                      "validations"
+                                    ],
+                                    "properties": {
+                                      "kind": {
+                                        "const": "field",
+                                        "type": "string"
+                                      },
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "fieldId": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "fieldKind": {
+                                        "anyOf": [
+                                          {
+                                            "const": "text",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "integer",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "decimal",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "boolean",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "singleChoice",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "multiChoice",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "computed",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "image",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      "editable": {
+                                        "type": "boolean"
+                                      },
+                                      "constraints": {
+                                        "type": "object",
+                                        "properties": {
+                                          "required": {
+                                            "type": "boolean"
+                                          },
+                                          "min": {
+                                            "type": "number"
+                                          },
+                                          "max": {
+                                            "type": "number"
+                                          },
+                                          "step": {
+                                            "type": "number"
+                                          },
+                                          "minLength": {
+                                            "type": "integer"
+                                          },
+                                          "maxLength": {
+                                            "type": "integer"
+                                          },
+                                          "options": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "required": [
+                                                "id",
+                                                "label"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "type": "string"
+                                                },
+                                                "label": {
+                                                  "type": "string"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "validations": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "validationId",
+                                            "severity",
+                                            "message",
+                                            "targetDefinitionId"
+                                          ],
+                                          "properties": {
+                                            "validationId": {
+                                              "type": "string"
+                                            },
+                                            "severity": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "error",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "warning",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            },
+                                            "message": {
+                                              "type": "string"
+                                            },
+                                            "targetDefinitionId": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
                                 },
                                 "sheets": {
                                   "type": "array",

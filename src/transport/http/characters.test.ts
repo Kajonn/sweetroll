@@ -221,6 +221,38 @@ describe("character HTTP routes", () => {
     }
   });
 
+  it.each([undefined, [], [{
+    kind: "field" as const, id: "unlisted-name", fieldId: "unlisted-name", label: "Unlisted name",
+    fieldKind: "text" as const, value: "", editable: true,
+    constraints: { required: true, minLength: 1, maxLength: 120 }, validations: [],
+  }]])("preserves optional completion metadata across create, command and GET responses: %j", async (completionFields) => {
+    const view = characterView();
+    if (completionFields !== undefined) Object.assign(view.projection, { completionFields });
+    view.reconciliation.replayed = completionFields === undefined;
+    const app = await build(makeCharacters({
+      create: async () => ({ ok: true, value: view }),
+      apply: async () => ({ ok: true, value: { character: view, roll: null } }),
+      open: async () => ({ ok: true, value: view }),
+    }));
+    const responses = [
+      await app.inject({ method: "POST", url: "/characters", headers: cookie, payload: {
+        systemVersionId: view.systemVersionId, entityDefinitionId: "character", name: "Aria", idempotencyKey: "old-create",
+      } }),
+      await app.inject({ method: "POST", url: `/characters/${view.characterId}/fields/ability/set`, headers: cookie,
+        payload: { value: 12, expectedRevision: 1, idempotencyKey: "old-command" } }),
+      await app.inject({ method: "GET", url: `/characters/${view.characterId}`, headers: cookie }),
+    ];
+    expect(responses.map(response => response.statusCode)).toEqual([201, 200, 200]);
+    for (const response of responses) {
+      const body = response.json();
+      const projection = (body.character ?? body.result.character).projection;
+      expect(projection.projectionVersion).toBe("1.0");
+      if (completionFields === undefined) expect(projection).not.toHaveProperty("completionFields");
+      else expect(projection.completionFields).toEqual(completionFields);
+    }
+    expect(responses[2]!.headers.etag).toBe(eTag);
+  });
+
   it("maps POST /characters to create and requires an idempotencyKey in the body", async () => {
     let received: unknown;
     const app = await build(

@@ -25,6 +25,10 @@ export function buildCharacterProjection(input: {
   const actions = new Map(packageValue.actions.map((action) => [action.id, action]));
   const validationsFor = (id: string): RuntimeValidation[] =>
     validations.filter((validation) => validation.targetDefinitionId === id);
+  const entitySheets = packageValue.sheets.filter((sheet) => sheet.targetEntityId === entity.id);
+  const bound = new Set(entitySheets.flatMap(sheet => sheet.sections.flatMap(section =>
+    section.elements.flatMap(element => element.kind === "field" ? [element.fieldId] : [])
+  )));
 
   return {
     projectionVersion: "1.0",
@@ -33,8 +37,12 @@ export function buildCharacterProjection(input: {
     packageChecksum: packageValue.integrity.checksum,
     entityId: entity.id,
     entityLabel: entity.label,
-    sheets: packageValue.sheets
-      .filter((sheet) => sheet.targetEntityId === entity.id)
+    completionFields: entity.fields.flatMap((field) =>
+      field.kind !== "computed" && field.kind !== "image" && field.kind !== "resource"
+        && field.required && !bound.has(field.id)
+        ? [projectField(field.id, field, state, derivedValues, validationsFor)]
+        : []),
+    sheets: entitySheets
       .map((sheet) => ({
         id: sheet.id,
         label: sheet.label,
@@ -95,9 +103,19 @@ function projectElement(
     };
   }
 
+  return projectField(element.id, field, state, derivedValues, validationsFor);
+}
+
+function projectField(
+  id: string,
+  field: Exclude<FieldV1, { kind: "resource" }>,
+  state: RuntimeStateV1,
+  derivedValues: Record<string, RuntimeScalar>,
+  validationsFor: (id: string) => RuntimeValidation[],
+): Extract<CharacterProjectionElement, { kind: "field" }> {
   return {
     kind: "field",
-    id: element.id,
+    id,
     fieldId: field.id,
     label: field.label,
     fieldKind: field.kind,

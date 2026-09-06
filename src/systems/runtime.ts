@@ -160,6 +160,7 @@ export type CharacterProjectionV1 = {
   entityId: DefinitionId;
   entityLabel: string;
   sheets: CharacterProjectionSheet[];
+  completionFields?: Extract<CharacterProjectionElement, { kind: "field" }>[];
   derivedValues: Record<DefinitionId, RuntimeScalar>;
   validations: RuntimeValidation[];
 };

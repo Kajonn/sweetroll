@@ -2010,6 +2010,34 @@ export interface operations {
                                 packageChecksum: string;
                                 entityId: string;
                                 entityLabel: string;
+                                completionFields?: {
+                                    /** @constant */
+                                    kind: "field";
+                                    id: string;
+                                    fieldId: string;
+                                    label: string;
+                                    fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                    value: string | number | boolean | null | string[];
+                                    editable: boolean;
+                                    constraints: {
+                                        required?: boolean;
+                                        min?: number;
+                                        max?: number;
+                                        step?: number;
+                                        minLength?: number;
+                                        maxLength?: number;
+                                        options?: {
+                                            id: string;
+                                            label: string;
+                                        }[];
+                                    };
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                }[];
                                 sheets: {
                                     id: string;
                                     label: string;
@@ -2343,6 +2371,34 @@ export interface operations {
                                 packageChecksum: string;
                                 entityId: string;
                                 entityLabel: string;
+                                completionFields?: {
+                                    /** @constant */
+                                    kind: "field";
+                                    id: string;
+                                    fieldId: string;
+                                    label: string;
+                                    fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                    value: string | number | boolean | null | string[];
+                                    editable: boolean;
+                                    constraints: {
+                                        required?: boolean;
+                                        min?: number;
+                                        max?: number;
+                                        step?: number;
+                                        minLength?: number;
+                                        maxLength?: number;
+                                        options?: {
+                                            id: string;
+                                            label: string;
+                                        }[];
+                                    };
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                }[];
                                 sheets: {
                                     id: string;
                                     label: string;
@@ -2625,6 +2681,34 @@ export interface operations {
                                     packageChecksum: string;
                                     entityId: string;
                                     entityLabel: string;
+                                    completionFields?: {
+                                        /** @constant */
+                                        kind: "field";
+                                        id: string;
+                                        fieldId: string;
+                                        label: string;
+                                        fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                        value: string | number | boolean | null | string[];
+                                        editable: boolean;
+                                        constraints: {
+                                            required?: boolean;
+                                            min?: number;
+                                            max?: number;
+                                            step?: number;
+                                            minLength?: number;
+                                            maxLength?: number;
+                                            options?: {
+                                                id: string;
+                                                label: string;
+                                            }[];
+                                        };
+                                        validations: {
+                                            validationId: string;
+                                            severity: "error" | "warning";
+                                            message: string;
+                                            targetDefinitionId: string;
+                                        }[];
+                                    }[];
                                     sheets: {
                                         id: string;
                                         label: string;
@@ -2985,6 +3069,34 @@ export interface operations {
                                     packageChecksum: string;
                                     entityId: string;
                                     entityLabel: string;
+                                    completionFields?: {
+                                        /** @constant */
+                                        kind: "field";
+                                        id: string;
+                                        fieldId: string;
+                                        label: string;
+                                        fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                        value: string | number | boolean | null | string[];
+                                        editable: boolean;
+                                        constraints: {
+                                            required?: boolean;
+                                            min?: number;
+                                            max?: number;
+                                            step?: number;
+                                            minLength?: number;
+                                            maxLength?: number;
+                                            options?: {
+                                                id: string;
+                                                label: string;
+                                            }[];
+                                        };
+                                        validations: {
+                                            validationId: string;
+                                            severity: "error" | "warning";
+                                            message: string;
+                                            targetDefinitionId: string;
+                                        }[];
+                                    }[];
                                     sheets: {
                                         id: string;
                                         label: string;
@@ -3345,6 +3457,34 @@ export interface operations {
                                     packageChecksum: string;
                                     entityId: string;
                                     entityLabel: string;
+                                    completionFields?: {
+                                        /** @constant */
+                                        kind: "field";
+                                        id: string;
+                                        fieldId: string;
+                                        label: string;
+                                        fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                        value: string | number | boolean | null | string[];
+                                        editable: boolean;
+                                        constraints: {
+                                            required?: boolean;
+                                            min?: number;
+                                            max?: number;
+                                            step?: number;
+                                            minLength?: number;
+                                            maxLength?: number;
+                                            options?: {
+                                                id: string;
+                                                label: string;
+                                            }[];
+                                        };
+                                        validations: {
+                                            validationId: string;
+                                            severity: "error" | "warning";
+                                            message: string;
+                                            targetDefinitionId: string;
+                                        }[];
+                                    }[];
                                     sheets: {
                                         id: string;
                                         label: string;
@@ -3707,6 +3847,34 @@ export interface operations {
                                     packageChecksum: string;
                                     entityId: string;
                                     entityLabel: string;
+                                    completionFields?: {
+                                        /** @constant */
+                                        kind: "field";
+                                        id: string;
+                                        fieldId: string;
+                                        label: string;
+                                        fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                        value: string | number | boolean | null | string[];
+                                        editable: boolean;
+                                        constraints: {
+                                            required?: boolean;
+                                            min?: number;
+                                            max?: number;
+                                            step?: number;
+                                            minLength?: number;
+                                            maxLength?: number;
+                                            options?: {
+                                                id: string;
+                                                label: string;
+                                            }[];
+                                        };
+                                        validations: {
+                                            validationId: string;
+                                            severity: "error" | "warning";
+                                            message: string;
+                                            targetDefinitionId: string;
+                                        }[];
+                                    }[];
                                     sheets: {
                                         id: string;
                                         label: string;
@@ -4067,6 +4235,34 @@ export interface operations {
                                     packageChecksum: string;
                                     entityId: string;
                                     entityLabel: string;
+                                    completionFields?: {
+                                        /** @constant */
+                                        kind: "field";
+                                        id: string;
+                                        fieldId: string;
+                                        label: string;
+                                        fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                        value: string | number | boolean | null | string[];
+                                        editable: boolean;
+                                        constraints: {
+                                            required?: boolean;
+                                            min?: number;
+                                            max?: number;
+                                            step?: number;
+                                            minLength?: number;
+                                            maxLength?: number;
+                                            options?: {
+                                                id: string;
+                                                label: string;
+                                            }[];
+                                        };
+                                        validations: {
+                                            validationId: string;
+                                            severity: "error" | "warning";
+                                            message: string;
+                                            targetDefinitionId: string;
+                                        }[];
+                                    }[];
                                     sheets: {
                                         id: string;
                                         label: string;
@@ -4705,6 +4901,34 @@ export interface operations {
                                 packageChecksum: string;
                                 entityId: string;
                                 entityLabel: string;
+                                completionFields?: {
+                                    /** @constant */
+                                    kind: "field";
+                                    id: string;
+                                    fieldId: string;
+                                    label: string;
+                                    fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                    value: string | number | boolean | null | string[];
+                                    editable: boolean;
+                                    constraints: {
+                                        required?: boolean;
+                                        min?: number;
+                                        max?: number;
+                                        step?: number;
+                                        minLength?: number;
+                                        maxLength?: number;
+                                        options?: {
+                                            id: string;
+                                            label: string;
+                                        }[];
+                                    };
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                }[];
                                 sheets: {
                                     id: string;
                                     label: string;
@@ -5034,6 +5258,34 @@ export interface operations {
                                     packageChecksum: string;
                                     entityId: string;
                                     entityLabel: string;
+                                    completionFields?: {
+                                        /** @constant */
+                                        kind: "field";
+                                        id: string;
+                                        fieldId: string;
+                                        label: string;
+                                        fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                        value: string | number | boolean | null | string[];
+                                        editable: boolean;
+                                        constraints: {
+                                            required?: boolean;
+                                            min?: number;
+                                            max?: number;
+                                            step?: number;
+                                            minLength?: number;
+                                            maxLength?: number;
+                                            options?: {
+                                                id: string;
+                                                label: string;
+                                            }[];
+                                        };
+                                        validations: {
+                                            validationId: string;
+                                            severity: "error" | "warning";
+                                            message: string;
+                                            targetDefinitionId: string;
+                                        }[];
+                                    }[];
                                     sheets: {
                                         id: string;
                                         label: string;
@@ -5392,6 +5644,34 @@ export interface operations {
                                     packageChecksum: string;
                                     entityId: string;
                                     entityLabel: string;
+                                    completionFields?: {
+                                        /** @constant */
+                                        kind: "field";
+                                        id: string;
+                                        fieldId: string;
+                                        label: string;
+                                        fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                        value: string | number | boolean | null | string[];
+                                        editable: boolean;
+                                        constraints: {
+                                            required?: boolean;
+                                            min?: number;
+                                            max?: number;
+                                            step?: number;
+                                            minLength?: number;
+                                            maxLength?: number;
+                                            options?: {
+                                                id: string;
+                                                label: string;
+                                            }[];
+                                        };
+                                        validations: {
+                                            validationId: string;
+                                            severity: "error" | "warning";
+                                            message: string;
+                                            targetDefinitionId: string;
+                                        }[];
+                                    }[];
                                     sheets: {
                                         id: string;
                                         label: string;

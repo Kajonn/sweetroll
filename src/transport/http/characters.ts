@@ -84,14 +84,7 @@ const ProjectionActionInputDto = Type.Object({
   required: Type.Boolean(),
   default: RuntimeScalarDto,
 });
-const ProjectionElementDto = Type.Union([
-  Type.Object({
-    kind: Type.Literal("heading"),
-    id: Type.String(),
-    text: Type.String(),
-    level: Type.Union([Type.Literal(2), Type.Literal(3)]),
-  }),
-  Type.Object({
+const ProjectionFieldDto = Type.Object({
     kind: Type.Literal("field"),
     id: Type.String(),
     fieldId: Type.String(),
@@ -110,7 +103,15 @@ const ProjectionElementDto = Type.Union([
     editable: Type.Boolean(),
     constraints: ProjectionFieldConstraintsDto,
     validations: Type.Array(RuntimeValidationDto),
+  });
+const ProjectionElementDto = Type.Union([
+  Type.Object({
+    kind: Type.Literal("heading"),
+    id: Type.String(),
+    text: Type.String(),
+    level: Type.Union([Type.Literal(2), Type.Literal(3)]),
   }),
+  ProjectionFieldDto,
   Type.Object({
     kind: Type.Literal("resource"),
     id: Type.String(),
@@ -140,6 +141,7 @@ const ProjectionDto = Type.Object({
   packageChecksum: Type.String(),
   entityId: Type.String(),
   entityLabel: Type.String(),
+  completionFields: Type.Optional(Type.Array(ProjectionFieldDto)),
   sheets: Type.Array(
     Type.Object({
       id: Type.String(),

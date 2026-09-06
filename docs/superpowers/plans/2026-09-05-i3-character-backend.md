@@ -823,9 +823,9 @@ Expected: every command passes both times; e2e cleanup leaves zero owner-created
 
 Create `docs/acceptance/i3-2026-09-05.md` with tested commit, commands, pass counts, acceptance sequence, p95 measurements, and explicit proof that publication did not mutate a pinned character before migration commit.
 
-- [x] **Step 8: Mark I3 closed in the design**
+- [x] **Step 8: Record I3 closure**
 
-Update the I3 note in `design_v2.md` from approved design to closed implementation, linking the acceptance record. Do not edit I4 scope.
+Per the task-brief instruction, the `design_v2.md` note update below was intentionally skipped (see "Step 8 deviation" under Completion reconciliation); the closure is recorded in this plan document, linking the acceptance record. `design_v2.md` remains "approved design"; do not edit I4 scope.
 
 - [x] **Step 9: Commit closure**
 
@@ -879,7 +879,7 @@ Per the task-brief instruction, the closure note is recorded in this plan docume
 
 - Demo scripts `scripts/i3-character-acceptance-demo.ts` / `.sh` re-run the full documented character HTTP surface against the compose database; the archived transcript is `docs/acceptance/i3-2026-09-05-transcript.log`.
 - Full verification ran twice (plan Step 6): `test:integration` 108/108, `npm test` 253/253, `typecheck` pass, `contracts:check` pass, `web:test` 273/273, `web:typecheck` pass, `web:e2e` 13/13. Acceptance + load suites re-run green; load p95 measured well under budget (creates 169 ms, reads 22.5 ms, bumps 22.2 ms, rolls 32 ms vs 300/300/300/500 ms).
-- Plan Step 5 discovered and fixed three production defects and two test gaps:
+- Plan Step 5 discovered and fixed three production defects and two web integration gaps:
   1. **Authoring publish version-ID mismatch** (root cause of `422 invalid_package` on every character create): `publish` compiled the package with a throwaway UUID while the `system_versions` row id was auto-generated. Fix: `PublishVersionInput` carries `versionId` and the row is inserted with that explicit id.
   2. **Replay beyond `expires_at` re-executed** (200 instead of 409) and expired create keys surfaced as 500 UNIQUE violations: `claimExecution`/create now return `{ status: "expired" }` mapped to `conflict`.
   3. **Create replay was not byte-identical**: the response view used the PostgreSQL row timestamp while the persisted result used the Node `now()`, a 1 ms skew that intermittently failed the offline-replay deep-equal. Fix: the character row is inserted with the module's `createdAt`.

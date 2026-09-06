@@ -151,6 +151,14 @@ function migrationPreview(): CharacterMigrationPreview {
 function makeCharacters(overrides: Partial<Characters> = {}): Characters {
   const base: Characters = {
     create: async () => ({ ok: true, value: characterView() }),
+    creationOptions: async () => ({
+      ok: true,
+      value: {
+        versionId: randomUUID(),
+        packageChecksum: d20Package.integrity.checksum,
+        entities: [{ id: "character", label: "Character" }],
+      },
+    }),
     list: async () => ({ ok: true, value: { characters: [], nextCursor: null } }),
     open: async () => ({ ok: true, value: characterView() }),
     apply: async () => ({ ok: true, value: commandResult() }),
@@ -335,6 +343,86 @@ describe("character HTTP routes", () => {
     const bad = await app.inject({ method: "GET", url: "/characters?limit=999", headers: cookie });
     expect(bad.statusCode).toBe(400);
     expect(bad.json().error.code).toBe("bad_request");
+  });
+
+  it("maps GET /characters/creation-options to creationOptions and forwards its data", async () => {
+    let received: unknown;
+    const versionId = randomUUID();
+    const app = await build(
+      makeCharacters({
+        creationOptions: async (_ctx, input) => {
+          received = input;
+          return {
+            ok: true,
+            value: {
+              versionId,
+              packageChecksum: d20Package.integrity.checksum,
+              entities: [{ id: "character", label: "Character" }],
+            },
+          };
+        },
+      }),
+    );
+    const response = await app.inject({
+      method: "GET",
+      url: `/characters/creation-options?systemVersionId=${versionId}`,
+      headers: cookie,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      data: {
+        versionId,
+        packageChecksum: d20Package.integrity.checksum,
+        entities: [{ id: "character", label: "Character" }],
+      },
+      requestId: expect.any(String),
+    });
+    expect(received).toEqual({ systemVersionId: versionId });
+  });
+
+  it("requires the systemVersionId query parameter for creation options", async () => {
+    const app = await build(makeCharacters({}));
+    const missing = await app.inject({ method: "GET", url: "/characters/creation-options", headers: cookie });
+    expect(missing.statusCode).toBe(400);
+    expect(missing.json().error.code).toBe("bad_request");
+
+    const malformed = await app.inject({
+      method: "GET",
+      url: "/characters/creation-options?systemVersionId=not-a-uuid",
+      headers: cookie,
+    });
+    expect(malformed.statusCode).toBe(400);
+    expect(malformed.json().error.code).toBe("bad_request");
+  });
+
+  it("maps unauthorized and inaccessible creation-option lookups to 404", async () => {
+    const notFound: Characters["creationOptions"] = async () => ({
+      ok: false,
+      error: { code: "not_found", message: "The requested resource does not exist." },
+    });
+    const app = await build(makeCharacters({ creationOptions: notFound }));
+    const response = await app.inject({
+      method: "GET",
+      url: `/characters/creation-options?systemVersionId=${randomUUID()}`,
+      headers: cookie,
+    });
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.cacheDisposition).toBe("purge");
+  });
+
+  it("maps corrupt-package creation-option lookups to 422", async () => {
+    const invalidValue: Characters["creationOptions"] = async () => ({
+      ok: false,
+      error: { code: "invalid_value", message: "Published package is corrupt." },
+    });
+    const app = await build(makeCharacters({ creationOptions: invalidValue }));
+    const response = await app.inject({
+      method: "GET",
+      url: `/characters/creation-options?systemVersionId=${randomUUID()}`,
+      headers: cookie,
+    });
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe("invalid_value");
   });
 
   it("maps GET /characters/:characterId to open and emits private cache headers", async () => {

@@ -152,6 +152,16 @@ export type CreateCharacter = {
   idempotencyKey: string;
 };
 
+export type CharacterCreationOptions = {
+  versionId: VersionId;
+  packageChecksum: string;
+  entities: { id: DefinitionId; label: string }[];
+};
+
+export type CreationOptionsInput = {
+  systemVersionId: VersionId;
+};
+
 export type ListCharacters = {
   limit: number;
   cursor: string | null;
@@ -311,6 +321,10 @@ export type RollbackCharacterMigration = {
 
 export interface Characters {
   create(ctx: RequestContext, input: CreateCharacter): Promise<CharacterResult<CharacterView>>;
+  creationOptions(
+    ctx: RequestContext,
+    input: CreationOptionsInput,
+  ): Promise<CharacterResult<CharacterCreationOptions>>;
   list(ctx: RequestContext, input: ListCharacters): Promise<CharacterResult<CharacterPage>>;
   open(ctx: RequestContext, characterId: CharacterId): Promise<CharacterResult<CharacterView>>;
 
@@ -645,6 +659,20 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             updatedAt: record.updatedAt,
           },
         };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async creationOptions(ctx, creationInput) {
+      try {
+        const authorized = await input.authorizeVersionUse(ctx, creationInput.systemVersionId);
+        if (!authorized.ok) return { ok: false, error: errors.not_found() };
+
+        const described = await input.runtime.describeVersion({ versionId: authorized.value.versionId });
+        if (!described.ok) return { ok: false, error: mapRuntimeError(described.error) };
+
+        return { ok: true, value: described.value };
       } catch {
         return { ok: false, error: errors.internal() };
       }

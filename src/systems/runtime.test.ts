@@ -24,12 +24,16 @@ import type {
   RuntimeResolution,
   RuntimeResult,
   SystemRuntime,
+  VersionDescription,
 } from "./runtime.js";
 
 describe("SystemRuntime contract", () => {
   it("exposes the stable asynchronous resolution contract", () => {
     expectTypeOf<SystemRuntime["resolve"]>().returns.toEqualTypeOf<
       Promise<RuntimeResult<RuntimeResolution>>
+    >();
+    expectTypeOf<SystemRuntime["describeVersion"]>().returns.toEqualTypeOf<
+      Promise<RuntimeResult<VersionDescription>>
     >();
     expectTypeOf<RuntimeErrorCode>().toEqualTypeOf<
       | "bad_request"
@@ -752,6 +756,51 @@ describe("SystemRuntime contract", () => {
       entityId: "character",
       intent: { kind: "initialize" },
     })).resolves.toMatchObject({ ok: false, error: { code: "invalid_package" } });
+  });
+});
+
+describe("SystemRuntime.describeVersion", () => {
+  it("describes the reference entity IDs and labels for every reference system", async () => {
+    for (const packageValue of [d20Package, d6SuccessPoolPackage, pbta2d6Package]) {
+      const runtime = createRuntime(packageValue);
+      const described = await runtime.describeVersion({ versionId: packageValue.versionId });
+
+      expect(described.ok).toBe(true);
+      if (!described.ok) return;
+      expect(described.value).toEqual({
+        versionId: packageValue.versionId,
+        packageChecksum: packageValue.integrity.checksum,
+        entities: [{ id: "character", label: "Character" }],
+      });
+    }
+  });
+
+  it("shares the package loading and corruption checks with resolve", async () => {
+    const runtime = createSystemRuntime({
+      loadPackage: async () => d20Package,
+      authoritativeRollSecret: "0123456789abcdef0123456789abcdef",
+    });
+    const mismatched = await runtime.describeVersion({ versionId: "00000000-0000-4000-8000-000000000099" });
+    expect(mismatched).toMatchObject({ ok: false, error: { code: "invalid_package" } });
+
+    const missing = createSystemRuntime({
+      loadPackage: async () => null,
+      authoritativeRollSecret: "0123456789abcdef0123456789abcdef",
+    });
+    await expect(missing.describeVersion({ versionId: "00000000-0000-4000-8000-000000000099" })).resolves.toMatchObject({
+      ok: false,
+      error: { code: "not_found" },
+    });
+
+    const corrupt = createSystemRuntime({
+      loadPackage: async () => {
+        throw new PublishedPackageCorruptError("00000000-0000-4000-8000-000000000099");
+      },
+      authoritativeRollSecret: "0123456789abcdef0123456789abcdef",
+    });
+    await expect(
+      corrupt.describeVersion({ versionId: "00000000-0000-4000-8000-000000000099" }),
+    ).resolves.toMatchObject({ ok: false, error: { code: "invalid_package" } });
   });
 });
 

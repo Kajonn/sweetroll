@@ -187,6 +187,17 @@ const CharacterSummaryDto = Type.Object({
   updatedAt: Type.String({ format: DATE_TIME_FORMAT }),
 });
 
+const CharacterCreationOptionsDto = Type.Object({
+  versionId: Type.String({ format: UUID_FORMAT }),
+  packageChecksum: Type.String(),
+  entities: Type.Array(
+    Type.Object({
+      id: Type.String({ minLength: 1 }),
+      label: Type.String({ minLength: 1 }),
+    }),
+  ),
+});
+
 const DiceDto = Type.Object({
   sides: Type.Integer(),
   value: Type.Integer(),
@@ -305,6 +316,10 @@ const ListCharactersQuery = Type.Object({
   cursor: Type.Optional(Type.String()),
 });
 
+const CreationOptionsQuery = Type.Object({
+  systemVersionId: Type.String({ format: UUID_FORMAT }),
+});
+
 const CharacterIdParams = Type.Object({ characterId: Type.String({ format: UUID_FORMAT }) });
 const FieldSetParams = Type.Object({
   characterId: Type.String({ format: UUID_FORMAT }),
@@ -420,6 +435,23 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
         }),
         "400": CharacterErrorEnvelope,
         "401": UnauthorizedEnvelope,
+        "500": CharacterErrorEnvelope,
+        "503": CharacterErrorEnvelope,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/characters/creation-options",
+    operationId: "get_characters_creation_options",
+    schema: {
+      querystring: CreationOptionsQuery,
+      response: {
+        "200": Type.Object({ data: CharacterCreationOptionsDto, requestId: Type.String() }),
+        "400": CharacterErrorEnvelope,
+        "401": UnauthorizedEnvelope,
+        "404": CharacterErrorEnvelope,
+        "422": CharacterErrorEnvelope,
         "500": CharacterErrorEnvelope,
         "503": CharacterErrorEnvelope,
       },
@@ -728,6 +760,15 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
           nextCursor: result.value.nextCursor,
           requestId: request.id,
         };
+      },
+
+      get_characters_creation_options: async (request, reply) => {
+        const query = request.query as { systemVersionId: string };
+        const result = await characters.creationOptions(ctxOf(request), {
+          systemVersionId: query.systemVersionId,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { data: result.value, requestId: request.id };
       },
 
       get_characters_characterId: async (request, reply) => {

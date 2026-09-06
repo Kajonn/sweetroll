@@ -813,6 +813,9 @@ describeWithDatabase("Characters (apply: set/bump)", () => {
       async resolve() {
         return { ok: false, error: { code: "internal", message: "Package loading failed." } };
       },
+      async describeVersion() {
+        return { ok: false, error: { code: "internal", message: "Package loading failed." } };
+      },
     };
     const flakyCharacters = createCharactersModule({
       pool,
@@ -1323,6 +1326,9 @@ describeWithDatabase("Characters (apply: executeAction)", () => {
     const throwingRuntime: SystemRuntime = {
       async resolve() {
         throw new Error("RNG-backed resolve must not be invoked on replay");
+      },
+      async describeVersion() {
+        throw new Error("describeVersion must not be invoked on replay");
       },
     };
     const secondInstanceCharacters = createCharactersModule({

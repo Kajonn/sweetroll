@@ -195,8 +195,15 @@ export type RuntimeResult<T> =
   | { ok: true; value: T }
   | { ok: false; error: RuntimeError };
 
+export type VersionDescription = {
+  versionId: VersionId;
+  packageChecksum: string;
+  entities: { id: DefinitionId; label: string }[];
+};
+
 export interface SystemRuntime {
   resolve(input: RuntimeRequest): Promise<RuntimeResult<RuntimeResolution>>;
+  describeVersion(input: { versionId: VersionId }): Promise<RuntimeResult<VersionDescription>>;
 }
 
 export function createSystemRuntime(input: {
@@ -208,25 +215,23 @@ export function createSystemRuntime(input: {
   }
 
   return {
+    async describeVersion(describeInput) {
+      const loaded = await loadPublishedPackage(input.loadPackage, describeInput.versionId);
+      if (!loaded.ok) return loaded;
+      return {
+        ok: true,
+        value: {
+          versionId: loaded.value.versionId,
+          packageChecksum: loaded.value.integrity.checksum,
+          entities: loaded.value.entities.map((entity) => ({ id: entity.id, label: entity.label })),
+        },
+      };
+    },
+
     async resolve(request) {
-      let packageValue;
-      try {
-        packageValue = await input.loadPackage(request.versionId);
-      } catch (error) {
-        if (error instanceof PublishedPackageCorruptError) {
-          return {
-            ok: false,
-            error: { code: "invalid_package", message: "Published package is corrupt." },
-          };
-        }
-        return { ok: false, error: { code: "internal", message: "Package loading failed." } };
-      }
-      if (packageValue === null) {
-        return { ok: false, error: { code: "not_found", message: "Published version not found." } };
-      }
-      if (packageValue.versionId !== request.versionId) {
-        return { ok: false, error: { code: "invalid_package", message: "Published package version differs from the request." } };
-      }
+      const loaded = await loadPublishedPackage(input.loadPackage, request.versionId);
+      if (!loaded.ok) return loaded;
+      const packageValue = loaded.value;
 
       const entity = packageValue.entities.find((candidate) => candidate.id === request.entityId);
       if (entity === undefined) {
@@ -373,6 +378,34 @@ export function createSystemRuntime(input: {
       };
     },
   };
+}
+
+async function loadPublishedPackage(
+  loadPackage: PublishedPackageLoader,
+  versionId: VersionId,
+): Promise<RuntimeResult<SystemPackageV1>> {
+  let packageValue;
+  try {
+    packageValue = await loadPackage(versionId);
+  } catch (error) {
+    if (error instanceof PublishedPackageCorruptError) {
+      return {
+        ok: false,
+        error: { code: "invalid_package", message: "Published package is corrupt." },
+      };
+    }
+    return { ok: false, error: { code: "internal", message: "Package loading failed." } };
+  }
+  if (packageValue === null) {
+    return { ok: false, error: { code: "not_found", message: "Published version not found." } };
+  }
+  if (packageValue.versionId !== versionId) {
+    return {
+      ok: false,
+      error: { code: "invalid_package", message: "Published package version differs from the request." },
+    };
+  }
+  return { ok: true, value: packageValue };
 }
 
 function findOwnedAction(packageValue: SystemPackageV1, entityId: string, actionId: string) {

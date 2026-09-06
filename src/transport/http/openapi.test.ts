@@ -19,6 +19,7 @@ describe("buildOpenApiDocument", () => {
     expect(doc.openapi).toBe("3.1.0");
     expect(Object.keys(doc.paths ?? {}).sort()).toEqual([
       "/characters",
+      "/characters/creation-options",
       "/characters/{characterId}",
       "/characters/{characterId}/actions/{actionId}",
       "/characters/{characterId}/activity",

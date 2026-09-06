@@ -29,7 +29,7 @@ export type CharacterStore = {
     character: CharacterView,
     generation: number,
   ): Promise<void>;
-  retireEntries(actorId: string, characterId: string, entryIds: string[]): Promise<void>;
+  retireEntries(actorId: string, characterId: string, entryIds: string[], generation: number): Promise<void>;
   purgeCharacter(actorId: string, characterId: string): Promise<void>;
   clearAccount(actorId: string): Promise<void>;
   close(): Promise<void>;
@@ -300,7 +300,22 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
         if (!record || record.generation !== generation) {
           throw new Error("stale acknowledgment: generation changed");
         }
+        const acknowledged = await getRequest<QueueEntry>(tx, QUEUE, [actorId, characterId, entryId]);
         await deleteRequest(tx, QUEUE, [actorId, characterId, entryId]);
+        // Persist own-queue progression with the receipt, never with an external GET.
+        if (acknowledged) {
+          const pending = await collectByKey<QueueEntry>(tx, QUEUE, IDBKeyRange.bound(
+            [actorId, characterId, ""], [actorId, characterId, MAX_STRING],
+          ));
+          for (const entry of pending) {
+            if (entry.attempt === null && entry.sequence > acknowledged.sequence &&
+                entry.baseRevision === acknowledged.baseRevision && entry.packageChecksum === acknowledged.packageChecksum) {
+              await putRequest(tx, QUEUE, {
+                ...entry, baseRevision: character.reconciliation.revision, packageChecksum: character.projection.packageChecksum,
+              });
+            }
+          }
+        }
         record.confirmed = character;
         record.generation += 1;
         await putRequest(tx, CHAR, record);
@@ -325,13 +340,14 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
       });
     },
 
-    async retireEntries(actorId, characterId, entryIds) {
+    async retireEntries(actorId, characterId, entryIds, generation) {
       await openTx(db, [CHAR, QUEUE], "readwrite", async (tx) => {
         const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
-        if (record) {
-          record.generation += 1;
-          await putRequest(tx, CHAR, record);
+        if (!record || record.generation !== generation) {
+          throw new Error("stale retirement: generation changed");
         }
+        record.generation += 1;
+        await putRequest(tx, CHAR, record);
         for (const entryId of entryIds) {
           await deleteRequest(tx, QUEUE, [actorId, characterId, entryId]);
         }

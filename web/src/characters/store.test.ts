@@ -83,6 +83,33 @@ async function openFresh() {
 }
 
 describe("CharacterStore", () => {
+  it("acknowledgment advances only matching unsent bases and preserves frozen requests", async () => {
+    const store = await openFresh();
+    await store.enqueue(makeEntry());
+    await store.enqueue(makeEntry({ id: "unsent", sequence: 1 }));
+    const frozen = makeEntry({ id: "frozen", sequence: 2, attempt: makeRequest() });
+    await store.enqueue(frozen);
+    const unrelated = makeEntry({ id: "unrelated", sequence: 3, baseRevision: 7 });
+    await store.enqueue(unrelated);
+    await store.acknowledge("actor-A", "char-1", "entry-1", makeView("char-1", 2), 0);
+    const { entries } = await store.read("actor-A", "char-1");
+    expect(entries[0]).toMatchObject({ id: "unsent", baseRevision: 2, attempt: null });
+    expect(entries[1]).toEqual(frozen);
+    expect(entries[2]).toEqual(unrelated);
+    await store.close();
+  });
+  it("rejects stale retirement without deleting entries or advancing generation", async () => {
+    const store = await openFresh();
+    await store.enqueue(makeEntry());
+    const stale = await store.read("actor-A", "char-1");
+    await store.confirmSnapshot("actor-A", "char-1", makeView("char-1", 7), stale.generation);
+    const latest = await store.read("actor-A", "char-1");
+    await expect(store.retireEntries("actor-A", "char-1", ["entry-1"], stale.generation)).rejects.toThrow("stale");
+    expect(await store.read("actor-A", "char-1")).toEqual(latest);
+    await store.retireEntries("actor-A", "char-1", ["entry-1"], latest.generation);
+    expect((await store.read("actor-A", "char-1")).entries).toEqual([]);
+    await store.close();
+  });
   it("persists a frozen request verbatim across reopen", async () => {
     const store = await openFresh();
     const entry = makeEntry();

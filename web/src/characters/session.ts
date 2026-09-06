@@ -107,7 +107,7 @@ const KIND_TO_PHASE: Record<BlockingErrorKind, SessionPhase> = {
   "storage-error": "storage-error",
   purged: "purged",
   "expired-attempt": "conflict",
-  protocol: "uncertain",
+  protocol: "conflict",
   "not-found": "conflict",
   "network-unavailable": "offline",
 };
@@ -123,14 +123,8 @@ function structuredError(message: string, kind: BlockingErrorKind, details?: unk
   return err;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
 function isStaleAck(err: unknown): boolean {
-  return err instanceof Error && err.message.includes("stale acknowledgment");
+  return err instanceof Error && err.message.startsWith("stale ");
 }
 
 function projectionsEqual(a: CharacterView["projection"], b: CharacterView["projection"]): boolean {
@@ -155,6 +149,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   const entryWrites = new Map<string, Promise<void>>();
 
   let draining = false;
+  let initialized = false;
+  let opening: Promise<void> | null = null;
+  let needsFresh = true;
+  let conflictRefreshPending = false;
+  let conflictMinimumRevision = 0;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let transientFailures = 0;
   const idleWaiters: (() => void)[] = [];
@@ -174,7 +173,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       phase,
       confirmed,
       tentative: computeTentative(),
-      entries: entries.filter((e) => e.attempt !== null).map((e) => ({ ...e })),
+      entries: entries.filter((e) => !entryWrites.has(e.id)).map((e) => ({ ...e })),
       editing: { ...editing },
       error: error ? { ...error } : null,
     };
@@ -262,13 +261,17 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     } catch (storageErr) {
       rejectWrite(storageErr);
       entryWrites.delete(entry.id);
+      entries = entries.filter(e => e.id !== entry.id);
       setBlocked("storage-error", "Could not save your edit because local storage is unavailable.");
       freezeWaiters.delete(entry.id);
       emit();
       throw storageErr instanceof Error ? storageErr : new Error("storage failure");
     }
     resolveWrite();
+    entryWrites.delete(entry.id);
+    resolveFreezeWaiter(entry.id);
     await waiter;
+    emit();
   }
 
   function resolveFreezeWaiter(entryId: string) {
@@ -350,25 +353,48 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return "blocked";
   }
 
-  function handleSendError(err: unknown): SendOutcome {
+  async function fetchLatestForConflict(latestRevision: number | null = null): Promise<void> {
+    conflictRefreshPending = true;
+    conflictMinimumRevision = Math.max(conflictMinimumRevision, latestRevision ?? 0);
+    try {
+      const envelope = await api.open(characterId);
+      const server = envelope.character;
+      const local = confirmed;
+      if (server.reconciliation.revision < Math.max(local?.reconciliation.revision ?? 0, conflictMinimumRevision)) {
+        // A lagging GET is not a review base for the revision the conflict reported.
+        setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.");
+        return;
+      }
+      await reconcile(server);
+      if (error === null || error.kind === "conflict") conflictRefreshPending = false;
+    } catch (err) {
+      await handleOpenError(err);
+      return;
+    }
+    if (error === null) {
+      setBlocked("conflict", "The character changed on the server. Review before re-sending.");
+    }
+  }
+
+  async function handleSendError(err: unknown): Promise<SendOutcome> {
     if (err instanceof ApiError) {
+      if (err.code === "idempotency_mismatch") {
+        setBlocked("protocol", "The server rejected this request's idempotency key. Manual review is required.");
+        return "blocked";
+      }
       switch (err.status) {
         case 401:
           setBlocked("reauthenticate", "Your session expired. Sign in again to continue.");
           return "blocked";
         case 409:
-          setBlocked("conflict", "The character changed on the server. Review before re-sending.");
+          await fetchLatestForConflict(err.latestRevision);
           return "blocked";
         case 422:
           setBlocked("invalid", err.message, { diagnostics: err.diagnostics });
           return "blocked";
       }
       if (err.code === "expected_revision_mismatch") {
-        setBlocked("conflict", "The character changed on the server. Review before re-sending.");
-        return "blocked";
-      }
-      if (err.code === "idempotency_mismatch") {
-        setBlocked("protocol", "The server rejected this request's idempotency key. Manual review is required.");
+        await fetchLatestForConflict(err.latestRevision);
         return "blocked";
       }
       if (err.code === "invalid_value" || err.code === "bad_request") {
@@ -401,6 +427,10 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       }
     }
     let current = entry;
+    if (!isConnected() || !editing.owned || disposed) {
+      refreshPhase();
+      return "blocked";
+    }
     if (current.attempt === null) {
       if (isExpired(current)) {
         setBlocked("expired-attempt", "This change is older than the server's replay window. Review it manually before continuing.");
@@ -424,7 +454,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       setBlocked("expired-attempt", "This change is older than the server's replay window. Review it manually before continuing.");
       return "blocked";
     }
-    if (!isConnected()) {
+    if (!isConnected() || !editing.owned || disposed) {
       refreshPhase();
       emit();
       return "blocked";
@@ -441,7 +471,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         await handleNotFound(err);
         return "blocked";
       }
-      return handleSendError(err);
+      return await handleSendError(err);
     }
     const character = response?.result?.character;
     if (!character) {
@@ -458,7 +488,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     confirmed = character;
     generation += 1;
     transientFailures = 0;
-    entries = entries.filter((e) => e.id !== current.id);
+    entries = entries.filter((e) => e.id !== current.id).map((e) =>
+      e.attempt === null && e.sequence > current.sequence &&
+      e.baseRevision === current.baseRevision && e.packageChecksum === current.packageChecksum
+        ? { ...e, baseRevision: character.reconciliation.revision, packageChecksum: character.projection.packageChecksum }
+        : e,
+    );
     phase = "sending";
     emit();
     return "acked";
@@ -477,21 +512,29 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }, backoffDelay());
   }
 
-  async function runDrainPass(inlineRetry = false): Promise<"idle" | "retry" | "blocked"> {
+  async function runDrainPass(): Promise<"idle" | "retry" | "blocked"> {
     while (!disposed) {
       if (isBlocked()) {
         emit();
         return "blocked";
       }
+      if (!editing.owned) return "blocked";
+      if (conflictRefreshPending && isConnected()) {
+        await fetchLatestForConflict();
+        return "blocked";
+      }
       const front = entries[0];
+      // Replay uncertain attempts first; check drift before freezing any unsent work.
+      if (needsFresh && isConnected() && !front?.attempt) {
+        await reconcileFresh();
+        if (isBlocked()) return "blocked";
+        needsFresh = false;
+        continue;
+      }
       if (!front) return "idle";
       const outcome = await processEntry(front);
       if (outcome === "acked") continue;
       if (outcome === "retry") {
-        if (inlineRetry) {
-          await sleep(backoffDelay());
-          continue;
-        }
         scheduleRetry();
         return "retry";
       }
@@ -502,7 +545,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   function scheduleDrain() {
-    if (disposed || draining) return;
+    if (disposed || draining || !initialized) return;
     draining = true;
     runDrainPass()
       .catch(() => {
@@ -540,49 +583,34 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       await handleNotFound(err);
     } else if (err instanceof ApiError && err.status === 401) {
       setBlocked("reauthenticate", "Your session expired. Sign in again to continue.");
+    } else {
+      setBlocked("network-unavailable", "Could not refresh the character. Cached data is unchanged; retry when connected.");
     }
   }
 
   async function reconcile(server: CharacterView) {
     const local = confirmed;
-    if (!local) {
-      if (entries.length === 0) {
-        try {
-          await store.confirmSnapshot(actorId, characterId, server, generation);
-          confirmed = server;
-          generation += 1;
-        } catch {
-          // stale snapshot confirm: another tombstone happened concurrently
-        }
-      }
+    if (local && server.reconciliation.revision < local.reconciliation.revision) {
+      setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.");
       return;
     }
-    if (server.reconciliation.revision === local.reconciliation.revision) {
-      if (!projectionsEqual(server.projection, local.projection)) {
-        // Legacy projection refresh: adopt the new projection without
-        // touching pending entries.
-        try {
-          await store.confirmSnapshot(actorId, characterId, server, generation);
-          confirmed = server;
-          generation += 1;
-        } catch {
-          // stale confirm; keep current
-        }
+    const drifted = local
+      ? server.reconciliation.revision !== local.reconciliation.revision || server.projection.packageChecksum !== local.projection.packageChecksum
+      : entries.some(e => e.baseRevision !== server.reconciliation.revision || e.packageChecksum !== server.projection.packageChecksum);
+    if (!local || drifted || !projectionsEqual(server.projection, local.projection)) {
+      try {
+        await store.confirmSnapshot(actorId, characterId, server, generation);
+        confirmed = server;
+        generation += 1;
+      } catch (err) {
+        await handleAckError(err);
+        return;
       }
-      return;
     }
-    if (server.reconciliation.revision > local.reconciliation.revision) {
-      if (entries.length === 0) {
-        try {
-          await store.confirmSnapshot(actorId, characterId, server, generation);
-          confirmed = server;
-          generation += 1;
-        } catch {
-          // stale confirm; keep current
-        }
-      } else {
-        setBlocked("conflict", "A newer revision of this character exists. Review before continuing.");
-      }
+    const unresolved = entries.some(e => e.attempt === null &&
+      (e.baseRevision !== server.reconciliation.revision || e.packageChecksum !== server.projection.packageChecksum));
+    if ((drifted || unresolved) && entries.length > 0) {
+      setBlocked("conflict", "A newer revision or package of this character exists. Review before continuing.");
     }
   }
 
@@ -604,9 +632,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   async function resolveConflict(input: { mode: "discard" | "reapply"; selectedIds: string[] }): Promise<void> {
     if (disposed) return;
+    if (draining || conflictRefreshPending || !error || !["conflict", "invalid", "expired-attempt"].includes(error.kind)) {
+      throw new Error("Resolve the blocking error and refresh current state before reviewing intentions.");
+    }
     const selected = new Set(input.selectedIds);
     if (input.mode === "discard") {
-      await store.retireEntries(actorId, characterId, input.selectedIds);
+      await store.retireEntries(actorId, characterId, input.selectedIds, generation);
       generation += 1;
       const remaining = entries.filter((e) => !selected.has(e.id));
       for (const entry of entries) {
@@ -617,12 +648,13 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       }
       entries = remaining;
     } else {
-      await store.retireEntries(actorId, characterId, input.selectedIds);
+      await store.retireEntries(actorId, characterId, input.selectedIds, generation);
       generation += 1;
       const rebuilt: QueueEntry[] = [];
       for (const entry of entries) {
         if (selected.has(entry.id)) {
           const replica = newEntry(entry.intent);
+          replica.baseRevision = confirmed!.reconciliation.revision;
           replica.sequence = entry.sequence;
           await store.enqueue(replica);
           rebuilt.push(replica);
@@ -636,11 +668,17 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
     }
     error = null;
+    needsFresh = false;
     emit();
     scheduleDrain();
   }
 
-  async function open(): Promise<void> {
+  function open(): Promise<void> {
+    opening ??= initialize();
+    return opening;
+  }
+
+  async function initialize(): Promise<void> {
     const loaded = await store.read(actorId, characterId);
     confirmed = loaded.confirmed;
     entries = loaded.entries;
@@ -650,23 +688,16 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     emit();
 
     await requestEditing();
-
-    if (!isConnected()) {
-      refreshPhase();
-      emit();
-      return;
-    }
-    await runDrainPass(true);
-    if (!disposed && !isBlocked() && isConnected()) {
-      await reconcileFresh();
-    }
-    refreshPhase();
-    emit();
+    initialized = true;
+    scheduleDrain();
+    if (draining) await new Promise<void>(resolve => idleWaiters.push(resolve));
   }
 
   async function requestEditing(): Promise<boolean> {
+    const wasOwner = editing.owned;
     const granted = await coordination.requestEditing();
     editing = { owned: granted, owner: null };
+    if (granted && !wasOwner) needsFresh = true;
     emit();
     if (granted) scheduleDrain();
     return granted;
@@ -690,7 +721,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   const unsubscribeIdentity = identity.subscribe(() => {
     if (disposed) return;
-    if (isConnected() && error?.kind === "reauthenticate") {
+    if (!isConnected()) needsFresh = true;
+    if (isConnected() && (error?.kind === "reauthenticate" || error?.kind === "network-unavailable")) {
       error = null;
     }
     if (isConnected() && !isBlocked()) {

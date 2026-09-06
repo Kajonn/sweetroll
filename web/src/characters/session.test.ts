@@ -268,6 +268,7 @@ describe("CharacterSession", () => {
 
     await session.open();
 
+    await vi.waitFor(() => expect(session.getSnapshot().phase).toBe("ready"));
     expect(api.sent[0]?.body).toEqual(frozen.body);
     expect(api.sent[1]?.body).toEqual(frozen.body);
     expect(api.sent[1]?.body.idempotencyKey).toBe("frozen-key");
@@ -395,6 +396,7 @@ describe("CharacterSession", () => {
     await session.open();
 
     api.scriptSend(async () => ({ error: conflictError() }));
+    api.scriptOpenView(viewFor("char-1", 7));
 
     const first = session.setField("health", 11).catch(() => {});
     const second = session.setField("gold", 20).catch(() => {});
@@ -402,12 +404,15 @@ describe("CharacterSession", () => {
     await session.whenIdle();
 
     expect(session.getSnapshot().phase).toBe("conflict");
-    const selected = session.getSnapshot().entries.map((e) => e.id);
+    const selected = session.getSnapshot().entries.slice(0, 1).map((e) => e.id);
     expect(selected).toHaveLength(1);
+    expect(session.getSnapshot().confirmed?.revision).toBe(7);
+    expect((await store.read(ARM, "char-1")).confirmed?.revision).toBe(7);
+    expect(session.getSnapshot().tentative).toEqual({ health: 11, gold: 20, name: "Ivy" });
 
-    api.scriptSend(async () => successEnvelope(viewFor("char-1", 2)));
-    api.scriptSend(async () => successEnvelope(viewFor("char-1", 3)));
-    api.scriptSend(async () => successEnvelope(viewFor("char-1", 4)));
+    api.scriptSend(async () => successEnvelope(viewFor("char-1", 8)));
+    api.scriptSend(async () => successEnvelope(viewFor("char-1", 9)));
+    api.scriptSend(async () => successEnvelope(viewFor("char-1", 10)));
 
     await session.resolveConflict({ mode: "reapply", selectedIds: selected });
     await session.whenIdle();
@@ -418,9 +423,9 @@ describe("CharacterSession", () => {
     const sent = api.sent;
     expect(sent).toHaveLength(4);
     expect(sent[0]?.body.idempotencyKey).not.toBe(sent[1]?.body.idempotencyKey);
-    expect(sent[1]?.body.expectedRevision).toBe(1);
-    expect(sent[2]?.body.expectedRevision).toBe(2);
-    expect(sent[3]?.body.expectedRevision).toBe(3);
+    expect(sent[1]?.body.expectedRevision).toBe(7);
+    expect(sent[2]?.body.expectedRevision).toBe(8);
+    expect(sent[3]?.body.expectedRevision).toBe(9);
     expect(sent[1]?.path).toContain("/fields/health/set");
     expect(sent[2]?.path).toContain("/fields/gold/set");
     expect(sent[3]?.path).toContain("/fields/name/set");
@@ -544,7 +549,7 @@ describe("CharacterSession", () => {
     await store.close();
   });
 
-  it("enters storage-error when freezing fails and does not show the edit as queued", async () => {
+  it("enters storage-error when freezing fails and preserves the durable intention", async () => {
     const { api, store, session } = await makeHarness();
     await seedConfirmed(store, "char-1", viewFor("char-1", 1));
     await seedQueue(store, "char-1", [
@@ -567,7 +572,8 @@ describe("CharacterSession", () => {
 
     expect(session.getSnapshot().phase).toBe("storage-error");
     expect(session.getSnapshot().error?.kind).toBe("storage-error");
-    expect(session.getSnapshot().entries).toEqual([]);
+    expect(session.getSnapshot().entries).toHaveLength(1);
+    expect(session.getSnapshot().entries[0]?.attempt).toBeNull();
     const stored = await store.read(ARM, "char-1");
     expect(stored.entries.length).toBeGreaterThanOrEqual(1);
     await store.close();
@@ -640,23 +646,23 @@ describe("CharacterSession", () => {
       } as CharacterView["projection"],
     });
     api.scriptOpenView(refreshed);
-    api.scriptSend(async () =>
-      successEnvelope(
-        viewFor("char-1", 2, {
-          state: { schemaVersion: "1.0", values: { name: "Aria", origin: "Feywild" } },
-        }),
-      ),
-    );
+    await seedQueue(store, "char-1", [
+      { id: "legacy-pending", intent: { kind: "setField", fieldId: "origin", value: "Feywild" } },
+    ]);
+    const pendingBefore = (await store.read(ARM, "char-1")).entries;
+    api.scriptSend(async () => {
+      const stored = await store.read(ARM, "char-1");
+      expect(stored.confirmed?.projection.completionFields).toEqual(refreshed.projection.completionFields);
+      expect(stored.entries[0]?.intent).toEqual(pendingBefore[0]?.intent);
+      return { error: new ApiError({ code: "invalid_value", status: 422, message: "Invalid", requestId: "r", latestRevision: null, diagnostics: [] }) };
+    });
     await session.open();
 
     const snap = session.getSnapshot();
     expect(snap.confirmed?.projection.completionFields).toBeDefined();
-    expect(snap.phase).toBe("ready");
-
-    await session.setField("origin", "Feywild");
-    await session.whenIdle();
-    expect(session.getSnapshot().entries).toEqual([]);
-    expect(session.getSnapshot().confirmed?.state.values.origin).toBe("Feywild");
+    expect(snap.phase).toBe("invalid");
+    expect(snap.tentative).toEqual({ origin: "Feywild" });
+    expect((await store.read(ARM, "char-1")).entries[0]?.id).toBe("legacy-pending");
     await store.close();
   });
 
@@ -696,6 +702,263 @@ describe("CharacterSession store integrity", () => {
 });
 
 describe("CharacterSession serialization", () => {
+  it.each(["revision", "package"] as const)("retains unresolved %s drift across sessions until explicit reapply", async (drift) => {
+    const first = await makeHarness();
+    await seedConfirmed(first.store, "char-1", viewFor("char-1", 1));
+    first.identity.online = false;
+    await first.session.open();
+    await first.session.setField("name", "Briar");
+    await first.session.whenIdle();
+    const latest = viewFor("char-1", drift === "revision" ? 7 : 1);
+    if (drift === "package") {
+      latest.projection.packageChecksum = "new-package";
+      latest.reconciliation.packageChecksum = "new-package";
+    }
+    first.api.scriptOpenView(latest);
+    first.identity.online = true;
+    first.identity.signal();
+    await first.session.whenIdle();
+    expect(first.session.getSnapshot().phase).toBe("conflict");
+    const retained = await first.store.read(ARM, "char-1");
+    expect(retained.confirmed).toEqual(latest);
+    expect(retained.entries[0]).toMatchObject({ baseRevision: 1, packageChecksum: "abc", attempt: null });
+    first.session.dispose();
+    await first.store.close();
+
+    const second = await makeHarness();
+    second.api.scriptOpenView(latest);
+    second.api.setSendFallback(async () => successEnvelope(viewFor("char-1", latest.revision + 1)));
+    try {
+      await second.session.open();
+      expect(second.api.sent).toEqual([]);
+      expect(second.session.getSnapshot().phase).toBe("conflict");
+      expect((await second.store.read(ARM, "char-1")).entries).toEqual(retained.entries);
+      await second.session.resolveConflict({ mode: "reapply", selectedIds: retained.entries.map(e => e.id) });
+      await second.session.whenIdle();
+      expect(second.api.sent).toHaveLength(1);
+      expect(second.api.sent[0]?.body).toMatchObject({ expectedRevision: latest.revision, value: "Briar" });
+      expect(second.session.getSnapshot().phase).toBe("ready");
+      expect((await second.store.read(ARM, "char-1")).entries).toEqual([]);
+    } finally { second.session.dispose(); await second.store.close(); }
+  });
+
+  it("durably advances its own unsent bases before closing after acknowledgment", async () => {
+    const first = await makeHarness();
+    await seedConfirmed(first.store, "char-1", viewFor("char-1", 1));
+    await seedQueue(first.store, "char-1", [
+      { id: "first", intent: { kind: "setField", fieldId: "name", value: "Briar" } },
+      { id: "next", intent: { kind: "setField", fieldId: "gold", value: 10 } },
+    ]);
+    first.api.scriptOpenView(viewFor("char-1", 1));
+    first.api.scriptSend(async () => successEnvelope(viewFor("char-1", 2)));
+    first.session.subscribe(snapshot => {
+      if (snapshot.confirmed?.revision === 2 && snapshot.entries.length === 1) first.session.dispose();
+    });
+    await first.session.open();
+    expect(first.api.sent).toHaveLength(1);
+    const retained = await first.store.read(ARM, "char-1");
+    expect(retained.entries[0]).toMatchObject({ id: "next", baseRevision: 2, attempt: null });
+    await first.store.close();
+
+    const second = await makeHarness();
+    second.api.scriptOpenView(viewFor("char-1", 2));
+    second.api.scriptSend(async () => successEnvelope(viewFor("char-1", 3)));
+    await second.session.open();
+    expect(second.api.sent).toHaveLength(1);
+    expect(second.api.sent[0]?.body.expectedRevision).toBe(2);
+    expect(second.session.getSnapshot().phase).toBe("ready");
+    second.session.dispose();
+    await second.store.close();
+  });
+
+  it("does not treat a GET behind the conflict's latestRevision as a refreshed review base", async () => {
+    const { api, store, session, identity } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 1));
+    await session.open();
+    api.scriptSend(async () => ({ error: conflictError() }));
+    api.scriptOpenView(viewFor("char-1", 1));
+    await session.setField("name", "Briar");
+    await session.whenIdle();
+    expect(session.getSnapshot().error?.kind).toBe("network-unavailable");
+    const selectedIds = session.getSnapshot().entries.map(e => e.id);
+    await expect(session.resolveConflict({ mode: "reapply", selectedIds })).rejects.toThrow();
+    api.scriptOpenView(viewFor("char-1", 7));
+    identity.signal();
+    await session.whenIdle();
+    expect(session.getSnapshot().phase).toBe("conflict");
+    expect((await store.read(ARM, "char-1")).confirmed?.revision).toBe(7);
+    expect(api.sent).toHaveLength(1);
+    session.dispose();
+    await store.close();
+  });
+
+  it("does not offer conflict reapply when persisting the latest GET fails", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 1));
+    await session.open();
+    api.scriptSend(async () => ({ error: conflictError() }));
+    api.scriptOpenView(viewFor("char-1", 7));
+    const confirm = vi.spyOn(store, "confirmSnapshot").mockRejectedValue(new Error("quota"));
+    await session.setField("name", "Briar");
+    await session.whenIdle();
+    expect(session.getSnapshot().error?.kind).toBe("storage-error");
+    expect((await store.read(ARM, "char-1")).confirmed?.revision).toBe(1);
+    await expect(session.resolveConflict({ mode: "reapply", selectedIds: session.getSnapshot().entries.map(e => e.id) })).rejects.toThrow();
+    confirm.mockRestore();
+    session.dispose();
+    await store.close();
+  });
+
+  it("leaves offline intentions unsent until reconnect drift has been checked", async () => {
+    const { api, store, session, identity } = await makeHarness();
+    await seedConfirmed(store, "char-1", viewFor("char-1", 1));
+    identity.online = false;
+    await session.open();
+    await session.setField("name", "Briar");
+    await session.whenIdle();
+    expect((await store.read(ARM, "char-1")).entries[0]?.attempt).toBeNull();
+    api.scriptOpenView(viewFor("char-1", 7));
+    identity.online = true;
+    identity.signal();
+    await session.whenIdle();
+    expect(api.sent).toEqual([]);
+    expect(session.getSnapshot().phase).toBe("conflict");
+    expect(session.getSnapshot().tentative).toEqual({ name: "Briar" });
+    session.dispose();
+    await store.close();
+  });
+
+  it("rejects stale session reapply after purge without recreating intentions", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 1));
+    await session.open();
+    api.scriptSend(async () => ({ error: conflictError() }));
+    api.scriptOpenView(viewFor("char-1", 7));
+    await session.setField("name", "Briar");
+    await session.whenIdle();
+    const selectedIds = session.getSnapshot().entries.map(e => e.id);
+    await store.purgeCharacter(ARM, "char-1");
+    const purged = await store.read(ARM, "char-1");
+    await expect(session.resolveConflict({ mode: "reapply", selectedIds })).rejects.toThrow("stale");
+    expect(await store.read(ARM, "char-1")).toEqual(purged);
+    expect(api.sent).toHaveLength(1);
+    session.dispose();
+    await store.close();
+  });
+
+  it("settles a failed startup GET with cached data and does not send unsent work", async () => {
+    const { api, store, session } = await makeHarness();
+    await seedConfirmed(store, "char-1", viewFor("char-1", 1));
+    await seedQueue(store, "char-1", [{ id: "pending", intent: { kind: "setField", fieldId: "name", value: "Briar" } }]);
+    api.scriptOpenError(new TypeError("offline"));
+    await session.open();
+    expect(session.getSnapshot().phase).toBe("offline");
+    expect(session.getSnapshot().confirmed?.revision).toBe(1);
+    expect(api.sent).toEqual([]);
+    expect((await store.read(ARM, "char-1")).entries[0]?.attempt).toBeNull();
+    session.dispose();
+    await store.close();
+  });
+
+  it("settles open on transport failure with cache and exactly one frozen send", async () => {
+    const { api, store, session } = await makeHarness();
+    await seedConfirmed(store, "char-1", viewFor("char-1", 1));
+    const request: FrozenRequest = {
+      method: "POST", path: "/characters/char-1/fields/name/set",
+      body: { value: "Briar", expectedRevision: 1, idempotencyKey: "old" }, firstAttemptAt: EVER,
+    };
+    await seedQueue(store, "char-1", [{ id: "pending", intent: { kind: "setField", fieldId: "name", value: "Briar" }, request }]);
+    const get = vi.spyOn(api, "open");
+    api.setSendFallback(async () => ({ error: new TypeError("offline despite hint") }));
+    try {
+      await session.open();
+      expect(api.sent).toEqual([request]);
+      expect(get).not.toHaveBeenCalled();
+      expect(session.getSnapshot().confirmed?.revision).toBe(1);
+      expect(session.getSnapshot().phase).toBe("uncertain");
+      expect((await store.read(ARM, "char-1")).entries[0]?.attempt).toEqual(request);
+    } finally { session.dispose(); await store.close(); }
+  });
+
+  it("checks drift before freezing unsent work on open", async () => {
+    const { api, store, session } = await makeHarness();
+    await seedConfirmed(store, "char-1", viewFor("char-1", 1));
+    await seedQueue(store, "char-1", [{ id: "pending", intent: { kind: "setField", fieldId: "name", value: "Briar" } }]);
+    api.scriptOpenView(viewFor("char-1", 7));
+    try {
+      await session.open();
+      expect(api.sent).toEqual([]);
+      expect(session.getSnapshot().phase).toBe("conflict");
+      const stored = await store.read(ARM, "char-1");
+      expect(stored.confirmed?.revision).toBe(7);
+      expect(stored.entries[0]?.attempt).toBeNull();
+    } finally { session.dispose(); await store.close(); }
+  });
+
+  it("serializes requestEditing with the frozen replay during open, then checks GET before unsent work", async () => {
+    const { api, store, session } = await makeHarness();
+    await seedConfirmed(store, "char-1", viewFor("char-1", 1));
+    const request: FrozenRequest = { method: "POST", path: "/characters/char-1/fields/name/set", body: { value: "Briar", expectedRevision: 1, idempotencyKey: "old" }, firstAttemptAt: EVER };
+    await seedQueue(store, "char-1", [
+      { id: "frozen", intent: { kind: "setField", fieldId: "name", value: "Briar" }, request },
+      { id: "unsent", intent: { kind: "setField", fieldId: "gold", value: 10 } },
+    ]);
+    const d = deferredEnvelope();
+    api.setSendFallback(async () => d.promise);
+    const get = vi.spyOn(api, "open");
+    api.scriptOpenView(viewFor("char-1", 7));
+    const opening = session.open();
+    await vi.waitFor(() => expect(api.sent.length).toBeGreaterThan(0));
+    await session.requestEditing();
+    expect(api.sent).toEqual([request]);
+    expect(get).not.toHaveBeenCalled();
+    d.release(viewFor("char-1", 2));
+    await opening;
+    expect(api.sent).toHaveLength(1);
+    expect(session.getSnapshot().confirmed?.revision).toBe(7);
+    expect(session.getSnapshot().phase).toBe("conflict");
+    session.dispose();
+    await store.close();
+  });
+
+  it.each([
+    [401, "unauthorized", undefined, "reauthenticate"],
+    [404, "not_found", "purge", "purged"],
+    [0, "network", undefined, "network-unavailable"],
+  ] as const)("preserves conflict GET failure %s rather than claiming a refreshed base", async (status, code, cacheDisposition, kind) => {
+    const { api, store, session } = await makeHarness();
+    await seedConfirmed(store, "char-1", viewFor("char-1", 1));
+    api.scriptOpenView(viewFor("char-1", 1));
+    await session.open();
+    api.scriptSend(async () => ({ error: conflictError() }));
+    api.scriptOpenError(status === 0 ? new TypeError("offline") : new ApiError({ status, code, cacheDisposition: cacheDisposition ?? null, message: "Failed", requestId: "r", latestRevision: null, diagnostics: [] }));
+    await session.setField("name", "Briar");
+    await session.whenIdle();
+    expect(session.getSnapshot().error?.kind).toBe(kind);
+    expect(session.getSnapshot().confirmed?.revision).toBe(kind === "purged" ? undefined : 1);
+    await expect(session.resolveConflict({ mode: "reapply", selectedIds: session.getSnapshot().entries.map(e => e.id) })).rejects.toThrow();
+    expect(api.sent).toHaveLength(1);
+    if (kind === "purged") expect((await store.read(ARM, "char-1")).entries).toEqual([]);
+    session.dispose();
+    await store.close();
+  });
+
+  it("stops idempotency_mismatch as protocol before generic 409 recovery", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 1));
+    await session.open();
+    const get = vi.spyOn(api, "open");
+    api.scriptSend(async () => ({ error: new ApiError({ status: 409, code: "idempotency_mismatch", message: "Mismatch", requestId: "r", latestRevision: null, diagnostics: [] }) }));
+    await session.setField("name", "Briar");
+    await session.whenIdle();
+    expect(session.getSnapshot().error?.kind).toBe("protocol");
+    expect(get).not.toHaveBeenCalled();
+    await expect(session.resolveConflict({ mode: "reapply", selectedIds: session.getSnapshot().entries.map(e => e.id) })).rejects.toThrow();
+    expect(api.sent).toHaveLength(1);
+    session.dispose();
+    await store.close();
+  });
+
   it("never starts a second send while one is in flight", async () => {
     const { api, store, session } = await makeHarness();
     await seedConfirmed(store, "char-1", viewFor("char-1", 1));

@@ -9,6 +9,7 @@ export type FrozenRequest = {
   method: "POST" | "PATCH";
   path: string;
   body: Record<string, unknown> & { idempotencyKey: string };
+  firstAttemptAt: string;
 };
 
 export type OpenCharacterResponse = operations["get_characters_characterId"]["responses"]["200"]["content"]["application/json"];

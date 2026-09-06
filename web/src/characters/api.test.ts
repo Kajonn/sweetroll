@@ -28,6 +28,7 @@ const request = {
   method: "POST" as const,
   path: "/characters/11111111-1111-4111-8111-111111111111/fields/health/set",
   body: { value: 14, expectedRevision: 2, idempotencyKey: "key-1" },
+  firstAttemptAt: "2026-09-06T00:00:00.000Z",
 };
 
 describe("createCharactersApi", () => {
@@ -98,6 +99,7 @@ describe("createCharactersApi", () => {
       method: "PATCH",
       path: "/characters/c-1",
       body: { command: "archive", expectedRevision: 3, idempotencyKey: "key-2" },
+      firstAttemptAt: "2026-09-06T00:00:00.000Z",
     };
     await api.send(management);
     expect(client.fetch).toHaveBeenCalledWith("PATCH", "/characters/c-1", { body: management.body });

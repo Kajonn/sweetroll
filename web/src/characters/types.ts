@@ -12,6 +12,32 @@ export type FrozenRequest = {
   firstAttemptAt: string;
 };
 
+export type EditIntent =
+  | { kind: "setField"; fieldId: string; value: unknown }
+  | { kind: "bumpResource"; resourceId: string; direction: "up" | "down" };
+export type QueueEntry = {
+  id: string;
+  actorId: string;
+  characterId: string;
+  sequence: number;
+  baseRevision: number;
+  packageChecksum: string;
+  createdAt: string;
+  intent: EditIntent;
+  attempt: FrozenRequest | null;
+};
+export type SessionPhase =
+  | "loading"
+  | "ready"
+  | "offline"
+  | "sending"
+  | "conflict"
+  | "invalid"
+  | "reauthenticate"
+  | "uncertain"
+  | "storage-error"
+  | "purged";
+
 export type OpenCharacterResponse = operations["get_characters_characterId"]["responses"]["200"]["content"]["application/json"];
 export type CharacterView = OpenCharacterResponse["character"];
 

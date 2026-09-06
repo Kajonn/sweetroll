@@ -9,12 +9,15 @@ export type OnlineAttempt = {
   createdAt: string;
 };
 
+export type StoredIdentity = { actorId: string | null; generation: number; pendingLogout: string | null };
+export type WriteGuard = { generation: number; accountGeneration: number };
+
 export type CharacterStore = {
   read(
     actorId: string,
     characterId: string,
-  ): Promise<{ confirmed: CharacterView | null; entries: QueueEntry[]; generation: number }>;
-  enqueue(entry: QueueEntry): Promise<void>;
+  ): Promise<{ confirmed: CharacterView | null; entries: QueueEntry[] } & WriteGuard>;
+  enqueue(entry: QueueEntry, guard: WriteGuard): Promise<void>;
   freeze(actorId: string, characterId: string, entryId: string, request: FrozenRequest): Promise<void>;
   acknowledge(
     actorId: string,
@@ -29,7 +32,7 @@ export type CharacterStore = {
     character: CharacterView,
     generation: number,
   ): Promise<void>;
-  retireEntries(actorId: string, characterId: string, entryIds: string[], generation: number): Promise<void>;
+  retireEntries(actorId: string, characterId: string, entryIds: string[], guard: WriteGuard): Promise<void>;
   purgeCharacter(actorId: string, characterId: string): Promise<void>;
   clearAccount(actorId: string): Promise<void>;
   close(): Promise<void>;
@@ -39,11 +42,12 @@ export type CharacterStore = {
   deleteOnlineAttempt(actorId: string, attemptId: string): Promise<void>;
   deleteOnlineAttemptsForCharacter(actorId: string, characterId: string): Promise<void>;
 
-  setLastAccount(actorId: string, expectedAccount?: string | null): Promise<boolean>;
+  readIdentity(): Promise<StoredIdentity>;
+  setLastAccount(actorId: string, expected?: StoredIdentity): Promise<boolean>;
   readLastAccount(): Promise<string | null>;
   setPendingLogout(actorId: string): Promise<void>;
   readPendingLogout(): Promise<string | null>;
-  clearPendingLogout(): Promise<void>;
+  clearPendingLogout(expectedGeneration?: number): Promise<void>;
 };
 
 const DB_VERSION = 1;
@@ -113,7 +117,10 @@ function openTx<T>(
     const result = run(tx);
     result.then(
       () => undefined,
-      (error: unknown) => settle(() => reject(error))(),
+      (error: unknown) => {
+        try { tx.abort(); } catch { /* Already completed or aborted. */ }
+        settle(() => reject(error))();
+      },
     );
     tx.oncomplete = settle(() => {
       result.then(
@@ -229,6 +236,23 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
   // Account tombstones also protect GETs begun before any character row existed.
   const accountGeneration = async (tx: IDBTransaction, actorId: string) =>
     (await getRequest<{ generation: number }>(tx, LAST_ACCOUNT, `generation:${actorId}`))?.generation ?? 0;
+  const identityGeneration = async (tx: IDBTransaction) =>
+    (await getRequest<{ generation: number }>(tx, LAST_ACCOUNT, "identity-generation"))?.generation ?? 0;
+  const advanceIdentity = async (tx: IDBTransaction) => {
+    await putRequest(tx, LAST_ACCOUNT, { key: "identity-generation", generation: await identityGeneration(tx) + 1 });
+  };
+  const readIdentity = async (tx: IDBTransaction): Promise<StoredIdentity> => ({
+    actorId: (await getRequest<{ actorId: string }>(tx, LAST_ACCOUNT, "last"))?.actorId ?? null,
+    generation: await identityGeneration(tx),
+    pendingLogout: (await getRequest<{ actorId: string }>(tx, PENDING_LOGOUT, "pending"))?.actorId ?? null,
+  });
+  const assertWriteIdentity = async (tx: IDBTransaction, actorId: string, expectedGeneration?: number) => {
+    const current = await readIdentity(tx);
+    if (current.pendingLogout !== null || (current.actorId !== null && current.actorId !== actorId) ||
+        (expectedGeneration !== undefined && current.generation !== expectedGeneration)) {
+      throw new Error("stale write: account changed or logout pending");
+    }
+  };
 
   async function deleteOnlineAttemptsForCharacter(tx: IDBTransaction, actorId: string, characterId: string): Promise<void> {
     const attempts = await collectByKey<OnlineAttempt>(
@@ -256,14 +280,19 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
           confirmed: record?.confirmed ?? null,
           entries,
           generation: record?.generation ?? await accountGeneration(tx, actorId),
+          accountGeneration: await identityGeneration(tx),
         };
       });
     },
 
-    async enqueue(entry) {
-      await openTx(db, [CHAR, QUEUE, LAST_ACCOUNT], "readwrite", async (tx) => {
+    async enqueue(entry, guard) {
+      await openTx(db, [CHAR, QUEUE, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async (tx) => {
+        await assertWriteIdentity(tx, entry.actorId, guard.accountGeneration);
         const key: IDBValidKey = [entry.actorId, entry.characterId];
         const existing = await getRequest<CharacterRecord>(tx, CHAR, key);
+        if ((existing?.generation ?? await accountGeneration(tx, entry.actorId)) !== guard.generation) {
+          throw new Error("stale enqueue: character generation changed");
+        }
         if (!existing) {
           await putRequest(tx, CHAR, {
             actorId: entry.actorId,
@@ -291,9 +320,8 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
     },
 
     async acknowledge(actorId, characterId, entryId, character, generation) {
-      await openTx(db, [CHAR, QUEUE, LAST_ACCOUNT], "readwrite", async (tx) => {
-        const account = await getRequest<{ actorId: string }>(tx, LAST_ACCOUNT, "last");
-        if (account && account.actorId !== actorId) throw new Error("stale acknowledgment: account changed");
+      await openTx(db, [CHAR, QUEUE, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async (tx) => {
+        await assertWriteIdentity(tx, actorId);
         const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
         if (!record || record.generation !== generation) {
           throw new Error("stale acknowledgment: generation changed");
@@ -321,9 +349,8 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
     },
 
     async confirmSnapshot(actorId, characterId, character, generation) {
-      await openTx(db, [CHAR, LAST_ACCOUNT], "readwrite", async (tx) => {
-        const account = await getRequest<{ actorId: string }>(tx, LAST_ACCOUNT, "last");
-        if (account && account.actorId !== actorId) throw new Error("stale snapshot confirm: account changed");
+      await openTx(db, [CHAR, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async (tx) => {
+        await assertWriteIdentity(tx, actorId);
         const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
         if ((record?.generation ?? await accountGeneration(tx, actorId)) !== generation) {
           throw new Error("stale snapshot confirm: generation changed");
@@ -340,10 +367,11 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
       });
     },
 
-    async retireEntries(actorId, characterId, entryIds, generation) {
-      await openTx(db, [CHAR, QUEUE], "readwrite", async (tx) => {
+    async retireEntries(actorId, characterId, entryIds, guard) {
+      await openTx(db, [CHAR, QUEUE, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async (tx) => {
+        await assertWriteIdentity(tx, actorId, guard.accountGeneration);
         const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
-        if (!record || record.generation !== generation) {
+        if (!record || record.generation !== guard.generation) {
           throw new Error("stale retirement: generation changed");
         }
         record.generation += 1;
@@ -369,6 +397,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
 
     async clearAccount(actorId) {
       await openTx(db, [CHAR, QUEUE, ATTEMPTS, LAST_ACCOUNT], "readwrite", async (tx) => {
+        await advanceIdentity(tx);
         await putRequest(tx, LAST_ACCOUNT, {
           key: `generation:${actorId}`, generation: await accountGeneration(tx, actorId) + 1,
         });
@@ -425,14 +454,17 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
       );
     },
 
-    async setLastAccount(actorId, expectedAccount) {
-      return openTx(db, [LAST_ACCOUNT], "readwrite", async tx => {
-        const current = (await getRequest<{ actorId: string }>(tx, LAST_ACCOUNT, "last"))?.actorId ?? null;
-        if (expectedAccount !== undefined && current !== expectedAccount && current !== actorId) {
+    readIdentity() { return openTx(db, [LAST_ACCOUNT, PENDING_LOGOUT], "readonly", readIdentity); },
+
+    async setLastAccount(actorId, expected) {
+      return openTx(db, [LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async tx => {
+        const current = await readIdentity(tx);
+        if (current.pendingLogout !== null || (expected && current.generation !== expected.generation)) {
           throw new Error("stale account confirmation");
         }
         await putRequest(tx, LAST_ACCOUNT, { key: "last", actorId });
-        return current !== actorId;
+        if (current.actorId !== actorId) await advanceIdentity(tx);
+        return current.actorId !== actorId;
       });
     },
 
@@ -444,9 +476,10 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
     },
 
     async setPendingLogout(actorId) {
-      await openTx(db, [PENDING_LOGOUT], "readwrite", (tx) =>
-        putRequest(tx, PENDING_LOGOUT, { key: "pending", actorId }),
-      );
+      await openTx(db, [LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async tx => {
+        await advanceIdentity(tx);
+        await putRequest(tx, PENDING_LOGOUT, { key: "pending", actorId });
+      });
     },
 
     async readPendingLogout() {
@@ -456,10 +489,13 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
       return record?.actorId ?? null;
     },
 
-    async clearPendingLogout() {
-      await openTx(db, [PENDING_LOGOUT], "readwrite", (tx) =>
-        deleteRequest(tx, PENDING_LOGOUT, "pending"),
-      );
+    async clearPendingLogout(expectedGeneration) {
+      await openTx(db, [LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async tx => {
+        if (expectedGeneration !== undefined && await identityGeneration(tx) !== expectedGeneration) {
+          throw new Error("stale logout completion");
+        }
+        await deleteRequest(tx, PENDING_LOGOUT, "pending");
+      });
     },
   };
 }

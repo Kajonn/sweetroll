@@ -1,7 +1,51 @@
 import { expect, it, vi } from "vitest";
 import { createIdentityGate } from "./identity.js";
-import { openCharacterStore } from "./store.js";
-import { makeView } from "./testing.js";
+import { openCharacterStore, type StoredIdentity } from "./store.js";
+import { createTestLocks, makeView } from "./testing.js";
+
+it("serializes refresh against another tab's pending revocation with delayed broadcasts", async () => {
+  const name = crypto.randomUUID();
+  const store = await openCharacterStore(name);
+  const otherStore = await openCharacterStore(name);
+  const locks = createTestLocks();
+  await store.setLastAccount("a");
+  let releaseMarker!: () => void;
+  let readFinished!: () => void;
+  const markerDone = new Promise<void>(resolve => { readFinished = resolve; });
+  const readMarker = store.readIdentity.bind(store);
+  vi.spyOn(store, "readIdentity").mockImplementationOnce(async () => {
+    await new Promise<void>(resolve => { releaseMarker = resolve; });
+    const result = await readMarker();
+    readFinished();
+    return result;
+  });
+  let finishLogout!: () => void;
+  let revoked = false;
+  const calls: string[] = [];
+  const client = { fetch: vi.fn(async (_method: string, path: string) => {
+    calls.push(path);
+    if (path === "/signout") {
+      await new Promise<void>(resolve => { finishLogout = resolve; });
+      revoked = true;
+    }
+    return (revoked ? { state: "anonymous" } : { state: "authenticated", userId: "a" }) as never;
+  }) };
+  const reader = createIdentityGate({ store, client, locks, online: () => true, channel: null });
+  const owner = createIdentityGate({ store: otherStore, client, locks, online: () => true, channel: null });
+  const refresh = reader.refresh();
+  await vi.waitFor(() => expect(releaseMarker).toBeDefined());
+  const logout = owner.signOut();
+  await vi.waitFor(async () => expect(await otherStore.readLastAccount()).toBeNull());
+  releaseMarker();
+  await markerDone;
+  await new Promise<void>(resolve => setTimeout(resolve, 0));
+  await vi.waitFor(() => expect(finishLogout).toBeDefined());
+  expect(calls).toEqual(["/signout"]);
+  finishLogout(); await logout; await refresh;
+  expect(await store.readLastAccount()).toBeNull();
+  expect(reader.getSnapshot().verified).toBe(false);
+  reader.dispose(); owner.dispose(); await store.close(); await otherStore.close();
+});
 
 it("confirms real IDs, uses only confirmed offline identity, and revokes before future me", async () => {
   const store = await openCharacterStore(crypto.randomUUID());
@@ -117,14 +161,15 @@ it("a late me cannot overwrite a newer account confirmation from another tab", a
 it("does not start me after signout invalidates an awaited marker read", async () => {
   const store = await openCharacterStore(crypto.randomUUID());
   await store.setLastAccount("a");
-  let finish!: (actor: string) => void;
-  vi.spyOn(store, "readLastAccount").mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const before = await store.readIdentity();
+  let finish!: (identity: StoredIdentity) => void;
+  vi.spyOn(store, "readIdentity").mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
   const client = { fetch: vi.fn(async () => ({ state: "anonymous" }) as never) };
   const gate = createIdentityGate({ store, client, online: () => true, channel: null });
   const refresh = gate.refresh();
   await vi.waitFor(() => expect(finish).toBeDefined());
   const logout = gate.signOut();
-  finish("a"); await refresh; await logout;
+  finish(before); await refresh; await logout;
   expect(client.fetch.mock.calls).toEqual([["POST", "/signout"]]);
   gate.dispose(); await store.close();
 });

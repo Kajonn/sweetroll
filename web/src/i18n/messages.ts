@@ -1,6 +1,7 @@
 export type MessageTable = Record<string, string>;
 
 export const defaultMessages: MessageTable = {
+  "shell.characterStorageUnavailable": "Offline character storage is unavailable. Online sign-in and System Builder remain available.",
   "shell.signOut.button": "Sign out",
   "shell.signOut.confirm": "Sign out and clear this account's cached characters and unsynchronized edits? Unsynchronized edits will be lost.",
   "shell.signOut.pending": "Local data hidden; server sign-out is pending. Reconnect to finish signing out.",

@@ -5,17 +5,44 @@ import { createIdentityGate, type BrowserChannel } from "./identity.js";
 import { createCharactersApi } from "./api.js";
 import { createApiClient } from "../api/client.js";
 import { openCharacterStore } from "./store.js";
-import { makeEntry, makeEnvelope, makeOpenEnvelope, makeRequest, makeView } from "./testing.js";
+import { createTestLocks, makeEntry, makeEnvelope, makeOpenEnvelope, makeRequest, makeView } from "./testing.js";
+
+it("cancels takeover behind an initial acquisition without posting to a disposed channel", async () => {
+  let closed = false;
+  const tab = createCoordination({ actorId: "a", characterId: "c", locks: createTestLocks(), channel: {
+    onmessage: null, close() { closed = true; }, postMessage() { if (closed) throw new Error("closed channel"); },
+  } });
+  const initial = tab.acquire();
+  const takeover = tab.requestTakeover();
+  tab.dispose();
+  await initial;
+  await expect(takeover).resolves.toBe(false);
+});
+
+it("queued takeover survives owner disappearance and cancels when the requester is disposed", async () => {
+  const locks = createTestLocks();
+  const tab = () => createCoordination({ actorId: "a", characterId: "c", locks, channel: null });
+  const owner = tab(); const next = tab();
+  await owner.acquire();
+  const takeover = next.requestTakeover();
+  owner.dispose();
+  expect(await takeover).toBe(true);
+  const cancelled = tab();
+  const pending = cancelled.requestTakeover();
+  cancelled.dispose();
+  expect(await pending).toBe(false);
+  next.dispose();
+  await vi.waitFor(async () => {
+    const last = tab();
+    expect(await last.acquire()).toBe(true);
+    last.dispose();
+  });
+});
 
 function browser() {
-  const held = new Set<string>();
   const peers = new Set<BrowserChannel>();
   return {
-    locks: { request: async (name: string, _options: LockOptions, callback: (lock: unknown) => Promise<void>) => {
-      if (held.has(name)) return callback(null);
-      held.add(name);
-      try { await callback({ name }); } finally { held.delete(name); }
-    } } as LockManager,
+    locks: createTestLocks(),
     channel() {
       const channel: BrowserChannel = {
         onmessage: null,
@@ -53,12 +80,13 @@ it("real sessions never send without a lock and takeover waits for the active re
   expect(send).not.toHaveBeenCalled();
   online = true; await identity.refresh();
   await vi.waitFor(() => expect(send).toHaveBeenCalledOnce());
-  await reader.requestEditing();
+  const takeover = reader.requestEditing();
   await vi.waitFor(() => expect(owner.getSnapshot().editing.owned).toBe(false));
   expect(reader.getSnapshot().editing.owned).toBe(false);
   const frozen = (await store.read("a", "c")).entries[0]!.attempt;
   expect(frozen).not.toBeNull();
   finish(new Response(JSON.stringify(makeEnvelope(view))));
+  await takeover;
   await vi.waitFor(() => expect(reader.getSnapshot().editing.owned).toBe(true));
   expect(reader.getSnapshot().entries).toEqual([]);
   expect(send).toHaveBeenCalledOnce();
@@ -72,7 +100,7 @@ it("real sessions never send without a lock and takeover waits for the active re
 it("an unsupported browser cannot drain a persisted attempt", async () => {
   const store = await openCharacterStore(crypto.randomUUID());
   await store.confirmSnapshot("a", "c", makeView({ characterId: "c", revision: 1 }), 0);
-  await store.enqueue(makeEntry({ actorId: "a", characterId: "c", attempt: makeRequest() }));
+  await store.enqueue(makeEntry({ actorId: "a", characterId: "c", attempt: makeRequest() }), await store.read("a", "c"));
   const send = vi.fn();
   const identity = createIdentityGate({ store, client: { fetch: async () => ({ state: "authenticated", userId: "a" }) as never }, online: () => true, channel: null });
   await identity.refresh();
@@ -108,7 +136,7 @@ it.each(["switch", "logout"])("real identity %s hides cached data and blocks act
   finish(new Response(JSON.stringify(makeEnvelope(makeView({ characterId: "c", revision: 2 })))));
   await session.whenIdle();
   expect(send).toHaveBeenCalledOnce();
-  if (mode === "switch") expect(await store.read("a", "c")).toEqual(before);
+  if (mode === "switch") expect(await store.read("a", "c")).toEqual({ ...before, accountGeneration: before.accountGeneration + 1 });
   else expect(await store.read("a", "c")).toMatchObject({ confirmed: null, entries: [] });
   session.dispose(); identity.dispose(); await store.close();
 });
@@ -154,7 +182,7 @@ it("takeover flushes an active conflict recovery before releasing the lock", asy
   const store = await openCharacterStore(crypto.randomUUID());
   const scheduler = browser();
   await store.confirmSnapshot("a", "c", makeView({ characterId: "c", revision: 1 }), 0);
-  await store.enqueue(makeEntry({ actorId: "a", characterId: "c" }));
+  await store.enqueue(makeEntry({ actorId: "a", characterId: "c" }), await store.read("a", "c"));
   const identity = createIdentityGate({ store, client: { fetch: async () => ({ state: "authenticated", userId: "a" }) as never }, online: () => true, channel: null });
   await identity.refresh();
   const owner = createCoordination({ actorId: "a", characterId: "c", locks: scheduler.locks, channel: null });

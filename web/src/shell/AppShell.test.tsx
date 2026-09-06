@@ -7,6 +7,27 @@ import { AppShell, useAuth } from "./AppShell.js";
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 describe("AppShell", () => {
+  it("keeps real dev sign-in working when character IndexedDB cannot open", async () => {
+    vi.stubEnv("MODE", "development");
+    vi.spyOn(indexedDB, "open").mockImplementation(() => { throw new DOMException("Blocked", "SecurityError"); });
+    let signedIn = false;
+    const paths: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      paths.push(new URL(url, window.location.origin).pathname);
+      if (url === "/dev/signin") { signedIn = true; return new Response("{}"); }
+      return new Response(JSON.stringify(signedIn ? { state: "authenticated", userId: "real-without-idb" } : { state: "anonymous" }));
+    }));
+    function Identity() { const auth = useAuth(); return <p>{auth.state === "authenticated" ? auth.userId : auth.state}</p>; }
+    render(<AppShell><Identity /></AppShell>);
+    expect(await screen.findByText(/offline character storage is unavailable/i)).toBeInTheDocument();
+    await userEvent.setup().click(await screen.findByTestId("dev-signin"));
+    expect(await screen.findByText("real-without-idb")).toBeInTheDocument();
+    expect(paths).toEqual(["/api/me", "/dev/signin", "/api/me"]);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Sign out" }));
+    expect(await screen.findByText(/local sign-out could not be saved/i)).toBeInTheDocument();
+    expect(paths.at(-1)).toBe("/api/signout");
+  });
   it("preserves dev sign-in but verifies me instead of inventing an account", async () => {
     vi.stubEnv("MODE", "development");
     let signedIn = false;

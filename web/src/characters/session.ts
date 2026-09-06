@@ -144,6 +144,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   let confirmed: CharacterView | null = null;
   let entries: QueueEntry[] = [];
   let generation = 0;
+  let accountGeneration = 0;
   let nextSequence = 0;
   let phase: SessionPhase = "loading";
   let error: BlockingError | null = null;
@@ -275,13 +276,15 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     entries = [...entries, entry].sort((a, b) => a.sequence - b.sequence);
     scheduleDrain();
     try {
-      await store.enqueue(entry);
+      await store.enqueue(entry, { generation, accountGeneration });
       coordination.invalidate?.();
     } catch (storageErr) {
       rejectWrite(storageErr);
       entryWrites.delete(entry.id);
       entries = entries.filter(e => e.id !== entry.id);
-      setBlocked("storage-error", "Could not save your edit because local storage is unavailable.");
+      if (isStaleAck(storageErr)) {
+        if (await identityIsCurrent()) await handleAckError(storageErr);
+      } else setBlocked("storage-error", "Could not save your edit because local storage is unavailable.");
       freezeWaiters.delete(entry.id);
       emit();
       throw storageErr instanceof Error ? storageErr : new Error("storage failure");
@@ -672,7 +675,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     const selected = new Set(input.selectedIds);
     if (input.mode === "discard") {
-      await store.retireEntries(actorId, characterId, input.selectedIds, generation);
+      await store.retireEntries(actorId, characterId, input.selectedIds, { generation, accountGeneration });
       if (!identityMatches()) return;
       generation += 1;
       const remaining = entries.filter((e) => !selected.has(e.id));
@@ -684,7 +687,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       }
       entries = remaining;
     } else {
-      await store.retireEntries(actorId, characterId, input.selectedIds, generation);
+      await store.retireEntries(actorId, characterId, input.selectedIds, { generation, accountGeneration });
       if (!identityMatches()) return;
       generation += 1;
       const rebuilt: QueueEntry[] = [];
@@ -694,7 +697,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           const replica = newEntry(entry.intent);
           replica.baseRevision = confirmed!.reconciliation.revision;
           replica.sequence = entry.sequence;
-          await store.enqueue(replica);
+          await store.enqueue(replica, { generation, accountGeneration });
           if (!identityMatches()) return;
           rebuilt.push(replica);
           resolveFreezeWaiter(entry.id);
@@ -728,6 +731,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     confirmed = loaded.confirmed;
     entries = loaded.entries;
     generation = loaded.generation;
+    accountGeneration = loaded.accountGeneration;
     nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), 0);
     phase = "loading";
     emit();
@@ -754,6 +758,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       const loaded = await store.read(actorId, characterId);
       if (!identityMatches() || !coordination.isOwner()) return;
       confirmed = loaded.confirmed; entries = loaded.entries; generation = loaded.generation;
+      accountGeneration = loaded.accountGeneration;
       nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), 0);
       editing = { owned: true, owner: null }; needsFresh = true;
       emit(); scheduleDrain();
@@ -866,7 +871,13 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     },
     resolveConflict(input) {
       if (recovering) return Promise.reject(new Error("Conflict recovery is already in progress."));
-      recovering = resolveConflict(input).finally(() => { recovering = null; });
+      recovering = resolveConflict(input).catch(async error => {
+        if (isStaleAck(error)) {
+          if (await identityIsCurrent()) await handleAckError(error);
+          emit();
+        }
+        throw error;
+      }).finally(() => { recovering = null; });
       return recovering;
     },
     requestEditing,

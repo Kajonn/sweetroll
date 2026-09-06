@@ -28,6 +28,41 @@ beforeEach(() => {
 const ARM = "00000000-0000-4000-8000-000000000000";
 const EVER = "2026-09-06T00:00:00.000Z";
 
+it("rejects an already accepted edit whose enqueue arrives after another tab's logout", async () => {
+  const { session, api, identity, store } = await makeHarness();
+  api.scriptOpenView(viewFor("char-1", 1)); await session.open();
+  identity.online = false; identity.signal();
+  let finish!: () => void;
+  const enqueue = store.enqueue.bind(store);
+  vi.spyOn(store, "enqueue").mockImplementation(async (...args) => {
+    await new Promise<void>(resolve => { finish = resolve; });
+    await enqueue(...args);
+  });
+  const edit = expect(session.setField("name", "private")).rejects.toThrow(/stale/);
+  await vi.waitFor(() => expect(finish).toBeDefined());
+  await store.clearAccount(ARM);
+  finish(); await edit; await session.whenIdle();
+  expect(await store.read(ARM, "char-1")).toMatchObject({ confirmed: null, entries: [] });
+  expect(session.getSnapshot().confirmed).toBeNull();
+  expect(api.sent).toEqual([]);
+  session.dispose(); await store.close();
+});
+
+it("cannot recreate recovery intentions when another tab clears the account after retirement", async () => {
+  const { session, api, store } = await makeHarness();
+  await seedConfirmed(store, "char-1", viewFor("char-1", 1));
+  await seedQueue(store, "char-1", [{ id: "pending", intent: { kind: "setField", fieldId: "name", value: "private" } }]);
+  api.scriptOpenView(viewFor("char-1", 2)); await session.open();
+  const retire = store.retireEntries.bind(store);
+  vi.spyOn(store, "retireEntries").mockImplementation(async (...args) => {
+    await retire(...args); await store.clearAccount(ARM);
+  });
+  await expect(session.resolveConflict({ mode: "reapply", selectedIds: ["pending"] })).rejects.toThrow(/stale/);
+  expect(await store.read(ARM, "char-1")).toMatchObject({ confirmed: null, entries: [] });
+  expect(api.sent).toEqual([]);
+  session.dispose(); await store.close();
+});
+
 it("reports a failed initial store read without rejecting the observable session lifecycle", async () => {
   const { session, store } = await makeHarness();
   vi.spyOn(store, "read").mockRejectedValue(new Error("storage unavailable"));
@@ -303,6 +338,7 @@ async function seedConfirmed(store: CharacterStore, characterId: string, confirm
       packageChecksum: confirmed.projection.packageChecksum,
       intent: { kind: "setField", fieldId: "name", value: confirmed.state.values.name ?? null },
     }),
+    await store.read(ARM, characterId),
   );
   const frozen: FrozenRequest = {
     method: "POST",
@@ -337,7 +373,7 @@ async function seedQueue(
       intent: e.intent,
       attempt: e.request ?? null,
     });
-    await store.enqueue(entry);
+    await store.enqueue(entry, await store.read(ARM, characterId));
     if (e.request) {
       await store.freeze(ARM, characterId, entry.id, e.request);
     }

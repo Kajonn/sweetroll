@@ -36,12 +36,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [auth, setAuth] = useState<AuthState>({ state: "loading" });
   const [identity, setIdentity] = useState<IdentityGate | null>(null);
+  const [storageUnavailable, setStorageUnavailable] = useState(false);
   const [logoutStatus, setLogoutStatus] = useState<"pending" | "complete" | "error" | null>(null);
   useEffect(() => {
     let disposed = false;
     let cleanup = () => {};
-    void openCharacterStore("sweetroll-characters").then(store => {
-      if (disposed) { void store.close(); return; }
+    void openCharacterStore("sweetroll-characters").catch(() => null).then(store => {
+      if (disposed) { void store?.close(); return; }
+      setStorageUnavailable(store === null);
       const gate = createIdentityGate({ store, client: createApiClient({ baseUrl: "/api" }) });
       setIdentity(gate);
       const update = () => {
@@ -52,7 +54,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         setOnline(navigator.onLine);
       };
       const unsubscribe = gate.subscribe(update);
-      cleanup = () => { unsubscribe(); gate.dispose(); void store.close(); };
+      cleanup = () => { unsubscribe(); gate.dispose(); void store?.close(); };
       void gate.refresh();
     }).catch(() => { if (!disposed) setAuth({ state: "anonymous" }); });
     return () => { disposed = true; cleanup(); };
@@ -86,6 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </header>
           <ErrorBoundary>
             <main role="main" className={styles.main}>
+              {storageUnavailable && <p role="status">{t("shell.characterStorageUnavailable")}</p>}
               {auth.state === "anonymous" && isDevMode() ? (
                 <DevSignInPanel onSignedIn={markSignedIn} />
               ) : (

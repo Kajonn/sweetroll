@@ -1,4 +1,36 @@
 import { ApiError } from "../api/client.js";
+
+/** FIFO browser scheduling, including queued-lock cancellation, without lease stealing. */
+export function createTestLocks(): LockManager {
+  const held = new Set<string>();
+  const queues = new Map<string, Array<() => void>>();
+  return { request(name: string, options: LockOptions, callback: (lock: { name: string } | null) => unknown) {
+    return new Promise<unknown>((resolve, reject) => {
+      const queue = queues.get(name) ?? [];
+      queues.set(name, queue);
+      const abort = () => {
+        const index = queue.indexOf(run);
+        if (index >= 0) queue.splice(index, 1);
+        reject(new DOMException("Aborted", "AbortError"));
+      };
+      const run = () => {
+        options.signal?.removeEventListener("abort", abort);
+        if (options.signal?.aborted) { abort(); return; }
+        held.add(name);
+        Promise.resolve().then(() => callback({ name })).then(resolve, reject).finally(() => {
+          held.delete(name);
+          queue.shift()?.();
+        });
+      };
+      if (options.signal?.aborted) { abort(); return; }
+      if (held.has(name)) {
+        if (options.ifAvailable) { Promise.resolve(callback(null)).then(resolve, reject); return; }
+        queue.push(run);
+        options.signal?.addEventListener("abort", abort, { once: true });
+      } else run();
+    });
+  } } as LockManager;
+}
 import type {
   CharacterView,
   CommandResultResponse,

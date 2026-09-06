@@ -5,6 +5,57 @@ import type { OnlineAttempt } from "./store.js";
 
 let counter = 0;
 let dbName = "sweetroll-test-store";
+const initialGuard = { generation: 0, accountGeneration: 0 };
+
+it("rolls back identity confirmation if persisting its generation fails", async () => {
+  const store = await openCharacterStore(crypto.randomUUID());
+  const before = await store.readIdentity();
+  const put = IDBObjectStore.prototype.put;
+  const spy = vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (this: IDBObjectStore, value: unknown, key?: IDBValidKey) {
+    if ((value as { key?: string }).key === "identity-generation") throw new DOMException("Quota", "QuotaExceededError");
+    return put.apply(this, [value, key as IDBValidKey]);
+  });
+  await expect(store.setLastAccount("a", before)).rejects.toThrow();
+  spy.mockRestore();
+  expect(await store.readIdentity()).toEqual(before);
+  await store.close();
+});
+
+it("an older revocation cannot clear a newer logout barrier", async () => {
+  const store = await openCharacterStore(crypto.randomUUID());
+  await store.setPendingLogout("a");
+  const before = await store.readIdentity();
+  await store.setPendingLogout("a");
+  await expect(store.clearPendingLogout(before.generation)).rejects.toThrow(/stale/);
+  expect(await store.readPendingLogout()).toBe("a");
+  await store.close();
+});
+
+it("rejects late enqueue and retirement after durable account invalidation", async () => {
+  const store = await openCharacterStore(crypto.randomUUID());
+  const entry = makeEntry();
+  await store.confirmSnapshot(entry.actorId, entry.characterId, makeView(entry.characterId, 1), 0);
+  const guard = await store.read(entry.actorId, entry.characterId);
+  await store.setPendingLogout(entry.actorId);
+  await expect(store.enqueue(entry, guard)).rejects.toThrow(/stale/);
+  await expect(store.retireEntries(entry.actorId, entry.characterId, [entry.id], guard)).rejects.toThrow(/stale/);
+  await store.clearAccount(entry.actorId);
+  await store.clearPendingLogout();
+  await expect(store.enqueue(entry, guard)).rejects.toThrow(/stale/);
+  expect((await store.read(entry.actorId, entry.characterId)).entries).toEqual([]);
+  await store.close();
+});
+
+it("rejects identity confirmation across a logout generation even when the marker returns to null", async () => {
+  const store = await openCharacterStore(crypto.randomUUID());
+  const before = await store.readIdentity();
+  await store.setPendingLogout("a");
+  await expect(store.setLastAccount("a", before)).rejects.toThrow(/stale/);
+  await store.clearAccount("a"); await store.clearPendingLogout();
+  await expect(store.setLastAccount("a", before)).rejects.toThrow(/stale/);
+  expect(await store.readLastAccount()).toBeNull();
+  await store.close();
+});
 
 it("account clearing tombstones even a first GET without a stored character", async () => {
   const store = await openCharacterStore(crypto.randomUUID());
@@ -34,7 +85,7 @@ it("checks the account marker inside snapshot/acknowledgment transactions", asyn
   await store.setLastAccount("b");
   await expect(store.acknowledge("a", "c", "entry", makeView("c", 2), before.generation)).rejects.toThrow(/stale/);
   await expect(store.confirmSnapshot("a", "c", makeView("c", 2), before.generation)).rejects.toThrow(/stale/);
-  expect(await store.read("a", "c")).toEqual(before);
+  expect(await store.read("a", "c")).toEqual({ ...before, accountGeneration: before.accountGeneration + 1 });
   await store.close();
 });
 
@@ -117,12 +168,12 @@ async function openFresh() {
 describe("CharacterStore", () => {
   it("acknowledgment advances only matching unsent bases and preserves frozen requests", async () => {
     const store = await openFresh();
-    await store.enqueue(makeEntry());
-    await store.enqueue(makeEntry({ id: "unsent", sequence: 1 }));
+    await store.enqueue(makeEntry(), initialGuard);
+    await store.enqueue(makeEntry({ id: "unsent", sequence: 1 }), initialGuard);
     const frozen = makeEntry({ id: "frozen", sequence: 2, attempt: makeRequest() });
-    await store.enqueue(frozen);
+    await store.enqueue(frozen, initialGuard);
     const unrelated = makeEntry({ id: "unrelated", sequence: 3, baseRevision: 7 });
-    await store.enqueue(unrelated);
+    await store.enqueue(unrelated, initialGuard);
     await store.acknowledge("actor-A", "char-1", "entry-1", makeView("char-1", 2), 0);
     const { entries } = await store.read("actor-A", "char-1");
     expect(entries[0]).toMatchObject({ id: "unsent", baseRevision: 2, attempt: null });
@@ -132,20 +183,20 @@ describe("CharacterStore", () => {
   });
   it("rejects stale retirement without deleting entries or advancing generation", async () => {
     const store = await openFresh();
-    await store.enqueue(makeEntry());
+    await store.enqueue(makeEntry(), initialGuard);
     const stale = await store.read("actor-A", "char-1");
     await store.confirmSnapshot("actor-A", "char-1", makeView("char-1", 7), stale.generation);
     const latest = await store.read("actor-A", "char-1");
-    await expect(store.retireEntries("actor-A", "char-1", ["entry-1"], stale.generation)).rejects.toThrow("stale");
+    await expect(store.retireEntries("actor-A", "char-1", ["entry-1"], stale)).rejects.toThrow("stale");
     expect(await store.read("actor-A", "char-1")).toEqual(latest);
-    await store.retireEntries("actor-A", "char-1", ["entry-1"], latest.generation);
+    await store.retireEntries("actor-A", "char-1", ["entry-1"], latest);
     expect((await store.read("actor-A", "char-1")).entries).toEqual([]);
     await store.close();
   });
   it("persists a frozen request verbatim across reopen", async () => {
     const store = await openFresh();
     const entry = makeEntry();
-    await store.enqueue(entry);
+    await store.enqueue(entry, initialGuard);
     const request = makeRequest();
     await store.freeze("actor-A", "char-1", entry.id, request);
     await store.close();
@@ -158,9 +209,9 @@ describe("CharacterStore", () => {
 
   it("returns entries in sequence order", async () => {
     const store = await openFresh();
-    await store.enqueue(makeEntry({ id: "a", sequence: 2 }));
-    await store.enqueue(makeEntry({ id: "b", sequence: 0 }));
-    await store.enqueue(makeEntry({ id: "c", sequence: 1 }));
+    await store.enqueue(makeEntry({ id: "a", sequence: 2 }), initialGuard);
+    await store.enqueue(makeEntry({ id: "b", sequence: 0 }), initialGuard);
+    await store.enqueue(makeEntry({ id: "c", sequence: 1 }), initialGuard);
     const { entries } = await store.read("actor-A", "char-1");
     expect(entries.map((e) => e.id)).toEqual(["b", "c", "a"]);
     await store.close();
@@ -169,7 +220,7 @@ describe("CharacterStore", () => {
   it("rolls back a multi-store write transaction that aborts, leaving snapshot and queue unchanged", async () => {
     const store = await openFresh();
     const entry = makeEntry();
-    await store.enqueue(entry);
+    await store.enqueue(entry, initialGuard);
     const request = makeRequest();
     await store.freeze("actor-A", "char-1", entry.id, request);
     const stable = await store.read("actor-A", "char-1");
@@ -203,7 +254,7 @@ describe("CharacterStore", () => {
   it("rejects changing an already-frozen request body", async () => {
     const store = await openFresh();
     const entry = makeEntry();
-    await store.enqueue(entry);
+    await store.enqueue(entry, initialGuard);
     const request = makeRequest();
     await store.freeze("actor-A", "char-1", entry.id, request);
     await expect(
@@ -220,7 +271,7 @@ describe("CharacterStore", () => {
   it("acknowledge clears the entry, updates the snapshot and bumps the generation atomically", async () => {
     const store = await openFresh();
     const entry = makeEntry();
-    await store.enqueue(entry);
+    await store.enqueue(entry, initialGuard);
     const before = await store.read("actor-A", "char-1");
     const view = makeView("char-1", 2);
     await store.acknowledge("actor-A", "char-1", entry.id, view, before.generation);
@@ -235,7 +286,7 @@ describe("CharacterStore", () => {
   it("rejects a late acknowledge after clearAccount bumps the generation", async () => {
     const store = await openFresh();
     const entry = makeEntry();
-    await store.enqueue(entry);
+    await store.enqueue(entry, initialGuard);
     const before = await store.read("actor-A", "char-1");
     await store.acknowledge("actor-A", "char-1", entry.id, makeView("char-1", 2), before.generation);
 
@@ -250,7 +301,7 @@ describe("CharacterStore", () => {
   it("purgeCharacter deletes snapshot, queue and attempts, and increments the generation", async () => {
     const store = await openFresh();
     const entry = makeEntry();
-    await store.enqueue(entry);
+    await store.enqueue(entry, initialGuard);
     const attempt: OnlineAttempt = {
       id: "oa-1",
       actorId: "actor-A",
@@ -274,7 +325,7 @@ describe("CharacterStore", () => {
   it("rejects a late acknowledge after purgeCharacter bumps the generation", async () => {
     const store = await openFresh();
     const entry = makeEntry();
-    await store.enqueue(entry);
+    await store.enqueue(entry, initialGuard);
     await store.acknowledge("actor-A", "char-1", entry.id, makeView("char-1", 2), 0);
     const before = await store.read("actor-A", "char-1");
     await store.purgeCharacter("actor-A", "char-1");
@@ -297,7 +348,7 @@ describe("CharacterStore", () => {
       }
       return realPut.apply(this, [value, key as IDBValidKey]);
     });
-    await expect(store.enqueue(makeEntry())).rejects.toThrow();
+    await expect(store.enqueue(makeEntry(), initialGuard)).rejects.toThrow();
     spy.mockRestore();
     const { entries } = await store.read("actor-A", "char-1");
     expect(entries).toEqual([]);
@@ -306,7 +357,7 @@ describe("CharacterStore", () => {
 
   it("isolates account data across actors and clearAccount preserves the other account", async () => {
     const store = await openFresh();
-    await store.enqueue(makeEntry({ actorId: "actor-A", characterId: "char-1" }));
+    await store.enqueue(makeEntry({ actorId: "actor-A", characterId: "char-1" }), initialGuard);
     await store.freeze("actor-A", "char-1", "entry-1", makeRequest());
     const before = await store.read("actor-A", "char-1");
     await store.acknowledge("actor-A", "char-1", "entry-1", makeView("char-1", 2), before.generation);

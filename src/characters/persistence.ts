@@ -45,6 +45,7 @@ export type CreateCharacterInput = {
     entityDefinitionId: DefinitionId;
     name: string;
     state: RuntimeStateV1;
+    createdAt: Date;
   };
   execution: {
     executionId: ExecutionId;
@@ -353,7 +354,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         `SELECT execution_id, actor_id, command_kind, idempotency_key, input_hash, character_id,
                 status, result_json, created_at, expires_at
            FROM character_command_executions
-          WHERE actor_id = $1 AND command_kind = $2 AND idempotency_key = $3 AND expires_at > now()`,
+          WHERE actor_id = $1 AND command_kind = $2 AND idempotency_key = $3`,
         [input.actorId, input.commandKind, input.idempotencyKey],
       );
       const row = result.rows[0];
@@ -365,8 +366,8 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       try {
         await client.query("BEGIN");
         const inserted = await client.query<CharacterRow>(
-          `INSERT INTO characters (id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle)
-           VALUES ($1, $2, $3, $4, $5, 1, $6::jsonb, 'owner_only', 'active')
+          `INSERT INTO characters (id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, 1, $6::jsonb, 'owner_only', 'active', $7, $7)
            RETURNING id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
           [
             input.character.characterId,
@@ -375,6 +376,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
             input.character.entityDefinitionId,
             input.character.name,
             JSON.stringify(input.character.state),
+            input.character.createdAt,
           ],
         );
         const characterRow = requireRow(inserted.rows[0], "createCharacterTx");

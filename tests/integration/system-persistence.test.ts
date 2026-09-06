@@ -473,6 +473,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
 
     const published = await repo.publishVersion({
       systemId,
+      versionId: "10000000-0000-4000-8000-000000000001",
       expectedRevision: 1,
       sourceChecksum: "sha256:one",
       semanticVersion: "1.0.0",
@@ -493,6 +494,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
 
     const duplicate = await repo.publishVersion({
       systemId,
+      versionId: "10000000-0000-4000-8000-000000000002",
       expectedRevision: 1,
       sourceChecksum: "sha256:one",
       semanticVersion: "1.0.0",
@@ -508,6 +510,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
 
     const stale = await repo.publishVersion({
       systemId,
+      versionId: "10000000-0000-4000-8000-000000000003",
       expectedRevision: 99,
       sourceChecksum: "sha256:one",
       semanticVersion: "1.1.0",
@@ -523,6 +526,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
 
     const noDraft = await repo.publishVersion({
       systemId: randomUUID(),
+      versionId: "10000000-0000-4000-8000-000000000004",
       expectedRevision: 1,
       sourceChecksum: "sha256:x",
       semanticVersion: "1.0.0",

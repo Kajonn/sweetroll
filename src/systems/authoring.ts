@@ -485,9 +485,10 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
         if (!assessed.ok || assessed.document === null) {
           return { ok: false, error: errors.invalid_package(assessed.assessment.diagnostics) };
         }
+        const versionId = randomUUID();
         const compiled = compileDocument(assessed.document, {
           systemId: input.systemId,
-          versionId: randomUUID(),
+          versionId,
           semanticVersion: input.semanticVersion,
         });
         if (!compiled.ok) return { ok: false, error: errors.invalid_package(compiled.diagnostics) };
@@ -512,6 +513,7 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
 
         const result = await repo.publishVersion({
           systemId: input.systemId,
+          versionId,
           expectedRevision: draft.revision,
           sourceChecksum: draft.sourceChecksum,
           semanticVersion: input.semanticVersion,

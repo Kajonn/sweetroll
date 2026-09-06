@@ -74,6 +74,7 @@ export function PublishDialog({
       semanticVersion: semver,
       releaseNotes,
       idempotencyKey: crypto.randomUUID(),
+      acknowledgeBreaking: allAcknowledged,
     };
     try {
       const v = await mutation.mutateAsync(input);

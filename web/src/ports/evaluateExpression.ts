@@ -4,6 +4,7 @@ import {
   renderExpression,
   type CompiledExpressionV1,
   type EvalResult,
+  type EvaluationBindings,
   type ExpressionAstV1,
   type Rng,
   type ScalarValue,
@@ -30,6 +31,20 @@ export type EvaluateDiagnostic = { code: string; path: string; message: string }
 
 export type DieResult = { sides: number; value: number; kept: boolean };
 
+/** `EvaluationBindings` with its scopes populated from the flat binding map. */
+type EvaluateExpressionBindings = EvaluationBindings;
+
+function pickBindings(
+  all: Record<string, ScalarValue>,
+  scope: Record<string, ValueType>,
+): Record<string, ScalarValue> {
+  const picked: Record<string, ScalarValue> = {};
+  for (const id of Object.keys(all)) {
+    if (Object.prototype.hasOwnProperty.call(scope, id)) picked[id] = all[id]!;
+  }
+  return picked;
+}
+
 export type EvaluateExpressionResult =
   | {
       ok: true;
@@ -52,9 +67,13 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
     return { ok: false, expression: null, diagnostics: compiled.diagnostics };
   }
   const body = compiled.value;
+  const scopedBindings: EvaluateExpressionBindings = {
+    fields: pickBindings(input.bindings, input.env.fields),
+    inputs: pickBindings(input.bindings, input.env.inputs),
+  };
   const evaluated: EvalResult = evaluate(
     { id: "try_it", ...body } as CompiledExpressionV1,
-    input.bindings,
+    scopedBindings,
     input.rng,
   );
   const expression = renderExpression(body.ast);

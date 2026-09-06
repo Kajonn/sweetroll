@@ -1,0 +1,56 @@
+=== I3 character-backend acceptance demonstration ===
+DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll
+REPO_ROOT=/home/jonas/dev/sweetroll/.worktrees/i3-character-backend
+
+--- Step 0: bring up compose postgres ---
+ Container i3-character-backend-postgres-1  Running
+--- Step 0: wait for pg_isready ---
+postgres is ready (after 1s)
+
+--- Step 0: run migrations ---
+
+> sweetroll@0.0.0 migrate
+> tsx src/bootstrap/migrate.ts
+
+{"level":30,"time":1788654661239,"service":"sweetroll","msg":"database migrations complete"}
+
+--- Steps: walk the character HTTP surface ---
+INFO: actor ada=804e45c6-8cab-4399-90c1-23b639199348 bob=0221a0e4-dd17-4749-8db3-f79fceb12c17 ts=1788654662451
+STEP: POST /systems (blank draft) -> 201
+STEP: PUT /systems/{id}/draft (d20) -> 200
+STEP: POST /systems/{id}/publish (v1.0.0) -> 200
+STEP: POST /characters (create) -> 201
+INFO: characterId=b19a7445-4884-413a-bda8-aae9992efdb1
+STEP: GET /characters/{id} -> 200
+INFO: etag="1-sha256:a18ea6d25c1994cdaafc16710e81cfc2c5305d6323ca60ec50a5a24829b60e01-1.0" cache-control=private x-resource-revision=1
+STEP: POST .../fields/ability/set -> 200
+STEP: POST .../resources/health/bump (down) -> 200
+STEP: POST .../actions/check -> 200
+INFO: roll dice=[{"sides":20,"value":4,"kept":true}] total=6 expression=d20 + fields.modifier + inputs.bonus
+STEP: POST .../actions/check (replay) -> 200
+INFO: replay replayed=true, same commandExecutionId
+STEP: race two bumps at revision 3 -> 200 / 409 (expected one 200, one 409)
+INFO: winner revision=4
+STEP: PATCH /characters/{id} (archive) -> 200
+STEP: POST .../fields/... (archived) -> 409
+STEP: PATCH /characters/{id} (recover) -> 200
+STEP: GET /characters/{id}/activity -> 200
+INFO: activity kinds=["character_recovered","character_archived","character_resource_bumped","character_action_executed","character_resource_bumped","character_field_set","character_created"]
+STEP: POST /characters/{id}/exports -> 200
+INFO: export mediaType=application/vnd.sweetroll.character+json;version=1
+STEP: PUT /systems/{id}/draft (breaking v2) -> 200
+STEP: POST /systems/{id}/publish (breaking, no acknowledge) -> 422
+STEP: POST /systems/{id}/publish (v2.0.0 acknowledged) -> 200
+STEP: GET /characters/{id} (still pinned to v1) -> 200
+INFO: character remains pinned to v1 after v2 publish
+STEP: POST .../migration-previews -> 201
+INFO: preview candidate={"ability_score":15,"modifier":0,"ancestry":null,"health":{"current":8,"max":10},"level":1} warnings=["Source field(s) \"proficient\" have no target and will be dropped.","Target field(s) \"level\" have no source value and will use their package default."]
+STEP: POST .../migrations/{id}/commit -> 200
+STEP: POST .../migrations/{id}/rollback -> 200
+STEP: POST /characters/{id}/ownership-transfer (to Bob) -> 200
+STEP: GET /characters/{id} (old owner) -> 404
+STEP: POST .../ownership-transfer (old-owner replay) -> 200
+STEP: POST /characters (expired replay window) -> 409
+ALL STEPS PASSED
+
+=== I3 character-backend acceptance demonstration complete ===

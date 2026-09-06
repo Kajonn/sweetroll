@@ -16,6 +16,7 @@ export type ClaimExecutionInput = {
 export type ClaimExecutionResult =
   | { status: "claimed"; executionId: ExecutionId }
   | { status: "replay"; executionId: ExecutionId; resultJson: unknown }
+  | { status: "expired"; executionId: ExecutionId; resultJson: unknown }
   | { status: "mismatch" }
   | { status: "in_progress" };
 
@@ -25,6 +26,7 @@ type ExecutionRow = {
   input_hash: string;
   result_json: unknown;
   lease_expires_at: Date;
+  expires_at: Date;
 };
 
 const UNIQUE_VIOLATION = "23505";
@@ -38,6 +40,7 @@ function isUniqueViolation(error: unknown): boolean {
  *
  * - Inserts a new pending row when the key is unused, returning a fresh execution ID.
  * - Returns a completed replay when the key/input hash already succeeded.
+ * - Returns `expired` when a completed replay has fallen outside its replay window.
  * - Returns `mismatch` when the key was used with different input.
  * - Returns `in_progress` when another non-expired lease owns the pending execution.
  * - Atomically reclaims an expired pending lease while preserving the original execution ID.
@@ -73,7 +76,7 @@ export async function claimExecution(pool: Pool, input: ClaimExecutionInput): Pr
     }
 
     const existing = await client.query<ExecutionRow>(
-      `SELECT execution_id, status, input_hash, result_json, lease_expires_at
+      `SELECT execution_id, status, input_hash, result_json, lease_expires_at, expires_at
          FROM character_command_executions
         WHERE actor_id = $1 AND command_kind = $2 AND idempotency_key = $3
         FOR UPDATE`,
@@ -89,6 +92,10 @@ export async function claimExecution(pool: Pool, input: ClaimExecutionInput): Pr
       return { status: "mismatch" };
     }
     if (row.status === "completed") {
+      if (new Date(row.expires_at).getTime() <= input.now.getTime()) {
+        await client.query("COMMIT");
+        return { status: "expired", executionId: row.execution_id, resultJson: row.result_json };
+      }
       await client.query("COMMIT");
       return { status: "replay", executionId: row.execution_id, resultJson: row.result_json };
     }

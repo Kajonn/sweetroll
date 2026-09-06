@@ -71,6 +71,7 @@ const ROLLBACK_COMMAND_KIND = "character_migration_rollback";
 const MAX_PAGE_LIMIT = 100;
 const NOT_FOUND_MESSAGE = "The requested character does not exist.";
 const MISMATCH_MESSAGE = "This idempotency key was already used with different input.";
+const REPLAY_EXPIRED_MESSAGE = "The replay window for this idempotency key has expired. Retry with a new key.";
 const ARCHIVED_MESSAGE = "Archived characters reject play commands until recovered.";
 const IN_PROGRESS_MESSAGE = "Another request is already processing this idempotency key.";
 
@@ -363,6 +364,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       cacheDisposition: "purge",
     }),
     mismatch: (): CharacterError => ({ code: "idempotency_mismatch", message: MISMATCH_MESSAGE }),
+    replayExpired: (): CharacterError => ({ code: "conflict", message: REPLAY_EXPIRED_MESSAGE }),
     inProgress: (): CharacterError => ({ code: "command_in_progress", message: IN_PROGRESS_MESSAGE }),
     archived: (): CharacterError => ({ code: "conflict", message: ARCHIVED_MESSAGE }),
     conflict: (
@@ -545,6 +547,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         });
         if (existing !== null) {
           if (existing.inputHash !== inputHash) return { ok: false, error: errors.mismatch() };
+          if (existing.expiresAt.getTime() <= now().getTime()) return { ok: false, error: errors.replayExpired() };
           const replayedView = deserializeView(existing.resultJson);
           return {
             ok: true,
@@ -610,6 +613,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             entityDefinitionId: createInput.entityDefinitionId,
             name: createInput.name,
             state: resolved.value.state,
+            createdAt,
           },
           execution: {
             executionId,
@@ -743,6 +747,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
 
         if (claimed.status === "mismatch") return { ok: false, error: errors.mismatch() };
         if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
+        if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
         if (claimed.status === "replay") {
           return replayStoredOutcome(claimed.resultJson);
         }
@@ -926,6 +931,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
 
         if (claimed.status === "mismatch") return { ok: false, error: errors.mismatch() };
         if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
+        if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
         if (claimed.status === "replay") {
           return replayStoredOutcome(claimed.resultJson);
         }
@@ -1270,6 +1276,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         });
         if (claimed.status === "mismatch") return { ok: false, error: errors.mismatch() };
         if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
+        if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
         if (claimed.status === "replay") return replayStoredOutcome(claimed.resultJson);
         const executionId = claimed.executionId;
         const replayExpiresAt = new Date(claimStartedAt.getTime() + REPLAY_TTL_MS);
@@ -1422,6 +1429,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         });
         if (claimed.status === "mismatch") return { ok: false, error: errors.mismatch() };
         if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
+        if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
         if (claimed.status === "replay") return replayStoredOutcome(claimed.resultJson);
         const executionId = claimed.executionId;
         const replayExpiresAt = new Date(claimStartedAt.getTime() + REPLAY_TTL_MS);

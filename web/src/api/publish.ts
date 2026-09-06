@@ -9,6 +9,7 @@ export type PublishInput = {
   semanticVersion: string;
   releaseNotes: string;
   idempotencyKey: string;
+  acknowledgeBreaking: boolean;
 };
 
 export type PublishResult = PublishedVersion;
@@ -26,6 +27,7 @@ export function usePublish(client: ApiClient) {
             semanticVersion: string;
             releaseNotes: string;
             idempotencyKey: string;
+            acknowledgeBreaking: boolean;
           }
         >("POST", `/systems/${input.systemId}/publish`, {
           body: {
@@ -33,6 +35,7 @@ export function usePublish(client: ApiClient) {
             semanticVersion: input.semanticVersion,
             releaseNotes: input.releaseNotes,
             idempotencyKey: input.idempotencyKey,
+            acknowledgeBreaking: input.acknowledgeBreaking,
           },
         })
         .then((r) => r.version),

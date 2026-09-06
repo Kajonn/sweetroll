@@ -48,6 +48,7 @@ export type PreviewSnapshotRecord = {
 
 export type PublishVersionInput = {
   systemId: SystemId;
+  versionId: VersionId;
   expectedRevision: number;
   sourceChecksum: string;
   semanticVersion: string;
@@ -695,10 +696,11 @@ async function publishVersionImpl(pool: Pool, input: PublishVersionInput): Promi
     try {
       const result = await client.query<VersionRow>(
         `INSERT INTO system_versions
-           (system_id, semantic_version, checksum, package_json, release_notes, compatibility_findings_json)
-          VALUES ($1, $2, $3, $4::jsonb, $5, $6::jsonb)
+           (id, system_id, semantic_version, checksum, package_json, release_notes, compatibility_findings_json)
+          VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::jsonb)
           RETURNING id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at`,
         [
+          input.versionId,
           input.systemId,
           input.semanticVersion,
           input.checksum,

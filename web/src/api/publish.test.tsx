@@ -41,6 +41,7 @@ describe("usePublish", () => {
       semanticVersion: "1.0.0",
       releaseNotes: "first",
       idempotencyKey: "k-1",
+      acknowledgeBreaking: true,
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -56,6 +57,7 @@ describe("usePublish", () => {
       semanticVersion: "1.0.0",
       releaseNotes: "first",
       idempotencyKey: "k-1",
+      acknowledgeBreaking: true,
     });
   });
 
@@ -88,6 +90,7 @@ describe("usePublish", () => {
       semanticVersion: "1.0.0",
       releaseNotes: "destructive",
       idempotencyKey: "k-2",
+      acknowledgeBreaking: false,
     });
 
     await waitFor(() => expect(result.current.isError).toBe(true));

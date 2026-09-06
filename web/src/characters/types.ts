@@ -14,7 +14,8 @@ export type FrozenRequest = {
 
 export type EditIntent =
   | { kind: "setField"; fieldId: string; value: unknown }
-  | { kind: "bumpResource"; resourceId: string; direction: "up" | "down" };
+  | { kind: "bumpResource"; resourceId: string; direction: "up" | "down" }
+  | { kind: "executeAction"; actionId: string; inputs?: Record<string, unknown> };
 export type QueueEntry = {
   id: string;
   actorId: string;

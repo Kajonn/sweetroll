@@ -23,6 +23,13 @@ export type CharacterStore = {
     character: CharacterView,
     generation: number,
   ): Promise<void>;
+  confirmSnapshot(
+    actorId: string,
+    characterId: string,
+    character: CharacterView,
+    generation: number,
+  ): Promise<void>;
+  retireEntries(actorId: string, characterId: string, entryIds: string[]): Promise<void>;
   purgeCharacter(actorId: string, characterId: string): Promise<void>;
   clearAccount(actorId: string): Promise<void>;
   close(): Promise<void>;
@@ -297,6 +304,37 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
         record.confirmed = character;
         record.generation += 1;
         await putRequest(tx, CHAR, record);
+      });
+    },
+
+    async confirmSnapshot(actorId, characterId, character, generation) {
+      await openTx(db, [CHAR], "readwrite", async (tx) => {
+        const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
+        if (record && record.generation !== generation) {
+          throw new Error("stale snapshot confirm: generation changed");
+        }
+        const fresh = record ?? {
+          actorId,
+          characterId,
+          generation,
+          confirmed: null as CharacterView | null,
+        };
+        fresh.confirmed = character;
+        fresh.generation += 1;
+        await putRequest(tx, CHAR, fresh);
+      });
+    },
+
+    async retireEntries(actorId, characterId, entryIds) {
+      await openTx(db, [CHAR, QUEUE], "readwrite", async (tx) => {
+        const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
+        if (record) {
+          record.generation += 1;
+          await putRequest(tx, CHAR, record);
+        }
+        for (const entryId of entryIds) {
+          await deleteRequest(tx, QUEUE, [actorId, characterId, entryId]);
+        }
       });
     },
 

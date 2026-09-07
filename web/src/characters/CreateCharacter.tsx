@@ -137,10 +137,11 @@ export function CreateCharacter({
 
   /**
    * Discoverable version list for a versionless `/characters/new`. It goes
-   * through the injected `api` seam (same queryKey/staleTime as the
-   * ApiClient-level `useCreationVersions` hook) because this component is
-   * only ever given a `CharactersApi`. Selecting a version reuses the
-   * unchanged `loadMetadata` path, so all guards still apply untouched.
+   * through the injected `api` seam to match this component's existing
+   * injection (`api`/`store`/`identity` props); the `ApiClient` itself is
+   * owned in router scope (see router.tsx:16) but is not threaded through
+   * here. Selecting a version reuses the unchanged `loadMetadata` path, so
+   * all guards still apply untouched.
    */
   const showPicker = initialSystemVersionId === undefined && metadata === null;
   const pickerQuery = useQuery<CreationVersionEntry[]>({

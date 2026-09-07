@@ -54,6 +54,15 @@ describe("createCharactersApi", () => {
     );
   });
 
+  it("listCreationVersions fetches GET /characters/creation-versions with no query/body", async () => {
+    const client = makeClient();
+    const envelope = { data: { versions: [] }, requestId: "r-1" };
+    client.fetch.mockResolvedValueOnce(envelope);
+    const api = createCharactersApi(client);
+    await expect(api.listCreationVersions()).resolves.toBe(envelope);
+    expect(client.fetch).toHaveBeenCalledWith("GET", "/characters/creation-versions");
+  });
+
   it("activity forwards the cursor query parameter", async () => {
     const client = makeClient();
     const envelope = { events: [], nextCursor: null, requestId: "r-1" };

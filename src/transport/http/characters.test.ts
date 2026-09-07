@@ -405,6 +405,21 @@ describe("character HTTP routes", () => {
     expect(response.json()).toEqual({ data: { versions }, requestId: expect.any(String) });
   });
 
+  it("maps internal creation-versions failures to 500", async () => {
+    const internal: Characters["listCreationVersions"] = async () => ({
+      ok: false,
+      error: { code: "internal", message: "An internal error occurred." },
+    });
+    const app = await build(makeCharacters({ listCreationVersions: internal }));
+    const response = await app.inject({
+      method: "GET",
+      url: "/characters/creation-versions",
+      headers: cookie,
+    });
+    expect(response.statusCode).toBe(500);
+    expect(response.json().error.code).toBe("internal");
+  });
+
   it("requires the systemVersionId query parameter for creation options", async () => {
     const app = await build(makeCharacters({}));
     const missing = await app.inject({ method: "GET", url: "/characters/creation-options", headers: cookie });

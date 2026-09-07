@@ -66,6 +66,25 @@ describeWithDatabase("Character creation versions", () => {
     return { systemId, versionId };
   }
 
+  /** Inserts an additional published version under an existing system with an
+   * explicit created_at so newest-first ordering within the system is deterministic. */
+  async function insertExtraVersion(
+    app: App,
+    systemId: string,
+    createdAt: string,
+  ): Promise<{ systemId: string; versionId: string }> {
+    const versionId = randomUUID();
+    const unsigned = structuredClone(d20Package) as unknown as UnsignedSystemPackageV1 & { integrity?: unknown };
+    delete unsigned.integrity;
+    unsigned.versionId = versionId;
+    const packageValue = signSystemPackage(unsigned);
+    await app.pool.query(
+      "INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, lifecycle, created_at) VALUES ($1, $2, '2.0.0', $3, $4::jsonb, 'published', $5)",
+      [versionId, systemId, packageValue.integrity.checksum, JSON.stringify(packageValue), createdAt],
+    );
+    return { systemId, versionId };
+  }
+
   async function rowCounts(app: App): Promise<{ systems: number; versions: number }> {
     const systems = await app.pool.query<{ count: number }>("SELECT count(*)::int AS count FROM systems");
     const versions = await app.pool.query<{ count: number }>(
@@ -85,6 +104,7 @@ describeWithDatabase("Character creation versions", () => {
     await insertVersion(app, bob.actorId, { name: "Delta Private", access: "private" });
     await insertVersion(app, ada.actorId, { name: "Epsilon Deprecated", versionLifecycle: "deprecated" });
     await insertVersion(app, ada.actorId, { name: "Zeta Archived", systemLifecycle: "archived" });
+    const pubOlder = await insertExtraVersion(app, pub.systemId, "2024-01-01T00:00:00.000Z");
 
     const before = await rowCounts(app);
     const response = await app.app.inject({
@@ -110,15 +130,25 @@ describeWithDatabase("Character creation versions", () => {
     expect(body.data.versions.map((v) => v.versionId)).toEqual([
       own.versionId,
       pub.versionId,
+      pubOlder.versionId,
       link.versionId,
     ]);
     expect(body.data.versions.map((v) => v.systemName)).toEqual([
       "Alpha Private",
       "Beta Public",
+      "Beta Public",
       "Gamma Link",
     ]);
+    const beta = body.data.versions.filter((v) => v.systemName === "Beta Public");
+    expect(beta[0]!.versionId).toBe(pub.versionId);
+    expect(beta[0]!.createdAt > beta[1]!.createdAt).toBe(true);
+    expect(body.data.versions.map((v) => v.semanticVersion)).toEqual([
+      "1.0.0",
+      "1.0.0",
+      "2.0.0",
+      "1.0.0",
+    ]);
     for (const entry of body.data.versions) {
-      expect(entry.semanticVersion).toBe("1.0.0");
       expect(entry.systemId).toBeTypeOf("string");
       expect(entry.createdAt).toBeTypeOf("string");
     }

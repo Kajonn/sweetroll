@@ -74,6 +74,7 @@ const characters = createCharactersModule({
   pool,
   runtime,
   authorizeVersionUse: authoring.authorizeVersionUse,
+  listAuthorizedVersions: authoring.listAuthorizedVersions,
 });
 
 const app = buildHttpApp({

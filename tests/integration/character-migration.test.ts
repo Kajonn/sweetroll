@@ -195,6 +195,7 @@ describeWithDatabase("Character migration (preview)", () => {
       pool,
       runtime,
       authorizeVersionUse: authoring.authorizeVersionUse,
+      listAuthorizedVersions: authoring.listAuthorizedVersions,
     });
   });
 
@@ -565,6 +566,7 @@ describeWithDatabase("Character migration (commit)", () => {
       pool,
       runtime,
       authorizeVersionUse: authoring.authorizeVersionUse,
+      listAuthorizedVersions: authoring.listAuthorizedVersions,
     });
   });
 
@@ -1066,6 +1068,7 @@ describeWithDatabase("Character migration (rollback)", () => {
       pool,
       runtime,
       authorizeVersionUse: authoring.authorizeVersionUse,
+      listAuthorizedVersions: authoring.listAuthorizedVersions,
     });
   });
 

@@ -16,6 +16,7 @@ import type {
   SystemPackageV1,
 } from "./implementation/package/schema/index.js";
 import type {
+  AuthorizedCreationVersion,
   DraftRecord,
   SystemId,
   SystemPersistenceRepository,
@@ -168,6 +169,9 @@ export interface SystemAuthoring {
     ctx: RequestContext,
     versionId: VersionId,
   ): Promise<Result<{ systemId: SystemId; versionId: VersionId; checksum: string }>>;
+  listAuthorizedVersions(
+    ctx: RequestContext,
+  ): Promise<Result<AuthorizedCreationVersion[]>>;
   exportVersion(ctx: RequestContext, versionId: VersionId): Promise<Result<ExportedPackage>>;
   listVersions(
     ctx: RequestContext,
@@ -575,6 +579,15 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
         const version = await repo.authorizeVersionUse(ctx.actorId, versionId);
         if (version === null) return { ok: false, error: errors.not_found() };
         return { ok: true, value: version };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async listAuthorizedVersions(ctx) {
+      try {
+        const versions = await repo.listAuthorizedVersions(ctx.actorId);
+        return { ok: true, value: versions };
       } catch {
         return { ok: false, error: errors.internal() };
       }

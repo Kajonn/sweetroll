@@ -3,6 +3,7 @@ export {
   REFERENCE_TEMPLATES,
   seedReferenceTemplates,
   type AuthorizedVersionUse,
+  type AuthorizedCreationVersion,
   type AuditRecord,
   type DeleteOwnedSystemResult,
   type DraftRecord,

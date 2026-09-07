@@ -159,6 +159,7 @@ function makeCharacters(overrides: Partial<Characters> = {}): Characters {
         entities: [{ id: "character", label: "Character" }],
       },
     }),
+    listCreationVersions: async () => ({ ok: true, value: { versions: [] } }),
     list: async () => ({ ok: true, value: { characters: [], nextCursor: null } }),
     open: async () => ({ ok: true, value: characterView() }),
     apply: async () => ({ ok: true, value: commandResult() }),
@@ -378,6 +379,30 @@ describe("character HTTP routes", () => {
       requestId: expect.any(String),
     });
     expect(received).toEqual({ systemVersionId: versionId });
+  });
+
+  it("maps GET /characters/creation-versions to listCreationVersions and forwards its data", async () => {
+    const versions = [
+      {
+        versionId: randomUUID(),
+        systemId: randomUUID(),
+        systemName: "D20",
+        semanticVersion: "1.0.0",
+        createdAt: "2026-09-06T00:00:00.000Z",
+      },
+    ];
+    const app = await build(
+      makeCharacters({
+        listCreationVersions: async () => ({ ok: true, value: { versions } }),
+      }),
+    );
+    const response = await app.inject({
+      method: "GET",
+      url: "/characters/creation-versions",
+      headers: cookie,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ data: { versions }, requestId: expect.any(String) });
   });
 
   it("requires the systemVersionId query parameter for creation options", async () => {

@@ -290,6 +290,7 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
     pool: input.pool,
     runtime: effectiveRuntime,
     authorizeVersionUse: authoring.authorizeVersionUse,
+    listAuthorizedVersions: authoring.listAuthorizedVersions,
   });
 
   const authHook = buildAuthHook({

@@ -162,6 +162,18 @@ export type CreationOptionsInput = {
   systemVersionId: VersionId;
 };
 
+export type CreationVersionEntry = {
+  versionId: VersionId;
+  systemId: string;
+  systemName: string;
+  semanticVersion: string;
+  createdAt: string;
+};
+
+export type CreationVersions = {
+  versions: CreationVersionEntry[];
+};
+
 export type ListCharacters = {
   limit: number;
   cursor: string | null;
@@ -325,6 +337,7 @@ export interface Characters {
     ctx: RequestContext,
     input: CreationOptionsInput,
   ): Promise<CharacterResult<CharacterCreationOptions>>;
+  listCreationVersions(ctx: RequestContext): Promise<CharacterResult<CreationVersions>>;
   list(ctx: RequestContext, input: ListCharacters): Promise<CharacterResult<CharacterPage>>;
   open(ctx: RequestContext, characterId: CharacterId): Promise<CharacterResult<CharacterView>>;
 
@@ -358,6 +371,7 @@ export type CreateCharactersModuleInput = {
   pool: Pool;
   runtime: SystemRuntime;
   authorizeVersionUse: SystemAuthoring["authorizeVersionUse"];
+  listAuthorizedVersions: SystemAuthoring["listAuthorizedVersions"];
   now?: () => Date;
   newId?: () => string;
   newExecutionId?: () => string;
@@ -673,6 +687,16 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (!described.ok) return { ok: false, error: mapRuntimeError(described.error) };
 
         return { ok: true, value: described.value };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async listCreationVersions(ctx) {
+      try {
+        const authorized = await input.listAuthorizedVersions(ctx);
+        if (!authorized.ok) return { ok: false, error: errors.internal() };
+        return { ok: true, value: { versions: authorized.value } };
       } catch {
         return { ok: false, error: errors.internal() };
       }

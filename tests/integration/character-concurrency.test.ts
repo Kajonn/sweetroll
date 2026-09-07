@@ -151,6 +151,7 @@ describeWithDatabase("Character command concurrency", () => {
       pool,
       runtime,
       authorizeVersionUse: authoring.authorizeVersionUse,
+      listAuthorizedVersions: authoring.listAuthorizedVersions,
     });
   });
 

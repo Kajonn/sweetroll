@@ -64,6 +64,7 @@ function makeAuthoring(overrides: Partial<SystemAuthoring> = {}): SystemAuthorin
       ok: true,
       value: { systemId: randomUUID(), versionId, checksum: d20Package.integrity.checksum },
     }),
+    listAuthorizedVersions: async () => ({ ok: true, value: [] }),
     publish: async () => ({
       ok: true,
       value: {

@@ -198,6 +198,18 @@ const CharacterCreationOptionsDto = Type.Object({
   ),
 });
 
+const CharacterCreationVersionsDto = Type.Object({
+  versions: Type.Array(
+    Type.Object({
+      versionId: Type.String({ format: UUID_FORMAT }),
+      systemId: Type.String({ format: UUID_FORMAT }),
+      systemName: Type.String({ minLength: 1 }),
+      semanticVersion: Type.String({ minLength: 1 }),
+      createdAt: Type.String({ format: DATE_TIME_FORMAT }),
+    }),
+  ),
+});
+
 const DiceDto = Type.Object({
   sides: Type.Integer(),
   value: Type.Integer(),
@@ -453,6 +465,19 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
         "401": UnauthorizedEnvelope,
         "404": CharacterErrorEnvelope,
         "422": CharacterErrorEnvelope,
+        "500": CharacterErrorEnvelope,
+        "503": CharacterErrorEnvelope,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/characters/creation-versions",
+    operationId: "get_characters_creation_versions",
+    schema: {
+      response: {
+        "200": Type.Object({ data: CharacterCreationVersionsDto, requestId: Type.String() }),
+        "401": UnauthorizedEnvelope,
         "500": CharacterErrorEnvelope,
         "503": CharacterErrorEnvelope,
       },
@@ -768,6 +793,12 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         const result = await characters.creationOptions(ctxOf(request), {
           systemVersionId: query.systemVersionId,
         });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { data: result.value, requestId: request.id };
+      },
+
+      get_characters_creation_versions: async (request, reply) => {
+        const result = await characters.listCreationVersions(ctxOf(request));
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { data: result.value, requestId: request.id };
       },

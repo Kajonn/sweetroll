@@ -7086,6 +7086,329 @@
         }
       }
     },
+    "/characters/creation-versions": {
+      "get": {
+        "operationId": "get_characters_creation_versions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "versions"
+                      ],
+                      "properties": {
+                        "versions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "versionId",
+                              "systemId",
+                              "systemName",
+                              "semanticVersion",
+                              "createdAt"
+                            ],
+                            "properties": {
+                              "versionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "systemId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "systemName": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "semanticVersion": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "createdAt": {
+                                "format": "date-time",
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "const": "unauthorized",
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/characters/{characterId}": {
       "get": {
         "operationId": "get_characters_characterId",

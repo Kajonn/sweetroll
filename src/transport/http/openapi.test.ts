@@ -29,6 +29,7 @@ describe("buildOpenApiDocument", () => {
     expect(Object.keys(doc.paths ?? {}).sort()).toEqual([
       "/characters",
       "/characters/creation-options",
+      "/characters/creation-versions",
       "/characters/{characterId}",
       "/characters/{characterId}/actions/{actionId}",
       "/characters/{characterId}/activity",

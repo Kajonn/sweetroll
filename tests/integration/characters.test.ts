@@ -160,6 +160,7 @@ describeWithDatabase("Characters (create/list/open)", () => {
       pool,
       runtime,
       authorizeVersionUse: authoring.authorizeVersionUse,
+      listAuthorizedVersions: authoring.listAuthorizedVersions,
     });
   });
 
@@ -505,6 +506,7 @@ describeWithDatabase("Characters (create/list/open)", () => {
       pool: failingPool,
       runtime,
       authorizeVersionUse: authoring.authorizeVersionUse,
+      listAuthorizedVersions: authoring.listAuthorizedVersions,
     });
 
     const result = await failingCharacters.create(ctx(owner), {
@@ -561,6 +563,7 @@ describeWithDatabase("Characters (apply: set/bump)", () => {
       pool,
       runtime,
       authorizeVersionUse: authoring.authorizeVersionUse,
+      listAuthorizedVersions: authoring.listAuthorizedVersions,
     });
   });
 
@@ -821,6 +824,7 @@ describeWithDatabase("Characters (apply: set/bump)", () => {
       pool,
       runtime: flakyRuntime,
       authorizeVersionUse: authoring.authorizeVersionUse,
+      listAuthorizedVersions: authoring.listAuthorizedVersions,
     });
 
     const idempotencyKey = randomUUID();
@@ -961,6 +965,7 @@ describeWithDatabase("Characters (apply: executeAction)", () => {
       pool,
       runtime,
       authorizeVersionUse: authoring.authorizeVersionUse,
+      listAuthorizedVersions: authoring.listAuthorizedVersions,
     });
   });
 
@@ -1270,6 +1275,7 @@ describeWithDatabase("Characters (apply: executeAction)", () => {
       pool: failingPool,
       runtime,
       authorizeVersionUse: authoring.authorizeVersionUse,
+      listAuthorizedVersions: authoring.listAuthorizedVersions,
     });
 
     const idempotencyKey = randomUUID();
@@ -1335,6 +1341,7 @@ describeWithDatabase("Characters (apply: executeAction)", () => {
       pool,
       runtime: throwingRuntime,
       authorizeVersionUse: authoring.authorizeVersionUse,
+      listAuthorizedVersions: authoring.listAuthorizedVersions,
       newExecutionId: () => "00000000-0000-4000-8000-000000000099",
     });
 
@@ -1397,6 +1404,7 @@ describeWithDatabase("Characters (manage/activity/export)", () => {
       pool,
       runtime,
       authorizeVersionUse: authoring.authorizeVersionUse,
+      listAuthorizedVersions: authoring.listAuthorizedVersions,
     });
   });
 

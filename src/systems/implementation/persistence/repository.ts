@@ -73,6 +73,14 @@ export type AuthorizedVersionUse = {
   checksum: string;
 };
 
+export type AuthorizedCreationVersion = {
+  systemId: SystemId;
+  versionId: VersionId;
+  systemName: string;
+  semanticVersion: string;
+  createdAt: string;
+};
+
 export type DeleteOwnedSystemResult =
   | { ok: true }
   | { ok: false; code: "not_found" | "referenced" };
@@ -142,6 +150,7 @@ export interface SystemPersistenceRepository {
   loadVersion(versionId: VersionId): Promise<VersionRecord | null>;
   listVersions(systemId: SystemId): Promise<VersionRecord[]>;
   authorizeVersionUse(actorId: UserId, versionId: VersionId): Promise<AuthorizedVersionUse | null>;
+  listAuthorizedVersions(actorId: UserId): Promise<AuthorizedCreationVersion[]>;
 
   recordReceipt(input: RecordReceiptInput): Promise<RecordReceiptResult>;
   loadReceipt(input: {
@@ -282,6 +291,27 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
       return row === undefined
         ? null
         : { systemId: row.system_id, versionId: row.version_id, checksum: row.checksum };
+    },
+
+    async listAuthorizedVersions(actorId) {
+      const result = await pool.query<AuthorizedCreationVersionRow>(
+        `SELECT v.id AS version_id, s.id AS system_id, s.name AS system_name,
+                v.semantic_version, v.created_at
+           FROM system_versions v
+           JOIN systems s ON s.id = v.system_id
+          WHERE v.lifecycle = 'published'
+            AND s.lifecycle = 'active'
+            AND (s.owner_id = $1 OR s.access IN ('public', 'link'))
+          ORDER BY s.name ASC, v.created_at DESC, v.id DESC`,
+        [actorId],
+      );
+      return result.rows.map((row) => ({
+        versionId: row.version_id,
+        systemId: row.system_id,
+        systemName: row.system_name,
+        semanticVersion: row.semantic_version,
+        createdAt: row.created_at.toISOString(),
+      }));
     },
 
     async recordReceipt(input) {
@@ -443,6 +473,14 @@ type AuthorizedVersionUseRow = {
   system_id: string;
   version_id: string;
   checksum: string;
+};
+
+type AuthorizedCreationVersionRow = {
+  version_id: string;
+  system_id: string;
+  system_name: string;
+  semantic_version: string;
+  created_at: Date;
 };
 
 type PreviewRow = {

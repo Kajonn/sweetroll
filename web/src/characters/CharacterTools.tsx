@@ -77,7 +77,9 @@ export function CharacterTools({ characterId, api, session, now = () => new Date
           title={t("character.tools.archiveTitle")}
           confirmLabel={t("character.tools.confirmArchive")}
           onConfirm={async () => {
-            if (snapshot.entries.length > 0 || snapshot.phase !== "ready") return;
+            if (snapshot.entries.length > 0 || snapshot.phase !== "ready") {
+              throw new Error(t("character.tools.confirmFailed"));
+            }
             // Refresh and freeze before initiating the online-only operation.
             await session.archive();
           }}
@@ -89,7 +91,9 @@ export function CharacterTools({ characterId, api, session, now = () => new Date
           title={t("character.tools.recoverTitle")}
           confirmLabel={t("character.tools.confirmRecover")}
           onConfirm={async () => {
-            if (snapshot.entries.length > 0 || snapshot.phase !== "ready") return;
+            if (snapshot.entries.length > 0 || snapshot.phase !== "ready") {
+              throw new Error(t("character.tools.confirmFailed"));
+            }
             // Refresh and freeze before initiating the online-only operation.
             await session.recover();
           }}

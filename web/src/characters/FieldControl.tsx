@@ -56,7 +56,10 @@ export function FieldControl({ field, tentativeValue, disabled, pending, onCommi
   };
   // Rejected UI command promises are caught and surfaced here: the draft is
   // preserved because only a changed tentative/confirmed value resets it.
+  // A new commit always clears a previous commit error first so a stale
+  // alert cannot survive a successful checkbox/choice retry.
   const commitValue = (value: unknown): void => {
+    setCommitError(null);
     let result: void | Promise<void>;
     try {
       result = onCommit(field.fieldId, value);
@@ -65,7 +68,10 @@ export function FieldControl({ field, tentativeValue, disabled, pending, onCommi
       return;
     }
     if (result !== undefined && result !== null && typeof (result as Promise<void>).then === "function") {
-      (result as Promise<void>).then(undefined, (error: unknown) => failCommit(error));
+      (result as Promise<void>).then(
+        () => { setCommitError(null); },
+        (error: unknown) => failCommit(error),
+      );
     }
   };
   const commitDraft = (): boolean => {

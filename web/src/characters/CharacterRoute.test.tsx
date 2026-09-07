@@ -576,6 +576,86 @@ describe("CharacterRoute workflows", () => {
     }
   });
 
+  it("mounts the routed review surface for an expired queued edit without sending", async () => {
+    const store = await openStore();
+    await store.confirmSnapshot(ACTOR, CHARACTER_ID, actionView(1), 0);
+    await store.enqueue(
+      makeEntry({
+        id: "e1",
+        actorId: ACTOR,
+        characterId: CHARACTER_ID,
+        sequence: 1,
+        baseRevision: 1,
+        packageChecksum: "abc",
+        // Older than the 30-day replay window relative to the real clock.
+        createdAt: "2026-07-01T00:00:00.000Z",
+        intent: { kind: "setField", fieldId: "name", value: "Briar" },
+        attempt: null,
+      }),
+      await store.read(ACTOR, CHARACTER_ID),
+    );
+    const api = makeWorkflowApi({ openView: () => actionView(1) });
+    try {
+      render(
+        <CharacterDetail
+          characterId={CHARACTER_ID} api={api} store={store}
+          identity={makeIdentity()} coordination={makeCoordination(true)} locksSupported
+        />,
+      );
+      expect(await screen.findByRole("heading", { name: "Review conflicts" })).toBeVisible();
+      expect(screen.getAllByText(/replay window/i)).toHaveLength(2);
+      expect(api.send).not.toHaveBeenCalled();
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("mounts the routed review surface for an invalid value with a correction hint", async () => {
+    const user = userEvent.setup();
+    const store = await openStore();
+    await store.confirmSnapshot(ACTOR, CHARACTER_ID, actionView(1), 0);
+    await store.enqueue(
+      makeEntry({
+        id: "e1",
+        actorId: ACTOR,
+        characterId: CHARACTER_ID,
+        sequence: 1,
+        baseRevision: 1,
+        packageChecksum: "abc",
+        createdAt: "2026-09-06T00:00:00.000Z",
+        intent: { kind: "setField", fieldId: "name", value: "Briar" },
+        attempt: null,
+      }),
+      await store.read(ACTOR, CHARACTER_ID),
+    );
+    const api = makeWorkflowApi({
+      openView: () => actionView(1),
+      onSend: () => {
+        throw new ApiError({
+          code: "invalid_value",
+          message: "Name is invalid.",
+          status: 422,
+          requestId: "req-1",
+          latestRevision: null,
+          diagnostics: [],
+        });
+      },
+    });
+    try {
+      render(
+        <CharacterDetail
+          characterId={CHARACTER_ID} api={api} store={store}
+          identity={makeIdentity()} coordination={makeCoordination(true)} locksSupported
+        />,
+      );
+      expect(await screen.findByRole("heading", { name: "Review conflicts" })).toBeVisible();
+      expect(screen.getByText(/Correct the highlighted values/i)).toBeVisible();
+      await waitFor(() => expect(api.send).toHaveBeenCalledTimes(1));
+    } finally {
+      await store.close();
+    }
+  });
+
   it("resolves a simulated conflict from the routed review surface", async () => {
     const user = userEvent.setup();
     const store = await openStore();

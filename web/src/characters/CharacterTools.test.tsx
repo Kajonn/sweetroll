@@ -255,6 +255,51 @@ describe("CharacterTools", () => {
     expect(session.archive).not.toHaveBeenCalled();
   });
 
+  it("keeps the archive dialog open with an error when the session stops being ready mid-confirm", async () => {
+    const user = userEvent.setup();
+    let current = readySnapshot();
+    const listeners = new Set<(snapshot: CharacterSnapshot) => void>();
+    const emit = () => {
+      for (const listener of listeners) listener(current);
+    };
+    const base = makeSession(readySnapshot());
+    const session = {
+      ...base,
+      getSnapshot: () => current,
+      subscribe: (listener: (snapshot: CharacterSnapshot) => void) => {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+    } as unknown as Parameters<typeof CharacterTools>[0]["session"];
+    render(<CharacterTools characterId="char-1" api={makeApi()} session={session} />);
+    await user.click(screen.getByRole("button", { name: /^archive$/i }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    // A queued edit lands after the dialog opened: confirm must not run and
+    // must not close the dialog silently.
+    current = readySnapshot({
+      entries: [
+        {
+          id: "e1",
+          actorId: "a",
+          characterId: "char-1",
+          sequence: 0,
+          baseRevision: 3,
+          packageChecksum: "abc",
+          createdAt: "2026-09-06T00:00:00.000Z",
+          intent: { kind: "setField", fieldId: "name", value: "Briar" },
+          attempt: null,
+        },
+      ],
+    });
+    emit();
+    await user.click(screen.getByRole("button", { name: /confirm archive/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Request failed.");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(base.archive).not.toHaveBeenCalled();
+  });
+
   it("restores focus after a secondary dialog closes", async () => {
     const user = userEvent.setup();
     render(<CharacterTools characterId="char-1" api={makeApi()} session={makeSession(readySnapshot())} />);

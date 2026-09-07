@@ -89,6 +89,10 @@ describe("VersionHistory", () => {
     expect(screen.getByTestId("version-history-row-v2")).toHaveTextContent("0.9.0");
     expect(screen.getByTestId("version-history-lifecycle-v1")).toHaveTextContent("Active");
     expect(screen.getByTestId("version-history-lifecycle-v2")).toHaveTextContent("Deprecated");
+    expect(screen.getByTestId("version-history-create-character-v1")).toHaveAttribute(
+      "href",
+      "/characters/new?systemVersionId=v1",
+    );
   });
 
   it("shows an empty state when there are no versions", async () => {

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -101,6 +101,22 @@ describe("FieldControl", () => {
     expect(onCommit).toHaveBeenCalledWith("strength", 12);
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not save this change: Session closed.");
     expect(input).toHaveValue(12);
+  });
+  it("clears a stale checkbox commit error when the retry succeeds", async () => {
+    const user = userEvent.setup();
+    let shouldFail = true;
+    const onCommit = vi.fn(async () => {
+      if (shouldFail) throw new Error("Offline. Try again.");
+    });
+    render(<FieldControl field={{ ...text, id: "ready-element", fieldId: "ready", label: "Ready", fieldKind: "boolean", value: false, constraints: {} }} tentativeValue={null} disabled={false} pending={false} onCommit={onCommit} />);
+
+    await user.click(screen.getByRole("checkbox", { name: "Ready" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not save this change: Offline. Try again.");
+
+    shouldFail = false;
+    await user.click(screen.getByRole("checkbox", { name: "Ready" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(onCommit).toHaveBeenCalledTimes(2);
   });
   it("shows diagnostics for read-only and unavailable fields", () => {
     render(<>

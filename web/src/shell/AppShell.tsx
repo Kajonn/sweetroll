@@ -73,6 +73,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className={styles.shell}>
           <header role="banner" data-testid="app-header" className={styles.header}>
             <span>Sweetroll</span>
+            <a href="/characters/new">{t("shell.nav.newCharacter")}</a>
             {auth.state === "authenticated" && (
               <button type="button" onClick={() => { void signOut(); }}>{t("shell.signOut.button")}</button>
             )}

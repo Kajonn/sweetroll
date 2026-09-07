@@ -165,6 +165,13 @@ export function VersionHistory({ client, systemId }: { client: ApiClient; system
                         ? t("versionHistory.action.cloning")
                         : t("versionHistory.action.clone")}
                     </button>
+                    <a
+                      className={styles.action}
+                      href={`/characters/new?systemVersionId=${v.versionId}`}
+                      data-testid={`version-history-create-character-${v.versionId}`}
+                    >
+                      {t("versionHistory.action.createCharacter")}
+                    </a>
                     <button
                       type="button"
                       className={isDeprecated ? styles.actionMuted : styles.actionDanger}

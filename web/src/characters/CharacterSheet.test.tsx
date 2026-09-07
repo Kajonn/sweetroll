@@ -55,7 +55,7 @@ describe("CharacterSheet", () => {
     const onBump = vi.fn();
     render(<CharacterSheet snapshot={snapshot({ phase: "offline", tentative: { name: "Briar", health: { up: 1, down: 0 } }, entries: [{ id: "pending", actorId: "a", characterId: "character", sequence: 0, baseRevision: 1, packageChecksum: "checksum", createdAt: "2026-09-06T00:00:00Z", intent: { kind: "setField", fieldId: "name", value: "Briar" }, attempt: null }] })} onSetField={vi.fn()} onBump={onBump} onExecuteAction={vi.fn()} />);
 
-    expect(screen.getByRole("heading", { name: "Complete your character" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Complete Your Character" })).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("Changes pending");
     expect(screen.getAllByDisplayValue("Briar")).toHaveLength(3);
     expect(screen.getByText("Validation is based on saved values.")).toBeVisible();

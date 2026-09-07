@@ -36,6 +36,8 @@ export type CharacterStore = {
   purgeCharacter(actorId: string, characterId: string): Promise<void>;
   clearAccount(actorId: string): Promise<void>;
   close(): Promise<void>;
+  /** Locally cached characters for one account only; never enumerate across accounts. */
+  listCharacters(actorId: string): Promise<Array<{ characterId: string; name: string }>>;
 
   saveOnlineAttempt(attempt: OnlineAttempt): Promise<void>;
   readOnlineAttempts(actorId: string): Promise<OnlineAttempt[]>;
@@ -430,6 +432,19 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
 
     async close() {
       db.close();
+    },
+
+    async listCharacters(actorId) {
+      return openTx(db, [CHAR], "readonly", async tx => {
+        const records = await collectByKey<CharacterRecord>(
+          tx,
+          CHAR,
+          IDBKeyRange.bound([actorId], [actorId, MAX_STRING]),
+        );
+        return records
+          .filter(record => record.confirmed !== null)
+          .map(record => ({ characterId: record.characterId, name: record.confirmed!.name }));
+      });
     },
 
     async saveOnlineAttempt(attempt) {

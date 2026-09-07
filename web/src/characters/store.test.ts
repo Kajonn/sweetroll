@@ -584,3 +584,184 @@ describe("CharacterStore resolveEntries", () => {
     await store.close();
   });
 });
+
+describe("CharacterStore online acknowledgment", () => {
+  function makeOnlineAttempt(id: string, key: string): OnlineAttempt {
+    return {
+      id,
+      actorId: "actor-A",
+      characterId: "char-1",
+      kind: "archive",
+      request: makeRequest({
+        method: "PATCH",
+        path: "/characters/char-1",
+        body: { command: "archive", expectedRevision: 1, idempotencyKey: key },
+      }),
+      createdAt: "2026-09-06T00:00:00.000Z",
+    };
+  }
+
+  async function seedOnline() {
+    const store = await openFresh();
+    await store.confirmSnapshot("actor-A", "char-1", makeView("char-1", 1), 0);
+    await store.saveOnlineAttempt(makeOnlineAttempt("oa-1", "key-1"));
+    await store.saveOnlineAttempt(makeOnlineAttempt("oa-2", "key-2"));
+    return store;
+  }
+
+  it("acknowledges an online attempt atomically: confirmed state persists and exactly that attempt retires", async () => {
+    const store = await seedOnline();
+    const before = await store.read("actor-A", "char-1");
+    await store.acknowledgeOnlineAttempt("actor-A", "char-1", "oa-1", makeView("char-1", 2), {
+      generation: before.generation,
+      accountGeneration: before.accountGeneration,
+    });
+    const after = await store.read("actor-A", "char-1");
+    expect(after.confirmed?.revision).toBe(2);
+    expect(after.generation).toBe(before.generation + 1);
+    expect((await store.readOnlineAttempts("actor-A")).map((a) => a.id)).toEqual(["oa-2"]);
+    await store.close();
+  });
+
+  it("rolls back the whole online acknowledgment when the final write fails", async () => {
+    const store = await seedOnline();
+    const before = await store.read("actor-A", "char-1");
+    const attemptsBefore = await store.readOnlineAttempts("actor-A");
+    const realPut = IDBObjectStore.prototype.put;
+    const spy = vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (this: IDBObjectStore, value: unknown, key?: IDBValidKey) {
+      if (this.name === "characters") {
+        this.transaction.abort();
+        throw new DOMException("Quota exceeded", "QuotaExceededError");
+      }
+      return realPut.apply(this, [value, key as IDBValidKey]);
+    });
+    try {
+      await expect(
+        store.acknowledgeOnlineAttempt("actor-A", "char-1", "oa-1", makeView("char-1", 2), {
+          generation: before.generation,
+          accountGeneration: before.accountGeneration,
+        }),
+      ).rejects.toThrow();
+    } finally {
+      spy.mockRestore();
+    }
+    await store.close();
+
+    const reopened = await openCharacterStore(dbName);
+    const after = await reopened.read("actor-A", "char-1");
+    expect(after.confirmed).toEqual(before.confirmed);
+    expect(after.generation).toBe(before.generation);
+    expect(await reopened.readOnlineAttempts("actor-A")).toEqual(attemptsBefore);
+    await reopened.close();
+  });
+
+  it("rejects a stale online acknowledgment guard without changing state", async () => {
+    const store = await seedOnline();
+    const stale = await store.read("actor-A", "char-1");
+    await store.confirmSnapshot("actor-A", "char-1", makeView("char-1", 2), stale.generation);
+    const latest = await store.read("actor-A", "char-1");
+    await expect(
+      store.acknowledgeOnlineAttempt("actor-A", "char-1", "oa-1", makeView("char-1", 3), {
+        generation: stale.generation,
+        accountGeneration: stale.accountGeneration,
+      }),
+    ).rejects.toThrow(/stale/);
+    expect(await store.read("actor-A", "char-1")).toEqual(latest);
+    expect((await store.readOnlineAttempts("actor-A")).map((a) => a.id)).toEqual(["oa-1", "oa-2"]);
+    await store.close();
+  });
+
+  it("rejects acknowledging an unknown online attempt id", async () => {
+    const store = await seedOnline();
+    const before = await store.read("actor-A", "char-1");
+    await expect(
+      store.acknowledgeOnlineAttempt("actor-A", "char-1", "missing", makeView("char-1", 2), {
+        generation: before.generation,
+        accountGeneration: before.accountGeneration,
+      }),
+    ).rejects.toThrow();
+    // An attempt identifier from another character never acknowledges here.
+    await expect(
+      store.acknowledgeOnlineAttempt("actor-A", "char-2", "oa-1", makeView("char-1", 2), {
+        generation: before.generation,
+        accountGeneration: before.accountGeneration,
+      }),
+    ).rejects.toThrow();
+    expect((await store.readOnlineAttempts("actor-A")).map((a) => a.id)).toEqual(["oa-1", "oa-2"]);
+    await store.close();
+  });
+
+  it("retires exactly one online attempt under guard, leaving unrelated attempts untouched", async () => {
+    const store = await seedOnline();
+    const before = await store.read("actor-A", "char-1");
+    const retired = await store.retireOnlineAttempt("actor-A", "char-1", "oa-1", {
+      generation: before.generation,
+      accountGeneration: before.accountGeneration,
+    });
+    expect(retired.id).toBe("oa-1");
+    const remaining = await store.readOnlineAttempts("actor-A");
+    expect(remaining.map((a) => a.id)).toEqual(["oa-2"]);
+    expect(remaining[0]?.request.body).toEqual({ command: "archive", expectedRevision: 1, idempotencyKey: "key-2" });
+    const after = await store.read("actor-A", "char-1");
+    expect(after.confirmed).toEqual(before.confirmed);
+    expect(after.generation).toBe(before.generation + 1);
+    await store.close();
+  });
+
+  it("rejects retiring an unknown or stale-guarded online attempt", async () => {
+    const store = await seedOnline();
+    const stale = await store.read("actor-A", "char-1");
+    await store.confirmSnapshot("actor-A", "char-1", makeView("char-1", 2), stale.generation);
+    await expect(
+      store.retireOnlineAttempt("actor-A", "char-1", "oa-1", {
+        generation: stale.generation,
+        accountGeneration: stale.accountGeneration,
+      }),
+    ).rejects.toThrow(/stale/);
+    const latest = await store.read("actor-A", "char-1");
+    await expect(
+      store.retireOnlineAttempt("actor-A", "char-1", "missing", {
+        generation: latest.generation,
+        accountGeneration: latest.accountGeneration,
+      }),
+    ).rejects.toThrow();
+    expect((await store.readOnlineAttempts("actor-A")).map((a) => a.id)).toEqual(["oa-1", "oa-2"]);
+    await store.close();
+  });
+
+  it("marks replay expiry under guard while retaining the frozen request verbatim", async () => {
+    const store = await seedOnline();
+    const before = await store.read("actor-A", "char-1");
+    await store.markOnlineAttemptReplayExpired("actor-A", "char-1", "oa-1", {
+      generation: before.generation,
+      accountGeneration: before.accountGeneration,
+    });
+    const attempts = await store.readOnlineAttempts("actor-A");
+    expect(attempts.find((a) => a.id === "oa-1")?.replayExpired).toBe(true);
+    expect(attempts.find((a) => a.id === "oa-1")?.request.body).toEqual({
+      command: "archive", expectedRevision: 1, idempotencyKey: "key-1",
+    });
+    expect(attempts.find((a) => a.id === "oa-2")?.replayExpired).not.toBe(true);
+    await store.close();
+  });
+
+  it("rejects replay-expiry marking and guarded saves after account clearing", async () => {
+    const store = await seedOnline();
+    const guard = await store.read("actor-A", "char-1");
+    await store.clearAccount("actor-A");
+    await expect(
+      store.markOnlineAttemptReplayExpired("actor-A", "char-1", "oa-1", {
+        generation: guard.generation,
+        accountGeneration: guard.accountGeneration,
+      }),
+    ).rejects.toThrow(/stale/);
+    await expect(
+      store.saveOnlineAttempt(makeOnlineAttempt("oa-3", "key-3"), {
+        generation: guard.generation,
+        accountGeneration: guard.accountGeneration,
+      }),
+    ).rejects.toThrow(/stale/);
+    expect((await store.readOnlineAttempts("actor-A")).map((a) => a.id)).toEqual([]);
+    await store.close();
+  });
+});

@@ -1276,7 +1276,7 @@ describe("CharacterSession online operations", () => {
     await store.close();
   });
 
-  it("deletes an expired online attempt and mints a fresh key on the next attempt", async () => {
+  it("retains an expired online attempt until explicit unknown-outcome review retires it", async () => {
     const { api, store, session } = await makeHarness();
     api.scriptOpenView(viewFor("char-1", 3));
     await session.open();
@@ -1297,9 +1297,10 @@ describe("CharacterSession online operations", () => {
     await expect(session.archive()).rejects.toThrow(/replay window/);
     expect(session.getSnapshot().error?.kind).toBe("expired-attempt");
     expect(api.sent).toHaveLength(0);
+    // The aged attempt is retained verbatim: elapsed time proves nothing.
+    expect(await store.readOnlineAttempts(ARM)).toHaveLength(1);
+    await session.reviewExpiredAttempt({ attemptId: "old-attempt", acknowledgeUnknownOutcome: true });
     expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
-    await session.resolveConflict({ mode: "discard", selectedIds: [] });
-    await session.whenIdle();
     api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
     await session.archive();
     expect(api.sent).toHaveLength(1);
@@ -1309,29 +1310,33 @@ describe("CharacterSession online operations", () => {
     await store.close();
   });
 
-  it("cleans superseded migration preview attempts when committing a newer preview", async () => {
+  it("retains an unresolved migration commit when a newer preview commit is requested", async () => {
     const { api, store, session } = await makeHarness();
     api.scriptOpenView(viewFor("char-1", 3));
     await session.open();
     api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
-    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4)));
+    const original = {
+      method: "POST" as const,
+      path: "/characters/char-1/migrations/p-1/commit",
+      body: { expectedRevision: 3, idempotencyKey: "preview-old-key" },
+      firstAttemptAt: EVER,
+    };
     await store.saveOnlineAttempt({
       id: "stale-preview",
       actorId: ARM,
       characterId: "char-1",
       kind: "migration",
-      request: {
-        method: "POST",
-        path: "/characters/char-1/migrations/p-1/commit",
-        body: { expectedRevision: 3, idempotencyKey: "preview-old-key" },
-        firstAttemptAt: EVER,
-      },
+      request: original,
       createdAt: EVER,
     });
-    await session.commitMigration("p-2");
-    expect(api.sent).toHaveLength(1);
-    expect(api.sent[0]?.path).toBe("/characters/char-1/migrations/p-2/commit");
-    expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+    // A newer preview never deletes or replaces the unresolved commit: the
+    // newer command is blocked until the old outcome is resolved.
+    await expect(session.commitMigration("p-2")).rejects.toThrow(/uncertain|resolve/i);
+    expect(api.sent).toHaveLength(0);
+    const retained = await store.readOnlineAttempts(ARM);
+    expect(retained).toHaveLength(1);
+    expect(retained[0]?.id).toBe("stale-preview");
+    expect(retained[0]?.request).toEqual(original);
     session.dispose();
     await store.close();
   });
@@ -1535,5 +1540,563 @@ describe("CharacterSession selection-safe conflict recovery", () => {
     await h.store.close();
     h.pending1.catch(() => {});
     h.pending2.catch(() => {});
+  });
+});
+
+describe("CharacterSession uncertain online outcomes", () => {
+  it("replays a durable archive attempt verbatim before any newer command or fresh-state decision", async () => {
+    const { api, store, session } = await makeHarness();
+    await seedConfirmed(store, "char-1", viewFor("char-1", 3));
+    const original: FrozenRequest = {
+      method: "PATCH",
+      path: "/characters/char-1",
+      body: { command: "archive", expectedRevision: 3, idempotencyKey: "archive-key" },
+      firstAttemptAt: EVER,
+    };
+    await store.saveOnlineAttempt({
+      id: "archive-1",
+      actorId: ARM,
+      characterId: "char-1",
+      kind: "archive",
+      request: original,
+      createdAt: EVER,
+    });
+    // A newer local intention queued behind the uncertain attempt.
+    const newer = makeEntry({
+      id: "newer-edit",
+      actorId: ARM,
+      characterId: "char-1",
+      sequence: 1,
+      baseRevision: 3,
+      packageChecksum: "abc",
+      createdAt: EVER,
+      intent: { kind: "setField", fieldId: "name", value: "Newer" },
+    });
+    await store.enqueue(newer, await store.read(ARM, "char-1"));
+    let releaseReplay!: (step: SendStep) => void;
+    api.scriptSend(() => new Promise<SendStep>((resolve) => { releaseReplay = resolve; }));
+    api.setSendFallback(async () => {
+      throw new Error("a newer command must not send before the uncertain outcome resolves");
+    });
+    const openSpy = vi.spyOn(api, "open");
+    const opening = session.open();
+    await vi.waitFor(() => expect(api.sent).toHaveLength(1));
+    const retried = api.sent[0]!;
+    expect(retried.method).toBe(original.method);
+    expect(retried.path).toBe(original.path);
+    expect(retried.body).toEqual(original.body);
+    expect(retried.firstAttemptAt).toBe(original.firstAttemptAt);
+    // No fresh-state decision and no newer command while the outcome is uncertain.
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(api.sent).toHaveLength(1);
+    releaseReplay(successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+    await opening;
+    await session.whenIdle();
+    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+    expect(api.sent).toHaveLength(1);
+    // The acknowledgment itself is authoritative: no extra fresh-state
+    // decision was needed, and the trailing edit stays paused for its own
+    // explicit review against the acked revision.
+    expect(session.getSnapshot().entries.map((e) => e.id)).toEqual(["newer-edit"]);
+    expect(session.getSnapshot().error?.kind).toBe("conflict");
+    expect((await store.read(ARM, "char-1")).entries[0]).toMatchObject({ id: "newer-edit", attempt: null });
+    session.dispose();
+    await store.close();
+  });
+
+  it("replays a durable migration commit verbatim across reopen while a newer command waits", async () => {
+    const first = await makeHarness();
+    await seedConfirmed(first.store, "char-1", viewFor("char-1", 3));
+    const original: FrozenRequest = {
+      method: "POST",
+      path: "/characters/char-1/migrations/p-1/commit",
+      body: { expectedRevision: 3, idempotencyKey: "commit-key" },
+      firstAttemptAt: EVER,
+    };
+    await first.store.saveOnlineAttempt({
+      id: "commit-1",
+      actorId: ARM,
+      characterId: "char-1",
+      kind: "migration",
+      request: original,
+      createdAt: EVER,
+    });
+    let releaseReplay!: (step: SendStep) => void;
+    first.api.scriptSend(() => new Promise<SendStep>((resolve) => { releaseReplay = resolve; }));
+    first.api.setSendFallback(async () => {
+      throw new Error("a newer command must not send before the uncertain outcome resolves");
+    });
+    const openSpy = vi.spyOn(first.api, "open");
+    const opening = first.session.open();
+    await vi.waitFor(() => expect(first.api.sent).toHaveLength(1));
+    // A newer preview commit requested while the old outcome is uncertain is
+    // blocked: it must not overtake or erase the stored attempt.
+    await expect(first.session.commitMigration("p-2")).rejects.toThrow(/uncertain|resolve/i);
+    const retried = first.api.sent[0]!;
+    expect(retried.method).toBe(original.method);
+    expect(retried.path).toBe(original.path);
+    expect(retried.body).toEqual(original.body);
+    expect(retried.firstAttemptAt).toBe(original.firstAttemptAt);
+    expect(openSpy).not.toHaveBeenCalled();
+    releaseReplay(successEnvelope(viewFor("char-1", 4)));
+    await opening;
+    await first.session.whenIdle();
+    expect(first.api.sent).toHaveLength(1);
+    expect(await first.store.readOnlineAttempts(ARM)).toHaveLength(0);
+    expect(first.session.getSnapshot().confirmed?.revision).toBe(4);
+    first.session.dispose();
+    await first.store.close();
+  });
+
+  it("retains a timed-out archive attempt and replays the identical body", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+    api.scriptSend(async () => ({ error: new TypeError("timeout") }));
+    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+    await expect(session.archive()).rejects.toThrow();
+    expect(session.getSnapshot().phase).toBe("uncertain");
+    const retained = await store.readOnlineAttempts(ARM);
+    expect(retained).toHaveLength(1);
+    const first = api.sent[0]!;
+    expect(retained[0]?.request.body).toEqual(first.body);
+    await session.whenIdle();
+    expect(api.sent).toHaveLength(2);
+    expect(api.sent[1]?.method).toBe(first.method);
+    expect(api.sent[1]?.path).toBe(first.path);
+    expect(api.sent[1]?.body).toEqual(first.body);
+    expect(api.sent[1]?.firstAttemptAt).toBe(first.firstAttemptAt);
+    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+    session.dispose();
+    await store.close();
+  });
+
+  it.each(["command_in_progress", "temporarily_unavailable"] as const)(
+    "backs off with the same request on %s",
+    async (code) => {
+      const { api, store, session } = await makeHarness();
+      api.scriptOpenView(viewFor("char-1", 3));
+      await session.open();
+      api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+      api.scriptSend(async () => ({
+        error: new ApiError({ status: 409, code, message: "Busy.", requestId: "r", latestRevision: null, diagnostics: [] }),
+      }));
+      api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+      await expect(session.archive()).rejects.toThrow();
+      expect(await store.readOnlineAttempts(ARM)).toHaveLength(1);
+      await session.whenIdle();
+      expect(api.sent).toHaveLength(2);
+      expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
+      expect(api.sent[1]?.path).toBe(api.sent[0]?.path);
+      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      session.dispose();
+      await store.close();
+    },
+  );
+
+  it("pauses with retry guidance on an unexpected 500 and retries with the same key", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+    api.scriptSend(async () => ({
+      error: new ApiError({ status: 500, code: "internal", message: "boom", requestId: "r", latestRevision: null, diagnostics: [] }),
+    }));
+    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+    const failure = await session.archive().catch((error: unknown) => error);
+    expect(String(failure instanceof Error ? failure.message : failure)).toMatch(/retr|same key|duplicate/i);
+    // The attempt is retained verbatim: a 500 proves nothing about the outcome.
+    const retained = await store.readOnlineAttempts(ARM);
+    expect(retained).toHaveLength(1);
+    expect(retained[0]?.request.body).toEqual(api.sent[0]?.body);
+    // A newer command cannot overtake the uncertain attempt.
+    await expect(session.recover()).rejects.toThrow(/uncertain|resolve/i);
+    expect(api.sent).toHaveLength(1);
+    await session.whenIdle();
+    expect(api.sent).toHaveLength(2);
+    expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
+    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    session.dispose();
+    await store.close();
+  });
+
+  it("stops on idempotency_mismatch without advancing or retrying the same key", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+    api.scriptSend(async () => ({
+      error: new ApiError({ status: 409, code: "idempotency_mismatch", message: "Mismatch.", requestId: "r", latestRevision: null, diagnostics: [] }),
+    }));
+    await expect(session.archive()).rejects.toThrow();
+    expect(session.getSnapshot().error?.kind).toBe("protocol");
+    await session.whenIdle();
+    expect(api.sent).toHaveLength(1);
+    session.dispose();
+    await store.close();
+  });
+
+  it("pauses on 401, resumes with the same body for the same account, and never sends for another account", async () => {
+    const { api, identity, store, session } = await makeHarness();
+    await seedConfirmed(store, "char-1", viewFor("char-1", 3));
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+    api.scriptSend(async () => ({
+      error: new ApiError({ status: 401, code: "unauthorized", message: "Expired.", requestId: "r", latestRevision: null, diagnostics: [] }),
+    }));
+    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+    await expect(session.archive()).rejects.toThrow();
+    expect(session.getSnapshot().error?.kind).toBe("reauthenticate");
+    expect(await store.readOnlineAttempts(ARM)).toHaveLength(1);
+    // Another account must never send the retained attempt.
+    identity.actorId = "other";
+    identity.signal();
+    await session.whenIdle();
+    expect(api.sent).toHaveLength(1);
+    expect(session.getSnapshot().confirmed).toBeNull();
+    // The same account resumes with the identical body.
+    identity.actorId = ARM;
+    identity.signal();
+    await session.requestEditing();
+    await session.whenIdle();
+    expect(api.sent).toHaveLength(2);
+    expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
+    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    session.dispose();
+    await store.close();
+  });
+
+  it("purges online attempts with private records and hides their contents", async () => {
+    const { api, store, session } = await makeHarness();
+    await seedConfirmed(store, "char-1", viewFor("char-1", 3));
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    await store.saveOnlineAttempt({
+      id: "archive-1",
+      actorId: ARM,
+      characterId: "char-1",
+      kind: "archive",
+      request: {
+        method: "PATCH",
+        path: "/characters/char-1",
+        body: { command: "archive", expectedRevision: 3, idempotencyKey: "private-key" },
+        firstAttemptAt: EVER,
+      },
+      createdAt: EVER,
+    });
+    api.scriptSend(async () => ({
+      error: new ApiError({
+        status: 404,
+        code: "not_found",
+        message: "entity_not_found: characters/char-1 with private payload details",
+        cacheDisposition: "purge",
+        requestId: "r",
+        latestRevision: null,
+        diagnostics: [],
+      }),
+    }));
+    await expect(session.archive()).rejects.toThrow();
+    const snap = session.getSnapshot();
+    expect(snap.error?.kind).toBe("purged");
+    expect(String(snap.error?.message)).not.toContain("private");
+    expect(String(snap.error?.message)).not.toContain("private-key");
+    expect(await store.readOnlineAttempts(ARM)).toEqual([]);
+    const stored = await store.read(ARM, "char-1");
+    expect(stored.confirmed).toBeNull();
+    expect(stored.entries).toEqual([]);
+    expect(snap.confirmed).toBeNull();
+    session.dispose();
+    await store.close();
+  });
+
+  it("retains a replay-window-expired conflict, fetches current state and requires explicit review", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+    await store.saveOnlineAttempt({
+      id: "archive-1",
+      actorId: ARM,
+      characterId: "char-1",
+      kind: "archive",
+      request: {
+        method: "PATCH",
+        path: "/characters/char-1",
+        body: { command: "archive", expectedRevision: 3, idempotencyKey: "archive-key" },
+        firstAttemptAt: EVER,
+      },
+      createdAt: EVER,
+    });
+    api.scriptSend(async () => ({
+      error: new ApiError({
+        status: 409,
+        code: "conflict",
+        message: "The replay window for this idempotency key has expired. Retry with a new key.",
+        requestId: "r",
+        latestRevision: 3,
+        diagnostics: [],
+      }),
+    }));
+    await expect(session.archive()).rejects.toThrow(/replay window|manual review/i);
+    expect(session.getSnapshot().error?.kind).toBe("expired-attempt");
+    // Retained with its frozen body, and current authorized state was fetched.
+    const retained = await store.readOnlineAttempts(ARM);
+    expect(retained).toHaveLength(1);
+    expect(retained[0]?.request.body).toEqual({ command: "archive", expectedRevision: 3, idempotencyKey: "archive-key" });
+    expect(session.getSnapshot().confirmed?.revision).toBe(3);
+    // Ordinary recovery and newer sends stay blocked.
+    await expect(session.resolveConflict({ mode: "discard", selectedIds: [] })).rejects.toThrow(/uncertain/i);
+    await expect(session.archive()).rejects.toThrow(/replay window|manual review|expired/i);
+    expect(api.sent).toHaveLength(1);
+    // Explicit unknown-outcome review retires exactly that attempt without
+    // minting a replacement mutation.
+    await session.reviewExpiredAttempt({ attemptId: "archive-1", acknowledgeUnknownOutcome: true });
+    expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+    expect(api.sent).toHaveLength(1);
+    // A deliberate new mutation afterwards uses a fresh key.
+    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+    await session.archive();
+    expect(api.sent).toHaveLength(2);
+    expect(api.sent[1]?.body.idempotencyKey).not.toBe("archive-key");
+    session.dispose();
+    await store.close();
+  });
+
+  it("keeps the attempt when persisting an online acknowledgment fails", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+    api.scriptSend(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+    const acknowledge = store.acknowledgeOnlineAttempt.bind(store);
+    const spy = vi.spyOn(store, "acknowledgeOnlineAttempt").mockRejectedValueOnce(new Error("quota"));
+    await expect(session.archive()).rejects.toThrow();
+    spy.mockRestore();
+    expect(acknowledge).toBeDefined();
+    expect(await store.readOnlineAttempts(ARM)).toHaveLength(1);
+    api.scriptSend(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+    await session.archive();
+    expect(api.sent).toHaveLength(2);
+    expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
+    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+    session.dispose();
+    await store.close();
+  });
+
+  it("does not acknowledge an online send that resolves after purge", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+    let release!: (step: SendStep) => void;
+    api.scriptSend(() => new Promise<SendStep>((resolve) => { release = resolve; }));
+    const pending = session.archive().catch(() => {});
+    await vi.waitFor(() => expect(api.sent).toHaveLength(1));
+    await store.purgeCharacter(ARM, "char-1");
+    release(successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+    await pending;
+    await session.whenIdle();
+    const snap = session.getSnapshot();
+    expect(snap.phase).toBe("purged");
+    expect(snap.confirmed).toBeNull();
+    expect((await store.read(ARM, "char-1")).confirmed).toBeNull();
+    expect(await store.readOnlineAttempts(ARM)).toEqual([]);
+    session.dispose();
+    await store.close();
+  });
+
+  it("preserves migration identifiers and authoritative action results for later UI consumption", async () => {
+    const { api, store, session } = await makeHarness();
+    await seedConfirmed(store, "char-1", viewFor("char-1", 3));
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    const roll = {
+      actionId: "ironclad",
+      expression: "2d6",
+      dice: [{ sides: 6, value: 4, kept: true }],
+      bindings: [],
+      total: 7,
+      output: "hit",
+      audience: "owner_only" as const,
+    };
+    api.scriptSend(async () => ({ envelope: { result: { character: viewFor("char-1", 3), roll }, requestId: "req-1" } }));
+    await session.executeAction("ironclad", { difficulty: 10 });
+    await session.whenIdle();
+    expect(session.getSnapshot().lastRoll).toEqual(roll);
+    expect(session.getSnapshot().lastMigration).toBeNull();
+    api.scriptOpenView(viewFor("char-1", 3));
+    api.scriptSend(async () => successEnvelope(viewFor("char-1", 4)));
+    await session.commitMigration("p-1");
+    expect(session.getSnapshot().lastMigration).toEqual({ operation: "commit", previewId: "p-1", revision: 4 });
+    // Authoritative action results survive later online acknowledgments.
+    expect(session.getSnapshot().lastRoll).toEqual(roll);
+    api.scriptOpenView(viewFor("char-1", 4));
+    api.scriptSend(async () => successEnvelope(viewFor("char-1", 5)));
+    await session.rollbackMigration("m-9");
+    expect(session.getSnapshot().lastMigration).toEqual({ operation: "rollback", migrationId: "m-9", revision: 5 });
+    expect(session.getSnapshot().lastRoll).toEqual(roll);
+    session.dispose();
+    await store.close();
+  });
+
+  describe("reviewExpiredAttempt", () => {
+    async function seedAgedAttempt(store: CharacterStore, id = "old-attempt") {
+      await store.saveOnlineAttempt({
+        id,
+        actorId: ARM,
+        characterId: "char-1",
+        kind: "archive",
+        request: {
+          method: "PATCH",
+          path: "/characters/char-1",
+          body: { command: "archive", expectedRevision: 3, idempotencyKey: "old-key" },
+          firstAttemptAt: "2020-01-01T00:00:00.000Z",
+        },
+        createdAt: "2020-01-01T00:00:00.000Z",
+      });
+    }
+
+    it("rejects while offline", async () => {
+      const { store, session, identity } = await makeHarness();
+      await seedAgedAttempt(store);
+      identity.online = false;
+      identity.signal();
+      await expect(
+        session.reviewExpiredAttempt({ attemptId: "old-attempt", acknowledgeUnknownOutcome: true }),
+      ).rejects.toThrow();
+      expect(await store.readOnlineAttempts(ARM)).toHaveLength(1);
+      session.dispose();
+      await store.close();
+    });
+
+    it("rejects after an account switch", async () => {
+      const { store, session, identity } = await makeHarness();
+      await seedAgedAttempt(store);
+      identity.actorId = "other";
+      identity.generationCounter += 1;
+      identity.signal();
+      await expect(
+        session.reviewExpiredAttempt({ attemptId: "old-attempt", acknowledgeUnknownOutcome: true }),
+      ).rejects.toThrow();
+      expect(await store.readOnlineAttempts(ARM)).toHaveLength(1);
+      session.dispose();
+      await store.close();
+    });
+
+    it("rejects after purge", async () => {
+      const { api, store, session } = await makeHarness();
+      api.scriptOpenView(viewFor("char-1", 3));
+      await session.open();
+      await seedAgedAttempt(store);
+      await store.purgeCharacter(ARM, "char-1");
+      await expect(
+        session.reviewExpiredAttempt({ attemptId: "old-attempt", acknowledgeUnknownOutcome: true }),
+      ).rejects.toThrow();
+      session.dispose();
+      await store.close();
+    });
+
+    it("rejects an unexpired attempt that still has a resolvable outcome", async () => {
+      const { store, session } = await makeHarness();
+      await store.saveOnlineAttempt({
+        id: "fresh-attempt",
+        actorId: ARM,
+        characterId: "char-1",
+        kind: "archive",
+        request: {
+          method: "PATCH",
+          path: "/characters/char-1",
+          body: { command: "archive", expectedRevision: 3, idempotencyKey: "fresh-key" },
+          firstAttemptAt: EVER,
+        },
+        createdAt: EVER,
+      });
+      await expect(
+        session.reviewExpiredAttempt({ attemptId: "fresh-attempt", acknowledgeUnknownOutcome: true }),
+      ).rejects.toThrow(/resolv|replay|expir/i);
+      expect(await store.readOnlineAttempts(ARM)).toHaveLength(1);
+      session.dispose();
+      await store.close();
+    });
+
+    it("rejects without explicit unknown-outcome acknowledgment", async () => {
+      const { store, session } = await makeHarness();
+      await seedAgedAttempt(store);
+      await expect(
+        session.reviewExpiredAttempt({ attemptId: "old-attempt", acknowledgeUnknownOutcome: false }),
+      ).rejects.toThrow(/acknowledge/i);
+      expect(await store.readOnlineAttempts(ARM)).toHaveLength(1);
+      session.dispose();
+      await store.close();
+    });
+
+    it("does not retire when the state refresh fails", async () => {
+      const { api, store, session } = await makeHarness();
+      api.scriptOpenView(viewFor("char-1", 3));
+      await session.open();
+      await seedAgedAttempt(store);
+      api.setOpenFallback(async () => {
+        throw new TypeError("offline");
+      });
+      await expect(
+        session.reviewExpiredAttempt({ attemptId: "old-attempt", acknowledgeUnknownOutcome: true }),
+      ).rejects.toThrow();
+      expect(await store.readOnlineAttempts(ARM)).toHaveLength(1);
+      session.dispose();
+      await store.close();
+    });
+
+    it("leaves unrelated attempts untouched", async () => {
+      const { api, store, session } = await makeHarness();
+      api.scriptOpenView(viewFor("char-1", 3));
+      await session.open();
+      api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+      await seedAgedAttempt(store, "old-attempt");
+      await store.saveOnlineAttempt({
+        id: "other-attempt",
+        actorId: ARM,
+        characterId: "char-1",
+        kind: "recover",
+        request: {
+          method: "PATCH",
+          path: "/characters/char-1",
+          body: { command: "recover", expectedRevision: 3, idempotencyKey: "other-key" },
+          firstAttemptAt: EVER,
+        },
+        createdAt: EVER,
+      });
+      await session.reviewExpiredAttempt({ attemptId: "old-attempt", acknowledgeUnknownOutcome: true });
+      const remaining = await store.readOnlineAttempts(ARM);
+      expect(remaining.map((a) => a.id)).toEqual(["other-attempt"]);
+      expect(remaining[0]?.request.body).toEqual({ command: "recover", expectedRevision: 3, idempotencyKey: "other-key" });
+      session.dispose();
+      await store.close();
+    });
+
+    it("retires the exact expired attempt and allows a deliberate new-key mutation", async () => {
+      const { api, store, session } = await makeHarness();
+      api.scriptOpenView(viewFor("char-1", 3));
+      await session.open();
+      api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+      await seedAgedAttempt(store);
+      await expect(session.archive()).rejects.toThrow(/replay window/);
+      expect(session.getSnapshot().error?.kind).toBe("expired-attempt");
+      await session.reviewExpiredAttempt({ attemptId: "old-attempt", acknowledgeUnknownOutcome: true });
+      expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+      expect(session.getSnapshot().error).toBeNull();
+      // No replacement mutation was created automatically.
+      expect(api.sent).toHaveLength(0);
+      api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+      await session.archive();
+      expect(api.sent).toHaveLength(1);
+      expect(api.sent[0]?.body.idempotencyKey).not.toBe("old-key");
+      session.dispose();
+      await store.close();
+    });
   });
 });

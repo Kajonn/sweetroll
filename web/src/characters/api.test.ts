@@ -198,4 +198,84 @@ describe("createCharactersApi", () => {
     const error = await api.send(request).catch((e: unknown) => e) as ApiError;
     expect(error.diagnostics).toEqual([{ code: "required", path: "/widgets", message: "Missing widget" }]);
   });
+
+  it("send forwards a migration commit unchanged and never mints an idempotency key", async () => {
+    const client = makeClient();
+    const envelope = { result: { character: { characterId: "c-1" }, roll: null }, requestId: "r-1" };
+    client.fetch.mockResolvedValueOnce(envelope);
+    const api = createCharactersApi(client);
+    const commit: FrozenRequest = {
+      method: "POST",
+      path: "/characters/c-1/migrations/p-1/commit",
+      body: { expectedRevision: 3, idempotencyKey: "commit-key" },
+      firstAttemptAt: "2026-09-06T00:00:00.000Z",
+    };
+    await expect(api.send(commit)).resolves.toBe(envelope);
+    expect(client.fetch).toHaveBeenCalledWith("POST", commit.path, { body: commit.body });
+    expect(commit.body.idempotencyKey).toBe("commit-key");
+    expect(Object.keys(commit.body).sort()).toEqual(["expectedRevision", "idempotencyKey"]);
+  });
+
+  it("send forwards a migration rollback unchanged", async () => {
+    const client = makeClient();
+    const envelope = { result: { character: { characterId: "c-1" }, roll: null }, requestId: "r-1" };
+    client.fetch.mockResolvedValueOnce(envelope);
+    const api = createCharactersApi(client);
+    const rollback: FrozenRequest = {
+      method: "POST",
+      path: "/characters/c-1/migrations/m-1/rollback",
+      body: { idempotencyKey: "rollback-key" },
+      firstAttemptAt: "2026-09-06T00:00:00.000Z",
+    };
+    await api.send(rollback);
+    expect(client.fetch).toHaveBeenCalledWith("POST", rollback.path, { body: rollback.body });
+    expect(rollback.body.idempotencyKey).toBe("rollback-key");
+  });
+
+  it.each(["command_in_progress", "temporarily_unavailable"] as const)(
+    "propagates %s with code, status and revision intact for same-request retry",
+    async (code) => {
+      const client = makeClient();
+      client.fetch.mockRejectedValueOnce(rejectWith({ code, status: 409, message: "Busy.", latestRevision: 3 }));
+      const api = createCharactersApi(client);
+      const error = await api.send(request).catch((e: unknown) => e) as ApiError;
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error.code).toBe(code);
+      expect(error.status).toBe(409);
+      expect(error.latestRevision).toBe(3);
+    },
+  );
+
+  it("propagates replay-window expiry conflicts with code and message intact", async () => {
+    const client = makeClient();
+    client.fetch.mockRejectedValueOnce(
+      rejectWith({
+        code: "conflict",
+        status: 409,
+        message: "The replay window for this idempotency key has expired. Retry with a new key.",
+        latestRevision: 3,
+      }),
+    );
+    const api = createCharactersApi(client);
+    const error = await api.send(request).catch((e: unknown) => e) as ApiError;
+    expect(error.code).toBe("conflict");
+    expect(error.message).toMatch(/replay window/);
+    expect(error.latestRevision).toBe(3);
+  });
+
+  it("propagates idempotency mismatches and unexpected 500s without rewriting them", async () => {
+    const client = makeClient();
+    client.fetch.mockRejectedValueOnce(
+      rejectWith({ code: "idempotency_mismatch", status: 409, message: "Mismatch." }),
+    );
+    const api = createCharactersApi(client);
+    const mismatch = await api.send(request).catch((e: unknown) => e) as ApiError;
+    expect(mismatch.code).toBe("idempotency_mismatch");
+    expect(mismatch.status).toBe(409);
+
+    client.fetch.mockRejectedValueOnce(rejectWith({ code: "internal", status: 500, message: "boom" }));
+    const internal = await api.send(request).catch((e: unknown) => e) as ApiError;
+    expect(internal.code).toBe("internal");
+    expect(internal.status).toBe(500);
+  });
 });

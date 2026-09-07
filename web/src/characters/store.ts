@@ -7,6 +7,13 @@ export type OnlineAttempt = {
   kind: "create" | "archive" | "recover" | "export" | "migration";
   request: FrozenRequest;
   createdAt: string;
+  /**
+   * Durable marker set when the backend declares the idempotency replay
+   * window expired for this exact key. The frozen request is retained
+   * verbatim; the flag only admits the attempt to explicit unknown-outcome
+   * review before its local 30-day age alone would.
+   */
+  replayExpired?: boolean;
 };
 
 export type StoredIdentity = { actorId: string | null; generation: number; pendingLogout: string | null };
@@ -52,10 +59,46 @@ export type CharacterStore = {
   /** Locally cached characters for one account only; never enumerate across accounts. */
   listCharacters(actorId: string): Promise<Array<{ characterId: string; name: string }>>;
 
-  saveOnlineAttempt(attempt: OnlineAttempt): Promise<void>;
+  saveOnlineAttempt(attempt: OnlineAttempt, guard?: WriteGuard): Promise<void>;
   readOnlineAttempts(actorId: string): Promise<OnlineAttempt[]>;
   deleteOnlineAttempt(actorId: string, attemptId: string): Promise<void>;
   deleteOnlineAttemptsForCharacter(actorId: string, characterId: string): Promise<void>;
+  /**
+   * Guarded atomic online acknowledgment. In one transaction this verifies
+   * the identity/character guards, persists the confirmed state and retires
+   * exactly the acknowledged attempt. Any failure aborts the whole
+   * transaction, so the attempt survives a failed acknowledgment write.
+   */
+  acknowledgeOnlineAttempt(
+    actorId: string,
+    characterId: string,
+    attemptId: string,
+    character: CharacterView,
+    guard: WriteGuard,
+  ): Promise<void>;
+  /**
+   * Guarded retirement of exactly one online attempt (explicit review and
+   * definitive server rejections). Returns the retired attempt; unrelated
+   * attempts are untouched. Any guard or write failure aborts without
+   * deleting anything.
+   */
+  retireOnlineAttempt(
+    actorId: string,
+    characterId: string,
+    attemptId: string,
+    guard: WriteGuard,
+  ): Promise<OnlineAttempt>;
+  /**
+   * Durably flags a retained attempt whose idempotency replay window the
+   * backend declared expired. The frozen request is left verbatim; the flag
+   * only admits the attempt to explicit unknown-outcome review.
+   */
+  markOnlineAttemptReplayExpired(
+    actorId: string,
+    characterId: string,
+    attemptId: string,
+    guard: WriteGuard,
+  ): Promise<void>;
 
   readIdentity(): Promise<StoredIdentity>;
   setLastAccount(actorId: string, expected?: StoredIdentity): Promise<boolean>;
@@ -513,8 +556,20 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
       });
     },
 
-    async saveOnlineAttempt(attempt) {
-      await openTx(db, [ATTEMPTS], "readwrite", (tx) => putRequest(tx, ATTEMPTS, attempt));
+    async saveOnlineAttempt(attempt, guard) {
+      await openTx(db, [CHAR, ATTEMPTS, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async (tx) => {
+        if (guard !== undefined) {
+          await assertWriteIdentity(tx, attempt.actorId, guard.accountGeneration);
+          if (attempt.characterId !== null) {
+            const record = await getRequest<CharacterRecord>(tx, CHAR, [attempt.actorId, attempt.characterId]);
+            const expected = record?.generation ?? await accountGeneration(tx, attempt.actorId);
+            if (expected !== guard.generation) {
+              throw new Error("stale online attempt: character generation changed");
+            }
+          }
+        }
+        await putRequest(tx, ATTEMPTS, attempt);
+      });
     },
 
     async readOnlineAttempts(actorId) {
@@ -533,6 +588,61 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
       await openTx(db, [ATTEMPTS], "readwrite", (tx) =>
         deleteOnlineAttemptsForCharacter(tx, actorId, characterId),
       );
+    },
+
+    async acknowledgeOnlineAttempt(actorId, characterId, attemptId, character, guard) {
+      await openTx(db, [CHAR, ATTEMPTS, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async (tx) => {
+        await assertWriteIdentity(tx, actorId, guard.accountGeneration);
+        const attempt = await getRequest<OnlineAttempt>(tx, ATTEMPTS, [actorId, attemptId]);
+        if (!attempt || attempt.actorId !== actorId || attempt.characterId !== characterId) {
+          throw new Error("online attempt not found");
+        }
+        const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
+        if (!record || record.generation !== guard.generation) {
+          throw new Error("stale online acknowledgment: generation changed");
+        }
+        // Confirmed-state persistence and exact-attempt retirement commit or
+        // roll back together: a failure keeps the attempt for verbatim replay.
+        record.confirmed = character;
+        record.generation += 1;
+        await putRequest(tx, CHAR, record);
+        await deleteRequest(tx, ATTEMPTS, [actorId, attemptId]);
+      });
+    },
+
+    async retireOnlineAttempt(actorId, characterId, attemptId, guard) {
+      return openTx(db, [CHAR, ATTEMPTS, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async (tx) => {
+        await assertWriteIdentity(tx, actorId, guard.accountGeneration);
+        const attempt = await getRequest<OnlineAttempt>(tx, ATTEMPTS, [actorId, attemptId]);
+        if (!attempt || attempt.actorId !== actorId || attempt.characterId !== characterId) {
+          throw new Error("online attempt not found");
+        }
+        const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
+        if (!record || record.generation !== guard.generation) {
+          throw new Error("stale online retirement: generation changed");
+        }
+        await deleteRequest(tx, ATTEMPTS, [actorId, attemptId]);
+        record.generation += 1;
+        await putRequest(tx, CHAR, record);
+        return attempt;
+      });
+    },
+
+    async markOnlineAttemptReplayExpired(actorId, characterId, attemptId, guard) {
+      await openTx(db, [CHAR, ATTEMPTS, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async (tx) => {
+        await assertWriteIdentity(tx, actorId, guard.accountGeneration);
+        const attempt = await getRequest<OnlineAttempt>(tx, ATTEMPTS, [actorId, attemptId]);
+        if (!attempt || attempt.actorId !== actorId || attempt.characterId !== characterId) {
+          throw new Error("online attempt not found");
+        }
+        const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
+        if (!record || record.generation !== guard.generation) {
+          throw new Error("stale online retirement: generation changed");
+        }
+        // Flag-only write: the frozen request stays verbatim and the
+        // character generation is untouched.
+        await putRequest(tx, ATTEMPTS, { ...attempt, replayExpired: true });
+      });
     },
 
     readIdentity() { return openTx(db, [LAST_ACCOUNT, PENDING_LOGOUT], "readonly", readIdentity); },

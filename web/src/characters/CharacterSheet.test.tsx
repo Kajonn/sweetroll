@@ -28,7 +28,7 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
   };
   return {
     phase: "ready", confirmed: makeView({ characterId: "character", revision: 1, projection }), tentative: null,
-    entries: [], editing: { owned: true }, error: null, lastRoll: null, ...overrides,
+    entries: [], editing: { owned: true }, error: null, lastRoll: null, lastMigration: null, pendingOnlineAttempts: [], ...overrides,
   };
 }
 

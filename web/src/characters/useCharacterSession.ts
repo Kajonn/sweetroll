@@ -3,6 +3,7 @@ import type { CharacterSession, CharacterSnapshot } from "./session.js";
 
 const loading: CharacterSnapshot = {
   phase: "loading", confirmed: null, tentative: null, entries: [], editing: { owned: false }, error: null, lastRoll: null,
+  lastMigration: null, pendingOnlineAttempts: [],
 };
 const emptySubscribe = () => () => {};
 const emptySnapshot = () => loading;

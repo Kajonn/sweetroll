@@ -17,6 +17,8 @@ function readySnapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSna
     editing: { owned: true },
     error: null,
     lastRoll: null,
+    lastMigration: null,
+    pendingOnlineAttempts: [],
     ...overrides,
   };
 }

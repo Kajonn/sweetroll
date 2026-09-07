@@ -50,6 +50,25 @@ export type ResolveConflictInput = {
   selectedIds: string[];
   correctedIntents?: Record<string, EditIntent>;
 };
+/**
+ * Explicit unknown-outcome review for a retained online attempt. It never
+ * retries the stored request and never mints a replacement mutation: it may
+ * retire exactly the identified expired attempt only after current state has
+ * been fetched and the caller explicitly accepts the unknown outcome.
+ */
+export type ReviewExpiredAttemptInput = {
+  attemptId: string;
+  acknowledgeUnknownOutcome: boolean;
+};
+/**
+ * The latest successful online lifecycle/migration result, preserved for
+ * later UI consumption (e.g. offering rollback without manual guessing).
+ * The migration identifier comes from the deliberate commit/rollback input;
+ * the server commit response carries no separate migration id.
+ */
+export type LastMigrationResult =
+  | { operation: "commit"; previewId: string; revision: number }
+  | { operation: "rollback"; migrationId: string; revision: number };
 export type SessionPhase =
   | "loading"
   | "ready"

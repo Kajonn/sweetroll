@@ -6,8 +6,10 @@ import type {
   CommandResultResponse,
   EditIntent,
   FrozenRequest,
+  LastMigrationResult,
   QueueEntry,
   ResolveConflictInput,
+  ReviewExpiredAttemptInput,
   SessionPhase,
 } from "./types.js";
 
@@ -81,6 +83,14 @@ export type CharacterSnapshot = {
   error: BlockingError | null;
   /** The latest authoritative roll result received during this open session. */
   lastRoll: CommandResultResponse["result"]["roll"];
+  /** The latest successful migration commit/rollback, kept for later UI use. */
+  lastMigration: LastMigrationResult | null;
+  /**
+   * Unresolved per-character online attempts (archive/recover/migration).
+   * They replay verbatim before any newer command; only explicit
+   * unknown-outcome review retires an expired one.
+   */
+  pendingOnlineAttempts: OnlineAttempt[];
 };
 
 export type CharacterSession = {
@@ -95,6 +105,13 @@ export type CharacterSession = {
   recover(): Promise<void>;
   commitMigration(previewId: string): Promise<void>;
   rollbackMigration(migrationId: string): Promise<void>;
+  /**
+   * Explicit unknown-outcome review for one retained expired online attempt.
+   * Never retries the stored request and never mints a replacement: it
+   * retires exactly the identified attempt after fetching current authorized
+   * state, and only when the caller explicitly accepts the unknown outcome.
+   */
+  reviewExpiredAttempt(input: ReviewExpiredAttemptInput): Promise<void>;
   requestEditing(): Promise<boolean>;
   /** Test/support helper: resolves when the serialized drain is idle. */
   whenIdle(): Promise<void>;
@@ -113,6 +130,9 @@ export type CreateCharacterSessionInput = {
 };
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Backend-declared idempotency replay-window expiry for one exact key. */
+const REPLAY_EXPIRED_RE = /replay window/i;
 
 const KIND_TO_PHASE: Record<BlockingErrorKind, SessionPhase> = {
   conflict: "conflict",
@@ -169,14 +189,18 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   let confirmed: CharacterView | null = null;
   let entries: QueueEntry[] = [];
+  let pendingOnline: OnlineAttempt[] = [];
   let generation = 0;
   let accountGeneration = 0;
   let nextSequence = 0;
   let phase: SessionPhase = "loading";
   let error: BlockingError | null = null;
   let lastRoll: CommandResultResponse["result"]["roll"] = null;
+  let lastMigration: LastMigrationResult | null = null;
   let editing: { owned: boolean; owner: string | null } = { owned: coordination.isOwner(), owner: null };
   let disposed = false;
+  /** In-flight online sends/reviews, awaited by the ownership quiesce hook. */
+  const activeOnline = new Set<Promise<unknown>>();
 
   const identityGeneration = identity.getGeneration();
   const listeners = new Set<(snapshot: CharacterSnapshot) => void>();
@@ -222,6 +246,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       editing: { ...editing, owned: visible && editing.owned },
       error: visible && error ? { ...error } : null,
       lastRoll: visible ? lastRoll : null,
+      lastMigration: visible ? lastMigration : null,
+      pendingOnlineAttempts: visible ? pendingOnline.map((a) => ({ ...a, request: { ...a.request, body: { ...a.request.body } } })) : [],
     };
   }
 
@@ -400,6 +426,22 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       }
       return "blocked";
     }
+    // A purge or account clear beneath an in-flight request deletes attempts
+    // and nulls the snapshot: a "not found" write failure afterwards reports
+    // that terminal state rather than a storage error. A session that never
+    // confirmed anything keeps the storage-error diagnosis.
+    if (confirmed !== null) {
+      const fresh = await store.read(actorId, characterId).catch(() => null);
+      if (fresh !== null && identityMatches() && fresh.confirmed === null) {
+        confirmed = null;
+        entries = fresh.entries;
+        generation = fresh.generation;
+        accountGeneration = fresh.accountGeneration;
+        await refreshPendingOnline();
+        setBlocked("purged", "This character is no longer available.");
+        return "blocked";
+      }
+    }
     setBlocked("storage-error", "Could not persist the confirmed state. Storage is unavailable.");
     return "blocked";
   }
@@ -436,6 +478,13 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         setBlocked("protocol", "The server rejected this request's idempotency key. Manual review is required.");
         return "blocked";
       }
+      // command_in_progress arrives with a 409 status: it must back off with
+      // the same request, so check codes before the status switch.
+      if (err.code === "command_in_progress" || err.code === "temporarily_unavailable") {
+        phase = "uncertain";
+        transientFailures += 1;
+        return "retry";
+      }
       switch (err.status) {
         case 401:
           setBlocked("reauthenticate", "Your session expired. Sign in again to continue.");
@@ -455,11 +504,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         setBlocked("invalid", err.message, { diagnostics: err.diagnostics });
         return "blocked";
       }
-      if (
-        err.code === "command_in_progress" ||
-        err.code === "temporarily_unavailable" ||
-        err.status >= 500
-      ) {
+      // command_in_progress/temporarily_unavailable are handled above; any
+      // other 5xx is an uncertain outcome retried with the same request.
+      if (err.status >= 500) {
         phase = "uncertain";
         transientFailures += 1;
         return "retry";
@@ -589,6 +636,31 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         await fetchLatestForConflict();
         return "blocked";
       }
+      // One ordering boundary across edit/action/lifecycle/migration
+      // attempts: an unresolved online attempt replays verbatim before any
+      // fresh-state decision can reinterpret it or any newer command sends.
+      await refreshPendingOnline();
+      const uncertain = pendingOnline[0] ?? null;
+      if (uncertain !== null && isConnected() && coordination.isOwner() && !disposed) {
+        if (isReviewableExpired(uncertain)) {
+          await enterExpiredAttempt(uncertain);
+          await refreshPendingOnline();
+          emit();
+          return "blocked";
+        }
+        const onlineOutcome = await attemptOnlineSend(uncertain);
+        await refreshPendingOnline();
+        if (onlineOutcome === "acked") {
+          needsFresh = false;
+          continue;
+        }
+        if (onlineOutcome === "retry") {
+          scheduleRetry();
+          return "retry";
+        }
+        emit();
+        return "blocked";
+      }
       const front = entries[0];
       // Replay uncertain attempts first; check drift before freezing any unsent work.
       if (needsFresh && isConnected() && !front?.attempt) {
@@ -658,6 +730,38 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   async function reconcile(server: CharacterView) {
     if (!identityMatches()) return;
+    // The GET that produced `server` may have raced a purge, account clear
+    // or cross-tab write: never confirm a server view over a store
+    // generation we did not read it against. Adopt the winner instead. A
+    // nulled snapshot is terminal once this session confirmed something or
+    // recorded the purge: adopting the purged generation must not authorize
+    // a stale in-flight GET to confirm over it afterwards.
+    const fresh = await store.read(actorId, characterId).catch(() => null);
+    if (!identityMatches() || fresh === null) return;
+    if (fresh.confirmed === null && (confirmed !== null || error?.kind === "purged")) {
+      confirmed = null;
+      entries = fresh.entries;
+      generation = fresh.generation;
+      accountGeneration = fresh.accountGeneration;
+      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+      await refreshPendingOnline();
+      setBlocked("purged", "This character is no longer available.");
+      emit();
+      return;
+    }
+    if (fresh.generation !== generation || fresh.accountGeneration !== accountGeneration) {
+      confirmed = fresh.confirmed;
+      entries = fresh.entries;
+      generation = fresh.generation;
+      accountGeneration = fresh.accountGeneration;
+      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+      await refreshPendingOnline();
+      if (confirmed === null) {
+        setBlocked("purged", "This character is no longer available.");
+      }
+      emit();
+      return;
+    }
     const local = confirmed;
     if (local && server.reconciliation.revision < local.reconciliation.revision) {
       setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.");
@@ -705,6 +809,14 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   async function resolveConflict(input: ResolveConflictInput): Promise<void> {
     if (disposed) return;
     if (!identityMatches() || !editing.owned || !coordination.isOwner()) throw new Error("Editing ownership required.");
+    // Ordinary conflict recovery never retires online attempts: an uncertain
+    // online outcome blocks it until replay or explicit expired-outcome
+    // review resolves the local decision.
+    await refreshPendingOnline();
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+    if (pendingOnline.length > 0) {
+      throw new Error("Resolve the uncertain online outcome before reviewing intentions.");
+    }
     if (draining || conflictRefreshPending || !error || !["conflict", "invalid", "expired-attempt"].includes(error.kind)) {
       throw new Error("Resolve the blocking error and refresh current state before reviewing intentions.");
     }
@@ -858,6 +970,95 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return Date.parse(timestamp) < Date.parse(now()) - THIRTY_DAYS_MS;
   }
 
+  /**
+   * One ordering boundary across edit/action/lifecycle/migration attempts:
+   * the session keeps every unresolved per-character online attempt in
+   * memory (loaded at startup and ownership acquisition, refreshed before
+   * every drain pass and online operation) and replays the oldest verbatim
+   * before any fresh-state decision or newer command.
+   */
+  async function refreshPendingOnline(): Promise<void> {
+    if (!identityMatches()) {
+      pendingOnline = [];
+      return;
+    }
+    const stored = await store.readOnlineAttempts(actorId);
+    if (!identityMatches()) return;
+    pendingOnline = stored
+      .filter((attempt) => attempt.characterId === characterId)
+      .sort((a, b) => {
+        const time = Date.parse(a.createdAt || a.request.firstAttemptAt) - Date.parse(b.createdAt || b.request.firstAttemptAt);
+        return time !== 0 ? time : (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+      });
+  }
+
+  /**
+   * An attempt is reviewable only when replay can no longer resolve it:
+   * locally aged past the 30-day replay window (which matches the backend
+   * REPLAY_TTL_MS) or durably flagged after the backend declared this exact
+   * key's replay window expired. Anything else still has a resolvable
+   * outcome and must be replayed, not retired.
+   */
+  function isReviewableExpired(attempt: OnlineAttempt): boolean {
+    return attempt.replayExpired === true || isOnlineAttemptExpired(attempt);
+  }
+
+  function isReplayExpiredConflict(err: unknown): boolean {
+    return err instanceof ApiError && err.code === "conflict" && REPLAY_EXPIRED_RE.test(err.message);
+  }
+
+  /**
+   * Retains an expired attempt, fetches current authorized state for the
+   * eventual manual review, and blocks ordinary recovery and newer sends.
+   * A failed refresh never fabricates a review base: the attempt stays
+   * retained either way, and only purge/reauthenticate states win over the
+   * expired block.
+   */
+  async function enterExpiredAttempt(attempt: OnlineAttempt): Promise<void> {
+    if (await identityIsCurrent() && isConnected() && coordination.isOwner() && !disposed) {
+      try {
+        const envelope = await api.open(characterId);
+        if (!await identityIsCurrent()) return;
+        await reconcile(envelope.character);
+        if (!identityMatches()) return;
+      } catch (err) {
+        if (!await identityIsCurrent()) return;
+        await handleOpenError(err);
+        if (!identityMatches()) return;
+        if (error !== null && error.kind !== "conflict" && error.kind !== "network-unavailable") {
+          return;
+        }
+      }
+    }
+    setBlocked(
+      "expired-attempt",
+      "This change is older than the server's replay window. Its outcome is unknown: review the current state and explicitly acknowledge the unknown outcome before continuing.",
+      { attemptId: attempt.id },
+    );
+  }
+
+  /** Ownership-lifetime tracking so takeover quiesces active online sends. */
+  async function trackOnline<T>(run: Promise<T>): Promise<T> {
+    activeOnline.add(run);
+    try {
+      return await run;
+    } finally {
+      activeOnline.delete(run);
+    }
+  }
+
+  function migrationResultFor(attempt: OnlineAttempt, character: CharacterView): LastMigrationResult | null {
+    const commit = new RegExp(`^/characters/${characterId}/migrations/(.+)/commit$`).exec(attempt.request.path);
+    if (attempt.kind === "migration" && commit !== null) {
+      return { operation: "commit", previewId: commit[1]!, revision: character.reconciliation.revision };
+    }
+    const rollback = new RegExp(`^/characters/${characterId}/migrations/(.+)/rollback$`).exec(attempt.request.path);
+    if (attempt.kind === "migration" && rollback !== null) {
+      return { operation: "rollback", migrationId: rollback[1]!, revision: character.reconciliation.revision };
+    }
+    return null;
+  }
+
   function buildOnlineRequest(op: OnlineOperation, expectedRevision: number): FrozenRequest {
     const firstAttemptAt = now();
     const key = newId();
@@ -902,107 +1103,229 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   async function sendOnlineAttempt(attempt: OnlineAttempt): Promise<void> {
+    const run = sendOnlineAttemptInner(attempt);
+    const tracked = trackOnline(run);
+    try {
+      await tracked;
+    } catch (err) {
+      // Uncertain outcomes back off with the same request: wake the drain so
+      // the retained attempt replays verbatim, whether this send ran inline
+      // from a direct command or from the drain itself.
+      if (!disposed && initialized && !isBlocked() && phase === "uncertain") {
+        scheduleRetry();
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Retires a definitively rejected attempt (the server answered: nothing is
+   * uncertain) under guard. A failed retirement itself is handled as an
+   * acknowledgment/storage failure, so a lost retirement never silently
+   * drops the frozen request. Callers set the rejection block and rethrow
+   * the original server error.
+   */
+  async function retireRejectedOnlineAttempt(attempt: OnlineAttempt): Promise<void> {
+    try {
+      await store.retireOnlineAttempt(actorId, characterId, attempt.id, { generation, accountGeneration });
+    } catch (retireErr) {
+      if (!await identityIsCurrent()) throw retireErr instanceof Error ? retireErr : new Error("Account changed.");
+      await handleAckError(retireErr);
+      await refreshPendingOnline();
+      emit();
+      throw retireErr instanceof Error ? retireErr : new Error("Could not retire the rejected request.");
+    }
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+    generation += 1;
+    await refreshPendingOnline();
+  }
+
+  async function sendOnlineAttemptInner(attempt: OnlineAttempt): Promise<void> {
     const generationAtSend = generation;
+    const guard = { generation: generationAtSend, accountGeneration };
     let response: CommandResultResponse;
     try {
       response = await api.send(attempt.request);
     } catch (err) {
       if (!await identityIsCurrent()) throw err instanceof Error ? err : new Error("Account changed.");
       if (err instanceof ApiError && err.status === 404) {
-        await store.deleteOnlineAttempt(actorId, attempt.id).catch(() => {});
-        await handleNotFound(err);
+        if (err.cacheDisposition === "purge") {
+          await handleNotFound(err);
+          await refreshPendingOnline();
+          emit();
+          throw err;
+        }
+        await retireRejectedOnlineAttempt(attempt);
+        setBlocked("not-found", "This character could not be loaded.");
         emit();
         throw err;
       }
       if (err instanceof ApiError && err.status === 401) {
-        setBlocked("reauthenticate", "Your session expired. Sign in again to continue.");
+        setBlocked("reauthenticate", "Your session expired. Sign in again with the same account to continue.");
         emit();
         throw err;
       }
       if (err instanceof ApiError) {
         if (err.code === "idempotency_mismatch") {
-          await store.deleteOnlineAttempt(actorId, attempt.id).catch(() => {});
+          await retireRejectedOnlineAttempt(attempt);
           setBlocked("protocol", "The server rejected this request's idempotency key. Manual review is required.");
           emit();
           throw err;
         }
+        if (isReplayExpiredConflict(err)) {
+          // Uncertain, not rejected: the server forgot this key's receipt,
+          // which proves nothing about whether the effect applied. Retain
+          // verbatim, flag for explicit review, fetch current state.
+          try {
+            await store.markOnlineAttemptReplayExpired(actorId, characterId, attempt.id, guard);
+          } catch (markErr) {
+            if (!await identityIsCurrent()) throw markErr instanceof Error ? markErr : new Error("Account changed.");
+            await handleAckError(markErr);
+            await refreshPendingOnline();
+            emit();
+            throw err;
+          }
+          if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+          await refreshPendingOnline();
+          const flagged = pendingOnline.find((a) => a.id === attempt.id) ?? { ...attempt, replayExpired: true };
+          await enterExpiredAttempt(flagged);
+          await refreshPendingOnline();
+          emit();
+          throw structuredError(
+            "The replay window for this idempotency key has expired. Its outcome is unknown: review the current state and explicitly acknowledge the unknown outcome before continuing.",
+            "expired-attempt",
+            { attemptId: attempt.id },
+          );
+        }
+        if (err.code === "command_in_progress" || err.code === "temporarily_unavailable") {
+          // Checked before the generic 409 branch: these codes can arrive
+          // with a 409 status but must back off with the same request.
+          phase = "uncertain";
+          emit();
+          throw err;
+        }
         if (err.status === 409 || err.code === "expected_revision_mismatch") {
-          await store.deleteOnlineAttempt(actorId, attempt.id).catch(() => {});
+          await retireRejectedOnlineAttempt(attempt);
           await fetchLatestForConflict(err.latestRevision);
           emit();
           throw err;
         }
         if (err.status === 422 || err.code === "invalid_value" || err.code === "bad_request") {
-          await store.deleteOnlineAttempt(actorId, attempt.id).catch(() => {});
+          await retireRejectedOnlineAttempt(attempt);
           setBlocked("invalid", err.message, { diagnostics: err.diagnostics });
           emit();
           throw err;
         }
-        if (err.code === "command_in_progress" || err.code === "temporarily_unavailable" || err.status >= 500) {
+        if (err.status >= 500) {
+          // Pause with retry guidance: the request is retained verbatim and
+          // retried with the same key; no duplicate may be created.
           phase = "uncertain";
           emit();
-          throw err;
+          throw new ApiError({
+            code: err.code,
+            message: `The server returned an unexpected error (${err.message}). The request was kept and will be retried with the same key; do not send a duplicate.`,
+            status: err.status,
+            requestId: err.requestId,
+            latestRevision: err.latestRevision,
+            diagnostics: [...err.diagnostics],
+            runtimeDiagnostics: [...err.runtimeDiagnostics],
+            changedDefinitionIds: err.changedDefinitionIds === undefined ? null : [...err.changedDefinitionIds],
+            activityCursor: err.activityCursor,
+            cacheDisposition: err.cacheDisposition ?? null,
+          });
         }
       }
       phase = "uncertain";
       emit();
       throw err;
     }
-    if (!await identityIsCurrent()) throw new Error("Account changed. Reopen this character.");
+    if (!await identityIsCurrent() || !coordination.isOwner() || disposed) {
+      throw new Error("Account changed. Reopen this character.");
+    }
     const character = response?.result?.character;
     if (!character) {
       phase = "uncertain";
       emit();
       throw structuredError("The server returned an unexpected response.", "network-unavailable");
     }
+    // Guarded atomic acknowledgment: confirmed-state persistence and exact
+    // attempt retirement commit together. A storage failure aborts the whole
+    // transaction, so the attempt survives for verbatim replay.
     try {
-      await store.confirmSnapshot(actorId, characterId, character, generationAtSend);
+      await store.acknowledgeOnlineAttempt(actorId, characterId, attempt.id, character, guard);
     } catch (err) {
       if (!await identityIsCurrent()) throw err instanceof Error ? err : new Error("Account changed.");
       await handleAckError(err);
+      await refreshPendingOnline();
       emit();
       throw err;
     }
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
-    await store.deleteOnlineAttempt(actorId, attempt.id).catch(() => {});
     coordination.invalidate?.();
     confirmed = character;
+    // Authoritative action results survive later online acknowledgments: only
+    // a non-null roll replaces the retained one (online ops return null).
+    if (response.result.roll !== null && response.result.roll !== undefined) lastRoll = response.result.roll;
+    const migration = migrationResultFor(attempt, character);
+    if (migration !== null) lastMigration = migration;
     generation += 1;
     transientFailures = 0;
+    needsFresh = false;
+    await refreshPendingOnline();
     refreshPhase();
     emit();
   }
 
+  /**
+   * Drain-facing wrapper: converts sendOnlineAttempt's throw-shape into an
+   * outcome. Blocked states stay blocked; uncertain states back off with the
+   * same request via the drain's retry schedule.
+   */
+  async function attemptOnlineSend(attempt: OnlineAttempt): Promise<SendOutcome> {
+    try {
+      await sendOnlineAttempt(attempt);
+      return "acked";
+    } catch {
+      if (!identityMatches() || disposed) return "blocked";
+      if (isBlocked()) return "blocked";
+      if (phase === "uncertain") return "retry";
+      return "blocked";
+    }
+  }
+
   async function runOnlineOperation(op: OnlineOperation): Promise<void> {
     assertOnlineOperationAllowed();
-    const stored = await store.readOnlineAttempts(actorId);
+    await refreshPendingOnline();
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
-    const existing = stored.find((attempt) => onlineAttemptMatches(attempt, op)) ?? null;
+    const existing = pendingOnline.find((attempt) => onlineAttemptMatches(attempt, op)) ?? null;
     if (existing !== null) {
-      if (isOnlineAttemptExpired(existing)) {
-        setBlocked("expired-attempt", "This change is older than the server's replay window. Review it manually before continuing.");
-        // Drop the stale attempt so a post-review re-invocation mints a fresh
-        // idempotency key instead of re-throwing on the same orphan forever.
-        await store.deleteOnlineAttempt(actorId, existing.id).catch(() => {});
+      if (isReviewableExpired(existing)) {
+        // Elapsed time proves nothing: retain the attempt, fetch current
+        // state and require explicit unknown-outcome review. Never delete an
+        // expired attempt automatically and never mint a replacement here.
+        await enterExpiredAttempt(existing);
+        await refreshPendingOnline();
         emit();
-        throw structuredError("This change is older than the server's replay window.", "expired-attempt");
+        throw structuredError(
+          "This change is older than the server's replay window. Its outcome is unknown: review the current state and explicitly acknowledge the unknown outcome before continuing.",
+          "expired-attempt",
+          { attemptId: existing.id },
+        );
       }
       await sendOnlineAttempt(existing);
       return;
     }
-    if (op.operation === "commit") {
-      // Re-previewing orphans older preview commits: only the newest previewId
-      // can be committed, so superseded attempts could never replay. Clean them.
-      const superseded = stored.filter(
-        (attempt) =>
-          attempt.characterId === characterId &&
-          attempt.kind === "migration" &&
-          attempt.request.path.endsWith("/commit") &&
-          !onlineAttemptMatches(attempt, op),
-      );
-      for (const attempt of superseded) {
-        await store.deleteOnlineAttempt(actorId, attempt.id).catch(() => {});
+    const older = pendingOnline[0] ?? null;
+    if (older !== null) {
+      // One ordering boundary across command kinds: an unresolved attempt
+      // replays verbatim before any newer command. A newer preview, lifecycle
+      // change or migration never deletes or replaces it.
+      if (isReviewableExpired(older)) {
+        await enterExpiredAttempt(older);
+        await refreshPendingOnline();
+        emit();
       }
+      throw new Error("An earlier online change has an uncertain outcome. Resolve it before starting a newer command.");
     }
     if (entries.length > 0 || phase !== "ready") {
       throw new Error("Resolve pending edits and wait for the character to be ready before managing it.");
@@ -1022,9 +1345,131 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       request,
       createdAt: request.firstAttemptAt,
     };
-    await store.saveOnlineAttempt(attempt);
+    try {
+      await store.saveOnlineAttempt(attempt, { generation, accountGeneration });
+    } catch (saveErr) {
+      if (!await identityIsCurrent()) throw saveErr instanceof Error ? saveErr : new Error("Account changed.");
+      setBlocked("storage-error", "Could not save this change because local storage is unavailable.");
+      emit();
+      throw saveErr instanceof Error ? saveErr : new Error("storage failure");
+    }
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+    await refreshPendingOnline();
     await sendOnlineAttempt(attempt);
+  }
+
+  /**
+   * Explicit unknown-outcome review for one retained expired online attempt.
+   * This is not a retry and never mints a replacement mutation: after
+   * gating, it fetches current authorized state and retires exactly the
+   * identified attempt under guard. Offline, stale, other-account, purged,
+   * unacknowledged, refresh-failed and unexpired-resolvable reviews are all
+   * rejected without touching any attempt; unrelated attempts are untouched.
+   */
+  async function reviewExpiredAttemptInner(input: ReviewExpiredAttemptInput): Promise<void> {
+    if (disposed) throw new Error("Session closed.");
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+    if (!editing.owned || !coordination.isOwner()) throw new Error("Editing ownership required.");
+    if (!isConnected()) {
+      throw structuredError(
+        "Expired-outcome review requires connectivity and cannot run offline.",
+        "network-unavailable",
+      );
+    }
+    if (typeof input.attemptId !== "string" || input.attemptId.length === 0) {
+      throw new Error("An attempt id is required for expired-outcome review.");
+    }
+    const stored = (await store.readOnlineAttempts(actorId)).find(
+      (attempt) => attempt.id === input.attemptId && attempt.characterId === characterId,
+    ) ?? null;
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+    if (stored === null) {
+      throw new Error("This online attempt is no longer pending review.");
+    }
+    if (!isReviewableExpired(stored)) {
+      throw new Error("This attempt still has a resolvable outcome. Replay it instead of retiring it.");
+    }
+    if (input.acknowledgeUnknownOutcome !== true) {
+      throw new Error("Acknowledge the unknown outcome before retiring this attempt.");
+    }
+    if (!await identityIsCurrent() || !isConnected() || !editing.owned || !coordination.isOwner() || disposed) {
+      throw new Error("Account changed. Reopen this character.");
+    }
+    // Fetch current authorized state first. A failed refresh never retires:
+    // without a fresh review base there is nothing to accept.
+    let server: CharacterView;
+    try {
+      const envelope = await api.open(characterId);
+      if (!await identityIsCurrent()) throw new Error("Account changed. Reopen this character.");
+      server = envelope.character;
+    } catch (err) {
+      if (!await identityIsCurrent()) throw err instanceof Error ? err : new Error("Account changed.");
+      await handleOpenError(err);
+      emit();
+      throw err instanceof Error ? err : new Error("Could not refresh the character before review.");
+    }
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+    // The fetch may have raced a purge or account clear: re-verify the exact
+    // attempt is still pending before persisting anything over it.
+    const stillPending = (await store.readOnlineAttempts(actorId)).find(
+      (attempt) => attempt.id === stored.id && attempt.characterId === characterId,
+    ) ?? null;
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+    if (stillPending === null) {
+      await refreshPendingOnline();
+      emit();
+      throw new Error("This online attempt is no longer pending review.");
+    }
+    try {
+      await store.confirmSnapshot(actorId, characterId, server, generation);
+    } catch (err) {
+      if (!await identityIsCurrent()) throw err instanceof Error ? err : new Error("Account changed.");
+      await handleAckError(err);
+      emit();
+      throw err instanceof Error ? err : new Error("Could not persist the review base.");
+    }
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+    generation += 1;
+    try {
+      await store.retireOnlineAttempt(actorId, characterId, stored.id, { generation, accountGeneration });
+    } catch (err) {
+      if (!await identityIsCurrent()) throw err instanceof Error ? err : new Error("Account changed.");
+      await handleAckError(err);
+      emit();
+      throw err instanceof Error ? err : new Error("Could not retire the reviewed attempt.");
+    }
+    if (!identityMatches()) return;
+    const fresh = await store.read(actorId, characterId);
+    if (!identityMatches()) return;
+    if (fresh.accountGeneration !== accountGeneration) {
+      // Another tab cleared or replaced the account mid-review: adopt the
+      // cleared state and fail instead of recreating anything.
+      confirmed = fresh.confirmed;
+      entries = fresh.entries;
+      generation = fresh.generation;
+      accountGeneration = fresh.accountGeneration;
+      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+      await refreshPendingOnline();
+      emit();
+      throw new Error("stale recovery: account changed during review");
+    }
+    confirmed = fresh.confirmed;
+    entries = fresh.entries;
+    generation = fresh.generation;
+    accountGeneration = fresh.accountGeneration;
+    nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+    await refreshPendingOnline();
+    // Clearing the expired pause authorizes nothing by itself: any other
+    // retained attempt still blocks newer sends at the ordering boundary,
+    // and any deliberate new mutation needs its own fresh key.
+    const blockedAttempt = (error?.details as { attemptId?: string } | undefined)?.attemptId;
+    if (error?.kind === "expired-attempt" && blockedAttempt === stored.id) {
+      error = null;
+    }
+    needsFresh = false;
+    coordination.invalidate?.();
+    emit();
+    scheduleDrain();
   }
 
   function open(): Promise<void> {
@@ -1044,6 +1489,10 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     generation = loaded.generation;
     accountGeneration = loaded.accountGeneration;
     nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), 0);
+    // Load unresolved per-character online attempts before any drain pass so
+    // an uncertain outcome replays verbatim before fresh-state decisions.
+    await refreshPendingOnline();
+    if (!identityMatches()) return;
     phase = "loading";
     emit();
 
@@ -1082,6 +1531,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       confirmed = loaded.confirmed; entries = loaded.entries; generation = loaded.generation;
       accountGeneration = loaded.accountGeneration;
       nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), 0);
+      // A new owner resolves any inherited uncertain outcome first.
+      await refreshPendingOnline();
+      if (!identityMatches() || !coordination.isOwner()) return;
       editing = { owned: true, owner: null }; needsFresh = true;
       emit(); scheduleDrain();
     })().catch(() => {
@@ -1095,7 +1547,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   coordination.setQuiesce?.(async () => {
     if (draining) await new Promise<void>(resolve => idleWaiters.push(resolve));
     if (recovering) await Promise.allSettled([recovering]);
-    await Promise.allSettled([...entryWrites.values()]);
+    await Promise.allSettled([...entryWrites.values(), ...activeOnline]);
   });
 
   function dispose() {
@@ -1121,7 +1573,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   const unsubscribeIdentity = identity.subscribe(() => {
     if (disposed) return;
     if (!identityMatches()) {
-      confirmed = null; entries = []; error = null; editing = { owned: false, owner: null };
+      confirmed = null; entries = []; pendingOnline = []; error = null; editing = { owned: false, owner: null };
       coordination.letGo();
     }
     if (!isConnected()) needsFresh = true;
@@ -1210,6 +1662,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     async rollbackMigration(migrationId: string): Promise<void> {
       if (typeof migrationId !== "string" || migrationId.length === 0) throw new Error("A migration ID is required.");
       await runOnlineOperation({ kind: "migration", operation: "rollback", migrationId });
+    },
+    reviewExpiredAttempt(input) {
+      return trackOnline(reviewExpiredAttemptInner(input));
     },
     resolveConflict(input) {
       if (recovering) return Promise.reject(new Error("Conflict recovery is already in progress."));

@@ -503,11 +503,13 @@ Expose a versioned REST HTTP interface described by OpenAPI. Use resource-orient
 | Versions   | GET/PATCH /system-versions/{id}; GET /system-versions/{id}/export                                                                        |
 | Templates  | GET /templates; create a system with a version source to clone a template                                                               |
 | Campaigns  | POST /campaigns; GET/PATCH /campaigns/{id}; POST /campaigns/{id}/invitations; DELETE /campaigns/{id}/members/{memberId}                 |
-| Characters | POST /campaigns/{id}/characters; GET/PATCH /characters/{id}; POST /characters/{id}/actions/{actionId}; POST /characters/{id}/migrations |
+| Characters | POST /characters; GET /characters/creation-options; GET /characters/creation-versions; POST /campaigns/{id}/characters; GET/PATCH /characters/{id}; POST /characters/{id}/actions/{actionId}; POST /characters/{id}/migrations |
 | Content    | POST /campaigns/{id}/content; PATCH /content/{id}; POST /content/{id}/grants                                                            |
 | Session    | GET /campaigns/{id}/session (GM session board); POST /characters/{id}/resources/{resourceId}/bump                                        |
 | Activity   | GET /campaigns/{id}/activity; GET /characters/{id}/activity                                                                             |
 | Exports    | POST /characters/{id}/exports; POST /campaigns/{id}/exports; GET /exports/{id}                                                          |
+
+`GET /characters/creation-versions` uses the same authorization policy as character creation. The `/characters/new` page opened without a version shows a "Choose a system version" picker from this endpoint; the manual system-version-ID box remains as fallback, and picking a version loads its creation metadata through the unchanged lookup path.
 
 ## 13.1 Idempotency
 

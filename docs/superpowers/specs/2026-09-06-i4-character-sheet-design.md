@@ -137,6 +137,20 @@ Also test a cold missing-cache visit, two tabs and takeover during an uncertain 
 
 Run backend unit/integration, typecheck/build/contracts checks, web unit/typecheck/build, existing E2E and new production-offline E2E. Record exact commands, tested commit, pass counts, browser capabilities and limitations in `docs/acceptance/i4-2026-09-06.md` at closure. Do not claim an acceptance run before it happens.
 
+## Addendum 2026-09-07: creation version picker
+
+`GET /characters/creation-versions` lists every system version the signed-in
+actor may create from (published version, active system, owner-or-public/link —
+the same authorization policy as create). An empty list is a valid 200; anonymous
+callers get 401. Opened without `?systemVersionId=`, `/characters/new` renders a
+"Choose a system version" picker from this endpoint; the picker is visible only
+while no version is prefilled and no creation metadata is loaded, and only when
+online and signed in. Selecting a version fills the manual system-version-ID box
+(which remains as fallback) and loads its metadata through the unchanged
+`loadMetadata` path, so all existing guards and pending/expired behavior apply
+untouched. Proven by the production-browser picker journey in
+`web/tests/offline/character.spec.ts`.
+
 ## Self-review
 
 The approved offline and conflict policies are consistent with I3's ordinary-command replay contract. Persisted receipts justify the optional additive projection field. Creation metadata and sign-out wiring are explicit prerequisites, not hidden frontend scope. Asset caching is the approved I4 exception to the I5 PWA boundary. No browser runtime, automatic conflict merge, arbitrary resource set or background command executor is introduced. Implementation must verify the complete test matrix before marking I4 closed.

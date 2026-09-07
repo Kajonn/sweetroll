@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 
 import {
+  D20_REFERENCE_SYSTEM,
   REFERENCE_SYSTEMS,
   TEST_USER_A,
   apiBump,
@@ -110,6 +111,39 @@ test.describe("full production UI journey per system", () => {
       await expect(page.getByTestId("app-header")).toBeVisible();
       await expect(page.getByTestId("dev-signin")).toHaveCount(0);
       await expect(page.getByTestId("dev-signin-panel")).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("creation picker: versionless /characters/new reaches entity selection through the picker", async ({
+    browser,
+  }) => {
+    test.setTimeout(180_000);
+    const system = D20_REFERENCE_SYSTEM;
+    const { context } = await newSignedInContext(browser, TEST_USER_A.code);
+    try {
+      const page = await context.newPage();
+      await page.setViewportSize({ width: 360, height: 740 });
+      // No search input: the picker alone must offer the seeded versions.
+      await page.goto("/characters/new");
+      await expect(
+        page.getByRole("heading", { name: "Choose a system version" }),
+      ).toBeVisible({ timeout: 30_000 });
+      // Button label contract is `{systemName} {semanticVersion}`; the
+      // reference seed publishes "Template: d20" at 1.0.0.
+      await page.getByRole("button", { name: "Template: d20 1.0.0" }).click();
+      await page.getByLabel("Entity").selectOption("character");
+      // The picker fills the manual box with the chosen reference version,
+      // so the unchanged lookup/create path below runs on the d20 seed.
+      await expect(page.getByLabel("System version ID")).toHaveValue(system.systemVersionId);
+      const characterName = `Picker ${uid()}`;
+      await page.getByLabel("Character name").fill(characterName);
+      await page.getByRole("button", { name: "Create character", exact: true }).click();
+      await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+/, { timeout: 30_000 });
+      await expectSheetReady(page, characterName);
+      const build = await buildId(page);
+      await page.screenshot({ path: `${EVIDENCE_DIR}/creation-picker-360-${build}.png` });
     } finally {
       await context.close();
     }

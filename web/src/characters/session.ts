@@ -1,6 +1,6 @@
 import { ApiError } from "../api/client.js";
 import type { CharactersApi } from "./api.js";
-import type { CharacterStore } from "./store.js";
+import type { CharacterStore, OnlineAttempt } from "./store.js";
 import type {
   CharacterView,
   CommandResultResponse,
@@ -90,6 +90,10 @@ export type CharacterSession = {
   bumpResource(resourceId: string, direction: "up" | "down"): Promise<void>;
   executeAction(actionId: string, inputs?: Record<string, unknown>): Promise<void>;
   resolveConflict(input: { mode: "discard" | "reapply"; selectedIds: string[] }): Promise<void>;
+  archive(): Promise<void>;
+  recover(): Promise<void>;
+  commitMigration(previewId: string): Promise<void>;
+  rollbackMigration(migrationId: string): Promise<void>;
   requestEditing(): Promise<boolean>;
   /** Test/support helper: resolves when the serialized drain is idle. */
   whenIdle(): Promise<void>;
@@ -721,6 +725,179 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     scheduleDrain();
   }
 
+  type OnlineOperation =
+    | { kind: "archive" | "recover"; operation: "archive" | "recover" }
+    | { kind: "migration"; operation: "commit"; previewId: string }
+    | { kind: "migration"; operation: "rollback"; migrationId: string };
+
+  function onlineAttemptMatches(attempt: OnlineAttempt, op: OnlineOperation): boolean {
+    if (attempt.characterId !== characterId) return false;
+    if (op.operation === "commit") {
+      return attempt.kind === "migration" && attempt.request.path === `/characters/${characterId}/migrations/${op.previewId}/commit`;
+    }
+    if (op.operation === "rollback") {
+      return attempt.kind === "migration" && attempt.request.path === `/characters/${characterId}/migrations/${op.migrationId}/rollback`;
+    }
+    return attempt.kind === op.operation;
+  }
+
+  function isOnlineAttemptExpired(attempt: OnlineAttempt): boolean {
+    const timestamp = attempt.createdAt || attempt.request.firstAttemptAt;
+    return Date.parse(timestamp) < Date.parse(now()) - THIRTY_DAYS_MS;
+  }
+
+  function buildOnlineRequest(op: OnlineOperation, expectedRevision: number): FrozenRequest {
+    const firstAttemptAt = now();
+    const key = newId();
+    if (op.operation === "archive" || op.operation === "recover") {
+      return {
+        method: "PATCH",
+        path: `/characters/${characterId}`,
+        body: { command: op.operation, expectedRevision, idempotencyKey: key },
+        firstAttemptAt,
+      };
+    }
+    if (op.operation === "commit") {
+      return {
+        method: "POST",
+        path: `/characters/${characterId}/migrations/${op.previewId}/commit`,
+        body: { expectedRevision, idempotencyKey: key },
+        firstAttemptAt,
+      };
+    }
+    if (op.operation === "rollback") {
+      return {
+        method: "POST",
+        path: `/characters/${characterId}/migrations/${op.migrationId}/rollback`,
+        body: { idempotencyKey: key },
+        firstAttemptAt,
+      };
+    }
+    throw new Error("Unknown online operation.");
+  }
+
+  function assertOnlineOperationAllowed() {
+    if (disposed) throw new Error("Session closed.");
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+    if (!editing.owned || !coordination.isOwner()) throw new Error("Editing ownership required.");
+    if (!confirmed) throw new Error("Cannot manage until the character is loaded.");
+    if (!isConnected()) {
+      throw structuredError(
+        "Lifecycle, migration and export operations require connectivity and cannot be initiated offline.",
+        "network-unavailable",
+      );
+    }
+  }
+
+  async function sendOnlineAttempt(attempt: OnlineAttempt): Promise<void> {
+    const generationAtSend = generation;
+    let response: CommandResultResponse;
+    try {
+      response = await api.send(attempt.request);
+    } catch (err) {
+      if (!await identityIsCurrent()) throw err instanceof Error ? err : new Error("Account changed.");
+      if (err instanceof ApiError && err.status === 404) {
+        await store.deleteOnlineAttempt(actorId, attempt.id).catch(() => {});
+        await handleNotFound(err);
+        emit();
+        throw err;
+      }
+      if (err instanceof ApiError && err.status === 401) {
+        setBlocked("reauthenticate", "Your session expired. Sign in again to continue.");
+        emit();
+        throw err;
+      }
+      if (err instanceof ApiError) {
+        if (err.code === "idempotency_mismatch") {
+          await store.deleteOnlineAttempt(actorId, attempt.id).catch(() => {});
+          setBlocked("protocol", "The server rejected this request's idempotency key. Manual review is required.");
+          emit();
+          throw err;
+        }
+        if (err.status === 409 || err.code === "expected_revision_mismatch") {
+          await store.deleteOnlineAttempt(actorId, attempt.id).catch(() => {});
+          await fetchLatestForConflict(err.latestRevision);
+          emit();
+          throw err;
+        }
+        if (err.status === 422 || err.code === "invalid_value" || err.code === "bad_request") {
+          await store.deleteOnlineAttempt(actorId, attempt.id).catch(() => {});
+          setBlocked("invalid", err.message, { diagnostics: err.diagnostics });
+          emit();
+          throw err;
+        }
+        if (err.code === "command_in_progress" || err.code === "temporarily_unavailable" || err.status >= 500) {
+          phase = "uncertain";
+          emit();
+          throw err;
+        }
+      }
+      phase = "uncertain";
+      emit();
+      throw err;
+    }
+    if (!await identityIsCurrent()) throw new Error("Account changed. Reopen this character.");
+    const character = response?.result?.character;
+    if (!character) {
+      phase = "uncertain";
+      emit();
+      throw structuredError("The server returned an unexpected response.", "network-unavailable");
+    }
+    try {
+      await store.confirmSnapshot(actorId, characterId, character, generationAtSend);
+    } catch (err) {
+      if (!await identityIsCurrent()) throw err instanceof Error ? err : new Error("Account changed.");
+      await handleAckError(err);
+      emit();
+      throw err;
+    }
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+    await store.deleteOnlineAttempt(actorId, attempt.id).catch(() => {});
+    coordination.invalidate?.();
+    confirmed = character;
+    generation += 1;
+    transientFailures = 0;
+    refreshPhase();
+    emit();
+  }
+
+  async function runOnlineOperation(op: OnlineOperation): Promise<void> {
+    assertOnlineOperationAllowed();
+    const stored = await store.readOnlineAttempts(actorId);
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+    const existing = stored.find((attempt) => onlineAttemptMatches(attempt, op)) ?? null;
+    if (existing !== null) {
+      if (isOnlineAttemptExpired(existing)) {
+        setBlocked("expired-attempt", "This change is older than the server's replay window. Review it manually before continuing.");
+        emit();
+        throw structuredError("This change is older than the server's replay window.", "expired-attempt");
+      }
+      await sendOnlineAttempt(existing);
+      return;
+    }
+    if (entries.length > 0 || phase !== "ready") {
+      throw new Error("Resolve pending edits and wait for the character to be ready before managing it.");
+    }
+    await reconcileFresh();
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+    if (isBlocked()) throw structuredError(error!.message, error!.kind, error!.details);
+    if (entries.length > 0 || !confirmed) {
+      throw new Error("Resolve pending edits and wait for the character to be ready before managing it.");
+    }
+    const request = buildOnlineRequest(op, confirmed.reconciliation.revision);
+    const attempt: OnlineAttempt = {
+      id: newId(),
+      actorId,
+      characterId,
+      kind: op.kind,
+      request,
+      createdAt: request.firstAttemptAt,
+    };
+    await store.saveOnlineAttempt(attempt);
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+    await sendOnlineAttempt(attempt);
+  }
+
   function open(): Promise<void> {
     opening ??= initialize().catch(() => {
       if (!identityMatches()) return;
@@ -852,14 +1029,17 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     },
     async setField(fieldId: string, value: unknown): Promise<void> {
       assertMutationAllowed();
+      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({ kind: "setField", fieldId, value }));
     },
     async bumpResource(resourceId: string, direction: "up" | "down"): Promise<void> {
       assertMutationAllowed();
+      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({ kind: "bumpResource", resourceId, direction }));
     },
     async executeAction(actionId: string, inputs?: Record<string, unknown>): Promise<void> {
       assertMutationAllowed();
+      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       if (!isConnected()) {
         throw structuredError(
           "Actions require connectivity and cannot be initiated offline.",
@@ -873,6 +1053,20 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           ...(inputs !== undefined ? { inputs } : {}),
         }),
       );
+    },
+    async archive(): Promise<void> {
+      await runOnlineOperation({ kind: "archive", operation: "archive" });
+    },
+    async recover(): Promise<void> {
+      await runOnlineOperation({ kind: "recover", operation: "recover" });
+    },
+    async commitMigration(previewId: string): Promise<void> {
+      if (typeof previewId !== "string" || previewId.length === 0) throw new Error("A migration preview is required.");
+      await runOnlineOperation({ kind: "migration", operation: "commit", previewId });
+    },
+    async rollbackMigration(migrationId: string): Promise<void> {
+      if (typeof migrationId !== "string" || migrationId.length === 0) throw new Error("A migration ID is required.");
+      await runOnlineOperation({ kind: "migration", operation: "rollback", migrationId });
     },
     resolveConflict(input) {
       if (recovering) return Promise.reject(new Error("Conflict recovery is already in progress."));

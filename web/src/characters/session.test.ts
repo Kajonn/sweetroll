@@ -1113,3 +1113,141 @@ describe("CharacterSession serialization", () => {
     await store.close();
   });
 });
+
+describe("CharacterSession online operations", () => {
+  it("archives through PATCH with the confirmed revision and a fresh key", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+    api.setSendFallback(async (req) => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+    await session.archive();
+    expect(api.sent).toHaveLength(1);
+    expect(api.sent[0]?.method).toBe("PATCH");
+    expect(api.sent[0]?.path).toBe("/characters/char-1");
+    expect(api.sent[0]?.body).toMatchObject({ command: "archive", expectedRevision: 3 });
+    expect(typeof api.sent[0]?.body.idempotencyKey).toBe("string");
+    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+    session.dispose();
+    await store.close();
+  });
+
+  it("recovers an archived character through PATCH", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 4, { lifecycle: "archived" }));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 4, { lifecycle: "archived" }), requestId: "req-open" }));
+    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 5, { lifecycle: "active" })));
+    await session.recover();
+    expect(api.sent[0]?.body).toMatchObject({ command: "recover", expectedRevision: 4 });
+    expect(session.getSnapshot().confirmed?.lifecycle).toBe("active");
+    session.dispose();
+    await store.close();
+  });
+
+  it("replays the identical frozen archive body after an ambiguous outcome", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+    api.scriptSend(async () => ({ error: new TypeError("network down") }));
+    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+    await expect(session.archive()).rejects.toThrow();
+    const first = api.sent[0];
+    expect(await store.readOnlineAttempts(ARM)).toHaveLength(1);
+    await session.archive();
+    expect(api.sent).toHaveLength(2);
+    expect(api.sent[1]?.body).toEqual(first?.body);
+    expect(api.sent[1]?.path).toBe(first?.path);
+    session.dispose();
+    await store.close();
+  });
+
+  it("refuses online-only lifecycle work while edits are pending or offline", async () => {
+    const { api, store, session, identity } = await makeHarness();
+    await seedConfirmed(store, "char-1", viewFor("char-1", 1));
+    await seedQueue(store, "char-1", [{ id: "pending", intent: { kind: "setField", fieldId: "name", value: "Briar" } }]);
+    api.scriptOpenView(viewFor("char-1", 1));
+    api.setSendFallback(async () => ({ error: new TypeError("offline") }));
+    await session.open();
+    const managementBefore = api.sent.filter((r) => r.method === "PATCH").length;
+    await expect(session.archive()).rejects.toThrow();
+    expect(api.sent.filter((r) => r.method === "PATCH")).toHaveLength(managementBefore);
+    identity.online = false;
+    identity.signal();
+    await expect(session.recover()).rejects.toThrow();
+    expect(api.sent.filter((r) => r.method === "PATCH")).toHaveLength(managementBefore);
+    session.dispose();
+    await store.close();
+  });
+
+  it("commits a migration through the preview commit command and clears the attempt", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+    api.setSendFallback(async (req) => {
+      expect(req.path).toBe("/characters/char-1/migrations/p-1/commit");
+      return successEnvelope(viewFor("char-1", 4));
+    });
+    await session.commitMigration("p-1");
+    expect(api.sent[0]?.body).toMatchObject({ expectedRevision: 3 });
+    expect(typeof api.sent[0]?.body.idempotencyKey).toBe("string");
+    expect(session.getSnapshot().confirmed?.revision).toBe(4);
+    expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+    session.dispose();
+    await store.close();
+  });
+
+  it("replays an ambiguous migration commit verbatim", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+    api.scriptSend(async () => ({ error: new TypeError("network down") }));
+    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4)));
+    await expect(session.commitMigration("p-1")).rejects.toThrow();
+    await session.commitMigration("p-1");
+    expect(api.sent).toHaveLength(2);
+    expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
+    session.dispose();
+    await store.close();
+  });
+
+  it("surfaces rollback limits without retrying a fresh key", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 5));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 5), requestId: "req-open" }));
+    api.scriptSend(async () => ({
+      error: new ApiError({ status: 409, code: "conflict", message: "Rollback window expired.", requestId: "r", latestRevision: 5, diagnostics: [] }),
+    }));
+    await expect(session.rollbackMigration("m-1")).rejects.toThrow(/Rollback|expired|conflict/i);
+    expect(api.sent).toHaveLength(1);
+    expect(api.sent[0]?.path).toBe("/characters/char-1/migrations/m-1/rollback");
+    expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+    session.dispose();
+    await store.close();
+  });
+
+  it("reapplies selected intentions against the latest revision with fresh keys", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 1));
+    await session.open();
+    api.scriptSend(async () => ({ error: conflictError() }));
+    api.scriptOpenView(viewFor("char-1", 7));
+    await session.setField("name", "Briar");
+    await session.whenIdle();
+    const conflictedKey = (session.getSnapshot().entries[0]?.attempt?.body.idempotencyKey ?? api.sent[0]?.body.idempotencyKey) as string;
+    const selectedIds = session.getSnapshot().entries.map((e) => e.id);
+    await session.resolveConflict({ mode: "reapply", selectedIds });
+    await session.whenIdle();
+    expect(api.sent.length).toBeGreaterThanOrEqual(2);
+    const reapplyRequest = api.sent[api.sent.length - 1]!;
+    expect(reapplyRequest.body.expectedRevision).toBe(7);
+    expect(reapplyRequest.body.idempotencyKey).not.toBe(conflictedKey);
+    session.dispose();
+    await store.close();
+  });
+});

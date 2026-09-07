@@ -148,7 +148,46 @@ invalidate fresh baselines). Post-fix: 6/6 green.
 - Migration comment assertion (`0010` RESTRICT note): acceptable as-is; I4's runtime guard
   above is the enforcement.
 
-## Final verification (all unpiped, final code)
+## Final fix round — I4 guard extended to migration references (a2976d6 → HEAD)
+
+Remnant from re-review: the I4 seeder RESTRICT guard probed only
+`characters.system_version_id`, but `character_migration_previews` and
+`character_migrations` `source_version_id`/`target_version_id` also
+`REFERENCES system_versions ON DELETE RESTRICT`
+(`migrations/0009_create_characters.sql:94,96,116,117`). A drift+usage
+coincidence on those rows would have hit the same 23503 boot crash.
+
+Fix (`src/systems/implementation/persistence/repository.ts`): the guard now
+probes all three tables per drifted `versionId` (`$1`), each probe
+`42P01`-tolerant (isolated seeder schemas without those tables keep the old
+repair path), and skips the repair with `console.warn` + `versionsReplaced 0`
+when any probe hits:
+`characters WHERE system_version_id = $1`,
+`character_migration_previews WHERE source_version_id = $1 OR target_version_id = $1`,
+`character_migrations WHERE source_version_id = $1 OR target_version_id = $1`.
+
+Test (`tests/integration/reference-templates.test.ts`, TDD RED→GREEN): the
+fake runner previously ignored `$1`. It now captures `(text, params)`, serves
+drift only for the target `versionId` (other templates return matching
+checksum/identity → `alreadySeeded`, no probe), and returns a hit only when
+`params[0]` equals the target. Three cases — characters / previews /
+migrations — each assert no `DELETE`, the matching table probed with the
+drifted row's own `versionId` as `$1`, warning logged, `versionsReplaced 0`.
+RED pre-fix: the 2 new preview/migration cases failed with
+`unexpected query: DELETE FROM system_versions WHERE id = $1`; GREEN post-fix.
+
+Fresh evidence (all unpiped, final code):
+
+```
+TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run test:integration
+  Test Files  12 passed (12)
+       Tests  122 passed (122)
+```
+(log: `/tmp/opencode/task11-final-fix-integration.log`; 122 = prior 120 + 2 new
+guard cases; `reference-templates.test.ts` contributes 6 DB-backed + 3 fake-runner
+guard tests, all green)
+- `npm test` (root unit) → 28 files, **269 passed**
+- `npm run typecheck` → pass
 
 - `TEST_DATABASE_URL=… npm run test:integration` → 12 files, **120 passed**
 - `npm test` (root unit) → 28 files, **269 passed**

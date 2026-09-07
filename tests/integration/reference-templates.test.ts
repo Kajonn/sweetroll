@@ -139,28 +139,60 @@ describeWithDatabase("reference template seeding", () => {
 });
 
 /**
- * Task 11 I4 (TDD): repair-by-delete is RESTRICT-unsafe once characters
- * reference a drifted template row. The seeder must skip the repair (log +
- * keep the old row) instead of DELETEing a referenced version.
- * Runs against a fake runner so no database is required.
+ * Task 11 I4 (TDD): repair-by-delete is RESTRICT-unsafe once characters or
+ * migration rows reference a drifted template row. The seeder must skip the
+ * repair (log + keep the old row) instead of DELETEing a referenced version.
+ * Runs against a fake runner so no database is required. Probes must pass
+ * the drifted row's own versionId as $1 (per-versionId arguments).
  */
 describe("reference template seeder RESTRICT guard", () => {
-  it("skips repair when characters reference the drifted version", async () => {
-    const template = REFERENCE_TEMPLATES[0]!;
-    const calls: string[] = [];
+  type ProbeCall = { text: string; params: unknown[] };
+
+  function makeFake(targetVersionId: string, hitOn: "characters" | "previews" | "migrations") {
+    const calls: ProbeCall[] = [];
     const fakeRunner = {
-      async query(text: string) {
-        calls.push(text);
+      async query(text: string, params?: unknown[]) {
+        calls.push({ text, params: params ?? [] });
         if (text.startsWith("INSERT INTO systems")) return { rowCount: 0, rows: [] };
         if (text.startsWith("SELECT id, checksum")) {
-          return { rowCount: 1, rows: [{ id: template.versionId, checksum: "pending:d20", package_json: {} }] };
+          const versionId = params?.[0] as string;
+          const tpl = REFERENCE_TEMPLATES.find(t => t.versionId === versionId);
+          if (tpl !== undefined && versionId === targetVersionId) {
+            return { rowCount: 1, rows: [{ id: versionId, checksum: "pending:drift", package_json: {} }] };
+          }
+          if (tpl !== undefined) {
+            return {
+              rowCount: 1,
+              rows: [{
+                id: versionId,
+                checksum: tpl.package.integrity.checksum,
+                package_json: { versionId: tpl.versionId, systemId: tpl.systemId },
+              }],
+            };
+          }
+          return { rowCount: 0, rows: [] };
         }
         if (text.includes("FROM characters WHERE system_version_id")) {
-          return { rowCount: 1, rows: [{ one: 1 }] };
+          const hit = hitOn === "characters" && params?.[0] === targetVersionId;
+          return { rowCount: hit ? 1 : 0, rows: hit ? [{ one: 1 }] : [] };
+        }
+        if (text.includes("FROM character_migration_previews")) {
+          const hit = hitOn === "previews" && params?.[0] === targetVersionId;
+          return { rowCount: hit ? 1 : 0, rows: hit ? [{ one: 1 }] : [] };
+        }
+        if (text.includes("FROM character_migrations")) {
+          const hit = hitOn === "migrations" && params?.[0] === targetVersionId;
+          return { rowCount: hit ? 1 : 0, rows: hit ? [{ one: 1 }] : [] };
         }
         throw new Error(`unexpected query: ${text}`);
       },
     };
+    return { calls, fakeRunner };
+  }
+
+  async function expectSkipOnReference(hitOn: "characters" | "previews" | "migrations") {
+    const template = REFERENCE_TEMPLATES[0]!;
+    const { calls, fakeRunner } = makeFake(template.versionId, hitOn);
     // eslint-disable-next-line no-console
     const warn = console.warn;
     const warnings: unknown[][] = [];
@@ -173,8 +205,30 @@ describe("reference template seeder RESTRICT guard", () => {
       // eslint-disable-next-line no-console
       console.warn = warn;
     }
-    expect(calls.some(c => c.startsWith("DELETE FROM system_versions"))).toBe(false);
-    expect(calls.some(c => c.includes("FROM characters WHERE system_version_id"))).toBe(true);
+    expect(calls.some(c => c.text.startsWith("DELETE FROM system_versions"))).toBe(false);
+    const tableFragment =
+      hitOn === "characters"
+        ? "FROM characters WHERE system_version_id"
+        : hitOn === "previews"
+          ? "FROM character_migration_previews"
+          : "FROM character_migrations";
+    const probeCalls = calls.filter(c => c.text.includes(tableFragment));
+    expect(probeCalls.length).toBeGreaterThanOrEqual(1);
+    // Per-versionId probe arguments: every probe carries the drifted row's own versionId as $1.
+    for (const probe of probeCalls) expect(probe.params[0]).toBe(template.versionId);
+    expect(probeCalls.some(c => c.params[0] === template.versionId)).toBe(true);
     expect(warnings.length).toBeGreaterThanOrEqual(1);
+  }
+
+  it("skips repair when characters reference the drifted version", async () => {
+    await expectSkipOnReference("characters");
+  });
+
+  it("skips repair when migration previews reference the drifted version", async () => {
+    await expectSkipOnReference("previews");
+  });
+
+  it("skips repair when migrations reference the drifted version", async () => {
+    await expectSkipOnReference("migrations");
   });
 });

@@ -821,23 +821,38 @@ export async function seedReferenceTemplates(runner: SeedRunner): Promise<SeedRe
     // package/row identity invariant holds. Legacy rows under retired
     // synthetic ids are removed by migration 0010, not here.
     //
-    // RESTRICT guard (Task 11 I4): characters.system_version_id (plus
-    // migration preview/migration source/target ids) reference
+    // RESTRICT guard (Task 11 I4): characters.system_version_id plus
+    // character_migration_previews.source/target_version_id and
+    // character_migrations.source/target_version_id reference
     // system_versions with ON DELETE RESTRICT. A repair-by-delete would
     // fail (23503) — or worse, remove a row live characters depend on —
     // once drift coincides with real usage. Skip the repair, keep the old
     // row, and log so the drift is visible instead of crashing boot.
-    let referenced = false;
-    try {
-      const hit = await runner.query<{ one: number }>(
-        "SELECT 1 AS one FROM characters WHERE system_version_id = $1 LIMIT 1",
-        [tpl.versionId],
+    const isUndefinedTable = (error: unknown): boolean =>
+      (error as { code?: string }).code === "42P01";
+    const probeReferences = async (text: string): Promise<boolean> => {
+      try {
+        const hit = await runner.query<{ one: number }>(text, [tpl.versionId]);
+        return (hit.rows.length ?? 0) > 0;
+      } catch (error) {
+        // Isolated seeder schemas (e.g. reference-templates.test.ts) have no
+        // characters/migration tables yet — undefined_table means "no references".
+        if (isUndefinedTable(error)) return false;
+        throw error;
+      }
+    };
+    let referenced = await probeReferences(
+      "SELECT 1 AS one FROM characters WHERE system_version_id = $1 LIMIT 1",
+    );
+    if (!referenced) {
+      referenced = await probeReferences(
+        "SELECT 1 AS one FROM character_migration_previews WHERE source_version_id = $1 OR target_version_id = $1 LIMIT 1",
       );
-      referenced = (hit.rows.length ?? 0) > 0;
-    } catch (error) {
-      // Isolated seeder schemas (e.g. reference-templates.test.ts) have no
-      // characters table yet — undefined_table means "no references".
-      if ((error as { code?: string }).code !== "42P01") throw error;
+    }
+    if (!referenced) {
+      referenced = await probeReferences(
+        "SELECT 1 AS one FROM character_migrations WHERE source_version_id = $1 OR target_version_id = $1 LIMIT 1",
+      );
     }
     if (referenced) {
       console.warn(

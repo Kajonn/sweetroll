@@ -28,7 +28,7 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
   };
   return {
     phase: "ready", confirmed: makeView({ characterId: "character", revision: 1, projection }), tentative: null,
-    entries: [], editing: { owned: true }, error: null, lastRoll: null, lastMigration: null, pendingOnlineAttempts: [], ...overrides,
+    entries: [], editing: { owned: true }, error: null, lastRoll: null, lastMigration: null, pendingOnlineAttempts: [], connected: true, ...overrides,
   };
 }
 
@@ -198,7 +198,7 @@ describe("CharacterSheet", () => {
   });
 
   it("exposes no private detail once purged", () => {
-    render(<CharacterSheet snapshot={{ phase: "purged", confirmed: null, tentative: null, entries: [], editing: { owned: false }, error: { kind: "purged", message: "This character is no longer available." }, lastRoll: null, lastMigration: null, pendingOnlineAttempts: [] }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    render(<CharacterSheet snapshot={{ phase: "purged", confirmed: null, tentative: null, entries: [], editing: { owned: false }, error: { kind: "purged", message: "This character is no longer available." }, lastRoll: null, lastMigration: null, pendingOnlineAttempts: [], connected: false }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getByRole("status")).toHaveTextContent("This character is no longer available.");
     expect(screen.queryByText("Aria")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();

@@ -2,6 +2,7 @@ import { ApiError } from "../api/client.js";
 import type { CharactersApi } from "./api.js";
 import type { CharacterStore, OnlineAttempt } from "./store.js";
 import type {
+  ActivityEvent,
   CharacterView,
   CommandResultResponse,
   EditIntent,
@@ -81,6 +82,8 @@ export type CharacterSnapshot = {
   entries: QueueEntry[];
   editing: { owned: boolean; owner?: string | null };
   error: BlockingError | null;
+  /** True while this session's actor is authenticated online. Read-only panels gate on this. */
+  connected: boolean;
   /** The latest authoritative roll result received during this open session. */
   lastRoll: CommandResultResponse["result"]["roll"];
   /** The latest successful migration commit/rollback, kept for later UI use. */
@@ -113,9 +116,27 @@ export type CharacterSession = {
    */
   reviewExpiredAttempt(input: ReviewExpiredAttemptInput): Promise<void>;
   requestEditing(): Promise<boolean>;
+  /**
+   * Read-only activity paging through the durable account/character cache.
+   * Online it fetches the server page for the cursor and caches it; offline
+   * (or when the fetch fails) it serves the last fetched page marked stale.
+   * It never sends a mutation and never crosses accounts.
+   */
+  fetchActivityPage(cursor: string | null): Promise<ActivityPageResult>;
   /** Test/support helper: resolves when the serialized drain is idle. */
   whenIdle(): Promise<void>;
   dispose(): void;
+};
+
+/**
+ * One activity page as seen by read-only panels: the server events and
+ * cursor plus whether the page came from the durable cache while offline.
+ */
+export type ActivityPageResult = {
+  events: ActivityEvent[];
+  nextCursor: string | null;
+  stale: boolean;
+  fetchedAt: string;
 };
 
 export type CreateCharacterSessionInput = {
@@ -251,6 +272,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       entries: visible ? entries.filter((e) => !entryWrites.has(e.id)).map((e) => ({ ...e })) : [],
       editing: { ...editing, owned: visible && editing.owned },
       error: visible && error ? { ...error } : null,
+      connected: isConnected(),
       lastRoll: visible ? lastRoll : null,
       lastMigration: visible ? lastMigration : null,
       pendingOnlineAttempts: visible ? pendingOnline.map((a) => ({ ...a, request: { ...a.request, body: { ...a.request.body } } })) : [],
@@ -1563,6 +1585,62 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return opening;
   }
 
+  /**
+   * Read-only activity paging over the durable account/character cache.
+   * Online it fetches the server page for the cursor and caches it under
+   * guard; offline (or when the fetch fails) it serves the last fetched
+   * page marked stale. It never mints a mutation, never crosses accounts,
+   * and never fabricates events when nothing was cached.
+   */
+  async function fetchActivityPage(cursor: string | null): Promise<ActivityPageResult> {
+    if (disposed) throw new Error("Session closed.");
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+    if (cursor !== null && typeof cursor !== "string") throw new Error("An activity cursor must be a string or null.");
+    if (!isConnected()) {
+      const cached = await store.readActivityPage(actorId, characterId, cursor).catch(() => null);
+      if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+      if (cached === null) {
+        throw structuredError(
+          "Activity is unavailable offline and nothing was cached for this character yet.",
+          "network-unavailable",
+        );
+      }
+      return { events: cached.events, nextCursor: cached.nextCursor, stale: true, fetchedAt: cached.fetchedAt };
+    }
+    let response;
+    try {
+      response = await api.activity(characterId, cursor);
+    } catch (err) {
+      if (!await identityIsCurrent()) throw err instanceof Error ? err : new Error("Account changed.");
+      const cached = await store.readActivityPage(actorId, characterId, cursor).catch(() => null);
+      if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+      if (cached !== null) {
+        return { events: cached.events, nextCursor: cached.nextCursor, stale: true, fetchedAt: cached.fetchedAt };
+      }
+      throw err;
+    }
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+    const page = {
+      actorId,
+      characterId,
+      cursor,
+      events: response.events,
+      nextCursor: response.nextCursor,
+      fetchedAt: now(),
+    };
+    // Guarded best-effort cache write: a purge, sign-out or account switch
+    // racing the fetch must never repopulate cached activity, and a cache
+    // write failure must never block read-only panels from fresh data.
+    if (identityMatches()) {
+      try {
+        await store.saveActivityPage(page, { generation, accountGeneration });
+      } catch {
+        if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+      }
+    }
+    return { events: page.events, nextCursor: page.nextCursor, stale: false, fetchedAt: page.fetchedAt };
+  }
+
   async function initialize(): Promise<void> {
     const loaded = await store.read(actorId, characterId);
     if (!identityMatches()) return;
@@ -1747,6 +1825,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     },
     reviewExpiredAttempt(input) {
       return trackOnline(reviewExpiredAttemptInner(input));
+    },
+    fetchActivityPage(cursor) {
+      return fetchActivityPage(cursor);
     },
     resolveConflict(input) {
       if (recovering) return Promise.reject(new Error("Conflict recovery is already in progress."));

@@ -41,6 +41,13 @@ describe("shouldHandle", () => {
     expect(shouldHandle(navigate("https://app.test/api/characters/one"), "asset")).toBe(false);
     expect(shouldHandle(navigate("https://app.test/dev/panel"), "asset")).toBe(false);
   });
+
+  it("never handles character activity or export traffic, which stay network-only", () => {
+    expect(shouldHandle(navigate("https://app.test/api/characters/one/activity?cursor=abc"), "asset")).toBe(false);
+    expect(shouldHandle(navigate("https://app.test/api/characters/one/activity"), "navigate")).toBe(false);
+    expect(shouldHandle(navigate("https://app.test/api/characters/one/exports"), "asset")).toBe(false);
+    expect(shouldHandle(navigate("https://app.test/api/characters/one/exports"), "navigate")).toBe(false);
+  });
 });
 
 describe("isKnownShellRoute", () => {

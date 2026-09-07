@@ -237,7 +237,23 @@ class FakeApi implements CharactersApi {
   creationOptions(): Promise<CreationOptions> {
     throw new Error("unused");
   }
-  activity(): Promise<ActivityResponse> {
+  activityScript: Array<ActivityResponse | { __error: Error }> = [];
+  activityCalls: Array<{ characterId: string; cursor: string | null }> = [];
+  scriptActivity(response: ActivityResponse) {
+    this.activityScript.push(response);
+  }
+  scriptActivityError(error: Error) {
+    this.activityScript.push({ __error: error });
+  }
+  async activity(characterId: string, cursor: string | null): Promise<ActivityResponse> {
+    this.activityCalls.push({ characterId, cursor });
+    const planned = this.activityScript.length > 0 ? this.activityScript.shift()! : null;
+    if (planned !== null) {
+      if ("__error" in (planned as object)) {
+        throw (planned as unknown as { __error: Error }).__error;
+      }
+      return planned as ActivityResponse;
+    }
     throw new Error("unused");
   }
   export(): Promise<CharacterExport> {
@@ -2452,5 +2468,80 @@ describe("ordered resource estimates", () => {
     expect(harness.session.getSnapshot().tentative).toBeNull();
     harness.session.dispose();
     await harness.store.close();
+  });
+});
+
+function activityPage(events: Array<{ id: string }>, nextCursor: string | null): ActivityResponse {
+  return {
+    events: events.map((e) => ({
+      id: e.id,
+      characterRevision: 3,
+      kind: "set",
+      payload: {},
+      rollId: null,
+      requestId: "r",
+      occurredAt: "2026-09-06T00:00:00.000Z",
+    })),
+    nextCursor,
+    requestId: "r",
+  };
+}
+
+describe("CharacterSession activity cache", () => {
+  it("fetches a page online, caches it and forwards the server cursor", async () => {
+    const { api, session, store } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 1));
+    await session.open();
+    api.scriptActivity(activityPage([{ id: "a1" }], "cursor-1"));
+    const page = await session.fetchActivityPage(null);
+    expect(page.events.map((e) => e.id)).toEqual(["a1"]);
+    expect(page.nextCursor).toBe("cursor-1");
+    expect(page.stale).toBe(false);
+    expect(api.activityCalls).toEqual([{ characterId: "char-1", cursor: null }]);
+    const cached = await store.readActivityPage(ARM, "char-1", null);
+    expect(cached?.events.map((e) => e.id)).toEqual(["a1"]);
+    expect(cached?.nextCursor).toBe("cursor-1");
+    session.dispose();
+    await store.close();
+  });
+
+  it("serves the last fetched page marked stale while offline and skips the network", async () => {
+    const { api, identity, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 1));
+    await session.open();
+    api.scriptActivity(activityPage([{ id: "a1" }], "cursor-1"));
+    await session.fetchActivityPage(null);
+    identity.online = false;
+    identity.signal();
+    const page = await session.fetchActivityPage(null);
+    expect(page.events.map((e) => e.id)).toEqual(["a1"]);
+    expect(page.stale).toBe(true);
+    expect(api.activityCalls).toHaveLength(1);
+    session.dispose();
+  });
+
+  it("rejects offline activity without a cached page instead of inventing events", async () => {
+    const { api, identity, session, store } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 1));
+    await session.open();
+    identity.online = false;
+    identity.signal();
+    await expect(session.fetchActivityPage(null)).rejects.toThrow();
+    session.dispose();
+    await store.close();
+  });
+
+  it("hides cached activity after the account changes", async () => {
+    const { api, identity, session, store } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 1));
+    await session.open();
+    api.scriptActivity(activityPage([{ id: "a1" }], null));
+    await session.fetchActivityPage(null);
+    identity.actorId = "other";
+    identity.generationCounter++;
+    identity.signal();
+    await expect(session.fetchActivityPage(null)).rejects.toThrow();
+    session.dispose();
+    await store.close();
   });
 });

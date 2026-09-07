@@ -1,4 +1,4 @@
-import type { CharacterView, FrozenRequest, QueueEntry, ResolveEntriesInput } from "./types.js";
+import type { ActivityEvent, CharacterView, FrozenRequest, QueueEntry, ResolveEntriesInput } from "./types.js";
 
 export type OnlineAttempt = {
   id: string;
@@ -18,6 +18,22 @@ export type OnlineAttempt = {
 
 export type StoredIdentity = { actorId: string | null; generation: number; pendingLogout: string | null };
 export type WriteGuard = { generation: number; accountGeneration: number };
+
+/**
+ * One durably cached activity page, keyed by account, character and the
+ * server cursor that produced it (null for the first page). The page is
+ * private read state: it participates in character purge and account
+ * clearing, and it is never written to CacheStorage by the service worker
+ * (which stays network-only for `/api` traffic).
+ */
+export type CachedActivityPage = {
+  actorId: string;
+  characterId: string;
+  cursor: string | null;
+  events: ActivityEvent[];
+  nextCursor: string | null;
+  fetchedAt: string;
+};
 
 export type CharacterStore = {
   read(
@@ -109,15 +125,24 @@ export type CharacterStore = {
   setPendingLogout(actorId: string): Promise<void>;
   readPendingLogout(): Promise<string | null>;
   clearPendingLogout(expectedGeneration?: number): Promise<void>;
+  /**
+   * Durable per-account/per-character activity pages keyed by server cursor.
+   * Reads never cross accounts. Writes verify the account identity (and the
+   * character generation when a guard is supplied) so a late response can
+   * never repopulate activity after purge, sign-out or an account switch.
+   */
+  readActivityPage(actorId: string, characterId: string, cursor: string | null): Promise<CachedActivityPage | null>;
+  saveActivityPage(page: CachedActivityPage, guard?: WriteGuard): Promise<void>;
 };
 
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const CHAR = "characters";
 const QUEUE = "queue";
 const ATTEMPTS = "onlineAttempts";
 const LAST_ACCOUNT = "lastAccount";
 const PENDING_LOGOUT = "pendingLogout";
+const ACTIVITY = "activity";
 
 const MAX_STRING = "\uffff";
 
@@ -127,6 +152,17 @@ type CharacterRecord = {
   confirmed: CharacterView | null;
   generation: number;
 };
+
+type ActivityRecord = CachedActivityPage & { cursorKey: string };
+
+function activityKey(page: Pick<CachedActivityPage, "actorId" | "characterId" | "cursor">): IDBValidKey {
+  return [page.actorId, page.characterId, page.cursor ?? ""];
+}
+
+function toCachedActivityPage(record: ActivityRecord): CachedActivityPage {
+  const { cursorKey: _cursorKey, ...page } = record;
+  return page;
+}
 
 function openDatabase(name: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -148,6 +184,9 @@ function openDatabase(name: string): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(PENDING_LOGOUT)) {
         db.createObjectStore(PENDING_LOGOUT, { keyPath: "key" });
+      }
+      if (!db.objectStoreNames.contains(ACTIVITY)) {
+        db.createObjectStore(ACTIVITY, { keyPath: ["actorId", "characterId", "cursorKey"] });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -497,7 +536,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
     },
 
     async purgeCharacter(actorId, characterId) {
-      await openTx(db, [CHAR, QUEUE, ATTEMPTS, LAST_ACCOUNT], "readwrite", async (tx) => {
+      await openTx(db, [CHAR, QUEUE, ATTEMPTS, ACTIVITY, LAST_ACCOUNT], "readwrite", async (tx) => {
         const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]) ?? {
           actorId, characterId, confirmed: null, generation: await accountGeneration(tx, actorId),
         };
@@ -506,11 +545,12 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
         await putRequest(tx, CHAR, record);
         await deleteByPrefix(tx, QUEUE, [actorId, characterId]);
         await deleteOnlineAttemptsForCharacter(tx, actorId, characterId);
+        await deleteByPrefix(tx, ACTIVITY, [actorId, characterId]);
       });
     },
 
     async clearAccount(actorId) {
-      await openTx(db, [CHAR, QUEUE, ATTEMPTS, LAST_ACCOUNT], "readwrite", async (tx) => {
+      await openTx(db, [CHAR, QUEUE, ATTEMPTS, ACTIVITY, LAST_ACCOUNT], "readwrite", async (tx) => {
         await advanceIdentity(tx);
         await putRequest(tx, LAST_ACCOUNT, {
           key: `generation:${actorId}`, generation: await accountGeneration(tx, actorId) + 1,
@@ -526,6 +566,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
           await putRequest(tx, CHAR, record);
         }
         await deleteByPrefix(tx, QUEUE, [actorId]);
+        await deleteByPrefix(tx, ACTIVITY, [actorId]);
         const attempts = await collectByKey<OnlineAttempt>(
           tx,
           ATTEMPTS,
@@ -657,6 +698,26 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
 
     readIdentity() { return openTx(db, [LAST_ACCOUNT, PENDING_LOGOUT], "readonly", readIdentity); },
 
+    async readActivityPage(actorId, characterId, cursor) {
+      return openTx(db, [ACTIVITY], "readonly", async (tx) => {
+        const record = await getRequest<ActivityRecord>(tx, ACTIVITY, activityKey({ actorId, characterId, cursor }));
+        return record === undefined ? null : toCachedActivityPage(record);
+      });
+    },
+
+    async saveActivityPage(page, guard) {
+      await openTx(db, [CHAR, ACTIVITY, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async (tx) => {
+        await assertWriteIdentity(tx, page.actorId, guard?.accountGeneration);
+        if (guard !== undefined) {
+          const record = await getRequest<CharacterRecord>(tx, CHAR, [page.actorId, page.characterId]);
+          const expected = record?.generation ?? await accountGeneration(tx, page.actorId);
+          if (expected !== guard.generation) {
+            throw new Error("stale activity save: character generation changed");
+          }
+        }
+        await putRequest(tx, ACTIVITY, { ...page, cursorKey: page.cursor ?? "" });
+      });
+    },
     async setLastAccount(actorId, expected) {
       return openTx(db, [LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async tx => {
         const current = await readIdentity(tx);

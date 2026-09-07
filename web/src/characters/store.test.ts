@@ -841,4 +841,81 @@ describe("CharacterStore creation attempts", () => {
     expect(attempts[0]!.request.body).toEqual({ name: "Aria", systemVersionId: "v-1", idempotencyKey: "key-create-1" });
     await store.close();
   });
+
+  it("caches activity pages per account, character and server cursor", async () => {
+    const store = await openFresh();
+    expect(await store.readActivityPage("actor-A", "char-1", null)).toBeNull();
+    await store.saveActivityPage({
+      actorId: "actor-A",
+      characterId: "char-1",
+      cursor: null,
+      events: [
+        { id: "a1", characterRevision: 3, kind: "set", payload: {}, rollId: null, requestId: "r", occurredAt: "2026-09-06T00:00:00.000Z" },
+      ],
+      nextCursor: "cursor-1",
+      fetchedAt: "2026-09-06T01:00:00.000Z",
+    });
+    await store.saveActivityPage({
+      actorId: "actor-A",
+      characterId: "char-1",
+      cursor: "cursor-1",
+      events: [
+        { id: "a2", characterRevision: 4, kind: "bump", payload: {}, rollId: null, requestId: "r", occurredAt: "2026-09-06T02:00:00.000Z" },
+      ],
+      nextCursor: null,
+      fetchedAt: "2026-09-06T03:00:00.000Z",
+    });
+    const first = await store.readActivityPage("actor-A", "char-1", null);
+    expect(first?.events.map((e) => e.id)).toEqual(["a1"]);
+    expect(first?.nextCursor).toBe("cursor-1");
+    expect(first?.fetchedAt).toBe("2026-09-06T01:00:00.000Z");
+    const second = await store.readActivityPage("actor-A", "char-1", "cursor-1");
+    expect(second?.events.map((e) => e.id)).toEqual(["a2"]);
+    // Another account never sees this account's cached activity.
+    expect(await store.readActivityPage("actor-B", "char-1", null)).toBeNull();
+    await store.close();
+  });
+
+  it("purge and sign-out delete cached activity without touching other characters", async () => {
+    const store = await openFresh();
+    const page = (characterId: string) => ({
+      actorId: "actor-A",
+      characterId,
+      cursor: null as string | null,
+      events: [
+        { id: `event-${characterId}`, characterRevision: 1, kind: "set", payload: {}, rollId: null, requestId: "r", occurredAt: "2026-09-06T00:00:00.000Z" },
+      ],
+      nextCursor: null as string | null,
+      fetchedAt: "2026-09-06T01:00:00.000Z",
+    });
+    await store.saveActivityPage(page("char-1"));
+    await store.saveActivityPage(page("char-2"));
+    await store.purgeCharacter("actor-A", "char-1");
+    expect(await store.readActivityPage("actor-A", "char-1", null)).toBeNull();
+    expect(await store.readActivityPage("actor-A", "char-2", null)).not.toBeNull();
+    await store.clearAccount("actor-A");
+    expect(await store.readActivityPage("actor-A", "char-2", null)).toBeNull();
+    await store.close();
+  });
+
+  it("rejects activity writes after the account changes or a logout is pending", async () => {
+    const store = await openFresh();
+    const guard = await store.read("actor-A", "char-1");
+    await store.setPendingLogout("actor-A");
+    await expect(
+      store.saveActivityPage(
+        {
+          actorId: "actor-A",
+          characterId: "char-1",
+          cursor: null,
+          events: [],
+          nextCursor: null,
+          fetchedAt: "2026-09-06T01:00:00.000Z",
+        },
+        guard,
+      ),
+    ).rejects.toThrow(/stale/);
+    expect(await store.readActivityPage("actor-A", "char-1", null)).toBeNull();
+    await store.close();
+  });
 });

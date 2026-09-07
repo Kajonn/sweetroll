@@ -12,4 +12,9 @@
 .commandError, .fieldError { margin: 0; color: var(--color-error); font-size: 12px; }
 .diagnostics { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }.diagnostics h2 { margin: 0; font-size: 16px; }
 .rollResult { padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }.rollResult h2 { margin: 0 0 8px; font-size: 16px; }.rollResult dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; }.rollResult dt { color: var(--color-fg-muted); font-size: 12px; }.rollResult dd { margin: 0; font-family: var(--font-mono); }.rollDetails ul { margin: 8px 0 0; padding-left: 18px; font-family: var(--font-mono); font-size: 12px; }
+/* Recovery and management controls keep phone-usable touch targets. */
+.toolButton, .dialogButton { min-height: 44px; min-width: 44px; padding: 8px 12px; border: 1px solid var(--color-accent); border-radius: var(--radius-sm); background: var(--color-accent); color: var(--color-accent-fg); font: inherit; }
+.toolButton:disabled, .dialogButton:disabled { border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg-muted); cursor: not-allowed; }
+.checkRow { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.dialogField { min-height: 44px; padding: 6px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-fg); font: inherit; }
 @media (max-width: 420px) { .sheet { padding: 8px; }.resource { flex-wrap: wrap; }.resourceValue { flex-basis: 100%; order: 2; }.resource button { flex: 1; } }

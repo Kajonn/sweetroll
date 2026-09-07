@@ -18,6 +18,7 @@ function snapshot(): CharacterSnapshot {
     lastRoll: null,
     lastMigration: null,
     pendingOnlineAttempts: [],
+    connected: true,
   };
 }
 

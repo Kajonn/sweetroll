@@ -149,7 +149,7 @@ online and signed in. Selecting a version fills the manual system-version-ID box
 (which remains as fallback) and loads its metadata through the unchanged
 `loadMetadata` path, so all existing guards and pending/expired behavior apply
 untouched. Proven by the production-browser picker journey in
-`web/tests/offline/character.spec.ts`.
+`web/tests/offline/character.spec.ts`. Implementation deviation accepted: the version query is inlined in CreateCharacter.tsx via the existing CharactersApi.listCreationVersions() seam (single query path) rather than a standalone useCreationVersions hook file, the hook/test files having been removed in fix commit cb39a72 per coordinator ruling.
 
 ## Self-review
 

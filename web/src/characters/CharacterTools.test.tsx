@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
@@ -218,8 +218,6 @@ describe("CharacterTools", () => {
   });
 
   it("does not start lifecycle work while edits are pending", async () => {
-    if (readySnapshot().entries.length > 0 || readySnapshot().phase !== "ready") return;
-    // Refresh and freeze before initiating the online-only operation.
     const pending = readySnapshot({
       entries: [
         {
@@ -249,5 +247,98 @@ describe("CharacterTools", () => {
     expect(screen.getByRole("dialog")).toBeVisible();
     await user.keyboard("{Escape}");
     expect(activityButton).toHaveFocus();
+  });
+
+  it("summarizes candidate values in the migration preview before commit", async () => {
+    const user = userEvent.setup();
+    const preview = {
+      preview: {
+        previewId: "p-1",
+        characterId: "char-1",
+        sourceRevision: 3,
+        sourceVersionId: "11111111-1111-4000-8000-000000000000",
+        targetVersionId: "22222222-2222-4000-8000-000000000000",
+        candidateState: { schemaVersion: "1.0", values: { name: "Aria", health: 5 } },
+        candidateProjection: {},
+        warnings: [],
+        expiresAt: "2027-01-01T00:00:00.000Z",
+      },
+      requestId: "r",
+    } as unknown as MigrationPreviewResponse;
+    const api = makeApi({ previewMigration: vi.fn(async () => preview) });
+    render(<CharacterTools characterId="char-1" api={api} session={makeSession(readySnapshot())} now={() => "2026-09-06T00:00:00.000Z"} />);
+    await user.click(screen.getByRole("button", { name: /migration/i }));
+    await user.type(screen.getByLabelText(/target version/i), "22222222-2222-4000-8000-000000000000");
+    await user.click(screen.getByRole("button", { name: /preview migration/i }));
+    const region = await screen.findByLabelText(/migration preview/i);
+    expect(within(region).getByText(/name/)).toBeVisible();
+    expect(within(region).getByText(/Aria/)).toBeVisible();
+  });
+
+  it("labels the archive cancel button Cancel instead of the title", async () => {
+    const user = userEvent.setup();
+    render(<CharacterTools characterId="char-1" api={makeApi()} session={makeSession(readySnapshot())} />);
+    await user.click(screen.getByRole("button", { name: /^archive$/i }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeVisible();
+  });
+
+  it("traps Tab inside secondary dialogs", async () => {
+    const user = userEvent.setup();
+    render(<CharacterTools characterId="char-1" api={makeApi()} session={makeSession(readySnapshot())} />);
+    await user.click(screen.getByRole("button", { name: /^archive$/i }));
+    const dialog = screen.getByRole("dialog");
+    const confirmButton = within(dialog).getByRole("button", { name: /confirm archive/i });
+    expect(confirmButton).toHaveFocus();
+    await user.tab();
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    await user.tab();
+    expect(confirmButton).toHaveFocus();
+  });
+
+  it("disables commit when the preview source revision drifted and asks for re-preview", async () => {
+    const user = userEvent.setup();
+    const preview = {
+      preview: {
+        previewId: "p-1",
+        characterId: "char-1",
+        sourceRevision: 2,
+        sourceVersionId: "11111111-1111-4000-8000-000000000000",
+        targetVersionId: "22222222-2222-4000-8000-000000000000",
+        candidateState: { schemaVersion: "1.0", values: {} },
+        candidateProjection: {},
+        warnings: [],
+        expiresAt: "2027-01-01T00:00:00.000Z",
+      },
+      requestId: "r",
+    } as unknown as MigrationPreviewResponse;
+    const api = makeApi({ previewMigration: vi.fn(async () => preview) });
+    const session = makeSession(readySnapshot());
+    render(<CharacterTools characterId="char-1" api={api} session={session} now={() => "2026-09-06T00:00:00.000Z"} />);
+    await user.click(screen.getByRole("button", { name: /migration/i }));
+    await user.type(screen.getByLabelText(/target version/i), "22222222-2222-4000-8000-000000000000");
+    await user.click(screen.getByRole("button", { name: /preview migration/i }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /commit migration/i })).toBeDisabled());
+    expect(screen.getByText(/older revision|re-preview/i)).toBeVisible();
+    expect(session.commitMigration).not.toHaveBeenCalled();
+  });
+
+  it("attaches the export anchor to the document for the click", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    let connectedAtClick: boolean | null = null;
+    let clickedAnchor: HTMLAnchorElement | null = null;
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      connectedAtClick = this.isConnected;
+      clickedAnchor = this;
+    });
+    render(<CharacterTools characterId="char-1" api={api} session={makeSession(readySnapshot())} />);
+    await user.click(screen.getByRole("button", { name: /export/i }));
+    await user.click(screen.getByRole("button", { name: /download export/i }));
+    await waitFor(() => expect(api.export).toHaveBeenCalledWith("char-1"));
+    expect(clickSpy).toHaveBeenCalled();
+    expect(connectedAtClick).toBe(true);
+    expect(clickedAnchor === null || document.body.contains(clickedAnchor)).toBe(false);
+    clickSpy.mockRestore();
   });
 });

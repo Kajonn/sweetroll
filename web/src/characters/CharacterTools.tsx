@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { t } from "../i18n/index.js";
 import type { CharactersApi } from "./api.js";
+import { trapTabKey } from "./dialogTrap.js";
 import type { CharacterSession } from "./session.js";
 import type { ActivityEvent, MigrationPreview } from "./types.js";
 
@@ -98,43 +99,23 @@ export function CharacterTools({ characterId, api, session, now = () => new Date
   );
 }
 
-function DialogShell({ title, onClose, children }: { title: string; onClose(): void; children: React.ReactNode }) {
-  const firstRef = useRef<HTMLButtonElement | null>(null);
-  useEffect(() => {
-    firstRef.current?.focus();
-  }, []);
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") onClose();
-      }}
-    >
-      <h2>{title}</h2>
-      {children}
-      <button ref={firstRef} type="button" onClick={onClose}>
-        {title}
-      </button>
-    </div>
-  );
-}
-
 function ConfirmDialog({ title, confirmLabel, onConfirm, onClose }: { title: string; confirmLabel: string; onConfirm(): Promise<void>; onClose(): void }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const confirmRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     confirmRef.current?.focus();
   }, []);
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={title}
       onKeyDown={(event) => {
         if (event.key === "Escape") onClose();
+        trapTabKey(event, dialogRef.current);
       }}
     >
       <h2>{title}</h2>
@@ -151,7 +132,7 @@ function ConfirmDialog({ title, confirmLabel, onConfirm, onClose }: { title: str
               await onConfirm();
               onClose();
             } catch (err) {
-              setError(err instanceof Error ? err.message : "Request failed.");
+              setError(err instanceof Error ? err.message : t("character.tools.confirmFailed"));
             } finally {
               setBusy(false);
             }
@@ -161,7 +142,7 @@ function ConfirmDialog({ title, confirmLabel, onConfirm, onClose }: { title: str
         {confirmLabel}
       </button>
       <button type="button" disabled={busy} onClick={onClose}>
-        {title}
+        {t("character.conflict.cancel")}
       </button>
     </div>
   );
@@ -173,6 +154,7 @@ function ActivityDialog({ characterId, api, onClose }: { characterId: string; ap
   const [stale, setStale] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   const load = async (next: string | null, append: boolean) => {
     setLoading(true);
@@ -184,7 +166,7 @@ function ActivityDialog({ characterId, api, onClose }: { characterId: string; ap
       setStale(false);
     } catch (err) {
       setStale(true);
-      setError(err instanceof Error ? err.message : "Activity unavailable offline.");
+      setError(err instanceof Error ? err.message : t("character.tools.activityUnavailable"));
     } finally {
       setLoading(false);
     }
@@ -197,15 +179,17 @@ function ActivityDialog({ characterId, api, onClose }: { characterId: string; ap
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
-      aria-label="Activity"
+      aria-label={t("character.tools.activityTitle")}
       onKeyDown={(event) => {
         if (event.key === "Escape") onClose();
+        trapTabKey(event, dialogRef.current);
       }}
     >
-      <h2>Activity</h2>
-      {stale ? <p>Stale — showing the last fetched activity offline.</p> : null}
+      <h2>{t("character.tools.activityTitle")}</h2>
+      {stale ? <p>{t("character.tools.activityStale")}</p> : null}
       {error !== null ? <p role="alert">{error}</p> : null}
       <ul>
         {events.map((event) => (
@@ -214,14 +198,14 @@ function ActivityDialog({ characterId, api, onClose }: { characterId: string; ap
       </ul>
       {cursor !== null ? (
         <button type="button" disabled={loading} onClick={() => void load(cursor, true)}>
-          Load more
+          {t("character.tools.activityLoadMore")}
         </button>
       ) : null}
       <button type="button" disabled={loading} onClick={() => void load(null, false)}>
-        Refresh activity
+        {t("character.tools.activityRefresh")}
       </button>
       <button type="button" onClick={onClose}>
-        Close
+        {t("character.tools.close")}
       </button>
     </div>
   );
@@ -230,6 +214,7 @@ function ActivityDialog({ characterId, api, onClose }: { characterId: string; ap
 function ExportDialog({ characterId, api, blocked, onClose }: { characterId: string; api: CharactersApi; blocked: boolean; onClose(): void }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   const download = async () => {
     if (blocked) return;
@@ -243,13 +228,18 @@ function ExportDialog({ characterId, api, blocked, onClose }: { characterId: str
         const anchor = document.createElement("a");
         anchor.href = url;
         anchor.download = `character-${characterId}.json`;
-        anchor.click();
+        document.body.appendChild(anchor);
+        try {
+          anchor.click();
+        } finally {
+          anchor.remove();
+        }
       } finally {
         URL.revokeObjectURL(url);
       }
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Export failed.");
+      setError(err instanceof Error ? err.message : t("character.tools.exportFailed"));
     } finally {
       setBusy(false);
     }
@@ -257,20 +247,23 @@ function ExportDialog({ characterId, api, blocked, onClose }: { characterId: str
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
-      aria-label="Export"
+      aria-label={t("character.tools.exportTitle")}
       onKeyDown={(event) => {
         if (event.key === "Escape") onClose();
+        trapTabKey(event, dialogRef.current);
       }}
     >
-      <h2>Export</h2>
+      <h2>{t("character.tools.exportTitle")}</h2>
       {error !== null ? <p role="alert">{error}</p> : null}
+      {blocked ? <p>{t("character.tools.exportBlocked")}</p> : null}
       <button type="button" disabled={blocked || busy} onClick={() => void download()}>
-        Download export
+        {t("character.tools.exportDownload")}
       </button>
       <button type="button" onClick={onClose}>
-        Close
+        {t("character.tools.close")}
       </button>
     </div>
   );
@@ -297,8 +290,13 @@ function MigrationDialog({
   const [migrationId, setMigrationId] = useState("");
   const [opError, setOpError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   const expired = preview !== null && Date.parse(preview.expiresAt) < Date.parse(now());
+  const confirmedRevision = snapshot.confirmed?.reconciliation.revision;
+  const staleRevision =
+    preview !== null && confirmedRevision !== undefined && preview.sourceRevision !== confirmedRevision;
+  const candidateValues = preview !== null ? Object.entries(preview.candidateState.values as Record<string, unknown>) : [];
 
   const loadPreview = async () => {
     setBusy(true);
@@ -307,14 +305,14 @@ function MigrationDialog({
       const response = await api.previewMigration(characterId, { targetVersionId });
       setPreview(response.preview);
     } catch (err) {
-      setPreviewError(err instanceof Error ? err.message : "Preview failed.");
+      setPreviewError(err instanceof Error ? err.message : t("character.tools.migrationPreviewFailed"));
     } finally {
       setBusy(false);
     }
   };
 
   const commit = async () => {
-    if (preview === null || expired || blocked) return;
+    if (preview === null || expired || staleRevision || blocked) return;
     // Refresh and freeze before initiating the online-only operation.
     setBusy(true);
     setOpError(null);
@@ -322,7 +320,7 @@ function MigrationDialog({
       await session.commitMigration(preview.previewId);
       onClose();
     } catch (err) {
-      setOpError(err instanceof Error ? err.message : "Commit failed. Re-preview the migration and try again.");
+      setOpError(err instanceof Error ? err.message : t("character.tools.migrationCommitFailed"));
     } finally {
       setBusy(false);
     }
@@ -337,7 +335,7 @@ function MigrationDialog({
       await session.rollbackMigration(migrationId.trim());
       onClose();
     } catch (err) {
-      setOpError(err instanceof Error ? err.message : "Rollback failed. This migration may be past its rollback limit.");
+      setOpError(err instanceof Error ? err.message : t("character.tools.migrationRollbackFailed"));
     } finally {
       setBusy(false);
     }
@@ -345,41 +343,59 @@ function MigrationDialog({
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
-      aria-label="Migration"
+      aria-label={t("character.tools.migrationTitle")}
       onKeyDown={(event) => {
         if (event.key === "Escape") onClose();
+        trapTabKey(event, dialogRef.current);
       }}
     >
-      <h2>Migration</h2>
+      <h2>{t("character.tools.migrationTitle")}</h2>
       {previewError !== null ? <p role="alert">{previewError}</p> : null}
       {opError !== null ? <p role="alert">{opError}</p> : null}
-      <label htmlFor="migration-target">Target version</label>
+      <label htmlFor="migration-target">{t("character.tools.migrationTargetVersion")}</label>
       <input id="migration-target" value={targetVersionId} onChange={(event) => setTargetVersionId(event.target.value)} />
       <button type="button" disabled={busy || targetVersionId.trim() === ""} onClick={() => void loadPreview()}>
-        Preview migration
+        {t("character.tools.migrationPreviewAction")}
       </button>
       {preview !== null ? (
         <section aria-label="Migration preview">
+          <h3>{t("character.tools.migrationCandidateTitle")}</h3>
+          <p>
+            {t("character.tools.migrationTargetVersion")}: {preview.targetVersionId}
+          </p>
+          {candidateValues.length > 0 ? (
+            <ul>
+              {candidateValues.map(([definitionId, value]) => (
+                <li key={definitionId}>
+                  {definitionId}: {typeof value === "string" ? value : JSON.stringify(value)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>{t("character.tools.migrationCandidateEmpty")}</p>
+          )}
           <ul>
             {preview.warnings.map((warning) => (
               <li key={warning}>{warning}</li>
             ))}
           </ul>
-          {expired ? <p role="alert">This preview expired. Re-preview the migration before committing.</p> : null}
-          <button type="button" disabled={busy || expired || blocked} onClick={() => void commit()}>
-            Commit migration
+          {expired ? <p role="alert">{t("character.tools.migrationExpired")}</p> : null}
+          {staleRevision ? <p role="alert">{t("character.tools.migrationStale")}</p> : null}
+          <button type="button" disabled={busy || expired || staleRevision || blocked} onClick={() => void commit()}>
+            {t("character.tools.migrationCommit")}
           </button>
         </section>
       ) : null}
-      <label htmlFor="migration-id">Migration ID</label>
+      <label htmlFor="migration-id">{t("character.tools.migrationIdLabel")}</label>
       <input id="migration-id" value={migrationId} onChange={(event) => setMigrationId(event.target.value)} />
       <button type="button" disabled={busy || migrationId.trim() === "" || blocked} onClick={() => void rollback()}>
-        Roll back migration
+        {t("character.tools.migrationRollback")}
       </button>
       <button type="button" onClick={onClose}>
-        Close
+        {t("character.tools.close")}
       </button>
     </div>
   );

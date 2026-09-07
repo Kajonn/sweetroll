@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import { t } from "../i18n/index.js";
+import { trapTabKey } from "./dialogTrap.js";
 import type { CharacterSnapshot } from "./session.js";
 import styles from "./characters.module.css";
 
@@ -8,6 +9,8 @@ export type ConflictReviewProps = {
   snapshot: CharacterSnapshot;
   onResolve(input: { mode: "discard" | "reapply"; selectedIds: string[] }): Promise<void>;
   onClose(): void;
+  /** Injected clock (ms since epoch) for expiry checks; defaults to Date.now. */
+  now?: number;
 };
 
 type PendingMode = "discard" | "reapply" | null;
@@ -37,20 +40,38 @@ function entryLabel(entry: CharacterSnapshot["entries"][number]): string {
  * and submits the selected queue IDs to `resolveConflict`. Stateless across
  * repeated conflicts: a new snapshot simply re-renders.
  */
-export function ConflictReview({ snapshot, onResolve, onClose }: ConflictReviewProps) {
+export function ConflictReview({ snapshot, onResolve, onClose, now: nowProp }: ConflictReviewProps) {
   const [selected, setSelected] = useState<string[]>([]);
   const [pendingMode, setPendingMode] = useState<PendingMode>(null);
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const openerRef = useRef<Element | null>(null);
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
+  const confirmDialogRef = useRef<HTMLDivElement | null>(null);
   const dialogId = useId();
-  const now = Date.now();
+  const now = nowProp ?? Date.now();
 
   const expired = snapshot.entries.some((entry) => isExpiredEntry(entry, now)) || snapshot.error?.kind === "expired-attempt";
-  const invalidDetails = snapshot.error?.kind === "invalid"
-    ? (snapshot.error.details as { diagnostics?: Array<{ message: string }> } | undefined)?.diagnostics ?? []
+  const isInvalid = snapshot.error?.kind === "invalid";
+  const invalidDetails = isInvalid
+    ? (snapshot.error?.details as { diagnostics?: Array<{ message: string }> } | undefined)?.diagnostics ?? []
     : [];
+
+  // Drop selection for entries that disappeared when a new snapshot arrives.
+  useEffect(() => {
+    const ids = new Set(snapshot.entries.map((entry) => entry.id));
+    setSelected((current) =>
+      current.every((id) => ids.has(id)) ? current : current.filter((id) => ids.has(id)),
+    );
+  }, [snapshot.entries]);
+
+  // Queued entries after the selection that a discard/reapply would reorder.
+  const selectedSet = new Set(selected);
+  const firstSelectedIndex = snapshot.entries.findIndex((entry) => selectedSet.has(entry.id));
+  const dependents =
+    firstSelectedIndex === -1
+      ? []
+      : snapshot.entries.slice(firstSelectedIndex + 1).filter((entry) => !selectedSet.has(entry.id));
 
   useEffect(() => {
     if (pendingMode !== null) {
@@ -96,6 +117,7 @@ export function ConflictReview({ snapshot, onResolve, onClose }: ConflictReviewP
           ))}
         </ul>
       ) : null}
+      {isInvalid ? <p>{t("character.conflict.invalidHint")}</p> : null}
       <ul>
         {snapshot.entries.map((entry) => {
           const label = entryLabel(entry);
@@ -128,7 +150,11 @@ export function ConflictReview({ snapshot, onResolve, onClose }: ConflictReviewP
         <button type="button" disabled={selected.length === 0} onClick={() => setPendingMode("discard")}>
           {t("character.conflict.discard")}
         </button>
-        <button type="button" disabled={selected.length === 0} onClick={() => setPendingMode("reapply")}>
+        <button
+          type="button"
+          disabled={selected.length === 0 || isInvalid}
+          onClick={() => setPendingMode("reapply")}
+        >
           {t("character.conflict.reapply")}
         </button>
         <button type="button" onClick={onClose}>
@@ -137,17 +163,27 @@ export function ConflictReview({ snapshot, onResolve, onClose }: ConflictReviewP
       </div>
       {pendingMode !== null ? (
         <div
+          ref={confirmDialogRef}
           role="dialog"
           aria-modal="true"
           aria-labelledby={`${dialogId}-confirm`}
           onKeyDown={(event) => {
             if (event.key === "Escape") closeDialog();
+            trapTabKey(event, confirmDialogRef.current);
           }}
         >
           <h3 id={`${dialogId}-confirm`}>
             {pendingMode === "discard" ? t("character.conflict.confirmDiscard") : t("character.conflict.confirmReapply")}
           </h3>
           <p>{t("character.conflict.confirmDetail")}</p>
+          {dependents.length > 0 ? (
+            <p>
+              {t("character.conflict.confirmDependents", {
+                count: dependents.length,
+                ids: dependents.map((entry) => entry.id).join(", "),
+              })}
+            </p>
+          ) : null}
           <button ref={confirmButtonRef} type="button" disabled={busy} onClick={() => void confirm()}>
             {pendingMode === "discard" ? t("character.conflict.confirmDiscardButton") : t("character.conflict.confirmReapplyButton")}
           </button>

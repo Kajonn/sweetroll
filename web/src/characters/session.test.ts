@@ -1250,4 +1250,64 @@ describe("CharacterSession online operations", () => {
     session.dispose();
     await store.close();
   });
+
+  it("deletes an expired online attempt and mints a fresh key on the next attempt", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+    await store.saveOnlineAttempt({
+      id: "old-attempt",
+      actorId: ARM,
+      characterId: "char-1",
+      kind: "archive",
+      request: {
+        method: "PATCH",
+        path: "/characters/char-1",
+        body: { command: "archive", expectedRevision: 3, idempotencyKey: "old-key" },
+        firstAttemptAt: "2020-01-01T00:00:00.000Z",
+      },
+      createdAt: "2020-01-01T00:00:00.000Z",
+    });
+    await expect(session.archive()).rejects.toThrow(/replay window/);
+    expect(session.getSnapshot().error?.kind).toBe("expired-attempt");
+    expect(api.sent).toHaveLength(0);
+    expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+    await session.resolveConflict({ mode: "discard", selectedIds: [] });
+    await session.whenIdle();
+    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+    await session.archive();
+    expect(api.sent).toHaveLength(1);
+    expect(api.sent[0]?.body.idempotencyKey).not.toBe("old-key");
+    expect(typeof api.sent[0]?.body.idempotencyKey).toBe("string");
+    session.dispose();
+    await store.close();
+  });
+
+  it("cleans superseded migration preview attempts when committing a newer preview", async () => {
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4)));
+    await store.saveOnlineAttempt({
+      id: "stale-preview",
+      actorId: ARM,
+      characterId: "char-1",
+      kind: "migration",
+      request: {
+        method: "POST",
+        path: "/characters/char-1/migrations/p-1/commit",
+        body: { expectedRevision: 3, idempotencyKey: "preview-old-key" },
+        firstAttemptAt: EVER,
+      },
+      createdAt: EVER,
+    });
+    await session.commitMigration("p-2");
+    expect(api.sent).toHaveLength(1);
+    expect(api.sent[0]?.path).toBe("/characters/char-1/migrations/p-2/commit");
+    expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+    session.dispose();
+    await store.close();
+  });
 });

@@ -869,11 +869,28 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (existing !== null) {
       if (isOnlineAttemptExpired(existing)) {
         setBlocked("expired-attempt", "This change is older than the server's replay window. Review it manually before continuing.");
+        // Drop the stale attempt so a post-review re-invocation mints a fresh
+        // idempotency key instead of re-throwing on the same orphan forever.
+        await store.deleteOnlineAttempt(actorId, existing.id).catch(() => {});
         emit();
         throw structuredError("This change is older than the server's replay window.", "expired-attempt");
       }
       await sendOnlineAttempt(existing);
       return;
+    }
+    if (op.operation === "commit") {
+      // Re-previewing orphans older preview commits: only the newest previewId
+      // can be committed, so superseded attempts could never replay. Clean them.
+      const superseded = stored.filter(
+        (attempt) =>
+          attempt.characterId === characterId &&
+          attempt.kind === "migration" &&
+          attempt.request.path.endsWith("/commit") &&
+          !onlineAttemptMatches(attempt, op),
+      );
+      for (const attempt of superseded) {
+        await store.deleteOnlineAttempt(actorId, attempt.id).catch(() => {});
+      }
     }
     if (entries.length > 0 || phase !== "ready") {
       throw new Error("Resolve pending edits and wait for the character to be ready before managing it.");

@@ -11,6 +11,7 @@ Commit target: `feat: render playable character projections`
 - Extended the session snapshot with the latest server-authoritative roll result. No client-side rule evaluation or action-effect prediction is performed.
 - Review follow-up: Enter commits now suppress the matching blur commit; diagnostics render for every projected field, resource, and action; absent completion metadata is labeled; action restrictions have localized persistent accessibility descriptions; and controls meet the 44 px mobile target.
 - Review follow-up: roll results disclose only server-returned dice and bindings on demand, and resource-bump actions retain their callback-only behavior.
+- Review follow-up: the authoritative `owner_only` audience now travels from runtime roll normalization through persistence, HTTP/OpenAPI, generated web contracts, and the localized roll-result view. The client displays the returned value without inferring visibility.
 
 ## Verification
 
@@ -19,3 +20,8 @@ Commit target: `feat: render playable character projections`
 - `npm run web:test`: 398 passing tests in 51 files. The existing suite emits React `act(...)` warnings from router tests; no tests fail.
 - `npm run web:build`: passed.
 - Checked `CharacterSheet.tsx` and `FieldControl.tsx` for rule evaluator, package, router, transport, and storage imports: none found.
+- `npm test`: 269 passing tests in 28 files.
+- `npm run typecheck && npm run contracts:check`: passed.
+- `npm run web:test`: 398 passing tests in 51 files; existing router tests emit React `act(...)` warnings only.
+- `npm run web:typecheck`: passed.
+- `npm run build && npm run web:build`: passed.

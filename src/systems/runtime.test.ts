@@ -410,6 +410,7 @@ describe("SystemRuntime contract", () => {
       ],
       total: 1,
       output: "Successes: 1",
+      audience: "owner_only",
     });
     expect(a.value.roll?.dice).not.toEqual(b.value.roll?.dice);
   });

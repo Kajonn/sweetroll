@@ -215,6 +215,7 @@ const RollDto = Type.Object({
   bindings: Type.Array(RollBindingDto),
   total: Type.Number(),
   output: Type.String(),
+  audience: Type.Literal("owner_only"),
 });
 
 const CharacterCommandResultDto = Type.Object({

@@ -69,18 +69,19 @@ describe("CharacterSheet", () => {
   });
 
   it("renders the server-returned roll result without predicting action effects", () => {
-    render(<CharacterSheet snapshot={snapshot({ lastRoll: { actionId: "roll-check", expression: "d20 + 2", dice: [{ sides: 20, value: 14, kept: true }], bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }], total: 16, output: "Success" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    render(<CharacterSheet snapshot={snapshot({ lastRoll: { actionId: "roll-check", expression: "d20 + 2", dice: [{ sides: 20, value: 14, kept: true }], bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }], total: 16, output: "Success", audience: "owner_only" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: "Roll result" })).toBeVisible();
     expect(screen.getByText("d20 + 2")).toBeVisible();
     expect(screen.getByText("16")).toBeVisible();
     expect(screen.getByText("Success")).toBeVisible();
+    expect(screen.getByText("Owner only")).toBeVisible();
     expect(screen.queryByText("d20=14")).not.toBeInTheDocument();
   });
 
   it("shows roll dice and bindings only when details are requested", async () => {
     const user = userEvent.setup();
-    render(<CharacterSheet snapshot={snapshot({ lastRoll: { actionId: "roll-check", expression: "d20 + 2", dice: [{ sides: 20, value: 14, kept: true }], bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }], total: 16, output: "Success" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    render(<CharacterSheet snapshot={snapshot({ lastRoll: { actionId: "roll-check", expression: "d20 + 2", dice: [{ sides: 20, value: 14, kept: true }], bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }], total: 16, output: "Success", audience: "owner_only" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Show roll details" }));
     expect(screen.getByText("d20=14")).toBeVisible();
     expect(screen.getByText("inputs.bonus: 2")).toBeVisible();

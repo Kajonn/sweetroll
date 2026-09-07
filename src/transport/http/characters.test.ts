@@ -111,8 +111,8 @@ function characterView(overrides: Partial<CharacterView> = {}): CharacterView {
   };
 }
 
-function commandResult(): CharacterCommandResult {
-  return { character: characterView(), roll: null };
+function commandResult(roll: CharacterCommandResult["roll"] = null): CharacterCommandResult {
+  return { character: characterView(), roll };
 }
 
 function characterExport(): CharacterExportV1 {
@@ -514,7 +514,9 @@ describe("character HTTP routes", () => {
       makeCharacters({
         apply: async (_ctx, input) => {
           received = input;
-          return { ok: true, value: commandResult() };
+          return { ok: true, value: commandResult({
+            actionId: "check", expression: "d20", dice: [], bindings: [], total: 12, output: "12", audience: "owner_only",
+          } as CharacterCommandResult["roll"]) };
         },
       }),
     );
@@ -526,6 +528,7 @@ describe("character HTTP routes", () => {
       payload: { expectedRevision: 1, idempotencyKey: "key-1" },
     });
     expect(response.statusCode).toBe(200);
+    expect(response.json().result.roll).toMatchObject({ audience: "owner_only" });
     expect(received).toEqual({
       kind: "executeAction",
       characterId: id,

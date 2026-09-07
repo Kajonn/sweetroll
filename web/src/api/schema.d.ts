@@ -3065,6 +3065,8 @@ export interface operations {
                                 }[];
                                 total: number;
                                 output: string;
+                                /** @constant */
+                                audience: "owner_only";
                             } | null;
                         };
                         requestId: string;
@@ -3453,6 +3455,8 @@ export interface operations {
                                 }[];
                                 total: number;
                                 output: string;
+                                /** @constant */
+                                audience: "owner_only";
                             } | null;
                         };
                         requestId: string;
@@ -3841,6 +3845,8 @@ export interface operations {
                                 }[];
                                 total: number;
                                 output: string;
+                                /** @constant */
+                                audience: "owner_only";
                             } | null;
                         };
                         requestId: string;
@@ -4231,6 +4237,8 @@ export interface operations {
                                 }[];
                                 total: number;
                                 output: string;
+                                /** @constant */
+                                audience: "owner_only";
                             } | null;
                         };
                         requestId: string;
@@ -4619,6 +4627,8 @@ export interface operations {
                                 }[];
                                 total: number;
                                 output: string;
+                                /** @constant */
+                                audience: "owner_only";
                             } | null;
                         };
                         requestId: string;
@@ -5642,6 +5652,8 @@ export interface operations {
                                 }[];
                                 total: number;
                                 output: string;
+                                /** @constant */
+                                audience: "owner_only";
                             } | null;
                         };
                         requestId: string;
@@ -6028,6 +6040,8 @@ export interface operations {
                                 }[];
                                 total: number;
                                 output: string;
+                                /** @constant */
+                                audience: "owner_only";
                             } | null;
                         };
                         requestId: string;

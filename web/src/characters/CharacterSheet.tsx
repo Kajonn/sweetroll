@@ -38,9 +38,13 @@ function ActionControl({ element, disabled, disabledReason, onExecuteAction }: {
   </form>;
 }
 
+function audienceLabel(audience: NonNullable<CharacterSnapshot["lastRoll"]>["audience"]): string {
+  return t(`character.rollResult.audience.${audience}`);
+}
+
 function RollResult({ roll }: { roll: NonNullable<CharacterSnapshot["lastRoll"]> }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
-  return <section className={styles.rollResult} aria-labelledby="character-roll-result"><h2 id="character-roll-result">{t("character.rollResult.title")}</h2><dl><dt>{t("character.rollResult.expression")}</dt><dd>{roll.expression}</dd><dt>{t("character.rollResult.total")}</dt><dd>{roll.total}</dd><dt>{t("character.rollResult.output")}</dt><dd>{roll.output}</dd></dl><button type="button" className={styles.detailButton} onClick={() => setDetailsOpen(open => !open)} aria-expanded={detailsOpen}>{t(detailsOpen ? "character.rollResult.hideDetails" : "character.rollResult.showDetails")}</button>{detailsOpen ? <div className={styles.rollDetails}><ul>{roll.dice.map((die, index) => <li key={`${die.sides}-${index}`}>d{die.sides}={die.value}</li>)}</ul><ul>{roll.bindings.map(binding => <li key={`${binding.scope}-${binding.definitionId}`}>{binding.scope}.{binding.definitionId}: {String(binding.value)}</li>)}</ul></div> : null}</section>;
+  return <section className={styles.rollResult} aria-labelledby="character-roll-result"><h2 id="character-roll-result">{t("character.rollResult.title")}</h2><dl><dt>{t("character.rollResult.expression")}</dt><dd>{roll.expression}</dd><dt>{t("character.rollResult.total")}</dt><dd>{roll.total}</dd><dt>{t("character.rollResult.output")}</dt><dd>{roll.output}</dd><dt>{t("character.rollResult.audience")}</dt><dd>{audienceLabel(roll.audience)}</dd></dl><button type="button" className={styles.detailButton} onClick={() => setDetailsOpen(open => !open)} aria-expanded={detailsOpen}>{t(detailsOpen ? "character.rollResult.hideDetails" : "character.rollResult.showDetails")}</button>{detailsOpen ? <div className={styles.rollDetails}><ul>{roll.dice.map((die, index) => <li key={`${die.sides}-${index}`}>d{die.sides}={die.value}</li>)}</ul><ul>{roll.bindings.map(binding => <li key={`${binding.scope}-${binding.definitionId}`}>{binding.scope}.{binding.definitionId}: {String(binding.value)}</li>)}</ul></div> : null}</section>;
 }
 
 export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction }: CharacterSheetProps) {

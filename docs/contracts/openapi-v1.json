@@ -9550,7 +9550,8 @@
                                 "dice",
                                 "bindings",
                                 "total",
-                                "output"
+                                "output",
+                                "audience"
                               ],
                               "properties": {
                                 "actionId": {
@@ -9629,6 +9630,10 @@
                                   "type": "number"
                                 },
                                 "output": {
+                                  "type": "string"
+                                },
+                                "audience": {
+                                  "const": "owner_only",
                                   "type": "string"
                                 }
                               }
@@ -11393,7 +11398,8 @@
                                 "dice",
                                 "bindings",
                                 "total",
-                                "output"
+                                "output",
+                                "audience"
                               ],
                               "properties": {
                                 "actionId": {
@@ -11472,6 +11478,10 @@
                                   "type": "number"
                                 },
                                 "output": {
+                                  "type": "string"
+                                },
+                                "audience": {
+                                  "const": "owner_only",
                                   "type": "string"
                                 }
                               }
@@ -13247,7 +13257,8 @@
                                 "dice",
                                 "bindings",
                                 "total",
-                                "output"
+                                "output",
+                                "audience"
                               ],
                               "properties": {
                                 "actionId": {
@@ -13326,6 +13337,10 @@
                                   "type": "number"
                                 },
                                 "output": {
+                                  "type": "string"
+                                },
+                                "audience": {
+                                  "const": "owner_only",
                                   "type": "string"
                                 }
                               }
@@ -15093,7 +15108,8 @@
                                 "dice",
                                 "bindings",
                                 "total",
-                                "output"
+                                "output",
+                                "audience"
                               ],
                               "properties": {
                                 "actionId": {
@@ -15172,6 +15188,10 @@
                                   "type": "number"
                                 },
                                 "output": {
+                                  "type": "string"
+                                },
+                                "audience": {
+                                  "const": "owner_only",
                                   "type": "string"
                                 }
                               }
@@ -16930,7 +16950,8 @@
                                 "dice",
                                 "bindings",
                                 "total",
-                                "output"
+                                "output",
+                                "audience"
                               ],
                               "properties": {
                                 "actionId": {
@@ -17009,6 +17030,10 @@
                                   "type": "number"
                                 },
                                 "output": {
+                                  "type": "string"
+                                },
+                                "audience": {
+                                  "const": "owner_only",
                                   "type": "string"
                                 }
                               }
@@ -21418,7 +21443,8 @@
                                 "dice",
                                 "bindings",
                                 "total",
-                                "output"
+                                "output",
+                                "audience"
                               ],
                               "properties": {
                                 "actionId": {
@@ -21497,6 +21523,10 @@
                                   "type": "number"
                                 },
                                 "output": {
+                                  "type": "string"
+                                },
+                                "audience": {
+                                  "const": "owner_only",
                                   "type": "string"
                                 }
                               }
@@ -23255,7 +23285,8 @@
                                 "dice",
                                 "bindings",
                                 "total",
-                                "output"
+                                "output",
+                                "audience"
                               ],
                               "properties": {
                                 "actionId": {
@@ -23334,6 +23365,10 @@
                                   "type": "number"
                                 },
                                 "output": {
+                                  "type": "string"
+                                },
+                                "audience": {
+                                  "const": "owner_only",
                                   "type": "string"
                                 }
                               }

@@ -60,6 +60,9 @@ export type NormalizedRollBinding = {
   value: RuntimeScalar;
 };
 
+/** Standalone I4 characters expose authoritative rolls only to their owner. */
+export type NormalizedRollAudience = "owner_only";
+
 export type NormalizedRoll = {
   actionId: DefinitionId;
   expression: string;
@@ -67,6 +70,7 @@ export type NormalizedRoll = {
   bindings: NormalizedRollBinding[];
   total: number;
   output: string;
+  audience: NormalizedRollAudience;
 };
 
 export type CharacterProjectionChoice = {
@@ -354,6 +358,7 @@ export function createSystemRuntime(input: {
           bindings: evaluated.bindings,
           total: evaluated.roll.total,
           output: pendingRoll.outputTemplate.split("{total}").join(String(evaluated.roll.total)),
+          audience: "owner_only",
         };
       }
       const projection = buildCharacterProjection({

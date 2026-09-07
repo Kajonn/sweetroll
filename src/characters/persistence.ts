@@ -500,7 +500,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           const insertedRoll = await client.query<{ id: string }>(
             `INSERT INTO character_rolls
                (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id)
-             VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, 'owner_only', $10)
+             VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11)
              RETURNING id`,
             [
               updatedRow.id,
@@ -512,6 +512,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
               JSON.stringify(input.roll.bindings),
               input.roll.total,
               input.roll.output,
+              input.roll.audience,
               input.activity.requestId,
             ],
           );

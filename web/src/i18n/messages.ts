@@ -370,6 +370,8 @@ export const defaultMessages: MessageTable = {
   "character.rollResult.expression": "Expression",
   "character.rollResult.total": "Total",
   "character.rollResult.output": "Result",
+  "character.rollResult.audience": "Audience",
+  "character.rollResult.audience.owner_only": "Owner only",
   "character.rollResult.showDetails": "Show roll details",
   "character.rollResult.hideDetails": "Hide roll details",
 };

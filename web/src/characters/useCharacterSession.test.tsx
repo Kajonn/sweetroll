@@ -8,7 +8,7 @@ import { createCoordination } from "./coordination.js";
 import { makeView } from "./testing.js";
 import type { CharactersApi } from "./api.js";
 
-it("binds stable snapshots and disposes subscriptions/channels on navigation including StrictMode", async () => {
+it("binds stable snapshots and releases subscriptions on navigation including StrictMode", async () => {
   const store = await openCharacterStore(crypto.randomUUID());
   await store.confirmSnapshot("a", "c", makeView({ characterId: "c", revision: 1 }), 0);
   const close = vi.fn();
@@ -26,6 +26,9 @@ it("binds stable snapshots and disposes subscriptions/channels on navigation inc
   expect(result.current.snapshot.editing.owned).toBe(false);
   unmount();
   expect(listeners.size).toBe(0);
-  expect(close).toHaveBeenCalledTimes(2);
+  // The coordination channel is route-owned: session teardown releases the
+  // lock but must not dispose the shared handle (StrictMode remounts reuse
+  // it). Route cleanup closes the channel; see the router hook test.
+  expect(close).not.toHaveBeenCalled();
   await store.close();
 });

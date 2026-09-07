@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { createRootRoute, createRoute, createRouter, Outlet, useNavigate, useParams } from "@tanstack/react-router";
 
 import { createApiClient, type ApiClient } from "./api/client.js";
 import { createCharactersApi, type CharactersApi } from "./characters/api.js";
 import { createCoordination } from "./characters/coordination.js";
+import type { BrowserChannel } from "./characters/identity.js";
 import type { IdentityGate } from "./characters/identity.js";
 import { CharacterDetail, NewCharacterRoute, useSharedCharacterStore } from "./characters/CharacterRoute.js";
 import { t } from "./i18n/index.js";
@@ -25,6 +26,50 @@ function useIdentityTick(identity: IdentityGate | null): number {
     () => identity?.getSnapshot().generation ?? 0,
     () => 0,
   );
+}
+
+export type RouteCoordination = ReturnType<typeof createCoordination>;
+
+export type CoordinationPorts = { locks?: LockManager | null; channel?: BrowserChannel | null };
+
+/**
+ * Own the character editing/synchronization handle for one route lifetime.
+ * The handle is created in the effect (not memoized): StrictMode re-runs
+ * setup/cleanup on the same mounted tree, and disposing a memoized handle
+ * would poison the reused instance so the session could never acquire the
+ * Web Lock. Each setup therefore gets a fresh handle; cleanup still
+ * releases it so real unmounts never leak the lock.
+ */
+export function useCharacterCoordination(
+  actorId: string | null,
+  characterId: string,
+  ports?: CoordinationPorts,
+): RouteCoordination | null {
+  const [coordination, setCoordination] = useState<RouteCoordination | null>(null);
+  useEffect(() => {
+    if (actorId === null) {
+      setCoordination(null);
+      return;
+    }
+    const raw = createCoordination({ actorId, characterId, ...ports });
+    let disposed = false;
+    const wrapped: RouteCoordination = {
+      ...raw,
+      dispose: () => {
+        if (disposed) return;
+        disposed = true;
+        raw.dispose?.();
+      },
+    };
+    setCoordination(wrapped);
+    return () => {
+      wrapped.dispose();
+    };
+    // Ports are test-only construction seams; the live route always uses
+    // the browser defaults for a given actor/character.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actorId, characterId]);
+  return coordination;
 }
 
 const rootRoute = createRootRoute({ component: () => <AppShell><Outlet /></AppShell> });
@@ -93,25 +138,10 @@ function CharacterDetailRouteView() {
   const store = useSharedCharacterStore();
   const api = useCharactersApi();
   const actorId = identity?.getActorId() ?? null;
-  // Coordination ownership: the character session owns letGo/dispose once
-  // CharacterDetail mounts. This router-level cleanup only releases the
-  // handle when the detail view never mounted a session (e.g. signed-out
-  // fallback), and dispose is guarded to a single release so a second call
-  // from the session is a no-op.
-  const coordination = useMemo(() => {
-    if (actorId === null) return null;
-    const raw = createCoordination({ actorId, characterId });
-    let disposed = false;
-    return {
-      ...raw,
-      dispose: () => {
-        if (disposed) return;
-        disposed = true;
-        raw.dispose?.();
-      },
-    };
-  }, [actorId, characterId]);
-  useEffect(() => () => coordination?.dispose(), [coordination]);
+  // Coordination ownership: each effect setup owns a fresh handle (see
+  // useCharacterCoordination); cleanup releases it. A disposed handle is
+  // never reused, so StrictMode setup/cleanup/setup cannot wedge the lock.
+  const coordination = useCharacterCoordination(actorId, characterId);
   if (identity === null || store === undefined || coordination === null) {
     if (identity !== null && actorId === null && store !== undefined) {
       return (

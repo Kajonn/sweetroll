@@ -936,6 +936,17 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     emit();
 
     await requestEditing();
+    if (!editing.owned) {
+      // A same-page predecessor (StrictMode remount) or transient holder may
+      // still be releasing the Web Lock; retry briefly with ifAvailable
+      // semantics (never steal), then settle read-only like a genuine
+      // second tab once retries exhaust.
+      for (let attempt = 0; attempt < 10 && !disposed && identityMatches() && !editing.owned; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        if (disposed || !identityMatches()) break;
+        await requestEditing();
+      }
+    }
     initialized = true;
     scheduleDrain();
     if (draining) await new Promise<void>(resolve => idleWaiters.push(resolve));
@@ -984,8 +995,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     unsubscribeIdentity?.();
     unsubscribeCoordination?.();
+    // Release the lock but never dispose the coordination handle: its
+    // lifetime belongs to the route, which outlives StrictMode session
+    // turnover. Disposing here would poison the handle for the remount's
+    // session and wedge fresh sheets read-only.
     coordination.letGo();
-    coordination.dispose?.();
     for (const waiter of freezeWaiters.values()) waiter.reject(new Error("Session closed."));
     freezeWaiters.clear();
     if (!draining) resolveIdle();

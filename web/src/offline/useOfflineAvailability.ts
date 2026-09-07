@@ -33,23 +33,22 @@ export function useOfflineAvailability(view: CharacterView | null, stored?: bool
 
   useEffect(() => {
     let cancelled = false;
-    if (!hasControllingWorker()) return () => {};
-    void queryWorkerCacheReady().then(status => {
-      if (cancelled) return;
-      setWorkerReady(status.ready);
-      setUpdate(describeOfflineUpdate(buildId, status.buildId));
-    });
-    const onChange = () => {
+    if (!("serviceWorker" in navigator)) return;
+    const refresh = () => {
       void queryWorkerCacheReady().then(status => {
         if (cancelled) return;
         setWorkerReady(status.ready);
         setUpdate(describeOfflineUpdate(buildId, status.buildId));
       });
     };
-    navigator.serviceWorker.addEventListener("controllerchange", onChange);
+    // Subscribe unconditionally: deep links routinely mount before the
+    // worker finishes installing and claims the page. Querying only when
+    // already controlled would miss the claim and leave the badge stuck.
+    if (hasControllingWorker()) refresh();
+    navigator.serviceWorker.addEventListener("controllerchange", refresh);
     return () => {
       cancelled = true;
-      navigator.serviceWorker.removeEventListener("controllerchange", onChange);
+      navigator.serviceWorker.removeEventListener("controllerchange", refresh);
     };
   }, [buildId]);
 

@@ -14,17 +14,17 @@ describe("useListTemplates", () => {
             {
               templateId: "d20",
               label: "d20 sample",
-              versionId: "11111111-1111-1111-1111-111111111a01",
+              versionId: "a0000000-0000-5000-8000-000000000002",
             },
             {
               templateId: "pbta2d6",
               label: "PbtA 2d6 sample",
-              versionId: "11111111-1111-1111-1111-111111111a02",
+              versionId: "b0000000-0000-5000-8000-000000000002",
             },
             {
               templateId: "d6success",
               label: "d6 success pool sample",
-              versionId: "11111111-1111-1111-1111-111111111a03",
+              versionId: "c0000000-0000-5000-8000-000000000002",
             },
           ],
           requestId: "r",
@@ -39,7 +39,7 @@ describe("useListTemplates", () => {
     });
     await waitFor(() => expect(result.current.data?.length).toBe(3));
     expect(result.current.data?.[0]?.templateId).toBe("d20");
-    expect(result.current.data?.[0]?.versionId).toBe("11111111-1111-1111-1111-111111111a01");
+    expect(result.current.data?.[0]?.versionId).toBe("a0000000-0000-5000-8000-000000000002");
     expect(result.current.data?.[2]?.templateId).toBe("d6success");
     const call = fetch_.mock.calls[0] as [string, RequestInit | undefined] | undefined;
     if (call === undefined) throw new Error("expected a fetch call");

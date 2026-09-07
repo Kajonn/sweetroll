@@ -38,12 +38,25 @@ if (seeded.systemsInserted > 0 || seeded.versionsReplaced > 0) {
 // OIDC adapter is deferred, so /dev/signin is gated off and OIDC resolves no
 // codes through this path (session resolve/sign-out over HTTP remain fully
 // functional).
+//
+// Test-only exception for production-browser offline acceptance (Task 11):
+// `SWEETROLL_TEST_AUTH=1` seeds two isolated test identities and registers
+// `/dev/signin` even in production. The production UI never renders the dev
+// sign-in panel, so browser contexts authenticate through that endpoint
+// directly via the offline test-auth fixture — never through a production
+// synthetic user or production UI affordance.
+const testAuthEnabled = process.env.SWEETROLL_TEST_AUTH === "1";
 const seed = new Map([
   ["code-dev", { displayName: "Dev User", email: "dev@example.com", provider: "test", subject: "dev-1" }],
+  ["code-test-a", { displayName: "Offline Test A", email: "offline-a@example.com", provider: "test", subject: "offline-test-a" }],
+  ["code-test-b", { displayName: "Offline Test B", email: "offline-b@example.com", provider: "test", subject: "offline-test-b" }],
 ]);
 
 const identity = createIdentityModule({
-  oidc: config.nodeEnv === "production" ? createTestOidcClient(new Map()) : createTestOidcClient(seed),
+  oidc:
+    config.nodeEnv === "production" && !testAuthEnabled
+      ? createTestOidcClient(new Map())
+      : createTestOidcClient(seed),
   pool,
   sessionTtlMs: config.sessionTtlDays * 86_400_000,
 });
@@ -91,6 +104,7 @@ void app.register(
     cookieName: config.sessionCookieName,
     secure: config.cookieSecure,
     maxAgeSeconds: config.sessionTtlDays * 86_400,
+    allowInProduction: testAuthEnabled,
   }),
 );
 

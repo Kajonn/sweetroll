@@ -71,6 +71,27 @@ it("reports a failed initial store read without rejecting the observable session
   session.dispose(); await store.close();
 });
 
+it("retries a denied initial acquisition so a releasing predecessor does not wedge the sheet read-only", async () => {
+  // Regression for StrictMode double-mount (and any transient holder): the
+  // first session's async Web Lock release can deny the remount's
+  // ifAvailable acquisition. A bounded init retry recovers; a genuine
+  // second tab still settles read-only once retries exhaust.
+  const { api, coordination, session, store } = await makeHarness("char-1", false);
+  let calls = 0;
+  const realRequestEditing = coordination.requestEditing.bind(coordination);
+  coordination.requestEditing = async () => {
+    calls += 1;
+    if (calls < 3) return false;
+    return realRequestEditing();
+  };
+  api.scriptOpenView(viewFor("char-1", 1));
+  await session.open();
+  await vi.waitFor(() => expect(session.getSnapshot().editing.owned).toBe(true));
+  expect(calls).toBeGreaterThanOrEqual(3);
+  await vi.waitFor(() => expect(session.getSnapshot().confirmed?.revision).toBe(1));
+  session.dispose(); await store.close();
+});
+
 it("keeps snapshots stable and hides cached data on account switch", async () => {
   const { session, api, identity, store } = await makeHarness();
   api.scriptOpenView(viewFor("char-1", 1));
@@ -284,10 +305,11 @@ interface Harness {
   session: CharacterSession;
 }
 
-async function makeHarness(characterId = "char-1"): Promise<Harness> {
+async function makeHarness(characterId = "char-1", initialOwner = true): Promise<Harness> {
   const api = new FakeApi();
   const identity = new FakeIdentity();
   const coordination = new FakeCoordination();
+  coordination.owner = initialOwner;
   identity.actorId = ARM;
   let n = 0;
   const store = await openCharacterStore(dbName);

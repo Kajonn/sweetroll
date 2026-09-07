@@ -99,7 +99,7 @@ describe("CharacterRoute", () => {
     vi.restoreAllMocks();
   });
 
-  it("opens a character through identity, store, session and renderer, then disposes the session", async () => {
+  it("opens a character through identity, store, session and renderer, then releases the session", async () => {
     const store = await openStore();
     await store.confirmSnapshot(ACTOR, CHARACTER_ID, completionView(), 0);
     const letGo = vi.fn();
@@ -114,8 +114,11 @@ describe("CharacterRoute", () => {
       );
       expect(await screen.findByRole("heading", { level: 1, name: "Briar" })).toBeVisible();
       unmount();
+      // The session releases the lock on teardown, but the coordination
+      // handle is route-owned: disposing it here would poison StrictMode
+      // remounts that reuse the handle.
       expect(letGo).toHaveBeenCalled();
-      expect(dispose).toHaveBeenCalled();
+      expect(dispose).not.toHaveBeenCalled();
     } finally {
       await store.close();
     }

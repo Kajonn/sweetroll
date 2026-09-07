@@ -7,6 +7,10 @@ import { Client } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { runMigrations } from "../../src/platform/migrations.js";
+import {
+  REFERENCE_TEMPLATES,
+  seedReferenceTemplates,
+} from "../../src/systems/implementation/persistence/index.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const describeWithDatabase = databaseUrl === undefined ? describe.skip : describe;
@@ -142,7 +146,19 @@ describeWithDatabase("runMigrations", () => {
     const lifecycles = await client.query<{ lifecycle: string }>(
       "SELECT DISTINCT lifecycle FROM system_versions ORDER BY lifecycle",
     );
-    expect(lifecycles.rows).toEqual([{ lifecycle: "published" }]);
+    // Migration 0010 retires the synthetic placeholder rows; the migrate
+    // process reseeds fixture-identical template rows immediately after.
+    expect(lifecycles.rows).toEqual([]);
+    const seeded = await seedReferenceTemplates(client);
+    expect(seeded).toMatchObject({ systemsInserted: 3, versionsReplaced: 3 });
+    const reseeded = await client.query<{ id: string; lifecycle: string }>(
+      "SELECT id, lifecycle FROM system_versions ORDER BY id",
+    );
+    expect(reseeded.rows).toEqual(
+      [...REFERENCE_TEMPLATES]
+        .map(template => ({ id: template.versionId, lifecycle: "published" }))
+        .sort((a, b) => (a.id < b.id ? -1 : 1)),
+    );
   });
 
   it("normalizes existing active system versions during the 0009 upgrade", async () => {

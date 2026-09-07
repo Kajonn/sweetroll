@@ -20,12 +20,21 @@ export type BuildDevSignInRoutesInput = {
   cookieName?: string;
   secure?: boolean;
   maxAgeSeconds?: number;
+  /**
+   * Test-only escape hatch for production-browser offline acceptance: when
+   * true, the `/dev/signin` endpoint is registered even with
+   * `nodeEnv === "production"`. The production UI never renders the dev
+   * sign-in panel (it mounts only when `import.meta.env.MODE ===
+   * "development"`), so browser contexts authenticate through this endpoint
+   * directly via the test-auth fixture instead of any production UI.
+   */
+  allowInProduction?: boolean;
 };
 
 export const buildDevSignInRoutes: (input: BuildDevSignInRoutesInput) => FastifyPluginCallback =
-  ({ identity, nodeEnv, cookieName = "session", secure = false, maxAgeSeconds = 30 * 86_400 }) =>
+  ({ identity, nodeEnv, cookieName = "session", secure = false, maxAgeSeconds = 30 * 86_400, allowInProduction = false }) =>
   fp(async (app) => {
-    if (nodeEnv === "production") return;
+    if (nodeEnv === "production" && !allowInProduction) return;
     app.post(
       "/dev/signin",
       {

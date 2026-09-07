@@ -46,17 +46,17 @@ const TEMPLATES = {
     {
       templateId: "d20",
       label: "d20 sample",
-      versionId: "11111111-1111-1111-1111-111111111a01",
+      versionId: "a0000000-0000-5000-8000-000000000002",
     },
     {
       templateId: "pbta2d6",
       label: "PbtA 2d6 sample",
-      versionId: "11111111-1111-1111-1111-111111111a02",
+      versionId: "b0000000-0000-5000-8000-000000000002",
     },
     {
       templateId: "d6success",
       label: "d6 success pool sample",
-      versionId: "11111111-1111-1111-1111-111111111a03",
+      versionId: "c0000000-0000-5000-8000-000000000002",
     },
   ],
   requestId: "r",
@@ -143,7 +143,7 @@ describe("CloneFromTemplate (publish)", () => {
       const body = JSON.parse((postCall?.[1] as { body: string }).body);
       expect(body.source).toEqual({
         kind: "clone",
-        versionId: "11111111-1111-1111-1111-111111111a01",
+        versionId: "a0000000-0000-5000-8000-000000000002",
       });
       expect(body.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/i);
     });

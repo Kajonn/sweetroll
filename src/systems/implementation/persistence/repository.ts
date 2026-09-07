@@ -746,20 +746,24 @@ export type ReferenceTemplate = {
 
 export const REFERENCE_TEMPLATES: ReadonlyArray<ReferenceTemplate> = [
   {
-    systemId: "00000000-0000-0000-0000-000000000a01",
-    versionId: "11111111-1111-1111-1111-111111111a01",
+    // Row identity matches the fixture package identity verbatim: the
+    // runtime loader requires the stored package's embedded versionId to
+    // equal the requested row id, and the package schema only accepts
+    // schema-valid UUIDs. Never point these at synthetic row ids.
+    systemId: "a0000000-0000-5000-8000-000000000001",
+    versionId: "a0000000-0000-5000-8000-000000000002",
     name: "Template: d20",
     package: d20Package,
   },
   {
-    systemId: "00000000-0000-0000-0000-000000000a02",
-    versionId: "11111111-1111-1111-1111-111111111a02",
+    systemId: "b0000000-0000-5000-8000-000000000001",
+    versionId: "b0000000-0000-5000-8000-000000000002",
     name: "Template: PbtA 2d6",
     package: pbta2d6Package,
   },
   {
-    systemId: "00000000-0000-0000-0000-000000000a03",
-    versionId: "11111111-1111-1111-1111-111111111a03",
+    systemId: "c0000000-0000-5000-8000-000000000001",
+    versionId: "c0000000-0000-5000-8000-000000000002",
     name: "Template: d6 success pool",
     package: d6SuccessPoolPackage,
   },
@@ -771,6 +775,12 @@ export type SeedReferenceTemplatesResult = {
 };
 
 type SeedRunner = Pick<Pool | PoolClient, "query">;
+
+function storedPackageIdentity(packageJson: unknown): { versionId: unknown; systemId: unknown } {
+  if (packageJson === null || typeof packageJson !== "object") return { versionId: null, systemId: null };
+  const record = packageJson as { versionId?: unknown; systemId?: unknown };
+  return { versionId: record.versionId, systemId: record.systemId };
+}
 
 export async function seedReferenceTemplates(runner: SeedRunner): Promise<SeedReferenceTemplatesResult> {
   let systemsInserted = 0;
@@ -800,7 +810,16 @@ export async function seedReferenceTemplates(runner: SeedRunner): Promise<SeedRe
       versionsReplaced += 1;
       continue;
     }
-    if (!row.checksum.startsWith("pending:")) continue;
+    const identity = storedPackageIdentity(row.package_json);
+    const alreadySeeded =
+      row.checksum === tpl.package.integrity.checksum &&
+      identity.versionId === tpl.versionId &&
+      identity.systemId === tpl.systemId;
+    if (alreadySeeded) continue;
+    // Replace placeholder ("pending:") rows and repair rows whose stored
+    // package identity drifted from the fixture, so the runtime loader's
+    // package/row identity invariant holds. Legacy rows under retired
+    // synthetic ids are removed by migration 0010, not here.
     await runner.query("DELETE FROM system_versions WHERE id = $1", [tpl.versionId]);
     await runner.query(
       `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at)

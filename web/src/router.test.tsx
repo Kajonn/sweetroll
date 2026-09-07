@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { StrictMode } from "react";
 
-import { createAppRouter } from "./router.js";
+import { createAppRouter, useCharacterCoordination } from "./router.js";
 
 function renderAt(path: string) {
   window.history.pushState({}, "", path);
@@ -78,5 +79,27 @@ describe("router", () => {
       globalThis.fetch = originalFetch;
       window.history.pushState({}, "", "/");
     }
+  });
+
+  it("hands the session a live coordination handle across StrictMode remount", async () => {
+    // Regression: disposing a memoized handle in effect cleanup poisons the
+    // reused instance, so the session's Web Lock acquisition fails forever
+    // and fresh characters render "unavailable" in dev. Each setup must own
+    // a fresh, undisposed handle.
+    const grantingLocks = {
+      request: (async (_name: string, _options: unknown, callback: (lock: object | null) => unknown) =>
+        callback({})) as LockManager["request"],
+    } as unknown as LockManager;
+    const { result, unmount } = renderHook(
+      () => useCharacterCoordination("actor-1", "char-1", { locks: grantingLocks, channel: null }),
+      { wrapper: StrictMode },
+    );
+    await waitFor(() => expect(result.current).not.toBeNull());
+    await expect(result.current?.requestEditing()).resolves.toBe(true);
+    expect(result.current?.isOwner()).toBe(true);
+    const live = result.current;
+    unmount();
+    // Route teardown still releases and disposes the handle: no lock leaks.
+    await expect(live?.requestEditing()).resolves.toBe(false);
   });
 });

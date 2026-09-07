@@ -79,7 +79,7 @@ describe("CloneFromTemplate", () => {
     if (typeof body !== "string") throw new Error("expected POST body");
     expect(JSON.parse(body).source).toEqual({
       kind: "clone",
-      versionId: "11111111-1111-1111-1111-111111111a01",
+      versionId: "a0000000-0000-5000-8000-000000000002",
     });
     expect(JSON.parse(body).idempotencyKey).toMatch(/^[0-9a-f-]{36}$/i);
     await vi.waitFor(() => {

@@ -886,13 +886,13 @@ describeWithDatabase("SystemAuthoring", () => {
     await seedReferenceTemplates(pool);
     const template = await authoring.authorizeVersionUse(
       ctx(stranger),
-      "11111111-1111-1111-1111-111111111a01",
+      "a0000000-0000-5000-8000-000000000002",
     );
     expect(template).toEqual({
       ok: true,
       value: {
-        systemId: "00000000-0000-0000-0000-000000000a01",
-        versionId: "11111111-1111-1111-1111-111111111a01",
+        systemId: "a0000000-0000-5000-8000-000000000001",
+        versionId: "a0000000-0000-5000-8000-000000000002",
         checksum: d20Export.package.integrity.checksum,
       },
     });

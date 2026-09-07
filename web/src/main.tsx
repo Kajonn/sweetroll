@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 
 import { router } from "./router.js";
+import { registerOfflineWorker } from "./offline/register.js";
 import "./styles/global.css";
 
 const queryClient = new QueryClient({
@@ -15,6 +16,8 @@ const queryClient = new QueryClient({
 
 const root = document.getElementById("root");
 if (root === null) throw new Error("Missing #root element");
+// Production asset worker only; registration resolves without throwing.
+void registerOfflineWorker();
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

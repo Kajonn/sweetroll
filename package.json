@@ -21,6 +21,7 @@
     "web:build": "npm --prefix web run build",
     "web:test": "npm --prefix web run test",
     "web:test:e2e": "npm --prefix web run test:e2e",
+    "web:test:offline": "npm --prefix web run test:offline",
     "web:typecheck": "npm --prefix web run typecheck"
   },
   "dependencies": {

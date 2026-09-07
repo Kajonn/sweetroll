@@ -12,7 +12,10 @@ export type CharacterSheetCallbacks = {
   onExecuteAction?(actionId: string, inputs?: Record<string, unknown>): void | Promise<void>;
 };
 
-export type CharacterSheetProps = { snapshot: CharacterSnapshot } & CharacterSheetCallbacks;
+export type CharacterSheetProps = { snapshot: CharacterSnapshot } & CharacterSheetCallbacks & {
+  /** Offline availability once determined; omitted while unknown. */
+  offlineAvailable?: boolean | undefined;
+};
 type Element = NonNullable<CharacterSnapshot["confirmed"]>["projection"]["sheets"][number]["sections"][number]["elements"][number];
 
 function ValidationList({ validations }: { validations: Array<{ validationId: string; severity: "error" | "warning"; message: string }> }) {
@@ -48,7 +51,7 @@ function RollResult({ roll }: { roll: NonNullable<CharacterSnapshot["lastRoll"]>
   return <section className={styles.rollResult} aria-labelledby="character-roll-result"><h2 id="character-roll-result">{t("character.rollResult.title")}</h2><dl><dt>{t("character.rollResult.expression")}</dt><dd>{roll.expression}</dd><dt>{t("character.rollResult.total")}</dt><dd>{roll.total}</dd><dt>{t("character.rollResult.output")}</dt><dd>{roll.output}</dd><dt>{t("character.rollResult.audience")}</dt><dd>{audienceLabel(roll.audience)}</dd></dl><button type="button" className={styles.detailButton} onClick={() => setDetailsOpen(open => !open)} aria-expanded={detailsOpen}>{t(detailsOpen ? "character.rollResult.hideDetails" : "character.rollResult.showDetails")}</button>{detailsOpen ? <div className={styles.rollDetails}><ul>{roll.dice.map((die, index) => <li key={`${die.sides}-${index}`}>d{die.sides}={die.value}</li>)}</ul><ul>{roll.bindings.map(binding => <li key={`${binding.scope}-${binding.definitionId}`}>{binding.scope}.{binding.definitionId}: {String(binding.value)}</li>)}</ul></div> : null}</section>;
 }
 
-export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction }: CharacterSheetProps) {
+export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, offlineAvailable }: CharacterSheetProps) {
   const character = snapshot.confirmed;
   if (character === null) return <section className={styles.sheet}><p>{t("character.loading")}</p></section>;
   const { projection } = character;
@@ -84,7 +87,7 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction }
   };
 
   return <main className={styles.sheet} aria-busy={pending}>
-    <header className={styles.header}><h1>{character.name}</h1><span>{projection.entityLabel}</span><output role="status" aria-live="polite">{pending ? t("character.sync.pending") : t("character.sync.saved")}</output></header>
+    <header className={styles.header}><h1>{character.name}</h1><span>{projection.entityLabel}</span><output role="status" aria-live="polite">{pending ? t("character.sync.pending") : t("character.sync.saved")}</output>{offlineAvailable === undefined ? null : <p role="status">{t(offlineAvailable ? "character.offline.available" : "character.offline.unavailable")}</p>}</header>
     {stale ? <p className={styles.stale}>{t("character.validation.stale")}</p> : null}
     {actionUnavailableReason !== null ? <p id="character-action-unavailable" className={styles.actionUnavailable}>{actionUnavailableReason}</p> : null}
     {projection.sheets.map(sheet => <section key={sheet.id} className={styles.sheetSection} aria-labelledby={`sheet-${sheet.id}`}><h2 id={`sheet-${sheet.id}`}>{sheet.label}</h2>{sheet.sections.map(section => <section key={section.id} className={styles.section} aria-labelledby={`section-${section.id}`}><h3 id={`section-${section.id}`}>{section.label}</h3>{section.elements.map(renderElement)}</section>)}</section>)}

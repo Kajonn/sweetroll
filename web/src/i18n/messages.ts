@@ -356,6 +356,8 @@ export const defaultMessages: MessageTable = {
   "character.loading": "Loading character…",
   "character.sync.pending": "Changes pending",
   "character.sync.saved": "Saved",
+  "character.offline.available": "Available offline",
+  "character.offline.unavailable": "Offline copy not ready yet",
   "character.validation.stale": "Validation is based on saved values.",
   "character.image.unavailable": "Images are unavailable.",
   "character.choice.empty": "Choose…",

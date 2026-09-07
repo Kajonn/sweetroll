@@ -3,8 +3,10 @@ import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+import { offlineAssetsPlugin } from "./build/offline-assets.js";
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), offlineAssetsPlugin()],
   resolve: {
     alias: {
       "@sweetroll/rules": resolve(__dirname, "../src/systems/implementation/rules/index.ts"),
@@ -35,6 +37,6 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/testing/setup.ts"],
     globals: true,
-    exclude: ["**/node_modules/**", "**/dist/**", "tests/e2e/**"],
+    exclude: ["**/node_modules/**", "**/dist/**", "tests/e2e/**", "tests/offline/**"],
   },
 });

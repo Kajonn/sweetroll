@@ -4,13 +4,10 @@ import { t } from "../i18n/index.js";
 import type { CharactersApi } from "./api.js";
 import { CharacterSheet } from "./CharacterSheet.js";
 import { CreateCharacter, type CreateCharacterIdentity } from "./CreateCharacter.js";
-import {
-  createCharacterSession,
-  type CoordinationPort,
-  type IdentityPort,
-} from "./session.js";
+import { createCharacterSession, type CoordinationPort, type IdentityPort } from "./session.js";
 import { openCharacterStore, type CharacterStore } from "./store.js";
 import { useCharacterSession } from "./useCharacterSession.js";
+import { useOfflineAvailability } from "../offline/useOfflineAvailability.js";
 
 export type CharacterDetailProps = {
   characterId: string;
@@ -70,6 +67,7 @@ function CharacterDetailLoaded({ characterId, api, store, identity, coordination
     [actorId, characterId, api, store, identity, coordination],
   );
   const { session, snapshot } = useCharacterSession(createSession);
+  const offline = useOfflineAvailability(snapshot.confirmed);
 
   const focusedFor = useRef<string | null>(null);
   useEffect(() => {
@@ -126,7 +124,7 @@ function CharacterDetailLoaded({ characterId, api, store, identity, coordination
   return (
     <div>
       {!online ? <p role="status">{t("character.detail.offlineCached")}</p> : null}
-      <CharacterSheet snapshot={snapshot} onSetField={session.setField} onBump={session.bumpResource} />
+      <CharacterSheet snapshot={snapshot} onSetField={session.setField} onBump={session.bumpResource} offlineAvailable={offline.available} />
       {showRecovery ? (
         <nav aria-label={t("character.detail.recoveryTitle")}>
           <h2>{t("character.detail.recoveryTitle")}</h2>

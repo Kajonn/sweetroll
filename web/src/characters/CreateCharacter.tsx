@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { ApiError } from "../api/client.js";
 import { t } from "../i18n/index.js";
 import type { CharactersApi } from "./api.js";
 import type { CharacterStore, OnlineAttempt } from "./store.js";
-import type { CreationOptions, FrozenRequest, ReviewExpiredAttemptInput } from "./types.js";
+import type { CreationOptions, CreationVersionEntry, FrozenRequest, ReviewExpiredAttemptInput } from "./types.js";
 
 export type CreateCharacterIdentity = {
   getActorId(): string | null;
@@ -133,6 +134,24 @@ export function CreateCharacter({
   const actorId = identity.getActorId();
   const generation = identity.getGeneration?.() ?? 0;
   const seenLifetime = useRef<{ actor: string | null; generation: number } | undefined>(undefined);
+
+  /**
+   * Discoverable version list for a versionless `/characters/new`. It goes
+   * through the injected `api` seam (same queryKey/staleTime as the
+   * ApiClient-level `useCreationVersions` hook) because this component is
+   * only ever given a `CharactersApi`. Selecting a version reuses the
+   * unchanged `loadMetadata` path, so all guards still apply untouched.
+   */
+  const showPicker = initialSystemVersionId === undefined && metadata === null;
+  const pickerQuery = useQuery<CreationVersionEntry[]>({
+    queryKey: ["characters", "creation-versions"],
+    queryFn: async () => api.listCreationVersions().then(r => r.data.versions),
+    enabled: showPicker && online && actorId !== null,
+    staleTime: 30_000,
+  });
+  const pickerVersions = pickerQuery.data;
+  const pickerLoading = pickerQuery.isLoading;
+  const pickerError = pickerQuery.isError;
 
   const restoreFromAttempt = (attempt: OnlineAttempt) => {
     const body = attempt.request.body as { systemVersionId?: unknown; entityDefinitionId?: unknown; name?: unknown };
@@ -696,6 +715,23 @@ export function CreateCharacter({
         >
           {metaLoading ? t("character.create.loadingMetadata") : t("character.create.lookUp")}
         </button>
+        {showPicker ? (
+          <section aria-labelledby="create-character-picker-title">
+            <h2 id="create-character-picker-title">{t("character.create.pickVersion.title")}</h2>
+            {pickerLoading ? <p role="status">{t("character.create.pickVersion.loading")}</p> : null}
+            {pickerError ? <p role="alert">{t("character.create.pickVersion.error")}</p> : null}
+            {pickerVersions?.length === 0 ? <p role="status">{t("character.create.pickVersion.empty")}</p> : null}
+            <ul>
+              {(pickerVersions ?? []).map(v => (
+                <li key={v.versionId}>
+                  <button type="button" onClick={() => { setVersionId(v.versionId); void loadMetadata(v.versionId); }}>
+                    {v.systemName} {v.semanticVersion}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         {metaDenied ? <p role="alert">{t("character.create.denied")}</p> : null}
         {metadata !== null ? (
           <>

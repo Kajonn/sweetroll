@@ -6,6 +6,7 @@ import type {
   CharacterExport,
   CharacterView,
   CreationOptions,
+  CreationVersions,
   FrozenRequest,
   MigrationPreviewBody,
   MigrationPreviewResponse,
@@ -235,6 +236,9 @@ class FakeApi implements CharactersApi {
   }
 
   creationOptions(): Promise<CreationOptions> {
+    throw new Error("unused");
+  }
+  listCreationVersions(): Promise<CreationVersions> {
     throw new Error("unused");
   }
   activityScript: Array<ActivityResponse | { __error: Error }> = [];

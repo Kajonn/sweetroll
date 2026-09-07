@@ -1,5 +1,7 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../api/client.js";
@@ -11,19 +13,31 @@ const VERSION_ID = "11111111-1111-4000-8000-000000000001";
 
 function makeApi(): CharactersApi & {
   creationOptions: ReturnType<typeof vi.fn>;
+  listCreationVersions: ReturnType<typeof vi.fn>;
   send: ReturnType<typeof vi.fn>;
 } {
   return {
     open: vi.fn(),
     creationOptions: vi.fn(),
+    listCreationVersions: vi.fn(async () => ({ data: { versions: [] }, requestId: "r" })),
     activity: vi.fn(),
     send: vi.fn(),
     export: vi.fn(),
     previewMigration: vi.fn(),
   } as unknown as CharactersApi & {
     creationOptions: ReturnType<typeof vi.fn>;
+    listCreationVersions: ReturnType<typeof vi.fn>;
     send: ReturnType<typeof vi.fn>;
   };
+}
+
+/** Every render gets a fresh query client with retries off, like the other suites. */
+function renderCreate(node: ReactNode) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  );
+  return render(node, { wrapper });
 }
 
 function makeIdentity(overrides: { actorId?: string | null; online?: boolean } = {}) {
@@ -127,7 +141,7 @@ describe("CreateCharacter", () => {
     const store = await openStore();
     const onCreated = vi.fn();
     try {
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={onCreated} />,
       );
       await fillAndSubmit(user);
@@ -160,7 +174,7 @@ describe("CreateCharacter", () => {
     const first = makeApi();
     first.creationOptions.mockRejectedValueOnce(forbidden);
     const firstStore = await openStore();
-    const { unmount } = render(
+    const { unmount } = renderCreate(
       <CreateCharacter api={first} store={firstStore} identity={makeIdentity()} onCreated={vi.fn()} />,
     );
     await user.type(screen.getByLabelText("System version ID"), VERSION_ID);
@@ -175,7 +189,7 @@ describe("CreateCharacter", () => {
     const second = makeApi();
     second.creationOptions.mockRejectedValueOnce(missing);
     const secondStore = await openStore();
-    render(
+    renderCreate(
       <CreateCharacter api={second} store={secondStore} identity={makeIdentity()} onCreated={vi.fn()} />,
     );
     await user.type(screen.getByLabelText("System version ID"), VERSION_ID);
@@ -190,7 +204,7 @@ describe("CreateCharacter", () => {
     api.creationOptions.mockResolvedValueOnce(metadata());
     const store = await openStore();
     try {
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={makeIdentity({ online: false })} onCreated={vi.fn()} />,
       );
       expect(screen.getByText("Character creation requires an online connection.")).toBeVisible();
@@ -210,7 +224,7 @@ describe("CreateCharacter", () => {
     const store = await openStore();
     const onCreated = vi.fn();
     try {
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={onCreated} />,
       );
       await user.type(screen.getByLabelText("System version ID"), VERSION_ID);
@@ -239,7 +253,7 @@ describe("CreateCharacter", () => {
     const store = await openStore();
     const onCreated = vi.fn();
     try {
-      const first = render(
+      const first = renderCreate(
         <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={onCreated} />,
       );
       await fillAndSubmit(user);
@@ -251,7 +265,7 @@ describe("CreateCharacter", () => {
       expect(attempts[0]!.request.body).toEqual(firstCreate.body);
       first.unmount();
 
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={onCreated} />,
       );
       expect(await screen.findByRole("button", { name: "Retry creation" })).toBeVisible();
@@ -273,7 +287,7 @@ describe("CreateCharacter", () => {
     api.creationOptions.mockResolvedValueOnce(metadata());
     const store = await openStore();
     try {
-      render(
+      renderCreate(
         <CreateCharacter
           api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()}
           initialSystemVersionId={VERSION_ID}
@@ -301,7 +315,7 @@ describe("CreateCharacter", () => {
     );
     const store = await openStore();
     try {
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
       );
       await fillAndSubmit(user);
@@ -338,7 +352,7 @@ describe("CreateCharacter", () => {
         },
         createdAt: "2026-09-06T00:00:00.000Z",
       });
-      const view = render(
+      const view = renderCreate(
         <CreateCharacter api={api} store={store} identity={makeIdentity({ actorId: "actor-1" })} onCreated={vi.fn()} />,
       );
       expect(await screen.findByRole("button", { name: "Retry creation" })).toBeVisible();
@@ -367,7 +381,7 @@ describe("CreateCharacter", () => {
     const mutable = makeMutableIdentity("actor-1");
     const onCreated = vi.fn();
     try {
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={mutable.identity} onCreated={onCreated} />,
       );
       // Let mount recovery consume the real read before arming the gate.
@@ -402,7 +416,7 @@ describe("CreateCharacter", () => {
     const mutable = makeMutableIdentity("actor-1");
     const onCreated = vi.fn();
     try {
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={mutable.identity} onCreated={onCreated} />,
       );
       await fillForm(user);
@@ -429,7 +443,7 @@ describe("CreateCharacter", () => {
     const mutable = makeMutableIdentity("actor-1");
     const onCreated = vi.fn();
     try {
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={mutable.identity} onCreated={onCreated} />,
       );
       await fillForm(user);
@@ -463,7 +477,7 @@ describe("CreateCharacter", () => {
     const mutable = makeMutableIdentity("actor-1");
     const onCreated = vi.fn();
     try {
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={mutable.identity} onCreated={onCreated} />,
       );
       await fillForm(user);
@@ -494,7 +508,7 @@ describe("CreateCharacter", () => {
     try {
       await store.saveOnlineAttempt(makeCreateAttempt("actor-1"));
       api.send.mockResolvedValueOnce({ character: { characterId: "char-9" }, requestId: "req-9" });
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={onCreated} />,
       );
       expect(await screen.findByRole("button", { name: "Retry creation" })).toBeVisible();
@@ -524,7 +538,7 @@ describe("CreateCharacter", () => {
       .spyOn(store, "saveOnlineAttempt")
       .mockRejectedValueOnce(new DOMException("Quota exceeded", "QuotaExceededError"));
     try {
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
       );
       await fillForm(user);
@@ -549,7 +563,7 @@ describe("CreateCharacter", () => {
     const store = await openStore();
     const mutable = makeMutableIdentity("actor-1");
     try {
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={mutable.identity} onCreated={vi.fn()} />,
       );
       await fillForm(user);
@@ -582,7 +596,7 @@ describe("CreateCharacter", () => {
     const store = await openStore();
     const onCreated = vi.fn();
     try {
-      const view = render(
+      const view = renderCreate(
         <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={onCreated} />,
       );
       await fillForm(user);
@@ -604,7 +618,7 @@ describe("CreateCharacter", () => {
     const store = await openStore();
     try {
       await store.saveOnlineAttempt(makeCreateAttempt("actor-1", "create-old", "2026-01-01T00:00:00.000Z"));
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
       );
       expect(await screen.findByRole("alert")).toHaveTextContent(/replay window|expired|outcome is unknown/i);
@@ -624,7 +638,7 @@ describe("CreateCharacter", () => {
     try {
       await store.saveOnlineAttempt(makeCreateAttempt("actor-1", "create-old", "2026-01-01T00:00:00.000Z"));
       await store.saveOnlineAttempt(makeCreateAttempt("actor-1", "create-fresh"));
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={onCreated} />,
       );
       await screen.findByRole("alert");
@@ -644,7 +658,7 @@ describe("CreateCharacter", () => {
     api.creationOptions.mockResolvedValue(metadata());
     const store = await openStore();
     try {
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
       );
       await fillForm(user);
@@ -673,6 +687,113 @@ describe("CreateCharacter", () => {
     }
   });
 
+  it("P1 renders a button per available version when no version is prefilled", async () => {
+    const api = makeApi();
+    api.listCreationVersions.mockResolvedValue({
+      data: {
+        versions: [
+          {
+            versionId: "aaaaaaaa-aaaa-4000-8000-000000000001",
+            systemId: "system-d20",
+            systemName: "D20",
+            semanticVersion: "1.0.0",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            versionId: "bbbbbbbb-bbbb-4000-8000-000000000002",
+            systemId: "system-cards",
+            systemName: "Cards",
+            semanticVersion: "0.9.0",
+            createdAt: "2025-12-01T00:00:00.000Z",
+          },
+        ],
+      },
+      requestId: "req-versions",
+    });
+    const store = await openStore();
+    try {
+      renderCreate(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
+      );
+      expect(await screen.findByRole("heading", { name: "Choose a system version" })).toBeVisible();
+      expect(await screen.findByRole("button", { name: "D20 1.0.0" })).toBeVisible();
+      expect(await screen.findByRole("button", { name: "Cards 0.9.0" })).toBeVisible();
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("P2 selecting a version fills the version box and loads its metadata", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    const picked = "aaaaaaaa-aaaa-4000-8000-000000000001";
+    api.listCreationVersions.mockResolvedValue({
+      data: {
+        versions: [
+          {
+            versionId: picked,
+            systemId: "system-d20",
+            systemName: "D20",
+            semanticVersion: "1.0.0",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+      requestId: "req-versions",
+    });
+    api.creationOptions.mockResolvedValue(metadata());
+    const store = await openStore();
+    try {
+      renderCreate(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
+      );
+      await user.click(await screen.findByRole("button", { name: "D20 1.0.0" }));
+      expect(screen.getByLabelText("System version ID")).toHaveValue(picked);
+      await waitFor(() => expect(api.creationOptions).toHaveBeenCalledWith(picked));
+      expect(await screen.findByLabelText("Entity")).toBeInTheDocument();
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("P3 hides the picker when a version is prefilled from the route", async () => {
+    const api = makeApi();
+    api.creationOptions.mockResolvedValueOnce(metadata());
+    const store = await openStore();
+    try {
+      renderCreate(
+        <CreateCharacter
+          api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()}
+          initialSystemVersionId={VERSION_ID}
+        />,
+      );
+      expect(await screen.findByLabelText("Entity")).toBeInTheDocument();
+      expect(api.listCreationVersions).not.toHaveBeenCalled();
+      expect(screen.queryByRole("heading", { name: "Choose a system version" })).not.toBeInTheDocument();
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("P4 shows the picker error without breaking the manual version box", async () => {
+    const api = makeApi();
+    api.listCreationVersions.mockRejectedValueOnce(new Error("boom"));
+    const store = await openStore();
+    try {
+      renderCreate(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
+      );
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent(
+        "Available versions could not be loaded. Enter a system version ID manually.",
+      );
+      expect(screen.getByLabelText("System version ID")).toBeVisible();
+      expect(screen.getByRole("button", { name: "Look up version" })).toBeVisible();
+    } finally {
+      await store.close();
+    }
+  });
+
   it("T4l an idempotency mismatch stops with protocol review: attempt retired, no retry, no replacement key", async () => {
     const user = userEvent.setup();
     const api = makeApi();
@@ -680,7 +801,7 @@ describe("CreateCharacter", () => {
     const store = await openStore();
     const onCreated = vi.fn();
     try {
-      render(
+      renderCreate(
         <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={onCreated} />,
       );
       await fillForm(user);

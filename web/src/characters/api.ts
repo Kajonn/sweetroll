@@ -4,6 +4,7 @@ import type {
   CharacterExport,
   CommandResultResponse,
   CreationOptions,
+  CreationVersions,
   FrozenRequest,
   MigrationPreviewBody,
   MigrationPreviewResponse,
@@ -13,6 +14,7 @@ import type {
 export type CharactersApi = {
   open(characterId: string): Promise<OpenCharacterResponse>;
   creationOptions(versionId: string): Promise<CreationOptions>;
+  listCreationVersions(): Promise<CreationVersions>;
   activity(characterId: string, cursor: string | null): Promise<ActivityResponse>;
   send(request: FrozenRequest): Promise<CommandResultResponse>;
   export(characterId: string): Promise<CharacterExport>;
@@ -44,6 +46,8 @@ export function createCharactersApi(client: ApiClient): CharactersApi {
       client.fetch<CreationOptions>("GET", "/characters/creation-options", {
         query: { systemVersionId: versionId },
       }),
+    listCreationVersions: () =>
+      client.fetch<CreationVersions>("GET", "/characters/creation-versions"),
     activity: (characterId, cursor) =>
       client.fetch<ActivityResponse>("GET", `/characters/${characterId}/activity`, {
         query: { cursor },

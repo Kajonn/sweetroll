@@ -53,6 +53,9 @@ describe("router", () => {
       if (url.pathname === "/api/me") {
         return new Response(JSON.stringify({ state: "authenticated", userId: actor }));
       }
+      if (url.pathname === "/api/characters/creation-versions") {
+        return new Response(JSON.stringify({ data: { versions: [] }, requestId: "r" }), { status: 200 });
+      }
       return new Response(JSON.stringify({ systems: [], nextCursor: null, requestId: "r" }), { status: 200 });
     });
     const originalFetch = globalThis.fetch;
@@ -213,6 +216,9 @@ describe("character routes", () => {
           { status: 200 },
         );
       }
+      if (url.pathname === "/api/characters/creation-versions") {
+        return new Response(JSON.stringify({ data: { versions: [] }, requestId: "r" }), { status: 200 });
+      }
       return new Response(JSON.stringify({ systems: [], nextCursor: null, requestId: "r" }), { status: 200 });
     });
     const originalFetch = globalThis.fetch;
@@ -245,6 +251,9 @@ describe("character routes", () => {
           }),
           { status: 200 },
         );
+      }
+      if (url.pathname === "/api/characters/creation-versions") {
+        return new Response(JSON.stringify({ data: { versions: [] }, requestId: "r" }), { status: 200 });
       }
       if (url.pathname === "/api/characters" && init?.method === "POST") {
         return new Response(

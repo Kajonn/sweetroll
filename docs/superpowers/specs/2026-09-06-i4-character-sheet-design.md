@@ -1,7 +1,7 @@
 # I4 Character Sheet Frontend
 
 Date: 2026-09-06
-Status: Implemented and accepted; I4 closed 2026-09-07. Acceptance recorded in `docs/acceptance/i4-2026-09-06.md` (tested commit `be69809`). I5 untouched.
+Status: I4 reopened: completion/remediation in progress (2026-09-07). Previously recorded as implemented and accepted with I4 closed 2026-09-07; acceptance recorded in `docs/acceptance/i4-2026-09-06.md` (tested commit `be69809`). Those historical results are preserved but did not prove the full routed workflow. Remediation proceeds under `docs/superpowers/plans/2026-09-07-i4-completion-remediation.md`. Scope unchanged; I5 untouched.
 
 ## Goal and Scope
 

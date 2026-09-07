@@ -653,6 +653,8 @@ Every increment must meet all applicable criteria before work begins on the next
 **Acceptance demonstration:** From a 360 px viewport, create and use a standalone character, go offline, read and update the sheet, reconnect without duplicate resource changes, resolve a simulated conflict, and export the final state.
 
 > **I4 closed 2026-09-07 at `be69809` (closure commit `docs: close I4 character sheet frontend`).** The reusable projection-driven character sheet is implemented with durable offline edits, safe replay and fully offline reopening; verification recorded in `docs/acceptance/i4-2026-09-06.md` (backend unit 269, integration 122, web unit 484, E2E 19, production-offline 13, all green). Historical 30-day receipts replay unchanged. I5 remains untouched; installation and the Player PWA shell are still out of scope. See `docs/superpowers/specs/2026-09-06-i4-character-sheet-design.md`.
+>
+> **I4 reopened: completion/remediation in progress (2026-09-07).** The closure counts above are preserved as historical results; a follow-up audit found they did not prove the full routed workflow (unreachable action/tools/recovery controls, unsafe recovery/creation/estimate paths — see the remediation plan). Remediation proceeds under `docs/superpowers/plans/2026-09-07-i4-completion-remediation.md` with no scope changes: I5 remains untouched.
 
 ## 17.7 I5 - Standalone Player app
 

@@ -394,6 +394,12 @@ DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll AUTHORITATI
 > (tree `87e80e0`): backend unit 269/269, integration 122/122, web unit 484/484,
 > E2E 19/19, production-offline 13/13; typechecks, build, contracts check pass.
 > Acceptance: `docs/acceptance/i4-2026-09-06.md`. I5 untouched.
+>
+> **I4 reopened: completion/remediation in progress (2026-09-07).** The counts
+> above are preserved as historical results; they did not prove the full routed
+> workflow. Remediation proceeds task-by-task under
+> `docs/superpowers/plans/2026-09-07-i4-completion-remediation.md`, which
+> supersedes this plan's closure claim without changing approved scope.
 
 ## Plan Self-review
 

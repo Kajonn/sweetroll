@@ -14,12 +14,21 @@ import { defineConfig } from "@playwright/test";
  * (it mounts only when `import.meta.env.MODE === "development"`), so the
  * fixture posts to the endpoint directly.
  *
+ * I4 remediation uses dedicated resources that never touch the user's
+ * manual-test app (ports 3000/5173 + `sweetroll` DB):
+ * backend port 3100, preview port 4174, database `sweetroll_i4remed`.
+ * Override with BACKEND_PORT / PREVIEW_PORT / DATABASE_URL when needed.
+ *
  * Run `npm run web:build` first, then
- * `DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll
+ * `DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll_i4remed
  *  AUTHORITATIVE_ROLL_SECRET=development-only-roll-secret-32-bytes
+ *  SWEETROLL_TEST_AUTH=1
  *  npm run web:test:offline`.
  */
-const databaseUrl = process.env.DATABASE_URL ?? "postgres://sweetroll:sweetroll@localhost:5432/sweetroll";
+const backendPort = process.env.BACKEND_PORT ?? "3100";
+const previewPort = process.env.PREVIEW_PORT ?? "4174";
+const databaseUrl =
+  process.env.DATABASE_URL ?? "postgres://sweetroll:sweetroll@localhost:5432/sweetroll_i4remed";
 const rollSecret = process.env.AUTHORITATIVE_ROLL_SECRET ?? "development-only-roll-secret-32-bytes";
 
 export default defineConfig({
@@ -28,11 +37,11 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   timeout: 180_000,
-  use: { baseURL: "http://localhost:4173", trace: "retain-on-failure" },
+  use: { baseURL: `http://localhost:${previewPort}`, trace: "retain-on-failure" },
   webServer: [
     {
       command: "npm run migrate && npx tsx src/bootstrap/http.ts",
-      url: "http://localhost:3000/health/ready",
+      url: `http://localhost:${backendPort}/health/ready`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       cwd: "..",
@@ -41,15 +50,19 @@ export default defineConfig({
         AUTHORITATIVE_ROLL_SECRET: rollSecret,
         NODE_ENV: "production",
         SWEETROLL_TEST_AUTH: "1",
-        PORT: "3000",
+        PORT: backendPort,
       },
     },
     {
       command: "npm run preview",
-      url: "http://localhost:4173",
+      url: `http://localhost:${previewPort}`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
-      env: { PORT: "4173" },
+      env: {
+        PORT: previewPort,
+        PREVIEW_PORT: previewPort,
+        SWEETROLL_BACKEND_TARGET: `http://localhost:${backendPort}`,
+      },
     },
   ],
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],

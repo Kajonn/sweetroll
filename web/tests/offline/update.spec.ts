@@ -135,10 +135,34 @@ test.describe("service worker update with pending edits", () => {
           }),
       );
       expect(controllerBuildId).toBe(pageBuildId);
-      // Pending edits are untouched by the waiting build.
-      await expect(page.getByText("Changes pending")).toBeVisible();
+      // The held bump is an uncertain in-flight attempt (its frozen request
+      // was sent but no response arrived), so the steady state is
+      // "Confirming the last change…" — and the durable queue entry must
+      // still exist. Both prove the waiting build erased nothing.
+      await expect(page.getByText("Confirming the last change…")).toBeVisible({ timeout: 30_000 });
+      const queuedEntries = await page.evaluate(async () => {
+        const open = (): Promise<IDBDatabase> =>
+          new Promise((resolve, reject) => {
+            const request = indexedDB.open("sweetroll-characters");
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+        const db = await open();
+        try {
+          const rows: unknown[] = await new Promise((resolve, reject) => {
+            const tx = db.transaction("queue", "readonly");
+            const request = tx.objectStore("queue").getAll();
+            request.onsuccess = () => resolve(request.result as unknown[]);
+            request.onerror = () => reject(request.error);
+          });
+          return rows.length;
+        } finally {
+          db.close();
+        }
+      });
+      expect(queuedEntries).toBe(1);
       await expectAssetOnlyCaches(page);
-      await page.screenshot({ path: "test-results/offline-update-360-waiting.png" });
+      await page.screenshot({ path: `tests/offline/evidence/offline-update-360-waiting-${nextBuildId}.png` });
 
       // Activate by closing old clients: the new build takes control, keeps
       // the durable queue, and the edit still applies exactly once. Hold the
@@ -159,7 +183,9 @@ test.describe("service worker update with pending edits", () => {
             null,
         );
         expect(activeBuildId).toBe(nextBuildId);
-        await expect(migrated.getByText("Changes pending")).toBeVisible({ timeout: 60_000 });
+        // The new build keeps the frozen attempt: with replays held it
+        // reports the uncertain state (never a dropped queue or a loss).
+        await expect(migrated.getByText("Confirming the last change…")).toBeVisible({ timeout: 60_000 });
         await context.unrouteAll({ behavior: "wait" }).catch(() => {});
         await expect(migrated.getByText("Saved", { exact: true })).toBeVisible({
           timeout: 120_000,
@@ -172,7 +198,7 @@ test.describe("service worker update with pending edits", () => {
         );
         await expectAssetOnlyCaches(migrated);
         await expectNoHorizontalOverflow(migrated);
-        await migrated.screenshot({ path: "test-results/offline-update-1280-active.png" });
+        await migrated.screenshot({ path: `tests/offline/evidence/offline-update-1280-active-${nextBuildId}.png` });
       } finally {
         await migrated.close().catch(() => {});
       }

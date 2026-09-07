@@ -55,7 +55,12 @@ test.describe("character sheet responsive and keyboard", () => {
         await bump.focus();
         await expect(bump).toBeFocused();
         await page.keyboard.press("Enter");
-        await expect(page.getByText("Changes pending")).toBeVisible({ timeout: 30_000 });
+        // On fast connections the bump can reach Saved before the pending
+        // state is observable; either visible state proves the keyboard
+        // commit was accepted, and Saved below proves it applied.
+        await expect(
+          page.getByText("Changes pending").or(page.getByText("Saved", { exact: true })),
+        ).toBeVisible({ timeout: 30_000 });
         await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
 
         // No horizontal overflow at this width.

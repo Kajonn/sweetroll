@@ -139,6 +139,97 @@ test.describe("tab coordination over real web locks", () => {
     }
   });
 
+  test("visible takeover during an uncertain response: owner quiesces, never two owners", async ({
+    browser,
+  }) => {
+    test.setTimeout(240_000);
+    const system = D20_REFERENCE_SYSTEM;
+    const { context } = await newSignedInContext(browser, TEST_USER_A.code);
+    try {
+      const setup = await context.newPage();
+      const characterName = `Takeover ${Date.now().toString(36)}`;
+      const { characterId } = await createCharacter(setup.request, {
+        systemVersionId: system.systemVersionId,
+        name: characterName,
+      });
+      await setup.close();
+
+      const deepLink = `/characters/${characterId}`;
+      const first = await context.newPage();
+      await first.setViewportSize({ width: 360, height: 740 });
+      await first.goto(deepLink);
+      await expectSheetReady(first, characterName);
+      await expectOfflineAvailable(first);
+      const before = await readCharacter(first.request, characterId);
+      const initialHealth = (before.character.state.values.health as { current: number }).current;
+      await expect(first.getByText("Editing in this tab.")).toBeVisible();
+
+      // Make the owner's bump response uncertain: applied on the server,
+      // withheld from the page, replays held so it stays unresolved.
+      let withheldOnce = false;
+      await first.route("**/characters/*/resources/*/bump", async route => {
+        if (!withheldOnce) {
+          withheldOnce = true;
+          const response = await route.fetch();
+          expect(response.ok()).toBe(true);
+          await route.abort("failed");
+          return;
+        }
+        await route.abort("failed");
+      });
+      await first.getByRole("button", { name: system.decreaseButton }).click();
+      await expect(first.getByText("Confirming the last change…")).toBeVisible({ timeout: 30_000 });
+      expect(withheldOnce).toBe(true);
+
+      // Second page opens the same character while the owner is uncertain:
+      // real two-page contention, owner stays open.
+      const second = await context.newPage();
+      await second.setViewportSize({ width: 360, height: 740 });
+      await second.goto(deepLink);
+      await expectSheetReady(second, characterName);
+      await expect(second.getByText("Read-only in this tab.")).toBeVisible({ timeout: 30_000 });
+
+      // Sample ownership on both pages while the visible request control
+      // runs: assert never two owners/senders at any instant.
+      const bothEditing: boolean[] = [];
+      const sampler = (async () => {
+        for (let i = 0; i < 60; i++) {
+          const [firstEditing, secondEditing] = await Promise.all([
+            first.getByText("Editing in this tab.").isVisible().catch(() => false),
+            second.getByText("Editing in this tab.").isVisible().catch(() => false),
+          ]);
+          bothEditing.push(firstEditing && secondEditing);
+          if (!firstEditing && secondEditing) break;
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      })();
+      await second.getByRole("button", { name: "Request editing access" }).click();
+      await sampler;
+      expect(bothEditing.length).toBeGreaterThan(0);
+      expect(bothEditing.every(both => both === false)).toBe(true);
+
+      // Takeover completed: the second page edits, the first is read-only.
+      await expect(second.getByText("Editing in this tab.")).toBeVisible({ timeout: 60_000 });
+      await expect(first.getByText("Read-only in this tab.")).toBeVisible({ timeout: 60_000 });
+      await expect(second.getByRole("button", { name: system.decreaseButton })).toBeEnabled();
+
+      // The frozen attempt survives under the new owner and applies exactly
+      // once when replays succeed.
+      await first.unrouteAll({ behavior: "wait" }).catch(() => {});
+      await expect(second.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
+      const after = await readCharacter(second.request, characterId);
+      expect(after.character.revision).toBe(before.character.revision + 1);
+      expect((after.character.state.values.health as { current: number }).current).toBe(initialHealth - 1);
+      const activity = await readActivity(second.request, characterId);
+      expect(activity.events.filter(e => e.kind === "character_resource_bumped")).toHaveLength(1);
+
+      await first.close().catch(() => {});
+      await second.close().catch(() => {});
+    } finally {
+      await context.close();
+    }
+  });
+
   test("independent users use separate contexts and stay isolated", async ({ browser }) => {
     const system = D20_REFERENCE_SYSTEM;
     const first = await newSignedInContext(browser, TEST_USER_A.code);

@@ -5,6 +5,9 @@ import react from "@vitejs/plugin-react";
 
 import { offlineAssetsPlugin } from "./build/offline-assets.js";
 
+const backendTarget = process.env.SWEETROLL_BACKEND_TARGET ?? "http://localhost:3000";
+const previewPort = Number(process.env.PREVIEW_PORT ?? "4173");
+
 export default defineConfig({
   plugins: [react(), offlineAssetsPlugin()],
   resolve: {
@@ -20,16 +23,16 @@ export default defineConfig({
       // header. The backend distinguishes same-origin sign-out by comparing the
       // Origin host against this untouched Host header, so changing it here
       // would reject legitimate same-origin requests.
-      "/api": { target: "http://localhost:3000", rewrite: (p) => p.replace(/^\/api/, "") },
-      "/dev": { target: "http://localhost:3000" },
+      "/api": { target: backendTarget, rewrite: (p) => p.replace(/^\/api/, "") },
+      "/dev": { target: backendTarget },
     },
   },
   preview: {
-    port: 4173,
+    port: previewPort,
     strictPort: true,
     proxy: {
-      "/api": { target: "http://localhost:3000", rewrite: (p) => p.replace(/^\/api/, "") },
-      "/dev": { target: "http://localhost:3000" },
+      "/api": { target: backendTarget, rewrite: (p) => p.replace(/^\/api/, "") },
+      "/dev": { target: backendTarget },
     },
   },
   build: { outDir: "dist", sourcemap: true },

@@ -15,6 +15,9 @@ import type { APIRequestContext, Browser, Page } from "@playwright/test";
 export const TEST_USER_A = { code: "code-test-a", name: "Offline Test A" } as const;
 export const TEST_USER_B = { code: "code-test-b", name: "Offline Test B" } as const;
 
+/** Preview origin under test (dedicated I4 remediation port 4174 by default). */
+export const PREVIEW_ORIGIN = `http://localhost:${process.env.PREVIEW_PORT ?? "4174"}`;
+
 export type ReferenceSystem = {
   key: "d20" | "pbta" | "pool";
   /** Published template version seeded by migration/http bootstrap. */
@@ -24,6 +27,22 @@ export type ReferenceSystem = {
   /** Sheet heading shown for the resource section is the resource label. */
   decreaseButton: string;
   increaseButton: string;
+  /** Roll action button label rendered on the sheet. */
+  actionLabel: string;
+  /** A bound editable field exercised by UI edit (label + value to type). */
+  editFieldLabel: string;
+  editFieldValue: string;
+  /**
+   * Required-but-unbound completion control. `d20` exposes `Proficient`
+   * natively; `pbta`/`pool` bind every required field on their reference
+   * sheets, so the journey publishes a minimal authorized clone variant
+   * that drops `variantDropsElement` (a required field's sheet element)
+   * and completes it here instead.
+   */
+  completionLabel: string;
+  completionKind: "checkbox" | "text";
+  /** Sheet element id removed by the clone variant (null = reference as-is). */
+  variantDropsElement: string | null;
 };
 
 export const D20_REFERENCE_SYSTEM: ReferenceSystem = {
@@ -33,6 +52,12 @@ export const D20_REFERENCE_SYSTEM: ReferenceSystem = {
   resourceLabel: "Health",
   decreaseButton: "Decrease Health",
   increaseButton: "Increase Health",
+  actionLabel: "Check",
+  editFieldLabel: "Ability Score",
+  editFieldValue: "14",
+  completionLabel: "Proficient",
+  completionKind: "checkbox",
+  variantDropsElement: null,
 };
 
 export const PBTA_REFERENCE_SYSTEM: ReferenceSystem = {
@@ -42,6 +67,12 @@ export const PBTA_REFERENCE_SYSTEM: ReferenceSystem = {
   resourceLabel: "Harm",
   decreaseButton: "Decrease Harm",
   increaseButton: "Increase Harm",
+  actionLabel: "Make Move",
+  editFieldLabel: "Move Stat",
+  editFieldValue: "2",
+  completionLabel: "Condition",
+  completionKind: "checkbox",
+  variantDropsElement: "condition_element",
 };
 
 export const POOL_REFERENCE_SYSTEM: ReferenceSystem = {
@@ -51,6 +82,12 @@ export const POOL_REFERENCE_SYSTEM: ReferenceSystem = {
   resourceLabel: "Stress",
   decreaseButton: "Decrease Stress",
   increaseButton: "Increase Stress",
+  actionLabel: "Test Pool",
+  editFieldLabel: "Attribute",
+  editFieldValue: "4",
+  completionLabel: "Skill",
+  completionKind: "text",
+  variantDropsElement: "skill_element",
 };
 
 export const REFERENCE_SYSTEMS: readonly ReferenceSystem[] = [
@@ -62,7 +99,7 @@ export const REFERENCE_SYSTEMS: readonly ReferenceSystem[] = [
 /** Sign the context behind `request` in as `code` via the test endpoint. */
 export async function testSignIn(request: APIRequestContext, code: string): Promise<string> {
   const response = await request.post("/dev/signin", {
-    data: { code, redirectUri: "http://localhost:4173/cb" },
+    data: { code, redirectUri: `${PREVIEW_ORIGIN}/cb` },
   });
   if (response.status() !== 200) {
     throw new Error(`test sign-in (${code}) failed: ${response.status()} ${await response.text()}`);
@@ -76,7 +113,7 @@ export async function testSignIn(request: APIRequestContext, code: string): Prom
 
 /** New isolated browser context signed in as `code`. Independent users must use separate contexts. */
 export async function newSignedInContext(browser: Browser, code: string) {
-  const context = await browser.newContext({ baseURL: "http://localhost:4173" });
+  const context = await browser.newContext({ baseURL: PREVIEW_ORIGIN });
   const probe = await context.newPage();
   const userId = await testSignIn(probe.request, code);
   await probe.close();
@@ -146,4 +183,114 @@ export async function expectNoHorizontalOverflow(page: Page) {
     innerWidth: window.innerWidth,
   }));
   expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.innerWidth + 1);
+}
+
+/** Short unique suffix for names/keys within one acceptance run. */
+export function uid(): string {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+}
+
+type WorkspaceEnvelope = {
+  workspace: {
+    system: { systemId: string };
+    draft: { revision: number; document: unknown } | null;
+  };
+};
+
+/**
+ * Minimal authorized fixture variant for completion coverage (Task 8): clone
+ * the reference system through the real System Builder API, remove one
+ * required field's sheet element so it becomes a completion-only field, and
+ * publish. Returns the new published version id.
+ */
+export async function publishCompletionVariant(
+  request: APIRequestContext,
+  sourceVersionId: string,
+  dropElementId: string,
+): Promise<string> {
+  const created = await request.post("/api/systems", {
+    data: { source: { kind: "clone", versionId: sourceVersionId }, idempotencyKey: `variant-${uid()}` },
+  });
+  if (created.status() !== 201) {
+    throw new Error(`clone system failed: ${created.status()} ${await created.text()}`);
+  }
+  const workspace = ((await created.json()) as WorkspaceEnvelope).workspace;
+  const systemId = workspace.system.systemId;
+  const draft = workspace.draft;
+  if (draft === null) throw new Error("clone produced no draft");
+  const document = draft.document as {
+    sheets: Array<{ sections: Array<{ elements: Array<{ id?: string }> }> }>;
+  };
+  for (const sheet of document.sheets) {
+    for (const section of sheet.sections) {
+      section.elements = section.elements.filter(element => element.id !== dropElementId);
+    }
+  }
+  const saved = await request.put(`/api/systems/${systemId}/draft`, {
+    data: { expectedRevision: draft.revision, document },
+  });
+  if (saved.status() !== 200) {
+    throw new Error(`save variant draft failed: ${saved.status()} ${await saved.text()}`);
+  }
+  const nextRevision = ((await saved.json()) as WorkspaceEnvelope).workspace.draft?.revision;
+  if (typeof nextRevision !== "number") throw new Error("saved draft has no revision");
+  const published = await request.post(`/api/systems/${systemId}/publish`, {
+    data: {
+      expectedRevision: nextRevision,
+      semanticVersion: "1.0.0",
+      releaseNotes: "I4 completion coverage variant",
+      idempotencyKey: `variant-publish-${uid()}`,
+      acknowledgeBreaking: true,
+    },
+  });
+  if (published.status() !== 200) {
+    throw new Error(`publish variant failed: ${published.status()} ${await published.text()}`);
+  }
+  const body = (await published.json()) as { version: { versionId: string } };
+  return body.version.versionId;
+}
+
+/** Independent-writer field set through the real API (same owner, fresh key). */
+export async function apiSetField(
+  request: APIRequestContext,
+  characterId: string,
+  fieldId: string,
+  value: unknown,
+  expectedRevision: number,
+): Promise<number> {
+  const response = await request.post(`/api/characters/${characterId}/fields/${fieldId}/set`, {
+    data: { value, expectedRevision, idempotencyKey: `writer-${uid()}` },
+  });
+  if (response.status() !== 200) {
+    throw new Error(`writer set field failed: ${response.status()} ${await response.text()}`);
+  }
+  const body = (await response.json()) as { result: { character: { revision: number } } };
+  return body.result.character.revision;
+}
+
+/** Independent-writer resource bump through the real API (same owner, fresh key). */
+export async function apiBump(
+  request: APIRequestContext,
+  characterId: string,
+  resourceId: string,
+  direction: "up" | "down",
+  expectedRevision: number,
+): Promise<number> {
+  const response = await request.post(`/api/characters/${characterId}/resources/${resourceId}/bump`, {
+    data: { direction, expectedRevision, idempotencyKey: `writer-${uid()}` },
+  });
+  if (response.status() !== 200) {
+    throw new Error(`writer bump failed: ${response.status()} ${await response.text()}`);
+  }
+  const body = (await response.json()) as { result: { character: { revision: number } } };
+  return body.result.character.revision;
+}
+
+/** Authoritative server export document for download comparison. */
+export async function exportCharacter(request: APIRequestContext, characterId: string): Promise<unknown> {
+  const response = await request.post(`/api/characters/${characterId}/exports`);
+  if (response.status() !== 200) {
+    throw new Error(`export failed: ${response.status()} ${await response.text()}`);
+  }
+  return (await response.json()) as unknown;
 }

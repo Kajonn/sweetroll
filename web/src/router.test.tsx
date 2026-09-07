@@ -4,7 +4,7 @@ import { render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
 
-import { createAppRouter, useCharacterCoordination } from "./router.js";
+import { createAppRouter, creationViewKey, useCharacterCoordination } from "./router.js";
 
 function renderAt(path: string) {
   window.history.pushState({}, "", path);
@@ -101,5 +101,13 @@ describe("router", () => {
     unmount();
     // Route teardown still releases and disposes the handle: no lock leaks.
     await expect(live?.requestEditing()).resolves.toBe(false);
+  });
+
+  it("keys the creation view by account lifetime as well as version input", () => {
+    expect(creationViewKey("actor-1", 3, "v-1")).toBe(creationViewKey("actor-1", 3, "v-1"));
+    expect(creationViewKey("actor-1", 3, "v-1")).not.toBe(creationViewKey("actor-2", 3, "v-1"));
+    expect(creationViewKey("actor-1", 3, "v-1")).not.toBe(creationViewKey("actor-1", 4, "v-1"));
+    expect(creationViewKey("actor-1", 3, "v-1")).not.toBe(creationViewKey("actor-1", 3, "v-2"));
+    expect(creationViewKey(null, 3, "v-1")).not.toBe(creationViewKey("actor-1", 3, "v-1"));
   });
 });

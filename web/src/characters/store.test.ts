@@ -764,4 +764,81 @@ describe("CharacterStore online acknowledgment", () => {
     expect((await store.readOnlineAttempts("actor-A")).map((a) => a.id)).toEqual([]);
     await store.close();
   });
+
+  it("rejects guarded creation writes after account clearing", async () => {
+    const store = await openFresh();
+    const guard = await store.readIdentity().then(() => ({ generation: 0, accountGeneration: 0 }));
+    await store.clearAccount("actor-A");
+    const attempt: OnlineAttempt = {
+      id: "create-1",
+      actorId: "actor-A",
+      characterId: null,
+      kind: "create",
+      request: makeRequest({ path: "/characters", body: { name: "Aria", systemVersionId: "v-1", idempotencyKey: "k" } }),
+      createdAt: "2026-09-06T00:00:00.000Z",
+    };
+    await expect(store.saveOnlineAttempt(attempt, guard)).rejects.toThrow(/stale/);
+    await expect(store.retireOnlineAttempt("actor-A", null, "create-1", guard)).rejects.toThrow();
+    expect(await store.readOnlineAttempts("actor-A")).toEqual([]);
+    await store.close();
+  });
+});
+
+describe("CharacterStore creation attempts", () => {
+  function makeCreateAttempt(id: string, actorId = "actor-A"): OnlineAttempt {
+    return {
+      id,
+      actorId,
+      characterId: null,
+      kind: "create",
+      request: makeRequest({
+        path: "/characters",
+        body: { name: "Aria", systemVersionId: "v-1", idempotencyKey: `key-${id}` },
+      }),
+      createdAt: "2026-09-06T00:00:00.000Z",
+    };
+  }
+
+  it("retires exactly one creation attempt under identity guard without a character row", async () => {
+    const store = await openFresh();
+    await store.saveOnlineAttempt(makeCreateAttempt("create-1"));
+    await store.saveOnlineAttempt(makeCreateAttempt("create-2"));
+    const identity = await store.readIdentity();
+    const retired = await store.retireOnlineAttempt("actor-A", null, "create-1", {
+      generation: 0,
+      accountGeneration: identity.generation,
+    });
+    expect(retired.id).toBe("create-1");
+    expect(retired.request.body).toEqual({ name: "Aria", systemVersionId: "v-1", idempotencyKey: "key-create-1" });
+    expect((await store.readOnlineAttempts("actor-A")).map((a) => a.id)).toEqual(["create-2"]);
+    await store.close();
+  });
+
+  it("rejects creation retirement for unknown ids, other accounts and stale guards", async () => {
+    const store = await openFresh();
+    await store.saveOnlineAttempt(makeCreateAttempt("create-1"));
+    const identity = await store.readIdentity();
+    const guard = { generation: 0, accountGeneration: identity.generation };
+    await expect(store.retireOnlineAttempt("actor-A", null, "missing", guard)).rejects.toThrow();
+    await expect(store.retireOnlineAttempt("actor-B", null, "create-1", guard)).rejects.toThrow();
+    await store.clearAccount("actor-A");
+    await expect(store.retireOnlineAttempt("actor-A", null, "create-1", guard)).rejects.toThrow(/stale/);
+    expect(await store.readOnlineAttempts("actor-A")).toEqual([]);
+    await store.close();
+  });
+
+  it("flags replay expiry on a creation attempt while keeping the frozen request verbatim", async () => {
+    const store = await openFresh();
+    await store.saveOnlineAttempt(makeCreateAttempt("create-1"));
+    const identity = await store.readIdentity();
+    await store.markOnlineAttemptReplayExpired("actor-A", null, "create-1", {
+      generation: 0,
+      accountGeneration: identity.generation,
+    });
+    const attempts = await store.readOnlineAttempts("actor-A");
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]!.replayExpired).toBe(true);
+    expect(attempts[0]!.request.body).toEqual({ name: "Aria", systemVersionId: "v-1", idempotencyKey: "key-create-1" });
+    await store.close();
+  });
 });

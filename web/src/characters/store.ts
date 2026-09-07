@@ -80,22 +80,25 @@ export type CharacterStore = {
    * Guarded retirement of exactly one online attempt (explicit review and
    * definitive server rejections). Returns the retired attempt; unrelated
    * attempts are untouched. Any guard or write failure aborts without
-   * deleting anything.
+   * deleting anything. A null characterId scopes to creation attempts, which
+   * have no character row: only the identity guard and exact attempt match
+   * apply, with no generation bump.
    */
   retireOnlineAttempt(
     actorId: string,
-    characterId: string,
+    characterId: string | null,
     attemptId: string,
     guard: WriteGuard,
   ): Promise<OnlineAttempt>;
   /**
    * Durably flags a retained attempt whose idempotency replay window the
    * backend declared expired. The frozen request is left verbatim; the flag
-   * only admits the attempt to explicit unknown-outcome review.
+   * only admits the attempt to explicit unknown-outcome review. A null
+   * characterId scopes to creation attempts with no character row.
    */
   markOnlineAttemptReplayExpired(
     actorId: string,
-    characterId: string,
+    characterId: string | null,
     attemptId: string,
     guard: WriteGuard,
   ): Promise<void>;
@@ -617,11 +620,16 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
         if (!attempt || attempt.actorId !== actorId || attempt.characterId !== characterId) {
           throw new Error("online attempt not found");
         }
+        await deleteRequest(tx, ATTEMPTS, [actorId, attemptId]);
+        if (characterId === null) {
+          // Creation attempts have no character row: the identity guard and
+          // exact-attempt match above are the whole transaction.
+          return attempt;
+        }
         const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
         if (!record || record.generation !== guard.generation) {
           throw new Error("stale online retirement: generation changed");
         }
-        await deleteRequest(tx, ATTEMPTS, [actorId, attemptId]);
         record.generation += 1;
         await putRequest(tx, CHAR, record);
         return attempt;
@@ -635,9 +643,11 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
         if (!attempt || attempt.actorId !== actorId || attempt.characterId !== characterId) {
           throw new Error("online attempt not found");
         }
-        const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
-        if (!record || record.generation !== guard.generation) {
-          throw new Error("stale online retirement: generation changed");
+        if (characterId !== null) {
+          const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
+          if (!record || record.generation !== guard.generation) {
+            throw new Error("stale online retirement: generation changed");
+          }
         }
         // Flag-only write: the frozen request stays verbatim and the
         // character generation is untouched.

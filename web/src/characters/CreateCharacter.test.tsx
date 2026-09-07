@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../api/client.js";
 import type { CharactersApi } from "./api.js";
-import { openCharacterStore, type CharacterStore } from "./store.js";
+import { openCharacterStore, type CharacterStore, type OnlineAttempt } from "./store.js";
 import { CreateCharacter } from "./CreateCharacter.js";
 
 const VERSION_ID = "11111111-1111-4000-8000-000000000001";
@@ -58,6 +58,60 @@ async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>) {
   await user.selectOptions(screen.getByLabelText("Entity"), "sage");
   await user.type(screen.getByLabelText("Character name"), "Briar");
   await user.click(screen.getByRole("button", { name: "Create character" }));
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+/** Single stable identity object whose account can switch mid-flight, like the real gate. */
+function makeMutableIdentity(actor: string | null) {
+  let current = actor;
+  let generation = 0;
+  let durable = true;
+  const isCurrent = vi.fn(async () => durable && current !== null);
+  return {
+    identity: {
+      getActorId: () => current,
+      isOnline: () => true,
+      getGeneration: () => generation,
+      isCurrent,
+    },
+    switchTo(next: string | null) { current = next; generation += 1; },
+    revokeDurable() { durable = false; },
+  };
+}
+
+function makeCreateAttempt(actorId: string, id = "create-1", firstAttemptAt = "2026-09-06T00:00:00.000Z"): OnlineAttempt {
+  return {
+    id,
+    actorId,
+    characterId: null,
+    kind: "create",
+    request: {
+      method: "POST",
+      path: "/characters",
+      body: {
+        systemVersionId: VERSION_ID,
+        entityDefinitionId: "hero",
+        name: "OldName",
+        idempotencyKey: "old-key",
+      },
+      firstAttemptAt,
+    },
+    createdAt: firstAttemptAt,
+  };
+}
+
+async function fillForm(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText("System version ID"), VERSION_ID);
+  await user.click(screen.getByRole("button", { name: "Look up version" }));
+  await screen.findByLabelText("Entity");
+  await user.selectOptions(screen.getByLabelText("Entity"), "sage");
+  await user.type(screen.getByLabelText("Character name"), "Briar");
 }
 
 describe("CreateCharacter", () => {
@@ -298,6 +352,318 @@ describe("CreateCharacter", () => {
       const otherAttempts = await store.readOnlineAttempts("actor-1");
       expect(otherAttempts).toHaveLength(1);
       expect(otherAttempts[0]!.request.body).toMatchObject({ idempotencyKey: "old-key" });
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("T4a never sends after an account switch lands while attempts are being read", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    api.creationOptions.mockResolvedValue(metadata());
+    const store = await openStore();
+    const gate = deferred<OnlineAttempt[]>();
+    const read = vi.spyOn(store, "readOnlineAttempts");
+    const mutable = makeMutableIdentity("actor-1");
+    const onCreated = vi.fn();
+    try {
+      render(
+        <CreateCharacter api={api} store={store} identity={mutable.identity} onCreated={onCreated} />,
+      );
+      // Let mount recovery consume the real read before arming the gate.
+      await waitFor(() => expect(read).toHaveBeenCalled());
+      read.mockReturnValueOnce(gate.promise);
+      await fillForm(user);
+      await user.click(screen.getByRole("button", { name: "Create character" }));
+      await waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+      mutable.switchTo("actor-2");
+      gate.resolve([]);
+      await waitFor(() => expect(store.readOnlineAttempts("actor-2")).resolves.toEqual([]));
+      // Let any late continuation settle.
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(api.send).not.toHaveBeenCalled();
+      expect(onCreated).not.toHaveBeenCalled();
+      expect(await store.readOnlineAttempts("actor-1")).toEqual([]);
+      expect(await store.readOnlineAttempts("actor-2")).toEqual([]);
+    } finally {
+      read.mockRestore();
+      await store.close();
+    }
+  });
+
+  it("T4b never sends after sign-out lands while the creation attempt is being persisted", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    api.creationOptions.mockResolvedValue(metadata());
+    api.send.mockResolvedValue({ character: { characterId: "char-1" }, requestId: "req-1" });
+    const store = await openStore();
+    const gate = deferred<void>();
+    const save = vi.spyOn(store, "saveOnlineAttempt").mockReturnValueOnce(gate.promise);
+    const mutable = makeMutableIdentity("actor-1");
+    const onCreated = vi.fn();
+    try {
+      render(
+        <CreateCharacter api={api} store={store} identity={mutable.identity} onCreated={onCreated} />,
+      );
+      await fillForm(user);
+      await user.click(screen.getByRole("button", { name: "Create character" }));
+      await waitFor(() => expect(save).toHaveBeenCalled());
+      mutable.switchTo(null);
+      mutable.revokeDurable();
+      gate.resolve();
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(api.send).not.toHaveBeenCalled();
+      expect(onCreated).not.toHaveBeenCalled();
+    } finally {
+      save.mockRestore();
+      await store.close();
+    }
+  });
+
+  it("T4c rechecks durable currency immediately before the network send", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    api.creationOptions.mockResolvedValue(metadata());
+    api.send.mockResolvedValue({ character: { characterId: "char-1" }, requestId: "req-1" });
+    const store = await openStore();
+    const mutable = makeMutableIdentity("actor-1");
+    try {
+      render(
+        <CreateCharacter api={api} store={store} identity={mutable.identity} onCreated={vi.fn()} />,
+      );
+      await fillForm(user);
+      mutable.identity.isCurrent.mockClear();
+      const sendGate = deferred<unknown>();
+      api.send.mockReturnValueOnce(sendGate.promise);
+      await user.click(screen.getByRole("button", { name: "Create character" }));
+      await waitFor(() => expect(api.send).toHaveBeenCalledTimes(1));
+      // The submit path must consult the durable gate after persisting and
+      // before sending, not just during mount recovery.
+      expect(mutable.identity.isCurrent).toHaveBeenCalled();
+      mutable.switchTo("actor-2");
+      mutable.revokeDurable();
+      sendGate.resolve({ character: { characterId: "char-1" }, requestId: "req-1" });
+      await new Promise(resolve => setTimeout(resolve, 20));
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("T4d performs no marker write or navigation when the account switches before success cleanup", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    api.creationOptions.mockResolvedValue(metadata());
+    const sendGate = deferred<unknown>();
+    api.send.mockReturnValueOnce(sendGate.promise);
+    const store = await openStore();
+    const mutable = makeMutableIdentity("actor-1");
+    const onCreated = vi.fn();
+    try {
+      render(
+        <CreateCharacter api={api} store={store} identity={mutable.identity} onCreated={onCreated} />,
+      );
+      await fillForm(user);
+      await user.click(screen.getByRole("button", { name: "Create character" }));
+      await waitFor(() => expect(api.send).toHaveBeenCalledTimes(1));
+      const sent = api.send.mock.calls[0]![0] as { body: Record<string, unknown> };
+      mutable.switchTo("actor-2");
+      mutable.revokeDurable();
+      sendGate.resolve({ character: { characterId: "char-late" }, requestId: "req-late" });
+      await waitFor(() => expect(store.readOnlineAttempts("actor-1")).resolves.toHaveLength(1));
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(onCreated).not.toHaveBeenCalled();
+      // The stale success must neither navigate nor retire the old attempt,
+      // and must not mint anything under the new account.
+      expect(await store.readOnlineAttempts("actor-1")).toHaveLength(1);
+      expect((await store.readOnlineAttempts("actor-1"))[0]!.request.body).toEqual(sent.body);
+      expect(await store.readOnlineAttempts("actor-2")).toEqual([]);
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("T4e reloads the exact persisted creation body/key without fresh metadata", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    const store = await openStore();
+    const onCreated = vi.fn();
+    try {
+      await store.saveOnlineAttempt(makeCreateAttempt("actor-1"));
+      api.send.mockResolvedValueOnce({ character: { characterId: "char-9" }, requestId: "req-9" });
+      render(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={onCreated} />,
+      );
+      expect(await screen.findByRole("button", { name: "Retry creation" })).toBeVisible();
+      expect(api.creationOptions).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "Retry creation" }));
+      await waitFor(() => expect(api.send).toHaveBeenCalledTimes(1));
+      const retried = api.send.mock.calls[0]![0] as { body: Record<string, unknown> };
+      expect(retried.body).toEqual({
+        systemVersionId: VERSION_ID,
+        entityDefinitionId: "hero",
+        name: "OldName",
+        idempotencyKey: "old-key",
+      });
+      expect(api.creationOptions).not.toHaveBeenCalled();
+      await waitFor(() => expect(onCreated).toHaveBeenCalledWith("char-9"));
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("T4f surfaces durable storage rejection without sending", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    api.creationOptions.mockResolvedValue(metadata());
+    const store = await openStore();
+    const save = vi
+      .spyOn(store, "saveOnlineAttempt")
+      .mockRejectedValueOnce(new DOMException("Quota exceeded", "QuotaExceededError"));
+    try {
+      render(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
+      );
+      await fillForm(user);
+      await user.click(screen.getByRole("button", { name: "Create character" }));
+      await waitFor(() => expect(save).toHaveBeenCalled());
+      expect(await screen.findByRole("alert")).toHaveTextContent(/could not be saved|storage/i);
+      expect(api.send).not.toHaveBeenCalled();
+      expect(await store.readOnlineAttempts("actor-1")).toEqual([]);
+      expect(screen.queryByRole("button", { name: "Retry creation" })).not.toBeInTheDocument();
+    } finally {
+      save.mockRestore();
+      await store.close();
+    }
+  });
+
+  it("T4g cleans up a first-submit definitive rejection under the captured account, not the new one", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    api.creationOptions.mockResolvedValue(metadata());
+    const sendGate = deferred<unknown>();
+    api.send.mockReturnValueOnce(sendGate.promise);
+    const store = await openStore();
+    const mutable = makeMutableIdentity("actor-1");
+    try {
+      render(
+        <CreateCharacter api={api} store={store} identity={mutable.identity} onCreated={vi.fn()} />,
+      );
+      await fillForm(user);
+      await user.click(screen.getByRole("button", { name: "Create character" }));
+      await waitFor(() => expect(api.send).toHaveBeenCalledTimes(1));
+      mutable.switchTo("actor-2");
+      mutable.revokeDurable();
+      sendGate.reject(
+        new ApiError({
+          code: "denied", message: "No.", status: 403,
+          requestId: "req-x", latestRevision: null, diagnostics: [],
+        }),
+      );
+      await waitFor(() => expect(store.readOnlineAttempts("actor-1")).resolves.toHaveLength(0));
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(api.send).toHaveBeenCalledTimes(1);
+      expect(await store.readOnlineAttempts("actor-1")).toEqual([]);
+      expect(await store.readOnlineAttempts("actor-2")).toEqual([]);
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("T4h never navigates or resolves after unmount during response handling", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    api.creationOptions.mockResolvedValue(metadata());
+    const sendGate = deferred<unknown>();
+    api.send.mockReturnValueOnce(sendGate.promise);
+    const store = await openStore();
+    const onCreated = vi.fn();
+    try {
+      const view = render(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={onCreated} />,
+      );
+      await fillForm(user);
+      await user.click(screen.getByRole("button", { name: "Create character" }));
+      await waitFor(() => expect(api.send).toHaveBeenCalledTimes(1));
+      view.unmount();
+      sendGate.resolve({ character: { characterId: "char-gone" }, requestId: "req-gone" });
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(onCreated).not.toHaveBeenCalled();
+      // The unresolved attempt stays durable so a reload can replay it by key.
+      expect(await store.readOnlineAttempts("actor-1")).toHaveLength(1);
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("T4i shows expiry-specific review for an aged creation attempt and never auto-sends", async () => {
+    const api = makeApi();
+    const store = await openStore();
+    try {
+      await store.saveOnlineAttempt(makeCreateAttempt("actor-1", "create-old", "2026-01-01T00:00:00.000Z"));
+      render(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
+      );
+      expect(await screen.findByRole("alert")).toHaveTextContent(/replay window|expired|outcome is unknown/i);
+      expect(api.send).not.toHaveBeenCalled();
+      expect(screen.queryByRole("button", { name: "Retry creation" })).not.toBeInTheDocument();
+      expect(await store.readOnlineAttempts("actor-1")).toHaveLength(1);
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("T4j explicit expired-create review retires the exact attempt without minting a replacement", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    const store = await openStore();
+    const onCreated = vi.fn();
+    try {
+      await store.saveOnlineAttempt(makeCreateAttempt("actor-1", "create-old", "2026-01-01T00:00:00.000Z"));
+      await store.saveOnlineAttempt(makeCreateAttempt("actor-1", "create-fresh"));
+      render(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={onCreated} />,
+      );
+      await screen.findByRole("alert");
+      await user.click(screen.getByRole("button", { name: /acknowledge.*unknown outcome/i }));
+      await waitFor(() => expect(store.readOnlineAttempts("actor-1")).resolves.toHaveLength(1));
+      expect((await store.readOnlineAttempts("actor-1"))[0]!.id).toBe("create-fresh");
+      expect(api.send).not.toHaveBeenCalled();
+      expect(onCreated).not.toHaveBeenCalled();
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("T4k a replay-window-expired conflict is retained and flagged for explicit review, not retried", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    api.creationOptions.mockResolvedValue(metadata());
+    const store = await openStore();
+    try {
+      render(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
+      );
+      await fillForm(user);
+      api.send.mockRejectedValueOnce(
+        new ApiError({
+          code: "conflict",
+          message: "The replay window for this idempotency key has expired. Retry with a new key.",
+          status: 409,
+          requestId: "req-exp",
+          latestRevision: null,
+          diagnostics: [],
+        }),
+      );
+      await user.click(screen.getByRole("button", { name: "Create character" }));
+      await waitFor(() => expect(api.send).toHaveBeenCalledTimes(1));
+      expect(await screen.findByRole("alert")).toHaveTextContent(/replay window|expired|outcome is unknown/i);
+      expect(screen.queryByRole("button", { name: "Retry creation" })).not.toBeInTheDocument();
+      const attempts = await store.readOnlineAttempts("actor-1");
+      expect(attempts).toHaveLength(1);
+      expect(attempts[0]!.replayExpired).toBe(true);
+      expect(attempts[0]!.request.body["idempotencyKey"]).toBe(
+        (api.send.mock.calls[0]![0] as { body: Record<string, unknown> }).body["idempotencyKey"],
+      );
     } finally {
       await store.close();
     }

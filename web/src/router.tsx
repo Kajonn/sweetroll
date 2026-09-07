@@ -120,7 +120,7 @@ function NewCharacterRouteView() {
   }
   return (
     <NewCharacterRoute
-      key={search.systemVersionId ?? ""}
+      key={creationViewKey(identity.getActorId(), identity.getGeneration?.() ?? 0, search.systemVersionId)}
       api={api}
       store={store}
       identity={identity}
@@ -128,6 +128,20 @@ function NewCharacterRouteView() {
       onCreated={characterId => void navigate({ to: "/characters/$characterId", params: { characterId } })}
     />
   );
+}
+
+/**
+ * Account-lifetime key for the creation view: actor-specific component state
+ * (pending attempts, restored fields, in-flight submissions) must never
+ * survive an account switch or generation invalidation, so the route
+ * remounts when the lifetime changes as well as when the version input does.
+ */
+export function creationViewKey(
+  actorId: string | null,
+  generation: number,
+  systemVersionId: string | undefined,
+): string {
+  return `${actorId ?? "signed-out"}:${generation}:${systemVersionId ?? ""}`;
 }
 
 function CharacterDetailRouteView() {

@@ -304,6 +304,108 @@ export function CreateCharacter({
     }
   };
 
+  async function handleSendError(
+    sendError: unknown,
+    attempt: OnlineAttempt,
+    guard: { generation: number; accountGeneration: number },
+    alive: () => boolean,
+  ): Promise<void> {
+    if (sendError instanceof ApiError && sendError.status === 401) {
+      if (!alive()) return;
+      setPending(attempt);
+      setError(t(errorMessageKey(sendError)));
+      return;
+    }
+    if (sendError instanceof ApiError && (sendError.status === 403 || sendError.status === 404)) {
+      // Definitive rejection: the server answered, so nothing is uncertain.
+      // Retire exactly the captured attempt under its own actor/ID — never
+      // whichever account happens to be current later.
+      try {
+        await store.retireOnlineAttempt(attempt.actorId, null, attempt.id, guard);
+      } catch {
+        if (!alive()) return;
+        setPending(attempt);
+        setError(t("character.create.storageError"));
+        return;
+      }
+      if (!alive()) return;
+      setPending(null);
+      setError(t("character.create.denied"));
+      return;
+    }
+    if (sendError instanceof ApiError && sendError.status === 422) {
+      try {
+        await store.retireOnlineAttempt(attempt.actorId, null, attempt.id, guard);
+      } catch {
+        if (!alive()) return;
+        setPending(attempt);
+        setError(t("character.create.storageError"));
+        return;
+      }
+      if (!alive()) return;
+      setPending(null);
+      setError(t(errorMessageKey(sendError)));
+      return;
+    }
+    if (sendError instanceof ApiError && sendError.code === "idempotency_mismatch") {
+      // Protocol stop, mirroring the session: the key collided with different
+      // input, so replaying it can never succeed and minting a new key would
+      // hide a possible duplicate. Retire the captured attempt, clear pending
+      // so no Retry is offered, and require manual review before creating.
+      try {
+        await store.retireOnlineAttempt(attempt.actorId, null, attempt.id, guard);
+      } catch {
+        if (!alive()) return;
+        setPending(attempt);
+        setError(t("character.create.storageError"));
+        return;
+      }
+      if (!alive()) return;
+      setPending(null);
+      setError(t("character.create.protocolStop"));
+      return;
+    }
+    if (isReplayExpiredConflict(sendError)) {
+      // Uncertain, not rejected: the server forgot this key's receipt, which
+      // proves nothing about whether the effect applied. Retain verbatim,
+      // flag for explicit review and never auto-retry or auto-mint.
+      try {
+        await store.markOnlineAttemptReplayExpired(attempt.actorId, null, attempt.id, guard);
+      } catch {
+        if (!alive()) return;
+        setPending(attempt);
+        setError(t("character.create.storageError"));
+        return;
+      }
+      if (!alive()) return;
+      await enterExpiredReview({ ...attempt, replayExpired: true }, alive);
+      return;
+    }
+    if (!alive()) return;
+    setPending(attempt);
+    setError(t(errorMessageKey(sendError)));
+  }
+
+  /**
+   * Shows the expired-create review for a retained attempt: the original
+   * request is kept for explicit review, never retried automatically and
+   * never replaced with a fresh key. Ordinary creation stays blocked until
+   * the user explicitly acknowledges the unknown outcome.
+   */
+  async function enterExpiredReview(attempt: OnlineAttempt, alive: () => boolean): Promise<void> {
+    let links: Array<{ characterId: string; name: string }> = [];
+    try {
+      links = await store.listCharacters(attempt.actorId);
+    } catch {
+      links = [];
+    }
+    if (!alive()) return;
+    setPending(null);
+    setExpired(attempt);
+    setRecoveryLinks(links);
+    setError(t("character.create.expired"));
+  }
+
   const submit = async (retry: boolean) => {
     if (submitting.current) return;
     submitting.current = true;
@@ -445,90 +547,6 @@ export function CreateCharacter({
         if (mounted.current) setBusy(false);
       }
     }
-  };
-
-  const handleSendError = async (
-    sendError: unknown,
-    attempt: OnlineAttempt,
-    guard: { generation: number; accountGeneration: number },
-    alive: () => boolean,
-  ): Promise<void> => {
-    if (sendError instanceof ApiError && sendError.status === 401) {
-      if (!alive()) return;
-      setPending(attempt);
-      setError(t(errorMessageKey(sendError)));
-      return;
-    }
-    if (sendError instanceof ApiError && (sendError.status === 403 || sendError.status === 404)) {
-      // Definitive rejection: the server answered, so nothing is uncertain.
-      // Retire exactly the captured attempt under its own actor/ID — never
-      // whichever account happens to be current later.
-      try {
-        await store.retireOnlineAttempt(attempt.actorId, null, attempt.id, guard);
-      } catch {
-        if (!alive()) return;
-        setPending(attempt);
-        setError(t("character.create.storageError"));
-        return;
-      }
-      if (!alive()) return;
-      setPending(null);
-      setError(t("character.create.denied"));
-      return;
-    }
-    if (sendError instanceof ApiError && sendError.status === 422) {
-      try {
-        await store.retireOnlineAttempt(attempt.actorId, null, attempt.id, guard);
-      } catch {
-        if (!alive()) return;
-        setPending(attempt);
-        setError(t("character.create.storageError"));
-        return;
-      }
-      if (!alive()) return;
-      setPending(null);
-      setError(t(errorMessageKey(sendError)));
-      return;
-    }
-    if (isReplayExpiredConflict(sendError)) {
-      // Uncertain, not rejected: the server forgot this key's receipt, which
-      // proves nothing about whether the effect applied. Retain verbatim,
-      // flag for explicit review and never auto-retry or auto-mint.
-      try {
-        await store.markOnlineAttemptReplayExpired(attempt.actorId, null, attempt.id, guard);
-      } catch {
-        if (!alive()) return;
-        setPending(attempt);
-        setError(t("character.create.storageError"));
-        return;
-      }
-      if (!alive()) return;
-      await enterExpiredReview({ ...attempt, replayExpired: true }, alive);
-      return;
-    }
-    if (!alive()) return;
-    setPending(attempt);
-    setError(t(errorMessageKey(sendError)));
-  };
-
-  /**
-   * Shows the expired-create review for a retained attempt: the original
-   * request is kept for explicit review, never retried automatically and
-   * never replaced with a fresh key. Ordinary creation stays blocked until
-   * the user explicitly acknowledges the unknown outcome.
-   */
-  const enterExpiredReview = async (attempt: OnlineAttempt, alive: () => boolean): Promise<void> => {
-    let links: Array<{ characterId: string; name: string }> = [];
-    try {
-      links = await store.listCharacters(attempt.actorId);
-    } catch {
-      links = [];
-    }
-    if (!alive()) return;
-    setPending(null);
-    setExpired(attempt);
-    setRecoveryLinks(links);
-    setError(t("character.create.expired"));
   };
 
   /**

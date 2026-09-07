@@ -427,9 +427,10 @@ describe("CreateCharacter", () => {
     api.send.mockResolvedValue({ character: { characterId: "char-1" }, requestId: "req-1" });
     const store = await openStore();
     const mutable = makeMutableIdentity("actor-1");
+    const onCreated = vi.fn();
     try {
       render(
-        <CreateCharacter api={api} store={store} identity={mutable.identity} onCreated={vi.fn()} />,
+        <CreateCharacter api={api} store={store} identity={mutable.identity} onCreated={onCreated} />,
       );
       await fillForm(user);
       mutable.identity.isCurrent.mockClear();
@@ -444,6 +445,9 @@ describe("CreateCharacter", () => {
       mutable.revokeDurable();
       sendGate.resolve({ character: { characterId: "char-1" }, requestId: "req-1" });
       await new Promise(resolve => setTimeout(resolve, 20));
+      expect(onCreated).not.toHaveBeenCalled();
+      expect(await store.readOnlineAttempts("actor-1")).toHaveLength(1);
+      expect(await store.readOnlineAttempts("actor-2")).toEqual([]);
     } finally {
       await store.close();
     }
@@ -664,6 +668,42 @@ describe("CreateCharacter", () => {
       expect(attempts[0]!.request.body["idempotencyKey"]).toBe(
         (api.send.mock.calls[0]![0] as { body: Record<string, unknown> }).body["idempotencyKey"],
       );
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("T4l an idempotency mismatch stops with protocol review: attempt retired, no retry, no replacement key", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    api.creationOptions.mockResolvedValue(metadata());
+    const store = await openStore();
+    const onCreated = vi.fn();
+    try {
+      render(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={onCreated} />,
+      );
+      await fillForm(user);
+      api.send.mockRejectedValueOnce(
+        new ApiError({
+          code: "idempotency_mismatch",
+          message: "This idempotency key was already used with different input.",
+          status: 409,
+          requestId: "req-mm",
+          latestRevision: null,
+          diagnostics: [],
+        }),
+      );
+      await user.click(screen.getByRole("button", { name: "Create character" }));
+      await waitFor(() => expect(api.send).toHaveBeenCalledTimes(1));
+      expect(await screen.findByRole("alert")).toHaveTextContent(/idempotency key|manual review/i);
+      expect(screen.queryByRole("button", { name: "Retry creation" })).not.toBeInTheDocument();
+      await waitFor(() => expect(store.readOnlineAttempts("actor-1")).resolves.toHaveLength(0));
+      expect(onCreated).not.toHaveBeenCalled();
+      // No replacement is minted automatically: a single send happened and
+      // the rejected attempt is gone without a successor.
+      expect(api.send).toHaveBeenCalledTimes(1);
+      expect(await store.readOnlineAttempts("actor-1")).toEqual([]);
     } finally {
       await store.close();
     }

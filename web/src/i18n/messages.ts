@@ -380,6 +380,7 @@ export const defaultMessages: MessageTable = {
   "character.create.pending": "A previous creation is still waiting to be confirmed. Retry it instead of starting a new one.",
   "character.create.expired": "This creation request is older than the server's replay window, so its outcome is unknown. A character may already exist. Review your saved characters before creating another one — a new creation is a separate decision and will not reuse this request.",
   "character.create.acknowledgeUnknown": "Acknowledge unknown outcome and discard this request",
+  "character.create.protocolStop": "The server rejected this request's idempotency key. Manual review is required before creating again.",
   "character.create.storageError": "The creation request could not be saved on this device. It was not sent.",
   "character.detail.signIn": "Sign in to open this character.",
   "character.detail.unavailable": "This character is unavailable.",

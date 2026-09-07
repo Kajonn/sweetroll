@@ -166,10 +166,19 @@ test.describe("applied-but-unseen mutations", () => {
       await page.getByRole("button", { name: "Confirm archive" }).click();
 
       // A newer mutation attempt must not be sent while the outcome is unknown.
+      // Record the control state first so the evidence says which gate held:
+      // a disabled bump means the UI gate held; an enabled-but-unsent bump
+      // means the session-level send guard held.
       const bumpButton = page.getByRole("button", { name: system.decreaseButton });
-      if (await bumpButton.isEnabled()) await bumpButton.click();
-      await page.waitForTimeout(3_000);
-      expect(bumpRequests).toBe(0);
+      const bumpEnabledBefore = await bumpButton.isEnabled();
+      if (bumpEnabledBefore) {
+        await bumpButton.click();
+        await page.waitForTimeout(3_000);
+        expect(bumpRequests).toBe(0);
+      } else {
+        await expect(bumpButton).toBeDisabled();
+        expect(bumpRequests).toBe(0);
+      }
 
       // A new migration preview must not erase or overtake the frozen
       // request: while the archive outcome is uncertain the dialog refuses

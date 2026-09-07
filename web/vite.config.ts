@@ -6,6 +6,7 @@ import react from "@vitejs/plugin-react";
 import { offlineAssetsPlugin } from "./build/offline-assets.js";
 
 const backendTarget = process.env.SWEETROLL_BACKEND_TARGET ?? "http://localhost:3000";
+const devPort = Number(process.env.WEB_PORT ?? "5173");
 const previewPort = Number(process.env.PREVIEW_PORT ?? "4173");
 
 export default defineConfig({
@@ -16,7 +17,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: devPort,
     strictPort: true,
     proxy: {
       // Forward /api and /dev to the HTTP backend without rewriting the Host

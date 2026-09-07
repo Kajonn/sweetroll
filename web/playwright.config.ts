@@ -6,6 +6,13 @@ import { defineConfig } from "@playwright/test";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
 
+// Test-config-only env knobs (mirroring playwright.offline.config.ts) so E2E
+// can run against dedicated ports/DB without touching the manual-test app's
+// 3000/5173. Defaults preserve the historical behavior exactly.
+const backendPort = process.env.BACKEND_PORT ?? "3000";
+const webPort = process.env.WEB_PORT ?? "5173";
+const backendTarget = process.env.SWEETROLL_BACKEND_TARGET ?? `http://localhost:${backendPort}`;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
@@ -18,10 +25,24 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   snapshotPathTemplate: "{testDir}/../visual/__screenshots__/{testFilePath}/{arg}{ext}",
-  use: { baseURL: "http://localhost:5173", trace: "retain-on-failure" },
+  use: { baseURL: `http://localhost:${webPort}`, trace: "retain-on-failure" },
   webServer: [
-    { command: "npm run migrate && npm run dev:http", url: "http://localhost:3000/health/ready", reuseExistingServer: !process.env.CI, timeout: 60_000, cwd: repoRoot },
-    { command: "npm run web:dev", url: "http://localhost:5173", reuseExistingServer: !process.env.CI, timeout: 60_000, cwd: repoRoot },
+    {
+      command: "npm run migrate && npm run dev:http",
+      url: `http://localhost:${backendPort}/health/ready`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+      cwd: repoRoot,
+      env: { PORT: backendPort },
+    },
+    {
+      command: "npm run web:dev",
+      url: `http://localhost:${webPort}`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+      cwd: repoRoot,
+      env: { SWEETROLL_BACKEND_TARGET: backendTarget },
+    },
   ],
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
 });

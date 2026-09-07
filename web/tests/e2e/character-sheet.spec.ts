@@ -70,7 +70,13 @@ test.describe("character sheet responsive and keyboard", () => {
         }));
         expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.innerWidth + 1);
 
-        await page.screenshot({ path: `test-results/e2e-character-${system.key}-${width}.png` });
+        // Durable evidence (the dev server has no production build ID, so the
+        // filename carries system, width and run timestamp instead of going
+        // to the cleared results dir). The committed journey PNGs under
+        // tests/offline/evidence/ remain the production-build durable set.
+        await page.screenshot({
+          path: `tests/e2e/evidence/e2e-character-${system.key}-${width}-${Date.now()}.png`,
+        });
         const results = await new AxeBuilder({ page }).analyze();
         expect(
           results.violations.filter(v => v.impact === "serious" || v.impact === "critical"),

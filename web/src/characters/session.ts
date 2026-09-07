@@ -201,6 +201,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   let disposed = false;
   /** In-flight online sends/reviews, awaited by the ownership quiesce hook. */
   const activeOnline = new Set<Promise<unknown>>();
+  /**
+   * In-flight online sends only. Explicit review serializes behind these so
+   * a retirement can never slip between a send's response and its guarded
+   * acknowledgment write unnoticed.
+   */
+  const activeOnlineSends = new Set<Promise<unknown>>();
 
   const identityGeneration = identity.getGeneration();
   const listeners = new Set<(snapshot: CharacterSnapshot) => void>();
@@ -288,10 +294,15 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     phase = KIND_TO_PHASE[kind];
   }
 
-  function assertMutationAllowed() {
+  function assertMutationAllowed(options?: { offlineIntent?: boolean }) {
     if (disposed) throw new Error("Session closed.");
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
-    if (error) throw structuredError(error.message, error.kind, error.details);
+    // An online protocol stop bars online commands, never offline-capable
+    // field sets and resource bumps: those stay durable, ordered intentions
+    // that still pass every send-time gate.
+    if (error && !(error.kind === "protocol" && options?.offlineIntent === true)) {
+      throw structuredError(error.message, error.kind, error.details);
+    }
     if (!editing.owned || !coordination.isOwner()) throw structuredError("Editing requires ownership of a supported browser Web Lock.", "conflict");
     if (!confirmed) throw new Error("Cannot edit until the character is loaded.");
   }
@@ -817,7 +828,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (pendingOnline.length > 0) {
       throw new Error("Resolve the uncertain online outcome before reviewing intentions.");
     }
-    if (draining || conflictRefreshPending || !error || !["conflict", "invalid", "expired-attempt"].includes(error.kind)) {
+    if (draining || conflictRefreshPending || !error || !["conflict", "invalid", "expired-attempt", "protocol", "not-found"].includes(error.kind)) {
       throw new Error("Resolve the blocking error and refresh current state before reviewing intentions.");
     }
     if (!confirmed) {
@@ -1105,6 +1116,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   async function sendOnlineAttempt(attempt: OnlineAttempt): Promise<void> {
     const run = sendOnlineAttemptInner(attempt);
     const tracked = trackOnline(run);
+    activeOnlineSends.add(tracked);
     try {
       await tracked;
     } catch (err) {
@@ -1115,7 +1127,37 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         scheduleRetry();
       }
       throw err;
+    } finally {
+      if (activeOnlineSends.has(tracked)) activeOnlineSends.delete(tracked);
     }
+  }
+
+  /**
+   * Detects an acknowledgment/retirement racing a concurrent explicit review
+   * that already retired the exact attempt: the attempt is absent while the
+   * snapshot stands, so the outcome is resolved and reporting a storage
+   * error would wedge the session. Adopts current store state and returns
+   * true for the benign case; a nulled snapshot (purge/clear) returns false
+   * so the caller reports the terminal state instead.
+   */
+  async function retiredByConcurrentReview(attempt: OnlineAttempt): Promise<boolean> {
+    const attempts = await store.readOnlineAttempts(actorId).catch(() => null);
+    if (attempts === null || !identityMatches()) return false;
+    if (attempts.some((a) => a.id === attempt.id && a.characterId === characterId)) return false;
+    const fresh = await store.read(actorId, characterId).catch(() => null);
+    if (fresh === null || !identityMatches() || fresh.confirmed === null) return false;
+    confirmed = fresh.confirmed;
+    entries = fresh.entries;
+    generation = fresh.generation;
+    accountGeneration = fresh.accountGeneration;
+    nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+    await refreshPendingOnline();
+    const blockedAttempt = (error?.details as { attemptId?: string } | undefined)?.attemptId;
+    if (error?.kind === "expired-attempt" && blockedAttempt === attempt.id) {
+      error = null;
+    }
+    emit();
+    return true;
   }
 
   /**
@@ -1130,6 +1172,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       await store.retireOnlineAttempt(actorId, characterId, attempt.id, { generation, accountGeneration });
     } catch (retireErr) {
       if (!await identityIsCurrent()) throw retireErr instanceof Error ? retireErr : new Error("Account changed.");
+      if (await retiredByConcurrentReview(attempt)) {
+        return;
+      }
       await handleAckError(retireErr);
       await refreshPendingOnline();
       emit();
@@ -1180,6 +1225,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
             await store.markOnlineAttemptReplayExpired(actorId, characterId, attempt.id, guard);
           } catch (markErr) {
             if (!await identityIsCurrent()) throw markErr instanceof Error ? markErr : new Error("Account changed.");
+            if (await retiredByConcurrentReview(attempt)) {
+              return;
+            }
             await handleAckError(markErr);
             await refreshPendingOnline();
             emit();
@@ -1255,6 +1303,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       await store.acknowledgeOnlineAttempt(actorId, characterId, attempt.id, character, guard);
     } catch (err) {
       if (!await identityIsCurrent()) throw err instanceof Error ? err : new Error("Account changed.");
+      if (await retiredByConcurrentReview(attempt)) {
+        refreshPhase();
+        emit();
+        return;
+      }
       await handleAckError(err);
       await refreshPendingOnline();
       emit();
@@ -1379,6 +1432,14 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (typeof input.attemptId !== "string" || input.attemptId.length === 0) {
       throw new Error("An attempt id is required for expired-outcome review.");
     }
+    // Serialize behind in-flight online sends: a retirement must observe the
+    // send's outcome (acked and gone, or retained for review) rather than
+    // slipping between its response and its acknowledgment write. The sync
+    // gates above already ran, so waiting here cannot deadlock with the
+    // sender, which never awaits a review.
+    await Promise.allSettled([...activeOnlineSends]);
+    if (disposed) throw new Error("Session closed.");
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
     const stored = (await store.readOnlineAttempts(actorId)).find(
       (attempt) => attempt.id === input.attemptId && attempt.characterId === characterId,
     ) ?? null;
@@ -1623,12 +1684,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       };
     },
     async setField(fieldId: string, value: unknown): Promise<void> {
-      assertMutationAllowed();
+      assertMutationAllowed({ offlineIntent: true });
       if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({ kind: "setField", fieldId, value }));
     },
     async bumpResource(resourceId: string, direction: "up" | "down"): Promise<void> {
-      assertMutationAllowed();
+      assertMutationAllowed({ offlineIntent: true });
       if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({ kind: "bumpResource", resourceId, direction }));
     },

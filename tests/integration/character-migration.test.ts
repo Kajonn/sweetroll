@@ -753,6 +753,61 @@ describeWithDatabase("Character migration (commit)", () => {
     expect(audit.rows).toHaveLength(1);
   });
 
+  it("replays a completed commit by its original key after a newer preview exists", async () => {
+    const owner = await createUser("Ada");
+    const { systemId, versionId } = await publishSource(owner);
+    const targetVersionId = await publishV2Version(owner, systemId);
+    const characterId = await createCharacter(owner, versionId);
+
+    const firstPreview = await preview(owner, characterId, targetVersionId);
+    const key = randomUUID();
+    const first = await characters.commitMigration(ctx(owner), {
+      characterId,
+      previewId: firstPreview.previewId,
+      expectedRevision: 1,
+      idempotencyKey: key,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) throw new Error(`unexpected commit failure: ${JSON.stringify(first.error)}`);
+    expect(first.value.character.revision).toBe(2);
+    expect(first.value.character.reconciliation.replayed).toBe(false);
+
+    // A newer preview now exists for the same character. The completed commit
+    // must still replay by its original key: claim-first replay runs before
+    // any preview consumed/expiry check.
+    const newer = await characters.previewMigration(ctx(owner), {
+      characterId,
+      targetVersionId,
+      mappings: {},
+    });
+    expect(newer.ok).toBe(true);
+    if (!newer.ok) throw new Error(`unexpected preview failure: ${JSON.stringify(newer.error)}`);
+    expect(newer.value.previewId).not.toBe(firstPreview.previewId);
+
+    const replay = await characters.commitMigration(ctx(owner), {
+      characterId,
+      previewId: firstPreview.previewId,
+      expectedRevision: 1,
+      idempotencyKey: key,
+    });
+    expect(replay.ok).toBe(true);
+    if (!replay.ok) throw new Error(`unexpected replay failure: ${JSON.stringify(replay.error)}`);
+    expect(replay.value.character.reconciliation.replayed).toBe(true);
+    expect(replay.value.character.revision).toBe(2);
+    expect(replay.value.character.systemVersionId).toBe(targetVersionId);
+
+    const charRow = await pool.query<{ revision: number }>(
+      "SELECT revision FROM characters WHERE id = $1",
+      [characterId],
+    );
+    expect(charRow.rows[0]!.revision).toBe(2);
+    const migrations = await pool.query<{ id: string }>(
+      "SELECT id FROM character_migrations WHERE character_id = $1",
+      [characterId],
+    );
+    expect(migrations.rows).toHaveLength(1);
+  });
+
   it("rejects a second commit of an already-consumed preview", async () => {
     const owner = await createUser("Ada");
     const { systemId, versionId } = await publishSource(owner);

@@ -1111,8 +1111,19 @@ describe("CharacterSession serialization", () => {
     await session.whenIdle();
     expect(session.getSnapshot().error?.kind).toBe("protocol");
     expect(get).not.toHaveBeenCalled();
-    await expect(session.resolveConflict({ mode: "reapply", selectedIds: session.getSnapshot().entries.map(e => e.id) })).rejects.toThrow();
+    // No automatic recovery: the entry stays queued with its frozen request.
     expect(api.sent).toHaveLength(1);
+    expect(session.getSnapshot().entries).toHaveLength(1);
+    // Explicit user-initiated recovery is admitted for protocol stops and
+    // retires the queued entry with a fresh key on reapply.
+    const selectedIds = session.getSnapshot().entries.map((e) => e.id);
+    const conflictedKey = api.sent[0]?.body.idempotencyKey;
+    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 2)));
+    await session.resolveConflict({ mode: "reapply", selectedIds });
+    await session.whenIdle();
+    expect(api.sent.length).toBeGreaterThanOrEqual(2);
+    expect(api.sent[api.sent.length - 1]?.body.idempotencyKey).not.toBe(conflictedKey);
+    expect(session.getSnapshot().phase).toBe("ready");
     session.dispose();
     await store.close();
   });
@@ -1944,8 +1955,228 @@ describe("CharacterSession uncertain online outcomes", () => {
     await store.close();
   });
 
-  describe("reviewExpiredAttempt", () => {
-    async function seedAgedAttempt(store: CharacterStore, id = "old-attempt") {
+  describe("protocol-stop recovery", () => {
+    async function seedMismatch(harness: Harness) {
+      const { api, store } = harness;
+      api.scriptSend(async () => ({
+        error: new ApiError({ status: 409, code: "idempotency_mismatch", message: "Mismatch.", requestId: "r", latestRevision: null, diagnostics: [] }),
+      }));
+      await expect(harness.session.archive()).rejects.toThrow();
+      expect(harness.session.getSnapshot().error?.kind).toBe("protocol");
+      expect(api.sent).toHaveLength(1);
+    }
+
+    it("still queues offline edits after a protocol stop without minting anything", async () => {
+      const harness = await makeHarness();
+      const { api, identity, store, session } = harness;
+      api.scriptOpenView(viewFor("char-1", 3));
+      await session.open();
+      api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+      await seedMismatch(harness);
+      identity.online = false;
+      identity.signal();
+      await session.setField("name", "Briar");
+      await session.whenIdle();
+      const stored = await store.read(ARM, "char-1");
+      expect(stored.entries).toHaveLength(1);
+      expect(stored.entries[0]?.attempt).toBeNull();
+      // Nothing auto-mints a replacement key for the retired attempt.
+      expect(api.sent).toHaveLength(1);
+      expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+      session.dispose();
+      await store.close();
+    });
+
+    it("lets an explicit review clear the protocol stop so a deliberate new-key command proceeds", async () => {
+      const harness = await makeHarness();
+      const { api, store, session } = harness;
+      api.scriptOpenView(viewFor("char-1", 3));
+      await session.open();
+      api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+      await seedMismatch(harness);
+      const retiredKey = api.sent[0]?.body.idempotencyKey as string;
+      // Ordinary recovery is admitted for protocol stops: user-initiated,
+      // never automatic.
+      await session.resolveConflict({ mode: "discard", selectedIds: [] });
+      expect(session.getSnapshot().error).toBeNull();
+      expect(api.sent).toHaveLength(1);
+      api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+      await session.archive();
+      expect(api.sent).toHaveLength(2);
+      expect(api.sent[1]?.body.idempotencyKey).not.toBe(retiredKey);
+      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      session.dispose();
+      await store.close();
+    });
+
+    it("admits explicit recovery after a non-purge 404 so a deliberate new-key command proceeds", async () => {
+      const { api, store, session } = await makeHarness();
+      api.scriptOpenView(viewFor("char-1", 3));
+      await session.open();
+      api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+      api.scriptSend(async () => ({
+        error: new ApiError({ status: 404, code: "not_found", message: "Preview gone.", requestId: "r", latestRevision: null, diagnostics: [] }),
+      }));
+      await expect(session.commitMigration("p-1")).rejects.toThrow(/gone/i);
+      expect(session.getSnapshot().error?.kind).toBe("not-found");
+      expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+      await session.resolveConflict({ mode: "discard", selectedIds: [] });
+      expect(session.getSnapshot().error).toBeNull();
+      expect(api.sent).toHaveLength(1);
+      api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4)));
+      await session.commitMigration("p-1");
+      expect(api.sent).toHaveLength(2);
+      expect(api.sent[1]?.body.idempotencyKey).not.toBe(api.sent[0]?.body.idempotencyKey);
+      expect(session.getSnapshot().lastMigration).toEqual({ operation: "commit", previewId: "p-1", revision: 4 });
+      session.dispose();
+      await store.close();
+    });
+
+    it("does not retry a retired mismatch attempt on reconnect signals", async () => {      const harness = await makeHarness();
+      const { api, identity, store, session } = harness;
+      api.scriptOpenView(viewFor("char-1", 3));
+      await session.open();
+      api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+      await seedMismatch(harness);
+      identity.signal();
+      await session.whenIdle();
+      identity.online = false;
+      identity.signal();
+      identity.online = true;
+      identity.signal();
+      await session.whenIdle();
+      expect(api.sent).toHaveLength(1);
+      expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+      session.dispose();
+      await store.close();
+    });
+  });
+
+  describe("concurrent review and in-flight send", () => {
+    it("treats a second same-key ack after explicit review as benign, not storage-error", async () => {
+      const { api, store, session } = await makeHarness();
+      api.scriptOpenView(viewFor("char-1", 3));
+      await session.open();
+      api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+      await store.saveOnlineAttempt({
+        id: "archive-1",
+        actorId: ARM,
+        characterId: "char-1",
+        kind: "archive",
+        request: {
+          method: "PATCH",
+          path: "/characters/char-1",
+          body: { command: "archive", expectedRevision: 3, idempotencyKey: "archive-key" },
+          firstAttemptAt: EVER,
+        },
+        createdAt: EVER,
+      });
+      let releases: Array<(step: SendStep) => void> = [];
+      const hang = () => new Promise<SendStep>((resolve) => { releases.push(resolve); });
+      api.scriptSend(hang);
+      api.setSendFallback(hang);
+      const first = session.archive();
+      const second = session.archive();
+      await vi.waitFor(() => expect(api.sent).toHaveLength(2));
+      expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
+      const done = successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" }));
+      releases.forEach((release) => release(done));
+      await first;
+      await second;
+      await session.whenIdle();
+      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      expect(session.getSnapshot().error).toBeNull();
+      expect(session.getSnapshot().phase).toBe("ready");
+      expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+      session.dispose();
+      await store.close();
+    });
+
+    it("lets an unrelated review proceed while another attempt is in flight", async () => {
+      const { api, store, session } = await makeHarness();
+      api.scriptOpenView(viewFor("char-1", 3));
+      await session.open();
+      api.setOpenFallback(async () => ({ character: viewFor("char-1", 4, { lifecycle: "archived" }), requestId: "req-open" }));
+      await store.saveOnlineAttempt({
+        id: "archive-1",
+        actorId: ARM,
+        characterId: "char-1",
+        kind: "archive",
+        request: {
+          method: "PATCH",
+          path: "/characters/char-1",
+          body: { command: "archive", expectedRevision: 3, idempotencyKey: "archive-key" },
+          firstAttemptAt: EVER,
+        },
+        createdAt: EVER,
+      });
+      let release!: (step: SendStep) => void;
+      api.scriptSend(() => new Promise<SendStep>((resolve) => { release = resolve; }));
+      const sending = session.archive();
+      await vi.waitFor(() => expect(api.sent).toHaveLength(1));
+      await store.saveOnlineAttempt({
+        id: "old-attempt",
+        actorId: ARM,
+        characterId: "char-1",
+        kind: "recover",
+        request: {
+          method: "PATCH",
+          path: "/characters/char-1",
+          body: { command: "recover", expectedRevision: 3, idempotencyKey: "old-key" },
+          firstAttemptAt: "2020-01-01T00:00:00.000Z",
+        },
+        createdAt: "2020-01-01T00:00:00.000Z",
+      });
+      // Review serializes behind the in-flight send, then retires exactly its
+      // own attempt without disturbing the acked outcome.
+      const reviewing = session.reviewExpiredAttempt({ attemptId: "old-attempt", acknowledgeUnknownOutcome: true });
+      await new Promise((r) => setTimeout(r, 10));
+      expect((await store.readOnlineAttempts(ARM)).map((a) => a.id).sort()).toEqual(["archive-1", "old-attempt"]);
+      release(successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+      await sending;
+      await reviewing;
+      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+      session.dispose();
+      await store.close();
+    });
+
+    it("waits for a same-id in-flight send before reviewing, then reports it resolved", async () => {
+      const { api, store, session } = await makeHarness();
+      api.scriptOpenView(viewFor("char-1", 3));
+      await session.open();
+      api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+      await store.saveOnlineAttempt({
+        id: "archive-1",
+        actorId: ARM,
+        characterId: "char-1",
+        kind: "archive",
+        request: {
+          method: "PATCH",
+          path: "/characters/char-1",
+          body: { command: "archive", expectedRevision: 3, idempotencyKey: "archive-key" },
+          firstAttemptAt: EVER,
+        },
+        createdAt: EVER,
+      });
+      let release!: (step: SendStep) => void;
+      api.scriptSend(() => new Promise<SendStep>((resolve) => { release = resolve; }));
+      const sending = session.archive();
+      await vi.waitFor(() => expect(api.sent).toHaveLength(1));
+      const reviewing = session.reviewExpiredAttempt({ attemptId: "archive-1", acknowledgeUnknownOutcome: true });
+      await new Promise((r) => setTimeout(r, 10));
+      release(successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+      await sending;
+      // The send resolved the outcome first: there is nothing left to review.
+      await expect(reviewing).rejects.toThrow(/no longer pending/);
+      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+      session.dispose();
+      await store.close();
+    });
+  });
+
+  describe("reviewExpiredAttempt", () => {    async function seedAgedAttempt(store: CharacterStore, id = "old-attempt") {
       await store.saveOnlineAttempt({
         id,
         actorId: ARM,

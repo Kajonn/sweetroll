@@ -73,6 +73,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className={styles.shell}>
           <header role="banner" data-testid="app-header" className={styles.header}>
             <span>Sweetroll</span>
+            {/* Intentional plain anchor: AppShell also renders outside a
+                RouterProvider (standalone/tests), where TanStack Link has no
+                router context and crashes. */}
             <a href="/characters/new">{t("shell.nav.newCharacter")}</a>
             {auth.state === "authenticated" && (
               <button type="button" onClick={() => { void signOut(); }}>{t("shell.signOut.button")}</button>

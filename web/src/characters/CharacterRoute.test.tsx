@@ -244,4 +244,26 @@ describe("CharacterRoute", () => {
       window.history.pushState({}, "", "/");
     }
   });
+
+  it("C3 never opens a session or sends with a null actor", async () => {
+    const store = await openStore();
+    const api = makeApi();
+    const letGo = vi.fn();
+    const dispose = vi.fn();
+    try {
+      render(
+        <CharacterDetail
+          characterId={CHARACTER_ID} api={api} store={store}
+          identity={makeIdentity({ getActorId: () => null })}
+          coordination={makeCoordination(false, { letGo, dispose })}
+        />,
+      );
+      expect(await screen.findByText("Sign in to open this character.")).toBeVisible();
+      await new Promise(resolve => setTimeout(resolve, 50));
+      expect(api.open).not.toHaveBeenCalled();
+      expect(letGo).not.toHaveBeenCalled();
+    } finally {
+      await store.close();
+    }
+  });
 });

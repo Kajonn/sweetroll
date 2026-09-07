@@ -25,14 +25,40 @@ export type CharacterDetailProps = {
  * store, character session and renderer; the session is disposed on
  * navigation away. Reads only the current account's partition, so a deep
  * link can never expose another account's cache.
+ *
+ * The identity gate runs before any hook creates a session: with a null
+ * actor this returns the sign-in fallback without building or opening a
+ * character session, so no session is ever opened or sent with an empty
+ * identity.
  */
 export function CharacterDetail({ characterId, api, store, identity, coordination }: CharacterDetailProps) {
   const actorId = identity.getActorId();
+  if (actorId === null) {
+    return (
+      <section aria-labelledby="character-detail-title">
+        <h1 id="character-detail-title">{t("character.loading")}</h1>
+        <p role="status">{t("character.detail.signIn")}</p>
+      </section>
+    );
+  }
+  return (
+    <CharacterDetailLoaded
+      characterId={characterId}
+      api={api}
+      store={store}
+      identity={identity}
+      coordination={coordination}
+      actorId={actorId}
+    />
+  );
+}
+
+function CharacterDetailLoaded({ characterId, api, store, identity, coordination, actorId }: CharacterDetailProps & { actorId: string }) {
   const online = identity.isOnline();
   const createSession = useMemo(
     () => () =>
       createCharacterSession({
-        actorId: actorId ?? "",
+        actorId,
         characterId,
         api,
         store,
@@ -57,9 +83,9 @@ export function CharacterDetail({ characterId, api, store, identity, coordinatio
 
   const [cached, setCached] = useState<Array<{ characterId: string; name: string }>>([]);
   const showRecovery =
-    actorId !== null && (!online || snapshot.error !== null || (snapshot.confirmed === null && snapshot.phase !== "loading"));
+    !online || snapshot.error !== null || (snapshot.confirmed === null && snapshot.phase !== "loading");
   useEffect(() => {
-    if (!showRecovery || actorId === null) return;
+    if (!showRecovery) return;
     let cancelled = false;
     void store
       .listCharacters(actorId)
@@ -72,14 +98,6 @@ export function CharacterDetail({ characterId, api, store, identity, coordinatio
     };
   }, [showRecovery, store, actorId, characterId]);
 
-  if (actorId === null) {
-    return (
-      <section aria-labelledby="character-detail-title">
-        <h1 id="character-detail-title">{t("character.loading")}</h1>
-        <p role="status">{t("character.detail.signIn")}</p>
-      </section>
-    );
-  }
   if (session === null || (snapshot.confirmed === null && snapshot.phase === "loading")) {
     return (
       <section aria-labelledby="character-detail-title">
@@ -95,6 +113,9 @@ export function CharacterDetail({ characterId, api, store, identity, coordinatio
         <p role="alert">{t("character.detail.unavailable")}</p>
         {showRecovery ? (
           <nav aria-label={t("character.detail.recoveryTitle")}>
+            {/* Intentional plain anchors: CharacterDetail also renders
+                standalone without a RouterProvider, where TanStack Link has
+                no router context and crashes. */}
             <a href="/characters/new">{t("character.detail.createNew")}</a>
             <a href="/">{t("character.detail.backToLibrary")}</a>
           </nav>

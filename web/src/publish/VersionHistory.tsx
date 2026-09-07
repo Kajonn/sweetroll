@@ -165,6 +165,9 @@ export function VersionHistory({ client, systemId }: { client: ApiClient; system
                         ? t("versionHistory.action.cloning")
                         : t("versionHistory.action.clone")}
                     </button>
+                    {/* Intentional plain anchor: VersionHistory also renders
+                        outside a RouterProvider (standalone/tests), where
+                        TanStack Link has no router context and crashes. */}
                     <a
                       className={styles.action}
                       href={`/characters/new?systemVersionId=${v.versionId}`}

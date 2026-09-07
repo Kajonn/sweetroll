@@ -234,4 +234,72 @@ describe("CreateCharacter", () => {
       await store.close();
     }
   });
+
+  it("C1 deletes the durable create attempt on first-submit 403 even though pending state is stale", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    api.creationOptions.mockResolvedValueOnce(metadata());
+    api.send.mockRejectedValueOnce(
+      new ApiError({
+        code: "denied", message: "No.", status: 403,
+        requestId: "req-x", latestRevision: null, diagnostics: [],
+      }),
+    );
+    const store = await openStore();
+    try {
+      render(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
+      );
+      await fillAndSubmit(user);
+      await waitFor(() => expect(api.send).toHaveBeenCalledTimes(1));
+      await screen.findByRole("alert");
+      await waitFor(() => expect(store.readOnlineAttempts("actor-1")).resolves.toHaveLength(0));
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("C2 never reuses a previous account's frozen body/key after an account switch", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    api.creationOptions.mockResolvedValue(metadata());
+    api.send.mockResolvedValue({ character: { characterId: "char-x" }, requestId: "req-x" });
+    const store = await openStore();
+    try {
+      await store.saveOnlineAttempt({
+        id: "attempt-old",
+        actorId: "actor-1",
+        characterId: null,
+        kind: "create",
+        request: {
+          method: "POST",
+          path: "/characters",
+          body: {
+            systemVersionId: VERSION_ID,
+            entityDefinitionId: "hero",
+            name: "OldName",
+            idempotencyKey: "old-key",
+          },
+          firstAttemptAt: "2026-09-06T00:00:00.000Z",
+        },
+        createdAt: "2026-09-06T00:00:00.000Z",
+      });
+      const view = render(
+        <CreateCharacter api={api} store={store} identity={makeIdentity({ actorId: "actor-1" })} onCreated={vi.fn()} />,
+      );
+      expect(await screen.findByRole("button", { name: "Retry creation" })).toBeVisible();
+      view.rerender(
+        <CreateCharacter api={api} store={store} identity={makeIdentity({ actorId: "actor-2" })} onCreated={vi.fn()} />,
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole("button", { name: "Retry creation" })).not.toBeInTheDocument(),
+      );
+      expect(api.send).not.toHaveBeenCalled();
+      const otherAttempts = await store.readOnlineAttempts("actor-1");
+      expect(otherAttempts).toHaveLength(1);
+      expect(otherAttempts[0]!.request.body).toMatchObject({ idempotencyKey: "old-key" });
+    } finally {
+      await store.close();
+    }
+  });
 });

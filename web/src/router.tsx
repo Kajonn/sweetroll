@@ -75,6 +75,7 @@ function NewCharacterRouteView() {
   }
   return (
     <NewCharacterRoute
+      key={search.systemVersionId ?? ""}
       api={api}
       store={store}
       identity={identity}
@@ -92,9 +93,23 @@ function CharacterDetailRouteView() {
   const store = useSharedCharacterStore();
   const api = useCharactersApi();
   const actorId = identity?.getActorId() ?? null;
+  // Coordination ownership: the character session owns letGo/dispose once
+  // CharacterDetail mounts. This router-level cleanup only releases the
+  // handle when the detail view never mounted a session (e.g. signed-out
+  // fallback), and dispose is guarded to a single release so a second call
+  // from the session is a no-op.
   const coordination = useMemo(() => {
     if (actorId === null) return null;
-    return createCoordination({ actorId, characterId });
+    const raw = createCoordination({ actorId, characterId });
+    let disposed = false;
+    return {
+      ...raw,
+      dispose: () => {
+        if (disposed) return;
+        disposed = true;
+        raw.dispose?.();
+      },
+    };
   }, [actorId, characterId]);
   useEffect(() => () => coordination?.dispose(), [coordination]);
   if (identity === null || store === undefined || coordination === null) {

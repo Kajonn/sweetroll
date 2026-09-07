@@ -9,6 +9,10 @@ import type { CreationOptions, FrozenRequest } from "./types.js";
 export type CreateCharacterIdentity = {
   getActorId(): string | null;
   isOnline(): boolean;
+  /** Identity generation; when present, a change invalidates in-flight recovery. */
+  getGeneration?(): number;
+  /** Durable account recheck; when present, recovery is discarded unless current. */
+  isCurrent?(): Promise<boolean>;
 };
 
 export type CreateCharacterProps = {
@@ -71,26 +75,65 @@ export function CreateCharacter({
   }, []);
 
   const online = identity.isOnline();
+  const actorId = identity.getActorId();
+  const generation = identity.getGeneration?.() ?? 0;
+  const seenActor = useRef<string | null | undefined>(undefined);
 
   // Recover a durable creation attempt left by an uncertain outcome or reload.
+  // The recovery is scoped to the current account: an account switch clears
+  // the previous account's pending attempt and restored fields instead of
+  // replaying its frozen body/key under the new actor/session.
   useEffect(() => {
     let cancelled = false;
-    const actorId = identity.getActorId();
-    if (actorId === null || !identity.isOnline()) return;
-    void store.readOnlineAttempts(actorId).then(attempts => {
+    const actorAtStart = identity.getActorId();
+    const generationAtStart = identity.getGeneration?.() ?? 0;
+    if (seenActor.current !== undefined && seenActor.current !== actorAtStart) {
+      setPending(null);
+      setVersionId("");
+      setEntityId("");
+      setName("");
+      setMetadata(null);
+      setMetaDenied(false);
+      setError(null);
+    }
+    seenActor.current = actorAtStart;
+    if (actorAtStart === null || !identity.isOnline()) {
+      setPending(null);
+      return;
+    }
+    void (async () => {
+      let attempts;
+      try {
+        attempts = await store.readOnlineAttempts(actorAtStart);
+      } catch {
+        return;
+      }
+      if (cancelled || !mounted.current) return;
+      if (identity.getActorId() !== actorAtStart) return;
+      if ((identity.getGeneration?.() ?? 0) !== generationAtStart) return;
+      if (identity.isCurrent) {
+        try {
+          if (!(await identity.isCurrent())) return;
+        } catch {
+          return;
+        }
+      }
       if (cancelled || !mounted.current) return;
       const create = attempts.find(attempt => attempt.kind === "create") ?? null;
-      if (create === null) return;
+      if (create === null) {
+        setPending(null);
+        return;
+      }
       setPending(create);
       const body = create.request.body as { systemVersionId?: unknown; entityDefinitionId?: unknown; name?: unknown };
       if (typeof body.systemVersionId === "string") setVersionId(body.systemVersionId);
       if (typeof body.entityDefinitionId === "string") setEntityId(body.entityDefinitionId);
       if (typeof body.name === "string") setName(body.name);
       setError(t("character.create.pending"));
-    }).catch(() => {});
+    })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store]);
+  }, [store, actorId, online, generation]);
 
   const loadMetadata = async (version: string) => {
     setMetaLoading(true);
@@ -100,11 +143,25 @@ export function CreateCharacter({
       const options = await api.creationOptions(version);
       if (!mounted.current) return;
       setMetadata(options.data);
-      setEntityId(current => current !== "" ? current : "");
-    } catch {
+      // The entity list belongs to the freshly loaded version; a selection
+      // restored from an older attempt may not exist here, so always reset.
+      setEntityId("");
+    } catch (metadataError) {
       if (!mounted.current) return;
       setMetadata(null);
-      setMetaDenied(true);
+      setEntityId("");
+      if (
+        metadataError instanceof ApiError &&
+        (metadataError.status === 403 || metadataError.status === 404)
+      ) {
+        setMetaDenied(true);
+      } else if (metadataError instanceof ApiError && metadataError.status === 401) {
+        setMetaDenied(false);
+        setError(t("character.create.unauthorized"));
+      } else {
+        setMetaDenied(false);
+        setError(t("character.create.uncertain"));
+      }
     } finally {
       if (mounted.current) setMetaLoading(false);
     }
@@ -128,7 +185,6 @@ export function CreateCharacter({
     );
   }
 
-  const actorId = identity.getActorId();
   if (actorId === null) {
     return (
       <section aria-labelledby="create-character-title">
@@ -143,6 +199,9 @@ export function CreateCharacter({
     submitting.current = true;
     setBusy(true);
     setError(null);
+    // The durable attempt (not `pending` state, which is stale in this
+    // closure on first submit) is the source of truth for cleanup.
+    let attempt: OnlineAttempt | null = null;
     try {
       const actor = identity.getActorId();
       if (actor === null) {
@@ -154,10 +213,15 @@ export function CreateCharacter({
         return;
       }
       const stored = await store.readOnlineAttempts(actor);
-      let attempt = stored.find(entry => entry.kind === "create") ?? null;
+      attempt = stored.find(entry => entry.kind === "create") ?? null;
       if (attempt === null) {
         if (!retry && (versionId.trim() === "" || entityId === "" || name.trim() === "")) return;
-        const source = retry && pending !== null ? (pending.request.body as Record<string, unknown>) : null;
+        // Only replay a frozen body/key that belongs to the current actor;
+        // a previous account's attempt must never be sent under this actor.
+        const source =
+          retry && pending !== null && pending.actorId === actor
+            ? (pending.request.body as Record<string, unknown>)
+            : null;
         const body: Record<string, unknown> & { idempotencyKey: string } = source !== null && typeof source["idempotencyKey"] === "string"
           ? { ...(source as Record<string, unknown>), idempotencyKey: source["idempotencyKey"] as string }
           : {
@@ -209,19 +273,21 @@ export function CreateCharacter({
         return;
       }
       if (requestError instanceof ApiError && (requestError.status === 403 || requestError.status === 404)) {
-        const actor = identity.getActorId();
-        if (pending !== null && actor !== null) {
-          await store.deleteOnlineAttempt(actor, pending.id).catch(() => {});
-          setPending(null);
+        const failedId = attempt?.id;
+        const actorNow = identity.getActorId();
+        if (failedId && actorNow) {
+          await store.deleteOnlineAttempt(actorNow, failedId).catch(() => {});
+          if (mounted.current) setPending(null);
         }
         setError(t("character.create.denied"));
         return;
       }
       if (requestError instanceof ApiError && requestError.status === 422) {
-        const actor = identity.getActorId();
-        if (pending !== null && actor !== null) {
-          await store.deleteOnlineAttempt(actor, pending.id).catch(() => {});
-          setPending(null);
+        const failedId = attempt?.id;
+        const actorNow = identity.getActorId();
+        if (failedId && actorNow) {
+          await store.deleteOnlineAttempt(actorNow, failedId).catch(() => {});
+          if (mounted.current) setPending(null);
         }
         setError(t(errorMessageKey(requestError)));
         return;
@@ -234,7 +300,12 @@ export function CreateCharacter({
   };
 
   const entities: EntityOption[] = metadata?.entities ?? [];
-  const canCreate = metadata !== null && entityId !== "" && name.trim() !== "" && !busy;
+  const canCreate =
+    metadata !== null &&
+    entityId !== "" &&
+    entities.some(entity => entity.id === entityId) &&
+    name.trim() !== "" &&
+    !busy;
 
   return (
     <section aria-labelledby="create-character-title">

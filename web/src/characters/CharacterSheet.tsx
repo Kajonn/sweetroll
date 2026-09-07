@@ -56,8 +56,10 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction }
   const editable = snapshot.editing.owned && character.lifecycle === "active";
   const executeAction = onExecuteAction ?? (() => {});
   const actionsAvailable = editable && snapshot.phase === "ready" && onExecuteAction !== undefined;
-  const actionUnavailableReason = snapshot.phase === "offline"
-    ? t("character.action.offline")
+  const actionUnavailableReason = onExecuteAction === undefined
+    ? t("character.action.unavailable")
+    : snapshot.phase === "offline"
+      ? t("character.action.offline")
     : character.lifecycle === "archived"
       ? t("character.action.archived")
       : !snapshot.editing.owned

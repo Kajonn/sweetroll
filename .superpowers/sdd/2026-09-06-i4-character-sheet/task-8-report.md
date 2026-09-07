@@ -44,3 +44,30 @@ Commit: `feat: create and open standalone character sheets`
 
 - Existing React `act(...)` warnings from router tests persist; no failures.
 - Browser-level offline/service-worker acceptance (Task 10/11) not run here; only jsdom/fake-indexeddb unit coverage for routes.
+
+## Follow-up (review fix round)
+
+Commit: `fix: harden character creation and route identity`
+
+Red regression tests first (TDD): `C1 deletes the durable create attempt on first-submit 403 even though pending state is stale` and `C2 never reuses a previous account's frozen body/key after an account switch` both failed pre-fix (orphaned `kind==="create"` attempt length 1; `Retry creation` still rendered after actor switch). `C3 never opens a session or sends with a null actor` held pre-fix as an invariant guard and now pins the outer gate.
+
+- C1 (`CreateCharacter.tsx` submit): definitive-error cleanup now uses the durable local `attempt` (`const failedId = attempt?.id; const actorNow = identity.getActorId(); if (failedId && actorNow) await store.deleteOnlineAttempt(actorNow, failedId)`) for 403/404/422 instead of stale `pending` state; `attempt` lifted before `try` so `catch` sees it.
+- C2 (`CreateCharacter.tsx` recovery/submit): retry source gated on `pending.actorId === actor`; recovery effect deps `[store, actorId, online, generation]` (identity extended with optional `getGeneration`/`isCurrent`); actor change clears `pending` + restored fields (version/entity/name/metadata/error); async read re-validated against current actor/generation and `isCurrent()` before restoring.
+- C3 (`CharacterRoute.tsx`): `CharacterDetail` now gates on `identity.getActorId()` before any hook runs and delegates to `CharacterDetailLoaded`; no session factory is built, opened, or sent with `actorId ?? ""`.
+- I4: `loadMetadata` resets `setEntityId("")` on every version load/failure; `canCreate &&= entities.some(e => e.id === entityId)`.
+- I5: metadata errors branch — 403/404 → `metaDenied` + `character.create.denied`; 401 → `character.create.unauthorized`; network/other/500 → `character.create.uncertain` (existing i18n keys, no new strings).
+- I6 (`router.tsx` + `session.ts` dispose): documented single ownership (session owns `letGo`/`dispose`; router cleanup only covers the never-mounted fallback) with a dispose-once guard on the router-created coordination handle.
+- M7 (`CharacterSheet.tsx`): `actionUnavailableReason` returns `character.action.unavailable` when `onExecuteAction` is undefined.
+- M8: evaluated TanStack `Link`; kept intentional plain `<a href>` with code notes in `CharacterRoute.tsx`/`AppShell.tsx`/`VersionHistory.tsx` because all three render standalone without a `RouterProvider`, where `Link` throws (`Cannot read properties of null (reading '__store')`, reproduced in test). `M8` verified red-crash before revert.
+- M9 (`router.test.tsx`): added static-before-dynamic test (`/characters/new` renders the creation search input, not `$characterId`) and `/systems/$systemId` editor test (`document-editor-loading`).
+- M10 (`router.tsx`): `NewCharacterRoute` keyed on `search.systemVersionId` so a version change remounts instead of reusing stale metadata/entity state.
+
+Verification (TDD red → green):
+
+- Red: `npm run web:test -- src/characters/CreateCharacter.test.tsx src/characters/CharacterRoute.test.tsx` → 2 failed / 13 passed (C1 orphan length 1; C2 retry button still present).
+- Green focused: `npm run web:test -- src/characters/CreateCharacter.test.tsx src/characters/CharacterRoute.test.tsx src/router.test.tsx src/shell/AppShell.test.tsx src/publish/VersionHistory.test.tsx src/characters/CharacterSheet.test.tsx` → 6 files, 37/37 passed.
+- Full: `npm run web:test` → 53 files, 415/415 passed.
+- `npm run web:typecheck` → passed.
+- `npm run web:build` → passed (1812 modules, `dist/index.html` + CSS/JS emitted).
+
+No design change: behavior now matches the account-scoped durable-attempt design already described above and in `design_v2.md`; no scope added.

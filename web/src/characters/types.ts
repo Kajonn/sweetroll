@@ -27,6 +27,29 @@ export type QueueEntry = {
   intent: EditIntent;
   attempt: FrozenRequest | null;
 };
+/**
+ * Atomic conflict-recovery replacement. `selectedIds` retire exactly the
+ * explicitly reviewed intentions; `replacements` are newly identified,
+ * unsent records for the selected reapply/correction only. Unselected
+ * records and their provenance are left unchanged. Selection validity
+ * (non-empty while entries remain, no duplicates, every id present) is
+ * enforced inside the same guarded transaction as the replacement.
+ */
+export type ResolveEntriesInput = {
+  selectedIds: string[];
+  replacements: QueueEntry[];
+};
+/**
+ * Explicit conflict-resolution request. `correctedIntents` carries offline-
+ * only replacement intents (field sets/resource bumps, never lifecycle or
+ * actions) for a subset of the selected ids; any other selected entry is
+ * reapplied with its original intent verbatim.
+ */
+export type ResolveConflictInput = {
+  mode: "discard" | "reapply";
+  selectedIds: string[];
+  correctedIntents?: Record<string, EditIntent>;
+};
 export type SessionPhase =
   | "loading"
   | "ready"

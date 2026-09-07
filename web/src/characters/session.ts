@@ -7,6 +7,7 @@ import type {
   EditIntent,
   FrozenRequest,
   QueueEntry,
+  ResolveConflictInput,
   SessionPhase,
 } from "./types.js";
 
@@ -89,7 +90,7 @@ export type CharacterSession = {
   setField(fieldId: string, value: unknown): Promise<void>;
   bumpResource(resourceId: string, direction: "up" | "down"): Promise<void>;
   executeAction(actionId: string, inputs?: Record<string, unknown>): Promise<void>;
-  resolveConflict(input: { mode: "discard" | "reapply"; selectedIds: string[] }): Promise<void>;
+  resolveConflict(input: ResolveConflictInput): Promise<void>;
   archive(): Promise<void>;
   recover(): Promise<void>;
   commitMigration(previewId: string): Promise<void>;
@@ -142,6 +143,25 @@ function isStaleAck(err: unknown): boolean {
 
 function projectionsEqual(a: CharacterView["projection"], b: CharacterView["projection"]): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * An entry is authorized to send only against the confirmed base it was
+ * reviewed for. Anything else must pause for explicit review instead of
+ * silently inheriting an unrelated external revision.
+ */
+function entryMatchesBase(entry: QueueEntry, base: CharacterView): boolean {
+  if (entry.baseRevision !== base.reconciliation.revision ||
+      entry.packageChecksum !== base.projection.packageChecksum) {
+    return false;
+  }
+  if (entry.attempt !== null) {
+    const expected = (entry.attempt.body as { expectedRevision?: unknown }).expectedRevision;
+    if (typeof expected === "number" && expected !== base.reconciliation.revision) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function createCharacterSession(input: CreateCharacterSessionInput): CharacterSession {
@@ -465,6 +485,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       refreshPhase();
       return "blocked";
     }
+    if (confirmed !== null && !entryMatchesBase(current, confirmed)) {
+      setBlocked("conflict", "The character changed on the server. Review before re-sending.", {
+        retainedIds: [current.id],
+      });
+      return "blocked";
+    }
     if (current.attempt === null) {
       if (isExpired(current)) {
         setBlocked("expired-attempt", "This change is older than the server's replay window. Review it manually before continuing.");
@@ -676,48 +702,134 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     phase = draining ? "sending" : "ready";
   }
 
-  async function resolveConflict(input: { mode: "discard" | "reapply"; selectedIds: string[] }): Promise<void> {
+  async function resolveConflict(input: ResolveConflictInput): Promise<void> {
     if (disposed) return;
     if (!identityMatches() || !editing.owned || !coordination.isOwner()) throw new Error("Editing ownership required.");
     if (draining || conflictRefreshPending || !error || !["conflict", "invalid", "expired-attempt"].includes(error.kind)) {
       throw new Error("Resolve the blocking error and refresh current state before reviewing intentions.");
     }
-    const selected = new Set(input.selectedIds);
-    if (input.mode === "discard") {
-      await store.retireEntries(actorId, characterId, input.selectedIds, { generation, accountGeneration });
-      if (!identityMatches()) return;
-      generation += 1;
-      const remaining = entries.filter((e) => !selected.has(e.id));
-      for (const entry of entries) {
-        if (selected.has(entry.id)) {
-          resolveFreezeWaiter(entry.id);
-          entryWrites.delete(entry.id);
-        }
-      }
-      entries = remaining;
-    } else {
-      await store.retireEntries(actorId, characterId, input.selectedIds, { generation, accountGeneration });
-      if (!identityMatches()) return;
-      generation += 1;
-      const rebuilt: QueueEntry[] = [];
-      for (const entry of entries) {
-        if (!identityMatches()) return;
-        if (selected.has(entry.id)) {
-          const replica = newEntry(entry.intent);
-          replica.baseRevision = confirmed!.reconciliation.revision;
-          replica.sequence = entry.sequence;
-          await store.enqueue(replica, { generation, accountGeneration });
-          if (!identityMatches()) return;
-          rebuilt.push(replica);
-          resolveFreezeWaiter(entry.id);
-          entryWrites.delete(entry.id);
-        } else {
-          rebuilt.push(entry);
-        }
-      }
-      entries = rebuilt.sort((a, b) => a.sequence - b.sequence);
-      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+    if (!confirmed) {
+      throw new Error("Resolve the blocking error and refresh current state before reviewing intentions.");
     }
+    const ordered = [...entries].sort((a, b) => a.sequence - b.sequence);
+    const selected = new Set(input.selectedIds);
+    if (input.selectedIds.length !== selected.size) {
+      throw new Error("Review each selected intention once before continuing.");
+    }
+    if (selected.size === 0 && ordered.length > 0) {
+      throw new Error("Select at least one intention to discard or reapply.");
+    }
+    for (const id of selected) {
+      if (!ordered.some((entry) => entry.id === id)) {
+        throw new Error("Select only intentions that are still queued.");
+      }
+    }
+    // Selection-safe recovery: a selected entry cannot jump ahead of an
+    // earlier unresolved predecessor. While drifted entries remain, the
+    // review set is the drifted entries in order; otherwise (invalid without
+    // drift) every queued entry still needs its own ordered review.
+    const reviewSet = (() => {
+      const drifted = ordered.filter((entry) => !entryMatchesBase(entry, confirmed!));
+      return drifted.length > 0 ? drifted : ordered;
+    })();
+    if (reviewSet.length > 0) {
+      const flags = reviewSet.map((entry) => selected.has(entry.id));
+      const firstUnselected = flags.indexOf(false);
+      const lastSelected = flags.lastIndexOf(true);
+      if (lastSelected === -1 || (firstUnselected !== -1 && firstUnselected < lastSelected)) {
+        throw new Error("Review intentions in order: resolve the earliest pending intention first.");
+      }
+      for (const id of selected) {
+        if (!reviewSet.some((entry) => entry.id === id)) {
+          throw new Error("Review intentions in order: resolve the earliest pending intention first.");
+        }
+      }
+    }
+    const corrected = input.correctedIntents ?? {};
+    if (input.mode === "discard" && Object.keys(corrected).length > 0) {
+      throw new Error("Corrections require reapply mode.");
+    }
+    for (const [id, intent] of Object.entries(corrected)) {
+      if (!selected.has(id)) {
+        throw new Error("Correct only selected intentions.");
+      }
+      if (intent.kind !== "setField" && intent.kind !== "bumpResource") {
+        throw new Error("Corrections support offline field sets and resource bumps only.");
+      }
+      if (intent.kind === "setField" && intent.value === undefined) {
+        throw new Error("Correct the invalid value before reapplying.");
+      }
+    }
+    // Build replacements before touching durable state so validation or
+    // storage failure leaves the in-memory queue untouched as well.
+    let replacements: QueueEntry[] = [];
+    if (input.mode === "reapply") {
+      const taken = new Set(ordered.map((entry) => entry.id));
+      replacements = ordered
+        .filter((entry) => selected.has(entry.id))
+        .map((entry) => {
+          // Replacement intentions always use new ids. An injected id source
+          // may repeat across sessions sharing one store, so retry rather
+          // than overwrite a retained intention.
+          let id = newId();
+          for (let attempt = 0; taken.has(id) && attempt < 10; attempt += 1) {
+            id = newId();
+          }
+          if (taken.has(id)) {
+            throw new Error("Review failed to mint fresh intention ids.");
+          }
+          taken.add(id);
+          return {
+            id,
+            actorId,
+            characterId,
+            sequence: entry.sequence,
+            baseRevision: confirmed!.reconciliation.revision,
+            packageChecksum: confirmed!.projection.packageChecksum,
+            createdAt: now(),
+            intent: corrected[entry.id] ?? entry.intent,
+            attempt: null,
+          };
+        });
+    }
+    // One guarded transaction retires the selected originals and inserts
+    // the replacements. Unselected entries keep their bodies, attempts and
+    // provenance. Publish the new snapshot only after the commit.
+    await store.resolveEntries(
+      actorId,
+      characterId,
+      { selectedIds: ordered.filter((entry) => selected.has(entry.id)).map((entry) => entry.id), replacements },
+      { generation, accountGeneration },
+    );
+    if (!identityMatches()) return;
+    const fresh = await store.read(actorId, characterId);
+    if (!identityMatches()) return;
+    if (fresh.accountGeneration !== accountGeneration) {
+      // Another tab cleared or replaced the account mid-review: adopt the
+      // cleared state and fail instead of recreating intentions.
+      confirmed = fresh.confirmed;
+      entries = fresh.entries;
+      generation = fresh.generation;
+      accountGeneration = fresh.accountGeneration;
+      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+      emit();
+      throw new Error("stale recovery: account changed during review");
+    }
+    confirmed = fresh.confirmed;
+    entries = fresh.entries;
+    generation = fresh.generation;
+    accountGeneration = fresh.accountGeneration;
+    nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+    for (const entry of ordered) {
+      if (selected.has(entry.id)) {
+        resolveFreezeWaiter(entry.id);
+        entryWrites.delete(entry.id);
+      }
+    }
+    // Clearing the pause alone authorizes nothing: any unselected entry that
+    // still mismatches the confirmed base stays paused at the send gate and
+    // needs its own explicit review rather than inheriting the reviewed
+    // revision. That gate is stateless, so the pause survives reopen.
     error = null;
     needsFresh = false;
     coordination.invalidate?.();

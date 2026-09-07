@@ -53,8 +53,8 @@ it("cannot recreate recovery intentions when another tab clears the account afte
   await seedConfirmed(store, "char-1", viewFor("char-1", 1));
   await seedQueue(store, "char-1", [{ id: "pending", intent: { kind: "setField", fieldId: "name", value: "private" } }]);
   api.scriptOpenView(viewFor("char-1", 2)); await session.open();
-  const retire = store.retireEntries.bind(store);
-  vi.spyOn(store, "retireEntries").mockImplementation(async (...args) => {
+  const retire = store.resolveEntries.bind(store);
+  vi.spyOn(store, "resolveEntries").mockImplementation(async (...args) => {
     await retire(...args); await store.clearAccount(ARM);
   });
   await expect(session.resolveConflict({ mode: "reapply", selectedIds: ["pending"] })).rejects.toThrow(/stale/);
@@ -559,8 +559,11 @@ describe("CharacterSession", () => {
     await session.whenIdle();
 
     expect(session.getSnapshot().phase).toBe("conflict");
-    const selected = session.getSnapshot().entries.slice(0, 1).map((e) => e.id);
-    expect(selected).toHaveLength(1);
+    // Recovery is selection-safe: only an ordered prefix of the unresolved
+    // entries may be reviewed at once, so reapply the full set here. Partial
+    // selection keeps the remainder paused (see selection-safe tests below).
+    const selected = session.getSnapshot().entries.map((e) => e.id);
+    expect(selected).toHaveLength(3);
     expect(session.getSnapshot().confirmed?.revision).toBe(7);
     expect((await store.read(ARM, "char-1")).confirmed?.revision).toBe(7);
     expect(session.getSnapshot().tentative).toEqual({ health: 11, gold: 20, name: "Ivy" });
@@ -1331,5 +1334,206 @@ describe("CharacterSession online operations", () => {
     expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
     session.dispose();
     await store.close();
+  });
+});
+
+describe("CharacterSession selection-safe conflict recovery", () => {
+  async function twoOfflineEditsInConflict() {
+    const harness = await makeHarness();
+    const { api, store, session } = harness;
+    await seedConfirmed(store, "char-1", viewFor("char-1", 1));
+    api.scriptOpenView(viewFor("char-1", 1));
+    await session.open();
+    api.scriptSend(async () => ({ error: conflictError() }));
+    api.scriptOpenView(viewFor("char-1", 7));
+    const pending1 = session.setField("name", "Briar").catch(() => {});
+    const pending2 = session.setField("gold", 10).catch(() => {});
+    await session.whenIdle();
+    expect(session.getSnapshot().phase).toBe("conflict");
+    const ids = session.getSnapshot().entries.map((e) => e.id);
+    expect(ids).toHaveLength(2);
+    return { ...harness, ids, pending1, pending2, sentBefore: api.sent.length };
+  }
+
+  it("partial discard keeps the unselected entry paused without rebasing it, across reopen", async () => {
+    const first = await twoOfflineEditsInConflict();
+    await first.session.resolveConflict({ mode: "discard", selectedIds: [first.ids[0]!] });
+    await first.session.whenIdle();
+    expect(first.api.sent).toHaveLength(first.sentBefore);
+    expect(first.session.getSnapshot().phase).toBe("conflict");
+    const remaining = first.session.getSnapshot().entries;
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]).toMatchObject({ baseRevision: 1, packageChecksum: "abc", attempt: null });
+    const stored = await first.store.read(ARM, "char-1");
+    expect(stored.confirmed?.revision).toBe(7);
+    expect(stored.entries).toHaveLength(1);
+    expect(stored.entries[0]).toMatchObject({ baseRevision: 1, packageChecksum: "abc", attempt: null });
+    first.session.dispose();
+    await first.store.close();
+    await first.pending1;
+    first.pending2.catch(() => {});
+
+    const second = await makeHarness();
+    second.api.scriptOpenView(viewFor("char-1", 7));
+    second.api.setSendFallback(async () => successEnvelope(viewFor("char-1", 8)));
+    await second.session.open();
+    await second.session.whenIdle();
+    expect(second.api.sent).toEqual([]);
+    expect(second.session.getSnapshot().phase).toBe("conflict");
+    expect(second.session.getSnapshot().entries).toHaveLength(1);
+    expect(second.session.getSnapshot().entries[0]).toMatchObject({ baseRevision: 1, attempt: null });
+    second.session.dispose();
+    await second.store.close();
+  });
+
+  it("partial reapply sends only the selected entry with a new key and keeps the second paused for its own review", async () => {
+    const first = await twoOfflineEditsInConflict();
+    first.api.scriptSend(async () => successEnvelope(viewFor("char-1", 8)));
+    first.api.scriptSend(async () => successEnvelope(viewFor("char-1", 9)));
+    await first.session.resolveConflict({ mode: "reapply", selectedIds: [first.ids[0]!] });
+    await first.session.whenIdle();
+    expect(first.api.sent).toHaveLength(first.sentBefore + 1);
+    expect(first.api.sent[first.sentBefore]?.body).toMatchObject({ expectedRevision: 7, value: "Briar" });
+    expect(first.api.sent[first.sentBefore]?.body.idempotencyKey).not.toBe(
+      first.api.sent[0]?.body.idempotencyKey,
+    );
+    expect(first.session.getSnapshot().phase).toBe("conflict");
+    const remaining = first.session.getSnapshot().entries;
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]).toMatchObject({ baseRevision: 1, packageChecksum: "abc", attempt: null });
+
+    await first.session.resolveConflict({ mode: "reapply", selectedIds: [remaining[0]!.id] });
+    await first.session.whenIdle();
+    expect(first.api.sent).toHaveLength(first.sentBefore + 2);
+    expect(first.api.sent[first.sentBefore + 1]?.body.expectedRevision).toBe(8);
+    expect(first.session.getSnapshot().phase).toBe("ready");
+    expect(first.session.getSnapshot().entries).toEqual([]);
+    first.session.dispose();
+    await first.store.close();
+    await first.pending1;
+    first.pending2.catch(() => {});
+  });
+
+  it("rejects resolving a later entry while an earlier predecessor is unresolved", async () => {
+    const h = await twoOfflineEditsInConflict();
+    await expect(
+      h.session.resolveConflict({ mode: "discard", selectedIds: [h.ids[1]!] }),
+    ).rejects.toThrow();
+    await expect(
+      h.session.resolveConflict({ mode: "reapply", selectedIds: [h.ids[1]!] }),
+    ).rejects.toThrow();
+    expect(h.api.sent).toHaveLength(h.sentBefore);
+    expect(h.session.getSnapshot().phase).toBe("conflict");
+    expect(h.session.getSnapshot().entries).toHaveLength(2);
+    h.session.dispose();
+    await h.store.close();
+    h.pending1.catch(() => {});
+    h.pending2.catch(() => {});
+  });
+
+  it("rejects empty, duplicate and nonexistent selections without clearing the pause", async () => {
+    const h = await twoOfflineEditsInConflict();
+    await expect(h.session.resolveConflict({ mode: "discard", selectedIds: [] })).rejects.toThrow();
+    await expect(
+      h.session.resolveConflict({ mode: "discard", selectedIds: [h.ids[0]!, h.ids[0]!] }),
+    ).rejects.toThrow();
+    await expect(
+      h.session.resolveConflict({ mode: "reapply", selectedIds: ["no-such-entry"] }),
+    ).rejects.toThrow();
+    expect(h.api.sent).toHaveLength(h.sentBefore);
+    expect(h.session.getSnapshot().phase).toBe("conflict");
+    expect(h.session.getSnapshot().entries).toHaveLength(2);
+    expect((await h.store.read(ARM, "char-1")).entries).toHaveLength(2);
+    h.session.dispose();
+    await h.store.close();
+    h.pending1.catch(() => {});
+    h.pending2.catch(() => {});
+  });
+
+  it("corrects an invalid entry atomically with a new key while preserving the dependent", async () => {
+    const { api, store, session } = await makeHarness();
+    await seedConfirmed(store, "char-1", viewFor("char-1", 1));
+    api.scriptOpenView(viewFor("char-1", 1));
+    await session.open();
+    const invalid = new ApiError({
+      code: "invalid_value",
+      message: "Value is out of range.",
+      status: 422,
+      requestId: "req-1",
+      latestRevision: 1,
+      diagnostics: [],
+    });
+    api.scriptSend(async () => ({ error: invalid }));
+    const pending1 = session.setField("health", 99).catch(() => {});
+    const pending2 = session.setField("gold", 10).catch(() => {});
+    await session.whenIdle();
+    expect(session.getSnapshot().phase).toBe("invalid");
+    const ids = session.getSnapshot().entries.map((e) => e.id);
+    expect(ids).toHaveLength(2);
+    const conflictedKey = api.sent[0]?.body.idempotencyKey;
+
+    api.scriptSend(async () => successEnvelope(viewFor("char-1", 2)));
+    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 3)));
+    await session.resolveConflict({
+      mode: "reapply",
+      selectedIds: [ids[0]!],
+      correctedIntents: { [ids[0]!]: { kind: "setField", fieldId: "health", value: 13 } },
+    });
+    await session.whenIdle();
+    expect(api.sent[1]?.body).toMatchObject({ value: 13, expectedRevision: 1 });
+    expect(api.sent[1]?.body.idempotencyKey).not.toBe(conflictedKey);
+    expect(api.sent[2]?.body).toMatchObject({ value: 10, expectedRevision: 2 });
+    expect(session.getSnapshot().phase).toBe("ready");
+    expect(session.getSnapshot().entries).toEqual([]);
+    expect((await store.read(ARM, "char-1")).entries).toEqual([]);
+    session.dispose();
+    await store.close();
+    await pending1;
+    await pending2;
+  });
+
+  it("rolls back the whole recovery when the atomic replacement write fails, with no new sends", async () => {
+    const h = await twoOfflineEditsInConflict();
+    const before = await h.store.read(ARM, "char-1");
+    const realPut = IDBObjectStore.prototype.put;
+    const spy = vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (this: IDBObjectStore, value: unknown, key?: IDBValidKey) {
+      if (this.name === "queue") {
+        this.transaction.abort();
+        throw new DOMException("Quota exceeded", "QuotaExceededError");
+      }
+      return realPut.apply(this, [value, key as IDBValidKey]);
+    });
+    await expect(
+      h.session.resolveConflict({ mode: "reapply", selectedIds: [h.ids[0]!] }),
+    ).rejects.toThrow();
+    spy.mockRestore();
+    expect(h.api.sent).toHaveLength(h.sentBefore);
+    expect(h.session.getSnapshot().phase).toBe("conflict");
+    expect(h.session.getSnapshot().entries.map((e) => e.id).sort()).toEqual(h.ids.slice().sort());
+    h.session.dispose();
+    await h.store.close();
+    h.pending1.catch(() => {});
+    h.pending2.catch(() => {});
+
+    const reopened = await openCharacterStore(dbName);
+    const after = await reopened.read(ARM, "char-1");
+    expect(after.entries).toEqual(before.entries);
+    expect(after.generation).toBe(before.generation);
+    await reopened.close();
+  });
+
+  it("does not resurrect state when the account is cleared during review", async () => {
+    const h = await twoOfflineEditsInConflict();
+    await h.store.clearAccount(ARM);
+    await expect(
+      h.session.resolveConflict({ mode: "discard", selectedIds: [h.ids[0]!] }),
+    ).rejects.toThrow(/stale/);
+    expect((await h.store.read(ARM, "char-1")).entries).toEqual([]);
+    expect(h.api.sent).toHaveLength(h.sentBefore);
+    expect(h.session.getSnapshot().confirmed).toBeNull();
+    h.session.dispose();
+    await h.store.close();
+    h.pending1.catch(() => {});
+    h.pending2.catch(() => {});
   });
 });

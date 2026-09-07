@@ -192,9 +192,11 @@ it("takeover flushes an active conflict recovery before releasing the lock", asy
   await session.open();
   expect(session.getSnapshot().phase).toBe("conflict");
   let finish!: () => void;
-  const retire = store.retireEntries.bind(store);
-  vi.spyOn(store, "retireEntries").mockImplementation(async (...args) => {
-    await retire(...args);
+  // Recovery commits through the atomic resolveEntries transaction (Task 2);
+  // hold that commit to prove takeover quiesces an in-flight recovery.
+  const resolve = store.resolveEntries.bind(store);
+  vi.spyOn(store, "resolveEntries").mockImplementation(async (...args) => {
+    await resolve(...args);
     await new Promise<void>(resolve => { finish = resolve; });
   });
   const recovery = session.resolveConflict({ mode: "reapply", selectedIds: ["entry-1"] });

@@ -457,3 +457,130 @@ describe("CharacterStore", () => {
     await reopened.close();
   });
 });
+
+describe("CharacterStore resolveEntries", () => {
+  async function seedConflicted() {
+    const store = await openFresh();
+    await store.confirmSnapshot("actor-A", "char-1", makeView("char-1", 7), 0);
+    await store.enqueue(makeEntry({ id: "first", sequence: 0, baseRevision: 1 }), await store.read("actor-A", "char-1"));
+    await store.enqueue(makeEntry({ id: "second", sequence: 1, baseRevision: 1 }), await store.read("actor-A", "char-1"));
+    return store;
+  }
+
+  it("retires the selected entries and inserts replacements atomically, leaving unselected provenance untouched", async () => {
+    const store = await seedConflicted();
+    const before = await store.read("actor-A", "char-1");
+    const replacement: QueueEntry = makeEntry({ id: "first-reapplied", sequence: 0, baseRevision: 7, attempt: null });
+    await store.resolveEntries(
+      "actor-A",
+      "char-1",
+      { selectedIds: ["first"], replacements: [replacement] },
+      { generation: before.generation, accountGeneration: before.accountGeneration },
+    );
+    const after = await store.read("actor-A", "char-1");
+    expect(after.entries.map((e) => e.id)).toEqual(["first-reapplied", "second"]);
+    expect(after.entries.find((e) => e.id === "second")).toEqual(
+      before.entries.find((e) => e.id === "second"),
+    );
+    expect(after.entries.find((e) => e.id === "first-reapplied")).toEqual(replacement);
+    expect(after.generation).toBe(before.generation + 1);
+    expect(after.accountGeneration).toBe(before.accountGeneration);
+    await store.close();
+  });
+
+  it("rejects an empty selection while entries remain, without changing the queue", async () => {
+    const store = await seedConflicted();
+    const before = await store.read("actor-A", "char-1");
+    await expect(
+      store.resolveEntries("actor-A", "char-1", { selectedIds: [], replacements: [] },
+        { generation: before.generation, accountGeneration: before.accountGeneration }),
+    ).rejects.toThrow();
+    expect(await store.read("actor-A", "char-1")).toEqual(before);
+    await store.close();
+  });
+
+  it("rejects a duplicate selection without changing the queue", async () => {
+    const store = await seedConflicted();
+    const before = await store.read("actor-A", "char-1");
+    await expect(
+      store.resolveEntries("actor-A", "char-1", { selectedIds: ["first", "first"], replacements: [] },
+        { generation: before.generation, accountGeneration: before.accountGeneration }),
+    ).rejects.toThrow();
+    expect(await store.read("actor-A", "char-1")).toEqual(before);
+    await store.close();
+  });
+
+  it("rejects a nonexistent selected id without changing the queue", async () => {
+    const store = await seedConflicted();
+    const before = await store.read("actor-A", "char-1");
+    await expect(
+      store.resolveEntries("actor-A", "char-1", { selectedIds: ["missing"], replacements: [] },
+        { generation: before.generation, accountGeneration: before.accountGeneration }),
+    ).rejects.toThrow();
+    expect(await store.read("actor-A", "char-1")).toEqual(before);
+    await store.close();
+  });
+
+  it("rejects a stale guard without retiring entries or advancing the generation", async () => {
+    const store = await seedConflicted();
+    const stale = await store.read("actor-A", "char-1");
+    await store.confirmSnapshot("actor-A", "char-1", makeView("char-1", 8), stale.generation);
+    const latest = await store.read("actor-A", "char-1");
+    await expect(
+      store.resolveEntries("actor-A", "char-1", { selectedIds: ["first"], replacements: [] },
+        { generation: stale.generation, accountGeneration: stale.accountGeneration }),
+    ).rejects.toThrow(/stale/);
+    expect(await store.read("actor-A", "char-1")).toEqual(latest);
+    await store.close();
+  });
+
+  it("rolls back selected deletes when the replacement write aborts, preserving queue, bodies and generation", async () => {
+    const store = await seedConflicted();
+    const frozen = makeRequest();
+    await store.freeze("actor-A", "char-1", "second", frozen);
+    const before = await store.read("actor-A", "char-1");
+    const replacement: QueueEntry = makeEntry({ id: "first-reapplied", sequence: 0, baseRevision: 7, attempt: null });
+
+    const realPut = IDBObjectStore.prototype.put;
+    const spy = vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (this: IDBObjectStore, value: unknown, key?: IDBValidKey) {
+      if (this.name === "queue" && (value as QueueEntry).id === "first-reapplied") {
+        this.transaction.abort();
+        throw new DOMException("Quota exceeded", "QuotaExceededError");
+      }
+      return realPut.apply(this, [value, key as IDBValidKey]);
+    });
+    await expect(
+      store.resolveEntries("actor-A", "char-1", { selectedIds: ["first"], replacements: [replacement] },
+        { generation: before.generation, accountGeneration: before.accountGeneration }),
+    ).rejects.toThrow();
+    spy.mockRestore();
+    await store.close();
+
+    const reopened = await openCharacterStore(dbName);
+    const after = await reopened.read("actor-A", "char-1");
+    expect(after.entries).toEqual(before.entries);
+    expect(after.entries.find((e) => e.id === "second")?.attempt).toEqual(frozen);
+    expect(after.generation).toBe(before.generation);
+    expect(after.confirmed).toEqual(before.confirmed);
+    await reopened.close();
+  });
+
+  it("rejects recovery after account clearing without resurrecting cleared state", async () => {
+    const store = await seedConflicted();
+    const guard = await store.read("actor-A", "char-1");
+    await store.clearAccount("actor-A");
+    await expect(
+      store.resolveEntries("actor-A", "char-1", { selectedIds: ["first"], replacements: [] },
+        { generation: guard.generation, accountGeneration: guard.accountGeneration }),
+    ).rejects.toThrow(/stale/);
+    const cleared = await store.read("actor-A", "char-1");
+    expect(cleared.entries).toEqual([]);
+    expect(cleared.confirmed).toBeNull();
+    await expect(
+      store.resolveEntries("actor-A", "char-1", { selectedIds: ["first"], replacements: [] },
+        { generation: cleared.generation, accountGeneration: cleared.accountGeneration }),
+    ).rejects.toThrow();
+    expect(await store.read("actor-A", "char-1")).toEqual(cleared);
+    await store.close();
+  });
+});

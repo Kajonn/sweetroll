@@ -1,4 +1,4 @@
-import type { CharacterView, FrozenRequest, QueueEntry } from "./types.js";
+import type { CharacterView, FrozenRequest, QueueEntry, ResolveEntriesInput } from "./types.js";
 
 export type OnlineAttempt = {
   id: string;
@@ -33,6 +33,19 @@ export type CharacterStore = {
     generation: number,
   ): Promise<void>;
   retireEntries(actorId: string, characterId: string, entryIds: string[], guard: WriteGuard): Promise<void>;
+  /**
+   * Atomic conflict-recovery replacement. In one guarded transaction this
+   * validates the selection, retires exactly the selected records, inserts
+   * the newly identified unsent replacements and advances the generation.
+   * Unselected records keep their bodies, attempts and provenance. Any
+   * validation or write failure aborts the whole transaction.
+   */
+  resolveEntries(
+    actorId: string,
+    characterId: string,
+    input: ResolveEntriesInput,
+    guard: WriteGuard,
+  ): Promise<void>;
   purgeCharacter(actorId: string, characterId: string): Promise<void>;
   clearAccount(actorId: string): Promise<void>;
   close(): Promise<void>;
@@ -381,6 +394,59 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
         for (const entryId of entryIds) {
           await deleteRequest(tx, QUEUE, [actorId, characterId, entryId]);
         }
+      });
+    },
+
+    async resolveEntries(actorId, characterId, input, guard) {
+      await openTx(db, [CHAR, QUEUE, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async (tx) => {
+        await assertWriteIdentity(tx, actorId, guard.accountGeneration);
+        const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
+        if (!record || record.generation !== guard.generation) {
+          throw new Error("stale recovery: generation changed");
+        }
+        const existing = await collectByKey<QueueEntry>(
+          tx,
+          QUEUE,
+          IDBKeyRange.bound([actorId, characterId, ""], [actorId, characterId, MAX_STRING]),
+        );
+        const byId = new Map(existing.map((entry) => [entry.id, entry]));
+        const { selectedIds, replacements } = input;
+        if (selectedIds.length !== new Set(selectedIds).size) {
+          throw new Error("invalid recovery: duplicate selected intention");
+        }
+        if (selectedIds.length === 0 && existing.length > 0) {
+          throw new Error("invalid recovery: empty selection cannot resolve a paused queue");
+        }
+        for (const id of selectedIds) {
+          if (!byId.has(id)) {
+            throw new Error("invalid recovery: selected intention not found");
+          }
+        }
+        if (replacements.length !== new Set(replacements.map((entry) => entry.id)).size) {
+          throw new Error("invalid recovery: duplicate replacement intention");
+        }
+        for (const replacement of replacements) {
+          if (replacement.actorId !== actorId || replacement.characterId !== characterId) {
+            throw new Error("invalid recovery: replacement identity mismatch");
+          }
+          if (replacement.attempt !== null) {
+            throw new Error("invalid recovery: replacements must be unsent");
+          }
+          if (byId.has(replacement.id)) {
+            throw new Error("invalid recovery: replacements must use new ids");
+          }
+        }
+        // Deletes, replacement inserts and the generation bump commit or
+        // roll back together: an abort at the final write restores the
+        // selected originals instead of losing them.
+        for (const entryId of selectedIds) {
+          await deleteRequest(tx, QUEUE, [actorId, characterId, entryId]);
+        }
+        for (const replacement of replacements) {
+          await putRequest(tx, QUEUE, replacement);
+        }
+        record.generation += 1;
+        await putRequest(tx, CHAR, record);
       });
     },
 

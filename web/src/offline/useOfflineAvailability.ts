@@ -24,7 +24,7 @@ export type OfflineAvailability = {
  * readiness. Without a worker (tests, unsupported browsers, dev builds)
  * this stays unavailable rather than guessing.
  */
-export function useOfflineAvailability(view: CharacterView | null): OfflineAvailability {
+export function useOfflineAvailability(view: CharacterView | null, stored?: boolean): OfflineAvailability {
   const [workerReady, setWorkerReady] = useState(false);
   const [update, setUpdate] = useState<OfflineUpdateStatus>("current");
   const [buildId] = useState<string | null>(() =>
@@ -53,7 +53,11 @@ export function useOfflineAvailability(view: CharacterView | null): OfflineAvail
     };
   }, [buildId]);
 
-  const snapshotStored = view !== null;
+  // Strictness: `view !== null` is in-memory presence, not a durable
+  // store acknowledgement. Callers on a store-ack path may pass explicit
+  // `stored`; otherwise presence of the confirmed view (which the session
+  // only sets after loading from the durable store) implies stored.
+  const snapshotStored = stored ?? view !== null;
   return {
     available: offlineReady({
       workerReady,

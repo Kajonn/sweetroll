@@ -82,6 +82,13 @@ describe("renderServiceWorker", () => {
     expect(source).toContain("sweetroll:offline-status");
   });
 
+  it("is eviction-aware: status reply checks cache presence before reporting ready", () => {
+    const source = renderServiceWorker(manifest);
+    expect(source).toContain("caches.has");
+    expect(source).toContain("caches.match");
+    expect(source).not.toContain("ready: true");
+  });
+
   it("has no DOM-only dependencies so it can build as an isolated worker", async () => {
     const fs = await import("node:fs/promises");
     const here = dirname(fileURLToPath(import.meta.url));

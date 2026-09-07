@@ -22,7 +22,7 @@ export type OfflineReadiness = {
 
 /** Available-offline requires a stored snapshot plus worker cache readiness. */
 export function offlineReady(state: OfflineReadiness): boolean {
-  const compatible = state.snapshotCompatible ?? state.snapshotStored;
+  const compatible = state.snapshotCompatible ?? false;
   return state.workerReady && state.snapshotStored && compatible;
 }
 
@@ -64,7 +64,8 @@ function serviceWorkerContainer(): ServiceWorkerContainerLike | null {
 
 /** True once a worker controls this page (registration alone is not enough). */
 export function hasControllingWorker(): boolean {
-  return serviceWorkerContainer()?.controller !== null && serviceWorkerContainer()?.controller !== undefined;
+  const c = serviceWorkerContainer()?.controller;
+  return c !== null && c !== undefined;
 }
 
 export type OfflineRegistrationResult = "registered" | "skipped" | "unsupported";

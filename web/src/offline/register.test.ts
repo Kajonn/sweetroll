@@ -15,7 +15,11 @@ describe("offlineReady", () => {
   it("requires both worker readiness and a stored snapshot", () => {
     expect(offlineReady({ workerReady: false, snapshotStored: true })).toBe(false);
     expect(offlineReady({ workerReady: true, snapshotStored: false })).toBe(false);
-    expect(offlineReady({ workerReady: true, snapshotStored: true })).toBe(true);
+    expect(offlineReady({ workerReady: true, snapshotStored: true, snapshotCompatible: true })).toBe(true);
+  });
+
+  it("defaults missing compatibility to not ready", () => {
+    expect(offlineReady({ workerReady: true, snapshotStored: true })).toBe(false);
   });
 
   it("treats an incompatible snapshot as not ready", () => {

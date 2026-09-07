@@ -19,8 +19,9 @@ export type OfflineAssetsPluginOptions = {
   buildId?: string;
 };
 
-const CACHEABLE_EXTENSIONS = new Set(["js", "css", "woff", "woff2", "ttf", "otf", "eot", "svg", "png", "jpg", "jpeg", "gif", "webp", "ico"]);
-const GENERATED_FILES = new Set(["sw.js", "offline-manifest.json", "manifest.webmanifest"]);
+const CACHEABLE_EXTENSIONS = new Set(["js", "css", "woff", "woff2", "ttf", "otf", "eot", "svg", "png", "jpg", "jpeg", "gif", "webp", "avif", "ico"]);
+// manifest.webmanifest is not emitted by this build, so it is intentionally absent here.
+const GENERATED_FILES = new Set(["sw.js", "offline-manifest.json"]);
 
 /**
  * Versioned asset list: entry HTML first, then every cacheable bundle

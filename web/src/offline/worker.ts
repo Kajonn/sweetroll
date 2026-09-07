@@ -127,13 +127,27 @@ self.addEventListener("fetch", (event) => {
 self.addEventListener("message", (event) => {
   const data = event.data;
   if (!data || data.type !== OFFLINE_STATUS_MESSAGE) return;
-  const reply = { type: OFFLINE_STATUS_MESSAGE, ready: true, buildId: OFFLINE_MANIFEST.buildId, cache: OFFLINE_CACHE_NAME };
   const port = event.ports && event.ports[0];
-  if (port) {
-    port.postMessage(reply);
-    return;
-  }
-  if (event.source) event.source.postMessage(reply);
+  const target = port ? port : event.source;
+  if (!target) return;
+  event.waitUntil(
+    (async () => {
+      // Eviction-aware readiness: liveness alone is not enough. A
+      // post-activation eviction can leave the worker alive while the
+      // versioned cache or shell is gone, so confirm both before reporting
+      // ready.
+      let ready = false;
+      try {
+        const hasCache = await caches.has(OFFLINE_CACHE_NAME);
+        const shell = hasCache ? await caches.match("/index.html") : undefined;
+        ready = hasCache && !!shell;
+      } catch {
+        ready = false;
+      }
+      const reply = { type: OFFLINE_STATUS_MESSAGE, ready, buildId: OFFLINE_MANIFEST.buildId, cache: OFFLINE_CACHE_NAME };
+      target.postMessage(reply);
+    })(),
+  );
 });
 `;
 }

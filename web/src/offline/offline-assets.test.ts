@@ -41,6 +41,11 @@ describe("collectOfflineAssets", () => {
     expect(new Set(assets).size).toBe(assets.length);
     expect(assets.slice(1)).toEqual([...assets.slice(1)].sort());
   });
+
+  it("caches avif images", () => {
+    const assets = collectOfflineAssets({ img: { fileName: "assets/photo.avif" } });
+    expect(assets).toContain("/assets/photo.avif");
+  });
 });
 
 describe("offlineAssetsPlugin", () => {

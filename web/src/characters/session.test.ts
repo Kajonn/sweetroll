@@ -2309,8 +2309,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       await store.close();
     });
 
-    it("retires the exact expired attempt and allows a deliberate new-key mutation", async () => {
-      const { api, store, session } = await makeHarness();
+    it("retires the exact expired attempt and allows a deliberate new-key mutation", async () => {      const { api, store, session } = await makeHarness();
       api.scriptOpenView(viewFor("char-1", 3));
       await session.open();
       api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
@@ -2329,5 +2328,129 @@ describe("CharacterSession uncertain online outcomes", () => {
       session.dispose();
       await store.close();
     });
+  });
+});
+
+describe("ordered resource estimates", () => {
+  function resourceView(
+    characterId: string,
+    revision: number,
+    resources: Array<{ resourceId: string; label: string; current: number; min: number; max: number; step: number }>,
+  ): CharacterView {
+    return viewFor(characterId, revision, {
+      projection: {
+        projectionVersion: "1.0",
+        systemId: "22222222-2222-4000-8000-000000000000",
+        versionId: "11111111-1111-4000-8000-000000000000",
+        packageChecksum: "abc",
+        entityId: "hero",
+        entityLabel: "Hero",
+        derivedValues: {},
+        validations: [],
+        sheets: [
+          {
+            id: "play",
+            label: "Play",
+            sections: [
+              {
+                id: "resources",
+                label: "Resources",
+                elements: resources.map((resource, index) => ({
+                  kind: "resource" as const,
+                  id: `resource-${index}`,
+                  resourceId: resource.resourceId,
+                  label: resource.label,
+                  value: { current: resource.current, max: resource.max },
+                  min: resource.min,
+                  max: resource.max,
+                  step: resource.step,
+                  resetTo: "max" as const,
+                  validations: [],
+                })),
+              },
+            ],
+          },
+        ],
+      },
+    });
+  }
+
+  async function offlineHarnessWith(
+    resources: Array<{ resourceId: string; label: string; current: number; min: number; max: number; step: number }>,
+  ): Promise<Harness> {
+    const harness = await makeHarness();
+    await seedConfirmed(harness.store, "char-1", resourceView("char-1", 1, resources));
+    harness.identity.online = false;
+    await harness.session.open();
+    return harness;
+  }
+
+  it("applies bounded steps in order instead of collapsing them into a net delta", async () => {
+    const { session, store } = await offlineHarnessWith([
+      { resourceId: "health", label: "Health", current: 1, min: 0, max: 10, step: 2 },
+    ]);
+    await session.bumpResource("health", "down");
+    await session.bumpResource("health", "up");
+    // Sequential: 1 - 2 clamps to 0, then 0 + 2 = 2. A net delta would show 1.
+    expect(session.getSnapshot().tentative).toEqual({ health: 2 });
+    session.dispose();
+    await store.close();
+  });
+
+  it("clamps every step when bumping up then down near max", async () => {
+    const { session, store } = await offlineHarnessWith([
+      { resourceId: "health", label: "Health", current: 9, min: 0, max: 10, step: 2 },
+    ]);
+    await session.bumpResource("health", "up");
+    await session.bumpResource("health", "down");
+    // Sequential: 9 + 2 clamps to 10, then 10 - 2 = 8. A net delta would show 9.
+    expect(session.getSnapshot().tentative).toEqual({ health: 8 });
+    session.dispose();
+    await store.close();
+  });
+
+  it("honors distinct steps per resource and shares one estimate across duplicate intentions", async () => {
+    const { session, store } = await offlineHarnessWith([
+      { resourceId: "health", label: "Health", current: 4, min: 0, max: 10, step: 2 },
+      { resourceId: "mana", label: "Mana", current: 1, min: 0, max: 9, step: 3 },
+    ]);
+    await session.bumpResource("health", "up");
+    await session.bumpResource("mana", "up");
+    await session.bumpResource("health", "up");
+    expect(session.getSnapshot().tentative).toEqual({ health: 8, mana: 4 });
+    session.dispose();
+    await store.close();
+  });
+
+  it("mixes field sets with resource estimates and derives no value from action intentions", async () => {
+    const harness = await offlineHarnessWith([
+      { resourceId: "health", label: "Health", current: 1, min: 0, max: 10, step: 2 },
+    ]);
+    const { session, store } = harness;
+    await session.setField("name", "Briar");
+    await session.bumpResource("health", "down");
+    await session.bumpResource("health", "up");
+    expect(session.getSnapshot().tentative).toEqual({ name: "Briar", health: 2 });
+    session.dispose();
+    await store.close();
+  });
+
+  it("derives no estimate from queued action intentions and unknown resources", async () => {
+    const harness = await makeHarness();
+    await seedConfirmed(harness.store, "char-1", resourceView("char-1", 1, [
+      { resourceId: "health", label: "Health", current: 4, min: 0, max: 10, step: 1 },
+    ]));
+    await seedQueue(harness.store, "char-1", [
+      { id: "a1", intent: { kind: "executeAction", actionId: "ironclad", inputs: {} } },
+    ]);
+    harness.identity.online = false;
+    await harness.session.open();
+    // Actions are never evaluated into estimates; the queued action contributes nothing.
+    expect(harness.session.getSnapshot().tentative).toBeNull();
+    await harness.session.bumpResource("missing", "up");
+    // Unknown resource ids have no confirmed bounds, so they produce no estimate.
+    expect(harness.session.getSnapshot().tentative).toBeNull();
+    harness.session.dispose();
+    await harness.store.close();
   });
 });

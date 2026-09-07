@@ -257,21 +257,42 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     };
   }
 
+  function resourceBounds(resourceId: string): { current: number; min: number; max: number; step: number } | null {
+    if (!confirmed) return null;
+    for (const sheet of confirmed.projection.sheets) {
+      for (const section of sheet.sections) {
+        for (const element of section.elements) {
+          if (element.kind === "resource" && element.resourceId === resourceId) {
+            return { current: element.value.current, min: element.min, max: element.max, step: element.step };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   function computeTentative(): Record<string, unknown> | null {
     if (!confirmed) return null;
     const values: Record<string, unknown> = {};
-    for (const entry of entries) {
+    const ordered = [...entries].sort((a, b) => a.sequence - b.sequence);
+    for (const entry of ordered) {
       if (entry.intent.kind === "setField") {
         values[entry.intent.fieldId] = entry.intent.value;
       } else if (entry.intent.kind === "bumpResource") {
-        const current = (values[entry.intent.resourceId] as { up: number; down: number } | undefined) ?? {
-          up: 0,
-          down: 0,
-        };
-        if (entry.intent.direction === "up") current.up += 1;
-        else current.down += 1;
-        values[entry.intent.resourceId] = current;
+        // Sequential bounded estimates over ordered intentions: apply each
+        // step against the confirmed bounds in queue order, clamping every
+        // step. Never collapse the sequence into a net delta, never evaluate
+        // authored rules, and never claim the estimate will be accepted.
+        const bounds = resourceBounds(entry.intent.resourceId);
+        if (bounds === null) continue;
+        const previous = typeof values[entry.intent.resourceId] === "number"
+          ? (values[entry.intent.resourceId] as number)
+          : bounds.current;
+        const stepped = entry.intent.direction === "up" ? previous + bounds.step : previous - bounds.step;
+        values[entry.intent.resourceId] = Math.max(bounds.min, Math.min(bounds.max, stepped));
       }
+      // executeAction intentions contribute no estimate: applying a roll
+      // outcome would be rule evaluation, and only the server confirms it.
     }
     return Object.keys(values).length > 0 ? values : null;
   }

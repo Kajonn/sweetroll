@@ -39,25 +39,69 @@ export function FieldControl({ field, tentativeValue, disabled, pending, onCommi
   const generatedId = useId();
   const inputId = `field-${field.id}-${generatedId}`;
   const errorId = `${inputId}-errors`;
+  const commitErrorId = `${inputId}-commit-error`;
   const displayed = tentativeValue ?? field.value;
   const [draft, setDraft] = useState(() => scalarText(displayed));
+  const [commitError, setCommitError] = useState<string | null>(null);
   const submittedOnEnter = useRef<string | null>(null);
+  const inFlight = useRef<string | null>(null);
 
   useEffect(() => {
     setDraft(scalarText(displayed));
   }, [displayed]);
 
+  const failCommit = (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    setCommitError(t("character.command.failed", { message }));
+  };
+  // Rejected UI command promises are caught and surfaced here: the draft is
+  // preserved because only a changed tentative/confirmed value resets it.
+  const commitValue = (value: unknown): void => {
+    let result: void | Promise<void>;
+    try {
+      result = onCommit(field.fieldId, value);
+    } catch (error) {
+      failCommit(error);
+      return;
+    }
+    if (result !== undefined && result !== null && typeof (result as Promise<void>).then === "function") {
+      (result as Promise<void>).then(undefined, (error: unknown) => failCommit(error));
+    }
+  };
   const commitDraft = (): boolean => {
+    let value: unknown;
     if (field.fieldKind === "integer" || field.fieldKind === "decimal") {
-      const value = isValidNumber(draft, field);
-      if (value === null) return false;
-      onCommit(field.fieldId, value);
+      const number = isValidNumber(draft, field);
+      if (number === null) return false;
+      value = number;
+    } else {
+      value = draft;
+    }
+    // Prevent duplicate Enter/blur submissions for the same draft, both
+    // while a commit is in flight and after Enter already consumed it.
+    if (inFlight.current === draft) return true;
+    inFlight.current = draft;
+    let result: void | Promise<void>;
+    try {
+      result = onCommit(field.fieldId, value);
+    } catch (error) {
+      inFlight.current = null;
+      failCommit(error);
       return true;
     }
-    onCommit(field.fieldId, draft);
+    if (result !== undefined && result !== null && typeof (result as Promise<void>).then === "function") {
+      (result as Promise<void>).then(
+        () => { inFlight.current = null; setCommitError(null); },
+        (error: unknown) => { inFlight.current = null; failCommit(error); },
+      );
+    } else {
+      inFlight.current = null;
+    }
     return true;
   };
-  const describedBy = field.validations.length > 0 ? errorId : undefined;
+  const describedByParts = [field.validations.length > 0 ? errorId : null, commitError !== null ? commitErrorId : null].filter((part): part is string => part !== null);
+  const describedBy = describedByParts.length > 0 ? describedByParts.join(" ") : undefined;
+  const commitAlert = commitError !== null ? <p id={commitErrorId} role="alert" className={styles.fieldError}>{commitError}</p> : null;
 
   if (field.fieldKind === "computed") {
     return <div className={styles.field}><div className={styles.readOnlyField}><span>{field.label}</span><span>{scalarText(field.value)}</span></div><Diagnostics field={field} /></div>;
@@ -73,13 +117,13 @@ export function FieldControl({ field, tentativeValue, disabled, pending, onCommi
     <div className={styles.field} data-pending={pending || undefined}>
       {field.fieldKind === "boolean" ? (
         <label className={styles.checkboxLabel} htmlFor={inputId}>
-          <input id={inputId} type="checkbox" checked={displayed === true} disabled={disabled} onChange={(event) => onCommit(field.fieldId, event.target.checked)} aria-describedby={describedBy} />
+          <input id={inputId} type="checkbox" checked={displayed === true} disabled={disabled} onChange={(event) => commitValue(event.target.checked)} aria-describedby={describedBy} />
           {field.label}
         </label>
       ) : field.fieldKind === "singleChoice" ? (
         <>
           <label htmlFor={inputId}>{field.label}</label>
-          <select id={inputId} value={typeof displayed === "string" ? displayed : ""} disabled={disabled} required={field.constraints.required} onChange={(event) => onCommit(field.fieldId, event.target.value)} aria-describedby={describedBy}>
+          <select id={inputId} value={typeof displayed === "string" ? displayed : ""} disabled={disabled} required={field.constraints.required} onChange={(event) => commitValue(event.target.value)} aria-describedby={describedBy}>
             {!field.constraints.required ? <option value="">{t("character.choice.empty")}</option> : null}
             {field.constraints.options?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
           </select>
@@ -91,7 +135,7 @@ export function FieldControl({ field, tentativeValue, disabled, pending, onCommi
             const selected = Array.isArray(displayed) && displayed.includes(option.id);
             return <label key={option.id}><input type="checkbox" checked={selected} disabled={disabled} onChange={() => {
               const values = Array.isArray(displayed) ? displayed.filter((value): value is string => typeof value === "string") : [];
-              onCommit(field.fieldId, selected ? values.filter(value => value !== option.id) : [...values, option.id]);
+              commitValue(selected ? values.filter(value => value !== option.id) : [...values, option.id]);
             }} />{option.label}</label>;
           })}
         </fieldset>
@@ -109,7 +153,7 @@ export function FieldControl({ field, tentativeValue, disabled, pending, onCommi
             step={field.constraints.step ?? (field.fieldKind === "integer" ? 1 : "any")}
             minLength={field.constraints.minLength}
             maxLength={field.constraints.maxLength}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => { setDraft(event.target.value); setCommitError(null); }}
             onBlur={() => {
               if (submittedOnEnter.current === draft) { submittedOnEnter.current = null; return; }
               commitDraft();
@@ -120,6 +164,7 @@ export function FieldControl({ field, tentativeValue, disabled, pending, onCommi
         </>
       )}
       {field.validations.length > 0 ? <ul id={errorId} className={styles.validationList}>{field.validations.map(validation => <li key={validation.validationId} data-severity={validation.severity}>{validation.message}</li>)}</ul> : null}
+      {commitAlert}
     </div>
   );
 }

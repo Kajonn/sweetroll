@@ -70,6 +70,38 @@ describe("FieldControl", () => {
     expect(onCommit).toHaveBeenCalledWith("tags", ["brave", "swift"]);
   });
 
+  it("preserves numeric drafts and surfaces commit failures without duplicate submissions", async () => {
+    const user = userEvent.setup();
+    let reject!: (error: Error) => void;
+    const onCommit = vi.fn().mockImplementation(() => new Promise<void>((_resolve, fail) => { reject = fail; }));
+    render(<FieldControl field={strength} tentativeValue={null} disabled={false} pending={false} onCommit={onCommit} />);
+    const input = screen.getByRole("spinbutton", { name: "Strength" });
+
+    await user.clear(input);
+    await user.type(input, "15");
+    await user.keyboard("{Enter}");
+    await user.keyboard("{Enter}");
+    expect(onCommit).toHaveBeenCalledTimes(1);
+
+    reject(new Error("Account changed. Reopen this character."));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not save this change: Account changed. Reopen this character.");
+    expect(input).toHaveValue(15);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces synchronous commit failures while keeping the draft", async () => {
+    const user = userEvent.setup();
+    const onCommit = vi.fn((): void => { throw new Error("Session closed."); });
+    render(<FieldControl field={strength} tentativeValue={null} disabled={false} pending={false} onCommit={onCommit} />);
+    const input = screen.getByRole("spinbutton", { name: "Strength" });
+
+    await user.clear(input);
+    await user.type(input, "12");
+    await user.tab();
+    expect(onCommit).toHaveBeenCalledWith("strength", 12);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not save this change: Session closed.");
+    expect(input).toHaveValue(12);
+  });
   it("shows diagnostics for read-only and unavailable fields", () => {
     render(<>
       <FieldControl field={{ ...text, id: "computed", fieldId: "armor", label: "Armor", fieldKind: "computed", value: 12, editable: false, constraints: {}, validations: [{ validationId: "armor-error", severity: "warning", message: "Armor is stale", targetDefinitionId: "armor" }] }} tentativeValue={null} disabled={false} pending={false} onCommit={vi.fn()} />

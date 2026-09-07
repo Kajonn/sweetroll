@@ -820,6 +820,31 @@ export async function seedReferenceTemplates(runner: SeedRunner): Promise<SeedRe
     // package identity drifted from the fixture, so the runtime loader's
     // package/row identity invariant holds. Legacy rows under retired
     // synthetic ids are removed by migration 0010, not here.
+    //
+    // RESTRICT guard (Task 11 I4): characters.system_version_id (plus
+    // migration preview/migration source/target ids) reference
+    // system_versions with ON DELETE RESTRICT. A repair-by-delete would
+    // fail (23503) — or worse, remove a row live characters depend on —
+    // once drift coincides with real usage. Skip the repair, keep the old
+    // row, and log so the drift is visible instead of crashing boot.
+    let referenced = false;
+    try {
+      const hit = await runner.query<{ one: number }>(
+        "SELECT 1 AS one FROM characters WHERE system_version_id = $1 LIMIT 1",
+        [tpl.versionId],
+      );
+      referenced = (hit.rows.length ?? 0) > 0;
+    } catch (error) {
+      // Isolated seeder schemas (e.g. reference-templates.test.ts) have no
+      // characters table yet — undefined_table means "no references".
+      if ((error as { code?: string }).code !== "42P01") throw error;
+    }
+    if (referenced) {
+      console.warn(
+        `[seedReferenceTemplates] skipping repair of ${tpl.versionId}: referenced by characters; keeping existing row`,
+      );
+      continue;
+    }
     await runner.query("DELETE FROM system_versions WHERE id = $1", [tpl.versionId]);
     await runner.query(
       `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at)

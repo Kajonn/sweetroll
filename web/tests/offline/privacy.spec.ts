@@ -104,6 +104,86 @@ test.describe("offline privacy and sign-out", () => {
     }
   });
 
+  test("prior owner cache is purged after server-side ownership transfer", async ({ browser }) => {
+    test.setTimeout(180_000);
+    const system = D20_REFERENCE_SYSTEM;
+    const owner = await newSignedInContext(browser, TEST_USER_A.code);
+    const nextOwner = await newSignedInContext(browser, TEST_USER_B.code);
+    try {
+      const setup = await owner.context.newPage();
+      const characterName = `Revoke ${Date.now().toString(36)}`;
+      const { characterId } = await createCharacter(setup.request, {
+        systemVersionId: system.systemVersionId,
+        name: characterName,
+      });
+      const before = await readCharacter(setup.request, characterId);
+      await setup.close();
+
+      // Cache as owner: open the sheet until offline-ready (durable
+      // snapshot + worker cache), then queue one offline bump so both a
+      // snapshot and a queued attempt exist locally.
+      const page = await owner.context.newPage();
+      await page.setViewportSize({ width: 360, height: 740 });
+      await page.goto(`/characters/${characterId}`);
+      await expectSheetReady(page, characterName);
+      await expectOfflineAvailable(page);
+      await owner.context.setOffline(true);
+      await page.getByRole("button", { name: system.decreaseButton }).click();
+      await expect(page.getByText("Changes pending")).toBeVisible({ timeout: 15_000 });
+
+      // Hold the queued bump (abort sync attempts) while transferring
+      // ownership server-side as the current owner, so the queue cannot
+      // drain before revocation.
+      await owner.context.setOffline(false);
+      await page.route("**/characters/*/resources/*/bump", route => void route.abort("failed"));
+      const transfer = await page.request.post(`/api/characters/${characterId}/ownership-transfer`, {
+        data: {
+          toUserId: nextOwner.userId,
+          expectedRevision: before.character.revision,
+          idempotencyKey: `revoke-${Date.now().toString(36)}`,
+        },
+      });
+      expect(transfer.status()).toBe(200);
+
+      // Reconnect as the prior owner: the next sync must observe the
+      // purge disposition, drop local snapshot + queue, and never leak
+      // the private name.
+      await page.unrouteAll({ behavior: "wait" }).catch(() => {});
+      await page.reload();
+      await expect(page.getByText("This character is unavailable.")).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole("heading", { name: characterName })).toHaveCount(0);
+      await expect(page.getByText("Changes pending")).toHaveCount(0);
+      const bodyText = (await page.content()) ?? "";
+      expect(bodyText).not.toContain(characterName);
+      const api = await page.request.get(`/api/characters/${characterId}`);
+      expect(api.status()).toBe(404);
+      expect(((await api.json()) as { error: { cacheDisposition: string } }).error.cacheDisposition).toBe(
+        "purge",
+      );
+
+      // Queue is deleted, not sent: the new owner still sees the
+      // pre-transfer revision (no bump effect leaked through).
+      const verifier = await nextOwner.context.newPage();
+      await testSignIn(verifier.request, TEST_USER_B.code);
+      const afterTransfer = await readCharacter(verifier.request, characterId);
+      expect(afterTransfer.character.revision).toBe(before.character.revision + 1);
+      await verifier.close();
+
+      // Snapshot is deleted: a fresh page in the prior-owner context still
+      // shows unavailable (never the cached name), even after reload.
+      const fresh = await owner.context.newPage();
+      await fresh.goto(`/characters/${characterId}`);
+      await expect(fresh.getByText("This character is unavailable.")).toBeVisible({ timeout: 30_000 });
+      await expect(fresh.getByRole("heading", { name: characterName })).toHaveCount(0);
+      await fresh.close();
+      await page.close();
+    } finally {
+      await owner.context.setOffline(false).catch(() => {});
+      await owner.context.close();
+      await nextOwner.context.close();
+    }
+  });
+
   test("revoked access purges cached reads for the affected character", async ({ browser }) => {
     test.setTimeout(120_000);
     const system = D20_REFERENCE_SYSTEM;

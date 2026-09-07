@@ -114,8 +114,16 @@ async function runAcceptance(
 
       // Reconnect with one lost response: abort the first bump attempt so the
       // client must retry the identical frozen request (same idempotency key).
+      // I1: capture both attempt bodies and assert the frozen request is
+      // replayed verbatim (identical idempotencyKey + body).
       let abortedFirst = false;
+      const bumpAttempts: Array<{ url: string; body: unknown }> = [];
       await reopened.route("**/characters/*/resources/*/bump", async route => {
+        try {
+          bumpAttempts.push({ url: route.request().url(), body: route.request().postDataJSON() });
+        } catch {
+          bumpAttempts.push({ url: route.request().url(), body: null });
+        }
         if (!abortedFirst) {
           abortedFirst = true;
           await route.abort("failed");
@@ -127,6 +135,13 @@ async function runAcceptance(
       await expect(reopened.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
       expect(abortedFirst).toBe(true);
       await reopened.unrouteAll({ behavior: "wait" });
+      // Same frozen request replayed: at least retry, identical key + body.
+      expect(bumpAttempts.length).toBeGreaterThanOrEqual(2);
+      const firstBump = bumpAttempts[0]!.body as { idempotencyKey?: unknown };
+      const secondBump = bumpAttempts[1]!.body as { idempotencyKey?: unknown };
+      expect(firstBump?.idempotencyKey).toBeDefined();
+      expect(secondBump?.idempotencyKey).toBe(firstBump?.idempotencyKey);
+      expect(secondBump).toEqual(firstBump);
 
       // Final persisted values: exactly one resource effect.
       const after = await readCharacter(reopened.request, created.characterId);
@@ -136,7 +151,28 @@ async function runAcceptance(
 
       const activity = await readActivity(reopened.request, created.characterId);
       const bumpEvents = activity.events.filter(e => e.kind === "character_resource_bumped");
-      expect(bumpEvents.length).toBeGreaterThanOrEqual(1);
+      // I2: revision +1 already proves single effect; exactly one row proves
+      // no double-apply across the abort+retry window.
+      expect(bumpEvents.length).toBe(1);
+
+      // Abort landed pre-apply (client-side failure never reached the
+      // server), so additionally prove the frozen key is idempotent: replay
+      // the captured frozen body server-side — it must return replayed
+      // without a second effect (revision still +1, still one activity row).
+      const replayFrozen = await reopened.request.post(
+        `/api/characters/${created.characterId}/resources/${system.resourceId}/bump`,
+        { data: firstBump },
+      );
+      expect(replayFrozen.status()).toBe(200);
+      const replayJson = (await replayFrozen.json()) as {
+        result: { character: { revision: number; reconciliation: { replayed: boolean } } };
+      };
+      expect(replayJson.result.character.reconciliation.replayed).toBe(true);
+      expect(replayJson.result.character.revision).toBe(before.character.revision + 1);
+      const activityAfterReplay = await readActivity(reopened.request, created.characterId);
+      expect(
+        activityAfterReplay.events.filter(e => e.kind === "character_resource_bumped").length,
+      ).toBe(1);
 
       await expectNoHorizontalOverflow(reopened);
       await reopened.screenshot({ path: `test-results/offline-${system.key}-360-synced.png` });

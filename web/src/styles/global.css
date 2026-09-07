@@ -8,6 +8,7 @@
   --color-accent-fg: #ffffff;
   --color-error: #dc2626;
   --color-warning: #d97706;
+  --color-warning-fg: #92400e;
   --color-success: #059669;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, sans-serif;
   --font-mono: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;

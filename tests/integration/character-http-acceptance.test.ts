@@ -315,6 +315,7 @@ describeWithDatabase("characters HTTP acceptance", () => {
       ]),
       total: expect.any(Number),
       output: `Result: ${r1.roll.total}`,
+      audience: "owner_only",
     });
     expect(r1.character.reconciliation.replayed).toBe(false);
 

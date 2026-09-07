@@ -8,6 +8,7 @@ import {
   expectOfflineAvailable,
   expectSheetReady,
   newSignedInContext,
+  readActivity,
   readCharacter,
   testSignIn,
 } from "./test-auth.js";
@@ -78,9 +79,15 @@ test.describe("tab coordination over real web locks", () => {
       await expect(second.getByText("Changes pending")).toBeVisible({ timeout: 30_000 });
 
       // Lost response on the first post-takeover sync; the identical frozen
-      // request retries and applies exactly once.
+      // request retries and applies exactly once (I1: identical key + body).
       let abortedFirst = false;
+      const bumpAttempts: Array<{ url: string; body: unknown }> = [];
       await second.route("**/characters/*/resources/*/bump", async route => {
+        try {
+          bumpAttempts.push({ url: route.request().url(), body: route.request().postDataJSON() });
+        } catch {
+          bumpAttempts.push({ url: route.request().url(), body: null });
+        }
         if (!abortedFirst) {
           abortedFirst = true;
           await route.abort("failed");
@@ -92,11 +99,34 @@ test.describe("tab coordination over real web locks", () => {
       try {
         await expect(second.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
         expect(abortedFirst).toBe(true);
+        expect(bumpAttempts.length).toBeGreaterThanOrEqual(2);
+        const firstBump = bumpAttempts[0]!.body as { idempotencyKey?: unknown };
+        const secondBump = bumpAttempts[1]!.body as { idempotencyKey?: unknown };
+        expect(firstBump?.idempotencyKey).toBeDefined();
+        expect(secondBump?.idempotencyKey).toBe(firstBump?.idempotencyKey);
+        expect(secondBump).toEqual(firstBump);
         const after = await readCharacter(second.request, characterId);
         expect(after.character.revision).toBe(before.character.revision + 1);
         expect((after.character.state.values.health as { current: number }).current).toBe(
           initialHealth - 1,
         );
+        // I2: exactly one bump row proves no double-apply across abort+retry.
+        const activity = await readActivity(second.request, characterId);
+        expect(activity.events.filter(e => e.kind === "character_resource_bumped").length).toBe(1);
+        // Frozen-key idempotence: replaying the captured body must not add
+        // a second effect.
+        const replayFrozen = await second.request.post(
+          `/api/characters/${characterId}/resources/health/bump`,
+          { data: firstBump },
+        );
+        expect(replayFrozen.status()).toBe(200);
+        const replayJson = (await replayFrozen.json()) as {
+          result: { character: { revision: number; reconciliation: { replayed: boolean } } };
+        };
+        expect(replayJson.result.character.reconciliation.replayed).toBe(true);
+        expect(replayJson.result.character.revision).toBe(before.character.revision + 1);
+        const activityAfter = await readActivity(second.request, characterId);
+        expect(activityAfter.events.filter(e => e.kind === "character_resource_bumped").length).toBe(1);
         // Takeover granted editing to the second page.
         await expect(second.getByRole("button", { name: system.decreaseButton })).toBeEnabled();
       } finally {

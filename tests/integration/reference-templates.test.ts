@@ -137,3 +137,44 @@ describeWithDatabase("reference template seeding", () => {
     expect(row?.package_json.systemId).toBe(template?.systemId);
   });
 });
+
+/**
+ * Task 11 I4 (TDD): repair-by-delete is RESTRICT-unsafe once characters
+ * reference a drifted template row. The seeder must skip the repair (log +
+ * keep the old row) instead of DELETEing a referenced version.
+ * Runs against a fake runner so no database is required.
+ */
+describe("reference template seeder RESTRICT guard", () => {
+  it("skips repair when characters reference the drifted version", async () => {
+    const template = REFERENCE_TEMPLATES[0]!;
+    const calls: string[] = [];
+    const fakeRunner = {
+      async query(text: string) {
+        calls.push(text);
+        if (text.startsWith("INSERT INTO systems")) return { rowCount: 0, rows: [] };
+        if (text.startsWith("SELECT id, checksum")) {
+          return { rowCount: 1, rows: [{ id: template.versionId, checksum: "pending:d20", package_json: {} }] };
+        }
+        if (text.includes("FROM characters WHERE system_version_id")) {
+          return { rowCount: 1, rows: [{ one: 1 }] };
+        }
+        throw new Error(`unexpected query: ${text}`);
+      },
+    };
+    // eslint-disable-next-line no-console
+    const warn = console.warn;
+    const warnings: unknown[][] = [];
+    // eslint-disable-next-line no-console
+    console.warn = (...args: unknown[]) => void warnings.push(args);
+    try {
+      const result = await seedReferenceTemplates(fakeRunner as never);
+      expect(result.versionsReplaced).toBe(0);
+    } finally {
+      // eslint-disable-next-line no-console
+      console.warn = warn;
+    }
+    expect(calls.some(c => c.startsWith("DELETE FROM system_versions"))).toBe(false);
+    expect(calls.some(c => c.includes("FROM characters WHERE system_version_id"))).toBe(true);
+    expect(warnings.length).toBeGreaterThanOrEqual(1);
+  });
+});

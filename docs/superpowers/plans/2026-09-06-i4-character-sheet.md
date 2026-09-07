@@ -370,7 +370,7 @@ expect(secondPageEditingEnabled).toBe(false);
 
 **Interfaces:** Consumes passing Tasks 1-11. Produces recorded acceptance and an accurate I4 status; I5 remains untouched.
 
-- [ ] Run the complete verification commands below with unfiltered exit status; do not pipe through truncators that hide failures. If running from a repo containing nested worktrees, exclude `.worktrees/**` from Vitest or run in the isolated worktree. Inspect DB cleanup before repeating browser tests.
+- [x] Run the complete verification commands below with unfiltered exit status; do not pipe through truncators that hide failures. If running from a repo containing nested worktrees, exclude `.worktrees/**` from Vitest or run in the isolated worktree. Inspect DB cleanup before repeating browser tests.
 
 ```bash
 npm test
@@ -385,10 +385,15 @@ DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll AUTHORITATI
 DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll AUTHORITATIVE_ROLL_SECRET=development-only-roll-secret-32-bytes npm run web:test:offline
 ```
 
-- [ ] Record the exact tested commit/tree, commands, counts, production asset/offline proof, final DB effects and browser support limitations. If evidence predates the closure commit, state that precisely instead of inventing a tested SHA. Do not claim offline persistence is guaranteed against browser eviction.
-- [ ] Reconcile every requirement to a test/task. Mark I4 closed only if the full acceptance and regression suite pass. Keep historical I3 receipt compatibility explicitly covered.
-- [ ] Run `git diff --check`, inspect staged/intended changes, and review the closure record for unsupported claims.
-- [ ] Commit the closure artifacts: `docs: close I4 character sheet frontend`.
+- [x] Record the exact tested commit/tree, commands, counts, production asset/offline proof, final DB effects and browser support limitations. If evidence predates the closure commit, state that precisely instead of inventing a tested SHA. Do not claim offline persistence is guaranteed against browser eviction.
+- [x] Reconcile every requirement to a test/task. Mark I4 closed only if the full acceptance and regression suite pass. Keep historical I3 receipt compatibility explicitly covered.
+- [x] Run `git diff --check`, inspect staged/intended changes, and review the closure record for unsupported claims.
+- [x] Commit the closure artifacts: `docs: close I4 character sheet frontend`.
+
+> **I4 closed 2026-09-07.** Full verification green on tested commit `be69809`
+> (tree `87e80e0`): backend unit 269/269, integration 122/122, web unit 484/484,
+> E2E 19/19, production-offline 13/13; typechecks, build, contracts check pass.
+> Acceptance: `docs/acceptance/i4-2026-09-06.md`. I5 untouched.
 
 ## Plan Self-review
 

@@ -652,7 +652,7 @@ Every increment must meet all applicable criteria before work begins on the next
 
 **Acceptance demonstration:** From a 360 px viewport, create and use a standalone character, go offline, read and update the sheet, reconnect without duplicate resource changes, resolve a simulated conflict, and export the final state.
 
-> **I4 design decisions approved 2026-09-06; implementation pending.** Queue field edits and direct resource bumps offline, with explicit conflict recovery and one editing/synchronizing tab per character. Cache account-scoped projections and immutable command attempts in IndexedDB. Fully offline reopening of previously opened sheets includes minimal application-asset service-worker caching in I4; installation and the Player PWA shell remain I5. Actions and lifecycle/migration/export initiation require connectivity. Required fields omitted from authored sheets receive backend completion metadata; authorized creation metadata and existing sign-out operation HTTP wiring are explicit prerequisites. See `docs/superpowers/specs/2026-09-06-i4-character-sheet-design.md`.
+> **I4 closed 2026-09-07 at `be69809` (closure commit `docs: close I4 character sheet frontend`).** The reusable projection-driven character sheet is implemented with durable offline edits, safe replay and fully offline reopening; verification recorded in `docs/acceptance/i4-2026-09-06.md` (backend unit 269, integration 122, web unit 484, E2E 19, production-offline 13, all green). Historical 30-day receipts replay unchanged. I5 remains untouched; installation and the Player PWA shell are still out of scope. See `docs/superpowers/specs/2026-09-06-i4-character-sheet-design.md`.
 
 ## 17.7 I5 - Standalone Player app
 

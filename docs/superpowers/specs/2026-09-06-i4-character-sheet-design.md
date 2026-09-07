@@ -1,7 +1,7 @@
 # I4 Character Sheet Frontend
 
 Date: 2026-09-06
-Status: Recommended design decisions approved by the user; implementation not started.
+Status: Implemented and accepted; I4 closed 2026-09-07. Acceptance recorded in `docs/acceptance/i4-2026-09-06.md` (tested commit `be69809`). I5 untouched.
 
 ## Goal and Scope
 

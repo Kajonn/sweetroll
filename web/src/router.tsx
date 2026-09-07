@@ -151,6 +151,7 @@ function CharacterDetailRouteView() {
   useIdentityTick(identity);
   const store = useSharedCharacterStore();
   const api = useCharactersApi();
+  const navigate = useNavigate();
   const actorId = identity?.getActorId() ?? null;
   // Coordination ownership: each effect setup owns a fresh handle (see
   // useCharacterCoordination); cleanup releases it. A disposed handle is
@@ -177,6 +178,17 @@ function CharacterDetailRouteView() {
       store={store}
       identity={identity}
       coordination={coordination}
+      navigation={{
+        onCreateNew: () => {
+          void navigate({ to: "/characters/new" });
+        },
+        onOpenLibrary: () => {
+          void navigate({ to: "/" });
+        },
+        onOpenCharacter: nextId => {
+          void navigate({ to: "/characters/$characterId", params: { characterId: nextId } });
+        },
+      }}
     />
   );
 }

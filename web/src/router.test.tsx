@@ -1,9 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { render, renderHook, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
 
+import { createTestLocks, makeView } from "./characters/testing.js";
+import type { CharacterView, CommandResultResponse } from "./characters/types.js";
+import { openCharacterStore } from "./characters/store.js";
 import { createAppRouter, creationViewKey, useCharacterCoordination } from "./router.js";
 
 function renderAt(path: string) {
@@ -109,5 +113,220 @@ describe("router", () => {
     expect(creationViewKey("actor-1", 3, "v-1")).not.toBe(creationViewKey("actor-1", 4, "v-1"));
     expect(creationViewKey("actor-1", 3, "v-1")).not.toBe(creationViewKey("actor-1", 3, "v-2"));
     expect(creationViewKey(null, 3, "v-1")).not.toBe(creationViewKey("actor-1", 3, "v-1"));
+  });
+});
+
+// Task 7: the routed character workflows through the real RouterProvider
+// composition, including creation-to-focus and the full detail surface.
+const ROUTER_ACTOR = "00000000-0000-4000-8000-0000000000a1";
+const ROUTER_CHAR = "00000000-0000-4000-8000-0000000000e5";
+const ROUTER_NEW_CHAR = "00000000-0000-4000-8000-0000000000d4";
+
+function stubWebLocks() {
+  Object.defineProperty(window.navigator, "locks", {
+    configurable: true,
+    writable: true,
+    value: createTestLocks(),
+  });
+}
+
+function routerActionView(characterId: string, revision: number, name = "Briar"): CharacterView {
+  return makeView({
+    characterId,
+    revision,
+    name,
+    state: { schemaVersion: "1.0", values: { name } },
+    projection: {
+      projectionVersion: "1.0",
+      systemId: "22222222-2222-4000-8000-000000000000",
+      versionId: "11111111-1111-4000-8000-000000000000",
+      packageChecksum: "abc",
+      entityId: "hero",
+      entityLabel: "Hero",
+      sheets: [
+        {
+          id: "play", label: "Play", sections: [{
+            id: "moves", label: "Moves", elements: [
+              {
+                kind: "action" as const, id: "roll", actionId: "roll-check", label: "Roll check",
+                actionKind: "roll" as const,
+                inputs: [{ id: "bonus", label: "Bonus", valueType: "integer" as const, required: false, default: 0 }],
+                validations: [],
+              },
+            ],
+          }],
+        },
+      ],
+      derivedValues: {},
+      validations: [],
+      completionFields: [],
+    },
+  });
+}
+
+function routerCompletionView(characterId: string, name: string): CharacterView {
+  return makeView({
+    characterId,
+    revision: 1,
+    name,
+    state: { schemaVersion: "1.0", values: { name } },
+    projection: {
+      projectionVersion: "1.0",
+      systemId: "22222222-2222-4000-8000-000000000000",
+      versionId: "11111111-1111-4000-8000-000000000000",
+      packageChecksum: "abc",
+      entityId: "hero",
+      entityLabel: "Hero",
+      sheets: [],
+      derivedValues: {},
+      validations: [],
+      completionFields: [
+        {
+          kind: "field" as const, id: "completion-name", fieldId: "name", label: "Name",
+          fieldKind: "text" as const, value: "", editable: true,
+          constraints: { required: true }, validations: [],
+        },
+      ],
+    },
+  });
+}
+
+describe("character routes", () => {
+  afterEach(() => {
+    window.history.pushState({}, "", "/");
+    Reflect.deleteProperty(window.navigator, "locks");
+    vi.restoreAllMocks();
+  });
+
+  it("prefills creation from ?systemVersionId and remounts when it changes", async () => {
+    const fetch_ = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input), window.location.origin);
+      if (url.pathname === "/api/me") {
+        return new Response(JSON.stringify({ state: "authenticated", userId: ROUTER_ACTOR }));
+      }
+      if (url.pathname === "/api/characters/creation-options") {
+        return new Response(
+          JSON.stringify({
+            data: { versionId: url.searchParams.get("systemVersionId"), packageChecksum: "abc", entities: [] },
+            requestId: "r",
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ systems: [], nextCursor: null, requestId: "r" }), { status: 200 });
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetch_ as unknown as typeof fetch;
+    try {
+      const router = renderAt("/characters/new?systemVersionId=v-1");
+      expect(await screen.findByLabelText("System version ID")).toHaveValue("v-1");
+      await router.navigate({ to: "/characters/new", search: { systemVersionId: "v-2" } });
+      await waitFor(() => expect(screen.getByLabelText("System version ID")).toHaveValue("v-2"));
+    } finally {
+      globalThis.fetch = originalFetch;
+      window.history.pushState({}, "", "/");
+    }
+  });
+
+  it("creates through the router, navigates to the new character, and focuses required-field completion", { timeout: 30000 }, async () => {
+    const user = userEvent.setup();
+    stubWebLocks();
+    const createdView = routerCompletionView(ROUTER_NEW_CHAR, "Briar");
+    const fetch_ = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input), window.location.origin);
+      if (url.pathname === "/api/me") {
+        return new Response(JSON.stringify({ state: "authenticated", userId: ROUTER_ACTOR }));
+      }
+      if (url.pathname === "/api/characters/creation-options") {
+        return new Response(
+          JSON.stringify({
+            data: { versionId: "v-1", packageChecksum: "abc", entities: [{ id: "hero", label: "Hero" }] },
+            requestId: "r",
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.pathname === "/api/characters" && init?.method === "POST") {
+        return new Response(
+          JSON.stringify({ result: { character: { characterId: ROUTER_NEW_CHAR } }, requestId: "r" }),
+          { status: 200 },
+        );
+      }
+      if (url.pathname === `/api/characters/${ROUTER_NEW_CHAR}`) {
+        return new Response(JSON.stringify({ character: createdView, requestId: "r" }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ systems: [], nextCursor: null, requestId: "r" }), { status: 200 });
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetch_ as unknown as typeof fetch;
+    try {
+      renderAt("/characters/new?systemVersionId=v-1");
+      expect(await screen.findByLabelText("System version ID")).toHaveValue("v-1");
+      await user.click(screen.getByRole("button", { name: "Look up version" }));
+      await user.selectOptions(await screen.findByLabelText("Entity"), "hero");
+      await user.type(screen.getByLabelText("Character name"), "Briar");
+      await user.click(screen.getByRole("button", { name: "Create character" }));
+      expect(await screen.findByRole("heading", { name: "Complete Your Character" }, { timeout: 5000 })).toBeVisible();
+      await waitFor(
+        () => expect(screen.getByRole("heading", { name: "Complete Your Character" })).toHaveFocus(),
+        { timeout: 5000 },
+      );
+      expect(window.location.pathname).toBe(`/characters/${ROUTER_NEW_CHAR}`);
+    } finally {
+      globalThis.fetch = originalFetch;
+      window.history.pushState({}, "", "/");
+    }
+  });
+
+  it("exposes actions, tools, ownership and roll results through the real router composition", { timeout: 30000 }, async () => {
+    const user = userEvent.setup();
+    stubWebLocks();
+    const seed = await openCharacterStore("sweetroll-characters");
+    await seed.confirmSnapshot(ROUTER_ACTOR, ROUTER_CHAR, routerActionView(ROUTER_CHAR, 1), 0);
+    await seed.close();
+    const roll: NonNullable<CommandResultResponse["result"]["roll"]> = {
+      actionId: "roll-check",
+      expression: "d20 + 2",
+      dice: [{ sides: 20, value: 14, kept: true }],
+      bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }],
+      total: 16,
+      output: "Success",
+      audience: "owner_only",
+    };
+    const fetch_ = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input), window.location.origin);
+      if (url.pathname === "/api/me") {
+        return new Response(JSON.stringify({ state: "authenticated", userId: ROUTER_ACTOR }));
+      }
+      if (url.pathname.startsWith(`/api/characters/${ROUTER_CHAR}/actions/`) && init?.method === "POST") {
+        return new Response(
+          JSON.stringify({ result: { character: routerActionView(ROUTER_CHAR, 2), roll }, requestId: "r" }),
+          { status: 200 },
+        );
+      }
+      if (url.pathname === `/api/characters/${ROUTER_CHAR}`) {
+        return new Response(JSON.stringify({ character: routerActionView(ROUTER_CHAR, 1), requestId: "r" }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ systems: [], nextCursor: null, requestId: "r" }), { status: 200 });
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetch_ as unknown as typeof fetch;
+    try {
+      renderAt(`/characters/${ROUTER_CHAR}`);
+      expect(await screen.findByRole("heading", { level: 1, name: "Briar" }, { timeout: 5000 })).toBeVisible();
+      expect(await screen.findByText("Editing in this tab.", {}, { timeout: 5000 })).toBeVisible();
+      expect(screen.getByRole("button", { name: "Activity" })).toBeVisible();
+      expect(screen.getByRole("button", { name: "Archive" })).toBeVisible();
+      expect(screen.getByRole("button", { name: "Export" })).toBeVisible();
+      expect(screen.getByRole("button", { name: "Migration" })).toBeVisible();
+      const rollButton = screen.getByRole("button", { name: "Roll check" });
+      await waitFor(() => expect(rollButton).toBeEnabled(), { timeout: 5000 });
+      await user.click(rollButton);
+      expect(await screen.findByRole("heading", { name: "Roll result" }, { timeout: 5000 })).toBeVisible();
+      expect(screen.getByText("d20 + 2")).toBeVisible();
+    } finally {
+      globalThis.fetch = originalFetch;
+      window.history.pushState({}, "", "/");
+    }
   });
 });

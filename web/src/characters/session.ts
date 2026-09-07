@@ -78,6 +78,8 @@ export type CharacterSnapshot = {
   entries: QueueEntry[];
   editing: { owned: boolean; owner?: string | null };
   error: BlockingError | null;
+  /** The latest authoritative roll result received during this open session. */
+  lastRoll: CommandResultResponse["result"]["roll"];
 };
 
 export type CharacterSession = {
@@ -148,6 +150,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   let nextSequence = 0;
   let phase: SessionPhase = "loading";
   let error: BlockingError | null = null;
+  let lastRoll: CommandResultResponse["result"]["roll"] = null;
   let editing: { owned: boolean; owner: string | null } = { owned: coordination.isOwner(), owner: null };
   let disposed = false;
 
@@ -194,6 +197,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       entries: visible ? entries.filter((e) => !entryWrites.has(e.id)).map((e) => ({ ...e })) : [],
       editing: { ...editing, owned: visible && editing.owned },
       error: visible && error ? { ...error } : null,
+      lastRoll: visible ? lastRoll : null,
     };
   }
 
@@ -517,6 +521,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (!identityMatches()) return "blocked";
     coordination.invalidate?.();
     confirmed = character;
+    if (current.intent.kind === "executeAction") lastRoll = response.result.roll;
     generation += 1;
     transientFailures = 0;
     entries = entries.filter((e) => e.id !== current.id).map((e) =>

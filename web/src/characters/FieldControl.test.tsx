@@ -49,5 +49,34 @@ describe("FieldControl", () => {
     await user.type(input, "15");
     await user.keyboard("{Enter}");
     expect(onCommit).toHaveBeenCalledWith("strength", 15);
+    await user.tab();
+    expect(onCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("commits decimal and multi-choice values", async () => {
+    const user = userEvent.setup();
+    const onCommit = vi.fn();
+    render(<>
+      <FieldControl field={{ ...strength, id: "weight-element", fieldId: "weight", label: "Weight", fieldKind: "decimal", value: 1.5, constraints: { min: 0, step: 0.1 } }} tentativeValue={null} disabled={false} pending={false} onCommit={onCommit} />
+      <FieldControl field={{ ...text, id: "tags-element", fieldId: "tags", label: "Tags", fieldKind: "multiChoice", value: ["brave"], constraints: { options: [{ id: "brave", label: "Brave" }, { id: "swift", label: "Swift" }] } }} tentativeValue={null} disabled={false} pending={false} onCommit={onCommit} />
+    </>);
+
+    await user.clear(screen.getByRole("spinbutton", { name: "Weight" }));
+    await user.type(screen.getByRole("spinbutton", { name: "Weight" }), "2.75");
+    await user.tab();
+    await user.click(screen.getByRole("checkbox", { name: "Swift" }));
+
+    expect(onCommit).toHaveBeenCalledWith("weight", 2.75);
+    expect(onCommit).toHaveBeenCalledWith("tags", ["brave", "swift"]);
+  });
+
+  it("shows diagnostics for read-only and unavailable fields", () => {
+    render(<>
+      <FieldControl field={{ ...text, id: "computed", fieldId: "armor", label: "Armor", fieldKind: "computed", value: 12, editable: false, constraints: {}, validations: [{ validationId: "armor-error", severity: "warning", message: "Armor is stale", targetDefinitionId: "armor" }] }} tentativeValue={null} disabled={false} pending={false} onCommit={vi.fn()} />
+      <FieldControl field={{ ...text, id: "image", fieldId: "portrait", label: "Portrait", fieldKind: "image", value: null, editable: false, constraints: {}, validations: [{ validationId: "portrait-error", severity: "error", message: "Portrait is required", targetDefinitionId: "portrait" }] }} tentativeValue={null} disabled={false} pending={false} onCommit={vi.fn()} />
+    </>);
+
+    expect(screen.getByText("Armor is stale")).toBeVisible();
+    expect(screen.getByText("Portrait is required")).toBeVisible();
   });
 });

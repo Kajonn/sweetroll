@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { t } from "../i18n/index.js";
 import type { CharacterView } from "./types.js";
@@ -16,6 +16,10 @@ export type FieldControlProps = {
   pending: boolean;
   onCommit(fieldId: string, value: unknown): void | Promise<void>;
 };
+
+function Diagnostics({ field }: { field: ProjectedField }) {
+  return field.validations.length > 0 ? <ul className={styles.validationList}>{field.validations.map(validation => <li key={validation.validationId} data-severity={validation.severity}>{validation.message}</li>)}</ul> : null;
+}
 
 function scalarText(value: unknown): string {
   return value === null || value === undefined ? "" : String(value);
@@ -37,29 +41,32 @@ export function FieldControl({ field, tentativeValue, disabled, pending, onCommi
   const errorId = `${inputId}-errors`;
   const displayed = tentativeValue ?? field.value;
   const [draft, setDraft] = useState(() => scalarText(displayed));
+  const submittedOnEnter = useRef<string | null>(null);
 
   useEffect(() => {
     setDraft(scalarText(displayed));
   }, [displayed]);
 
-  const commitDraft = () => {
+  const commitDraft = (): boolean => {
     if (field.fieldKind === "integer" || field.fieldKind === "decimal") {
       const value = isValidNumber(draft, field);
-      if (value !== null) onCommit(field.fieldId, value);
-      return;
+      if (value === null) return false;
+      onCommit(field.fieldId, value);
+      return true;
     }
     onCommit(field.fieldId, draft);
+    return true;
   };
   const describedBy = field.validations.length > 0 ? errorId : undefined;
 
   if (field.fieldKind === "computed") {
-    return <div className={styles.readOnlyField}><span>{field.label}</span><span>{scalarText(field.value)}</span></div>;
+    return <div className={styles.field}><div className={styles.readOnlyField}><span>{field.label}</span><span>{scalarText(field.value)}</span></div><Diagnostics field={field} /></div>;
   }
   if (field.fieldKind === "image") {
-    return <div className={styles.imageUnavailable}><span>{field.label}</span><span>{t("character.image.unavailable")}</span></div>;
+    return <div className={styles.field}><div className={styles.imageUnavailable}><span>{field.label}</span><span>{t("character.image.unavailable")}</span></div><Diagnostics field={field} /></div>;
   }
   if (!field.editable) {
-    return <div className={styles.readOnlyField}><span>{field.label}</span><span>{scalarText(field.value)}</span></div>;
+    return <div className={styles.field}><div className={styles.readOnlyField}><span>{field.label}</span><span>{scalarText(field.value)}</span></div><Diagnostics field={field} /></div>;
   }
 
   return (
@@ -103,8 +110,11 @@ export function FieldControl({ field, tentativeValue, disabled, pending, onCommi
             minLength={field.constraints.minLength}
             maxLength={field.constraints.maxLength}
             onChange={(event) => setDraft(event.target.value)}
-            onBlur={commitDraft}
-            onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commitDraft(); } }}
+            onBlur={() => {
+              if (submittedOnEnter.current === draft) { submittedOnEnter.current = null; return; }
+              commitDraft();
+            }}
+            onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); if (commitDraft()) submittedOnEnter.current = draft; } }}
             aria-describedby={describedBy}
           />
         </>

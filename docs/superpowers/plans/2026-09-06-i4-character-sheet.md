@@ -400,6 +400,12 @@ DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll AUTHORITATI
 > workflow. Remediation proceeds task-by-task under
 > `docs/superpowers/plans/2026-09-07-i4-completion-remediation.md`, which
 > supersedes this plan's closure claim without changing approved scope.
+>
+> **I4 reclosed 2026-09-07 (Task 9).** Fresh verification green on tested
+> commit `8b9f40d` (backend unit 269, integration 123, web unit 621, E2E 19,
+> production-offline 21; typechecks/builds/contracts/`git diff --check`
+> clean) with complete routed-workflow evidence in
+> `docs/acceptance/i4-2026-09-06.md` (Reclosure section). I5 untouched.
 
 ## Plan Self-review
 

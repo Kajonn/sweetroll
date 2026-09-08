@@ -57,8 +57,21 @@ function readActiveTab(): TabId {
   return "metadata";
 }
 
-export function DocumentEditor({ client, systemId }: { client: ApiClient; systemId: string }) {
-  const query = useOpenSystem(client, systemId);
+export function DocumentEditor({
+  client,
+  systemId,
+  actorId,
+  generation,
+}: {
+  client: ApiClient;
+  systemId: string;
+  actorId?: string | null;
+  generation?: number;
+}) {
+  const query = useOpenSystem(client, systemId, {
+    actorId: actorId ?? null,
+    generation: generation ?? 0,
+  });
   const [active, setActive] = useState<TabId>(() => readActiveTab());
 
   if (query.isPending) {
@@ -176,6 +189,13 @@ function DocumentEditorBody({
     },
   });
   syncRef.current = sync;
+
+  // Unmount (route change, sign-out, account switch) drops pending autosave
+  // work: the debounce timer and stashed edits are cancelled, so no PUT goes
+  // out after unmount and a late in-flight resolution commits no state.
+  useEffect(() => () => {
+    syncRef.current?.cancel();
+  }, []);
 
   const bodyRef = useRef<HTMLDivElement>(null);
   useFocusEditorListener(bodyRef);

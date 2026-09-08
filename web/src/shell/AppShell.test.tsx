@@ -1,7 +1,10 @@
+import { QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createApiClient } from "../api/client.js";
+import { DocumentEditor } from "../editor/DocumentEditor.js";
 import { queryClient } from "../queryClient.js";
 import { AppShell, useAuth } from "./AppShell.js";
 
@@ -99,6 +102,80 @@ describe("AppShell", () => {
       expect(qc.getQueryData(["me"])).toBeUndefined();
       expect(qc.getQueryData(["system", "library"])).toBeUndefined();
     });
+    qc.clear();
+  });
+
+  it("unmounts the system editor on sign-out with no system data or further fetches", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const path = new URL(url, window.location.origin).pathname;
+      if (path === "/api/signout") return new Response(null, { status: 204 });
+      return new Response(JSON.stringify({ state: "authenticated", userId: "user-a" }));
+    }));
+    const doc = (name: string) => ({
+      schemaVersion: "1.0",
+      metadata: { name, description: "d", language: "en", defaultDice: "d20" },
+      entities: [],
+      referenceData: [],
+      sheets: [],
+      expressions: [],
+      actions: [],
+      validations: [],
+    });
+    let revision = 1;
+    let gets = 0;
+    let puts = 0;
+    const workspace = () => ({
+      system: {
+        systemId: "s1",
+        name: "Secret System",
+        access: "private",
+        lifecycle: "active",
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+      draft: {
+        revision,
+        document: doc("Secret System"),
+        sourceChecksum: "c",
+        updatedBy: "user-a",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+      versions: [],
+      assessment: { ok: true, diagnostics: [] },
+    });
+    const editorFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const target = typeof input === "string" ? input : input.toString();
+      if (target.endsWith("/draft")) {
+        puts += 1;
+        revision += 1;
+        return new Response(JSON.stringify({ workspace: workspace(), requestId: "r" }), { status: 200 });
+      }
+      gets += 1;
+      return new Response(JSON.stringify({ workspace: workspace(), requestId: "r" }), { status: 200 });
+    });
+    const qc = queryClient;
+    qc.clear();
+    const client = createApiClient({ baseUrl: "http://x", fetch: editorFetch as typeof fetch });
+    render(
+      <QueryClientProvider client={qc}>
+        <AppShell>
+          <DocumentEditor client={client} systemId="s1" />
+        </AppShell>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByTestId("document-editor-name")).toHaveTextContent("Secret System");
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Sign out" }));
+    // Production anonymous renders a sign-in prompt instead of protected children.
+    expect(await screen.findByText(/sign in to open this character/i)).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(screen.queryByTestId("document-editor-header")).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText("Secret System")).not.toBeInTheDocument();
+    // The unmounted editor issues no further system fetches or draft saves.
+    const settled = { gets, puts };
+    await new Promise<void>((resolve) => { setTimeout(resolve, 400); });
+    expect({ gets, puts }).toEqual(settled);
     qc.clear();
   });
 });

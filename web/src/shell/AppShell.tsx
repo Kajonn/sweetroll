@@ -66,6 +66,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   // (late responses from the previous identity must not commit) and drops
   // cached account data. The character subsystem guards its own lifetimes;
   // this covers the React Query surface (me, library, versions, drafts).
+  // In-flight draft PUTs cannot be aborted (no abort signal reaches the HTTP
+  // layer in the installed TanStack Query v5); they are neutralized instead:
+  // sign-out/switch unmounts the protected editor (see below and the
+  // lifetime-keyed SystemEditorRoute), whose unmount cleanup calls
+  // sync.cancel(), and the draft-sync epoch guard ignores late resolutions
+  // from a previous lifetime so they commit no state and flush no follow-up.
   const lastLifetimeRef = useRef<{ actor: string | null; generation: number } | null>(null);
   useEffect(() => {
     if (identity === null) return;
@@ -116,6 +122,11 @@ export function AppShell({ children }: { children: ReactNode }) {
               {storageUnavailable && <p role="status">{t("shell.characterStorageUnavailable")}</p>}
               {auth.state === "anonymous" && isDevMode() ? (
                 <DevSignInPanel onSignedIn={markSignedIn} />
+              ) : auth.state === "anonymous" ? (
+                // Production anonymous never keeps protected views mounted:
+                // sign-out unmounts routed children (editor, library) instead
+                // of leaving previous-identity data on screen.
+                <p role="status">{t("character.detail.signIn")}</p>
               ) : (
                 children
               )}

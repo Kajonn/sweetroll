@@ -96,7 +96,33 @@ const characterDetailRoute = createRoute({
 function SystemEditorRoute() {
   const params = useParams({ strict: false });
   const systemId = params["systemId"] ?? "";
-  return <DocumentEditor client={apiClient} systemId={systemId} />;
+  const identity = useIdentity();
+  useIdentityTick(identity);
+  if (identity === null) {
+    return <p role="status">{t("editor.loading")}</p>;
+  }
+  const actorId = identity.getActorId();
+  if (actorId === null) {
+    // Anonymous never sees the editor: sign-out unmounts the protected view
+    // (mirroring CharacterDetailRouteView) instead of leaving system data
+    // mounted with no identity.
+    return (
+      <section aria-labelledby="system-editor-title">
+        <h1 id="system-editor-title">{t("editor.loading")}</h1>
+        <p role="status">{t("character.detail.signIn")}</p>
+      </section>
+    );
+  }
+  const generation = identity.getGeneration?.() ?? 0;
+  return (
+    <DocumentEditor
+      key={`${actorId}:${generation}:${systemId}`}
+      client={apiClient}
+      systemId={systemId}
+      actorId={actorId}
+      generation={generation}
+    />
+  );
 }
 
 function LibraryRoute({ client }: { client: ApiClient }) {

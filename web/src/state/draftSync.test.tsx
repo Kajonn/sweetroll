@@ -400,4 +400,52 @@ describe("useDraftSync", () => {
     expect(fetch_).not.toHaveBeenCalled();
     expect(result.current.status).toBe("idle");
   });
+
+  it("unmount with a pending debounced save sends no PUT after unmount", async () => {
+    // Route change with pending work: the debounce timer is dropped on
+    // unmount, so nothing goes out after the editor is gone.
+    const fetch_ = vi.fn(async () => okSaveResponse(1));
+    const client = makeClient(fetch_);
+    const { result, unmount } = renderHook(
+      () => useDraftSync({ client, systemId: "s1", debounceMs: 50 }),
+      { wrapper: makeWrapper() },
+    );
+
+    act(() => {
+      result.current.save({ a: 1 }, null);
+    });
+    unmount();
+    await sleep(150);
+    expect(fetch_).not.toHaveBeenCalled();
+  });
+
+  it("unmount with an in-flight save ignores the late resolution", async () => {
+    // The PUT already on the wire cannot be recalled, but its late response
+    // must commit no state and flush no follow-up PUT for the stashed edit.
+    let release!: (response: Response) => void;
+    const gate = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    const fetch_ = vi.fn(async () => gate);
+    const client = makeClient(fetch_);
+    const { result, unmount } = renderHook(
+      () => useDraftSync({ client, systemId: "s1", debounceMs: 10 }),
+      { wrapper: makeWrapper() },
+    );
+
+    act(() => {
+      result.current.save({ v: 1 }, 5);
+    });
+    await waitFor(() => expect(fetch_).toHaveBeenCalledTimes(1));
+    // Edit stashed while the first save is in flight, then route away.
+    act(() => {
+      result.current.save({ v: 2 }, 5);
+    });
+    unmount();
+    release(okSaveResponse(6));
+    await sleep(80);
+    expect(fetch_).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe("saving");
+    expect(result.current.banner).toBeNull();
+  });
 });

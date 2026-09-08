@@ -28,12 +28,16 @@ describe("router", () => {
   });
 
   it("renders the system library + clone-from-template on /", async () => {
-    const fetch_ = vi.fn(async () =>
-      new Response(
+    const fetch_ = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input), window.location.origin);
+      if (url.pathname === "/api/me") {
+        return new Response(JSON.stringify({ state: "authenticated", userId: "router-user" }));
+      }
+      return new Response(
         JSON.stringify({ systems: [], nextCursor: null, requestId: "r" }),
         { status: 200 },
-      ),
-    );
+      );
+    });
     const originalFetch = globalThis.fetch;
     globalThis.fetch = fetch_ as unknown as typeof fetch;
     try {
@@ -73,7 +77,7 @@ describe("router", () => {
     const fetch_ = vi.fn(async (input: string | URL | Request) => {
       const url = new URL(String(input), window.location.origin);
       if (url.pathname === "/api/me") {
-        return new Response(JSON.stringify({ state: "anonymous" }));
+        return new Response(JSON.stringify({ state: "authenticated", userId: "router-user" }));
       }
       return new Promise<Response>(() => {});
     });
@@ -82,6 +86,27 @@ describe("router", () => {
     try {
       renderAt("/systems/sys-1");
       expect(await screen.findByTestId("document-editor-loading")).toBeInTheDocument();
+    } finally {
+      globalThis.fetch = originalFetch;
+      window.history.pushState({}, "", "/");
+    }
+  });
+
+  it("shows a sign-in prompt instead of the system editor when anonymous", async () => {
+    const fetch_ = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input), window.location.origin);
+      if (url.pathname === "/api/me") {
+        return new Response(JSON.stringify({ state: "anonymous" }));
+      }
+      return new Promise<Response>(() => {});
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetch_ as unknown as typeof fetch;
+    try {
+      renderAt("/systems/sys-1");
+      expect(await screen.findByText(/sign in to open this character/i)).toBeInTheDocument();
+      expect(screen.queryByTestId("document-editor-loading")).not.toBeInTheDocument();
+      expect(fetch_.mock.calls.some(([input]) => String(input).includes("/systems/sys-1"))).toBe(false);
     } finally {
       globalThis.fetch = originalFetch;
       window.history.pushState({}, "", "/");

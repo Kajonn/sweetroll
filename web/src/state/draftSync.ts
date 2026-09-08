@@ -80,22 +80,39 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
   const inFlightRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  /**
+   * Cancel epoch: bumped by cancel()/unmount. A save already on the wire
+   * cannot be aborted (no abort signal reaches the HTTP layer), so its late
+   * resolution is ignored unless its epoch is still current. This is the
+   * generation check for route changes and account switches.
+   */
+  const epochRef = useRef(0);
   const onAcceptTheirsRef = useRef(input.onAcceptTheirs);
   onAcceptTheirsRef.current = input.onAcceptTheirs;
   const onSavedRef = useRef(input.onSaved);
   onSavedRef.current = input.onSaved;
 
+  const cancel = useCallback(() => {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    pendingRef.current = null;
+    epochRef.current += 1;
+  }, []);
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
+      cancel();
     };
-  }, []);
+  }, [cancel]);
 
   const fireSave = useCallback(
     (document: unknown, expectedRevision: number | null, hash: string) => {
       inFlightRef.current = true;
+      const epoch = epochRef.current;
       lastSavedHashRef.current = null;
       setStatus("saving");
       setError(null);
@@ -104,7 +121,7 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
         {
           onSuccess: (workspace) => {
             inFlightRef.current = false;
-            if (!mountedRef.current) return;
+            if (!mountedRef.current || epoch !== epochRef.current) return;
             // The save response is authoritative for the new revision, so a
             // stashed edit flushes against it without waiting for a refetch.
             const nextRevision = workspace?.draft?.revision;
@@ -121,7 +138,7 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
           },
           onError: (err) => {
             inFlightRef.current = false;
-            if (!mountedRef.current) return;
+            if (!mountedRef.current || epoch !== epochRef.current) return;
             if (err instanceof ApiError && err.status === 409 && err.latestRevision !== null) {
               const latestRevision = err.latestRevision;
               setStatus("conflict");
@@ -188,14 +205,6 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
     },
     [fireSave, debounceMs],
   );
-
-  const cancel = useCallback(() => {
-    if (timerRef.current !== null) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    pendingRef.current = null;
-  }, []);
 
   const isConfirmed = useCallback(
     (document: unknown) => hashDocument(document) === lastSavedHashRef.current,

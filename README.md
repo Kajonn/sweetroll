@@ -2,6 +2,11 @@
 
 Sweetroll is the modular TypeScript application described in `design_v2.md`.
 
+## Design and implementation plan
+
+- [Product design and delivery increments](design_v2.md)
+- [GUI integration plan](docs/superpowers/plans/2026-09-08-gui-integration.md): I4a frontend integration, I5-I7 view rollout, and I7b simple scenes/player display.
+
 ## Requirements
 
 - Node.js 24

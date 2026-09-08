@@ -10,6 +10,12 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-06-i4-character-sheet-design.md` lines 44 (creation-options policy) and 56 (routes/entry); this plan extends that design with a version-list endpoint and picker UI. Root cause: manual GUI test showed `/characters/new` renders only a free-text "System version ID" box with no discoverable version IDs.
 
+## Implementation status and follow-up
+
+Reconciled against `d6bfd32`: the endpoint, picker, transport/component/integration tests, and production-browser journey are committed (`2c07bae` through `17f6a98`). The unchecked steps below are the original implementation recipe, not a request to rebuild the feature or a fresh verification claim. The accepted implementation uses one inline query in `CreateCharacter.tsx` through `CharactersApi.listCreationVersions()`; the standalone `web/src/api/listCreationVersions.ts` hook and test prescribed below are not the shipped design. Preserve the existing metadata/create and exact-version-link paths.
+
+Remaining GUI integration work is tracked in [the GUI plan](2026-09-08-gui-integration.md): G1 covers picker cache isolation across accounts; G4 covers discovery-policy resolution, polished picker states, generated response types, and the deferred invalid-UUID error; G6 covers bounded discovery before catalog expansion. Copying the known-version use predicate does not settle OD-01's unlisted discovery policy. Historical hook/predicate instructions below must not override these follow-up gates.
+
 ## Global Constraints
 
 - TDD: write the failing test first, watch it fail for the right reason, then implement. No production code before a red test.

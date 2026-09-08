@@ -3,7 +3,9 @@
 **Status:** Planned; no GUI implementation is claimed by this document.  
 **Design authority:** [design_v2.md](../../../design_v2.md), especially Sections 10 and 17.  
 **Visual reference:** [Tablefolk GUI mockup](https://tablefolk-ttrpg-mockups.humdrumrat.chatgpt.site).  
-**Baseline inspected:** `be3efc89b536f563c0f11f2f929171dd8129463b`.
+**Original baseline:** `be3efc89b536f563c0f11f2f929171dd8129463b`.
+
+**Reconciled baseline:** `d6bfd32b7016a3bdaf7d0b0585b7f4861f34374f` (after PR #1 merge and creation-picker work).
 
 ## Goal and boundaries
 
@@ -14,6 +16,27 @@ This is a frontend redesign with targeted lifecycle repairs, not a replacement a
 A simple creator remains the default: attributes and descriptions, GUI dice configuration, ordered sheet sections, preview, and publish. Keep supported advanced capabilities behind progressive disclosure; this plan does not expand or remove grammar v0.1. It also does not change the existing offline contract, campaign policy decisions, or historical I1-I4 completion records.
 
 The owner's previously requested GM phone/tablet display, manual fog, and token placement are explicitly scheduled as I7b. They require backend authorization and media work as well as UI; they are not a CSS task. No tactical grid, initiative, movement rules, vision, automatic lighting, combat simulation, arbitrary CSS, or theme editor is introduced.
+
+## Reconciliation with the new commits
+
+PR #1 and its CI scheduling fix are merged. The subsequent changes implement a character-creation version picker and add previously missing implementation-plan records. They do not implement the theme, shell redesign, complete I5 Player app, or GM/display milestones. Keep the delivery sequence below; reuse the new picker instead of rebuilding it.
+
+| Change at the reconciled baseline | Impact on this plan |
+| --- | --- |
+| `2c07bae`, `e76de22`: creation-version listing, transport/error coverage, ordering checks, and generated OpenAPI/client schema | G4/G6 consume `GET /characters/creation-versions` through `CharactersApi.listCreationVersions()`; do not create another list endpoint |
+| `b2e86c8`, `17a1630`: picker inside `CreateCharacter.tsx`, using one inline TanStack query and the existing `loadMetadata` path | Preserve versionless entry and exact-version deep links; keep the accepted inline API seam rather than recreating the abandoned standalone hook |
+| `2376105`, `17f6a98`: picker component/browser coverage and spec addendum | Reuse these tests; add account/cache, empty/offline/retry, and visual acceptance coverage rather than duplicating the happy path |
+| `d6bfd32`: creation-picker and I4-remediation plans added | These are implementation/history records, not instructions to restart completed I4 work. The picker plan's unchecked recipe and standalone-hook references need its reconciliation note |
+| Merged `6cd1c3a`: integration files execute sequentially | Preserve `npm run test:integration` and its unchanged load limits when implementing G0; this does not satisfy the still-missing frontend CI job |
+
+### Newly relevant acceptance gaps
+
+1. **Picker account/cache lifetime (G1, before G4 acceptance).** Its query key is currently `["characters", "creation-versions"]`, with a 30-second stale time and no actor/generation. The route remounts for account changes, but that does not clear the shared QueryClient. The picker must participate in the same account cleanup as creator queries. Disabling a query while offline/signed out does not remove its existing results.
+2. **Discovery versus use permission (OD-01, before G4 acceptance).** The new list returns other owners' `link` systems to any signed-in actor, because it copies the create-from-version predicate. That matches the current implementation tests but conflicts with an unlisted/link-only discovery model if OD-01 adopts it. Explicitly resolve which versions may be enumerated. Preserve server authorization for metadata lookup and creation, but do not assume that permission to use a known version implies permission to discover every such system. If links are unlisted, list only owned/explicitly discoverable systems and retain a separate authorized link entry path; add a second-account enumeration test. Do not silently close OD-01 based on the new endpoint.
+3. **Picker completion (G4).** The existing manual UUID fallback remains prominent, invalid UUID lookup can show an uncertain-outcome error for a definite 400 validation response, and the list has no bounded pagination. Style and complete the existing flow; do not treat it as finished onboarding. Keep invalid lookup feedback distinct from genuine uncertain creation outcomes.
+4. **Contract reuse (G4/G6).** OpenAPI and `schema.d.ts` include the new operation, but `CreationVersionEntry`/`CreationVersions` in `web/src/characters/types.ts` are hand-written. Derive them from `operations["get_characters_creation_versions"]` during integration so UI and server contracts cannot drift.
+
+These gaps are implementation work to perform under G1/G4/G6; this reconciliation changes documentation only. Existing editor/save, server revocation, production-authentication, frontend-CI, and deployment tasks remain open.
 
 ## Delivery sequence
 
@@ -39,6 +62,7 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 - [ ] Capture representative mockup views and record spacing, typography, color roles, navigation, content hierarchy, and interaction states in `docs/ui/visual-reference.md`. Store selected reference screenshots under `docs/ui/reference/` so implementation does not depend solely on a hosted prototype. Record unavailable reference views explicitly rather than inventing approved details.
 - [ ] Map every view to an existing or proposed route and milestone. Existing `/`, `/systems/$systemId`, `/characters/new`, and `/characters/$characterId` must remain usable. Any later URL change needs a redirect and deep-link tests.
 - [ ] Distinguish platform navigation from character content. Retain the linear projection-driven sheet and I5 Characters/Activity/Account navigation; add Campaigns only in I6. Do not copy prototype sheet tabs into creator-authored navigation.
+- [x] Preserve the merged integration-file isolation fix (`6cd1c3a`): `npm run test:integration` uses `--no-file-parallelism`; request concurrency and latency budgets remain enforced.
 - [ ] Add a required web CI job with its own lockfile cache and `npm ci`, `npm test`, `npm run typecheck`, and `npm run build` in `web/`; retain backend checks and add root `npm run contracts:check`.
 - [ ] Wire representative routed browser tests and the existing production-offline suite into CI with their actual database/server prerequisites. Verify a deliberate frontend failure fails the check.
 - [ ] Replace synthetic `page.setContent` visual checks for product states with real routed flows. Review baselines visually before accepting changes.
@@ -47,16 +71,17 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 
 ## G1 — Repair the lifecycle before changing its presentation
 
-**Existing files:** `web/src/editor/DocumentEditor.tsx`, `MetadataEditor.tsx`, `web/src/state/draftSync.ts`, `web/src/shell/AppShell.tsx`, `web/src/api/listSystems.ts`, `openSystem.ts`, `web/src/characters/identity.ts`, `src/transport/http/identity.ts`, `src/identity/index.ts`.
+**Existing files:** `web/src/editor/DocumentEditor.tsx`, `MetadataEditor.tsx`, `web/src/state/draftSync.ts`, `web/src/shell/AppShell.tsx`, `web/src/api/listSystems.ts`, `openSystem.ts`, `web/src/characters/identity.ts`, `CreateCharacter.tsx`, `web/src/router.tsx`, `src/transport/http/identity.ts`, `src/identity/index.ts`.
 
 - [ ] Reproduce the review findings against the current branch before repairing them. Use regression cases through actual components and HTTP contracts.
 - [ ] Establish one working editor document with server baseline, dirty state, pending save, and explicit conflict state. Serialize saves; preserve edits made during a save or before a debounced save. Adopt server refreshes only when clean or after an explicit resolution.
 - [ ] Make metadata inputs follow that working document. Do not reset only a baseline ref while leaving stale visible input state.
 - [ ] Make conflict actions accurate: reload server, or explicitly replace against the current revision. A whole-document overwrite must not be called Merge; implement a three-way merge only if retaining that action. Do not send null as a force-save revision.
 - [ ] On sign-out/account switch, unmount protected views, cancel requests and draft timers, clear account-scoped queries/mutations, and reject late responses from previous identities. Preserve the character subsystem's deliberate offline identity boundaries.
+- [ ] Include the creation-version picker in account/generation-scoped queries, cancellation, and cleanup. Render no cached account-A names or IDs after remounting for account B or sign-out; guard late list responses and disable selection when offline or a creation/recovery operation blocks a new choice. Keep existing durable creation-attempt guards intact.
 - [ ] Return a retryable error when server session revocation fails; keep reliable retry credentials and the pending-logout barrier while hiding local private data immediately. Distinguish unavailable session storage from invalid credentials.
 
-**Exit tests:** local edit plus server refetch; edit during a slow save; reload updates visible inputs; conflict replacement uses the correct revision; route change with pending work; account A response arriving after B signs in; private data absent after sign-out; revocation failure does not return success. These fixes are required before the relevant views are considered polished.
+**Exit tests:** local edit plus server refetch; edit during a slow save; reload updates visible inputs; conflict replacement uses the correct revision; route change with pending work; account A response arriving after B signs in; private data absent after sign-out; revocation failure does not return success; cached picker results across account remount/sign-out and late responses; reconnect/revoked-version selection. These fixes are required before the relevant views are considered polished.
 
 ## G2 — Theme tokens and shared controls
 
@@ -87,14 +112,18 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 
 ## G4 — Deliver the first polished character journey
 
-**Existing files:** `web/src/characters/CharacterRoute.tsx`, `CharacterSheet.tsx`, `FieldControl.tsx`, `CreateCharacter.tsx`, `CharacterTools.tsx`, `ConflictReview.tsx`, `characters.module.css`.
+**Existing files:** `web/src/characters/CharacterRoute.tsx`, `CharacterSheet.tsx`, `FieldControl.tsx`, `CreateCharacter.tsx`, `CharacterTools.tsx`, `ConflictReview.tsx`, `characters.module.css`, `api.ts`, `types.ts`; `tests/integration/character-creation-versions.test.ts` and `web/tests/offline/character.spec.ts`.
 
+- [x] Basic version picker and API are present: versionless `/characters/new` lists versions, selecting one reuses `loadMetadata`, and a prefilled `?systemVersionId=` bypasses the list. This credits the implemented seam only; G4 visual and privacy acceptance remain open.
+- [ ] Resolve OD-01's discovery semantics for this endpoint before accepting the polished picker. Record the allowed enumeration policy and test owned/private/link/public cases using two accounts; do not change known-version creation permissions as an incidental styling change.
+- [ ] Make the existing picker the primary normal entry: readable system names and exact version labels, loading/empty/error/retry states, and signed-out/offline guidance. Move manual version-ID entry behind a clearly labeled fallback; preserve exact-version deep links and the current metadata/create path. Treat UUID validation failures as definite input errors, not uncertain creates.
+- [ ] Derive picker response/entry types from generated operations. Keep the inline `useQuery` through the injected `CharactersApi` unless a concrete reuse need justifies extraction; do not add a parallel fetch path.
 - [ ] Compose shared controls into character identity, compact resources, ordered attribute/description sections, action buttons, reference descriptions, and roll results. Render the existing server projection; do not evaluate packages in a second renderer.
 - [ ] Restyle creation, required-field completion, direct edits, resource bumps, action inputs, activity, and tools. Keep export, migration, archive/recovery, and conflict controls reachable.
 - [ ] Present save/offline/synchronization states clearly without overwhelming the sheet. Preserve idempotency keys, durable attempts, historical receipts, and explicit uncertain-outcome recovery.
 - [ ] Verify all three existing reference families through the real routed workflow, including long descriptions, zero/negative values where permitted, validation failures, and read-only fields.
 
-**Exit demonstration:** open a character on a phone, edit an attribute, change a resource, roll, read the result, go offline, edit, reconnect, resolve a conflict, and export. Repeat critical interactions in dark mode and on desktop. This is the first visual acceptance checkpoint before migrating the creator.
+**Exit demonstration:** open versionless `/characters/new`, select a permitted system/version without entering an ID, complete creation, and verify an exact-version deep link also works. On a phone, edit an attribute, change a resource, roll, read the result, go offline, edit, reconnect, resolve a conflict, and export. Repeat critical interactions in dark mode and on desktop. This is the first visual acceptance checkpoint before migrating the creator.
 
 ## G5 — Apply the same design to the system creator
 
@@ -110,7 +139,8 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 
 ## G6 — Integrate with I5 rather than building a second Player app
 
-- [ ] Build onboarding, character library/search/recent items, system selection, personal activity, account preferences, and the installable shell with the shared components.
+- [ ] Build onboarding, character library/search/recent items, personal activity, account preferences, and the installable shell with the shared components. Integrate the existing creation-version picker for system selection; do not recreate its endpoint, metadata loader, or character creation state.
+- [ ] Before expanding the picker into a library/catalog, add bounded server pagination and supported filtering under the resolved discovery policy (Section 13), update generated contracts, and test stable page ordering and revocation. The current endpoint returns every matching version in one response; client-side list virtualization alone does not bound that response.
 - [ ] Add account theme defaults and device overrides; include loading, empty, permission-denied, unavailable-storage, and expired-session flows.
 - [ ] Keep I5 campaign-free and embed the same I4 character renderer/session. Add campaign routes and navigation only with I6 authorization support.
 - [ ] Complete real production sign-in and its return journey before I5 acceptance; separate test authentication from production startup. Verify first-sign-in concurrency resolves to one canonical user.
@@ -150,6 +180,17 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 - [ ] Run existing character offline/replay/recovery checks after shared-shell or identity changes. Broaden tests only where changed behavior creates a concrete risk.
 - [ ] Ship the built frontend and API together, consistent with Section 11's deployable-artifact direction: static assets, SPA fallback excluding API routes, and production `/api` routing. Verify direct links, refresh, authentication return, CSS/fonts, and offline shell reopening without Vite dev/preview serving production.
 - [ ] Before public release, run one physical-table session and one remote session, with phone GM/player interaction and a separate tablet display. Close blocking usability, data-loss, and disclosure findings before declaring acceptance.
+
+## Reconciliation verification
+
+Reviewed source and tests through `d6bfd32`. The historical I4 acceptance and newly committed picker browser test/screenshot are retained as existing evidence, not claimed as a fresh browser or PostgreSQL execution in this review. Fresh targeted checks on that baseline:
+
+- `node node_modules/vitest/vitest.mjs run src/transport/http/characters.test.ts src/transport/http/openapi.test.ts` from the repository root: **35 passed**.
+- `node node_modules/vitest/vitest.mjs run src/characters/api.test.ts src/characters/CreateCharacter.test.tsx src/router.test.tsx` from `web/`: **53 passed**.
+- `node --import tsx scripts/generate-system-contracts.ts --check` from the root: **passed**.
+- A temporary component regression check reproduced the picker leak: render account A's private version, retain the same QueryClient, switch the identity to B and remount the component with B's route key. A's version button remains visible while the 30-second cache entry is fresh, even when B's API stub returns an empty list. The assertion that A's name disappears failed. This exercises the real CreateCharacter component with controlled API/identity inputs; it is not a deployed-browser or backend authorization-bypass claim. The temporary test was kept outside the committed source changes.
+
+The existing tests passing does not close this new G1 gap. This update changes only the plan/specification documents; the corrective application work remains open.
 
 ## Implementation handoff
 

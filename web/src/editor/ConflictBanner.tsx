@@ -7,7 +7,6 @@ export type ConflictBannerProps = {
   latestRevision: number;
   onAcceptTheirs: () => void;
   onKeepMine: () => void;
-  onMergeIntoServer: () => void;
   onDismiss: () => void;
 };
 
@@ -15,7 +14,6 @@ export function ConflictBanner({
   latestRevision,
   onAcceptTheirs,
   onKeepMine,
-  onMergeIntoServer,
   onDismiss,
 }: ConflictBannerProps) {
   return (
@@ -46,14 +44,6 @@ export function ConflictBanner({
             data-testid="conflict-banner-keep-mine"
           >
             {t("editor.conflict.keepMine")}
-          </button>
-          <button
-            type="button"
-            className={styles.secondary}
-            onClick={onMergeIntoServer}
-            data-testid="conflict-banner-merge"
-          >
-            {t("editor.conflict.mergeIntoServer")}
           </button>
         </div>
       </div>

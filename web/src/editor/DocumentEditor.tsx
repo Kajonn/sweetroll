@@ -277,7 +277,6 @@ function DocumentEditorBody({
           latestRevision={sync.banner.latestRevision}
           onAcceptTheirs={sync.banner.onAcceptTheirs}
           onKeepMine={sync.banner.onKeepMine}
-          onMergeIntoServer={sync.banner.onMergeIntoServer}
           onDismiss={sync.banner.onDismiss}
         />
       )}

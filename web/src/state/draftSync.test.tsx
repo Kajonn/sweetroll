@@ -161,7 +161,7 @@ describe("useDraftSync", () => {
     expect(fetch_).toHaveBeenCalledTimes(1);
   });
 
-  it("surfaces a conflict banner on 409 and exposes keep-mine / merge / accept-theirs handlers", async () => {
+  it("surfaces a conflict banner with explicit replace/reload actions and no merge action", async () => {
     const fetch_ = vi.fn().mockResolvedValueOnce(conflictResponse(7));
     const client = makeClient(fetch_);
     const onAcceptTheirs = vi.fn();
@@ -180,11 +180,12 @@ describe("useDraftSync", () => {
     expect(banner.latestRevision).toBe(7);
     expect(typeof banner.onAcceptTheirs).toBe("function");
     expect(typeof banner.onKeepMine).toBe("function");
-    expect(typeof banner.onMergeIntoServer).toBe("function");
     expect(typeof banner.onDismiss).toBe("function");
+    // A whole-document overwrite must never be offered as a merge.
+    expect("onMergeIntoServer" in banner).toBe(false);
   });
 
-  it("keep-mine issues a fresh save with expectedRevision: null (force)", async () => {
+  it("keep-mine replaces against the conflict revision instead of sending null", async () => {
     const fetch_ = vi.fn()
       .mockResolvedValueOnce(conflictResponse(7))
       .mockResolvedValueOnce(okSaveResponse(8));
@@ -208,11 +209,11 @@ describe("useDraftSync", () => {
     await waitFor(() => expect(result.current.status).toBe("saved"));
     expect(fetch_).toHaveBeenCalledTimes(2);
     const second = fetch_.mock.calls[1] as [string, RequestInit | undefined] | undefined;
-    expect(JSON.parse(second?.[1]?.body as string)).toMatchObject({ expectedRevision: null });
+    expect(JSON.parse(second?.[1]?.body as string)).toMatchObject({ expectedRevision: 7 });
     expect(result.current.banner).toBeNull();
   });
 
-  it("merge-into-server saves with expectedRevision: latestRevision", async () => {
+  it("keep-mine uses the latest save()-ed document at click time", async () => {
     const fetch_ = vi.fn()
       .mockResolvedValueOnce(conflictResponse(7))
       .mockResolvedValueOnce(okSaveResponse(8));
@@ -227,33 +228,7 @@ describe("useDraftSync", () => {
     });
     await waitFor(() => expect(result.current.status).toBe("conflict"));
 
-    const banner = result.current.banner;
-    if (banner === null) throw new Error("banner expected");
-    await act(async () => {
-      banner.onMergeIntoServer();
-    });
-
-    await waitFor(() => expect(result.current.status).toBe("saved"));
-    const second = fetch_.mock.calls[1] as [string, RequestInit | undefined] | undefined;
-    expect(JSON.parse(second?.[1]?.body as string)).toMatchObject({ expectedRevision: 7 });
-  });
-
-  it("merge-into-server uses the latest save()-ed document at click time", async () => {
-    const fetch_ = vi.fn()
-      .mockResolvedValueOnce(conflictResponse(7))
-      .mockResolvedValueOnce(okSaveResponse(8));
-    const client = makeClient(fetch_);
-    const { result } = renderHook(
-      () => useDraftSync({ client, systemId: "s1", debounceMs: 10 }),
-      { wrapper: makeWrapper() },
-    );
-
-    act(() => {
-      result.current.save({ metadata: { name: "X" } }, 5);
-    });
-    await waitFor(() => expect(result.current.status).toBe("conflict"));
-
-    // User makes a further edit before clicking merge; save() updates latest document.
+    // User makes a further edit before clicking keep-mine; save() updates latest document.
     act(() => {
       result.current.save({ metadata: { name: "Newer" } }, 5);
     });
@@ -261,7 +236,7 @@ describe("useDraftSync", () => {
     const banner = result.current.banner;
     if (banner === null) throw new Error("banner expected");
     await act(async () => {
-      banner.onMergeIntoServer();
+      banner.onKeepMine();
     });
 
     await waitFor(() => expect(result.current.status).toBe("saved"));
@@ -358,5 +333,71 @@ describe("useDraftSync", () => {
       result.current.save({ b: 1 }, 1);
     });
     await waitFor(() => expect(fetch_).toHaveBeenCalledTimes(2));
+  });
+
+  it("serializes an edit made during a slow save against the fresh revision", async () => {
+    // Emulates the server revision check: only the current revision is accepted.
+    let revision = 5;
+    let calls = 0;
+    let releaseFirst!: (response: Response) => void;
+    const firstGate = new Promise<Response>((resolve) => { releaseFirst = resolve; });
+    const fetch_ = vi.fn(async (_url: string, init?: RequestInit) => {
+      calls += 1;
+      const body = JSON.parse(init?.body as string) as { expectedRevision: number | null; document: unknown };
+      if (calls === 1) {
+        // The slow first save still goes through the revision check on completion.
+        const response = await firstGate;
+        if (body.expectedRevision !== revision) return conflictResponse(revision);
+        revision += 1;
+        return response;
+      }
+      if (body.expectedRevision !== revision) return conflictResponse(revision);
+      revision += 1;
+      return okSaveResponse(revision);
+    });
+    const client = makeClient(fetch_);
+    const { result } = renderHook(
+      () => useDraftSync({ client, systemId: "s1", debounceMs: 10 }),
+      { wrapper: makeWrapper() },
+    );
+
+    act(() => {
+      result.current.save({ v: 1 }, 5);
+    });
+    await waitFor(() => expect(fetch_).toHaveBeenCalledTimes(1));
+
+    // Edit while the first save is still in flight, then let it complete.
+    // The follow-up must go out once, with the newest document against the
+    // revision the completed save produced — never a stale-revision 409.
+    act(() => {
+      result.current.save({ v: 2 }, 5);
+    });
+    releaseFirst(okSaveResponse(6));
+
+    await waitFor(() => expect(result.current.status).toBe("saved"));
+    await waitFor(() => expect(fetch_).toHaveBeenCalledTimes(2));
+    expect(result.current.banner).toBeNull();
+    const second = fetch_.mock.calls[1] as [string, RequestInit | undefined] | undefined;
+    expect(JSON.parse(second?.[1]?.body as string)).toMatchObject({
+      expectedRevision: 6,
+      document: { v: 2 },
+    });
+  });
+
+  it("cancel drops a debounced save and stashed edits", async () => {
+    const fetch_ = vi.fn(async () => okSaveResponse(1));
+    const client = makeClient(fetch_);
+    const { result } = renderHook(
+      () => useDraftSync({ client, systemId: "s1", debounceMs: 10 }),
+      { wrapper: makeWrapper() },
+    );
+
+    act(() => {
+      result.current.save({ a: 1 }, null);
+      result.current.cancel();
+    });
+    await sleep(40);
+    expect(fetch_).not.toHaveBeenCalled();
+    expect(result.current.status).toBe("idle");
   });
 });

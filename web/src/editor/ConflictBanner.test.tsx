@@ -7,13 +7,11 @@ import { ConflictBanner } from "./ConflictBanner.js";
 function renderBanner(overrides: Partial<React.ComponentProps<typeof ConflictBanner>> = {}) {
   const onAcceptTheirs = vi.fn();
   const onKeepMine = vi.fn();
-  const onMergeIntoServer = vi.fn();
   const onDismiss = vi.fn();
   const props: React.ComponentProps<typeof ConflictBanner> = {
     latestRevision: 7,
     onAcceptTheirs,
     onKeepMine,
-    onMergeIntoServer,
     onDismiss,
     ...overrides,
   };
@@ -22,18 +20,17 @@ function renderBanner(overrides: Partial<React.ComponentProps<typeof ConflictBan
     ...view,
     onAcceptTheirs,
     onKeepMine,
-    onMergeIntoServer,
     onDismiss,
   };
 }
 
 describe("ConflictBanner", () => {
-  it("renders the three recovery buttons plus a dismiss control", () => {
+  it("renders the two recovery buttons plus a dismiss control and no merge action", () => {
     renderBanner();
     expect(screen.getByTestId("conflict-banner")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /reload theirs/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /keep mine/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /merge into server/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /replace server version/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /merge/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /dismiss/i })).toBeInTheDocument();
   });
 
@@ -48,25 +45,14 @@ describe("ConflictBanner", () => {
     await user.click(screen.getByRole("button", { name: /reload theirs/i }));
     expect(banner.onAcceptTheirs).toHaveBeenCalledTimes(1);
     expect(banner.onKeepMine).not.toHaveBeenCalled();
-    expect(banner.onMergeIntoServer).not.toHaveBeenCalled();
   });
 
-  it("invokes onKeepMine when Keep mine is clicked", async () => {
+  it("invokes onKeepMine when Replace server version is clicked", async () => {
     const user = userEvent.setup();
     const banner = renderBanner();
-    await user.click(screen.getByRole("button", { name: /keep mine/i }));
+    await user.click(screen.getByRole("button", { name: /replace server version/i }));
     expect(banner.onKeepMine).toHaveBeenCalledTimes(1);
     expect(banner.onAcceptTheirs).not.toHaveBeenCalled();
-    expect(banner.onMergeIntoServer).not.toHaveBeenCalled();
-  });
-
-  it("invokes onMergeIntoServer when Merge into server is clicked", async () => {
-    const user = userEvent.setup();
-    const banner = renderBanner();
-    await user.click(screen.getByRole("button", { name: /merge into server/i }));
-    expect(banner.onMergeIntoServer).toHaveBeenCalledTimes(1);
-    expect(banner.onAcceptTheirs).not.toHaveBeenCalled();
-    expect(banner.onKeepMine).not.toHaveBeenCalled();
   });
 
   it("invokes onDismiss when the dismiss button is clicked", async () => {

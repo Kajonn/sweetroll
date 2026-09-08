@@ -9,12 +9,13 @@ export type ConflictBanner = {
   latestRevision: number;
   onAcceptTheirs: () => void;
   onKeepMine: () => void;
-  onMergeIntoServer: () => void;
   onDismiss: () => void;
 };
 
 export type DraftSync = {
   save: (document: unknown, expectedRevision: number | null) => void;
+  /** Drop a debounced save and stashed edits, e.g. on sign-out/account switch. */
+  cancel: () => void;
   status: SyncStatus;
   banner: ConflictBanner | null;
   error: Error | null;
@@ -54,7 +55,7 @@ function hashDocument(document: unknown): string {
   return out;
 }
 
-type PendingSave = { document: unknown; expectedRevision: number | null; hash: string };
+type PendingSave = { document: unknown; hash: string };
 
 export function useDraftSync(input: UseDraftSyncInput): DraftSync {
   const debounceMs = input.debounceMs ?? 600;
@@ -67,6 +68,10 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
   const lastSavedHashRef = useRef<string | null>(null);
   const pendingRef = useRef<PendingSave | null>(null);
   const latestDocumentRef = useRef<unknown>(null);
+  /** Freshest revision seen: numeric save() hints (monotonic) or save responses (authoritative). */
+  const knownRevisionRef = useRef<number | null>(null);
+  /** Manual in-flight flag: React Query's isPending lags within the tick that starts a mutation. */
+  const inFlightRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   const onAcceptTheirsRef = useRef(input.onAcceptTheirs);
@@ -84,21 +89,32 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
 
   const fireSave = useCallback(
     (document: unknown, expectedRevision: number | null, hash: string) => {
+      inFlightRef.current = true;
       lastSavedHashRef.current = null;
-      pendingRef.current = { document, expectedRevision, hash };
       setStatus("saving");
       setError(null);
       mutation.mutate(
         { systemId: input.systemId, expectedRevision, document },
         {
-          onSuccess: () => {
+          onSuccess: (workspace) => {
+            inFlightRef.current = false;
             if (!mountedRef.current) return;
+            // The save response is authoritative for the new revision, so a
+            // stashed edit flushes against it without waiting for a refetch.
+            const nextRevision = workspace?.draft?.revision;
+            if (typeof nextRevision === "number") knownRevisionRef.current = nextRevision;
             lastSavedHashRef.current = hash;
             setStatus("saved");
             setBanner(null);
             onSavedRef.current?.();
+            const stashed = pendingRef.current;
+            if (stashed !== null && stashed.hash !== hash) {
+              pendingRef.current = null;
+              fireSave(stashed.document, knownRevisionRef.current, stashed.hash);
+            }
           },
           onError: (err) => {
+            inFlightRef.current = false;
             if (!mountedRef.current) return;
             if (err instanceof ApiError && err.status === 409 && err.latestRevision !== null) {
               const latestRevision = err.latestRevision;
@@ -115,11 +131,9 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
                 onKeepMine: () => {
                   if (!mountedRef.current) return;
                   setBanner(null);
-                  fireSave(latestDocumentRef.current, null, hashDocument(latestDocumentRef.current));
-                },
-                onMergeIntoServer: () => {
-                  if (!mountedRef.current) return;
-                  setBanner(null);
+                  // Explicit replace against the current revision: the server
+                  // rejects a null expectedRevision for an existing draft, so
+                  // force-saving with null could never succeed.
                   fireSave(latestDocumentRef.current, latestRevision, hashDocument(latestDocumentRef.current));
                 },
                 onDismiss: () => {
@@ -144,20 +158,41 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
       latestDocumentRef.current = document;
       const hash = hashDocument(document);
       if (hash === lastSavedHashRef.current) return;
-      pendingRef.current = { document, expectedRevision, hash };
+      if (typeof expectedRevision === "number") {
+        const known = knownRevisionRef.current;
+        if (known === null || expectedRevision > known) knownRevisionRef.current = expectedRevision;
+      }
+      pendingRef.current = { document, hash };
+      // A save already on the wire owns the next send; its success handler
+      // flushes this stash against the fresh revision. Scheduling another
+      // timer now would fire with a stale revision and fake a conflict.
+      if (inFlightRef.current) return;
       if (timerRef.current !== null) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
         const pending = pendingRef.current;
-        if (pending !== null && mountedRef.current) {
-          fireSave(pending.document, pending.expectedRevision, pending.hash);
+        if (pending === null || !mountedRef.current) return;
+        if (pending.hash === lastSavedHashRef.current) {
+          pendingRef.current = null;
+          return;
         }
+        if (inFlightRef.current) return;
+        pendingRef.current = null;
+        fireSave(pending.document, knownRevisionRef.current, pending.hash);
       }, debounceMs);
     },
     [fireSave, debounceMs],
   );
 
+  const cancel = useCallback(() => {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    pendingRef.current = null;
+  }, []);
+
   return useMemo<DraftSync>(
-    () => ({ save, status, banner, error }),
-    [save, status, banner, error],
+    () => ({ save, cancel, status, banner, error }),
+    [save, cancel, status, banner, error],
   );
 }

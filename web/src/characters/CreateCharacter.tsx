@@ -145,7 +145,12 @@ export function CreateCharacter({
    */
   const showPicker = initialSystemVersionId === undefined && metadata === null;
   const pickerQuery = useQuery<CreationVersionEntry[]>({
-    queryKey: ["characters", "creation-versions"],
+    // Account-lifetime scope: the shared QueryClient outlives the route
+    // remount on sign-out/switch, so an unscoped key would keep serving
+    // account A's cached names to account B (or after sign-out) until the
+    // stale time lapses. Scoping by actor and generation gives each lifetime
+    // its own cache entry and discards late responses for old lifetimes.
+    queryKey: ["characters", "creation-versions", actorId, generation],
     queryFn: async () => api.listCreationVersions().then(r => r.data.versions),
     enabled: showPicker && online && actorId !== null,
     staleTime: 30_000,
@@ -725,7 +730,11 @@ export function CreateCharacter({
             <ul>
               {(pickerVersions ?? []).map(v => (
                 <li key={v.versionId}>
-                  <button type="button" onClick={() => { setVersionId(v.versionId); void loadMetadata(v.versionId); }}>
+                  <button
+                    type="button"
+                    disabled={busy || pending !== null || expired !== null}
+                    onClick={() => { setVersionId(v.versionId); void loadMetadata(v.versionId); }}
+                  >
                     {v.systemName} {v.semanticVersion}
                   </button>
                 </li>

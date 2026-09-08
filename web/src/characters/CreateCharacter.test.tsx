@@ -829,4 +829,74 @@ describe("CreateCharacter", () => {
       await store.close();
     }
   });
+
+  it("P5 does not show account A's cached versions after switching to account B", async () => {
+    const api = makeApi();
+    const mutable = makeMutableIdentity("actor-A");
+    const versionA = {
+      versionId: "aaaaaaaa-aaaa-4000-8000-000000000001",
+      systemId: "system-a",
+      systemName: "Private A",
+      semanticVersion: "1.0.0",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+    api.listCreationVersions.mockImplementation(async () => ({
+      data: { versions: mutable.identity.getActorId() === "actor-A" ? [versionA] : [] },
+      requestId: "r",
+    }));
+    const store = await openStore();
+    // One shared client across the remount, like the application router: the
+    // route remounts with an account-lifetime key but the QueryClient persists.
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    );
+    try {
+      const view = render(
+        <CreateCharacter key="actor-A:0:" api={api} store={store} identity={mutable.identity} onCreated={vi.fn()} />,
+        { wrapper },
+      );
+      expect(await screen.findByRole("button", { name: "Private A 1.0.0" })).toBeVisible();
+      expect(api.listCreationVersions).toHaveBeenCalledTimes(1);
+      mutable.switchTo("actor-B");
+      view.rerender(
+        <CreateCharacter key="actor-B:1:" api={api} store={store} identity={mutable.identity} onCreated={vi.fn()} />,
+      );
+      // B must refetch under its own lifetime instead of reusing A's cache.
+      await waitFor(() => expect(api.listCreationVersions).toHaveBeenCalledTimes(2));
+      await screen.findByText("No system versions are available for character creation.");
+      expect(screen.queryByRole("button", { name: "Private A 1.0.0" })).not.toBeInTheDocument();
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("P6 disables picker selection while a creation attempt is pending", async () => {
+    const api = makeApi();
+    api.listCreationVersions.mockResolvedValue({
+      data: {
+        versions: [
+          {
+            versionId: "aaaaaaaa-aaaa-4000-8000-000000000001",
+            systemId: "system-a",
+            systemName: "Private A",
+            semanticVersion: "1.0.0",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+      requestId: "r",
+    });
+    const store = await openStore();
+    try {
+      await store.saveOnlineAttempt(makeCreateAttempt("actor-1"));
+      renderCreate(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
+      );
+      expect(await screen.findByRole("button", { name: "Retry creation" })).toBeVisible();
+      expect(await screen.findByRole("button", { name: "Private A 1.0.0" })).toBeDisabled();
+    } finally {
+      await store.close();
+    }
+  });
 });

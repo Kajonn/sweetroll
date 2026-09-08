@@ -28,6 +28,11 @@ The HTTP process exposes liveness at `/health/live`, PostgreSQL readiness at
 
 Run `npm test`, `npm run test:integration`, `npm run typecheck`, and `npm run build`.
 
+The integration command runs test files sequentially so database setup and other
+suites do not compete with the session-burst test's latency measurements. The
+load and concurrency tests still issue concurrent requests internally; their
+workloads, correctness assertions, and latency budgets remain unchanged.
+
 ## Container modes
 
 Build one image with `docker build -t sweetroll .`.

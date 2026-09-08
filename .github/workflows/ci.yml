@@ -37,5 +37,106 @@ jobs:
       - run: npm test
       - run: npm run test:integration
       - run: npm run typecheck
+      - run: npm run contracts:check
       - run: npm run build
       - run: docker build -t sweetroll:ci .
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+          node-version-file: .nvmrc
+      - run: npm ci
+        working-directory: web
+      - run: npm test
+        working-directory: web
+      - run: npm run typecheck
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+
+  web-e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: sweetroll
+          POSTGRES_PASSWORD: sweetroll
+          POSTGRES_USER: sweetroll
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sweetroll -d sweetroll"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgres://sweetroll:sweetroll@localhost:5432/sweetroll
+      TEST_DATABASE_URL: postgres://sweetroll:sweetroll@localhost:5432/sweetroll
+      AUTHORITATIVE_ROLL_SECRET: development-only-roll-secret-32-bytes
+      CI: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version-file: .nvmrc
+      - run: npm ci
+      - uses: actions/setup-node@v4
+        with:
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+          node-version-file: .nvmrc
+      - run: npm ci
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm run migrate
+      - run: npx playwright test tests/e2e/smoke.spec.ts tests/e2e/acceptance.spec.ts tests/e2e/character-sheet.spec.ts
+        working-directory: web
+
+  web-offline:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: sweetroll
+          POSTGRES_PASSWORD: sweetroll
+          POSTGRES_USER: sweetroll
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sweetroll -d sweetroll"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgres://sweetroll:sweetroll@localhost:5432/sweetroll_offline
+      AUTHORITATIVE_ROLL_SECRET: development-only-roll-secret-32-bytes
+      SWEETROLL_TEST_AUTH: "1"
+      CI: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version-file: .nvmrc
+      - run: npm ci
+      - uses: actions/setup-node@v4
+        with:
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+          node-version-file: .nvmrc
+      - run: npm ci
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: psql postgres://sweetroll:sweetroll@localhost:5432/sweetroll -c "CREATE DATABASE sweetroll_offline;"
+      - run: npm run web:build
+      - run: npm --prefix web run test:offline

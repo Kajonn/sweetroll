@@ -150,27 +150,9 @@ function DocumentEditorBody({
     lastServerRevision.current = serverRevision;
     const serverDoc =
       ws.draft?.document !== undefined ? (ws.draft.document as SystemDocumentV1) : blankDocument();
-    dispatch({ type: "setMetadata", patch: serverDoc.metadata });
-    dispatch({
-      type: "setEntities",
-      entities: serverDoc.entities as unknown as EntityDefinitionV1[],
-    });
-    dispatch({
-      type: "setSheets",
-      sheets: serverDoc.sheets as unknown as SystemDocumentV1["sheets"][number][],
-    });
-    dispatch({
-      type: "setActions",
-      actions: serverDoc.actions as unknown as SystemDocumentV1["actions"][number][],
-    });
-    dispatch({
-      type: "setValidations",
-      validations: serverDoc.validations as unknown as ValidationV1[],
-    });
-    dispatch({
-      type: "setReferenceData",
-      referenceData: serverDoc.referenceData as unknown as SystemDocumentV1["referenceData"][number][],
-    });
+    // Adopt the full working document in one replace so no section (in
+    // particular expressions, which have no dedicated setter) goes stale.
+    dispatch({ type: "replace", document: serverDoc });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws.draft?.revision, ws.draft?.document]);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -206,6 +188,24 @@ function DocumentEditorBody({
 
   const errorCount = assessment.diagnostics.length;
   const publishDisabled = errorCount > 0;
+  // The header shows the working document's name while it diverges from the
+  // server document and falls back to the server system name when clean, so
+  // a dirty name is visible without waiting for the header itself to blur.
+  // When there is no server document yet, any non-empty working name is
+  // unconfirmed local content and is shown as-is.
+  const serverDocName =
+    ws.draft?.document !== undefined
+      ? ((ws.draft.document as SystemDocumentV1).metadata.name ?? "")
+      : null;
+  const workingName = document.metadata.name;
+  const displayName =
+    serverDocName === null
+      ? workingName === ""
+        ? ws.system.name
+        : workingName
+      : workingName === serverDocName
+        ? ws.system.name
+        : workingName;
   const previewPackage = useMemo(() => buildPreviewPackage(document), [document]);
   const previewSample = useMemo(
     () => (previewPackage === null ? null : generateSample(previewPackage)),
@@ -225,15 +225,25 @@ function DocumentEditorBody({
           suppressContentEditableWarning
           aria-label={t("editor.systemNameAria")}
           data-testid="document-editor-name"
+          onInput={(e) => {
+            const text = e.currentTarget.textContent ?? "";
+            if (text !== documentRef.current.metadata.name) {
+              // Mirror keystrokes into the working document live: the title
+              // stays dirty without waiting for blur, and the dirty state
+              // blocks server-refresh adoption from wiping the keystrokes.
+              // System name is metadata; reroute through the document reducer.
+              dispatch({ type: "setMetadata", patch: { name: text } });
+            }
+          }}
           onBlur={(e) => {
             const text = e.currentTarget.textContent ?? "";
-            if (text !== ws.system.name) {
+            if (text !== documentRef.current.metadata.name) {
               // System name is metadata; reroute through the document reducer.
               dispatch({ type: "setMetadata", patch: { name: text } });
             }
           }}
         >
-          {ws.system.name}
+          {displayName}
         </h1>
         <span className={styles.lifecycle} data-testid="document-editor-lifecycle">
           {t(`editor.lifecycle.${ws.draft !== null && ws.versions.length === 0 ? "draft" : ws.system.lifecycle}`)}

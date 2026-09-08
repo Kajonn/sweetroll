@@ -899,4 +899,233 @@ describe("CreateCharacter", () => {
       await store.close();
     }
   });
+
+  it("G slow A list resolving after B mounted never leaks A's names into B", async () => {
+    const api = makeApi();
+    const mutable = makeMutableIdentity("actor-A");
+    const versionA = {
+      versionId: "aaaaaaaa-aaaa-4000-8000-000000000001",
+      systemId: "system-a",
+      systemName: "Private A",
+      semanticVersion: "1.0.0",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+    const gate = deferred<{ data: { versions: typeof versionA[] }; requestId: string }>();
+    api.listCreationVersions.mockImplementation(async () => {
+      if (mutable.identity.getActorId() === "actor-A") return gate.promise;
+      return { data: { versions: [] }, requestId: "r-b" };
+    });
+    const store = await openStore();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    );
+    try {
+      const view = render(
+        <CreateCharacter key="actor-A:0" api={api} store={store} identity={mutable.identity} onCreated={vi.fn()} />,
+        { wrapper },
+      );
+      expect(await screen.findByText("Loading available versions…")).toBeVisible();
+      // B mounts (route remount with its own lifetime key) before A's slow
+      // list resolves; B's own fetch returns an empty list.
+      mutable.switchTo("actor-B");
+      view.rerender(
+        <CreateCharacter key="actor-B:1" api={api} store={store} identity={mutable.identity} onCreated={vi.fn()} />,
+      );
+      await screen.findByText("No system versions are available for character creation.");
+      expect(api.listCreationVersions).toHaveBeenCalledTimes(2);
+      // A's late response lands in A's cache entry only (keys isolate by
+      // actor+generation); it must never appear in B's picker and must never
+      // auto-select into a metadata load under B.
+      gate.resolve({ data: { versions: [versionA] }, requestId: "r-a" });
+      await new Promise(resolve => setTimeout(resolve, 30));
+      expect(screen.queryByRole("button", { name: "Private A 1.0.0" })).not.toBeInTheDocument();
+      expect(screen.getByText("No system versions are available for character creation.")).toBeVisible();
+      expect(api.creationOptions).not.toHaveBeenCalled();
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("G2 picker selection started by A never commits metadata under B", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    const picked = "aaaaaaaa-aaaa-4000-8000-000000000001";
+    api.listCreationVersions.mockResolvedValue({
+      data: {
+        versions: [
+          {
+            versionId: picked,
+            systemId: "system-a",
+            systemName: "Private A",
+            semanticVersion: "1.0.0",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+      requestId: "r",
+    });
+    const metaGate = deferred<ReturnType<typeof metadata>>();
+    api.creationOptions.mockReturnValueOnce(metaGate.promise);
+    const store = await openStore();
+    const mutable = makeMutableIdentity("actor-A");
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    );
+    try {
+      const view = render(
+        <CreateCharacter key="actor-A:0" api={api} store={store} identity={mutable.identity} onCreated={vi.fn()} />,
+        { wrapper },
+      );
+      await user.click(await screen.findByRole("button", { name: "Private A 1.0.0" }));
+      await waitFor(() => expect(api.creationOptions).toHaveBeenCalledWith(picked));
+      // Account switches while the metadata load is in flight; the late
+      // response is guarded by the actor/generation alive() check and must
+      // not render the entity form under B.
+      mutable.switchTo("actor-B");
+      mutable.revokeDurable();
+      view.rerender(
+        <CreateCharacter key="actor-B:1" api={api} store={store} identity={mutable.identity} onCreated={vi.fn()} />,
+      );
+      metaGate.resolve(metadata());
+      await new Promise(resolve => setTimeout(resolve, 30));
+      expect(screen.queryByLabelText("Entity")).not.toBeInTheDocument();
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("H-a offline shows guidance without fetching; reconnect refetches the list", async () => {
+    const api = makeApi();
+    api.listCreationVersions.mockResolvedValue({
+      data: {
+        versions: [
+          {
+            versionId: "aaaaaaaa-aaaa-4000-8000-000000000001",
+            systemId: "system-a",
+            systemName: "Private A",
+            semanticVersion: "1.0.0",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+      requestId: "r",
+    });
+    const store = await openStore();
+    try {
+      const view = renderCreate(
+        <CreateCharacter api={api} store={store} identity={makeIdentity({ online: false })} onCreated={vi.fn()} />,
+      );
+      expect(screen.getByText("Character creation requires an online connection.")).toBeVisible();
+      expect(screen.queryByRole("heading", { name: "Choose a system version" })).not.toBeInTheDocument();
+      expect(api.listCreationVersions).not.toHaveBeenCalled();
+      view.rerender(
+        <CreateCharacter api={api} store={store} identity={makeIdentity({ online: true })} onCreated={vi.fn()} />,
+      );
+      expect(await screen.findByRole("button", { name: "Private A 1.0.0" })).toBeVisible();
+      expect(api.listCreationVersions).toHaveBeenCalledTimes(1);
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("H-b revoked version shows denied message (not uncertain) with retry available", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    const picked = "aaaaaaaa-aaaa-4000-8000-000000000001";
+    api.listCreationVersions.mockResolvedValue({
+      data: {
+        versions: [
+          {
+            versionId: picked,
+            systemId: "system-a",
+            systemName: "Private A",
+            semanticVersion: "1.0.0",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+      requestId: "r",
+    });
+    api.creationOptions.mockRejectedValueOnce(
+      new ApiError({
+        code: "forbidden", message: "No access.", status: 403,
+        requestId: "req-403", latestRevision: null, diagnostics: [],
+      }),
+    );
+    api.creationOptions.mockResolvedValueOnce(metadata());
+    const store = await openStore();
+    try {
+      renderCreate(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
+      );
+      await user.click(await screen.findByRole("button", { name: "Private A 1.0.0" }));
+      expect(await screen.findByText("This system version is unavailable for character creation.")).toBeVisible();
+      expect(screen.queryByText(/may have been created|could not be confirmed/i)).not.toBeInTheDocument();
+      // Retry stays available: the picker and the manual lookup remain.
+      expect(screen.getByRole("heading", { name: "Choose a system version" })).toBeVisible();
+      const retry = await screen.findByRole("button", { name: "Private A 1.0.0" });
+      expect(retry).toBeEnabled();
+      expect(screen.getByLabelText("System version ID")).toBeVisible();
+      await user.click(retry);
+      expect(await screen.findByLabelText("Entity")).toBeInTheDocument();
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("H-b2 missing version shows denied message and 400 shows invalid input (never uncertain)", async () => {
+    const user = userEvent.setup();
+    const makeListApi = () => {
+      const listApi = makeApi();
+      listApi.listCreationVersions.mockResolvedValue({
+        data: {
+          versions: [
+            {
+              versionId: "aaaaaaaa-aaaa-4000-8000-000000000001",
+              systemId: "system-a",
+              systemName: "Private A",
+              semanticVersion: "1.0.0",
+              createdAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+        },
+        requestId: "r",
+      });
+      return listApi;
+    };
+    const notFound = makeListApi();
+    notFound.creationOptions.mockRejectedValueOnce(
+      new ApiError({
+        code: "not_found", message: "Missing.", status: 404,
+        requestId: "req-404", latestRevision: null, diagnostics: [],
+      }),
+    );
+    const notFoundStore = await openStore();
+    const { unmount } = renderCreate(
+      <CreateCharacter api={notFound} store={notFoundStore} identity={makeIdentity()} onCreated={vi.fn()} />,
+    );
+    await user.click(await screen.findByRole("button", { name: "Private A 1.0.0" }));
+    expect(await screen.findByText("This system version is unavailable for character creation.")).toBeVisible();
+    expect(screen.queryByText(/may have been created|could not be confirmed/i)).not.toBeInTheDocument();
+    unmount();
+    await notFoundStore.close();
+
+    const badInput = makeListApi();
+    badInput.creationOptions.mockRejectedValueOnce(
+      new ApiError({
+        code: "validation_failed", message: "Not a UUID.", status: 400,
+        requestId: "req-400", latestRevision: null, diagnostics: [],
+      }),
+    );
+    const badStore = await openStore();
+    renderCreate(
+      <CreateCharacter api={badInput} store={badStore} identity={makeIdentity()} onCreated={vi.fn()} />,
+    );
+    await user.click(await screen.findByRole("button", { name: "Private A 1.0.0" }));
+    expect(await screen.findByText("The server rejected this character. Correct the details and try again.")).toBeVisible();
+    expect(screen.queryByText(/may have been created|could not be confirmed/i)).not.toBeInTheDocument();
+    await badStore.close();
+  });
 });

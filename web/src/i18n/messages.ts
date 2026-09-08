@@ -7,6 +7,7 @@ export const defaultMessages: MessageTable = {
   "shell.signOut.pending": "Local data hidden; server sign-out is pending. Reconnect to finish signing out.",
   "shell.signOut.complete": "Signed out.",
   "shell.signOut.error": "Data is hidden, but local sign-out could not be saved. Retry before closing this page.",
+  "shell.signOut.serverError": "Server sign-out failed; local data is hidden but sign-out is still pending. Reconnect and retry sign-out to finish.",
   "library.title": "Library",
   "library.listAriaLabel": "Systems",
   "library.loadMore": "Load more",

@@ -283,6 +283,15 @@ export function CreateCharacter({
       } else if (metadataError instanceof ApiError && metadataError.status === 401) {
         setMetaDenied(false);
         setError(t("character.create.unauthorized"));
+      } else if (
+        metadataError instanceof ApiError &&
+        (metadataError.status === 400 || metadataError.status === 422)
+      ) {
+        // Definite input error (e.g. malformed UUID): never report as an
+        // uncertain creation outcome. G4 owns the picker's visual styling;
+        // here the mapping is what matters.
+        setMetaDenied(false);
+        setError(t("character.create.invalid"));
       } else {
         setMetaDenied(false);
         setError(t("character.create.uncertain"));
@@ -358,7 +367,7 @@ export function CreateCharacter({
       setError(t("character.create.denied"));
       return;
     }
-    if (sendError instanceof ApiError && sendError.status === 422) {
+    if (sendError instanceof ApiError && (sendError.status === 400 || sendError.status === 422)) {
       try {
         await store.retireOnlineAttempt(attempt.actorId, null, attempt.id, guard);
       } catch {

@@ -178,4 +178,34 @@ describe("AppShell", () => {
     expect({ gets, puts }).toEqual(settled);
     qc.clear();
   });
+
+  it("surfaces a retryable server-revocation failure and clears it on retry", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    let signouts = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const path = new URL(url, window.location.origin).pathname;
+      if (path === "/api/signout") {
+        signouts += 1;
+        if (signouts === 1) {
+          return new Response(
+            JSON.stringify({ error: { code: "revocation_failed", message: "Revocation failed." }, requestId: "r-1" }),
+            { status: 500 },
+          );
+        }
+        return new Response(null, { status: 204 });
+      }
+      return new Response(JSON.stringify({ state: "authenticated", userId: "signed-in" }));
+    }));
+    render(<AppShell>builder</AppShell>);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Sign out" }));
+    // Server failure is distinct from local-storage failure: retryable
+    // message, and the sign-out action stays available as the retry.
+    expect(await screen.findByText(/server sign-out failed.*retry/i)).toBeVisible();
+    expect(screen.queryByText(/local sign-out could not be saved/i)).not.toBeInTheDocument();
+    const retry = await screen.findByRole("button", { name: "Sign out" });
+    expect(retry).toBeVisible();
+    await userEvent.setup().click(retry);
+    expect(await screen.findByText("Signed out.")).toBeInTheDocument();
+    expect(signouts).toBe(2);
+  });
 });

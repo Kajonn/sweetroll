@@ -38,7 +38,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [auth, setAuth] = useState<AuthState>({ state: "loading" });
   const [identity, setIdentity] = useState<IdentityGate | null>(null);
   const [storageUnavailable, setStorageUnavailable] = useState(false);
-  const [logoutStatus, setLogoutStatus] = useState<"pending" | "complete" | "error" | null>(null);
+  const [logoutStatus, setLogoutStatus] = useState<"pending" | "complete" | "error" | "serverError" | null>(null);
   useEffect(() => {
     let disposed = false;
     let cleanup = () => {};
@@ -49,8 +49,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       setIdentity(gate);
       const update = () => {
         const snapshot = gate.getSnapshot();
-        if (snapshot.pendingLogout) setLogoutStatus("pending");
-        else setLogoutStatus(previous => previous === "pending" ? "complete" : previous);
+        // A server-revocation failure keeps the pending-logout barrier while
+        // surfacing its own retryable message: a later snapshot with
+        // pendingLogout must not downgrade serverError/error back to generic
+        // pending, and clearing the barrier resolves either into complete.
+        if (snapshot.pendingLogout) setLogoutStatus(previous => previous === "error" || previous === "serverError" ? previous : "pending");
+        else setLogoutStatus(previous => previous === "pending" || previous === "serverError" ? "complete" : previous);
         setAuth(snapshot.actorId ? { state: "authenticated", userId: snapshot.actorId } : { state: "anonymous" });
         setOnline(navigator.onLine);
       };
@@ -92,7 +96,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const signOut = async () => {
     if (!identity || !window.confirm(t("shell.signOut.confirm"))) return;
     try { await identity.signOut(); }
-    catch { setLogoutStatus("error"); }
+    catch (error) {
+      // Local-storage failures and server-revocation failures both reject,
+      // but only the latter keeps a retryable pending-logout barrier with
+      // local data already hidden. Distinguish them so the UI does not blame
+      // local storage when the server call failed. 401/invalid-credential vs
+      // storage-unavailable at shell level remains a follow-up (see report).
+      if (error instanceof Error && /Server sign-out failed/.test(error.message)) setLogoutStatus("serverError");
+      else setLogoutStatus("error");
+    }
   };
   return (
     <IdentityContext.Provider value={identity}>
@@ -105,6 +117,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                 router context and crashes. */}
             <a href="/characters/new">{t("shell.nav.newCharacter")}</a>
             {auth.state === "authenticated" && (
+              <button type="button" onClick={() => { void signOut(); }}>{t("shell.signOut.button")}</button>
+            )}
+            {/* Server-revocation failure keeps a retryable barrier while the
+                session reads anonymous (local data hidden): keep the same
+                sign-out action available as the retry so pendingLogout can be
+                cleared without new strings. */}
+            {logoutStatus === "serverError" && auth.state !== "authenticated" && (
               <button type="button" onClick={() => { void signOut(); }}>{t("shell.signOut.button")}</button>
             )}
             {logoutStatus && <span role="status">{t(`shell.signOut.${logoutStatus}`)}</span>}

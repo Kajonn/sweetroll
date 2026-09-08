@@ -1,6 +1,6 @@
 # Generic TTRPG Platform (Revised)
 
-**Product design specification — v0.3**
+**Product design specification — v0.4**
 
 *Shared, mobile-first character sheets and campaign coordination for any TTRPG system.*
 
@@ -8,8 +8,8 @@
 
 | Document         | Product and technical design                         |
 |------------------|------------------------------------------------------|
-| Status           | Draft v0.3 for validation                            |
-| Date             | 3 September 2026                                     |
+| Status           | Draft v0.4; GUI delivery added                       |
+| Date             | 8 September 2026                                     |
 | Primary audience | Product owner, UX designer, implementation team      |
 | Planning horizon | MVP followed by collaboration and marketplace phases |
 
@@ -26,7 +26,7 @@ The core strength versus existing VTTs is:
 
 The MVP is a modular monolith backed by PostgreSQL and object storage. System definitions are declarative, versioned documents. Math and dice expressions are parsed into a lightweight AST and evaluated by the platform; creator-supplied executable code is never run. Published system versions are immutable; campaigns and characters pin to a version and upgrade explicitly.
 
-> **MVP scope.** Build a trustworthy shared-character-sheet and campaign platform — not a full virtual tabletop and not an auto-applying rules simulator. The first Player and GM applications are mobile-first web apps delivered as an installable PWA. Native binaries and app-store distribution are post-MVP. Maps, video, voice, tactical movement, dynamic lighting, marketplace payments, and arbitrary scripting are excluded from the first release.
+> **MVP scope.** Build a trustworthy shared-character-sheet and campaign platform — not a full virtual tabletop and not an auto-applying rules simulator. The first Player and GM applications are mobile-first web apps delivered as an installable PWA. Native binaries and app-store distribution are post-MVP. Simple background images, manually edited fog, GM-positioned tokens, and a restricted player display are included in I7b. Video, voice, tactical movement, dynamic lighting, marketplace payments, and arbitrary scripting are excluded from the first release.
 
 # 2. Positioning and differentiation
 
@@ -44,7 +44,7 @@ The existing market forces a trade-off that no current tool fully resolves:
 > Shared, mobile-first character sheets and rolls for any TTRPG system — at a physical table or remote. Your group plays the game; we handle the math, visibility, and the session bookkeeping.
 
 **Deliberate non-identity (hard scope limit — do not creep toward these):**
-- Not a virtual tabletop with maps, tokens, or fog of war
+- Not a full virtual tabletop: simple image presentation, manual fog, and GM-positioned tokens are allowed; tactical grids, movement rules, vision, dynamic lighting, and automated combat are excluded
 - Not a physics/simulation layer that auto-applies rules to everything
 - Not a system-locked builder
 - Not a marketplace or content store
@@ -90,12 +90,12 @@ Roles are contextual capabilities, not account types. The same user can create a
 
 ## 4.2 Multi-device GM play
 
-A GM may use **multiple devices in the same session simultaneously**, each logged into the same account and campaign, with each device focused on a different task:
+A GM may use **multiple devices in the same session simultaneously**, with each device focused on a different task. Private control devices may share the GM account; a device handed to players uses restricted display access:
 
 - e.g. an **iPad or second screen for showing images/handouts to players**, while a **phone shows monster/stat sheets** for the GM's own reference.
 - Concurrency between the GM's devices is handled by the standard revision/`409` mechanism; single-writer per resource means the GM cannot corrupt their own data by editing from two screens, though they will see a conflict and refresh prompt if both attempt to mutate the same field at once.
-- Each device runs the normal responsive surface; "assume a device" is not a separate device class, just an allowed login + session combination. There is no artificial single-session lock.
-- Real-time subscription scopes to the campaign and the actor; a GM's reveal on one device is visible on their other devices via the standard activity feed.
+- Each authenticated GM device runs the normal responsive surface, with no artificial single-session lock. A tablet handed to players instead uses the dedicated restricted Display surface introduced in I7b; it must not retain the GM session or private cached data.
+- Updates are scoped to the campaign and actor, initially through authorized polling/revision refresh. In I7b, paired player displays receive only the permitted scene projection using revocable, display-scoped credentials; they never receive GM originals or secret payloads.
 
 # 5. Core user journeys
 
@@ -251,7 +251,13 @@ Actions may produce private, GM-only, or campaign-visible rolls according to cam
 
 ## 7.6 Content types (narrowed)
 
-MVP keeps **text notes only** with visibility levels and basic tags. **Deferred to post-MVP:** image upload, documents, file scanning, thumbnails, previews, and external links. These add surface area without differentiation and can be layered on later through the same content table.
+I6/I7 deliver **text notes** with visibility levels and basic tags. I7b adds authorized images and safe rendering derivatives for simple scene presentation, manual fog, and tokens. General document uploads, document previews, and external-link ingestion remain deferred. Media validation, access checks, and safe storage are prerequisites for I7b, not optional follow-up work.
+
+## 7.7 Simple scenes and player display
+
+A scene consists of a background image, a manually edited fog mask, and GM-positioned tokens with simple labels/images and visibility. Provide fit/pan/zoom, reveal/conceal, local undo, and drag or tap-to-place/move controls, with keyboard alternatives. Use normalized scene coordinates and revision-checked edits. There are no tactical grids, movement rules, initiative, automatic vision, or combat automation.
+
+A separate tablet or remote player receives only an authorized display projection. Fog-covered pixels must be removed from server-generated display imagery (or safe tiles); sending the original image under a client-only overlay does not protect secrets. Filter hidden tokens and GM metadata before delivery. Pairing credentials are revocable and cannot read campaign administration, GM notes, or originals. Clear privileged browser state when entering display mode, and blank the display when authorization is uncertain or revoked. Previously revealed information cannot be retracted from screenshots. See the GUI plan G8 for acceptance cases.
 
 # 8. Offline (MVP-critical)
 
@@ -314,6 +320,18 @@ Use role-based permissions for coarse capabilities and resource-level policy che
 ## 10.4 Accessibility and localization
 
 Target WCAG 2.2 AA for the authored application. The builder must flag missing labels, low contrast, ambiguous names, and controls available only by drag. Store display strings separately from stable IDs and design all UI for localization, plural rules, time zones, and longer translated labels. Bidirectional layout is a post-MVP validation item unless required at launch.
+
+## 10.5 Visual design, components, and flexible themes
+
+Use the [Tablefolk GUI mockup](https://tablefolk-ttrpg-mockups.humdrumrat.chatgpt.site) as the visual reference for hierarchy, restrained green accents, readable typography, rounded panels, and touch-friendly controls. Keep Sweetroll branding and the navigation/linear sheet constraints in this specification. Capture selected reference views in the repository during G0; prototype data and simulated services are not production implementations.
+
+Adopt the design incrementally in the existing React application. Keep CSS modules, accessible primitives, generated API contracts, and the character projection/session model. AppShell owns navigation and one flexible content region; individual views own their internal columns. Do not replace the backend or create a second character renderer.
+
+Use semantic CSS tokens for color roles, typography, spacing, borders, radii, shadows, and focus. Shared controls and feature components consume those tokens. Ship light/dark presets and Follow device, with portal inheritance and accessible states. I4a stores device preferences; I5 adds an account default with per-device override. Restricted display preferences remain device-local. Prove extensibility through a third internal preset; arbitrary CSS, a theme editor, and theme marketplace remain excluded.
+
+Implement loading, empty, validation, saving, offline, conflict, and permission states as part of every view. Theme changes must preserve editor/character state and must not recolor uploaded art or change fog/token visibility. Preserve 44px touch targets, visible keyboard focus, and readable text in every theme.
+
+The execution checklist is [GUI integration implementation plan](docs/superpowers/plans/2026-09-08-gui-integration.md). Its G0-G9 tasks supplement the delivery increments below; they do not retroactively change historical acceptance evidence.
 
 # 11. Technical architecture
 
@@ -554,7 +572,7 @@ Maintain three internal reference systems as acceptance fixtures: a minimal rule
 
 # 17. Delivery plan
 
-Delivery is organized as seven dependent increments. Each increment produces a complete, deployable capability rather than infrastructure that cannot be exercised. Backend increments are functional through the documented HTTP interface; frontend increments provide the normal user interface over capabilities completed by earlier increments.
+Delivery retains I1-I7 and adds I4a for GUI integration and I7b for simple scenes and restricted display. Each increment produces a complete, deployable capability rather than infrastructure that cannot be exercised. Backend increments are functional through the documented HTTP interface; frontend increments provide the normal user interface over capabilities completed by earlier increments.
 
 Foundational work belongs to the first increment that needs it. For example, repository setup, CI/CD, identity seams, database conventions, and baseline observability are tasks in I1 rather than a separate non-functional milestone.
 
@@ -578,9 +596,11 @@ Every increment must meet all applicable criteria before work begins on the next
 | I2 - System Builder frontend | No-code system authoring and publishing **(completed 2026-09-04)** | I1 | A non-programmer can create and publish a playable system entirely through the web interface. |
 | I3 - Character backend | Runtime character state and commands | I1; I2 validates the package model | A client can create and fully operate a standalone character through the documented HTTP interface. |
 | I4 - Character Sheet frontend | Reusable schema-driven character experience | I3 | A standalone character can be created and played through a responsive web sheet online or offline. |
-| I5 - Standalone Player app | Mobile-first Player PWA around the sheet | I4 | A player can manage and play personal characters in a mobile browser or installed PWA without joining a campaign. |
+| I4a - GUI integration | Lifecycle repairs, flexible themes, responsive shell, polished sheet and simple creator | I4 | G0-G5 pass through real routes, with frontend CI and visual acceptance. |
+| I5 - Standalone Player app | Mobile-first Player PWA around the sheet | I4; I4a | A player can manage and play personal characters in a mobile browser or installed PWA without joining a campaign. |
 | I6 - Campaign backend and Player integration | Campaign collaboration HTTP interface plus player-facing campaign flows | I3; I5 | Campaigns can be provisioned through HTTP, and invited players can join and participate through the Player app. |
 | I7 - GM app | Mobile-first GM PWA for campaign administration and session operation | I6 | A GM can create and run a secure campaign with four players from a mobile browser, installed PWA, or desktop browser. |
+| I7b - Simple scenes and player display | Authorized images, manual fog, simple tokens, restricted multi-device display | I7 | A GM phone controls a safe tablet/remote scene without disclosing GM-only data. |
 
 ## 17.3 I1 - System backend and rules runtime
 
@@ -669,9 +689,17 @@ Every increment must meet all applicable criteria before work begins on the next
 > I5 remains untouched; installation and the Player PWA shell are still out of
 > scope.
 
+## 17.6a I4a - GUI integration
+
+**Status:** Planned, added 2026-09-08. I1-I4 historical closure records remain unchanged.
+
+Complete G0-G5 in the [GUI integration plan](docs/superpowers/plans/2026-09-08-gui-integration.md): establish reference/route inventory and frontend CI; repair creator save/conflict and application-wide account cleanup; add theme tokens/shared controls; fix the responsive shell; polish the real character journey; and simplify/restyle the creator. G1 lifecycle repairs and G2 controls both precede protected-route migration.
+
+**Acceptance demonstration:** At phone/tablet/desktop widths and in light/dark, create and publish a simple system without writing expressions, create and use a character, roll, recover from offline/conflict states, and sign out without leaving private data visible. Preserve generated contracts, stable IDs, published versions, and the existing character session/renderer. Review real screenshots and targeted regression evidence before I5 begins.
+
 ## 17.7 I5 - Standalone Player app
 
-This increment intentionally contains no campaign, invitation, membership, shared-content, other-player, or GM concepts. It composes the completed Character Sheet rather than rebuilding it.
+This increment intentionally contains no campaign, invitation, membership, shared-content, other-player, or GM concepts. It composes the completed Character Sheet rather than rebuilding it. Apply GUI plan G6 using I4a shared components, including account theme defaults, device overrides, and real production sign-in.
 
 **Tasks:**
 
@@ -685,6 +713,8 @@ This increment intentionally contains no campaign, invitation, membership, share
 **Acceptance demonstration:** A new player signs in on a phone, selects a system, creates and plays multiple personal characters, finds a recent character, works through a connection loss, exports data, and securely clears local data on sign-out.
 
 ## 17.8 I6 - Campaign backend and Player integration
+
+Apply GUI plan G7 to the player campaign routes using I4a components and the owning Module authorization contracts.
 
 **Backend tasks:**
 
@@ -708,7 +738,7 @@ This increment intentionally contains no campaign, invitation, membership, share
 
 ## 17.9 I7 - GM app
 
-The first GM app is a responsive web surface within the shared PWA. Native packaging and app-store distribution are not part of this increment.
+The first GM app is a responsive web surface within the shared PWA. Native packaging and app-store distribution are not part of this increment. Apply GUI plan G7, including mobile NPC/monster list-to-sheet navigation. Image presentation and the restricted player display are delivered in I7b; I7 second-device acceptance uses permitted text content and authenticated GM views.
 
 **Tasks:**
 
@@ -725,15 +755,26 @@ The first GM app is a responsive web surface within the shared PWA. Native packa
 
 **Acceptance demonstration:** A GM creates a campaign without direct HTTP tools, invites four players, manages visibility, previews each player's view, runs the session board from a phone while showing content on a second device, resolves a concurrent edit, and explicitly upgrades the campaign without changing another pinned campaign.
 
+## 17.9a I7b - Simple scenes and restricted player display
+
+**Status:** Planned. Restores the owner-requested image, manual fog, token, and phone/tablet display scope; it does not introduce full VTT behavior.
+
+Complete GUI plan G8: define media/scene/display contracts and persistence; add safe authorized image storage and rendering; implement revision-controlled manual fog and token operations; implement revocable display pairing and server-filtered scene projections; then build touch/keyboard scene controls and the minimal display shell. Keep this within the modular application. Do not add a second rules engine or expose GM credentials on a shared tablet.
+
+**Acceptance demonstration:** From a phone, use a monster sheet while an iPad shows a scene; manually reveal/conceal fog, place/move a token, change scene, reconnect, and revoke the display. Verify response bodies, media URLs, browser storage, deep links, and direct requests cannot expose originals, hidden tokens, GM notes, or administrative actions. Run the same permitted scene with a remote player. Concealing cannot undo information already seen.
+
 ## 17.10 MVP acceptance criteria
 
 - **I1:** A complete reference system can be validated, published immutably, cloned, exported, and evaluated through the documented HTTP interface; hostile or over-budget packages are rejected safely.
 - **I2:** A non-programmer can reproduce or modify a reference system using only the GUI and publish it without database or code changes.
 - **I3:** A client can create, operate, export, and explicitly migrate a character through HTTP; retries do not duplicate effects and concurrent edits do not silently overwrite state.
 - **I4:** The player sheet works at 360 and 1280 px, renders without connectivity, and synchronizes queued writes idempotently on reconnect.
+- **I4a:** Existing creator/character routes meet the GUI plan G0-G5 gates with safe save/account lifecycles, flexible themes, responsive layouts, and frontend CI.
 - **I5:** A player can manage and play personal characters in a mobile browser or installed PWA with no campaign dependency.
 - **I6:** A player can join an HTTP-provisioned campaign, create or claim a character, and access only authorized content; guessed identifiers, revoked memberships, and replayed invitations disclose nothing.
 - **I7:** A GM can use the mobile-first web app to create a campaign from a shipped open-license template, invite four players, manage content visibility, verify each player's view, and run a session across two devices.
+- **I7b:** A GM phone and restricted tablet/remote display support simple images, manual fog, and tokens, with no GM secrets in display responses or caches.
+- **GUI release:** Apply G9 to each migrated view and final release: actual routed visual review, real phone/iPad checks, built frontend/API deployment, and physical-table/remote playtests.
 - Publishing a new system version never changes an existing character or campaign until its authorized owner completes an explicit upgrade.
 - Users can export system, character, and campaign data in documented formats.
 - Backup restoration, monitoring, alerting, load testing, and an incident runbook have been exercised before public beta.
@@ -756,6 +797,8 @@ The first GM app is a responsive web surface within the shared PWA. Native packa
 > **Note.** Offline support is now a requirement (Section 8), not an open decision.
 
 ## 18.2 Immediate next actions
+
+**Current next work (2026-09-08):** execute I4a / GUI plan G0-G5 before I5 feature expansion. Preserve I1-I4 records as history, carry G6-G7 into I5-I7, and implement the explicit I7b scene/display scope afterward. The numbered foundation actions below retain their original increment context; they are not instructions to redo completed work.
 
 1. The I1 capability matrix selects license-neutral d20, 2d6 PbtA-style, and d6 counted-success families; its detailed matrix is in the system-package contract design.
 2. OD-04 is resolved by grammar v0.1 in the system-package contract design; implement that grammar after the package structural contracts.

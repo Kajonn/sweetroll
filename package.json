@@ -13,7 +13,7 @@
     "start:http": "node dist/bootstrap/http.js",
     "start:migrate": "node dist/bootstrap/migrate.js",
     "test": "vitest run --exclude \"tests/integration/**\"",
-    "test:integration": "vitest run tests/integration",
+    "test:integration": "vitest run tests/integration --no-file-parallelism",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "contracts:generate": "tsx scripts/generate-system-contracts.ts",
     "contracts:check": "tsx scripts/generate-system-contracts.ts --check",

@@ -199,6 +199,10 @@ function DocumentEditorBody({
 
   const bodyRef = useRef<HTMLDivElement>(null);
   useFocusEditorListener(bodyRef);
+  const nameRef = useRef<HTMLHeadingElement>(null);
+  // Tracks h1 focus explicitly (rather than document.activeElement, which
+  // jsdom does not move to a contentEditable h1 on .focus()) so the repair
+  // effect below can stay out of the way while editing.
 
   useEffect(() => {
     sync.save(document, draftRevision);
@@ -218,14 +222,38 @@ function DocumentEditorBody({
       ? ((ws.draft.document as SystemDocumentV1).metadata.name ?? "")
       : null;
   const workingName = document.metadata.name;
+  // When the working name is empty, the heading falls back to display text
+  // only: the document value stays "" so a deliberate clear is preserved and
+  // still saves. Reuses the create-draft placeholder when no server name is
+  // available.
+  const fallbackName =
+    ws.system.name !== "" ? ws.system.name : t("createDraft.name.placeholder");
   const displayName =
-    serverDocName === null
-      ? workingName === ""
-        ? ws.system.name
-        : workingName
-      : workingName === serverDocName
-        ? ws.system.name
-        : workingName;
+    workingName === ""
+      ? fallbackName
+      : serverDocName === null
+        ? workingName
+        : workingName === serverDocName
+          ? fallbackName
+          : workingName;
+  const nameFocusedRef = useRef(false);
+  // Clearing the contentEditable to "" dispatches "" but leaves the rendered
+  // virtual text unchanged when the fallback was already showing (clean
+  // state), so React bails out and the DOM node stays empty: repair it so the
+  // settled (blurred) h1 is never empty. Skipped while focused so editing
+  // starts from the true document value (see onFocus below). Non-empty edits
+  // track the DOM exactly, and the document value is untouched (stays "").
+  useEffect(() => {
+    const el = nameRef.current;
+    if (
+      el !== null &&
+      workingName === "" &&
+      el.textContent !== displayName &&
+      !nameFocusedRef.current
+    ) {
+      el.textContent = displayName;
+    }
+  });
   const previewPackage = useMemo(() => buildPreviewPackage(document), [document]);
   const previewSample = useMemo(
     () => (previewPackage === null ? null : generateSample(previewPackage)),
@@ -245,6 +273,20 @@ function DocumentEditorBody({
           suppressContentEditableWarning
           aria-label={t("editor.systemNameAria")}
           data-testid="document-editor-name"
+          ref={nameRef}
+          onFocus={(e) => {
+            // While editing, show the true document value so fallback display
+            // text never becomes document content: after a clear the DOM holds
+            // the fallback while the doc is "", and appending a keystroke
+            // would otherwise save "fallback+X" instead of "X". The same
+            // applies to the clean state (working name === server name) where
+            // the header shows the system name. No state writes here.
+            nameFocusedRef.current = true;
+            const docName = documentRef.current.metadata.name;
+            if (displayName !== docName && e.currentTarget.textContent !== docName) {
+              e.currentTarget.textContent = docName;
+            }
+          }}
           onInput={(e) => {
             const text = e.currentTarget.textContent ?? "";
             if (text !== documentRef.current.metadata.name) {
@@ -256,10 +298,16 @@ function DocumentEditorBody({
             }
           }}
           onBlur={(e) => {
+            nameFocusedRef.current = false;
             const text = e.currentTarget.textContent ?? "";
             if (text !== documentRef.current.metadata.name) {
               // System name is metadata; reroute through the document reducer.
               dispatch({ type: "setMetadata", patch: { name: text } });
+            } else if (text !== displayName) {
+              // No edit (focus/blur without typing): restore the fallback
+              // display so the settled heading is never empty for a11y.
+              // Document value untouched.
+              e.currentTarget.textContent = displayName;
             }
           }}
         >

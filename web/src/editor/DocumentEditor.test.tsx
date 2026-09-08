@@ -14,10 +14,11 @@ type AssessmentLike = {
 const sleep = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); });
 
 /**
- * Wait until open-system GET / draft PUT activity settles. The autosave
- * label cannot be used for this: the idle label renders the same "Saved"
- * text as the saved label, so it matches before any save completes. The
- * 800ms quiet window exceeds the 600ms autosave debounce.
+ * Wait until open-system GET / draft PUT activity settles. The idle autosave
+ * label is now distinct ("Not saved yet") from the saved label ("Saved"), so
+ * label-based waits can detect real saves; this helper remains for
+ * revision-sensitive flows where quiescence (no new GETs/PUTs) is the signal.
+ * The 800ms quiet window exceeds the 600ms autosave debounce.
  */
 async function settleFetchActivity(reads: () => { gets: number; puts: number }) {
   for (let i = 0; i < 15; i++) {
@@ -81,7 +82,7 @@ describe("DocumentEditor", () => {
 
     expect(await screen.findByTestId("document-editor-name")).toHaveTextContent("Test System");
     expect(screen.getByTestId("document-editor-lifecycle")).toHaveTextContent("Active");
-    expect(screen.getByTestId("document-editor-autosave")).toHaveTextContent("Saved");
+    expect(screen.getByTestId("document-editor-autosave")).toHaveTextContent("Not saved yet");
     for (const label of ["Metadata", "Entities", "Sheets", "Actions", "Validations", "Reference data"]) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }
@@ -540,5 +541,220 @@ describe("DocumentEditor", () => {
     revision += 1;
     await qc.invalidateQueries({ queryKey: ["system", "open", "s1"] });
     await waitFor(() => expect(title).toHaveTextContent("Renamed System"), { timeout: 10_000 });
+  }, 30_000);
+
+  it("falls back to the server name when the working title is cleared without masking the clear", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, search: "" },
+    });
+    const docFor = (name: string) => ({
+      schemaVersion: "1.0",
+      metadata: { name, description: "d", language: "en", defaultDice: "d20" },
+      entities: [],
+      referenceData: [],
+      sheets: [],
+      expressions: [],
+      actions: [],
+      validations: [],
+    });
+    let revision = 1;
+    const systemName = "Test System";
+    let serverDoc = docFor("Server Doc");
+    let puts = 0;
+    let gets = 0;
+    const putNames: Array<string> = [];
+    const workspace = () => ({
+      system: {
+        systemId: "s1",
+        name: systemName,
+        access: "private",
+        lifecycle: "active",
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+      draft: {
+        revision,
+        document: serverDoc,
+        sourceChecksum: "c",
+        updatedBy: "u",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+      versions: [],
+      assessment: { ok: true, diagnostics: [] },
+    });
+    const fetch_ = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const target = typeof input === "string" ? input : input.toString();
+      if (target.includes("/versions")) {
+        return new Response(JSON.stringify({ versions: [], requestId: "r" }), { status: 200 });
+      }
+      if (target.endsWith("/draft")) {
+        puts += 1;
+        const body = JSON.parse(init?.body as string) as { expectedRevision: number | null; document: typeof serverDoc };
+        putNames.push(body.document.metadata.name);
+        if (body.expectedRevision !== revision) {
+          return new Response(
+            JSON.stringify({
+              error: { code: "conflict", message: "stale", latestRevision: revision },
+              requestId: "r",
+            }),
+            { status: 409, headers: { "content-type": "application/json" } },
+          );
+        }
+        revision += 1;
+        serverDoc = body.document;
+        return new Response(JSON.stringify({ workspace: workspace(), requestId: "r" }), { status: 200 });
+      }
+      gets += 1;
+      return new Response(JSON.stringify({ workspace: workspace(), requestId: "r" }), { status: 200 });
+    });
+    const client = createApiClient({ baseUrl: "http://x", fetch: fetch_ as typeof fetch });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <DocumentEditor client={client} systemId="s1" />
+      </QueryClientProvider>,
+    );
+
+    // Clean: the title falls back to the server system name.
+    const title = await screen.findByTestId("document-editor-name");
+    expect(title).toHaveTextContent("Test System");
+    // Quiesce the mount save and its echo before clearing the title.
+    await settleFetchActivity(() => ({ gets, puts }));
+
+    // Clear the existing draft's name: while editing (focused) the heading
+    // shows the true document value ("" after the clear) so fallback display
+    // text can never become document content; once blurred/settled it falls
+    // back to the server name for display only, while the working document
+    // keeps "" (visible in the metadata input and in the save).
+    const putsBefore = puts;
+    title.focus();
+    // Focus swaps the clean-state fallback for the true working value.
+    expect(title.textContent).toBe("Server Doc");
+    title.textContent = "";
+    fireEvent.input(title);
+    // Editing state: truly empty so the next keystroke starts from "".
+    expect(title.textContent).toBe("");
+    expect(screen.getByTestId("metadata-name")).toHaveValue("");
+    // Blurred/settled: fallback returns so the heading is never empty.
+    fireEvent.blur(title);
+    expect(title).toHaveTextContent("Test System");
+    expect(title.textContent).not.toBe("");
+    expect(screen.getByTestId("metadata-name")).toHaveValue("");
+
+    // The debounced save sends the deliberate clear; the heading keeps its
+    // fallback text through the save cycle.
+    await waitFor(() => expect(puts).toBeGreaterThan(putsBefore), { timeout: 10_000 });
+    expect(putNames.at(-1)).toBe("");
+    await settleFetchActivity(() => ({ gets, puts }));
+    expect(title).toHaveTextContent("Test System");
+    expect(title.textContent).not.toBe("");
+    expect(screen.getByTestId("metadata-name")).toHaveValue("");
+  }, 30_000);
+
+  it("types after a clear starting from empty instead of appending to the fallback", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, search: "" },
+    });
+    const docFor = (name: string) => ({
+      schemaVersion: "1.0",
+      metadata: { name, description: "d", language: "en", defaultDice: "d20" },
+      entities: [],
+      referenceData: [],
+      sheets: [],
+      expressions: [],
+      actions: [],
+      validations: [],
+    });
+    let revision = 1;
+    const systemName = "Test System";
+    let serverDoc = docFor("Server Doc");
+    let puts = 0;
+    let gets = 0;
+    const putNames: Array<string> = [];
+    const workspace = () => ({
+      system: {
+        systemId: "s1",
+        name: systemName,
+        access: "private",
+        lifecycle: "active",
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+      draft: {
+        revision,
+        document: serverDoc,
+        sourceChecksum: "c",
+        updatedBy: "u",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+      versions: [],
+      assessment: { ok: true, diagnostics: [] },
+    });
+    const fetch_ = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const target = typeof input === "string" ? input : input.toString();
+      if (target.includes("/versions")) {
+        return new Response(JSON.stringify({ versions: [], requestId: "r" }), { status: 200 });
+      }
+      if (target.endsWith("/draft")) {
+        puts += 1;
+        const body = JSON.parse(init?.body as string) as { expectedRevision: number | null; document: typeof serverDoc };
+        putNames.push(body.document.metadata.name);
+        if (body.expectedRevision !== revision) {
+          return new Response(
+            JSON.stringify({
+              error: { code: "conflict", message: "stale", latestRevision: revision },
+              requestId: "r",
+            }),
+            { status: 409, headers: { "content-type": "application/json" } },
+          );
+        }
+        revision += 1;
+        serverDoc = body.document;
+        return new Response(JSON.stringify({ workspace: workspace(), requestId: "r" }), { status: 200 });
+      }
+      gets += 1;
+      return new Response(JSON.stringify({ workspace: workspace(), requestId: "r" }), { status: 200 });
+    });
+    const client = createApiClient({ baseUrl: "http://x", fetch: fetch_ as typeof fetch });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <DocumentEditor client={client} systemId="s1" />
+      </QueryClientProvider>,
+    );
+
+    const title = await screen.findByTestId("document-editor-name");
+    expect(title).toHaveTextContent("Test System");
+    await settleFetchActivity(() => ({ gets, puts }));
+
+    // Clear, then type "X" appended at the end with no select-all: the
+    // keystroke must start from the true empty value, not the fallback text.
+    const putsBefore = puts;
+    title.focus();
+    expect(title.textContent).toBe("Server Doc");
+    title.textContent = "";
+    fireEvent.input(title);
+    expect(title.textContent).toBe("");
+    title.textContent = `${title.textContent}X`;
+    fireEvent.input(title);
+    expect(title).toHaveTextContent("X");
+    expect(title.textContent).toBe("X");
+    expect(screen.getByTestId("metadata-name")).toHaveValue("X");
+
+    // The debounced save sends "X" — never "Test SystemX" — and the saved
+    // value sticks in the working document. Once the save echo is adopted the
+    // header is clean again, so it shows the system name per the existing
+    // clean-state display rule (same as the clear test above); the saved name
+    // remains visible in the metadata input.
+    await waitFor(() => expect(puts).toBeGreaterThan(putsBefore), { timeout: 10_000 });
+    expect(putNames.at(-1)).toBe("X");
+    expect(putNames).not.toContain("Test SystemX");
+    await settleFetchActivity(() => ({ gets, puts }));
+    expect(putNames.at(-1)).toBe("X");
+    expect(putNames).not.toContain("Test SystemX");
+    expect(screen.getByTestId("metadata-name")).toHaveValue("X");
+    expect(title).toHaveTextContent("Test System");
   }, 30_000);
 });

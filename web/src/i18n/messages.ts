@@ -41,7 +41,7 @@ export const defaultMessages: MessageTable = {
   "editor.tab.actions": "Actions",
   "editor.tab.validations": "Validations",
   "editor.tab.referenceData": "Reference data",
-  "editor.autosave.idle": "Saved",
+  "editor.autosave.idle": "Not saved yet",
   "editor.autosave.saving": "Saving…",
   "editor.autosave.saved": "Saved",
   "editor.autosave.conflict": "Conflict",

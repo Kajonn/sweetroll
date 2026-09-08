@@ -123,3 +123,28 @@ Section 1). When authorized captures land, store representative views
 here with filename, source URL, capture date, and which details were
 unavailable — and update this file. Do not commit prototype data or
 simulated-service screens as production implementations.
+
+## 8. G0 visual review findings (2026-09-08)
+
+`web/tests/e2e/visual.spec.ts` no longer uses synthetic `page.setContent`
+checks: the conflict-banner baseline now renders the production
+`ConflictBanner` mounted by `DocumentEditor` after a genuine 409
+(clone d20 fixture, settle mount autosave, rival `PUT
+/systems/:id/draft` with the current revision, local rename so the
+debounced autosave fires stale). Verified locally against real
+Postgres + dev servers: 2/2 conflict tests pass with regenerated
+`conflict-banner-{360,1280}.png`; the other 8 visual tests pass
+unchanged against their committed baselines.
+
+Reviewed the regenerated baselines before accepting:
+
+- 1280px: full banner — warning icon, "modified by another save
+  (revision 3)" message, Reload theirs / Keep mine (force save) /
+  Merge into server, dismiss control. Correct.
+- 360px: banner element measures ~605px in a 360px viewport
+  (`documentElement.scrollWidth` stays 360, so the overflow is clipped
+  inside the editor pane rather than scrolling the page). The baseline
+  honestly captures this crop; it is **not** fixed here. G3 owns the
+  view-owned-layout repair (phone forms must not clip or horizontally
+  scroll); G1 lifecycle repairs come first per plan dependencies. Do
+  not "fix" this baseline by hiding the overflow.

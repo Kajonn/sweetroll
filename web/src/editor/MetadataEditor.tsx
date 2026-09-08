@@ -15,12 +15,15 @@ export function MetadataEditor({
   onChange?: (document: SystemDocumentV1) => void;
 }) {
   const [state, dispatch] = useReducer(documentReducer, document);
-  const baselineRef = useRef<SystemDocumentV1>(document);
   const dirtyRef = useRef(false);
 
+  // Follow the working document: adopt a refreshed server document in the
+  // visible inputs when clean. Unflushed local edits are preserved; the
+  // parent adopts server refreshes only when clean, so a dirty editor never
+  // has its keystrokes swapped out from under it here.
   useEffect(() => {
-    baselineRef.current = document;
-    dirtyRef.current = false;
+    if (dirtyRef.current) return;
+    dispatch({ type: "replace", document });
   }, [document]);
 
   const field = useCallback(

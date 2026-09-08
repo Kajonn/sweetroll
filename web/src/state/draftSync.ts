@@ -16,6 +16,12 @@ export type DraftSync = {
   save: (document: unknown, expectedRevision: number | null) => void;
   /** Drop a debounced save and stashed edits, e.g. on sign-out/account switch. */
   cancel: () => void;
+  /**
+   * True when this exact document content matches the last server-confirmed
+   * save. Lets owners adopt server refreshes only when clean instead of
+   * clobbering newer local edits with a stale echo.
+   */
+  isConfirmed: (document: unknown) => boolean;
   status: SyncStatus;
   banner: ConflictBanner | null;
   error: Error | null;
@@ -191,8 +197,13 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
     pendingRef.current = null;
   }, []);
 
+  const isConfirmed = useCallback(
+    (document: unknown) => hashDocument(document) === lastSavedHashRef.current,
+    [],
+  );
+
   return useMemo<DraftSync>(
-    () => ({ save, cancel, status, banner, error }),
-    [save, cancel, status, banner, error],
+    () => ({ save, cancel, isConfirmed, status, banner, error }),
+    [save, cancel, isConfirmed, status, banner, error],
   );
 }

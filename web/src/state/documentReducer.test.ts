@@ -3,6 +3,15 @@ import { describe, expect, it } from "vitest";
 import { blankDocument, documentReducer, type SystemDocumentV1 } from "./documentReducer.js";
 
 describe("documentReducer", () => {
+  it("replace adopts the whole server document", () => {
+    const initial = blankDocument();
+    const nextDoc: SystemDocumentV1 = {
+      ...blankDocument(),
+      metadata: { name: "Server", description: "d", language: "en", defaultDice: "d20" },
+    };
+    expect(documentReducer(initial, { type: "replace", document: nextDoc })).toBe(nextDoc);
+  });
+
   it("setMetadata replaces name + description", () => {
     const next = documentReducer(blankDocument(), {
       type: "setMetadata",

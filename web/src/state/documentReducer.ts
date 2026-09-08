@@ -32,6 +32,7 @@ export type SystemDocumentV1 = {
 };
 
 export type DocumentAction =
+  | { type: "replace"; document: SystemDocumentV1 }
   | { type: "setMetadata"; patch: SystemMetadataPatch }
   | { type: "addEntity"; entity: EntityDefinitionV1 }
   | { type: "removeEntity"; entityId: string }
@@ -62,6 +63,8 @@ export function blankDocument(): SystemDocumentV1 {
 
 export function documentReducer(state: SystemDocumentV1, action: DocumentAction): SystemDocumentV1 {
   switch (action.type) {
+    case "replace":
+      return action.document;
     case "setMetadata":
       return {
         ...state,

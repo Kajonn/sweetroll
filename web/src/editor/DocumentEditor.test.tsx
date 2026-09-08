@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -169,4 +169,105 @@ describe("DocumentEditor", () => {
     window.dispatchEvent(new CustomEvent("focus-editor:/sheets/0"));
     expect(scrollIntoView).toHaveBeenCalled();
   });
+
+  it("preserves an edit made during a slow save instead of adopting the stale echo", async () => {
+    const user = userEvent.setup();
+    // Pin the tab: earlier tests stub window.location with other tabs.
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, search: "" },
+    });
+    // Stateful server with the production revision check.
+    let revision = 1;
+    let serverName = "R1";
+    const docFor = (name: string) => ({
+      schemaVersion: "1.0",
+      metadata: { name, description: "d", language: "en", defaultDice: "d20" },
+      entities: [],
+      referenceData: [],
+      sheets: [],
+      expressions: [],
+      actions: [],
+      validations: [],
+    });
+    const workspace = (rev: number, name: string) => ({
+      system: {
+        systemId: "s1",
+        name: "Test System",
+        access: "private",
+        lifecycle: "active",
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+      draft: {
+        revision: rev,
+        document: docFor(name),
+        sourceChecksum: "c",
+        updatedBy: "u",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+      versions: [],
+      assessment: { ok: true, diagnostics: [] },
+    });
+    const errorBody = (latestRevision: number) => JSON.stringify({
+      error: { code: "conflict", message: "stale", latestRevision },
+      requestId: "r",
+    });
+    let puts = 0;
+    let releaseFirstPut!: () => void;
+    const firstPutGate = new Promise<void>((resolve) => { releaseFirstPut = resolve; });
+    let releaseSecondPut!: () => void;
+    const secondPutGate = new Promise<void>((resolve) => { releaseSecondPut = resolve; });
+    const getCalls: Array<unknown> = [];
+    const fetch_ = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const target = typeof input === "string" ? input : input.toString();
+      if (target.includes("/versions")) {
+        return new Response(JSON.stringify({ versions: [], requestId: "r" }), { status: 200 });
+      }
+      if (target.endsWith("/draft")) {
+        puts += 1;
+        const body = JSON.parse(init?.body as string) as { expectedRevision: number | null; document: { metadata: { name: string } } };
+        if (puts === 1) await firstPutGate;
+        if (puts === 2) await secondPutGate;
+        if (body.expectedRevision !== revision) {
+          return new Response(errorBody(revision), { status: 409, headers: { "content-type": "application/json" } });
+        }
+        revision += 1;
+        serverName = body.document.metadata.name;
+        return new Response(JSON.stringify({ workspace: workspace(revision, serverName), requestId: "r" }), { status: 200 });
+      }
+      getCalls.push(target);
+      return new Response(JSON.stringify({ workspace: workspace(revision, serverName), requestId: "r" }), { status: 200 });
+    });
+    const client = createApiClient({ baseUrl: "http://x", fetch: fetch_ as typeof fetch });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <DocumentEditor client={client} systemId="s1" />
+      </QueryClientProvider>,
+    );
+
+    // Mount autosave fires the slow first PUT; edit while it is in flight.
+    await waitFor(() => expect(puts).toBe(1), { timeout: 10_000 });
+    const nameInput = await screen.findByTestId("metadata-name");
+    expect(nameInput).toHaveValue("R1");
+    await user.type(nameInput, " + local");
+    nameInput.blur();
+    releaseFirstPut();
+
+    // The first save's echo refetch must not clobber the newer local edit.
+    await waitFor(() => expect(getCalls.length).toBeGreaterThanOrEqual(2), { timeout: 10_000 });
+    await new Promise<void>((resolve) => { setTimeout(resolve, 150); });
+    expect(screen.getByTestId("metadata-name")).toHaveValue("R1 + local");
+
+    // The stashed edit then saves cleanly against the fresh revision.
+    releaseSecondPut();
+    await waitFor(() => expect(puts).toBe(2), { timeout: 10_000 });
+    await waitFor(
+      () => expect(screen.getByTestId("document-editor-autosave")).toHaveTextContent("Saved"),
+      { timeout: 10_000 },
+    );
+    expect(screen.queryByTestId("conflict-banner")).not.toBeInTheDocument();
+    expect(screen.getByTestId("metadata-name")).toHaveValue("R1 + local");
+  }, 20_000);
 });

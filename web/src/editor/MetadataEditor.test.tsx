@@ -2,7 +2,21 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import type { SystemDocumentV1 } from "../state/documentReducer.js";
 import { MetadataEditor } from "./MetadataEditor.js";
+
+function docWithName(name: string): SystemDocumentV1 {
+  return {
+    schemaVersion: "1.0",
+    metadata: { name, description: "d", language: "en", defaultDice: "d20" },
+    entities: [],
+    referenceData: [],
+    sheets: [],
+    expressions: [],
+    actions: [],
+    validations: [],
+  };
+}
 
 describe("MetadataEditor", () => {
   it("renders the four metadata fields from the document", () => {
@@ -105,5 +119,20 @@ describe("MetadataEditor", () => {
     render(<MetadataEditor document={document} onChange={onChange} />);
     screen.getByTestId("metadata-name").blur();
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("adopts a refreshed server document in visible inputs when clean", () => {
+    const { rerender } = render(<MetadataEditor document={docWithName("Server v1")} />);
+    expect(screen.getByTestId("metadata-name")).toHaveValue("Server v1");
+    rerender(<MetadataEditor document={docWithName("Server v2")} />);
+    expect(screen.getByTestId("metadata-name")).toHaveValue("Server v2");
+  });
+
+  it("preserves unflushed local edits when a server refresh arrives", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<MetadataEditor document={docWithName("Server v1")} />);
+    await user.type(screen.getByTestId("metadata-name"), " + local");
+    rerender(<MetadataEditor document={docWithName("Server v2")} />);
+    expect(screen.getByTestId("metadata-name")).toHaveValue("Server v1 + local");
   });
 });

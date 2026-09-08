@@ -133,34 +133,45 @@ function DocumentEditorBody({
     initialDoc.entities[0]?.id ?? null,
   );
   const lastServerRevision = useRef<number | null>(ws.draft?.revision ?? null);
+  const documentRef = useRef(document);
+  documentRef.current = document;
+  const syncRef = useRef<ReturnType<typeof useDraftSync> | null>(null);
+  /** Forced adoption for explicit resolutions (e.g. Reload theirs). */
+  const adoptNextRef = useRef(false);
   useEffect(() => {
     const serverRevision = ws.draft?.revision ?? null;
-    if (serverRevision !== lastServerRevision.current) {
-      lastServerRevision.current = serverRevision;
-      const serverDoc =
-        ws.draft?.document !== undefined ? (ws.draft.document as SystemDocumentV1) : blankDocument();
-      dispatch({ type: "setMetadata", patch: serverDoc.metadata });
-      dispatch({
-        type: "setEntities",
-        entities: serverDoc.entities as unknown as EntityDefinitionV1[],
-      });
-      dispatch({
-        type: "setSheets",
-        sheets: serverDoc.sheets as unknown as SystemDocumentV1["sheets"][number][],
-      });
-      dispatch({
-        type: "setActions",
-        actions: serverDoc.actions as unknown as SystemDocumentV1["actions"][number][],
-      });
-      dispatch({
-        type: "setValidations",
-        validations: serverDoc.validations as unknown as ValidationV1[],
-      });
-      dispatch({
-        type: "setReferenceData",
-        referenceData: serverDoc.referenceData as unknown as SystemDocumentV1["referenceData"][number][],
-      });
-    }
+    if (serverRevision === lastServerRevision.current && !adoptNextRef.current) return;
+    // Adopt server refreshes only when clean: local edits newer than the last
+    // confirmed save are preserved, and the next save resolves divergence
+    // through the revision check plus explicit conflict resolution.
+    const sync = syncRef.current;
+    if (!adoptNextRef.current && sync !== null && !sync.isConfirmed(documentRef.current)) return;
+    adoptNextRef.current = false;
+    lastServerRevision.current = serverRevision;
+    const serverDoc =
+      ws.draft?.document !== undefined ? (ws.draft.document as SystemDocumentV1) : blankDocument();
+    dispatch({ type: "setMetadata", patch: serverDoc.metadata });
+    dispatch({
+      type: "setEntities",
+      entities: serverDoc.entities as unknown as EntityDefinitionV1[],
+    });
+    dispatch({
+      type: "setSheets",
+      sheets: serverDoc.sheets as unknown as SystemDocumentV1["sheets"][number][],
+    });
+    dispatch({
+      type: "setActions",
+      actions: serverDoc.actions as unknown as SystemDocumentV1["actions"][number][],
+    });
+    dispatch({
+      type: "setValidations",
+      validations: serverDoc.validations as unknown as ValidationV1[],
+    });
+    dispatch({
+      type: "setReferenceData",
+      referenceData: serverDoc.referenceData as unknown as SystemDocumentV1["referenceData"][number][],
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws.draft?.revision, ws.draft?.document]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
@@ -173,12 +184,16 @@ function DocumentEditorBody({
     client,
     systemId: ws.system.systemId,
     onAcceptTheirs: () => {
+      // Explicit resolution: adopt the reloaded server document even though
+      // local content is unconfirmed, then clear the forced flag.
+      adoptNextRef.current = true;
       queryClient.invalidateQueries({ queryKey: ["system", "open", ws.system.systemId] });
     },
     onSaved: () => {
       queryClient.invalidateQueries({ queryKey: ["system", "open", ws.system.systemId] });
     },
   });
+  syncRef.current = sync;
 
   const bodyRef = useRef<HTMLDivElement>(null);
   useFocusEditorListener(bodyRef);

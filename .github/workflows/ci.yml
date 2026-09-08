@@ -97,7 +97,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - run: npm run migrate
-      - run: npx playwright test tests/e2e/smoke.spec.ts tests/e2e/acceptance.spec.ts tests/e2e/character-sheet.spec.ts
+      - run: npx playwright test tests/e2e/smoke.spec.ts tests/e2e/acceptance.spec.ts tests/e2e/character-sheet.spec.ts tests/e2e/visual.spec.ts
         working-directory: web
 
   web-offline:

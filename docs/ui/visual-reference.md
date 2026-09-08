@@ -111,9 +111,9 @@ disabled, offline, conflict, permission-denied, and error/retry states
 with meaningful text — not color alone. Current coverage lives in
 `CharacterRoute/CharacterSheet/FieldControl/ConflictReview`,
 `DocumentEditor/MetadataEditor/draftSync`, and offline specs
-(`web/tests/offline/character.spec.ts`); `visual.spec.ts` conflict
-banner is still synthetic `page.setContent` and G0 replaces it with a
-real routed flow. Theme switching must not remount editors or reset
+(`web/tests/offline/character.spec.ts`); the `visual.spec.ts`
+conflict banner was replaced with a real routed flow in `b5a2586`
+(production `ConflictBanner` after a genuine 409; see §8). Theme switching must not remount editors or reset
 character state (G2 exit).
 
 ## 7. Reference screenshots

@@ -511,6 +511,8 @@ Expose a versioned REST HTTP interface described by OpenAPI. Use resource-orient
 
 `GET /characters/creation-versions` uses the same authorization policy as character creation. The `/characters/new` page opened without a version shows a "Choose a system version" picker from this endpoint; the manual system-version-ID box remains as fallback, and picking a version loads its creation metadata through the unchanged lookup path.
 
+At the reconciled baseline `d6bfd32`, the picker uses the inline `CharactersApi.listCreationVersions()` query in `CreateCharacter.tsx`. GUI work must reuse this path, preserve exact-version links, and add account-scoped cache handling before G4 acceptance. OD-01 now also governs discovery: the current endpoint enumerates other owners' `link` systems as well as public ones. Permission to use a known version and permission to enumerate it must be resolved explicitly before accepting the polished picker. G6 must bound/paginate this list before expanding it into a library/catalog. See the GUI plan reconciliation for current implementation versus remaining work.
+
 ## 13.1 Idempotency
 
 Create, roll, action, invitation, migration, and export commands accept an idempotency key scoped to user and endpoint. The server stores the completed result for a bounded interval. This prevents duplicated damage, resource spending, rolls, and invitations after mobile or offline retries.
@@ -693,9 +695,9 @@ Every increment must meet all applicable criteria before work begins on the next
 
 ## 17.6a I4a - GUI integration
 
-**Status:** Planned, added 2026-09-08. I1-I4 historical closure records remain unchanged.
+**Status:** Planned, added 2026-09-08; reconciled against `d6bfd32`. I1-I4 historical closure records remain unchanged. The basic creation picker is implemented and reused by G4/G6; this does not close I4a or I5.
 
-Complete G0-G5 in the [GUI integration plan](docs/superpowers/plans/2026-09-08-gui-integration.md): establish reference/route inventory and frontend CI; repair creator save/conflict and application-wide account cleanup; add theme tokens/shared controls; fix the responsive shell; polish the real character journey; and simplify/restyle the creator. G1 lifecycle repairs and G2 controls both precede protected-route migration.
+Resolve OD-01 discovery semantics for the new picker before G4 acceptance, and include picker cache lifetime in G1. Complete G0-G5 in the [GUI integration plan](docs/superpowers/plans/2026-09-08-gui-integration.md): establish reference/route inventory and frontend CI; repair creator save/conflict and application-wide account cleanup; add theme tokens/shared controls; fix the responsive shell; polish the real character journey; and simplify/restyle the creator. G1 lifecycle repairs and G2 controls both precede protected-route migration.
 
 **Acceptance demonstration:** At phone/tablet/desktop widths and in light/dark, create and publish a simple system without writing expressions, create and use a character, roll, recover from offline/conflict states, and sign out without leaving private data visible. Preserve generated contracts, stable IDs, published versions, and the existing character session/renderer. Review real screenshots and targeted regression evidence before I5 begins.
 
@@ -787,7 +789,7 @@ Complete GUI plan G8: define media/scene/display contracts and persistence; add 
 
 | **ID** | **Decision**   | **Question**                                                                      | **Working recommendation**                                        |
 |--------|----------------|-----------------------------------------------------------------------------------|-------------------------------------------------------------------|
-| OD-01  | Sharing model  | Systems discoverable, link-only, invitation-only, or all three at launch?         | Link-only plus private is the recommended MVP.                    |
+| OD-01  | Sharing model  | Which systems may be enumerated by the creation picker versus used from a known link?         | Private plus unlisted links; resolve picker enumeration before G4 acceptance.                    |
 | OD-02  | GM visibility  | Do campaign GMs always see full character state?                                  | Disclosed campaign policy; default yes.                           |
 | OD-03  | Collaboration  | Can several creators edit one system draft concurrently?                          | Named collaborators; serialize draft edits in MVP.                |
 | OD-04  | Rules ceiling (resolved) | Grammar v0.1 covers d20, 2d6, keep-high/low, advantage helpers, and threshold-counted dynamic d6 pools. | Defer reroll, explode, push, custom faces, lookups, and effects. |
@@ -800,7 +802,7 @@ Complete GUI plan G8: define media/scene/display contracts and persistence; add 
 
 ## 18.2 Immediate next actions
 
-**Current next work (2026-09-08):** execute I4a / GUI plan G0-G5 before I5 feature expansion. Preserve I1-I4 records as history, carry G6-G7 into I5-I7, and implement the explicit I7b scene/display scope afterward. The numbered foundation actions below retain their original increment context; they are not instructions to redo completed work.
+**Current next work (reconciled against `d6bfd32`):** execute I4a / GUI plan G0-G5 before I5 feature expansion. Reuse the completed picker, fix its account-cache lifetime under G1, and resolve OD-01 discovery before G4 acceptance. Preserve I1-I4 records as history, carry G6-G7 into I5-I7, and implement the explicit I7b scene/display scope afterward. The numbered foundation actions below retain their original increment context; they are not instructions to redo completed work.
 
 1. The I1 capability matrix selects license-neutral d20, 2d6 PbtA-style, and d6 counted-success families; its detailed matrix is in the system-package contract design.
 2. OD-04 is resolved by grammar v0.1 in the system-package contract design; implement that grammar after the package structural contracts.
@@ -811,7 +813,7 @@ Complete GUI plan G8: define media/scene/display contracts and persistence; add 
 7. Run five moderated creator tests during I2 and measure time to first published playable system.
 8. Create the ownership authorization table in I3, then extend it with campaign membership, audience, and GM-policy cases before I6 implementation.
 9. Keep the I5 Player app campaign-free; add all player campaign workflows together with their backend support in I6.
-10. Resolve OD-01 through OD-03 and OD-08 before I6; settle the GM visibility policy before I7. Keep commercial and public-discovery decisions outside the critical path.
+10. Resolve OD-01 discovery before G4 picker acceptance; resolve OD-02, OD-03, and OD-08 before I6; settle the GM visibility policy before I7. Keep commercial features and a public catalog outside the critical path.
 
 ## Appendix A. System package outline
 

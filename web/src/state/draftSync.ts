@@ -99,6 +99,9 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
     }
     pendingRef.current = null;
     epochRef.current += 1;
+    setStatus("idle");
+    setBanner(null);
+    setError(null);
   }, []);
 
   useEffect(() => {
@@ -146,13 +149,13 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
               setBanner({
                 latestRevision,
                 onAcceptTheirs: () => {
-                  if (!mountedRef.current) return;
+                  if (!mountedRef.current || epoch !== epochRef.current) return;
                   setBanner(null);
                   setStatus("idle");
                   onAcceptTheirsRef.current?.();
                 },
                 onKeepMine: () => {
-                  if (!mountedRef.current) return;
+                  if (!mountedRef.current || epoch !== epochRef.current) return;
                   setBanner(null);
                   // Explicit replace against the current revision: the server
                   // rejects a null expectedRevision for an existing draft, so
@@ -160,7 +163,7 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
                   fireSave(latestDocumentRef.current, latestRevision, hashDocument(latestDocumentRef.current));
                 },
                 onDismiss: () => {
-                  if (!mountedRef.current) return;
+                  if (!mountedRef.current || epoch !== epochRef.current) return;
                   setBanner(null);
                   setStatus("idle");
                 },

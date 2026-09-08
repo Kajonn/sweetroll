@@ -448,4 +448,74 @@ describe("useDraftSync", () => {
     expect(result.current.status).toBe("saving");
     expect(result.current.banner).toBeNull();
   });
+
+  it("cancel clears a shown conflict banner and drops stashed edits without flushing a PUT", async () => {
+    const fetch_ = vi.fn().mockResolvedValueOnce(conflictResponse(7));
+    const client = makeClient(fetch_);
+    const { result } = renderHook(
+      () => useDraftSync({ client, systemId: "s1", debounceMs: 10 }),
+      { wrapper: makeWrapper() },
+    );
+
+    act(() => {
+      result.current.save({ metadata: { name: "X" } }, 5);
+    });
+    await waitFor(() => expect(result.current.status).toBe("conflict"));
+    expect(result.current.banner).not.toBeNull();
+
+    // Stash an edit behind a debounce timer, then cancel before it fires.
+    act(() => {
+      result.current.save({ metadata: { name: "Newer" } }, 5);
+      result.current.cancel();
+    });
+    expect(result.current.status).toBe("idle");
+    expect(result.current.banner).toBeNull();
+    expect(result.current.error).toBeNull();
+
+    await sleep(40);
+    expect(fetch_).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe("idle");
+    expect(result.current.banner).toBeNull();
+    expect(result.current.error).toBeNull();
+  });
+
+  it("stale banner actions after cancel are no-ops", async () => {
+    const fetch_ = vi.fn().mockResolvedValueOnce(conflictResponse(7));
+    const client = makeClient(fetch_);
+    const onAcceptTheirs = vi.fn();
+    const { result } = renderHook(
+      () => useDraftSync({ client, systemId: "s1", debounceMs: 10, onAcceptTheirs }),
+      { wrapper: makeWrapper() },
+    );
+
+    act(() => {
+      result.current.save({ metadata: { name: "X" } }, 5);
+    });
+    await waitFor(() => expect(result.current.status).toBe("conflict"));
+    const staleBanner = result.current.banner;
+    if (staleBanner === null) throw new Error("banner expected");
+
+    act(() => {
+      result.current.cancel();
+    });
+    expect(result.current.status).toBe("idle");
+    expect(result.current.banner).toBeNull();
+
+    // Stale clicks after the cancel epoch bump must commit no state and fire no save.
+    act(() => {
+      staleBanner.onKeepMine();
+    });
+    act(() => {
+      staleBanner.onAcceptTheirs();
+    });
+    act(() => {
+      staleBanner.onDismiss();
+    });
+    await sleep(40);
+    expect(fetch_).toHaveBeenCalledTimes(1);
+    expect(onAcceptTheirs).not.toHaveBeenCalled();
+    expect(result.current.status).toBe("idle");
+    expect(result.current.banner).toBeNull();
+    expect(result.current.error).toBeNull();
+  });
 });

@@ -938,7 +938,13 @@ describe("CreateCharacter", () => {
       // actor+generation); it must never appear in B's picker and must never
       // auto-select into a metadata load under B.
       gate.resolve({ data: { versions: [versionA] }, requestId: "r-a" });
-      await new Promise(resolve => setTimeout(resolve, 30));
+      await gate.promise;
+      // Wait until A's late response has actually landed in A's own cache
+      // entry before asserting isolation: this proves B's UI survived the
+      // late write instead of racing it.
+      await waitFor(() => expect(
+        qc.getQueryData(["characters", "creation-versions", "actor-A", 0]),
+      ).toBeDefined());
       expect(screen.queryByRole("button", { name: "Private A 1.0.0" })).not.toBeInTheDocument();
       expect(screen.getByText("No system versions are available for character creation.")).toBeVisible();
       expect(api.creationOptions).not.toHaveBeenCalled();
@@ -989,7 +995,10 @@ describe("CreateCharacter", () => {
         <CreateCharacter key="actor-B:1" api={api} store={store} identity={mutable.identity} onCreated={vi.fn()} />,
       );
       metaGate.resolve(metadata());
-      await new Promise(resolve => setTimeout(resolve, 30));
+      await metaGate.promise;
+      // B's picker settling proves React processed updates past the account
+      // switch; the late metadata must not have committed the entity form.
+      await screen.findByRole("button", { name: "Private A 1.0.0" });
       expect(screen.queryByLabelText("Entity")).not.toBeInTheDocument();
     } finally {
       await store.close();
@@ -1127,5 +1136,30 @@ describe("CreateCharacter", () => {
     expect(await screen.findByText("The server rejected this character. Correct the details and try again.")).toBeVisible();
     expect(screen.queryByText(/may have been created|could not be confirmed/i)).not.toBeInTheDocument();
     await badStore.close();
+  });
+
+  it("H-b3 send-path 400 shows invalid input (not uncertain) and retires the attempt", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    api.creationOptions.mockResolvedValueOnce(metadata());
+    api.send.mockRejectedValueOnce(
+      new ApiError({
+        code: "validation_failed", message: "Bad input.", status: 400,
+        requestId: "req-400", latestRevision: null, diagnostics: [],
+      }),
+    );
+    const store = await openStore();
+    try {
+      renderCreate(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
+      );
+      await fillAndSubmit(user);
+      await waitFor(() => expect(api.send).toHaveBeenCalledTimes(1));
+      expect(await screen.findByText("The server rejected this character. Correct the details and try again.")).toBeVisible();
+      expect(screen.queryByText(/may have been created|could not be confirmed/i)).not.toBeInTheDocument();
+      await waitFor(() => expect(store.readOnlineAttempts("actor-1")).resolves.toHaveLength(0));
+    } finally {
+      await store.close();
+    }
   });
 });

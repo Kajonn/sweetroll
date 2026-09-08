@@ -47,7 +47,7 @@ function extractCharacterId(response: unknown): string | null {
 
 function errorMessageKey(error: unknown): string {
   if (error instanceof ApiError && error.status === 401) return "character.create.unauthorized";
-  if (error instanceof ApiError && error.status === 422) return "character.create.invalid";
+  if (error instanceof ApiError && (error.status === 400 || error.status === 422)) return "character.create.invalid";
   return "character.create.uncertain";
 }
 

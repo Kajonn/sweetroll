@@ -102,6 +102,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       // local data already hidden. Distinguish them so the UI does not blame
       // local storage when the server call failed. 401/invalid-credential vs
       // storage-unavailable at shell level remains a follow-up (see report).
+      // TECH DEBT: discriminates on the gate's English error text, so a gate
+      // message change breaks this. Switch to a typed code discriminant if
+      // the gate ever gains one; kept as-is to avoid over-engineering.
       if (error instanceof Error && /Server sign-out failed/.test(error.message)) setLogoutStatus("serverError");
       else setLogoutStatus("error");
     }

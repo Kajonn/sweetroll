@@ -106,23 +106,48 @@ export function createIdentityGate(input: {
       await store.setPendingLogout(account ?? "logout");
       if (account) await store.clearAccount(account);
     })();
+    let revocationError: unknown = null;
     const revoking = serialize(async () => {
       await clearing;
       if (!online()) return;
       try {
         const state = await store?.readIdentity();
-        if (state && state.pendingLogout === null) {
+        if (store && (!state || state.pendingLogout === null)) {
           if (!disposed) publish(null, false, false);
           return;
         }
         await client.fetch("POST", "/signout");
         await store?.clearPendingLogout(state?.generation);
         if (!disposed) publish(null, false, false);
-      } catch { /* The durable barrier must survive failed server revocation. */ }
+      } catch (error) {
+        // The durable barrier must survive failed server revocation, but the
+        // failure is reported so the caller can surface a retryable error
+        // instead of claiming success. Local data is already hidden.
+        revocationError = error;
+        throw error;
+      }
     });
-    return Promise.all([clearing, revoking]).then(() => {
-      if (!store) throw new Error("Local sign-out could not be saved because storage is unavailable.");
-    });
+    return Promise.all([clearing, revoking]).then(
+      () => {
+        if (!store) throw new Error("Local sign-out could not be saved because storage is unavailable.");
+        if (revocationError !== null) {
+          throw new Error("Server sign-out failed; local data is cleared and sign-out will be retried.", {
+            cause: revocationError,
+          });
+        }
+      },
+      (error) => {
+        // Local clearing failures propagate unchanged; a revocation failure
+        // is reported as retryable while the pending-logout barrier survives.
+        if (!store) throw new Error("Local sign-out could not be saved because storage is unavailable.");
+        if (revocationError !== null) {
+          throw new Error("Server sign-out failed; local data is cleared and sign-out will be retried.", {
+            cause: revocationError,
+          });
+        }
+        throw error;
+      },
+    );
   }
   if (channel) channel.onmessage = event => {
     if (event.data?.type !== "identity-changed" && event.data?.type !== "signed-out") return;

@@ -189,3 +189,35 @@ it("reports local logout persistence failure without waiting for a hanging me", 
   expect(gate.getSnapshot().actorId).toBeNull();
   gate.dispose(); await store.close();
 });
+
+it("rejects sign-out when server revocation fails while keeping the barrier and hiding local data", async () => {
+  const store = await openCharacterStore(crypto.randomUUID());
+  await store.setLastAccount("a");
+  await store.confirmSnapshot("a", "c", makeView({ characterId: "c", revision: 1 }), 0);
+  const client = { fetch: vi.fn(async (_method: string, path: string) => {
+    if (path === "/me") return { state: "authenticated", userId: "a" } as never;
+    if (path === "/signout") throw new Error("revocation down");
+    throw new Error(`unexpected ${path}`);
+  }) };
+  const gate = createIdentityGate({ store, client, online: () => true, channel: null });
+  await gate.refresh();
+  expect(gate.getSnapshot()).toMatchObject({ actorId: "a", verified: true });
+
+  await expect(gate.signOut()).rejects.toThrow(/sign-out|signout|revok/i);
+
+  // Local private data is hidden immediately...
+  expect(gate.getSnapshot()).toMatchObject({ actorId: null, pendingLogout: true });
+  expect((await store.read("a", "c")).confirmed).toBeNull();
+  expect(await store.readLastAccount()).toBeNull();
+  // ...but the durable pending-logout barrier survives for retry.
+  expect(await store.readPendingLogout()).not.toBeNull();
+
+  // A later refresh retries the revocation and clears the barrier on success.
+  client.fetch.mockImplementation(async (_method: string, path: string) => {
+    if (path === "/signout") return undefined as never;
+    return { state: "anonymous" } as never;
+  });
+  await gate.refresh();
+  expect(await store.readPendingLogout()).toBeNull();
+  gate.dispose(); await store.close();
+});

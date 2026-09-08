@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { HelpCircle } from "lucide-react";
 
 import { t } from "../i18n/index.js";
@@ -11,6 +11,7 @@ import styles from "./AppShell.module.css";
 import { createApiClient } from "../api/client.js";
 import { createIdentityGate, type IdentityGate } from "../characters/identity.js";
 import { openCharacterStore } from "../characters/store.js";
+import { queryClient } from "../queryClient.js";
 
 export type AuthState =
   | { state: "loading" }
@@ -60,6 +61,26 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => { disposed = true; cleanup(); };
   }, []);
   const requestId = useMemo(() => (typeof crypto !== "undefined" ? crypto.randomUUID() : "req"), []);
+  // Account-lifetime query hygiene: the shared client outlives sign-out and
+  // account switches, so every lifetime change cancels in-flight queries
+  // (late responses from the previous identity must not commit) and drops
+  // cached account data. The character subsystem guards its own lifetimes;
+  // this covers the React Query surface (me, library, versions, drafts).
+  const lastLifetimeRef = useRef<{ actor: string | null; generation: number } | null>(null);
+  useEffect(() => {
+    if (identity === null) return;
+    const snapshot = identity.getSnapshot();
+    const previous = lastLifetimeRef.current;
+    lastLifetimeRef.current = { actor: snapshot.actorId, generation: snapshot.generation };
+    if (
+      previous !== null &&
+      (previous.actor !== snapshot.actorId || previous.generation !== snapshot.generation)
+    ) {
+      void queryClient.cancelQueries().then(() => {
+        queryClient.removeQueries();
+      });
+    }
+  });
   useShortcut("?", () => setHelpOpen(true));
   const markSignedIn = async () => { await identity?.refresh(); };
   const signOut = async () => {

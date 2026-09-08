@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { queryClient } from "../queryClient.js";
 import { AppShell, useAuth } from "./AppShell.js";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
@@ -74,8 +75,30 @@ describe("AppShell", () => {
     expect(screen.getByTestId("status-bar")).toHaveTextContent("Online");
   });
 
-  it("renders children in the main region", () => {
+  it("renders children in the main region", async () => {
     render(<AppShell><span data-testid="child">x</span></AppShell>);
     expect(screen.getByTestId("child")).toBeInTheDocument();
+  });
+
+  it("cancels and clears account-scoped queries on sign-out", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => url.endsWith("/signout")
+      ? new Response(null, { status: 204 })
+      : new Response(JSON.stringify({ state: "authenticated", userId: "signed-in" }))));
+    const qc = queryClient;
+    qc.clear();
+    render(<AppShell>builder</AppShell>);
+    // Seed previous-identity cache entries only after sign-in settles, so the
+    // sign-in lifetime change cannot clear them vacuously.
+    await screen.findByRole("button", { name: "Sign out" });
+    qc.setQueryData(["me"], { state: "authenticated", userId: "signed-in" });
+    qc.setQueryData(["system", "library"], { pages: [] });
+    await userEvent.setup().click(screen.getByRole("button", { name: "Sign out" }));
+    await screen.findByText("Signed out.");
+    await vi.waitFor(() => {
+      expect(qc.getQueryData(["me"])).toBeUndefined();
+      expect(qc.getQueryData(["system", "library"])).toBeUndefined();
+    });
+    qc.clear();
   });
 });

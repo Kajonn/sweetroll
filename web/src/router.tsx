@@ -8,6 +8,9 @@ import type { BrowserChannel } from "./characters/identity.js";
 import type { IdentityGate } from "./characters/identity.js";
 import { CharacterDetail, NewCharacterRoute, useSharedCharacterStore } from "./characters/CharacterRoute.js";
 import { CharacterLibrary } from "./player/CharacterLibrary.js";
+import { Account } from "./player/Account.js";
+import { Onboarding } from "./player/Onboarding.js";
+import { PersonalActivity } from "./player/PersonalActivity.js";
 import { t } from "./i18n/index.js";
 import { DocumentEditor } from "./editor/DocumentEditor.js";
 import { CloneFromTemplate } from "./library/CloneFromTemplate.js";
@@ -93,6 +96,21 @@ const charactersRoute = createRoute({
   path: "/characters",
   component: CharacterLibraryRouteView,
 });
+const welcomeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/welcome",
+  component: WelcomeRouteView,
+});
+const activityRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/activity",
+  component: ActivityRouteView,
+});
+const accountRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/account",
+  component: AccountRouteView,
+});
 const characterDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/characters/$characterId",
@@ -165,6 +183,78 @@ function CharacterLibraryRouteView() {
   );
 }
 
+/**
+ * First-run welcome. Renders for any identity state (including anonymous):
+ * AppShell exempts /welcome from the anonymous gate, and the screen itself
+ * never blocks sign-in.
+ */
+function WelcomeRouteView() {
+  const identity = useIdentity();
+  useIdentityTick(identity);
+  if (identity === null) {
+    return <p role="status">{t("character.loading")}</p>;
+  }
+  return (
+    <Onboarding
+      key={libraryViewKey(identity.getActorId(), identity.getGeneration?.() ?? 0)}
+      actorId={identity.getActorId()}
+    />
+  );
+}
+
+/**
+ * Cross-character activity. Anonymous sees the sign-in prompt (matching the
+ * character detail route); the feed itself fans out Task 2's library ids.
+ */
+function ActivityRouteView() {
+  const identity = useIdentity();
+  useIdentityTick(identity);
+  const api = useCharactersApi();
+  if (identity === null) {
+    return <p role="status">{t("character.loading")}</p>;
+  }
+  if (identity.getActorId() === null) {
+    return (
+      <section aria-labelledby="personal-activity-title">
+        <h1 id="personal-activity-title">{t("player.activity.title")}</h1>
+        <p role="status">{t("character.detail.signIn")}</p>
+      </section>
+    );
+  }
+  return (
+    <PersonalActivity
+      key={libraryViewKey(identity.getActorId(), identity.getGeneration?.() ?? 0)}
+      api={api}
+      identity={identity}
+    />
+  );
+}
+
+/** Player account. Anonymous sees the sign-in prompt; storage state follows the shared store. */
+function AccountRouteView() {
+  const identity = useIdentity();
+  useIdentityTick(identity);
+  const store = useSharedCharacterStore();
+  if (identity === null || store === undefined) {
+    return <p role="status">{t("character.loading")}</p>;
+  }
+  if (identity.getActorId() === null) {
+    return (
+      <section aria-labelledby="account-title">
+        <h1 id="account-title">{t("player.account.title")}</h1>
+        <p role="status">{t("character.detail.signIn")}</p>
+      </section>
+    );
+  }
+  return (
+    <Account
+      key={libraryViewKey(identity.getActorId(), identity.getGeneration?.() ?? 0)}
+      client={apiClient}
+      identity={identity}
+      storageUnavailable={store === null}
+    />
+  );
+}
 /**
  * Account-lifetime key for the library view: the infinite-query cache is
  * already lifetime scoped (see characterLibraryKey), and the route remounts
@@ -260,7 +350,7 @@ function CharacterDetailRouteView() {
   );
 }
 
-const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute, welcomeRoute, activityRoute, accountRoute]);
 
 export function createAppRouter() { return createRouter({ routeTree }); }
 export const router = createAppRouter();

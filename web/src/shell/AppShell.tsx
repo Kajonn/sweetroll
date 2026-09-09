@@ -2,7 +2,9 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { HelpCircle } from "lucide-react";
 
 import { t } from "../i18n/index.js";
+import { isOnboardingComplete, Onboarding } from "../player/Onboarding.js";
 import { getStoredPreference, normalizePreference, persistPreference, THEME_STORAGE_KEY, type ThemePreference } from "../theme/theme.js";
+import { Button } from "../ui/Button.js";
 import { Select } from "../ui/Select.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { DevSignInPanel } from "./DevSignInPanel.js";
@@ -29,6 +31,32 @@ const isDevMode = (): boolean => {
   if (typeof import.meta === "undefined") return false;
   return import.meta.env?.MODE === "development";
 };
+
+/** Player paths where anonymous first-run sees the welcome instead of the sign-in prompt. */
+function isPlayerPath(pathname: string): boolean {
+  return (
+    pathname === "/characters" ||
+    pathname.startsWith("/characters/") ||
+    pathname === "/activity" ||
+    pathname === "/account"
+  );
+}
+
+type BeforeInstallPromptEvent = Event & {
+  prompt?: () => Promise<void>;
+  userChoice?: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
+const INSTALL_DISMISS_KEY = "sweetroll:pwa-install-dismissed";
+
+function isInstallDismissed(): boolean {
+  if (typeof localStorage === "undefined") return true;
+  try {
+    return localStorage.getItem(INSTALL_DISMISS_KEY) === "1";
+  } catch {
+    return true;
+  }
+}
 
 export function AuthProvider({ initial, children }: { initial: AuthState; children: ReactNode }) {
   return <AuthContext.Provider value={initial}>{children}</AuthContext.Provider>;
@@ -76,6 +104,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [identity, setIdentity] = useState<IdentityGate | null>(null);
   const [storageUnavailable, setStorageUnavailable] = useState(false);
   const [logoutStatus, setLogoutStatus] = useState<"pending" | "complete" | "error" | "serverError" | null>(null);
+  const [, setOnboardingTick] = useState(0);
+  const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installDismissed, setInstallDismissed] = useState<boolean>(() => isInstallDismissed());
   useEffect(() => {
     let disposed = false;
     let cleanup = () => {};
@@ -146,6 +177,36 @@ export function AppShell({ children }: { children: ReactNode }) {
   });
   useShortcut("?", () => setHelpOpen(true));
   const markSignedIn = async () => { await identity?.refresh(); };
+  // PWA install: capture the deferred prompt so the shell can offer the
+  // shared Install button; dismissal persists per device.
+  useEffect(() => {
+    const onPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallEvent(event as BeforeInstallPromptEvent);
+    };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
+  }, []);
+  const install = async () => {
+    const event = installEvent;
+    setInstallEvent(null);
+    try {
+      await event?.prompt?.();
+      await event?.userChoice;
+    } catch {
+      // A denied or failed prompt simply clears the banner; the user can
+      // still reach every route without installing.
+    }
+  };
+  const dismissInstall = () => {
+    try {
+      localStorage.setItem(INSTALL_DISMISS_KEY, "1");
+    } catch {
+      // Best-effort persistence only.
+    }
+    setInstallDismissed(true);
+    setInstallEvent(null);
+  };
   const signOut = async () => {
     if (!identity || !window.confirm(t("shell.signOut.confirm"))) return;
     try { await identity.signOut(); }
@@ -162,6 +223,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       else setLogoutStatus("error");
     }
   };
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
+  const showFirstRunWelcome =
+    auth.state === "anonymous" && pathname !== "/welcome" && isPlayerPath(pathname) && !isOnboardingComplete(null);
   return (
     <IdentityContext.Provider value={identity}>
       <AuthProvider initial={auth}>
@@ -176,6 +240,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               <a href="/" className={styles.navLink}>{t("shell.nav.home")}</a>
               <a href="/characters" className={styles.navLink}>{t("shell.nav.characters")}</a>
               <a href="/characters/new" className={styles.navLink}>{t("shell.nav.newCharacter")}</a>
+              <a href="/activity" className={styles.navLink}>{t("shell.nav.activity")}</a>
+              <a href="/account" className={styles.navLink}>{t("shell.nav.account")}</a>
             </nav>
             <div className={styles.actions}>
             {auth.state === "authenticated" && (
@@ -203,7 +269,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           <ErrorBoundary>
             <main role="main" id="main-content" data-testid="app-content" className={styles.main}>
               {storageUnavailable && <p role="status">{t("shell.characterStorageUnavailable")}</p>}
-              {auth.state === "anonymous" && isDevMode() ? (
+              {showFirstRunWelcome ? (
+                // Anonymous first-run on player paths sees the welcome inline:
+                // /welcome itself is exempt below and renders the routed
+                // Onboarding, while returning visitors fall through to the
+                // sign-in prompt. Dismissing only persists the flag and never
+                // blocks sign-in.
+                <Onboarding actorId={null} onDismiss={() => setOnboardingTick(tick => tick + 1)} />
+              ) : auth.state === "anonymous" && pathname === "/welcome" ? (
+                children
+              ) : auth.state === "anonymous" && isDevMode() ? (
                 <DevSignInPanel onSignedIn={markSignedIn} />
               ) : auth.state === "anonymous" ? (
                 // Production anonymous never keeps protected views mounted:
@@ -213,8 +288,26 @@ export function AppShell({ children }: { children: ReactNode }) {
               ) : (
                 children
               )}
+              {/* Phone bottom nav: Characters · Activity · Account. Plain
+                  anchors like the header nav (no router context required).
+                  Hidden on desktop, where the header keeps serving. */}
+              <nav aria-label={t("shell.bottomNav.label")} data-testid="player-bottom-nav" className={styles.bottomNav}>
+                <a href="/characters" className={styles.bottomNavLink}>{t("shell.nav.characters")}</a>
+                <a href="/activity" className={styles.bottomNavLink}>{t("shell.nav.activity")}</a>
+                <a href="/account" className={styles.bottomNavLink}>{t("shell.nav.account")}</a>
+              </nav>
             </main>
           </ErrorBoundary>
+          {installEvent !== null && !installDismissed ? (
+            <div role="region" aria-label={t("pwa.install")} data-testid="pwa-install" className={styles.installBanner}>
+              <Button type="button" variant="primary" onClick={() => { void install(); }}>
+                {t("pwa.install")}
+              </Button>
+              <Button type="button" variant="secondary" onClick={dismissInstall}>
+                {t("pwa.dismiss")}
+              </Button>
+            </div>
+          ) : null}
           <StatusBar requestId={requestId} online={online} />
           <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
         </div>

@@ -122,6 +122,15 @@ export type CompiledExpressionSummary = {
   resultType: ValueType;
   fallback: ScalarValue;
   ast: ExpressionAstV1;
+  /**
+   * Preview-only marker. Absent when the entry compiled cleanly under the
+   * preview env. `"uncompilable"` = failed preview compile (ast is a
+   * fallback literal so preview renders the sampled fallback value);
+   * `"invalid"` = the stored entry failed shape validation and was coerced
+   * to a fallback literal. The entry is always included — never omitted —
+   * so preview cannot silently drop an advanced definition.
+   */
+  previewError?: "invalid" | "uncompilable" | undefined;
 };
 
 export type SystemPackageV1 = {

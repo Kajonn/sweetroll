@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { compileExpression } from "@sweetroll/rules";
+import { compileExpression, type ExpressionAstV1 } from "@sweetroll/rules";
 import { Check } from "lucide-react";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
@@ -588,9 +588,11 @@ function nextSheetId(existing: ReadonlyArray<string>): string {
 }
 
 /**
- * Persist an edited expression source into `document.expressions` (via the
- * document reducer) instead of a render-local Map, so tab switches and
- * rerenders retain the edit. Unknown ids are ignored: no stray entries.
+ * Persist an edited expression source into `document.expressions` via the
+ * functional `setExpressionSource` reducer action (not a render-local Map
+ * and not a stale-snapshot `replace`), so tab switches/rerenders retain the
+ * edit and rapid successive edits cannot clobber each other. Unknown ids
+ * are ignored: no stray entries.
  */
 export function persistExpressionSource(
   document: SystemDocumentV1,
@@ -600,14 +602,32 @@ export function persistExpressionSource(
 ): void {
   const expressions = document.expressions ?? [];
   if (!expressions.some((entry) => entry.id === sourceId)) return;
+  dispatch({ type: "setExpressionSource", expressionId: sourceId, source });
+}
+
+/**
+ * Document-writing helper for computed-field blur commits (Task 2 wiring
+ * contract). Writes both the edited source and — when provided — the
+ * fallback into the `document.expressions` entry keyed by `expressionId`
+ * via the functional `setExpressionSource` action. Unknown ids are a
+ * no-op: no stray entries, and callers should keep their optional
+ * `onExpressionSourceChange`/`onFallbackChange` callbacks as the fallback
+ * path for dispatch-less use or entries not yet in the document.
+ */
+export function commitComputedSource(
+  document: SystemDocumentV1,
+  dispatch: React.Dispatch<DocumentAction>,
+  expressionId: string,
+  source: string,
+  fallback?: unknown,
+): void {
+  const expressions = document.expressions ?? [];
+  if (!expressions.some((entry) => entry.id === expressionId)) return;
   dispatch({
-    type: "replace",
-    document: {
-      ...document,
-      expressions: expressions.map((entry) =>
-        entry.id === sourceId ? { ...entry, source } : entry,
-      ),
-    },
+    type: "setExpressionSource",
+    expressionId,
+    source,
+    ...(fallback !== undefined ? { fallback, hasFallback: true as const } : null),
   });
 }
 
@@ -988,11 +1008,21 @@ export function buildPreviewPackage(document: SystemDocumentV1): import("../prev
 }
 
 /**
- * Best-effort preview compile of the document's source expressions (mirrors
- * the server's per-expression compile with a merged field env). Entries that
- * fail validation or compilation are skipped — the preview then falls back to
- * sampled/fallback values for those ids instead of crashing — but valid
- * expressions are never silently dropped.
+ * Preview pass-through for the document's source expressions. Every
+ * `document.expressions` id appears in the returned package: entries that
+ * fail shape validation or preview compilation are included with a
+ * `previewError` marker and a fallback-literal AST (so preview renders the
+ * sampled/fallback value) instead of being omitted. Validation and compile
+ * may only mark — never filter — so an untouched advanced definition can
+ * never silently disappear from preview.
+ *
+ * NOTE (preview/server env divergence, for Task 2+): the compile attempt
+ * below uses a merged cross-entity field env plus per-expression roll-input
+ * envs, which mirrors but does not match the server's per-owner envs
+ * (see server `compile-document.ts`). A multi-owner expression may therefore
+ * compile here yet fail on the server, or carry `previewError:
+ * "uncompilable"` here yet publish fine. The marker must be surfaced as a
+ * preview-only diagnostic, never as a publish verdict.
  */
 function compilePreviewExpressions(
   document: SystemDocumentV1,
@@ -1000,25 +1030,85 @@ function compilePreviewExpressions(
   const { fields, inputsByExpression } = previewExpressionEnvs(document);
   const out: import("../preview/sampleData.js").SystemPackageV1["expressions"] = [];
   for (const entry of (document.expressions ?? []) as unknown as Array<Record<string, unknown>>) {
-    if (typeof entry.id !== "string" || typeof entry.source !== "string") continue;
-    if (!isPreviewContext(entry.context) || !isPreviewResultType(entry.resultType)) continue;
-    if (!isPreviewFallback(entry.fallback)) continue;
-    const result = compileExpression(entry.source, {
-      env: { fields, inputs: inputsByExpression.get(entry.id) ?? {} },
-      resultType: entry.resultType,
-      context: entry.context,
-      fallback: entry.fallback,
-    });
-    if (!result.ok) continue;
+    if (typeof entry.id !== "string") continue;
+    const context = isPreviewContext(entry.context) ? entry.context : "computed";
+    const resultType = isPreviewResultType(entry.resultType)
+      ? entry.resultType
+      : inferPreviewResultType(entry.fallback);
+    const fallback: ScalarValue = isPreviewFallback(entry.fallback) ? entry.fallback : 0;
+    const shapeOk =
+      typeof entry.source === "string" &&
+      entry.context === context &&
+      entry.resultType === resultType &&
+      entry.fallback === fallback;
+    if (shapeOk) {
+      const result = compileExpression(entry.source as string, {
+        env: { fields, inputs: inputsByExpression.get(entry.id) ?? {} },
+        resultType,
+        context,
+        fallback,
+      });
+      if (result.ok) {
+        out.push({
+          id: entry.id,
+          context: result.value.context,
+          resultType: result.value.resultType,
+          fallback: result.value.fallback,
+          ast: result.value.ast,
+        });
+        continue;
+      }
+      out.push({
+        id: entry.id,
+        context,
+        resultType,
+        fallback,
+        ast: fallbackLiteralAst(fallback, resultType),
+        previewError: "uncompilable",
+      });
+      continue;
+    }
     out.push({
       id: entry.id,
-      context: result.value.context,
-      resultType: result.value.resultType,
-      fallback: result.value.fallback,
-      ast: result.value.ast,
+      context,
+      resultType,
+      fallback,
+      ast: fallbackLiteralAst(fallback, resultType),
+      previewError: "invalid",
     });
   }
   return out;
+}
+
+/** Coerce an unknown stored fallback to a result type for a marked entry. */
+function inferPreviewResultType(fallback: unknown): ValueType {
+  if (typeof fallback === "string") return "text";
+  if (typeof fallback === "boolean") return "boolean";
+  return "number";
+}
+
+/**
+ * Safe AST for a marked (uncompilable/invalid) preview entry: a literal of
+ * the fallback value, so preview render/evaluate paths stay total and show
+ * the sampled fallback instead of crashing or dropping the id.
+ */
+function fallbackLiteralAst(fallback: ScalarValue, resultType: ValueType): ExpressionAstV1 {
+  if (resultType === "text") {
+    return {
+      kind: "stringLiteral",
+      value: typeof fallback === "string" ? fallback : String(fallback),
+    };
+  }
+  if (resultType === "boolean") {
+    return {
+      kind: "booleanLiteral",
+      value: typeof fallback === "boolean" ? fallback : false,
+    };
+  }
+  return {
+    kind: "numberLiteral",
+    value: typeof fallback === "number" && Number.isFinite(fallback) ? fallback : 0,
+  };
 }
 
 function previewExpressionEnvs(document: SystemDocumentV1): {

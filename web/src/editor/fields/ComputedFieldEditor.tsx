@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Dispatch } from "react";
 
 import { t } from "../../i18n/index.js";
 import {
@@ -6,9 +6,14 @@ import {
   type ExpressionDiagnostic,
 } from "../../ports/expressions.js";
 import type {
+  DocumentAction,
+  SystemDocumentV1,
+} from "../../state/documentReducer.js";
+import type {
   ComputedFieldV1,
   FieldV1,
 } from "../../state/documentFieldTypes.js";
+import { commitComputedSource } from "../DocumentEditor.js";
 import { DefinitionIdInput } from "./DefinitionIdInput.js";
 import styles from "./FieldEditor.module.css";
 
@@ -27,6 +32,15 @@ export type ComputedFieldEditorProps = {
   fallback?: unknown;
   /** Commit an edited fallback back to the document (called on blur/select). */
   onFallbackChange?: ((next: unknown) => void) | undefined;
+  /**
+   * Document + dispatch for direct write-back via `commitComputedSource`.
+   * When both are provided (and the field's expressionId already exists in
+   * the document), blur commits go through the helper; the optional
+   * callbacks above remain the fallback path for dispatch-less use or for
+   * entries not yet in `document.expressions`.
+   */
+  document?: SystemDocumentV1 | undefined;
+  dispatch?: Dispatch<DocumentAction> | undefined;
   referencedBy?: number | undefined;
   disabled?: boolean | undefined;
 };
@@ -38,6 +52,8 @@ export function ComputedFieldEditor({
   onExpressionSourceChange,
   fallback,
   onFallbackChange,
+  document,
+  dispatch,
   referencedBy,
   disabled,
 }: ComputedFieldEditorProps) {
@@ -65,7 +81,16 @@ export function ComputedFieldEditor({
     onChange({ ...field, ...patch });
   };
   const commitSource = () => {
-    onExpressionSourceChange?.(draftSource);
+    if (
+      document !== undefined &&
+      dispatch !== undefined &&
+      field.expressionId !== "" &&
+      document.expressions?.some((entry) => entry.id === field.expressionId)
+    ) {
+      commitComputedSource(document, dispatch, field.expressionId, draftSource);
+    } else {
+      onExpressionSourceChange?.(draftSource);
+    }
   };
 
   return (
@@ -175,6 +200,8 @@ export function ComputedFieldEditor({
             field={field}
             fallback={fallback}
             onFallbackChange={onFallbackChange}
+            document={document}
+            dispatch={dispatch}
             disabled={disabled}
           />
         </label>
@@ -212,15 +239,31 @@ function FallbackInput({
   field,
   fallback,
   onFallbackChange,
+  document,
+  dispatch,
   disabled,
 }: {
   field: ComputedFieldV1;
   fallback: unknown;
   onFallbackChange: ((next: unknown) => void) | undefined;
+  document: SystemDocumentV1 | undefined;
+  dispatch: Dispatch<DocumentAction> | undefined;
   disabled: boolean | undefined;
 }) {
-  // Ephemeral edit buffer: commits go to onFallbackChange on blur (or on
-  // select for booleans) so the document keeps the source of truth.
+  // Ephemeral edit buffer: commits go through `commitComputedSource` when
+  // document + dispatch are available (preserving the stored source), and
+  // to onFallbackChange otherwise, so the document keeps the source of truth.
+  const commitFallback = (next: unknown) => {
+    const entry =
+      document !== undefined && field.expressionId !== ""
+        ? document.expressions?.find((candidate) => candidate.id === field.expressionId)
+        : undefined;
+    if (document !== undefined && dispatch !== undefined && entry !== undefined) {
+      commitComputedSource(document, dispatch, entry.id, entry.source, next);
+    } else {
+      onFallbackChange?.(next);
+    }
+  };
   const [draft, setDraft] = useState<string>(() => fallbackToDraft(fallback, field.valueType));
   useEffect(() => {
     setDraft(fallbackToDraft(fallback, field.valueType));
@@ -232,7 +275,7 @@ function FallbackInput({
         value={draft}
         onChange={(e) => {
           setDraft(e.target.value);
-          onFallbackChange?.(e.target.value === "true");
+          commitFallback(e.target.value === "true");
         }}
         data-testid={`computed-field-fallback-${field.id}`}
         disabled={disabled}
@@ -249,7 +292,7 @@ function FallbackInput({
         type="number"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={(e) => onFallbackChange?.(parseFallback(e.target.value, field.valueType))}
+        onBlur={(e) => commitFallback(parseFallback(e.target.value, field.valueType))}
         data-testid={`computed-field-fallback-${field.id}`}
         disabled={disabled}
       />
@@ -261,7 +304,7 @@ function FallbackInput({
       type="text"
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={(e) => onFallbackChange?.(parseFallback(e.target.value, field.valueType))}
+      onBlur={(e) => commitFallback(parseFallback(e.target.value, field.valueType))}
       data-testid={`computed-field-fallback-${field.id}`}
       disabled={disabled}
     />

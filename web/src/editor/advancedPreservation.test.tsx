@@ -1,16 +1,22 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useState } from "react";
+import { useState, type Dispatch } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { createApiClient } from "../api/client.js";
 import {
   buildPreviewPackage,
+  commitComputedSource,
   DocumentEditor,
   persistExpressionSource,
 } from "./DocumentEditor.js";
 import { defaultField, EntityList } from "./EntityList.js";
 import type { FieldV1 } from "../state/documentFieldTypes.js";
+import {
+  documentReducer,
+  type DocumentAction,
+} from "../state/documentReducer.js";
+import { generateSample } from "../preview/sampleData.js";
 import { ComputedFieldEditor } from "./fields/ComputedFieldEditor.js";
 
 type PutBody = { expectedRevision: number | null; document: any };
@@ -153,20 +159,95 @@ describe("advanced definition round-trip preservation (G5 task 1)", () => {
     );
   }, 30_000);
 
-  it("persistExpressionSource dispatches the edited source into document.expressions", () => {
+  it("persistExpressionSource dispatches a functional source update into document.expressions", () => {
     const dispatch = vi.fn();
     const document = fixtureDocument() as any;
     persistExpressionSource(document, dispatch, "e1", "2 + 3");
     expect(dispatch).toHaveBeenCalledTimes(1);
     const action = dispatch.mock.calls[0]?.[0];
-    expect(action?.type).toBe("replace");
-    expect(action?.document.expressions).toContainEqual(
-      expect.objectContaining({ id: "e1", source: "2 + 3" }),
-    );
+    expect(action).toMatchObject({
+      type: "setExpressionSource",
+      expressionId: "e1",
+      source: "2 + 3",
+    });
     // Unknown expression ids are left alone (no stray entries created).
     const noop = vi.fn();
     persistExpressionSource(document, noop, "missing", "x");
     expect(noop).not.toHaveBeenCalled();
+  });
+
+  it("commitComputedSource writes source and fallback back into document.expressions", () => {
+    const document = {
+      ...fixtureDocument(),
+      expressions: [
+        { id: "e1", context: "roll", resultType: "number", source: "1 + 1", fallback: 0 },
+        { id: "m", context: "computed", resultType: "number", source: "1", fallback: 0 },
+      ],
+    } as any;
+    const dispatched: DocumentAction[] = [];
+    commitComputedSource(document, ((a: DocumentAction) => {
+      dispatched.push(a);
+    }) as Dispatch<DocumentAction>, "m", "fields.level + 1", 5);
+    expect(dispatched).toHaveLength(1);
+    const next = documentReducer(document, dispatched[0]!);
+    expect(next.expressions).toContainEqual(
+      expect.objectContaining({ id: "m", source: "fields.level + 1", fallback: 5 }),
+    );
+    // Source-only commit preserves the stored fallback.
+    const dispatched2: DocumentAction[] = [];
+    commitComputedSource(document, ((a: DocumentAction) => {
+      dispatched2.push(a);
+    }) as Dispatch<DocumentAction>, "m", "fields.level + 2");
+    const next2 = documentReducer(document, dispatched2[0]!);
+    expect(next2.expressions).toContainEqual(
+      expect.objectContaining({ id: "m", source: "fields.level + 2", fallback: 0 }),
+    );
+    // Unknown expression ids are a no-op (no stray entries created).
+    const noop: DocumentAction[] = [];
+    commitComputedSource(document, ((a: DocumentAction) => {
+      noop.push(a);
+    }) as Dispatch<DocumentAction>, "missing", "x");
+    expect(noop).toHaveLength(0);
+  });
+
+  it("two rapid source edits both survive (functional action, no stale-snapshot replace)", () => {
+    const document = {
+      ...fixtureDocument(),
+      expressions: [
+        { id: "e1", context: "roll", resultType: "number", source: "1 + 1", fallback: 0 },
+        { id: "e2", context: "roll", resultType: "number", source: "d20", fallback: 0 },
+      ],
+    } as any;
+    // Two dispatches built without an intervening re-render: each applies to
+    // the latest reducer state, so neither clobbers the other (a
+    // stale-snapshot `replace` would lose the first edit here).
+    let next = documentReducer(document, {
+      type: "setExpressionSource",
+      expressionId: "e1",
+      source: "2 + 3",
+    });
+    // An unrelated update racing between the two edits is preserved too.
+    next = documentReducer(next, { type: "setMetadata", patch: { name: "R2" } });
+    next = documentReducer(next, {
+      type: "setExpressionSource",
+      expressionId: "e2",
+      source: "2d6",
+    });
+    expect(next.expressions).toContainEqual(
+      expect.objectContaining({ id: "e1", source: "2 + 3" }),
+    );
+    expect(next.expressions).toContainEqual(
+      expect.objectContaining({ id: "e2", source: "2d6" }),
+    );
+    expect(next.metadata.name).toBe("R2");
+    // Unknown ids leave the state untouched.
+    expect(
+      documentReducer(next, {
+        type: "setExpressionSource",
+        expressionId: "missing",
+        source: "x",
+      }),
+    ).toBe(next);
   });
 
   it("editing a computed field source writes back to the document on blur", () => {
@@ -199,6 +280,50 @@ describe("advanced definition round-trip preservation (G5 task 1)", () => {
     fireEvent.change(fallbackInput, { target: { value: "5" } });
     fireEvent.blur(fallbackInput);
     expect(onFallbackChange).toHaveBeenCalledWith(5);
+  });
+
+  it("computed blur commits through commitComputedSource when document+dispatch are provided", () => {
+    const document = {
+      ...fixtureDocument(),
+      expressions: [
+        { id: "modifier_expr", context: "computed", resultType: "number", source: "1 + 1", fallback: 0 },
+      ],
+    } as any;
+    const dispatched: DocumentAction[] = [];
+    const { unmount } = render(
+      <ComputedFieldEditor
+        field={{
+          kind: "computed",
+          id: "modifier",
+          label: "Modifier",
+          valueType: "number",
+          expressionId: "modifier_expr",
+        }}
+        onChange={vi.fn()}
+        expressionSource="1 + 1"
+        fallback={0}
+        document={document}
+        dispatch={((a: DocumentAction) => {
+          dispatched.push(a);
+        }) as Dispatch<DocumentAction>}
+      />,
+    );
+    const textarea = screen.getByTestId("computed-field-source-modifier");
+    fireEvent.change(textarea, { target: { value: "fields.level + 1" } });
+    fireEvent.blur(textarea);
+    // The dispatch path is used (no callback was even passed); applying the
+    // action writes the source back while preserving the stored fallback.
+    expect(dispatched).toHaveLength(1);
+    expect(dispatched[0]).toMatchObject({
+      type: "setExpressionSource",
+      expressionId: "modifier_expr",
+      source: "fields.level + 1",
+    });
+    const next = documentReducer(document, dispatched[0]!);
+    expect(next.expressions).toContainEqual(
+      expect.objectContaining({ id: "modifier_expr", source: "fields.level + 1", fallback: 0 }),
+    );
+    unmount();
   });
 
   it("defaultField preserves resource/computed kinds instead of coercing them to text", () => {
@@ -297,5 +422,49 @@ describe("advanced definition round-trip preservation (G5 task 1)", () => {
     });
     expect(pkg).not.toBeNull();
     expect(pkg?.expressions.map((e) => e.id)).toContain("e1");
+  });
+
+  it("buildPreviewPackage never omits ids: uncompilable/invalid entries are marked, not dropped", () => {
+    const pkg = buildPreviewPackage({
+      ...(fixtureDocument() as any),
+      entities: [
+        {
+          id: "hero",
+          label: "Hero",
+          fields: [
+            {
+              kind: "computed",
+              id: "modifier",
+              label: "Modifier",
+              valueType: "number",
+              expressionId: "broken",
+            },
+          ],
+        },
+      ],
+      expressions: [
+        { id: "e1", context: "roll", resultType: "number", source: "1 + 1", fallback: 0 },
+        // Compiles under no env: incomplete expression.
+        { id: "broken", context: "computed", resultType: "number", source: "1 +", fallback: 7 },
+        // Fails shape validation: non-string source.
+        { id: "odd", context: "roll", resultType: "number", source: 42, fallback: 0 },
+      ],
+    });
+    expect(pkg).not.toBeNull();
+    const ids = pkg?.expressions.map((e) => e.id) ?? [];
+    expect(ids).toContain("e1");
+    expect(ids).toContain("broken");
+    expect(ids).toContain("odd");
+    const broken = pkg?.expressions.find((e) => e.id === "broken");
+    expect(broken?.previewError).toBe("uncompilable");
+    // The marked entry carries a fallback literal so preview stays total.
+    expect(broken?.fallback).toBe(7);
+    const odd = pkg?.expressions.find((e) => e.id === "odd");
+    expect(odd?.previewError).toBe("invalid");
+    // The clean entry is unmarked; sampling still resolves the computed
+    // field to its fallback without crashing.
+    expect(pkg?.expressions.find((e) => e.id === "e1")?.previewError).toBeUndefined();
+    expect(() => generateSample(pkg!)).not.toThrow();
+    expect(generateSample(pkg!).hero?.fields.modifier).toBe(7);
   });
 });

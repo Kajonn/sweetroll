@@ -33,6 +33,7 @@ describe("buildOpenApiDocument", () => {
       "/characters/{characterId}",
       "/characters/{characterId}/actions/{actionId}",
       "/characters/{characterId}/activity",
+      "/characters/{characterId}/duplicate",
       "/characters/{characterId}/exports",
       "/characters/{characterId}/fields/{fieldId}/set",
       "/characters/{characterId}/migration-previews",
@@ -91,5 +92,11 @@ describe("buildOpenApiDocument", () => {
       | { required?: string[]; properties?: Record<string, unknown> }
       | undefined;
     expect(setFieldSchema?.required).toContain("idempotencyKey");
+
+    const duplicate = paths["/characters/{characterId}/duplicate"]?.post;
+    const duplicateSchema = duplicate?.requestBody?.content?.["application/json"]?.schema as
+      | { required?: string[]; properties?: Record<string, unknown> }
+      | undefined;
+    expect(duplicateSchema?.required).toContain("idempotencyKey");
   });
 });

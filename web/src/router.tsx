@@ -7,6 +7,7 @@ import { createCoordination } from "./characters/coordination.js";
 import type { BrowserChannel } from "./characters/identity.js";
 import type { IdentityGate } from "./characters/identity.js";
 import { CharacterDetail, NewCharacterRoute, useSharedCharacterStore } from "./characters/CharacterRoute.js";
+import { CharacterLibrary } from "./player/CharacterLibrary.js";
 import { t } from "./i18n/index.js";
 import { DocumentEditor } from "./editor/DocumentEditor.js";
 import { CloneFromTemplate } from "./library/CloneFromTemplate.js";
@@ -87,6 +88,11 @@ const charactersNewRoute = createRoute({
   }),
   component: NewCharacterRouteView,
 });
+const charactersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/characters",
+  component: CharacterLibraryRouteView,
+});
 const characterDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/characters/$characterId",
@@ -132,6 +138,41 @@ function LibraryRoute({ client }: { client: ApiClient }) {
       <CloneFromTemplate client={client} />
     </div>
   );
+}
+
+function CharacterLibraryRouteView() {
+  const identity = useIdentity();
+  useIdentityTick(identity);
+  const api = useCharactersApi();
+  const navigate = useNavigate();
+  if (identity === null) {
+    return <p role="status">{t("character.loading")}</p>;
+  }
+  return (
+    <CharacterLibrary
+      key={libraryViewKey(identity.getActorId(), identity.getGeneration?.() ?? 0)}
+      api={api}
+      identity={identity}
+      navigation={{
+        onOpenCharacter: characterId => {
+          void navigate({ to: "/characters/$characterId", params: { characterId } });
+        },
+        onCreateNew: () => {
+          void navigate({ to: "/characters/new" });
+        },
+      }}
+    />
+  );
+}
+
+/**
+ * Account-lifetime key for the library view: the infinite-query cache is
+ * already lifetime scoped (see characterLibraryKey), and the route remounts
+ * on lifetime change so search/filter/duplicate state never leaks across
+ * accounts.
+ */
+export function libraryViewKey(actorId: string | null, generation: number): string {
+  return `${actorId ?? "signed-out"}:${generation}`;
 }
 
 function NewCharacterRouteView() {
@@ -219,7 +260,7 @@ function CharacterDetailRouteView() {
   );
 }
 
-const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersNewRoute, characterDetailRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute]);
 
 export function createAppRouter() { return createRouter({ routeTree }); }
 export const router = createAppRouter();

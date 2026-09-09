@@ -401,6 +401,9 @@ const TransferOwnershipBody = Type.Object({
   expectedRevision: Type.Integer(),
   idempotencyKey: Type.String({ minLength: 1 }),
 });
+const DuplicateCharacterBody = Type.Object({
+  idempotencyKey: Type.String({ minLength: 1 }),
+});
 const CreateMigrationPreviewBody = Type.Object({
   targetVersionId: Type.String({ format: UUID_FORMAT }),
   mappings: Type.Optional(Type.Object({}, { additionalProperties: true })),
@@ -569,6 +572,19 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
       body: TransferOwnershipBody,
       response: {
         "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/characters/:characterId/duplicate",
+    operationId: "post_characters_characterId_duplicate",
+    schema: {
+      params: CharacterIdParams,
+      body: DuplicateCharacterBody,
+      response: {
+        "201": Type.Object({ character: CharacterViewDto, requestId: Type.String() }),
         ...ErrorResponses,
       },
     },
@@ -944,6 +960,17 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         const result = await characters.manage(ctxOf(request), command);
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
+      post_characters_characterId_duplicate: async (request, reply) => {
+        const params = request.params as { characterId: string };
+        const body = request.body as { idempotencyKey: string };
+        const result = await characters.duplicate(ctxOf(request), {
+          characterId: params.characterId,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return reply.code(201).send({ character: toCharacterDto(result.value), requestId: request.id });
       },
 
       get_characters_characterId_activity: async (request, reply) => {

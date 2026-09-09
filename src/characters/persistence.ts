@@ -131,6 +131,35 @@ export type ApplyManagementCommandOutcome =
   | { kind: "invalid_target" }
   | { kind: "conflict"; latestRevision: number };
 
+export type DuplicateCharacterInput = {
+  executionId: ExecutionId;
+  duplicate: {
+    characterId: CharacterId;
+    ownerId: UserId;
+    systemVersionId: VersionId;
+    entityDefinitionId: DefinitionId;
+    name: string;
+    state: RuntimeStateV1;
+    createdAt: Date;
+  };
+  activity: {
+    kind: string;
+    payloadJson: unknown;
+    requestId: string;
+  };
+  audit: {
+    kind: string;
+    summary: string;
+    requestId: string;
+  };
+  resultExpiresAt: Date;
+  buildResult: (args: { record: CharacterRecord }) => unknown;
+};
+
+export type DuplicateCharacterOutcome =
+  | { kind: "applied"; record: CharacterRecord; resultJson: unknown }
+  | { kind: "already_completed"; resultJson: unknown };
+
 export type MigrationPreviewRecord = {
   previewId: string;
   characterId: CharacterId;
@@ -273,6 +302,8 @@ export interface CharacterPersistenceRepository {
 
   applyManagementCommandTx(input: ApplyManagementCommandInput): Promise<ApplyManagementCommandOutcome>;
 
+  duplicateCharacterTx(input: DuplicateCharacterInput): Promise<DuplicateCharacterOutcome>;
+
   finalizeExecutionError(input: { executionId: ExecutionId; resultJson: unknown; expiresAt: Date }): Promise<void>;
 
   changedDefinitionIdsSinceRevision(
@@ -407,6 +438,65 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         );
         await client.query("COMMIT");
         return toCharacterRecord(characterRow);
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async duplicateCharacterTx(input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const execResult = await client.query<{ status: string; result_json: unknown }>(
+          `SELECT status, result_json FROM character_command_executions WHERE execution_id = $1 FOR UPDATE`,
+          [input.executionId],
+        );
+        const execRow = execResult.rows[0];
+        if (execRow === undefined) throw new Error("duplicateCharacterTx: execution row missing");
+        if (execRow.status === "completed") {
+          await client.query("COMMIT");
+          return { kind: "already_completed", resultJson: execRow.result_json };
+        }
+
+        const inserted = await client.query<CharacterRow>(
+          `INSERT INTO characters (id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, 1, $6::jsonb, 'owner_only', 'active', $7, $7)
+           RETURNING id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+          [
+            input.duplicate.characterId,
+            input.duplicate.ownerId,
+            input.duplicate.systemVersionId,
+            input.duplicate.entityDefinitionId,
+            input.duplicate.name,
+            JSON.stringify(input.duplicate.state),
+            input.duplicate.createdAt,
+          ],
+        );
+        const characterRow = requireRow(inserted.rows[0], "duplicateCharacterTx");
+        await client.query(
+          `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, request_id)
+           VALUES ($1, $2, $3, $4::jsonb, $5)`,
+          [characterRow.id, characterRow.revision, input.activity.kind, JSON.stringify(input.activity.payloadJson), input.activity.requestId],
+        );
+        await client.query(
+          `INSERT INTO character_audit_records (character_id, actor_id, kind, summary, request_id)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [characterRow.id, input.duplicate.ownerId, input.audit.kind, input.audit.summary, input.audit.requestId],
+        );
+
+        const record = toCharacterRecord(characterRow);
+        const resultJson = input.buildResult({ record });
+        await client.query(
+          `UPDATE character_command_executions
+              SET status = 'completed', result_json = $1::jsonb, expires_at = $2
+            WHERE execution_id = $3`,
+          [JSON.stringify(resultJson), input.resultExpiresAt, input.executionId],
+        );
+        await client.query("COMMIT");
+        return { kind: "applied", record, resultJson };
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

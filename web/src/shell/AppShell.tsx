@@ -174,6 +174,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   RouterProvider (standalone/tests), where TanStack Link has no
                   router context and crashes. */}
               <a href="/" className={styles.navLink}>{t("shell.nav.home")}</a>
+              <a href="/characters" className={styles.navLink}>{t("shell.nav.characters")}</a>
               <a href="/characters/new" className={styles.navLink}>{t("shell.nav.newCharacter")}</a>
             </nav>
             <div className={styles.actions}>

@@ -2,9 +2,12 @@ import { ApiError, type ApiClient } from "../api/client.js";
 import type {
   ActivityResponse,
   CharacterExport,
+  CharacterList,
   CommandResultResponse,
   CreationOptions,
   CreationVersions,
+  DuplicateCharacterBody,
+  DuplicateCharacterResponse,
   FrozenRequest,
   MigrationPreviewBody,
   MigrationPreviewResponse,
@@ -18,10 +21,17 @@ export type VersionCatalogQuery = {
   systemId?: string | null;
 };
 
+export type CharacterListQuery = {
+  cursor?: string | null;
+  limit?: number;
+};
+
 export type CharactersApi = {
   open(characterId: string): Promise<OpenCharacterResponse>;
   creationOptions(versionId: string): Promise<CreationOptions>;
   listCreationVersions(input?: VersionCatalogQuery): Promise<CreationVersions>;
+  listCharacters(input?: CharacterListQuery): Promise<CharacterList>;
+  duplicateCharacter(characterId: string, body: DuplicateCharacterBody): Promise<DuplicateCharacterResponse>;
   activity(characterId: string, cursor: string | null): Promise<ActivityResponse>;
   send(request: FrozenRequest): Promise<CommandResultResponse>;
   export(characterId: string): Promise<CharacterExport>;
@@ -64,6 +74,19 @@ export function createCharactersApi(client: ApiClient): CharactersApi {
             systemId: input.systemId ?? undefined,
           },
         }),
+    listCharacters: (input) =>
+      input === undefined
+        ? client.fetch<CharacterList>("GET", "/characters")
+        : client.fetch<CharacterList>("GET", "/characters", {
+          query: {
+            cursor: input.cursor ?? undefined,
+            limit: input.limit ?? undefined,
+          },
+        }),
+    duplicateCharacter: (characterId, body) =>
+      client.fetch<DuplicateCharacterResponse>("POST", `/characters/${characterId}/duplicate`, {
+        body,
+      }),
     activity: (characterId, cursor) =>
       client.fetch<ActivityResponse>("GET", `/characters/${characterId}/activity`, {
         query: { cursor },

@@ -95,6 +95,17 @@ export type CreationVersions = CreationVersionsResponse;
 export type ActivityResponse = operations["get_characters_characterId_activity"]["responses"]["200"]["content"]["application/json"];
 export type ActivityEvent = ActivityResponse["events"][number];
 
+export type CharacterListResponse =
+  operations["get_characters"]["responses"]["200"]["content"]["application/json"];
+export type CharacterList = CharacterListResponse;
+export type CharacterSummary = CharacterListResponse["characters"][number];
+
+export type DuplicateCharacterResponse =
+  operations["post_characters_characterId_duplicate"]["responses"]["201"]["content"]["application/json"];
+export type DuplicateCharacterBody = NonNullable<
+  operations["post_characters_characterId_duplicate"]["requestBody"]
+>["content"]["application/json"];
+
 export type CommandResultResponse = operations["post_characters_characterId_fields_fieldId_set"]["responses"]["200"]["content"]["application/json"];
 export type CommandResult = CommandResultResponse["result"];
 

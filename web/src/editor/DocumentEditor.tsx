@@ -1,4 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { compileExpression } from "@sweetroll/rules";
 import { Check } from "lucide-react";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
@@ -6,6 +7,7 @@ import type { ApiClient } from "../api/client.js";
 import { useOpenSystem } from "../api/openSystem.js";
 import type { DocumentAssessment } from "../api/server.js";
 import { t } from "../i18n/index.js";
+import type { ScalarValue, ValueType } from "../ports/evaluateExpression.js";
 import { ResourceBumpEditor, type ResourceBumpActionV1 } from "./actions/ResourceBumpEditor.js";
 import { RollActionEditor, type RollActionV1 } from "./actions/RollActionEditor.js";
 import { ConflictBanner } from "./ConflictBanner.js";
@@ -585,6 +587,30 @@ function nextSheetId(existing: ReadonlyArray<string>): string {
   return `sheet_${Date.now()}`;
 }
 
+/**
+ * Persist an edited expression source into `document.expressions` (via the
+ * document reducer) instead of a render-local Map, so tab switches and
+ * rerenders retain the edit. Unknown ids are ignored: no stray entries.
+ */
+export function persistExpressionSource(
+  document: SystemDocumentV1,
+  dispatch: React.Dispatch<DocumentAction>,
+  sourceId: string,
+  source: string,
+): void {
+  const expressions = document.expressions ?? [];
+  if (!expressions.some((entry) => entry.id === sourceId)) return;
+  dispatch({
+    type: "replace",
+    document: {
+      ...document,
+      expressions: expressions.map((entry) =>
+        entry.id === sourceId ? { ...entry, source } : entry,
+      ),
+    },
+  });
+}
+
 function ActionsTab({
   client,
   document,
@@ -646,8 +672,8 @@ function ActionsTab({
     });
   };
 
-  const expressionSourceMap = new Map<string, string>();
-  for (const e of expressions) expressionSourceMap.set(e.id, e.source ?? "");
+  const expressionSourceFor = (expressionId: string): string =>
+    expressions.find((entry) => entry.id === expressionId)?.source ?? "";
 
   return (
     <section data-testid="actions-tab" data-path="/actions">
@@ -672,9 +698,9 @@ function ActionsTab({
                   systemId="s1"
                   action={action}
                   onChange={(next) => replaceAction(idx, next)}
-                  expressionSource={expressionSourceMap.get(action.expressionId) ?? ""}
+                  expressionSource={expressionSourceFor(action.expressionId)}
                   onExpressionSourceChange={(next) => {
-                    expressionSourceMap.set(action.expressionId, next);
+                    persistExpressionSource(document, dispatch, action.expressionId, next);
                   }}
                   fieldTypes={buildFieldTypeMap(document)}
                 />
@@ -776,8 +802,8 @@ function ValidationsTab({
 }) {
   const validations = (document.validations as unknown as ValidationV1[]) ?? [];
   const expressions = (document.expressions as unknown as Array<{ id: string; source: string }>) ?? [];
-  const expressionSourceMap = new Map<string, string>();
-  for (const e of expressions) expressionSourceMap.set(e.id, e.source ?? "");
+  const expressionSourceFor = (expressionId: string): string =>
+    expressions.find((entry) => entry.id === expressionId)?.source ?? "";
 
   const addValidation = () => {
     const id = nextValidationId(validations.map((v) => v.id));
@@ -820,9 +846,9 @@ function ValidationsTab({
                 systemId="s1"
                 validation={v as unknown as Parameters<typeof ValidationEditor>[0]["validation"]}
                 onChange={(next) => replaceValidation(idx, next as unknown as ValidationV1)}
-                expressionSource={expressionSourceMap.get(v.expressionId) ?? ""}
+                expressionSource={expressionSourceFor(v.expressionId)}
                 onExpressionSourceChange={(next) => {
-                  expressionSourceMap.set(v.expressionId, next);
+                  persistExpressionSource(document, dispatch, v.expressionId, next);
                 }}
                 availableExpressions={expressionOptions}
                 availableTargets={targetOptions}
@@ -924,7 +950,7 @@ function nextReferenceDataId(existing: ReadonlyArray<string>): string {
   return `reference_${Date.now()}`;
 }
 
-function buildPreviewPackage(document: SystemDocumentV1): import("../preview/sampleData.js").SystemPackageV1 | null {
+export function buildPreviewPackage(document: SystemDocumentV1): import("../preview/sampleData.js").SystemPackageV1 | null {
   if (document.entities.length === 0) return null;
   const entities = document.entities.map((entity) => ({
     id: entity.id,
@@ -955,10 +981,114 @@ function buildPreviewPackage(document: SystemDocumentV1): import("../preview/sam
   >) ?? [];
   return {
     entities,
-    expressions: [],
+    expressions: compilePreviewExpressions(document),
     sheets: sheets as unknown as never,
     actions: actions as unknown as never,
   } as unknown as import("../preview/sampleData.js").SystemPackageV1;
+}
+
+/**
+ * Best-effort preview compile of the document's source expressions (mirrors
+ * the server's per-expression compile with a merged field env). Entries that
+ * fail validation or compilation are skipped — the preview then falls back to
+ * sampled/fallback values for those ids instead of crashing — but valid
+ * expressions are never silently dropped.
+ */
+function compilePreviewExpressions(
+  document: SystemDocumentV1,
+): import("../preview/sampleData.js").SystemPackageV1["expressions"] {
+  const { fields, inputsByExpression } = previewExpressionEnvs(document);
+  const out: import("../preview/sampleData.js").SystemPackageV1["expressions"] = [];
+  for (const entry of (document.expressions ?? []) as unknown as Array<Record<string, unknown>>) {
+    if (typeof entry.id !== "string" || typeof entry.source !== "string") continue;
+    if (!isPreviewContext(entry.context) || !isPreviewResultType(entry.resultType)) continue;
+    if (!isPreviewFallback(entry.fallback)) continue;
+    const result = compileExpression(entry.source, {
+      env: { fields, inputs: inputsByExpression.get(entry.id) ?? {} },
+      resultType: entry.resultType,
+      context: entry.context,
+      fallback: entry.fallback,
+    });
+    if (!result.ok) continue;
+    out.push({
+      id: entry.id,
+      context: result.value.context,
+      resultType: result.value.resultType,
+      fallback: result.value.fallback,
+      ast: result.value.ast,
+    });
+  }
+  return out;
+}
+
+function previewExpressionEnvs(document: SystemDocumentV1): {
+  fields: Record<string, ValueType>;
+  inputsByExpression: Map<string, Record<string, ValueType>>;
+} {
+  const fields: Record<string, ValueType> = {};
+  for (const entity of document.entities) {
+    for (const field of entity.fields as unknown as Array<{
+      id: string;
+      kind?: string;
+      valueType?: unknown;
+    }>) {
+      if (fields[field.id] !== undefined) continue;
+      const valueType = previewFieldValueType(field.kind, field.valueType);
+      if (valueType !== undefined) fields[field.id] = valueType;
+    }
+  }
+  const inputsByExpression = new Map<string, Record<string, ValueType>>();
+  for (const action of document.actions as unknown as Array<{
+    kind?: string;
+    expressionId?: string;
+    inputs?: Array<{ id: string; valueType?: string }>;
+  }>) {
+    if (action.kind !== "roll" || typeof action.expressionId !== "string") continue;
+    const inputs = inputsByExpression.get(action.expressionId) ?? {};
+    for (const input of action.inputs ?? []) {
+      if (inputs[input.id] === undefined) {
+        inputs[input.id] =
+          input.valueType === "boolean"
+            ? "boolean"
+            : input.valueType === "text"
+              ? "text"
+              : "number";
+      }
+    }
+    inputsByExpression.set(action.expressionId, inputs);
+  }
+  return { fields, inputsByExpression };
+}
+
+function previewFieldValueType(kind: unknown, valueType: unknown): ValueType | undefined {
+  switch (kind) {
+    case "text":
+    case "singleChoice":
+    case "multiChoice":
+      return "text";
+    case "integer":
+    case "decimal":
+    case "resource":
+      return "number";
+    case "boolean":
+      return "boolean";
+    case "computed":
+      return isPreviewResultType(valueType) ? valueType : undefined;
+    default:
+      return undefined;
+  }
+}
+
+function isPreviewContext(value: unknown): value is "computed" | "roll" | "validation" {
+  return value === "computed" || value === "roll" || value === "validation";
+}
+
+function isPreviewResultType(value: unknown): value is ValueType {
+  return value === "number" || value === "text" || value === "boolean";
+}
+
+function isPreviewFallback(value: unknown): value is ScalarValue {
+  return typeof value === "number" || typeof value === "string" || typeof value === "boolean";
 }
 
 function VersionHistoryOverlay({

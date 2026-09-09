@@ -41,7 +41,7 @@ function defaultLabel(existing: EntityListEntity[]): string {
   return `${base} ${Date.now()}`;
 }
 
-function defaultField(kind: FieldV1["kind"]): FieldV1 {
+export function defaultField(kind: FieldV1["kind"]): FieldV1 {
   switch (kind) {
     case "text":
       return {
@@ -109,15 +109,23 @@ function defaultField(kind: FieldV1["kind"]): FieldV1 {
         required: false,
       };
     case "resource":
+      return {
+        kind: "resource",
+        id: "resource",
+        label: t("editor.entity.fieldKind.resource"),
+        default: { current: 0, max: 10 },
+        min: 0,
+        max: 10,
+        step: 1,
+        resetTo: "max",
+      };
     case "computed":
       return {
-        kind: "text",
-        id: "placeholder",
-        label: t("editor.entity.fieldKind.placeholder"),
-        default: "",
-        required: false,
-        minLength: 0,
-        maxLength: 120,
+        kind: "computed",
+        id: "computed",
+        label: t("editor.entity.fieldKind.computed"),
+        valueType: "number",
+        expressionId: "",
       };
   }
 }
@@ -145,9 +153,17 @@ function FieldEditorRouter({
       return <ResourceFieldEditor field={field} onChange={onChange} />;
     case "computed":
       return (
-        <p className={styles.unsupported} data-testid={`field-unsupported-${field.id}`}>
-          {t("editor.entity.landsLater", { kind: t(`editor.fields.kind.${field.kind}`) })}
-        </p>
+        <div className={styles.unsupported} data-testid={`field-unsupported-${field.id}`}>
+          <span data-testid={`field-unsupported-summary-${field.id}`}>
+            {field.label} ({t(`editor.fields.kind.${field.kind}`)})
+          </span>{" "}
+          <span>
+            {t("editor.entity.unsupportedPreserved", {
+              label: field.label,
+              kind: t(`editor.fields.kind.${field.kind}`),
+            })}
+          </span>
+        </div>
       );
   }
 }

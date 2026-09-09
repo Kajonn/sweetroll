@@ -22,7 +22,7 @@
   color: var(--color-fg-muted);
   font-weight: 500;
   flex: 1 1 140px;
-  min-width: 140px;
+  min-width: 0;
 }
 
 .field input[type="text"],
@@ -71,10 +71,12 @@
   display: flex;
   gap: 8px;
   align-items: center;
+  min-width: 0;
 }
 
 .optionsRow > input[type="text"] {
   flex: 1;
+  min-width: 0;
 }
 
 .optionsRow > button {

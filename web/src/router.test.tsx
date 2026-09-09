@@ -364,3 +364,65 @@ describe("character routes", () => {
     }
   });
 });
+
+// G3-3 back-navigation regression (G3 exit: deep links/back-nav survive the
+// shell migration). Router-level, mocked fetch, jsdom history shim:
+// library (/) -> system editor (/systems/$systemId) -> back -> library
+// restores -> forward -> editor restores. Shell chrome (header + one main
+// region) is asserted intact at every step: the migration must not break
+// the AppShell <Outlet/> composition.
+//
+// Honest limits (stated, not silent): jsdom runs no layout engine and this
+// exercises the router's history shim, NOT real browser chrome history
+// (G9 real-device work). The editor workspace fetch never resolves, so the
+// editor side asserts route restoration, not a full dirty-state round-trip:
+// no edits exist at the loading state, and input-state survival across
+// resizes/remounts is covered by the AppShell no-remount test instead.
+describe("G3 shell migration: back navigation", () => {
+  afterEach(() => {
+    window.history.pushState({}, "", "/");
+    vi.restoreAllMocks();
+  });
+
+  it("restores library and editor routes across back/forward with shell chrome intact", async () => {
+    const fetch_ = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input), window.location.origin);
+      if (url.pathname === "/api/me") {
+        return new Response(JSON.stringify({ state: "authenticated", userId: "g3-back-nav" }));
+      }
+      if (url.pathname.startsWith("/api/systems/")) {
+        return new Promise<Response>(() => {});
+      }
+      return new Response(JSON.stringify({ systems: [], nextCursor: null, requestId: "r" }), { status: 200 });
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetch_ as unknown as typeof fetch;
+    try {
+      const router = renderAt("/");
+      await waitFor(() => expect(screen.getByTestId("library-route")).toBeInTheDocument());
+      expect(screen.getByRole("banner")).toBeInTheDocument();
+      expect(screen.getAllByRole("main")).toHaveLength(1);
+
+      await router.navigate({ to: "/systems/$systemId", params: { systemId: "sys-1" } });
+      await waitFor(() => expect(screen.getByTestId("document-editor-loading")).toBeInTheDocument());
+      expect(screen.queryByTestId("library-route")).not.toBeInTheDocument();
+      expect(screen.getByRole("banner")).toBeInTheDocument();
+      expect(screen.getAllByRole("main")).toHaveLength(1);
+
+      router.history.back();
+      await waitFor(() => expect(screen.getByTestId("library-route")).toBeInTheDocument());
+      expect(screen.queryByTestId("document-editor-loading")).not.toBeInTheDocument();
+      expect(screen.getByRole("banner")).toBeInTheDocument();
+      expect(screen.getAllByRole("main")).toHaveLength(1);
+
+      router.history.forward();
+      await waitFor(() => expect(screen.getByTestId("document-editor-loading")).toBeInTheDocument());
+      expect(screen.queryByTestId("library-route")).not.toBeInTheDocument();
+      expect(screen.getByRole("banner")).toBeInTheDocument();
+      expect(screen.getAllByRole("main")).toHaveLength(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+      window.history.pushState({}, "", "/");
+    }
+  });
+});

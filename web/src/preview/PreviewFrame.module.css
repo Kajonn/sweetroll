@@ -3,13 +3,18 @@
   flex-direction: column;
   gap: 8px;
   align-items: flex-start;
+  min-width: 0;
+  max-width: 100%;
   font-family: var(--font-sans);
 }
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
   padding: 4px 8px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -49,6 +54,9 @@
   border-radius: var(--radius-md);
   box-shadow: 0 2px 8px rgba(23, 23, 23, 0.08);
   background: var(--color-surface);
-  overflow: hidden;
+  /* The fixed preview width is a canvas, not the page: clamp it to the
+     viewport and scroll inside the pane instead of clipping the page. */
+  max-width: 100%;
+  overflow: auto;
   transition: width 0.2s ease;
 }

@@ -21,7 +21,7 @@
   color: var(--color-fg-muted);
   font-weight: 500;
   flex: 1 1 140px;
-  min-width: 140px;
+  min-width: 0;
 }
 
 .field input[type="text"],
@@ -112,6 +112,7 @@
 
 .tryItRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
 }
@@ -154,9 +155,10 @@
 
 .resultRow {
   display: grid;
-  grid-template-columns: 110px 1fr;
+  grid-template-columns: 110px minmax(0, 1fr);
   gap: 8px;
   align-items: start;
+  overflow-wrap: break-word;
 }
 
 .resultLabel {

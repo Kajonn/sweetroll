@@ -3,6 +3,7 @@
   flex-direction: column;
   gap: 16px;
   width: 100%;
+  min-width: 0;
   background: var(--color-surface);
   color: var(--color-fg);
 }
@@ -48,9 +49,17 @@
 
 .fieldRow {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) 2fr;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr);
   gap: 8px;
   align-items: baseline;
+}
+
+/* Phone: single-column field rows. */
+@media (max-width: 599px) {
+  .fieldRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
 }
 
 .fieldLabel {
@@ -69,6 +78,7 @@
   grid-template-columns: minmax(120px, 1fr) auto auto;
   gap: 8px;
   align-items: baseline;
+  overflow-wrap: break-word;
 }
 
 .resourceCurrent {
@@ -151,10 +161,11 @@
 
 .rollSheetRow {
   display: grid;
-  grid-template-columns: minmax(80px, auto) 1fr;
+  grid-template-columns: minmax(80px, auto) minmax(0, 1fr);
   gap: 8px;
   align-items: baseline;
   font-size: 12px;
+  overflow-wrap: break-word;
 }
 
 .rollSheetLabel {

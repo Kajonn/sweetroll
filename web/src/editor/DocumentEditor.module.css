@@ -3,13 +3,17 @@
   grid-template-rows: auto auto 1fr;
   height: 100%;
   min-height: 0;
+  min-width: 0;
+  max-width: 100%;
   background: var(--color-surface);
 }
 
 .header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
+  min-width: 0;
   padding: 10px 16px;
   border-bottom: 1px solid var(--color-border);
 }
@@ -21,6 +25,9 @@
   outline: none;
   border-radius: var(--radius-sm);
   padding: 2px 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .name:focus {
@@ -104,6 +111,39 @@
 .body {
   padding: 24px;
   overflow: auto;
+  min-width: 0;
+}
+
+/* Desktop: editing sits beside the live preview when space permits.
+   Phone/tablet portrait keep the stacked single column. Applied
+   alongside .body when the preview pane is open. */
+.bodySplit {
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .bodySplit {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+}
+
+/* Phone 320-599px: single column, tighter gutters so forms never
+   clip or force horizontal scrolling. */
+@media (max-width: 599px) {
+  .header {
+    padding: 8px 12px;
+  }
+
+  .body {
+    padding: 16px 12px;
+  }
+
+  .tabHeader {
+    margin-bottom: 12px;
+  }
 }
 
 .placeholder {
@@ -131,8 +171,9 @@
 
 .tabHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
   margin-bottom: 16px;
 }
 
@@ -170,6 +211,21 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Plain block overlay for the version-history sheet: keep it inside
+   the container's min-width:0 chain so the table cannot force the
+   editor pane wider than the viewport. */
+.versionOverlay {
+  min-width: 0;
+  max-width: 100%;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding-bottom: 16px;
+  overflow-wrap: break-word;
 }
 
 .sheetList,
@@ -181,6 +237,7 @@
   margin: 0;
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .sheetList > li,
@@ -191,4 +248,6 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
+  min-width: 0;
+  overflow-wrap: break-word;
 }

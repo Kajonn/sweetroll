@@ -150,12 +150,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     <IdentityContext.Provider value={identity}>
       <AuthProvider initial={auth}>
         <div className={styles.shell}>
+          <a href="#main-content" className={styles.skipLink}>{t("shell.skipToContent")}</a>
           <header role="banner" data-testid="app-header" className={styles.header}>
-            <span>Sweetroll</span>
-            {/* Intentional plain anchor: AppShell also renders outside a
-                RouterProvider (standalone/tests), where TanStack Link has no
-                router context and crashes. */}
-            <a href="/characters/new">{t("shell.nav.newCharacter")}</a>
+            <span className={styles.brand}>Sweetroll</span>
+            <nav aria-label={t("shell.nav.label")} className={styles.nav}>
+              {/* Intentional plain anchors: AppShell also renders outside a
+                  RouterProvider (standalone/tests), where TanStack Link has no
+                  router context and crashes. */}
+              <a href="/" className={styles.navLink}>{t("shell.nav.home")}</a>
+              <a href="/characters/new" className={styles.navLink}>{t("shell.nav.newCharacter")}</a>
+            </nav>
+            <div className={styles.actions}>
             {auth.state === "authenticated" && (
               <button type="button" onClick={() => { void signOut(); }}>{t("shell.signOut.button")}</button>
             )}
@@ -166,7 +171,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {logoutStatus === "serverError" && auth.state !== "authenticated" && (
               <button type="button" onClick={() => { void signOut(); }}>{t("shell.signOut.button")}</button>
             )}
-            {logoutStatus && <span role="status">{t(`shell.signOut.${logoutStatus}`)}</span>}
+            {logoutStatus && <span role="status" className={styles.signOutStatus}>{t(`shell.signOut.${logoutStatus}`)}</span>}
             <ThemeSwitcher />
             <button
               type="button"
@@ -176,9 +181,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <HelpCircle aria-hidden size={18} />
             </button>
+            </div>
           </header>
           <ErrorBoundary>
-            <main role="main" className={styles.main}>
+            <main role="main" id="main-content" data-testid="app-content" className={styles.main}>
               {storageUnavailable && <p role="status">{t("shell.characterStorageUnavailable")}</p>}
               {auth.state === "anonymous" && isDevMode() ? (
                 <DevSignInPanel onSignedIn={markSignedIn} />

@@ -704,7 +704,7 @@ expect(rollback.json().result.character.state.values).toEqual({
     }
   });
 
-  it("keeps a transfered character reachable by the new owner and generic-404s (purge) the previous owner, while the transfer stays replayable", async () => {
+  it("keeps a transfered character reachable by the new owner and generic-404s (purge) the previous owner, including transfer replay", async () => {
     const app = await makeApp();
     apps.push(app);
     const ada = app.users.ada;
@@ -737,9 +737,10 @@ expect(rollback.json().result.character.state.values).toEqual({
     expect(asAdaCommand.json().error).toMatchObject({ code: "not_found", cacheDisposition: "purge" });
 
     const replayTransfer = await transferOwnership(app, ada, characterId, bob.actorId, 1, "tr-x1");
-    expect(replayTransfer.statusCode, replayTransfer.body).toBe(200);
-    expect(replayTransfer.json().result.character.reconciliation.replayed).toBe(true);
-    expect(replayTransfer.json().result.character.ownerId).toBe(bob.actorId);
+    // I6 Task 1: the saved transfer receipt is not disclosed to the previous
+    // owner after ownership moved; the transfer itself stays committed.
+    expect(replayTransfer.statusCode, replayTransfer.body).toBe(404);
+    expect(replayTransfer.json().error).toMatchObject({ code: "not_found", cacheDisposition: "purge" });
   });
 
   it("rejects replay of a key whose 30-day replay window has expired instead of re-executing", async () => {

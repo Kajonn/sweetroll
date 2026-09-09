@@ -1496,7 +1496,7 @@ describeWithDatabase("Characters (manage/activity/export)", () => {
     expect(audit.rows).toHaveLength(1);
   });
 
-  it("transfers ownership, revokes the old owner immediately, grants the new owner, and replays the receipt for the old owner", async () => {
+  it("transfers ownership, revokes the old owner immediately, grants the new owner, and denies receipt replay for the old owner", async () => {
     const owner = await createUser("Ada");
     const newOwner = await createUser("Bob");
     const { versionId } = await publishVersion(owner);
@@ -1536,10 +1536,18 @@ describeWithDatabase("Characters (manage/activity/export)", () => {
       expectedRevision: 1,
       idempotencyKey: key,
     });
-    expect(replay.ok).toBe(true);
-    if (!replay.ok) throw new Error("unexpected");
-    expect(replay.value.character.reconciliation.replayed).toBe(true);
-    expect(replay.value.character.ownerId).toBe(newOwner);
+    // I6 Task 1: the saved transfer receipt must not be disclosed to the
+    // previous owner after ownership moved. The mutation stays committed.
+    expect(replay.ok).toBe(false);
+    if (replay.ok) throw new Error("unexpected");
+    expect(replay.error.code).toBe("not_found");
+    expect(replay).not.toHaveProperty("value");
+
+    const stillTransferred = await characters.open(ctx(newOwner), characterId);
+    expect(stillTransferred.ok).toBe(true);
+    if (!stillTransferred.ok) throw new Error("unexpected");
+    expect(stillTransferred.value.ownerId).toBe(newOwner);
+    expect(stillTransferred.value.revision).toBe(2);
   });
 
   it("rejects transfer to a nonexistent destination user without mutating the character", async () => {

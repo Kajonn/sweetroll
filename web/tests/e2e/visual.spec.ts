@@ -61,6 +61,9 @@ test.describe("visual: document editor (d20)", () => {
       await expect(page.getByTestId("document-editor-header")).toBeVisible();
       await expect(page.getByTestId("document-editor-name")).toBeVisible();
       createdSystemIds.push(page.url().split("/").pop() ?? "");
+      await expect(page.getByTestId("document-editor-autosave")).toHaveText("Saved", {
+        timeout: 30_000,
+      });
       await expect(page).toHaveScreenshot(`document-editor-${width}.png`, {
         mask: [page.getByTestId("status-bar")],
       });

@@ -6,6 +6,7 @@ import {
   type SystemDocumentV1,
   type SystemMetadataV1,
 } from "../state/documentReducer.js";
+import styles from "./MetadataEditor.module.css";
 
 export function MetadataEditor({
   document,
@@ -44,7 +45,7 @@ export function MetadataEditor({
 
   return (
     <form
-      className="metadata-editor"
+      className={styles.form}
       onSubmit={(e) => {
         e.preventDefault();
         flush();
@@ -52,19 +53,21 @@ export function MetadataEditor({
       onBlur={flush}
       data-testid="metadata-editor"
     >
-      <label className="metadata-editor__field">
-        <span className="metadata-editor__label">{t("editor.metadata.name")}</span>
+      <label className={styles.field}>
+        <span className={styles.label}>{t("editor.metadata.name")}</span>
         <input
           type="text"
+          className={styles.input}
           value={meta.name}
           maxLength={120}
           onChange={(e) => field("name", e.target.value)}
           data-testid="metadata-name"
         />
       </label>
-      <label className="metadata-editor__field">
-        <span className="metadata-editor__label">{t("editor.metadata.description")}</span>
+      <label className={styles.field}>
+        <span className={styles.label}>{t("editor.metadata.description")}</span>
         <textarea
+          className={styles.textarea}
           value={meta.description}
           maxLength={2_000}
           rows={4}
@@ -72,26 +75,30 @@ export function MetadataEditor({
           data-testid="metadata-description"
         />
       </label>
-      <label className="metadata-editor__field">
-        <span className="metadata-editor__label">{t("editor.metadata.language")}</span>
-        <input
-          type="text"
-          value={meta.language}
-          maxLength={10_000}
-          onChange={(e) => field("language", e.target.value)}
-          data-testid="metadata-language"
-        />
-      </label>
-      <label className="metadata-editor__field">
-        <span className="metadata-editor__label">{t("editor.metadata.defaultDice")}</span>
-        <input
-          type="text"
-          value={meta.defaultDice}
-          maxLength={10_000}
-          onChange={(e) => field("defaultDice", e.target.value)}
-          data-testid="metadata-default-dice"
-        />
-      </label>
+      <div className={styles.settingsRow} data-testid="metadata-settings-row">
+        <label className={styles.field}>
+          <span className={styles.label}>{t("editor.metadata.language")}</span>
+          <input
+            type="text"
+            className={styles.input}
+            value={meta.language}
+            maxLength={10_000}
+            onChange={(e) => field("language", e.target.value)}
+            data-testid="metadata-language"
+          />
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>{t("editor.metadata.defaultDice")}</span>
+          <input
+            type="text"
+            className={styles.input}
+            value={meta.defaultDice}
+            maxLength={10_000}
+            onChange={(e) => field("defaultDice", e.target.value)}
+            data-testid="metadata-default-dice"
+          />
+        </label>
+      </div>
     </form>
   );
 }

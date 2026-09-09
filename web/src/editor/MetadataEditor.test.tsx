@@ -1,4 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -134,5 +137,23 @@ describe("MetadataEditor", () => {
     await user.type(screen.getByTestId("metadata-name"), " + local");
     rerender(<MetadataEditor document={docWithName("Server v2")} />);
     expect(screen.getByTestId("metadata-name")).toHaveValue("Server v1 + local");
+  });
+
+  it("groups language and default dice in a compact settings row", () => {
+    render(<MetadataEditor document={docWithName("Pocket Quest")} onChange={vi.fn()} />);
+    const settings = screen.getByTestId("metadata-settings-row");
+    expect(within(settings).getByLabelText("Language")).toBeInTheDocument();
+    expect(within(settings).getByLabelText("Default dice")).toBeInTheDocument();
+    expect(settings).not.toContainElement(screen.getByLabelText("Name"));
+    expect(settings).not.toContainElement(screen.getByLabelText("Description"));
+  });
+
+  it("authors touch-sized responsive metadata controls", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/editor/MetadataEditor.module.css"), "utf8");
+    expect(css).toMatch(/min-height:\s*44px/);
+    expect(css).toMatch(/width:\s*100%/);
+    expect(css).toMatch(/min-width:\s*0/);
+    expect(css).toMatch(/@media\s*\(min-width:\s*1024px\)/);
+    expect(css).toMatch(/grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
   });
 });

@@ -84,13 +84,18 @@ reference templates via `migrate`; dev sign-in default code; unique
   (unit-tested), and the new e2e asserts no cached names in UI, storage, or
   after reload.
 - `design_v2.md` §17.7 untouched: this task changes no design.
-- Visual baselines: `visual.spec.ts` run for information — **7 PNG
-  comparisons fail** (left failing; no `--update-snapshots` without owner
-  approval): library 360 + 1280, document editor (d20) 360 + 1280, sheet
-  preview 360, publish dialog 360, conflict banner 360. The
-  playerJourney/playerShell/playerLibrary specs pass on the same surfaces,
-  so these read as post-baseline restyle diffs (G4/G5/G6), pending
-  owner-reviewed regeneration.
+- Visual baselines: owner HUMAN-APPROVED regenerating the 7 stale G6
+  player-chrome baselines (approval recorded in the controller session;
+  actuals inspected beforehand — header nav entries, phone bottom nav,
+  shared-button styles; no functional errors; conflict banner renders
+  correctly). Regenerated 2026-09-09 via
+  `npx playwright test tests/e2e/visual.spec.ts --update-snapshots`
+  (from `web/`, same env as above), then re-ran
+  `npx playwright test tests/e2e/visual.spec.ts` — **10/10 pass**.
+  Regenerated PNGs: library 360 + 1280, document editor (d20) 360 + 1280,
+  sheet preview 360, publish dialog 360, conflict banner 360. The 1280
+  variants of sheet preview, publish dialog, and conflict banner were
+  already green and are unchanged.
 
 ## Limitations (open)
 
@@ -100,7 +105,8 @@ reference templates via `migrate`; dev sign-in default code; unique
 - G9 real-device remainder: no physical phone/tablet runs, no standalone
   install proof (synthetic `beforeinstallprompt` only), contrast sign-off
   outstanding, no physical-table/remote playtest sessions.
-- Visual baselines pending owner approval (7 mismatches above).
+- Visual baselines regenerated with owner approval (see Findings) —
+  `visual.spec.ts` **10/10 green** after regeneration.
 - E2E ran against a shared dev Postgres (unique names per run; prior runs'
   owned clones remain listed for the dev user but are selected by exact
   version id, so they do not interfere).

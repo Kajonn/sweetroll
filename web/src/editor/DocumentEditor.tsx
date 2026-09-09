@@ -232,6 +232,10 @@ export function DocumentEditorBody({
   const [publishOpen, setPublishOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const draftRevision = ws.draft?.revision ?? null;
+  // Newest-first (server ORDER BY created_at DESC): the first entry is the
+  // latest published version. Read from the already-loaded workspace — no
+  // new backend calls for readiness.
+  const latestPublished = ws.versions[0]?.semanticVersion ?? null;
   const queryClient = useQueryClient();
 
   const sync = useDraftSync({
@@ -271,6 +275,9 @@ export function DocumentEditorBody({
 
   const errorCount = assessment.diagnostics.length;
   const publishDisabled = errorCount > 0;
+  // Unsaved changes come from the G1 owner: true until this exact document
+  // content matches the last server-confirmed save.
+  const unsaved = !sync.isConfirmed(document);
   // The header shows the working document's name while it diverges from the
   // server document and falls back to the server system name when clean, so
   // a dirty name is visible without waiting for the header itself to blur.
@@ -377,12 +384,28 @@ export function DocumentEditorBody({
           {displayName}
         </h1>
         <span className={styles.lifecycle} data-testid="document-editor-lifecycle">
-          {t(`editor.lifecycle.${ws.draft !== null && ws.versions.length === 0 ? "draft" : ws.system.lifecycle}`)}
+          {ws.draft !== null && ws.versions.length === 0
+            ? t("editor.lifecycle.draftUnpublished")
+            : t(`editor.lifecycle.${ws.system.lifecycle}`)}
         </span>
-        <span className={styles.autosave} data-testid="document-editor-autosave">
+        <span
+          className={styles.autosave}
+          data-testid="document-editor-autosave"
+          role={sync.status === "conflict" || sync.status === "error" ? "alert" : "status"}
+        >
           <Check aria-hidden size={14} />
           {autosaveLabel(sync.status)}
+          {sync.offline ? ` · ${t("editor.save.offline")}` : null}
         </span>
+        {sync.status === "error" ? (
+          <Button
+            variant="secondary"
+            data-testid="document-editor-save-retry"
+            onClick={() => sync.save(document, draftRevision)}
+          >
+            {t("editor.save.retry")}
+          </Button>
+        ) : null}
         <Button
           variant="secondary"
           data-testid="document-editor-preview-toggle"
@@ -454,6 +477,56 @@ export function DocumentEditorBody({
         >
           {t("editor.publish.label")}
         </Button>
+        <section
+          className={styles.readiness}
+          data-testid="document-editor-readiness"
+          aria-label={t("editor.readiness.title")}
+        >
+          <ul className={styles.readinessList}>
+            <li className={styles.readinessItem}>
+              {draftRevision !== null
+                ? t("editor.readiness.draftRev", { revision: draftRevision })
+                : t("editor.readiness.noDraft")}
+            </li>
+            <li className={styles.readinessItem}>
+              {t("editor.readiness.saveState", { state: autosaveLabel(sync.status) })}
+            </li>
+            <li className={styles.readinessItem}>
+              {errorCount === 0
+                ? t("editor.readiness.noIssues")
+                : t("editor.readiness.issues", { count: errorCount })}{" "}
+              <Button
+                variant="secondary"
+                data-testid="document-editor-readiness-diagnostics"
+                disabled={errorCount === 0}
+                onClick={() => setDiagnosticsOpen(true)}
+              >
+                {t("editor.readiness.reviewDiagnostics")}
+              </Button>
+            </li>
+            <li className={styles.readinessItem}>
+              {latestPublished !== null
+                ? t("editor.readiness.latestPublished", { version: latestPublished })
+                : t("editor.readiness.noPublished")}{" "}
+              <Button
+                variant="secondary"
+                data-testid="document-editor-readiness-versions"
+                onClick={() => setVersionHistoryOpen(true)}
+              >
+                {t("editor.readiness.viewVersions")}
+              </Button>
+            </li>
+          </ul>
+          <p
+            className={styles.readinessReason}
+            data-testid="document-editor-publish-reason"
+            role="status"
+          >
+            {publishDisabled
+              ? t("editor.publish.disabled.reason", { count: errorCount })
+              : t("editor.readiness.ready")}
+          </p>
+        </section>
       </header>
       {sync.banner !== null && (
         <ConflictBanner
@@ -534,6 +607,12 @@ export function DocumentEditorBody({
         onOpenChange={setPublishOpen}
         systemId={ws.system.systemId}
         expectedRevision={draftRevision ?? 0}
+        readiness={{
+          draftRevision,
+          diagnosticsCount: errorCount,
+          latestPublished,
+          unsaved,
+        }}
       />
       {versionHistoryOpen ? (
         <VersionHistoryOverlay

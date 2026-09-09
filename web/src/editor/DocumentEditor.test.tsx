@@ -129,6 +129,23 @@ describe("DocumentEditor", () => {
     );
   });
 
+  it("shows the publish disable reason as visible text, not tooltip-only", async () => {
+    renderEditor("http://localhost/", {
+      ok: false,
+      diagnostics: [
+        { code: "invalid_definition_id", path: "/entities/0/id", message: "ID is invalid." },
+        { code: "missing_reference", path: "/entities/0/fields/0", message: "Missing reference." },
+      ],
+    });
+    expect(await screen.findByTestId("document-editor-publish-reason")).toHaveTextContent(
+      "Publish disabled — 2 error diagnostics must be resolved.",
+    );
+    const panel = screen.getByTestId("document-editor-readiness");
+    expect(panel).toHaveTextContent(/2 issues/);
+    expect(panel).toHaveTextContent(/No draft yet/);
+    expect(panel).toHaveTextContent(/Not published yet/);
+  });
+
   it("renders preview, diagnostics, and version-history toggle buttons in the header", async () => {
     renderEditor();
     expect(await screen.findByTestId("document-editor-preview-toggle")).toBeInTheDocument();

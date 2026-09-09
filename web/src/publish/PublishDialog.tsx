@@ -13,6 +13,18 @@ type BumpKind = "patch" | "minor" | "major";
 
 const BUMP_KINDS: ReadonlyArray<BumpKind> = ["patch", "minor", "major"];
 
+/**
+ * Publish-readiness snapshot taken from the already-loaded workspace (Task
+ * 5). Display-only: the dialog never fetches or re-assesses here, and the
+ * submit gate stays unchanged (breaking-findings acknowledgements).
+ */
+export type PublishDialogReadiness = {
+  draftRevision: number | null;
+  diagnosticsCount: number;
+  latestPublished: string | null;
+  unsaved: boolean;
+};
+
 function findingKey(f: ApiDiagnostic): string {
   return `${f.code}:${f.path}`;
 }
@@ -50,12 +62,14 @@ export function PublishDialog({
   onOpenChange,
   systemId,
   expectedRevision,
+  readiness,
 }: {
   client: ApiClient;
   open: boolean;
   onOpenChange: (next: boolean) => void;
   systemId: string;
   expectedRevision: number;
+  readiness?: PublishDialogReadiness | undefined;
 }) {
   const [semver, setSemver] = useState("0.1.0");
   const [releaseNotes, setReleaseNotes] = useState("");
@@ -156,6 +170,32 @@ export function PublishDialog({
           data-testid="publish-dialog"
         >
           <Dialog.Title className={styles.title}>{t("publish.title")}</Dialog.Title>
+          {readiness !== undefined ? (
+            <section
+              className={styles.readiness}
+              aria-label={t("publish.readiness.title")}
+              data-testid="publish-dialog-readiness"
+            >
+              <ul className={styles.readinessList}>
+                <li>
+                  {readiness.draftRevision !== null
+                    ? t("publish.readiness.draft", { revision: readiness.draftRevision })
+                    : t("publish.readiness.noDraft")}
+                </li>
+                <li>{readiness.unsaved ? t("publish.readiness.unsaved") : t("publish.readiness.saved")}</li>
+                <li>
+                  {readiness.diagnosticsCount === 0
+                    ? t("publish.readiness.noIssues")
+                    : t("publish.readiness.issues", { count: readiness.diagnosticsCount })}
+                </li>
+                <li>
+                  {readiness.latestPublished !== null
+                    ? t("publish.readiness.latest", { version: readiness.latestPublished })
+                    : t("publish.readiness.noPublished")}
+                </li>
+              </ul>
+            </section>
+          ) : null}
           <FormField label={t("publish.semver")}>
             <input
               id="publish-dialog-semver"

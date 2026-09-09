@@ -81,6 +81,7 @@ export function VersionHistory({ client, systemId }: { client: ApiClient; system
   return (
     <section
       aria-label={t("versionHistory.title")}
+      id="version-history"
       data-testid="version-history"
       className={styles.root}
     >

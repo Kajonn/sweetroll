@@ -7,7 +7,7 @@ export type PanelProps = {
   title?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
-  className?: string;
+  className?: string | undefined;
 };
 
 export function Panel({ title, actions, children, className }: PanelProps) {

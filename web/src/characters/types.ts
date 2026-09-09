@@ -86,14 +86,11 @@ export type CharacterView = OpenCharacterResponse["character"];
 
 export type CreationOptions = operations["get_characters_creation_options"]["responses"]["200"]["content"]["application/json"];
 
-export type CreationVersionEntry = {
-  versionId: string;
-  systemId: string;
-  systemName: string;
-  semanticVersion: string;
-  createdAt: string;
-};
-export type CreationVersions = { data: { versions: CreationVersionEntry[] }; requestId: string };
+export type CreationVersionsResponse =
+  operations["get_characters_creation_versions"]["responses"]["200"]["content"]["application/json"];
+
+export type CreationVersionEntry = CreationVersionsResponse["data"]["versions"][number];
+export type CreationVersions = CreationVersionsResponse;
 
 export type ActivityResponse = operations["get_characters_characterId_activity"]["responses"]["200"]["content"]["application/json"];
 export type ActivityEvent = ActivityResponse["events"][number];

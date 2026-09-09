@@ -3,6 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 
 import { ApiError } from "../api/client.js";
 import { t } from "../i18n/index.js";
+import { Button } from "../ui/Button.js";
+import { EmptyState } from "../ui/EmptyState.js";
+import { FormField } from "../ui/FormField.js";
+import { Panel } from "../ui/Panel.js";
+import { Select } from "../ui/Select.js";
 import type { CharactersApi } from "./api.js";
 import type { CharacterStore, OnlineAttempt } from "./store.js";
 import type { CreationOptions, CreationVersionEntry, FrozenRequest, ReviewExpiredAttemptInput } from "./types.js";
@@ -718,72 +723,106 @@ export function CreateCharacter({
           void submit(false);
         }}
       >
-        <label htmlFor="create-character-version">{t("character.create.versionId")}</label>
-        <input
-          id="create-character-version"
-          value={versionId}
-          onChange={event => setVersionId(event.target.value)}
-        />
-        <button
-          type="button"
-          disabled={metaLoading || versionId.trim() === ""}
-          onClick={() => void loadMetadata(versionId.trim())}
-        >
-          {metaLoading ? t("character.create.loadingMetadata") : t("character.create.lookUp")}
-        </button>
         {showPicker ? (
-          <section aria-labelledby="create-character-picker-title">
-            <h2 id="create-character-picker-title">{t("character.create.pickVersion.title")}</h2>
+          <Panel title={t("character.create.pickVersion.title")}>
             {pickerLoading ? <p role="status">{t("character.create.pickVersion.loading")}</p> : null}
-            {pickerError ? <p role="alert">{t("character.create.pickVersion.error")}</p> : null}
-            {pickerVersions?.length === 0 ? <p role="status">{t("character.create.pickVersion.empty")}</p> : null}
+            {pickerError ? (
+              <>
+                <p role="alert">{t("character.create.pickVersion.error")}</p>
+                <Button variant="secondary" onClick={() => void pickerQuery.refetch()}>
+                  {t("character.create.pickVersion.retry")}
+                </Button>
+              </>
+            ) : null}
+            {pickerVersions?.length === 0 ? (
+              <EmptyState title={t("character.create.pickVersion.empty")} />
+            ) : null}
             <ul>
               {(pickerVersions ?? []).map(v => (
                 <li key={v.versionId}>
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
                     disabled={busy || pending !== null || expired !== null}
                     onClick={() => { setVersionId(v.versionId); void loadMetadata(v.versionId); }}
                   >
                     {v.systemName} {v.semanticVersion}
-                  </button>
+                    <span aria-hidden="true" title={v.versionId}> · {v.versionId.slice(0, 8)}…</span>
+                  </Button>
                 </li>
               ))}
             </ul>
-          </section>
+          </Panel>
         ) : null}
+        {showPicker ? (
+          <Panel title={t("character.create.pickVersion.manualTitle")}>
+            <p>{t("character.create.pickVersion.manualHint")}</p>
+            <FormField label={t("character.create.versionId")}>
+              <input
+                id="create-character-version"
+                value={versionId}
+                onChange={event => setVersionId(event.target.value)}
+              />
+            </FormField>
+            <Button
+              variant="secondary"
+              disabled={metaLoading || versionId.trim() === ""}
+              pending={metaLoading}
+              pendingText={t("character.create.loadingMetadata")}
+              onClick={() => void loadMetadata(versionId.trim())}
+            >
+              {t("character.create.lookUp")}
+            </Button>
+          </Panel>
+        ) : (
+          <>
+            <FormField label={t("character.create.versionId")}>
+              <input
+                id="create-character-version"
+                value={versionId}
+                onChange={event => setVersionId(event.target.value)}
+              />
+            </FormField>
+            <Button
+              variant="secondary"
+              disabled={metaLoading || versionId.trim() === ""}
+              pending={metaLoading}
+              pendingText={t("character.create.loadingMetadata")}
+              onClick={() => void loadMetadata(versionId.trim())}
+            >
+              {t("character.create.lookUp")}
+            </Button>
+          </>
+        )}
         {metaDenied ? <p role="alert">{t("character.create.denied")}</p> : null}
         {metadata !== null ? (
           <>
-            <label htmlFor="create-character-entity">{t("character.create.entity")}</label>
-            <select
+            <Select
+              label={t("character.create.entity")}
               id="create-character-entity"
               value={entityId}
               onChange={event => setEntityId(event.target.value)}
-            >
-              <option value="">{t("character.choice.empty")}</option>
-              {entities.map(entity => (
-                <option key={entity.id} value={entity.id}>{entity.label}</option>
-              ))}
-            </select>
-            <label htmlFor="create-character-name">{t("character.create.name")}</label>
-            <input
-              id="create-character-name"
-              value={name}
-              onChange={event => setName(event.target.value)}
-              required
+              placeholder={t("character.choice.empty")}
+              options={entities.map(entity => ({ value: entity.id, label: entity.label }))}
             />
-            <button type="submit" disabled={!canCreate}>
-              {busy ? t("character.create.submitting") : t("character.create.submit")}
-            </button>
+            <FormField label={t("character.create.name")}>
+              <input
+                id="create-character-name"
+                value={name}
+                onChange={event => setName(event.target.value)}
+                required
+              />
+            </FormField>
+            <Button type="submit" variant="primary" disabled={!canCreate} pending={busy} pendingText={t("character.create.submitting")}>
+              {t("character.create.submit")}
+            </Button>
           </>
         ) : null}
       </form>
       {error !== null ? <p role="alert">{error}</p> : null}
       {pending !== null && expiredAttempt === null ? (
-        <button type="button" disabled={busy} onClick={() => void submit(true)}>
+        <Button variant="secondary" disabled={busy} onClick={() => void submit(true)}>
           {t("character.create.retry")}
-        </button>
+        </Button>
       ) : null}
       {expiredAttempt !== null ? (
         <div>
@@ -799,13 +838,13 @@ export function CreateCharacter({
               </ul>
             </nav>
           ) : null}
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             disabled={busy}
             onClick={() => void acknowledgeExpired({ attemptId: expiredAttempt.id, acknowledgeUnknownOutcome: true })}
           >
             {t("character.create.acknowledgeUnknown")}
-          </button>
+          </Button>
         </div>
       ) : null}
     </section>

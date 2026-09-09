@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { t } from "../i18n/index.js";
+import { Button } from "../ui/Button.js";
 import type { CharacterSnapshot } from "./session.js";
 import { FieldControl, type ProjectedField } from "./FieldControl.js";
 import styles from "./characters.module.css";
@@ -105,7 +106,7 @@ function ActionControl({ element, disabled, disabledReason, onExecuteAction }: {
     }
   }}>
     {element.inputs.map(input => <label key={input.id}>{input.label}<input type={input.valueType === "integer" || input.valueType === "decimal" ? "number" : input.valueType === "boolean" ? "checkbox" : "text"} required={input.required} value={input.valueType === "boolean" ? undefined : String(inputs[input.id] ?? "")} checked={input.valueType === "boolean" ? inputs[input.id] === true : undefined} onChange={(event) => setInputs(current => ({ ...current, [input.id]: input.valueType === "boolean" ? event.target.checked : input.valueType === "integer" || input.valueType === "decimal" ? Number(event.target.value) : event.target.value }))} disabled={disabled} aria-describedby={disabledReason === null ? undefined : "character-action-unavailable"} /></label>)}
-    <button type="submit" className={styles.actionButton} disabled={disabled} aria-describedby={disabledReason === null ? undefined : "character-action-unavailable"}>{element.label}</button>
+    <Button type="submit" variant="primary" disabled={disabled} aria-describedby={disabledReason === null ? undefined : "character-action-unavailable"}>{element.label}</Button>
     {commandError !== null ? <p role="alert" className={styles.commandError}>{commandError}</p> : null}
     <ValidationList validations={element.validations} />
   </form>;
@@ -117,7 +118,7 @@ function audienceLabel(audience: NonNullable<CharacterSnapshot["lastRoll"]>["aud
 
 function RollResult({ roll }: { roll: NonNullable<CharacterSnapshot["lastRoll"]> }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
-  return <section className={styles.rollResult} aria-labelledby="character-roll-result"><h2 id="character-roll-result">{t("character.rollResult.title")}</h2><dl><dt>{t("character.rollResult.expression")}</dt><dd>{roll.expression}</dd><dt>{t("character.rollResult.total")}</dt><dd>{roll.total}</dd><dt>{t("character.rollResult.output")}</dt><dd>{roll.output}</dd><dt>{t("character.rollResult.audience")}</dt><dd>{audienceLabel(roll.audience)}</dd></dl><button type="button" className={styles.detailButton} onClick={() => setDetailsOpen(open => !open)} aria-expanded={detailsOpen}>{t(detailsOpen ? "character.rollResult.hideDetails" : "character.rollResult.showDetails")}</button>{detailsOpen ? <div className={styles.rollDetails}><ul>{roll.dice.map((die, index) => <li key={`${die.sides}-${index}`}>d{die.sides}={die.value}</li>)}</ul><ul>{roll.bindings.map(binding => <li key={`${binding.scope}-${binding.definitionId}`}>{binding.scope}.{binding.definitionId}: {String(binding.value)}</li>)}</ul></div> : null}</section>;
+  return <section className={styles.rollResult} aria-labelledby="character-roll-result"><h2 id="character-roll-result">{t("character.rollResult.title")}</h2><dl><dt>{t("character.rollResult.expression")}</dt><dd>{roll.expression}</dd><dt>{t("character.rollResult.total")}</dt><dd>{roll.total}</dd><dt>{t("character.rollResult.output")}</dt><dd>{roll.output}</dd><dt>{t("character.rollResult.audience")}</dt><dd>{audienceLabel(roll.audience)}</dd></dl><Button variant="secondary" onClick={() => setDetailsOpen(open => !open)} aria-expanded={detailsOpen}>{t(detailsOpen ? "character.rollResult.hideDetails" : "character.rollResult.showDetails")}</Button>{detailsOpen ? <div className={styles.rollDetails}><ul>{roll.dice.map((die, index) => <li key={`${die.sides}-${index}`}>d{die.sides}={die.value}</li>)}</ul><ul>{roll.bindings.map(binding => <li key={`${binding.scope}-${binding.definitionId}`}>{binding.scope}.{binding.definitionId}: {String(binding.value)}</li>)}</ul></div> : null}</section>;
 }
 
 export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, offlineAvailable }: CharacterSheetProps) {
@@ -182,7 +183,7 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, 
       case "field": return <FieldControl key={element.id} field={element as ProjectedField} tentativeValue={tentativeValue(snapshot, element.fieldId)} disabled={!editable} pending={pending} onCommit={onSetField} />;
       case "resource": {
         const current = resourceCurrent(snapshot, element);
-        return <div key={element.id} className={styles.resourceGroup}><div className={styles.resource}><span className={styles.resourceLabel}>{element.label}</span><span className={styles.resourceValue}>{current} / {element.value.max}</span><button type="button" disabled={!editable || current <= element.min} onClick={() => invokeCommand(() => onBump(element.resourceId, "down"))}>{t("character.resource.decrease", { label: element.label })}</button><button type="button" disabled={!editable || current >= element.max} onClick={() => invokeCommand(() => onBump(element.resourceId, "up"))}>{t("character.resource.increase", { label: element.label })}</button></div><ValidationList validations={element.validations} /></div>;
+        return <div key={element.id} className={styles.resourceGroup}><div className={styles.resource}><span className={styles.resourceLabel}>{element.label}</span><span className={styles.resourceValue}>{current} / {element.value.max}</span><Button variant="primary" disabled={!editable || current <= element.min} onClick={() => invokeCommand(() => onBump(element.resourceId, "down"))}>{t("character.resource.decrease", { label: element.label })}</Button><Button variant="primary" disabled={!editable || current >= element.max} onClick={() => invokeCommand(() => onBump(element.resourceId, "up"))}>{t("character.resource.increase", { label: element.label })}</Button></div><ValidationList validations={element.validations} /></div>;
       }
       case "action": return <ActionControl key={element.id} element={element} disabled={!actionsAvailable} disabledReason={actionUnavailableReason} onExecuteAction={executeAction} />;
     }

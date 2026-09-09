@@ -9,6 +9,7 @@ import {
 } from "../../ports/expressions.js";
 import { registerShortcut } from "../../shell/ShortcutHelp.js";
 import { useShortcut } from "../../shell/useShortcut.js";
+import { Button, FormField } from "../../ui/index.js";
 import styles from "./ExpressionEditor.module.css";
 
 export type ExpressionEditorProps = {
@@ -77,31 +78,33 @@ export function ExpressionEditor({
       aria-label={t("editor.expression.title")}
     >
       <div className={styles.pane} data-testid="expression-editor-source-pane">
-        <label className={`${styles.sourceLabel} ${hasError ? styles.sourceError : ""}`}>
-          <span>{t("editor.expression.title")}</span>
-          <textarea
-            value={source}
-            onChange={(e) => onSourceChange(e.target.value)}
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            placeholder={t("editor.expression.source.placeholder")}
-            data-testid="expression-editor-source"
-            data-has-error={hasError ? "true" : "false"}
-            disabled={disabled}
-          />
-        </label>
+        <div className={hasError ? styles.sourceError : undefined}>
+          <FormField label={t("editor.expression.title")}>
+            <textarea
+              value={source}
+              onChange={(e) => onSourceChange(e.target.value)}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              placeholder={t("editor.expression.source.placeholder")}
+              data-testid="expression-editor-source"
+              data-has-error={hasError ? "true" : "false"}
+              disabled={disabled}
+            />
+          </FormField>
+        </div>
         <div className={styles.actions}>
-          <button
-            type="button"
-            className={styles.checkButton}
+          <Button
+            variant="secondary"
             onClick={runCheck}
             disabled={assess.isPending || disabled === true}
+            pending={assess.isPending}
+            pendingText={t("editor.expression.checking")}
             data-testid="expression-editor-check"
             title={t("editor.expression.checkShortcut")}
           >
-            {assess.isPending ? t("editor.expression.checking") : t("editor.expression.check")}
-          </button>
+            {t("editor.expression.check")}
+          </Button>
           <span className={styles.shortcutHint}>{t("editor.expression.checkShortcut")}</span>
         </div>
       </div>

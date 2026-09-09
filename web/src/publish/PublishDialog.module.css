@@ -1,8 +1,8 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(23, 23, 23, 0.45);
-  z-index: 1000;
+  background: var(--surface-scrim);
+  z-index: var(--layer-dialog-overlay);
 }
 
 .content {
@@ -10,16 +10,16 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: var(--color-surface);
-  color: var(--color-fg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  background: var(--surface-overlay);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-dialog);
   padding: 24px;
   width: min(520px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
   overflow: auto;
-  box-shadow: 0 12px 32px rgba(23, 23, 23, 0.2);
-  z-index: 1001;
+  box-shadow: var(--shadow-dialog);
+  z-index: var(--layer-dialog-content);
   display: grid;
   gap: 16px;
 }
@@ -28,6 +28,26 @@
   margin: 0;
   font-size: 16px;
   font-weight: 600;
+}
+
+/* Readiness snapshot (draft rev, save state, diagnostics, latest
+   published) as plain text above the form. Semantic tokens only; no
+   motion to reduce. */
+.readiness {
+  padding: 8px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-panel);
+}
+
+.readinessList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .body {
@@ -40,7 +60,7 @@
   display: grid;
   gap: 6px;
   font-size: 12px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
 }
 
 .label {
@@ -50,16 +70,23 @@
 .input,
 .textarea {
   font: inherit;
-  color: var(--color-fg);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--surface-page);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
   padding: 6px 8px;
   width: 100%;
+  min-height: 44px;
+}
+
+.input:focus-visible,
+.textarea:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .textarea {
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
   resize: vertical;
 }
 
@@ -73,39 +100,39 @@
 .bump {
   font: inherit;
   font-size: 12px;
-  background: var(--color-bg);
-  color: var(--color-fg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  background: var(--surface-page);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
   padding: 4px 10px;
   cursor: pointer;
 }
 
 .bump:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  border-color: var(--action-primary);
+  color: var(--action-primary);
 }
 
 .findings {
   display: grid;
   gap: 8px;
   padding: 12px;
-  border: 1px solid var(--color-warning);
-  border-radius: var(--radius-md);
-  background: rgba(217, 119, 6, 0.05);
+  border: 1px solid var(--status-warning);
+  border-radius: var(--radius-panel);
+  background: var(--status-warning-soft-bg);
 }
 
 .findingsTitle {
   margin: 0;
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-warning);
+  color: var(--status-warning);
 }
 
 .findingsIntro {
   margin: 0;
   font-size: 12px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
 }
 
 .findingList {
@@ -118,9 +145,9 @@
 
 .finding {
   padding: 8px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
 }
 
 .findingRow {
@@ -143,23 +170,23 @@
 }
 
 .findingCode {
-  font-family: var(--font-mono);
+  font-family: var(--font-code);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--color-error);
+  color: var(--status-error);
 }
 
 .findingPath {
-  font-family: var(--font-mono);
+  font-family: var(--font-code);
   font-size: 11px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   word-break: break-all;
 }
 
 .findingMessage {
   font-size: 13px;
-  color: var(--color-fg);
+  color: var(--text-primary);
 }
 
 .meta {
@@ -186,26 +213,26 @@
 .metaKey {
   margin: 0;
   font-size: 12px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   font-weight: 500;
 }
 
 .metaValue {
   margin: 0;
-  font-family: var(--font-mono);
+  font-family: var(--font-code);
   font-size: 12px;
-  color: var(--color-fg);
+  color: var(--text-primary);
   word-break: break-all;
 }
 
 .error {
   margin: 0;
   font-size: 13px;
-  color: var(--color-error);
+  color: var(--status-error);
   padding: 8px;
-  background: rgba(220, 38, 38, 0.06);
-  border: 1px solid var(--color-error);
-  border-radius: var(--radius-sm);
+  background: var(--status-error-bg);
+  border: 1px solid var(--status-error);
+  border-radius: var(--radius-control);
 }
 
 .actions {
@@ -215,29 +242,54 @@
   gap: 8px;
 }
 
+/* Post-publish handoff: plain anchor (Router-less safe, see
+   VersionHistory) styled as the primary action. Semantic tokens only. */
+.createLink {
+  font: inherit;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--action-primary);
+  background: var(--action-primary);
+  color: var(--action-primary-fg);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.createLink:hover {
+  filter: brightness(0.95);
+}
+
+.createLink:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .cancel,
 .submit {
   font: inherit;
   padding: 6px 14px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   border: 1px solid transparent;
   cursor: pointer;
 }
 
 .cancel {
   background: transparent;
-  color: var(--color-fg);
-  border-color: var(--color-border);
+  color: var(--text-primary);
+  border-color: var(--border-default);
 }
 
 .cancel:hover {
-  background: var(--color-bg);
+  background: var(--surface-page);
 }
 
 .submit {
-  background: var(--color-accent);
-  color: var(--color-accent-fg);
-  border-color: var(--color-accent);
+  background: var(--action-primary);
+  color: var(--action-primary-fg);
+  border-color: var(--action-primary);
 }
 
 .submit:hover:not(:disabled) {
@@ -247,4 +299,12 @@
 .submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content,
+  .input,
+  .textarea {
+    transition: none;
+  }
 }

@@ -5,6 +5,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCreateDraft, type CreateDraftInput } from "../api/createDraft.js";
 import type { ApiClient } from "../api/client.js";
 import { t } from "../i18n/index.js";
+import { Button, FormField } from "../ui/index.js";
 
 import styles from "./CreateDraftDialog.module.css";
 
@@ -64,46 +65,47 @@ export function CreateDraftDialog({
             </div>
           </fieldset>
           {kind === "blank" && (
-            <label className={styles.field}>
-              {t("createDraft.name")}
+            <FormField label={t("createDraft.name")}>
               <input
+                id="create-draft-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 data-testid="create-draft-name"
               />
-            </label>
+            </FormField>
           )}
           {kind === "clone" && (
-            <label className={styles.field}>
-              {t("createDraft.versionId")}
+            <FormField label={t("createDraft.versionId")}>
               <input
+                id="create-draft-version-id"
                 value={versionId}
                 onChange={(e) => setVersionId(e.target.value)}
                 data-testid="create-draft-version-id"
               />
-            </label>
+            </FormField>
           )}
           {kind === "import" && (
-            <label className={styles.field}>
-              {t("createDraft.import.content")}
+            <FormField label={t("createDraft.import.content")}>
               <textarea
+                id="create-draft-content"
                 rows={8}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 data-testid="create-draft-content"
               />
-            </label>
+            </FormField>
           )}
           <div className={styles.actions}>
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={submit}
               disabled={mutation.isPending}
+              pending={mutation.isPending}
+              pendingText={t("createDraft.submitting")}
               data-testid="create-draft-submit"
-              className={styles.submit}
             >
-              {mutation.isPending ? t("createDraft.submitting") : t("createDraft.submit")}
-            </button>
+              {t("createDraft.submit")}
+            </Button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

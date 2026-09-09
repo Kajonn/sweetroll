@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ApiClient } from "../api/client.js";
 import { useSystemLibrary } from "../api/listSystems.js";
 import { t } from "../i18n/index.js";
+import { Button } from "../ui/index.js";
 
 import { CreateDraftDialog } from "./CreateDraftDialog.js";
 import styles from "./SystemLibrary.module.css";
@@ -24,13 +25,13 @@ export function SystemLibrary({ client }: { client: ApiClient }) {
   return (
     <div className={styles.container}>
       <div className={styles.toolbar}>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           onClick={() => setCreateOpen(true)}
           data-testid="library-new-system"
         >
           {t("library.createDraft")}
-        </button>
+        </Button>
       </div>
       <ul ref={ref} className={styles.list} aria-label={t("library.listAriaLabel")} data-testid="system-library">
         {data?.pages.flatMap((p) => p.systems).map((s, i) => (
@@ -39,7 +40,7 @@ export function SystemLibrary({ client }: { client: ApiClient }) {
             <span>{s.lifecycle}</span>
           </li>
         ))}
-        {hasNextPage === true && <li><button type="button" onClick={() => fetchNextPage()}>{t("library.loadMore")}</button></li>}
+        {hasNextPage === true && <li><Button variant="secondary" onClick={() => fetchNextPage()}>{t("library.loadMore")}</Button></li>}
       </ul>
       <CreateDraftDialog client={client} open={createOpen} onOpenChange={setCreateOpen} />
     </div>

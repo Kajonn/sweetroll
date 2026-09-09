@@ -107,7 +107,7 @@ test.describe("visual: sheet preview", () => {
       await page.getByTestId("dev-signin").click();
       await page.getByTestId("clone-from-template-d20").click();
       await expect(page.getByTestId("document-editor-header")).toBeVisible();
-      await page.getByTestId("document-editor-tab-sheets").click();
+      await page.getByTestId("document-editor-tab-sections").click();
       await page.getByTestId("document-editor-preview-toggle").click();
       createdSystemIds.push(page.url().split("/").pop() ?? "");
       const frame = page.getByTestId("preview-frame");
@@ -135,7 +135,7 @@ test.describe("visual: sheet preview", () => {
         viewport.scrollLeft = 0;
         const canvasRect = canvas.getBoundingClientRect();
         const viewportRect = viewport.getBoundingClientRect();
-        const body = document.querySelector('[data-testid="document-editor-body-sheets"]');
+        const body = document.querySelector('[data-testid="document-editor-body-sections"]');
         const app = document.querySelector('[data-testid="app-content"]');
         const maxScroll = viewport.scrollWidth - viewport.clientWidth;
         viewport.scrollLeft = viewport.scrollWidth;
@@ -193,7 +193,7 @@ test.describe("visual: sheet preview", () => {
       // Restore the editor pane before capture so the baseline represents the
       // preview entry state, including its width controls, rather than a
       // transient post-assertion scroll position.
-      await page.getByTestId("document-editor-body-sheets").evaluate((element) => {
+      await page.getByTestId("document-editor-body-sections").evaluate((element) => {
         element.scrollTop = 0;
       });
       const header = page.getByTestId("app-header");
@@ -290,7 +290,7 @@ test.describe("visual: conflict banner", () => {
       await name.click();
       await page.keyboard.press("Control+A");
       await page.keyboard.type(`Conflict Demo ${width}`);
-      await page.getByTestId("document-editor-tab-entities").click();
+      await page.getByTestId("document-editor-tab-attributes").click();
 
       const banner = page.getByTestId("conflict-banner");
       await expect(banner).toBeVisible({ timeout: 30_000 });

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { t } from "../../i18n/index.js";
 import { useShortcut } from "../../shell/useShortcut.js";
 import type { DefinitionId } from "../../state/documentFieldTypes.js";
+import { Button, EmptyState, FormField } from "../../ui/index.js";
 import { DefinitionIdInput } from "../fields/DefinitionIdInput.js";
 import { SectionEditor } from "./SectionEditor.js";
 import styles from "./SheetEditor.module.css";
@@ -12,13 +13,19 @@ import type { SheetEditorV1, SheetSectionV1 } from "./sheetTypes.js";
 export type SheetEditorProps = {
   sheet: SheetEditorV1;
   onChange: (next: SheetEditorV1) => void;
+  /**
+   * Document-wide section/element-id allocators (see SectionEditor's
+   * allocateElementId). Fall back to sheet-local allocation when absent.
+   */
+  allocateSectionId?: (() => DefinitionId) | undefined;
+  allocateElementId?: (() => DefinitionId) | undefined;
 };
 
 type Focus =
   | { kind: "section"; sectionIdx: number; elementIdx: number | null }
   | null;
 
-export function SheetEditor({ sheet, onChange }: SheetEditorProps) {
+export function SheetEditor({ sheet, onChange, allocateSectionId, allocateElementId }: SheetEditorProps) {
   const [focus, setFocus] = useState<Focus>(null);
 
   const replaceSheet = (patch: Partial<SheetEditorV1>) => {
@@ -87,7 +94,7 @@ export function SheetEditor({ sheet, onChange }: SheetEditorProps) {
   });
 
   const addSection = () => {
-    const id = nextSectionId(sheet.sections);
+    const id = allocateSectionId?.() ?? nextSectionId(sheet.sections);
     const section: SheetSectionV1 = {
       id,
       label: defaultSectionLabel(sheet.sections),
@@ -111,20 +118,18 @@ export function SheetEditor({ sheet, onChange }: SheetEditorProps) {
     <section className={styles.layout} data-testid="sheet-editor">
       <header className={styles.header}>
         <div className={styles.headerRow}>
-          <label
-            className={styles.headerLabel}
-            htmlFor={`sheet-label-${sheet.id}`}
-          >
-            {t("editor.sheet.label")}
-            <input
-              id={`sheet-label-${sheet.id}`}
-              type="text"
-              value={sheet.label}
-              maxLength={120}
-              onChange={(e) => replaceSheet({ label: e.target.value })}
-              data-testid={`sheet-label-${sheet.id}`}
-            />
-          </label>
+          <div className={styles.headerLabel}>
+            <FormField label={t("editor.sheet.label")}>
+              <input
+                id={`sheet-label-${sheet.id}`}
+                type="text"
+                value={sheet.label}
+                maxLength={120}
+                onChange={(e) => replaceSheet({ label: e.target.value })}
+                data-testid={`sheet-label-${sheet.id}`}
+              />
+            </FormField>
+          </div>
           <div className={styles.elementField}>
             {t("editor.sheet.targetEntity")}
             <DefinitionIdInput
@@ -145,19 +150,18 @@ export function SheetEditor({ sheet, onChange }: SheetEditorProps) {
       </header>
       <div className={styles.sectionsHeader}>
         <h3 className={styles.sectionsTitle}>{t("editor.sheet.sections")}</h3>
-        <button
-          type="button"
-          className={styles.addButton}
+        <Button
+          variant="secondary"
           onClick={addSection}
           data-testid="sheet-add-section"
         >
           {t("editor.sheet.addSection")}
-        </button>
+        </Button>
       </div>
       {sheet.sections.length === 0 ? (
-        <p className={styles.empty} data-testid="sheet-empty">
-          {t("editor.section.empty")}
-        </p>
+        <div data-testid="sheet-empty">
+          <EmptyState title={t("editor.section.empty")} />
+        </div>
       ) : (
         <ul className={styles.sectionsList}>
           {sheet.sections.map((section, idx) => (
@@ -182,6 +186,7 @@ export function SheetEditor({ sheet, onChange }: SheetEditorProps) {
               onRemove={() => removeSection(idx)}
               onMoveUp={() => moveSection(idx, -1)}
               onMoveDown={() => moveSection(idx, 1)}
+              allocateElementId={allocateElementId}
             />
           ))}
         </ul>
@@ -200,14 +205,13 @@ function RemoveSheetButton({
   return (
     <Dialog.Root>
       <Dialog.Trigger asChild>
-        <button
-          type="button"
-          className={styles.removeButton}
+        <Button
+          variant="secondary"
           aria-label={t("editor.sheet.removeConfirm.title")}
           data-testid={`sheet-remove-${sheet.id}`}
         >
           {t("editor.sheet.removeConfirm.confirm")}
-        </button>
+        </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className={styles.dialogOverlay} />
@@ -225,23 +229,21 @@ function RemoveSheetButton({
           </p>
           <div className={styles.dialogActions}>
             <Dialog.Close asChild>
-              <button
-                type="button"
-                className={styles.dialogCancel}
+              <Button
+                variant="secondary"
                 data-testid="sheet-remove-confirm-cancel"
               >
                 {t("editor.sheet.removeConfirm.cancel")}
-              </button>
+              </Button>
             </Dialog.Close>
             <Dialog.Close asChild>
-              <button
-                type="button"
-                className={styles.dialogDestructive}
+              <Button
+                variant="danger"
                 onClick={onRemove}
                 data-testid="sheet-remove-confirm-submit"
               >
                 {t("editor.sheet.removeConfirm.confirm")}
-              </button>
+              </Button>
             </Dialog.Close>
           </div>
         </Dialog.Content>

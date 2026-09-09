@@ -25,6 +25,12 @@ export type DraftSync = {
   status: SyncStatus;
   banner: ConflictBanner | null;
   error: Error | null;
+  /**
+   * True while the browser reports no network connection. Saves still go
+   * through the normal debounced path (and fail into `error` when offline);
+   * this flag only lets owners render an explicit offline state as text.
+   */
+  offline: boolean;
 };
 
 export type UseDraftSyncInput = {
@@ -70,6 +76,20 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
   const [status, setStatus] = useState<SyncStatus>("idle");
   const [banner, setBanner] = useState<ConflictBanner | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const [offline, setOffline] = useState<boolean>(
+    () => typeof navigator !== "undefined" && navigator.onLine === false,
+  );
+
+  useEffect(() => {
+    const markOnline = () => setOffline(false);
+    const markOffline = () => setOffline(true);
+    window.addEventListener("online", markOnline);
+    window.addEventListener("offline", markOffline);
+    return () => {
+      window.removeEventListener("online", markOnline);
+      window.removeEventListener("offline", markOffline);
+    };
+  }, []);
 
   const lastSavedHashRef = useRef<string | null>(null);
   const pendingRef = useRef<PendingSave | null>(null);
@@ -215,7 +235,7 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
   );
 
   return useMemo<DraftSync>(
-    () => ({ save, cancel, isConfirmed, status, banner, error }),
-    [save, cancel, isConfirmed, status, banner, error],
+    () => ({ save, cancel, isConfirmed, status, banner, error, offline }),
+    [save, cancel, isConfirmed, status, banner, error, offline],
   );
 }

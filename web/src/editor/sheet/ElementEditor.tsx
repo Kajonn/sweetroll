@@ -1,5 +1,6 @@
 import { t } from "../../i18n/index.js";
 import type { DefinitionId } from "../../state/documentFieldTypes.js";
+import { FormField, Select } from "../../ui/index.js";
 import { DefinitionIdInput } from "../fields/DefinitionIdInput.js";
 import styles from "./SheetEditor.module.css";
 import type {
@@ -23,27 +24,23 @@ export function ElementEditor({ element, onChange }: ElementEditorProps) {
   return (
     <div className={styles.elementBody}>
       <div className={styles.elementRow2}>
-        <label
-          className={styles.elementField}
-          htmlFor={`element-kind-${element.id}`}
-        >
-          {t("editor.element.kind")}
-          <select
-            id={`element-kind-${element.id}`}
-            value={element.kind}
-            onChange={(e) => {
-              const nextKind = e.target.value as SheetElementKind;
-              if (nextKind === element.kind) return;
-              onChange(makeElementOfKind(nextKind, element.id));
-            }}
-            data-testid={`element-kind-${element.id}`}
-          >
-            <option value="heading">{t("editor.element.kind.heading")}</option>
-            <option value="field">{t("editor.element.kind.field")}</option>
-            <option value="resource">{t("editor.element.kind.resource")}</option>
-            <option value="action">{t("editor.element.kind.action")}</option>
-          </select>
-        </label>
+        <Select
+          label={t("editor.element.kind")}
+          id={`element-kind-${element.id}`}
+          value={element.kind}
+          onChange={(e) => {
+            const nextKind = e.target.value as SheetElementKind;
+            if (nextKind === element.kind) return;
+            onChange(makeElementOfKind(nextKind, element.id));
+          }}
+          data-testid={`element-kind-${element.id}`}
+          options={[
+            { value: "heading", label: t("editor.element.kind.heading") },
+            { value: "field", label: t("editor.element.kind.field") },
+            { value: "resource", label: t("editor.element.kind.resource") },
+            { value: "action", label: t("editor.element.kind.action") },
+          ]}
+        />
       </div>
       <ElementBodyRouter element={element} onChange={update} />
     </div>
@@ -89,38 +86,34 @@ function HeadingEditor({
 }) {
   return (
     <div className={styles.elementRow2}>
-      <label
-        className={styles.elementField}
-        htmlFor={`element-heading-text-${element.id}`}
-      >
-        {t("editor.element.heading.text")}
-        <input
-          id={`element-heading-text-${element.id}`}
-          type="text"
-          value={element.text}
-          maxLength={200}
-          onChange={(e) => onChange({ text: e.target.value })}
-          placeholder={t("editor.element.heading.text.placeholder")}
-          data-testid={`element-heading-text-${element.id}`}
-        />
-      </label>
-      <label
-        className={styles.elementField}
-        htmlFor={`element-heading-level-${element.id}`}
-      >
-        {t("editor.element.heading.level")}
-        <select
+      <div className={styles.elementField}>
+        <FormField label={t("editor.element.heading.text")}>
+          <input
+            id={`element-heading-text-${element.id}`}
+            type="text"
+            value={element.text}
+            maxLength={200}
+            onChange={(e) => onChange({ text: e.target.value })}
+            placeholder={t("editor.element.heading.text.placeholder")}
+            data-testid={`element-heading-text-${element.id}`}
+          />
+        </FormField>
+      </div>
+      <div className={styles.elementField}>
+        <Select
+          label={t("editor.element.heading.level")}
           id={`element-heading-level-${element.id}`}
           value={String(element.level)}
           onChange={(e) =>
             onChange({ level: Number(e.target.value) === 3 ? 3 : 2 })
           }
           data-testid={`element-heading-level-${element.id}`}
-        >
-          <option value="2">{t("editor.element.heading.level.h2")}</option>
-          <option value="3">{t("editor.element.heading.level.h3")}</option>
-        </select>
-      </label>
+          options={[
+            { value: "2", label: t("editor.element.heading.level.h2") },
+            { value: "3", label: t("editor.element.heading.level.h3") },
+          ]}
+        />
+      </div>
     </div>
   );
 }

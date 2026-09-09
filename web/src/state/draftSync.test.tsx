@@ -518,4 +518,22 @@ describe("useDraftSync", () => {
     expect(result.current.banner).toBeNull();
     expect(result.current.error).toBeNull();
   });
+
+  it("reports offline while the browser is offline and recovers on reconnect", () => {
+    const fetch_ = vi.fn();
+    const client = makeClient(fetch_);
+    const { result } = renderHook(() => useDraftSync({ client, systemId: "s1" }), {
+      wrapper: makeWrapper(),
+    });
+    expect(result.current.offline).toBe(false);
+    act(() => {
+      window.dispatchEvent(new Event("offline"));
+    });
+    expect(result.current.offline).toBe(true);
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+    expect(result.current.offline).toBe(false);
+    expect(fetch_).not.toHaveBeenCalled();
+  });
 });

@@ -1,7 +1,9 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { useState } from "react";
 
 import { t } from "../i18n/index.js";
 import type { FieldV1 } from "../state/documentFieldTypes.js";
+import { Button, EmptyState, FormField, Select } from "../ui/index.js";
 
 import { BooleanFieldEditor } from "./fields/BooleanFieldEditor.js";
 import { ChoiceFieldEditor } from "./fields/ChoiceFieldEditor.js";
@@ -41,7 +43,7 @@ function defaultLabel(existing: EntityListEntity[]): string {
   return `${base} ${Date.now()}`;
 }
 
-function defaultField(kind: FieldV1["kind"]): FieldV1 {
+export function defaultField(kind: FieldV1["kind"]): FieldV1 {
   switch (kind) {
     case "text":
       return {
@@ -109,15 +111,23 @@ function defaultField(kind: FieldV1["kind"]): FieldV1 {
         required: false,
       };
     case "resource":
+      return {
+        kind: "resource",
+        id: "resource",
+        label: t("editor.entity.fieldKind.resource"),
+        default: { current: 0, max: 10 },
+        min: 0,
+        max: 10,
+        step: 1,
+        resetTo: "max",
+      };
     case "computed":
       return {
-        kind: "text",
-        id: "placeholder",
-        label: t("editor.entity.fieldKind.placeholder"),
-        default: "",
-        required: false,
-        minLength: 0,
-        maxLength: 120,
+        kind: "computed",
+        id: "computed",
+        label: t("editor.entity.fieldKind.computed"),
+        valueType: "number",
+        expressionId: "",
       };
   }
 }
@@ -145,9 +155,17 @@ function FieldEditorRouter({
       return <ResourceFieldEditor field={field} onChange={onChange} />;
     case "computed":
       return (
-        <p className={styles.unsupported} data-testid={`field-unsupported-${field.id}`}>
-          {t("editor.entity.landsLater", { kind: t(`editor.fields.kind.${field.kind}`) })}
-        </p>
+        <div className={styles.unsupported} data-testid={`field-unsupported-${field.id}`}>
+          <span data-testid={`field-unsupported-summary-${field.id}`}>
+            {field.label} ({t(`editor.fields.kind.${field.kind}`)})
+          </span>{" "}
+          <span>
+            {t("editor.entity.unsupportedPreserved", {
+              label: field.label,
+              kind: t(`editor.fields.kind.${field.kind}`),
+            })}
+          </span>
+        </div>
       );
   }
 }
@@ -181,13 +199,13 @@ export function EntityList({
     onChange(entities.filter((e) => e.id !== id));
     if (selectedEntityId === id) onSelectEntity(null);
   };
-  const addField = (entityId: string) => {
+  const addField = (entityId: string, kind: FieldV1["kind"] = "text") => {
     const entity = entities.find((e) => e.id === entityId);
     if (entity === undefined) return;
     const baseId = "field";
     let id = baseId;
     for (let i = 1; entity.fields.some((f) => f.id === id); i++) id = `${baseId}_${i}`;
-    const field = defaultField("text");
+    const field = defaultField(kind);
     field.id = id;
     field.label = t("editor.entity.newFieldLabel");
     replaceEntity(entityId, { fields: [...entity.fields, field] });
@@ -198,19 +216,18 @@ export function EntityList({
       <aside className={styles.sidebar} aria-label={t("editor.entities.title")} data-testid="entity-list-sidebar">
         <header className={styles.sidebarHeader}>
           <h2 className={styles.sidebarTitle}>{t("editor.entities.title")}</h2>
-          <button
-            type="button"
-            className={styles.addButton}
+          <Button
+            variant="secondary"
             onClick={addEntity}
             data-testid="entity-list-add"
           >
             {t("editor.entities.add")}
-          </button>
+          </Button>
         </header>
         {entities.length === 0 ? (
-          <p className={styles.empty} data-testid="entity-list-empty">
-            {t("editor.entities.empty")}
-          </p>
+          <div data-testid="entity-list-empty">
+            <EmptyState title={t("editor.entities.empty")} />
+          </div>
         ) : (
           <ul className={styles.entityList}>
             {entities.map((entity) => {
@@ -226,8 +243,8 @@ export function EntityList({
                   data-testid={`entity-row-${entity.id}`}
                   data-selected={isSelected}
                 >
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
                     className={styles.entitySelect}
                     onClick={() => onSelectEntity(entity.id)}
                     aria-current={isSelected ? "true" : undefined}
@@ -237,7 +254,7 @@ export function EntityList({
                     <span className={styles.entityMeta}>
                       {entity.fields.length} {countLabel}
                     </span>
-                  </button>
+                  </Button>
                 </li>
               );
             })}
@@ -246,15 +263,15 @@ export function EntityList({
       </aside>
       <section className={styles.detail} data-testid="entity-list-detail">
         {selected === null ? (
-          <p className={styles.placeholder} data-testid="entity-list-no-selection">
-            {t("editor.entities.empty")}
-          </p>
+          <div data-testid="entity-list-no-selection">
+            <EmptyState title={t("editor.entities.empty")} />
+          </div>
         ) : (
           <EntityDetail
             entity={selected}
             onChange={(patch) => replaceEntity(selected.id, patch)}
             onFieldChange={(field) => replaceField(selected.id, field)}
-            onAddField={() => addField(selected.id)}
+            onAddField={(kind) => addField(selected.id, kind)}
             onRemove={(id) => removeEntity(id)}
           />
         )}
@@ -273,23 +290,28 @@ function EntityDetail({
   entity: EntityListEntity;
   onChange: (patch: Partial<EntityListEntity>) => void;
   onFieldChange: (field: FieldV1) => void;
-  onAddField: () => void;
+  onAddField: (kind: FieldV1["kind"]) => void;
   onRemove: (id: string) => void;
 }) {
+  // Guided kind picker for the add-field flow: defaults to text so the
+  // simple path never asks for grammar, with number/choice/resource
+  // reachable without leaving basics.
+  const [fieldKind, setFieldKind] = useState<FieldV1["kind"]>("text");
   return (
     <div className={styles.detailInner}>
       <header className={styles.detailHeader}>
-        <label className={styles.labelField} htmlFor={`entity-label-${entity.id}`}>
-          {t("editor.fields.label")}
-          <input
-            id={`entity-label-${entity.id}`}
-            type="text"
-            value={entity.label}
-            maxLength={120}
-            onChange={(e) => onChange({ label: e.target.value })}
-            data-testid={`entity-label-input-${entity.id}`}
-          />
-        </label>
+        <div className={styles.labelField}>
+          <FormField label={t("editor.fields.label")}>
+            <input
+              id={`entity-label-${entity.id}`}
+              type="text"
+              value={entity.label}
+              maxLength={120}
+              onChange={(e) => onChange({ label: e.target.value })}
+              data-testid={`entity-label-input-${entity.id}`}
+            />
+          </FormField>
+        </div>
         <div className={styles.detailMeta}>
           <span className={styles.monoLabel}>{t("editor.entity.idLabel")} {entity.id}</span>
           <RemoveEntityButton entity={entity} onRemove={onRemove} />
@@ -297,19 +319,31 @@ function EntityDetail({
       </header>
       <div className={styles.fieldsHeader}>
         <h3 className={styles.fieldsTitle}>{t("editor.entities.fields")}</h3>
-        <button
-          type="button"
-          className={styles.addButton}
-          onClick={onAddField}
+        <Select
+          label={t("editor.entities.fieldKind")}
+          id={`entity-field-kind-${entity.id}`}
+          value={fieldKind}
+          onChange={(e) => setFieldKind(e.target.value as FieldV1["kind"])}
+          data-testid={`entity-field-kind-picker-${entity.id}`}
+          options={[
+            { value: "text", label: t("editor.fields.kind.text") },
+            { value: "integer", label: t("editor.fields.kind.integer") },
+            { value: "singleChoice", label: t("editor.fields.kind.singleChoice") },
+            { value: "resource", label: t("editor.fields.kind.resource") },
+          ]}
+        />
+        <Button
+          variant="secondary"
+          onClick={() => onAddField(fieldKind)}
           data-testid={`entity-add-field-${entity.id}`}
         >
           {t("editor.entities.addField")}
-        </button>
+        </Button>
       </div>
       {entity.fields.length === 0 ? (
-        <p className={styles.placeholder} data-testid={`entity-fields-empty-${entity.id}`}>
-          {t("editor.entities.noFields")}
-        </p>
+        <div data-testid={`entity-fields-empty-${entity.id}`}>
+          <EmptyState title={t("editor.entities.noFields")} />
+        </div>
       ) : (
         <div className={styles.fieldsList}>
           {entity.fields.map((field) => (
@@ -336,14 +370,13 @@ function RemoveEntityButton({
   return (
     <Dialog.Root>
       <Dialog.Trigger asChild>
-        <button
-          type="button"
-          className={styles.removeButton}
+        <Button
+          variant="secondary"
           aria-label={t("editor.entity.removeAria", { label: entity.label })}
           data-testid={`entity-row-${entity.id}-remove`}
         >
           {t("editor.entities.removeConfirm.confirm")}
-        </button>
+        </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className={styles.dialogOverlay} />
@@ -361,23 +394,21 @@ function RemoveEntityButton({
           </p>
           <div className={styles.dialogActions}>
             <Dialog.Close asChild>
-              <button
-                type="button"
-                className={styles.dialogCancel}
+              <Button
+                variant="secondary"
                 data-testid="entity-remove-confirm-cancel"
               >
                 {t("editor.entities.removeConfirm.cancel")}
-              </button>
+              </Button>
             </Dialog.Close>
             <Dialog.Close asChild>
-              <button
-                type="button"
-                className={styles.dialogDestructive}
+              <Button
+                variant="danger"
                 onClick={() => onRemove(entity.id)}
                 data-testid="entity-remove-confirm-submit"
               >
                 {t("editor.entities.removeConfirm.confirm")}
-              </button>
+              </Button>
             </Dialog.Close>
           </div>
         </Dialog.Content>

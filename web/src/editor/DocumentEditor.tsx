@@ -1,4 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { compileExpression, type ExpressionAstV1 } from "@sweetroll/rules";
 import { Check } from "lucide-react";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
@@ -6,11 +7,13 @@ import type { ApiClient } from "../api/client.js";
 import { useOpenSystem } from "../api/openSystem.js";
 import type { DocumentAssessment } from "../api/server.js";
 import { t } from "../i18n/index.js";
+import type { ScalarValue, ValueType } from "../ports/evaluateExpression.js";
 import { ResourceBumpEditor, type ResourceBumpActionV1 } from "./actions/ResourceBumpEditor.js";
-import { RollActionEditor, type RollActionV1 } from "./actions/RollActionEditor.js";
+import { GUIDED_DICE_KINDS, RollActionEditor, type RollActionV1 } from "./actions/RollActionEditor.js";
 import { ConflictBanner } from "./ConflictBanner.js";
 import { DiagnosticsDrawer } from "./DiagnosticsDrawer.js";
 import { EntityList, type EntityListEntity } from "./EntityList.js";
+import { ExpressionEditor } from "./expressions/ExpressionEditor.js";
 import { MetadataEditor } from "./MetadataEditor.js";
 import { PreviewFrame } from "../preview/PreviewFrame.js";
 import { PreviewSheet } from "../preview/PreviewSheet.js";
@@ -31,12 +34,40 @@ import {
   type ValidationV1,
 } from "../state/documentReducer.js";
 import { useShortcut } from "../shell/useShortcut.js";
+import { Button, EmptyState } from "../ui/index.js";
 import { ValidationEditor } from "./validations/ValidationEditor.js";
 import styles from "./DocumentEditor.module.css";
 
-type TabId = "metadata" | "entities" | "sheets" | "actions" | "validations" | "referenceData";
+/** Basics-first creator tabs in workflow order. */
+export type CreatorTabId = "basics" | "attributes" | "dice" | "sections" | "advanced";
 
-const TABS: ReadonlyArray<TabId> = [
+/**
+ * Narrow-layout pane selection for the editor/preview switch (Task 4).
+ * Below the 1024px desktop boundary the switch selects a single visible
+ * pane (`editor` for small edits, `preview` for review); at desktop widths
+ * the `bodySplit` grid keeps both panes side-by-side regardless of this
+ * value. Full layout authoring stays desktop/tablet-oriented per spec.
+ */
+export type PreviewMobileView = "editor" | "preview";
+
+/**
+ * Pre-Task-2 tab ids, kept as URL aliases so `?tab=` deep links and
+ * `focus-editor:{path}` events issued against the old six-tab layout keep
+ * resolving to the matching basics-first tab.
+ */
+type LegacyTabId = "metadata" | "entities" | "sheets" | "actions" | "validations" | "referenceData";
+
+export type TabId = CreatorTabId | LegacyTabId;
+
+export const CREATOR_TABS: ReadonlyArray<CreatorTabId> = [
+  "basics",
+  "attributes",
+  "dice",
+  "sections",
+  "advanced",
+];
+
+const LEGACY_TABS: ReadonlyArray<LegacyTabId> = [
   "metadata",
   "entities",
   "sheets",
@@ -45,16 +76,40 @@ const TABS: ReadonlyArray<TabId> = [
   "referenceData",
 ];
 
-function isTabId(value: string): value is TabId {
-  return (TABS as ReadonlyArray<string>).includes(value);
+const LEGACY_TAB_ALIASES: Record<LegacyTabId, CreatorTabId> = {
+  metadata: "basics",
+  entities: "attributes",
+  sheets: "sections",
+  actions: "dice",
+  validations: "advanced",
+  referenceData: "advanced",
+};
+
+function isCreatorTabId(value: string): value is CreatorTabId {
+  return (CREATOR_TABS as ReadonlyArray<string>).includes(value);
 }
 
-function readActiveTab(): TabId {
-  if (typeof window === "undefined") return "metadata";
-  const params = new URLSearchParams(window.location.search);
-  const tab = params.get("tab");
-  if (tab !== null && isTabId(tab)) return tab;
-  return "metadata";
+function isLegacyTabId(value: string): value is LegacyTabId {
+  return (LEGACY_TABS as ReadonlyArray<string>).includes(value);
+}
+
+function readRawTabParam(): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("tab");
+}
+
+function readActiveTab(): CreatorTabId {
+  const tab = readRawTabParam();
+  if (tab === null) return "basics";
+  if (isCreatorTabId(tab)) return tab;
+  if (isLegacyTabId(tab)) return LEGACY_TAB_ALIASES[tab];
+  return "basics";
+}
+
+/** Legacy advanced tabs land with the disclosure open so their controls stay visible. */
+function readAdvancedDefaultOpen(): boolean {
+  const tab = readRawTabParam();
+  return tab === "validations" || tab === "referenceData";
 }
 
 export function DocumentEditor({
@@ -72,7 +127,7 @@ export function DocumentEditor({
     actorId: actorId ?? null,
     generation: generation ?? 0,
   });
-  const [active, setActive] = useState<TabId>(() => readActiveTab());
+  const [active, setActive] = useState<CreatorTabId>(() => readActiveTab());
 
   if (query.isPending) {
     return (
@@ -107,6 +162,7 @@ export function DocumentEditor({
       onActiveChange={setActive}
       initialDoc={initialDoc}
       assessment={ws.assessment}
+      advancedDefaultOpen={readAdvancedDefaultOpen()}
     />
   );
 }
@@ -126,20 +182,22 @@ function autosaveLabel(status: ReturnType<typeof useDraftSync>["status"]): strin
   }
 }
 
-function DocumentEditorBody({
+export function DocumentEditorBody({
   client,
   ws,
   active,
   onActiveChange,
   initialDoc,
   assessment,
+  advancedDefaultOpen,
 }: {
   client: ApiClient;
   ws: NonNullable<ReturnType<typeof useOpenSystem>["data"]>;
-  active: TabId;
-  onActiveChange: (next: TabId) => void;
+  active: CreatorTabId;
+  onActiveChange: (next: CreatorTabId) => void;
   initialDoc: SystemDocumentV1;
   assessment: DocumentAssessment;
+  advancedDefaultOpen?: boolean | undefined;
 }) {
   const [document, dispatch] = useReducer(documentReducer, initialDoc);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(
@@ -169,10 +227,15 @@ function DocumentEditorBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws.draft?.revision, ws.draft?.document]);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [mobileView, setMobileView] = useState<PreviewMobileView>("editor");
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const draftRevision = ws.draft?.revision ?? null;
+  // Newest-first (server ORDER BY created_at DESC): the first entry is the
+  // latest published version. Read from the already-loaded workspace — no
+  // new backend calls for readiness.
+  const latestPublished = ws.versions[0]?.semanticVersion ?? null;
   const queryClient = useQueryClient();
 
   const sync = useDraftSync({
@@ -212,6 +275,9 @@ function DocumentEditorBody({
 
   const errorCount = assessment.diagnostics.length;
   const publishDisabled = errorCount > 0;
+  // Unsaved changes come from the G1 owner: true until this exact document
+  // content matches the last server-confirmed save.
+  const unsaved = !sync.isConfirmed(document);
   // The header shows the working document's name while it diverges from the
   // server document and falls back to the server system name when clean, so
   // a dirty name is visible without waiting for the header itself to blur.
@@ -318,44 +384,87 @@ function DocumentEditorBody({
           {displayName}
         </h1>
         <span className={styles.lifecycle} data-testid="document-editor-lifecycle">
-          {t(`editor.lifecycle.${ws.draft !== null && ws.versions.length === 0 ? "draft" : ws.system.lifecycle}`)}
+          {ws.draft !== null && ws.versions.length === 0
+            ? t("editor.lifecycle.draftUnpublished")
+            : t(`editor.lifecycle.${ws.system.lifecycle}`)}
         </span>
-        <span className={styles.autosave} data-testid="document-editor-autosave">
+        <span
+          className={styles.autosave}
+          data-testid="document-editor-autosave"
+          role={sync.status === "conflict" || sync.status === "error" ? "alert" : "status"}
+        >
           <Check aria-hidden size={14} />
           {autosaveLabel(sync.status)}
+          {sync.offline ? ` · ${t("editor.save.offline")}` : null}
         </span>
-        <button
-          type="button"
-          className={styles.secondary}
+        {sync.status === "error" ? (
+          <Button
+            variant="secondary"
+            data-testid="document-editor-save-retry"
+            onClick={() => sync.save(document, draftRevision)}
+          >
+            {t("editor.save.retry")}
+          </Button>
+        ) : null}
+        <Button
+          variant="secondary"
           data-testid="document-editor-preview-toggle"
           aria-pressed={previewOpen}
-          onClick={() => setPreviewOpen((v) => !v)}
+          onClick={() => {
+            // Opening the preview selects the preview view so narrow
+            // layouts land on what was asked for; desktop still shows both
+            // panes side-by-side. Closing keeps the switch state.
+            if (!previewOpen) setMobileView("preview");
+            setPreviewOpen((v) => !v);
+          }}
           title={t("editor.preview.buttonShortcut")}
         >
           {t("editor.preview.buttonLabel")}
-        </button>
-        <button
-          type="button"
-          className={styles.secondary}
+        </Button>
+        {previewVisible ? (
+          <div
+            role="group"
+            aria-label={t("editor.preview.viewLabel")}
+            className={styles.previewSwitch}
+            data-testid="document-editor-preview-switch"
+          >
+            <Button
+              variant="secondary"
+              data-testid="document-editor-preview-view-editor"
+              aria-pressed={mobileView === "editor"}
+              onClick={() => setMobileView("editor")}
+            >
+              {t("editor.preview.viewEditor")}
+            </Button>
+            <Button
+              variant="secondary"
+              data-testid="document-editor-preview-view-preview"
+              aria-pressed={mobileView === "preview"}
+              onClick={() => setMobileView("preview")}
+            >
+              {t("editor.preview.viewPreview")}
+            </Button>
+          </div>
+        ) : null}
+        <Button
+          variant="secondary"
           data-testid="document-editor-diagnostics-toggle"
           aria-pressed={diagnosticsOpen}
           onClick={() => setDiagnosticsOpen((v) => !v)}
         >
           {t("editor.diagnostics.buttonLabel")}
           {errorCount > 0 ? ` (${errorCount})` : ""}
-        </button>
-        <button
-          type="button"
-          className={styles.secondary}
+        </Button>
+        <Button
+          variant="secondary"
           data-testid="document-editor-version-history-toggle"
           aria-pressed={versionHistoryOpen}
           onClick={() => setVersionHistoryOpen((v) => !v)}
         >
           {t("editor.versionHistory.buttonLabel")}
-        </button>
-        <button
-          type="button"
-          className={styles.publish}
+        </Button>
+        <Button
+          variant="primary"
           data-testid="document-editor-publish"
           disabled={publishDisabled}
           aria-disabled={publishDisabled ? "true" : undefined}
@@ -367,7 +476,57 @@ function DocumentEditorBody({
           }
         >
           {t("editor.publish.label")}
-        </button>
+        </Button>
+        <section
+          className={styles.readiness}
+          data-testid="document-editor-readiness"
+          aria-label={t("editor.readiness.title")}
+        >
+          <ul className={styles.readinessList}>
+            <li className={styles.readinessItem}>
+              {draftRevision !== null
+                ? t("editor.readiness.draftRev", { revision: draftRevision })
+                : t("editor.readiness.noDraft")}
+            </li>
+            <li className={styles.readinessItem}>
+              {t("editor.readiness.saveState", { state: autosaveLabel(sync.status) })}
+            </li>
+            <li className={styles.readinessItem}>
+              {errorCount === 0
+                ? t("editor.readiness.noIssues")
+                : t("editor.readiness.issues", { count: errorCount })}{" "}
+              <Button
+                variant="secondary"
+                data-testid="document-editor-readiness-diagnostics"
+                disabled={errorCount === 0}
+                onClick={() => setDiagnosticsOpen(true)}
+              >
+                {t("editor.readiness.reviewDiagnostics")}
+              </Button>
+            </li>
+            <li className={styles.readinessItem}>
+              {latestPublished !== null
+                ? t("editor.readiness.latestPublished", { version: latestPublished })
+                : t("editor.readiness.noPublished")}{" "}
+              <Button
+                variant="secondary"
+                data-testid="document-editor-readiness-versions"
+                onClick={() => setVersionHistoryOpen(true)}
+              >
+                {t("editor.readiness.viewVersions")}
+              </Button>
+            </li>
+          </ul>
+          <p
+            className={styles.readinessReason}
+            data-testid="document-editor-publish-reason"
+            role="status"
+          >
+            {publishDisabled
+              ? t("editor.publish.disabled.reason", { count: errorCount })
+              : t("editor.readiness.ready")}
+          </p>
+        </section>
       </header>
       {sync.banner !== null && (
         <ConflictBanner
@@ -378,7 +537,7 @@ function DocumentEditorBody({
         />
       )}
       <nav className={styles.tabs} aria-label={t("editor.tabsAriaLabel")}>
-        {TABS.map((tab) => {
+        {CREATOR_TABS.map((tab) => {
           const isActive = tab === active;
           return (
             <a
@@ -401,6 +560,7 @@ function DocumentEditorBody({
         className={previewVisible ? `${styles.body} ${styles.bodySplit}` : styles.body}
         ref={bodyRef}
         data-testid={`document-editor-body-${active}`}
+        data-mobile-view={previewVisible ? mobileView : undefined}
       >
         {previewOpen && previewPackage !== null && previewSample !== null ? (
           <div className={styles.previewPane} data-testid="document-editor-preview">
@@ -414,30 +574,32 @@ function DocumentEditorBody({
             <DiagnosticsDrawer assessment={assessment} />
           </div>
         ) : null}
-        {active === "metadata" ? (
-          <MetadataEditor
+        <div className={styles.editorPane} data-testid="document-editor-editor-pane">
+        {active === "basics" ? (
+          <BasicsTab
             document={document}
-            onChange={(next) => {
-              const patch = diffMetadata(document.metadata, next.metadata);
-              if (patch !== null) dispatch({ type: "setMetadata", patch });
-            }}
+            dispatch={dispatch}
           />
-        ) : active === "entities" ? (
+        ) : active === "attributes" ? (
           <EntitiesTab
             entities={document.entities}
             selectedEntityId={selectedEntityId}
             onSelectEntity={setSelectedEntityId}
             dispatch={dispatch}
           />
-        ) : active === "sheets" ? (
+        ) : active === "dice" ? (
+          <DiceTab client={client} document={document} dispatch={dispatch} />
+        ) : active === "sections" ? (
           <SheetsTab document={document} dispatch={dispatch} />
-        ) : active === "actions" ? (
-          <ActionsTab client={client} document={document} dispatch={dispatch} />
-        ) : active === "validations" ? (
-          <ValidationsTab client={client} document={document} dispatch={dispatch} />
-        ) : active === "referenceData" ? (
-          <ReferenceDataTab document={document} dispatch={dispatch} />
+        ) : active === "advanced" ? (
+          <AdvancedTab
+            client={client}
+            document={document}
+            dispatch={dispatch}
+            defaultOpen={advancedDefaultOpen}
+          />
         ) : null}
+        </div>
       </main>
       <PublishDialog
         client={client}
@@ -445,6 +607,12 @@ function DocumentEditorBody({
         onOpenChange={setPublishOpen}
         systemId={ws.system.systemId}
         expectedRevision={draftRevision ?? 0}
+        readiness={{
+          draftRevision,
+          diagnosticsCount: errorCount,
+          latestPublished,
+          unsaved,
+        }}
       />
       {versionHistoryOpen ? (
         <VersionHistoryOverlay
@@ -472,6 +640,30 @@ function diffMetadata(
   return changed ? patch : null;
 }
 
+/**
+ * Basics tab: the existing MetadataEditor fields (name, description,
+ * language, default dice) with stable IDs — no new API, no expressions.
+ */
+function BasicsTab({
+  document,
+  dispatch,
+}: {
+  document: SystemDocumentV1;
+  dispatch: React.Dispatch<DocumentAction>;
+}) {
+  return (
+    <section data-testid="basics-tab" data-path="/basics">
+      <MetadataEditor
+        document={document}
+        onChange={(next) => {
+          const patch = diffMetadata(document.metadata, next.metadata);
+          if (patch !== null) dispatch({ type: "setMetadata", patch });
+        }}
+      />
+    </section>
+  );
+}
+
 function EntitiesTab({
   entities,
   selectedEntityId,
@@ -489,17 +681,19 @@ function EntitiesTab({
     fields: entity.fields as unknown as EntityListEntity["fields"],
   }));
   return (
-    <EntityList
-      entities={entityList}
-      selectedEntityId={selectedEntityId}
-      onSelectEntity={onSelectEntity}
-      onChange={(next) => {
-        dispatch({
-          type: "setEntities",
-          entities: next as unknown as EntityDefinitionV1[],
-        });
-      }}
-    />
+    <section data-testid="attributes-tab" data-path="/attributes">
+      <EntityList
+        entities={entityList}
+        selectedEntityId={selectedEntityId}
+        onSelectEntity={onSelectEntity}
+        onChange={(next) => {
+          dispatch({
+            type: "setEntities",
+            entities: next as unknown as EntityDefinitionV1[],
+          });
+        }}
+      />
+    </section>
   );
 }
 
@@ -511,6 +705,26 @@ function SheetsTab({
   dispatch: React.Dispatch<DocumentAction>;
 }) {
   const sheets = (document.sheets as unknown as SheetEditorView[]) ?? [];
+  // Document-wide section/element-id allocation: definition IDs must be
+  // unique across the whole document (duplicate_definition_id blocks saves),
+  // so IDs for newly added sections/elements are drawn from the union of all
+  // sheets — never per sheet or per section.
+  const allocateSheetChildId = (prefix: "section" | "element"): string => {
+    const used = new Set<string>();
+    for (const sheet of sheets) {
+      for (const section of sheet.sections) {
+        used.add(section.id);
+        if (prefix === "element") {
+          for (const element of section.elements) used.add(element.id);
+        }
+      }
+    }
+    for (let i = 1; i < 10_000; i++) {
+      const candidate = `${prefix}_${i}`;
+      if (!used.has(candidate)) return candidate;
+    }
+    return `${prefix}_${Date.now()}`;
+  };
   const addSheet = () => {
     const id = nextSheetId(sheets.map((s) => s.id));
     const next: SheetEditorView = {
@@ -538,19 +752,22 @@ function SheetsTab({
     });
   };
   return (
-    <section data-testid="sheets-tab" data-path="/sheets">
+    <section data-testid="sections-tab" data-path="/sections">
+      <section data-testid="sheets-tab" data-path="/sheets">
       <header className={styles.tabHeader}>
         <h2 className={styles.tabTitle}>{t("editor.sheet.label")}</h2>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           onClick={addSheet}
           data-testid="sheet-add-button"
         >
           {t("editor.sheets.addSheet")}
-        </button>
+        </Button>
       </header>
       {sheets.length === 0 ? (
-        <p className={styles.placeholder} data-testid="sheets-tab-empty">{t("editor.sheets.empty")}</p>
+        <div data-testid="sheets-tab-empty">
+          <EmptyState title={t("editor.sheets.empty")} />
+        </div>
       ) : (
         <ul className={styles.sheetList}>
           {sheets.map((sheet, idx) => (
@@ -558,19 +775,22 @@ function SheetsTab({
               <SheetEditor
                 sheet={sheet}
                 onChange={(next) => replaceSheet(idx, next)}
+                allocateSectionId={() => allocateSheetChildId("section")}
+                allocateElementId={() => allocateSheetChildId("element")}
               />
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                className={styles.removeButton}
                 onClick={() => removeSheet(idx)}
                 data-testid={`sheets-tab-remove-${idx}`}
-                className={styles.removeButton}
               >
                 {t("editor.sheet.removeConfirm.confirm")}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
       )}
+      </section>
     </section>
   );
 }
@@ -585,7 +805,58 @@ function nextSheetId(existing: ReadonlyArray<string>): string {
   return `sheet_${Date.now()}`;
 }
 
-function ActionsTab({
+/**
+ * Persist an edited expression source into `document.expressions` via the
+ * functional `setExpressionSource` reducer action (not a render-local Map
+ * and not a stale-snapshot `replace`), so tab switches/rerenders retain the
+ * edit and rapid successive edits cannot clobber each other. Unknown ids
+ * are ignored: no stray entries.
+ */
+export function persistExpressionSource(
+  document: SystemDocumentV1,
+  dispatch: React.Dispatch<DocumentAction>,
+  sourceId: string,
+  source: string,
+): void {
+  const expressions = document.expressions ?? [];
+  if (!expressions.some((entry) => entry.id === sourceId)) return;
+  dispatch({ type: "setExpressionSource", expressionId: sourceId, source });
+}
+
+/**
+ * Document-writing helper for computed-field blur commits (Task 2 wiring
+ * contract). Writes both the edited source and — when provided — the
+ * fallback into the `document.expressions` entry keyed by `expressionId`
+ * via the functional `setExpressionSource` action. Unknown ids are a
+ * no-op: no stray entries, and callers should keep their optional
+ * `onExpressionSourceChange`/`onFallbackChange` callbacks as the fallback
+ * path for dispatch-less use or entries not yet in the document.
+ */
+export function commitComputedSource(
+  document: SystemDocumentV1,
+  dispatch: React.Dispatch<DocumentAction>,
+  expressionId: string,
+  source: string,
+  fallback?: unknown,
+): void {
+  const expressions = document.expressions ?? [];
+  if (!expressions.some((entry) => entry.id === expressionId)) return;
+  dispatch({
+    type: "setExpressionSource",
+    expressionId,
+    source,
+    ...(fallback !== undefined ? { fallback, hasFallback: true as const } : null),
+  });
+}
+
+/**
+ * Dice tab: guided roll-action editing (label + dice-kind + inputs) with no
+ * grammar input. Each roll owns a `document.expressions` entry created at
+ * add time; the dice-kind picker writes canned sources through
+ * `persistExpressionSource`, and the full source stays editable in Advanced.
+ * Resource-bump actions are grammar-free and stay fully editable here.
+ */
+function DiceTab({
   client,
   document,
   dispatch,
@@ -604,12 +875,23 @@ function ActionsTab({
   }>) ?? [];
 
   const addRoll = () => {
+    const expressionId = nextExpressionId(expressions.map((e) => e.id));
+    dispatch({
+      type: "addExpression",
+      expression: {
+        id: expressionId,
+        context: "roll",
+        resultType: "number",
+        source: "d20",
+        fallback: 0,
+      },
+    });
     const id = nextActionId(actions.map((a) => a.id));
     const next: RollActionV1 = {
       kind: "roll",
       id,
       label: t("editor.actions.kind.roll"),
-      expressionId: expressions[0]?.id ?? "",
+      expressionId,
       inputs: [],
       outputTemplate: "Result: {total}",
     };
@@ -646,22 +928,28 @@ function ActionsTab({
     });
   };
 
-  const expressionSourceMap = new Map<string, string>();
-  for (const e of expressions) expressionSourceMap.set(e.id, e.source ?? "");
+  const expressionSourceFor = (expressionId: string): string =>
+    expressions.find((entry) => entry.id === expressionId)?.source ?? "";
+
+  const hasExpression = (expressionId: string): boolean =>
+    expressions.some((entry) => entry.id === expressionId);
 
   return (
+    <section data-testid="dice-tab" data-path="/dice">
     <section data-testid="actions-tab" data-path="/actions">
       <header className={styles.tabHeader}>
         <h2 className={styles.tabTitle}>{t("editor.actions.addTitle")}</h2>
-        <button type="button" onClick={addRoll} data-testid="actions-add-roll">
+        <Button variant="secondary" onClick={addRoll} data-testid="actions-add-roll">
           {t("editor.actions.addRoll")}
-        </button>
-        <button type="button" onClick={addResourceBump} data-testid="actions-add-resource-bump">
+        </Button>
+        <Button variant="secondary" onClick={addResourceBump} data-testid="actions-add-resource-bump">
           {t("editor.actions.addResourceBump")}
-        </button>
+        </Button>
       </header>
       {actions.length === 0 ? (
-        <p className={styles.placeholder} data-testid="actions-tab-empty">{t("editor.actions.empty")}</p>
+        <div data-testid="actions-tab-empty">
+          <EmptyState title={t("editor.actions.empty")} />
+        </div>
       ) : (
         <ul className={styles.actionList}>
           {actions.map((action, idx) => (
@@ -672,11 +960,18 @@ function ActionsTab({
                   systemId="s1"
                   action={action}
                   onChange={(next) => replaceAction(idx, next)}
-                  expressionSource={expressionSourceMap.get(action.expressionId) ?? ""}
+                  expressionSource={expressionSourceFor(action.expressionId)}
                   onExpressionSourceChange={(next) => {
-                    expressionSourceMap.set(action.expressionId, next);
+                    persistExpressionSource(document, dispatch, action.expressionId, next);
                   }}
                   fieldTypes={buildFieldTypeMap(document)}
+                  guided
+                  diceKind={diceKindFor(expressionSourceFor(action.expressionId))}
+                  onDiceKindChange={hasExpression(action.expressionId)
+                    ? (kind) => {
+                        persistExpressionSource(document, dispatch, action.expressionId, kind);
+                      }
+                    : undefined}
                 />
               ) : (
                 <ResourceBumpEditor
@@ -685,20 +980,34 @@ function ActionsTab({
                   availableResources={collectResourceFields(document)}
                 />
               )}
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                className={styles.removeButton}
                 onClick={() => removeAction(idx)}
                 data-testid={`actions-tab-remove-${idx}`}
-                className={styles.removeButton}
               >
                 {t("editor.sheet.removeConfirm.confirm")}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
       )}
     </section>
+    </section>
   );
+}
+
+/** Guided dice-kind for a roll source: canned kind, else custom (Advanced edit). */
+function diceKindFor(source: string): string {
+  return (GUIDED_DICE_KINDS as ReadonlyArray<string>).includes(source) ? source : "custom";
+}
+
+function nextExpressionId(existing: ReadonlyArray<string>): string {
+  for (let i = 1; i < 10_000; i++) {
+    const candidate = `expr_${i}`;
+    if (!existing.some((id) => id === candidate)) return candidate;
+  }
+  return `expr_${Date.now()}`;
 }
 
 function nextActionId(existing: ReadonlyArray<string>): string {
@@ -776,8 +1085,8 @@ function ValidationsTab({
 }) {
   const validations = (document.validations as unknown as ValidationV1[]) ?? [];
   const expressions = (document.expressions as unknown as Array<{ id: string; source: string }>) ?? [];
-  const expressionSourceMap = new Map<string, string>();
-  for (const e of expressions) expressionSourceMap.set(e.id, e.source ?? "");
+  const expressionSourceFor = (expressionId: string): string =>
+    expressions.find((entry) => entry.id === expressionId)?.source ?? "";
 
   const addValidation = () => {
     const id = nextValidationId(validations.map((v) => v.id));
@@ -805,12 +1114,14 @@ function ValidationsTab({
     <section data-testid="validations-tab" data-path="/validations">
       <header className={styles.tabHeader}>
         <h2 className={styles.tabTitle}>{t("editor.actions.addTitle")}</h2>
-        <button type="button" onClick={addValidation} data-testid="validations-add-button">
+        <Button variant="secondary" onClick={addValidation} data-testid="validations-add-button">
           {t("editor.validations.add")}
-        </button>
+        </Button>
       </header>
       {validations.length === 0 ? (
-        <p className={styles.placeholder} data-testid="validations-tab-empty">{t("editor.validations.empty")}</p>
+        <div data-testid="validations-tab-empty">
+          <EmptyState title={t("editor.validations.empty")} />
+        </div>
       ) : (
         <ul className={styles.validationList}>
           {validations.map((v, idx) => (
@@ -820,21 +1131,21 @@ function ValidationsTab({
                 systemId="s1"
                 validation={v as unknown as Parameters<typeof ValidationEditor>[0]["validation"]}
                 onChange={(next) => replaceValidation(idx, next as unknown as ValidationV1)}
-                expressionSource={expressionSourceMap.get(v.expressionId) ?? ""}
+                expressionSource={expressionSourceFor(v.expressionId)}
                 onExpressionSourceChange={(next) => {
-                  expressionSourceMap.set(v.expressionId, next);
+                  persistExpressionSource(document, dispatch, v.expressionId, next);
                 }}
                 availableExpressions={expressionOptions}
                 availableTargets={targetOptions}
               />
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                className={styles.removeButton}
                 onClick={() => removeValidation(idx)}
                 data-testid={`validations-tab-remove-${idx}`}
-                className={styles.removeButton}
               >
                 {t("editor.sheet.removeConfirm.confirm")}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -887,27 +1198,27 @@ function ReferenceDataTab({
     <section data-testid="reference-data-tab" data-path="/referenceData">
       <header className={styles.tabHeader}>
         <h2 className={styles.tabTitle}>{t("editor.referenceData.addTitle")}</h2>
-        <button type="button" onClick={addReferenceData} data-testid="reference-data-add-button">
+        <Button variant="secondary" onClick={addReferenceData} data-testid="reference-data-add-button">
           {t("editor.referenceData.add")}
-        </button>
+        </Button>
       </header>
       {referenceData.length === 0 ? (
-        <p className={styles.placeholder} data-testid="reference-data-tab-empty">
-          {t("editor.referenceData.empty")}
-        </p>
+        <div data-testid="reference-data-tab-empty">
+          <EmptyState title={t("editor.referenceData.empty")} />
+        </div>
       ) : (
         <ul className={styles.referenceList}>
           {referenceData.map((r, idx) => (
             <li key={r.id} data-path={`/referenceData/${idx}`}>
               <ReferenceDataEditor referenceData={r} onChange={(next) => replaceReferenceData(idx, next)} />
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                className={styles.removeButton}
                 onClick={() => removeReferenceData(idx)}
                 data-testid={`reference-data-tab-remove-${idx}`}
-                className={styles.removeButton}
               >
                 {t("editor.sheet.removeConfirm.confirm")}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -924,7 +1235,101 @@ function nextReferenceDataId(existing: ReadonlyArray<string>): string {
   return `reference_${Date.now()}`;
 }
 
-function buildPreviewPackage(document: SystemDocumentV1): import("../preview/sampleData.js").SystemPackageV1 | null {
+/**
+ * Advanced tab: validations, reference data, and expression editors behind
+ * a collapsed-by-default labeled disclosure. Untouched advanced definitions
+ * stay byte-for-byte intact (Task 1): this tab only reads them through the
+ * same functional `persistExpressionSource` path the basics tabs use.
+ */
+function AdvancedTab({
+  client,
+  document,
+  dispatch,
+  defaultOpen,
+}: {
+  client: ApiClient;
+  document: SystemDocumentV1;
+  dispatch: React.Dispatch<DocumentAction>;
+  defaultOpen?: boolean | undefined;
+}) {
+  const [open, setOpen] = useState(defaultOpen ?? false);
+  return (
+    <section data-testid="advanced-tab" data-path="/advanced">
+      <details
+        className={styles.advancedDisclosure}
+        data-testid="advanced-disclosure"
+        data-path="/advanced/disclosure"
+        open={open}
+      >
+        <summary
+          className={styles.advancedSummary}
+          data-testid="advanced-disclosure-toggle"
+          aria-expanded={open ? "true" : "false"}
+          onClick={(e) => {
+            // Drive the disclosure from state (instead of the native toggle)
+            // so keyboard/click behavior is identical in browsers and jsdom.
+            e.preventDefault();
+            setOpen((v) => !v);
+          }}
+        >
+          {t("editor.advanced.disclosure")}
+        </summary>
+        {open ? (
+          <div className={styles.advancedBody}>
+            <ExpressionsSection client={client} document={document} dispatch={dispatch} />
+            <ValidationsTab client={client} document={document} dispatch={dispatch} />
+            <ReferenceDataTab document={document} dispatch={dispatch} />
+          </div>
+        ) : null}
+      </details>
+    </section>
+  );
+}
+
+function ExpressionsSection({
+  client,
+  document,
+  dispatch,
+}: {
+  client: ApiClient;
+  document: SystemDocumentV1;
+  dispatch: React.Dispatch<DocumentAction>;
+}) {
+  const expressions = (document.expressions as unknown as Array<{
+    id: string;
+    source: string;
+  }>) ?? [];
+  return (
+    <section data-testid="expressions-section" data-path="/expressions">
+      <header className={styles.tabHeader}>
+        <h2 className={styles.tabTitle}>{t("editor.advanced.expressions.title")}</h2>
+      </header>
+      {expressions.length === 0 ? (
+        <div data-testid="expressions-section-empty">
+          <EmptyState title={t("editor.advanced.expressions.empty")} />
+        </div>
+      ) : (
+        <ul className={styles.expressionList}>
+          {expressions.map((entry, idx) => (
+            <li key={entry.id} data-path={`/expressions/${idx}`}>
+              <ExpressionEditor
+                client={client}
+                systemId="s1"
+                expressionId={entry.id}
+                source={entry.source ?? ""}
+                onSourceChange={(next) => {
+                  persistExpressionSource(document, dispatch, entry.id, next);
+                }}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+export function buildPreviewPackage(document: SystemDocumentV1): import("../preview/sampleData.js").SystemPackageV1 | null {
   if (document.entities.length === 0) return null;
   const entities = document.entities.map((entity) => ({
     id: entity.id,
@@ -955,10 +1360,184 @@ function buildPreviewPackage(document: SystemDocumentV1): import("../preview/sam
   >) ?? [];
   return {
     entities,
-    expressions: [],
+    expressions: compilePreviewExpressions(document),
     sheets: sheets as unknown as never,
     actions: actions as unknown as never,
   } as unknown as import("../preview/sampleData.js").SystemPackageV1;
+}
+
+/**
+ * Preview pass-through for the document's source expressions. Every
+ * `document.expressions` id appears in the returned package: entries that
+ * fail shape validation or preview compilation are included with a
+ * `previewError` marker and a fallback-literal AST (so preview renders the
+ * sampled/fallback value) instead of being omitted. Validation and compile
+ * may only mark — never filter — so an untouched advanced definition can
+ * never silently disappear from preview.
+ *
+ * NOTE (preview/server env divergence, for Task 2+): the compile attempt
+ * below uses a merged cross-entity field env plus per-expression roll-input
+ * envs, which mirrors but does not match the server's per-owner envs
+ * (see server `compile-document.ts`). A multi-owner expression may therefore
+ * compile here yet fail on the server, or carry `previewError:
+ * "uncompilable"` here yet publish fine. The marker must be surfaced as a
+ * preview-only diagnostic, never as a publish verdict.
+ */
+function compilePreviewExpressions(
+  document: SystemDocumentV1,
+): import("../preview/sampleData.js").SystemPackageV1["expressions"] {
+  const { fields, inputsByExpression } = previewExpressionEnvs(document);
+  const out: import("../preview/sampleData.js").SystemPackageV1["expressions"] = [];
+  for (const entry of (document.expressions ?? []) as unknown as Array<Record<string, unknown>>) {
+    if (typeof entry.id !== "string") continue;
+    const context = isPreviewContext(entry.context) ? entry.context : "computed";
+    const resultType = isPreviewResultType(entry.resultType)
+      ? entry.resultType
+      : inferPreviewResultType(entry.fallback);
+    const fallback: ScalarValue = isPreviewFallback(entry.fallback) ? entry.fallback : 0;
+    const shapeOk =
+      typeof entry.source === "string" &&
+      entry.context === context &&
+      entry.resultType === resultType &&
+      entry.fallback === fallback;
+    if (shapeOk) {
+      const result = compileExpression(entry.source as string, {
+        env: { fields, inputs: inputsByExpression.get(entry.id) ?? {} },
+        resultType,
+        context,
+        fallback,
+      });
+      if (result.ok) {
+        out.push({
+          id: entry.id,
+          context: result.value.context,
+          resultType: result.value.resultType,
+          fallback: result.value.fallback,
+          ast: result.value.ast,
+        });
+        continue;
+      }
+      out.push({
+        id: entry.id,
+        context,
+        resultType,
+        fallback,
+        ast: fallbackLiteralAst(fallback, resultType),
+        previewError: "uncompilable",
+      });
+      continue;
+    }
+    out.push({
+      id: entry.id,
+      context,
+      resultType,
+      fallback,
+      ast: fallbackLiteralAst(fallback, resultType),
+      previewError: "invalid",
+    });
+  }
+  return out;
+}
+
+/** Coerce an unknown stored fallback to a result type for a marked entry. */
+function inferPreviewResultType(fallback: unknown): ValueType {
+  if (typeof fallback === "string") return "text";
+  if (typeof fallback === "boolean") return "boolean";
+  return "number";
+}
+
+/**
+ * Safe AST for a marked (uncompilable/invalid) preview entry: a literal of
+ * the fallback value, so preview render/evaluate paths stay total and show
+ * the sampled fallback instead of crashing or dropping the id.
+ */
+function fallbackLiteralAst(fallback: ScalarValue, resultType: ValueType): ExpressionAstV1 {
+  if (resultType === "text") {
+    return {
+      kind: "stringLiteral",
+      value: typeof fallback === "string" ? fallback : String(fallback),
+    };
+  }
+  if (resultType === "boolean") {
+    return {
+      kind: "booleanLiteral",
+      value: typeof fallback === "boolean" ? fallback : false,
+    };
+  }
+  return {
+    kind: "numberLiteral",
+    value: typeof fallback === "number" && Number.isFinite(fallback) ? fallback : 0,
+  };
+}
+
+function previewExpressionEnvs(document: SystemDocumentV1): {
+  fields: Record<string, ValueType>;
+  inputsByExpression: Map<string, Record<string, ValueType>>;
+} {
+  const fields: Record<string, ValueType> = {};
+  for (const entity of document.entities) {
+    for (const field of entity.fields as unknown as Array<{
+      id: string;
+      kind?: string;
+      valueType?: unknown;
+    }>) {
+      if (fields[field.id] !== undefined) continue;
+      const valueType = previewFieldValueType(field.kind, field.valueType);
+      if (valueType !== undefined) fields[field.id] = valueType;
+    }
+  }
+  const inputsByExpression = new Map<string, Record<string, ValueType>>();
+  for (const action of document.actions as unknown as Array<{
+    kind?: string;
+    expressionId?: string;
+    inputs?: Array<{ id: string; valueType?: string }>;
+  }>) {
+    if (action.kind !== "roll" || typeof action.expressionId !== "string") continue;
+    const inputs = inputsByExpression.get(action.expressionId) ?? {};
+    for (const input of action.inputs ?? []) {
+      if (inputs[input.id] === undefined) {
+        inputs[input.id] =
+          input.valueType === "boolean"
+            ? "boolean"
+            : input.valueType === "text"
+              ? "text"
+              : "number";
+      }
+    }
+    inputsByExpression.set(action.expressionId, inputs);
+  }
+  return { fields, inputsByExpression };
+}
+
+function previewFieldValueType(kind: unknown, valueType: unknown): ValueType | undefined {
+  switch (kind) {
+    case "text":
+    case "singleChoice":
+    case "multiChoice":
+      return "text";
+    case "integer":
+    case "decimal":
+    case "resource":
+      return "number";
+    case "boolean":
+      return "boolean";
+    case "computed":
+      return isPreviewResultType(valueType) ? valueType : undefined;
+    default:
+      return undefined;
+  }
+}
+
+function isPreviewContext(value: unknown): value is "computed" | "roll" | "validation" {
+  return value === "computed" || value === "roll" || value === "validation";
+}
+
+function isPreviewResultType(value: unknown): value is ValueType {
+  return value === "number" || value === "text" || value === "boolean";
+}
+
+function isPreviewFallback(value: unknown): value is ScalarValue {
+  return typeof value === "number" || typeof value === "string" || typeof value === "boolean";
 }
 
 function VersionHistoryOverlay({
@@ -979,9 +1558,9 @@ function VersionHistoryOverlay({
     >
       <header>
         <h2>{t("editor.versionHistory.titleInHeader")}</h2>
-        <button type="button" onClick={onClose} data-testid="document-editor-version-history-close">
+        <Button variant="secondary" onClick={onClose} data-testid="document-editor-version-history-close">
           {t("publish.close")}
-        </button>
+        </Button>
       </header>
       <VersionHistory client={client} systemId={systemId} />
     </div>
@@ -995,15 +1574,25 @@ function useFocusEditorListener(bodyRef: React.RefObject<HTMLDivElement>): void 
       if (target === null) return;
       if (!event.type.startsWith("focus-editor:")) return;
       const path = event.type.replace(/^focus-editor:/, "");
-      const selector = `[data-path="${path}"]`;
-      const el = target.querySelector(selector) ?? window.document.querySelector(selector);
-      if (el instanceof HTMLElement) {
-        el.scrollIntoView({ block: "center" });
-        el.focus({ preventScroll: true });
+      // Legacy six-tab deep links resolve to their basics-first successor:
+      // inner sections keep the legacy data-paths (/sheets, /actions,
+      // /validations, /referenceData), while /metadata and /entities map to
+      // the basics/attributes wrappers.
+      const candidates = [path, FOCUS_PATH_ALIASES[path]].filter(
+        (candidate): candidate is string => candidate !== undefined,
+      );
+      for (const candidate of candidates) {
+        const selector = `[data-path="${candidate}"]`;
+        const el = target.querySelector(selector) ?? window.document.querySelector(selector);
+        if (el instanceof HTMLElement) {
+          el.scrollIntoView({ block: "center" });
+          el.focus({ preventScroll: true });
+          return;
+        }
       }
     };
     const events: string[] = [];
-    for (const tab of TABS) {
+    for (const tab of [...CREATOR_TABS, ...LEGACY_TABS]) {
       events.push(`focus-editor:/${tab}`);
       events.push(`focus-editor:/${tab}/0`);
     }
@@ -1013,3 +1602,9 @@ function useFocusEditorListener(bodyRef: React.RefObject<HTMLDivElement>): void 
     };
   }, [bodyRef]);
 }
+
+/** Legacy `focus-editor:{path}` targets without a same-named data-path. */
+const FOCUS_PATH_ALIASES: Record<string, string> = {
+  "/metadata": "/basics",
+  "/entities": "/attributes",
+};

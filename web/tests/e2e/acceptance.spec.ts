@@ -32,7 +32,7 @@ test("acceptance: clone template, edit, preview, publish, breaking-change gate",
   await systemName.click();
   await page.keyboard.press("Control+A");
   await page.keyboard.type("Companion Demo");
-  await page.getByTestId("document-editor-tab-entities").click();
+  await page.getByTestId("document-editor-tab-attributes").click();
   await page.getByTestId("entity-list-add").click();
   const companionRow = page.locator('li[data-testid^="entity-row-"]').last();
   const companionId = (await companionRow.getAttribute("data-testid"))?.replace("entity-row-", "") ?? "";
@@ -43,14 +43,16 @@ test("acceptance: clone template, edit, preview, publish, breaking-change gate",
   // version-history side effect rather than inspecting internal field state.
 
   // 4. Add a "Companion" sheet section with two bound elements (the two new fields).
-  await page.getByTestId("document-editor-tab-sheets").click();
+  await page.getByTestId("document-editor-tab-sections").click();
   await page.getByTestId("sheet-add-section").click();
 
   // 5. Add a "Pet check-in" validation: `fields.loyalty >= 3`, warning severity,
   // message key editor.validations.petCheckIn. The validation editor exposes a
   // free-text message input keyed by validation id; the message key is a product
   // convention enforced by i18n catalogue tests rather than this e2e flow.
-  await page.getByTestId("document-editor-tab-validations").click();
+  await page.getByTestId("document-editor-tab-advanced").click();
+  // Advanced controls live behind the collapsed-by-default disclosure.
+  await page.getByTestId("advanced-disclosure-toggle").click();
   const lastEditSaved = page.waitForResponse(
     (r) => r.request().method() === "PUT" && r.url().includes("/api/systems/") && r.url().endsWith("/draft"),
     { timeout: 15_000 },
@@ -88,7 +90,7 @@ test("acceptance: clone template, edit, preview, publish, breaking-change gate",
   // publish 1.1.0. The publish dialog must surface a breaking-change finding
   // returned by the server (publishDialog.tsx:84,188) and block submit until
   // every finding is acknowledged.
-  await page.getByTestId("document-editor-tab-entities").click();
+  await page.getByTestId("document-editor-tab-attributes").click();
   const deletionSaved = page.waitForResponse(
     (r) => r.request().method() === "PUT" && r.url().includes("/api/systems/") && r.url().endsWith("/draft"),
     { timeout: 15_000 },
@@ -107,7 +109,7 @@ test("acceptance: clone template, edit, preview, publish, breaking-change gate",
   // is the contract: after a clean publish, version-history shows 1.1.0).
   await page.getByTestId("publish-dialog-cancel").click();
   // Restore step (re-add Companion) is exercised here.
-  await page.getByTestId("document-editor-tab-entities").click();
+  await page.getByTestId("document-editor-tab-attributes").click();
   const restoreSaved = page.waitForResponse(
     (r) => r.request().method() === "PUT" && r.url().includes("/api/systems/") && r.url().endsWith("/draft"),
     { timeout: 15_000 },

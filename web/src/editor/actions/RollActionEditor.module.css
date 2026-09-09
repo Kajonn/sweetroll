@@ -2,9 +2,9 @@
   display: grid;
   gap: 12px;
   padding: 12px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-page);
 }
 
 .row {
@@ -18,7 +18,7 @@
   display: grid;
   gap: 4px;
   font-size: 12px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   font-weight: 500;
   flex: 1 1 140px;
   min-width: 0;
@@ -29,18 +29,36 @@
 .field select,
 .field textarea {
   font: inherit;
-  color: var(--color-fg);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
   padding: 6px 8px;
   width: 100%;
+  min-height: 44px;
 }
 
 .field input:focus-visible,
 .field select:focus-visible,
 .field textarea:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* Guided dice-kind picker: semantic tokens only, 44px target. */
+.guidedSelect {
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  padding: 6px 8px;
+  width: 100%;
+  min-height: 44px;
+}
+
+.guidedSelect:focus-visible {
+  outline: var(--focus-ring);
   outline-offset: 1px;
 }
 
@@ -58,9 +76,9 @@
   gap: 8px;
   align-items: end;
   padding: 8px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--surface-panel);
 }
 
 @media (max-width: 720px) {
@@ -71,17 +89,17 @@
 
 .removeButton {
   font: inherit;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
   padding: 6px 10px;
   cursor: pointer;
 }
 
 .removeButton:not(:disabled):hover {
-  background: var(--color-bg);
-  color: var(--color-error, #dc2626);
+  background: var(--surface-page);
+  color: var(--status-error);
 }
 
 .removeButton:disabled {
@@ -92,17 +110,17 @@
 .addButton {
   justify-self: start;
   font: inherit;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   background: transparent;
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-control);
   padding: 6px 12px;
   cursor: pointer;
 }
 
 .addButton:not(:disabled):hover {
-  background: var(--color-bg);
-  color: var(--color-fg);
+  background: var(--surface-page);
+  color: var(--text-primary);
 }
 
 .addButton:disabled {
@@ -119,10 +137,10 @@
 
 .tryItButton {
   font: inherit;
-  color: var(--color-bg);
-  background: var(--color-accent);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-sm);
+  color: var(--action-primary-fg);
+  background: var(--action-primary);
+  border: 1px solid var(--action-primary);
+  border-radius: var(--radius-control);
   padding: 6px 14px;
   cursor: pointer;
 }
@@ -140,11 +158,11 @@
   display: grid;
   gap: 10px;
   padding: 12px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-panel);
   font-size: 13px;
-  color: var(--color-fg);
+  color: var(--text-primary);
 }
 
 .resultSheet h4 {
@@ -163,7 +181,7 @@
 
 .resultLabel {
   font-size: 12px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   font-weight: 500;
 }
 
@@ -177,12 +195,12 @@
 }
 
 .diceChip {
-  font-family: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-code);
   font-size: 12px;
   padding: 2px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--surface-page);
 }
 
 .diceChip[data-kept="false"] {
@@ -200,20 +218,27 @@
 
 .diagnosticItem {
   padding: 6px 8px;
-  border: 1px solid var(--color-error, #dc2626);
-  border-radius: var(--radius-sm);
-  background: rgba(220, 38, 38, 0.06);
+  border: 1px solid var(--status-error);
+  border-radius: var(--radius-control);
+  background: var(--status-error-bg);
   font-size: 12px;
-  color: var(--color-fg);
-  font-family: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+  color: var(--text-primary);
+  font-family: var(--font-code);
 }
 
 .formatted {
-  font-family: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-code);
   font-size: 13px;
   padding: 6px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--surface-page);
   white-space: pre-wrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layout,
+  .resultSheet {
+    transition: none;
+  }
 }

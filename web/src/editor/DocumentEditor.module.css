@@ -5,7 +5,7 @@
   min-height: 0;
   min-width: 0;
   max-width: 100%;
-  background: var(--color-surface);
+  background: var(--surface-panel);
 }
 
 .header {
@@ -15,7 +15,7 @@
   gap: 8px 12px;
   min-width: 0;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .name {
@@ -23,7 +23,7 @@
   font-size: 16px;
   font-weight: 600;
   outline: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   padding: 2px 6px;
   flex: 1 1 auto;
   min-width: 0;
@@ -31,16 +31,16 @@
 }
 
 .name:focus {
-  outline: 2px solid var(--color-accent);
+  outline: var(--focus-ring);
   outline-offset: 0;
 }
 
 .lifecycle {
   font-size: 12px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   padding: 2px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
 }
 
 .autosave {
@@ -49,29 +49,65 @@
   gap: 4px;
   margin-left: auto;
   font-size: 12px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
+}
+
+/* Publish-readiness summary beside the publish button: draft revision,
+   save state, diagnostics count, and latest published version as plain
+   text (never tooltip-only), plus the publish enable reason. Wraps below
+   the header controls on narrow layouts. No motion to reduce. */
+.readiness {
+  flex: 1 1 100%;
+  min-width: 0;
+  border-top: 1px solid var(--border-default);
+  padding-top: var(--space-2);
+}
+
+.readinessList {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.readinessItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.readinessReason {
+  margin: var(--space-1) 0 0;
+  font-size: 12px;
+  color: var(--text-primary);
 }
 
 .publish {
   font-size: 13px;
   font-weight: 500;
   padding: 6px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-accent);
-  background: var(--color-accent);
-  color: var(--color-accent-fg);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--action-primary);
+  background: var(--action-primary);
+  color: var(--action-primary-fg);
   cursor: pointer;
 }
 
 .publish:hover:not(:disabled) {
-  background: var(--color-accent-fg);
-  color: var(--color-accent);
+  background: var(--action-primary-fg);
+  color: var(--action-primary);
 }
 
 .publish:disabled {
-  background: var(--color-bg);
-  color: var(--color-fg-muted);
-  border-color: var(--color-border);
+  background: var(--surface-page);
+  color: var(--text-muted);
+  border-color: var(--border-default);
   cursor: not-allowed;
 }
 
@@ -79,7 +115,7 @@
   display: flex;
   gap: 4px;
   padding: 6px 12px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--border-default);
   overflow-x: auto;
 }
 
@@ -87,25 +123,25 @@
 .tabActive {
   font-size: 13px;
   padding: 6px 12px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   text-decoration: none;
   white-space: nowrap;
   border: 1px solid transparent;
 }
 
 .tab {
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   background: transparent;
 }
 
 .tab:hover {
-  color: var(--color-fg);
-  background: var(--color-bg);
+  color: var(--text-primary);
+  background: var(--surface-page);
 }
 
 .tabActive {
-  color: var(--color-accent-fg);
-  background: var(--color-accent);
+  color: var(--action-primary-fg);
+  background: var(--action-primary);
 }
 
 .body {
@@ -130,6 +166,42 @@
   }
 }
 
+/* Phone/tablet portrait switch: an explicit Editor/Preview segmented
+   control built from shared Buttons (44px targets and :focus-visible come
+   from the Button styles; this wrapper only lays them out). Hidden on
+   desktop, where the side-by-side split shows both panes at once. */
+.previewSwitch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .previewSwitch {
+    display: none;
+  }
+}
+
+/* Narrow layouts (<1024px) show a single switched pane: the switch selects
+   which one via data-mobile-view on the body. Desktop keeps the side-by-side
+   grid above regardless of the switch state. The editor pane joins the
+   min-width:0 chain so it can never force page-level horizontal scroll. */
+.editorPane {
+  min-width: 0;
+}
+
+@media (max-width: 1023px) {
+  .body[data-mobile-view="preview"] .editorPane {
+    display: none;
+  }
+
+  .body[data-mobile-view="editor"] .previewPane {
+    display: none;
+  }
+}
+
 /* Phone 320-599px: single column, tighter gutters so forms never
    clip or force horizontal scrolling. */
 @media (max-width: 599px) {
@@ -148,7 +220,7 @@
 
 .placeholder {
   margin: 0;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   font-style: italic;
 }
 
@@ -156,17 +228,17 @@
   font-size: 12px;
   font-weight: 500;
   padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-fg);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-default);
+  background: var(--surface-panel);
+  color: var(--text-primary);
   cursor: pointer;
 }
 
 .secondary[aria-pressed="true"] {
-  background: var(--color-bg);
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: var(--surface-page);
+  border-color: var(--action-primary);
+  color: var(--action-primary);
 }
 
 .tabHeader {
@@ -186,20 +258,20 @@
 .tabHeader button {
   font-size: 12px;
   padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-fg);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-default);
+  background: var(--surface-panel);
+  color: var(--text-primary);
   cursor: pointer;
 }
 
 .removeButton {
   font-size: 12px;
   padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-fg-muted);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-default);
+  background: var(--surface-panel);
+  color: var(--text-muted);
   cursor: pointer;
   margin-top: 8px;
 }
@@ -208,9 +280,9 @@
 .diagnosticsPane {
   margin-bottom: 16px;
   padding: 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-panel);
   min-width: 0;
   max-width: 100%;
 }
@@ -231,7 +303,8 @@
 .sheetList,
 .actionList,
 .validationList,
-.referenceList {
+.referenceList,
+.expressionList {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -243,11 +316,54 @@
 .sheetList > li,
 .actionList > li,
 .validationList > li,
-.referenceList > li {
+.referenceList > li,
+.expressionList > li {
   padding: 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-panel);
   min-width: 0;
   overflow-wrap: break-word;
+}
+
+/* Advanced disclosure: collapsed by default, semantic tokens only,
+   44px summary target with a visible focus ring. No motion to reduce. */
+.advancedDisclosure {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-panel);
+  padding: var(--space-3) var(--space-4);
+  min-width: 0;
+}
+
+.advancedSummary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-3));
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.advancedSummary:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.advancedBody {
+  display: grid;
+  gap: var(--space-6);
+  margin-top: var(--space-3);
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .container,
+  .header {
+    transition: none;
+  }
 }

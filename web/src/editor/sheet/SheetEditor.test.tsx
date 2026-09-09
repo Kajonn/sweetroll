@@ -150,6 +150,36 @@ describe("SheetEditor", () => {
     expect(next?.sections[2]?.elements).toEqual([]);
   });
 
+  it("uses the provided section allocator when adding a section", async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderSheet({ allocateSectionId: () => "custom_section" });
+    await user.click(screen.getByTestId("sheet-add-section"));
+    const next = lastCallPayload(onChange);
+    expect(next?.sections[2]?.id).toBe("custom_section");
+  });
+
+  it("uses the provided element allocator so new ids avoid the whole sheet", async () => {
+    // Definition IDs must be unique document-wide (duplicate_definition_id
+    // blocks saves): the allocator sees ids beyond the target section.
+    const user = userEvent.setup();
+    const used = new Set(["str", "dex", "hp", "element_1"]);
+    const { onChange } = renderSheet({
+      allocateElementId: () => {
+        for (let i = 1; i < 10_000; i++) {
+          const candidate = `element_${i}`;
+          if (!used.has(candidate)) {
+            used.add(candidate);
+            return candidate;
+          }
+        }
+        return `element_${Date.now()}`;
+      },
+    });
+    await user.click(screen.getByTestId("section-add-element-field-combat"));
+    const next = lastCallPayload(onChange);
+    expect(next?.sections[1]?.elements.at(-1)?.id).toBe("element_2");
+  });
+
   it("removes a section after the destructive confirmation", async () => {
     const user = userEvent.setup();
     const { onChange } = renderSheet();

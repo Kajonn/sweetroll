@@ -1,9 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { createApiClient } from "../api/client.js";
+import buttonStyles from "../ui/Button.module.css";
 import { PublishDialog } from "./PublishDialog.js";
 
 type RenderOptions = {
@@ -41,6 +44,24 @@ describe("PublishDialog", () => {
     expect(screen.getByTestId("publish-dialog-semver")).toBeInTheDocument();
     expect(screen.getByTestId("publish-dialog-release-notes")).toBeInTheDocument();
     expect(screen.getByTestId("publish-dialog-submit")).toBeInTheDocument();
+  });
+
+  it("publish dialog uses shared Button roles", () => {
+    renderDialog();
+    // submit button with accessible name /Publish/i using shared Button variant=primary
+    const submit = screen.getByRole("button", { name: /publish/i });
+    expect(submit).toHaveAttribute("data-testid", "publish-dialog-submit");
+    expect(submit.className.split(/\s+/)).toContain(buttonStyles.button);
+    expect(submit.className.split(/\s+/)).toContain(buttonStyles.buttonPrimary);
+  });
+
+  it("labels each publish field once and consumes semantic tokens only", () => {
+    renderDialog();
+    const semver = screen.getByTestId("publish-dialog-semver");
+    expect(semver.id).not.toBe("");
+    expect(document.querySelectorAll(`label[for="${semver.id}"]`)).toHaveLength(1);
+    const css = readFileSync(resolve(process.cwd(), "src/publish/PublishDialog.module.css"), "utf8");
+    expect(css).not.toMatch(/var\(--color-/);
   });
 
   it("defaults the semver input to 0.1.0", () => {
@@ -227,5 +248,39 @@ describe("PublishDialog", () => {
     expect(await screen.findByTestId("publish-dialog-success")).toBeInTheDocument();
     expect(screen.getByTestId("publish-dialog-success")).toHaveTextContent("1.0.0");
     expect(screen.getByTestId("publish-dialog-success")).toHaveTextContent("deadbeef");
+  });
+
+  it("success card links to character creation for the published version", async () => {
+    const user = userEvent.setup();
+    const fetch_ = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/publish") && init?.method === "POST") {
+        return new Response(
+          JSON.stringify({
+            version: {
+              versionId: "v1",
+              systemId: "s1",
+              semanticVersion: "1.0.0",
+              checksum: "deadbeef",
+              package: {},
+              releaseNotes: "init",
+              lifecycle: "active",
+              createdAt: "2026-01-01T00:00:00Z",
+            },
+            requestId: "r",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response("{}", { status: 200 });
+    });
+    renderDialog({ fetch_ });
+    await user.click(screen.getByTestId("publish-dialog-submit"));
+    const cta = await screen.findByTestId("publish-dialog-create-character");
+    expect(cta).toHaveAttribute("href", "/characters/new?systemVersionId=v1");
+    expect(cta).toHaveTextContent("Create test character");
+    // versionId/checksum display + Close are preserved alongside the CTA.
+    expect(screen.getByTestId("publish-dialog-success")).toHaveTextContent("v1");
+    expect(screen.getByTestId("publish-dialog-success")).toHaveTextContent("deadbeef");
+    expect(screen.getByTestId("publish-dialog-close")).toBeInTheDocument();
   });
 });

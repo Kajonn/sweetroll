@@ -1,4 +1,5 @@
 import { t } from "../../i18n/index.js";
+import { Button, FormField } from "../../ui/index.js";
 import styles from "../actions/RollActionEditor.module.css";
 
 export type DefinitionId = string;
@@ -105,21 +106,19 @@ export function ReferenceDataEditor({
         >
           {t("editor.referenceData.typeIdLabel", { id: referenceData.id })}
         </span>
-        <label
-          className={styles.field}
-          htmlFor={`reference-data-label-${referenceData.id}`}
-        >
-          {t("editor.referenceData.label")}
-          <input
-            id={`reference-data-label-${referenceData.id}`}
-            type="text"
-            value={referenceData.label}
-            maxLength={120}
-            onChange={(e) => setLabel(e.target.value)}
-            data-testid={`reference-data-label-${referenceData.id}`}
-            disabled={disabled}
-          />
-        </label>
+        <div className={styles.field}>
+          <FormField label={t("editor.referenceData.label")}>
+            <input
+              id={`reference-data-label-${referenceData.id}`}
+              type="text"
+              value={referenceData.label}
+              maxLength={120}
+              onChange={(e) => setLabel(e.target.value)}
+              data-testid={`reference-data-label-${referenceData.id}`}
+              disabled={disabled}
+            />
+          </FormField>
+        </div>
       </div>
       <div className={styles.row} data-testid={`reference-data-records-${referenceData.id}`}>
         <div className={styles.field}>
@@ -136,54 +135,48 @@ export function ReferenceDataEditor({
                   className={styles.inputItem}
                   data-testid={`reference-data-record-${record.id}`}
                 >
-                  <label
-                    className={styles.field}
-                    htmlFor={`reference-data-record-id-${record.id}`}
-                  >
-                    {t("editor.referenceData.recordId")}
-                    <input
-                      id={`reference-data-record-id-${record.id}`}
-                      type="text"
-                      value={record.id}
-                      onChange={(e) => replaceRecord(record.id, { id: e.target.value })}
-                      data-testid={`reference-data-record-id-${record.id}`}
-                      disabled={disabled}
-                    />
-                  </label>
-                  <label
-                    className={styles.field}
-                    htmlFor={`reference-data-record-label-${record.id}`}
-                  >
-                    {t("editor.referenceData.recordLabel")}
-                    <input
-                      id={`reference-data-record-label-${record.id}`}
-                      type="text"
-                      value={record.label}
-                      maxLength={120}
-                      onChange={(e) => replaceRecord(record.id, { label: e.target.value })}
-                      data-testid={`reference-data-record-label-${record.id}`}
-                      disabled={disabled}
-                    />
-                  </label>
-                  <label
-                    className={styles.field}
-                    htmlFor={`reference-data-record-values-${record.id}`}
-                  >
-                    {t("editor.referenceData.values")}
-                    <textarea
-                      id={`reference-data-record-values-${record.id}`}
-                      value={serializeValues(record.values)}
-                      onChange={(e) =>
-                        replaceRecord(record.id, { values: parseValues(e.target.value) })
-                      }
-                      placeholder={t("editor.referenceData.valuesPlaceholder")}
-                      data-testid={`reference-data-record-values-${record.id}`}
-                      disabled={disabled}
-                      rows={4}
-                    />
-                  </label>
-                  <button
-                    type="button"
+                  <div className={styles.field}>
+                    <FormField label={t("editor.referenceData.recordId")}>
+                      <input
+                        id={`reference-data-record-id-${record.id}`}
+                        type="text"
+                        value={record.id}
+                        onChange={(e) => replaceRecord(record.id, { id: e.target.value })}
+                        data-testid={`reference-data-record-id-${record.id}`}
+                        disabled={disabled}
+                      />
+                    </FormField>
+                  </div>
+                  <div className={styles.field}>
+                    <FormField label={t("editor.referenceData.recordLabel")}>
+                      <input
+                        id={`reference-data-record-label-${record.id}`}
+                        type="text"
+                        value={record.label}
+                        maxLength={120}
+                        onChange={(e) => replaceRecord(record.id, { label: e.target.value })}
+                        data-testid={`reference-data-record-label-${record.id}`}
+                        disabled={disabled}
+                      />
+                    </FormField>
+                  </div>
+                  <div className={styles.field}>
+                    <FormField label={t("editor.referenceData.values")}>
+                      <textarea
+                        id={`reference-data-record-values-${record.id}`}
+                        value={serializeValues(record.values)}
+                        onChange={(e) =>
+                          replaceRecord(record.id, { values: parseValues(e.target.value) })
+                        }
+                        placeholder={t("editor.referenceData.valuesPlaceholder")}
+                        data-testid={`reference-data-record-values-${record.id}`}
+                        disabled={disabled}
+                        rows={4}
+                      />
+                    </FormField>
+                  </div>
+                  <Button
+                    variant="secondary"
                     className={styles.removeButton}
                     onClick={() => removeRecord(record.id)}
                     aria-label={t("editor.referenceData.removeRecord", { id: record.id })}
@@ -191,7 +184,7 @@ export function ReferenceDataEditor({
                     disabled={disabled}
                   >
                     {t("editor.referenceData.removeRecordLabel")}
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -199,15 +192,14 @@ export function ReferenceDataEditor({
         </div>
       </div>
       <div className={styles.row}>
-        <button
-          type="button"
-          className={styles.addButton}
+        <Button
+          variant="secondary"
           onClick={addRecord}
           data-testid={`reference-data-records-add-${referenceData.id}`}
           disabled={disabled}
         >
           {t("editor.referenceData.addRecord")}
-        </button>
+        </Button>
       </div>
     </section>
   );

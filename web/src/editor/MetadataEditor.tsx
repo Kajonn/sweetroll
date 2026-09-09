@@ -6,6 +6,7 @@ import {
   type SystemDocumentV1,
   type SystemMetadataV1,
 } from "../state/documentReducer.js";
+import { FormField } from "../ui/index.js";
 import styles from "./MetadataEditor.module.css";
 
 export function MetadataEditor({
@@ -53,9 +54,9 @@ export function MetadataEditor({
       onBlur={flush}
       data-testid="metadata-editor"
     >
-      <label className={styles.field}>
-        <span className={styles.label}>{t("editor.metadata.name")}</span>
+      <FormField label={t("editor.metadata.name")}>
         <input
+          id="metadata-name"
           type="text"
           className={styles.input}
           value={meta.name}
@@ -63,10 +64,10 @@ export function MetadataEditor({
           onChange={(e) => field("name", e.target.value)}
           data-testid="metadata-name"
         />
-      </label>
-      <label className={styles.field}>
-        <span className={styles.label}>{t("editor.metadata.description")}</span>
+      </FormField>
+      <FormField label={t("editor.metadata.description")}>
         <textarea
+          id="metadata-description"
           className={styles.textarea}
           value={meta.description}
           maxLength={2_000}
@@ -74,11 +75,11 @@ export function MetadataEditor({
           onChange={(e) => field("description", e.target.value)}
           data-testid="metadata-description"
         />
-      </label>
+      </FormField>
       <div className={styles.settingsRow} data-testid="metadata-settings-row">
-        <label className={styles.field}>
-          <span className={styles.label}>{t("editor.metadata.language")}</span>
+        <FormField label={t("editor.metadata.language")}>
           <input
+            id="metadata-language"
             type="text"
             className={styles.input}
             value={meta.language}
@@ -86,10 +87,10 @@ export function MetadataEditor({
             onChange={(e) => field("language", e.target.value)}
             data-testid="metadata-language"
           />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>{t("editor.metadata.defaultDice")}</span>
+        </FormField>
+        <FormField label={t("editor.metadata.defaultDice")}>
           <input
+            id="metadata-default-dice"
             type="text"
             className={styles.input}
             value={meta.defaultDice}
@@ -97,7 +98,7 @@ export function MetadataEditor({
             onChange={(e) => field("defaultDice", e.target.value)}
             data-testid="metadata-default-dice"
           />
-        </label>
+        </FormField>
       </div>
     </form>
   );

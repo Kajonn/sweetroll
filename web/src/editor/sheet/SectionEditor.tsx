@@ -3,6 +3,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { t } from "../../i18n/index.js";
 import { useShortcut } from "../../shell/useShortcut.js";
 import type { DefinitionId } from "../../state/documentFieldTypes.js";
+import { Button, EmptyState, FormField } from "../../ui/index.js";
 import { DefinitionIdInput } from "../fields/DefinitionIdInput.js";
 import { ElementEditor, makeElementOfKind } from "./ElementEditor.js";
 import styles from "./SheetEditor.module.css";
@@ -24,6 +25,13 @@ export type SectionEditorProps = {
   onRemove: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  /**
+   * Document-wide element-id allocator. Definition IDs must be unique
+   * across the whole document (`duplicate_definition_id` blocks saves), so
+   * the sheet owner passes an allocator that sees every section. Falls back
+   * to section-local allocation when absent (standalone/test use).
+   */
+  allocateElementId?: (() => DefinitionId) | undefined;
 };
 
 export function SectionEditor({
@@ -38,6 +46,7 @@ export function SectionEditor({
   onRemove,
   onMoveUp,
   onMoveDown,
+  allocateElementId,
 }: SectionEditorProps) {
   const replaceSection = (patch: Partial<SheetSectionV1>) => {
     onChange({ ...section, ...patch });
@@ -79,7 +88,7 @@ export function SectionEditor({
   });
 
   const addElement = (kind: SheetElementKind) => {
-    const id = nextElementId(section.elements);
+    const id = allocateElementId?.() ?? nextElementId(section.elements);
     const element = makeElementOfKind(kind, id);
     replaceSection({ elements: [...section.elements, element] });
     onActivateElement(section.elements.length);
@@ -96,8 +105,8 @@ export function SectionEditor({
       data-active={isActive}
     >
       <div className={styles.sectionHeader}>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           className={isActive ? styles.handleButtonActive : styles.handleButton}
           onClick={onActivate}
           aria-label={t("editor.sheet.positionAria", {
@@ -113,9 +122,9 @@ export function SectionEditor({
             {position}
           </span>
           {section.label || t("editor.section.label")}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="secondary"
           className={styles.moveButton}
           onClick={onMoveUp}
           disabled={atFirst}
@@ -124,9 +133,9 @@ export function SectionEditor({
           data-testid={`${sectionRowId}-move-up`}
         >
           {t("editor.sheet.moveUp")}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="secondary"
           className={styles.moveButton}
           onClick={onMoveDown}
           disabled={atLast}
@@ -135,27 +144,25 @@ export function SectionEditor({
           data-testid={`${sectionRowId}-move-down`}
         >
           {t("editor.sheet.moveDown")}
-        </button>
+        </Button>
         <div className={styles.sectionMeta}>
           <span className={styles.monoLabel}>id: {section.id}</span>
           <RemoveSectionButton section={section} onRemove={onRemove} />
         </div>
       </div>
       <div className={styles.elementRow2}>
-        <label
-          className={styles.sectionLabel}
-          htmlFor={`section-label-${section.id}`}
-        >
-          {t("editor.section.label")}
-          <input
-            id={`section-label-${section.id}`}
-            type="text"
-            value={section.label}
-            maxLength={120}
-            onChange={(e) => replaceSection({ label: e.target.value })}
-            data-testid={`section-label-${section.id}`}
-          />
-        </label>
+        <div className={styles.sectionLabel}>
+          <FormField label={t("editor.section.label")}>
+            <input
+              id={`section-label-${section.id}`}
+              type="text"
+              value={section.label}
+              maxLength={120}
+              onChange={(e) => replaceSection({ label: e.target.value })}
+              data-testid={`section-label-${section.id}`}
+            />
+          </FormField>
+        </div>
         <div className={styles.elementField}>
           <DefinitionIdInput
             value={section.id}
@@ -167,12 +174,9 @@ export function SectionEditor({
         <h4 className={styles.elementsTitle}>{t("editor.section.elements")}</h4>
       </div>
       {section.elements.length === 0 ? (
-        <p
-          className={styles.empty}
-          data-testid={`${sectionRowId}-elements-empty`}
-        >
-          {t("editor.section.empty")}
-        </p>
+        <div data-testid={`${sectionRowId}-elements-empty`}>
+          <EmptyState title={t("editor.section.empty")} />
+        </div>
       ) : (
         <ul className={styles.elementsList}>
           {section.elements.map((element, idx) => {
@@ -189,8 +193,8 @@ export function SectionEditor({
                 data-active={isElementActive}
               >
                 <div className={styles.elementRow}>
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
                     className={
                       isElementActive
                         ? styles.handleButtonActive
@@ -212,9 +216,9 @@ export function SectionEditor({
                     <span className={styles.kindBadge}>
                       {t(`editor.element.kind.${element.kind}`)}
                     </span>
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="secondary"
                     className={styles.moveButton}
                     onClick={() => moveElement(idx, -1)}
                     disabled={atFirstElement}
@@ -223,9 +227,9 @@ export function SectionEditor({
                     data-testid={`${elementRowId}-move-up`}
                   >
                     {t("editor.sheet.moveUp")}
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="secondary"
                     className={styles.moveButton}
                     onClick={() => moveElement(idx, 1)}
                     disabled={atLastElement}
@@ -234,7 +238,7 @@ export function SectionEditor({
                     data-testid={`${elementRowId}-move-down`}
                   >
                     {t("editor.sheet.moveDown")}
-                  </button>
+                  </Button>
                   <div className={styles.elementMeta}>
                     <span className={styles.monoLabel}>id: {element.id}</span>
                     <RemoveElementButton
@@ -303,14 +307,14 @@ function AddElementButton({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="secondary"
       className={styles.kindPick}
       onClick={onClick}
       data-testid={`section-add-element-${kind}-${sectionId}`}
     >
       {t(`editor.element.kind.${kind}`)}
-    </button>
+    </Button>
   );
 }
 
@@ -324,14 +328,13 @@ function RemoveSectionButton({
   return (
     <Dialog.Root>
       <Dialog.Trigger asChild>
-        <button
-          type="button"
-          className={styles.removeButton}
+        <Button
+          variant="secondary"
           aria-label={t("editor.sheet.removeConfirm.title")}
           data-testid={`section-row-${section.id}-remove`}
         >
           {t("editor.sheet.removeConfirm.confirm")}
-        </button>
+        </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className={styles.dialogOverlay} />
@@ -349,23 +352,21 @@ function RemoveSectionButton({
           </p>
           <div className={styles.dialogActions}>
             <Dialog.Close asChild>
-              <button
-                type="button"
-                className={styles.dialogCancel}
+              <Button
+                variant="secondary"
                 data-testid="section-remove-confirm-cancel"
               >
                 {t("editor.section.removeConfirm.cancel")}
-              </button>
+              </Button>
             </Dialog.Close>
             <Dialog.Close asChild>
-              <button
-                type="button"
-                className={styles.dialogDestructive}
+              <Button
+                variant="danger"
                 onClick={onRemove}
                 data-testid="section-remove-confirm-submit"
               >
                 {t("editor.section.removeConfirm.confirm")}
-              </button>
+              </Button>
             </Dialog.Close>
           </div>
         </Dialog.Content>
@@ -389,14 +390,13 @@ function RemoveElementButton({
   return (
     <Dialog.Root>
       <Dialog.Trigger asChild>
-        <button
-          type="button"
-          className={styles.removeButton}
+        <Button
+          variant="secondary"
           aria-label={t("editor.element.removeConfirm.title")}
           data-testid={testId}
         >
           {t("editor.element.removeConfirm.confirm")}
-        </button>
+        </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className={styles.dialogOverlay} />
@@ -416,23 +416,21 @@ function RemoveElementButton({
           </p>
           <div className={styles.dialogActions}>
             <Dialog.Close asChild>
-              <button
-                type="button"
-                className={styles.dialogCancel}
+              <Button
+                variant="secondary"
                 data-testid="element-remove-confirm-cancel"
               >
                 {t("editor.element.removeConfirm.cancel")}
-              </button>
+              </Button>
             </Dialog.Close>
             <Dialog.Close asChild>
-              <button
-                type="button"
-                className={styles.dialogDestructive}
+              <Button
+                variant="danger"
                 onClick={onRemove}
                 data-testid="element-remove-confirm-submit"
               >
                 {t("editor.element.removeConfirm.confirm")}
-              </button>
+              </Button>
             </Dialog.Close>
           </div>
         </Dialog.Content>

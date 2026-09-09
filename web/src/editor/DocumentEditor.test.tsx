@@ -83,9 +83,14 @@ describe("DocumentEditor", () => {
     expect(await screen.findByTestId("document-editor-name")).toHaveTextContent("Test System");
     expect(screen.getByTestId("document-editor-lifecycle")).toHaveTextContent("Active");
     expect(screen.getByTestId("document-editor-autosave")).toHaveTextContent("Not saved yet");
-    for (const label of ["Metadata", "Entities", "Sheets", "Actions", "Validations", "Reference data"]) {
+    for (const label of ["Basics", "Attributes", "Dice", "Sections", "Advanced"]) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }
+  });
+
+  it("resolves legacy tab params to their basics-first tabs", async () => {
+    renderEditor("http://localhost/?tab=entities");
+    expect(await screen.findByTestId("attributes-tab")).toBeInTheDocument();
   });
 
   it("renders the EntityList inside the entities tab when tab=entities", async () => {
@@ -122,6 +127,23 @@ describe("DocumentEditor", () => {
     expect(button.getAttribute("title")).toBe(
       "Publish disabled — 2 error diagnostics must be resolved.",
     );
+  });
+
+  it("shows the publish disable reason as visible text, not tooltip-only", async () => {
+    renderEditor("http://localhost/", {
+      ok: false,
+      diagnostics: [
+        { code: "invalid_definition_id", path: "/entities/0/id", message: "ID is invalid." },
+        { code: "missing_reference", path: "/entities/0/fields/0", message: "Missing reference." },
+      ],
+    });
+    expect(await screen.findByTestId("document-editor-publish-reason")).toHaveTextContent(
+      "Publish disabled — 2 error diagnostics must be resolved.",
+    );
+    const panel = screen.getByTestId("document-editor-readiness");
+    expect(panel).toHaveTextContent(/2 issues/);
+    expect(panel).toHaveTextContent(/No draft yet/);
+    expect(panel).toHaveTextContent(/Not published yet/);
   });
 
   it("renders preview, diagnostics, and version-history toggle buttons in the header", async () => {

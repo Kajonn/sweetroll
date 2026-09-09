@@ -51,6 +51,7 @@ jobs:
           cache-dependency-path: web/package-lock.json
           node-version-file: .nvmrc
       - run: npm ci
+      - run: npm ci
         working-directory: web
       - run: npm test
         working-directory: web

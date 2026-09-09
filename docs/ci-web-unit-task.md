@@ -1,45 +1,37 @@
-# TASK (open): CI `web` job fails `npm test` on every push since run 8
+# CI `web` failures — diagnosed and fixed
 
-## Symptom
+## True cause (not flakes)
 
-`web` (`npm test` in `web/`) fails on CI runs 8, 9, 10, 11 (four straight,
-across four different trees); `verify`, `web-e2e`, `web-offline` pass on
-run 11. Step duration (~36 s) is consistent with the suite running and a
-test failing, but step logs need repo rights and could not be read during
-diagnosis (API: 403; check-runs carry no output).
+CI pasted log: `FAIL src/preview/sampleData.test.ts — Failed to resolve
+import "json-canonicalize" from
+"../src/systems/implementation/package/canonical.ts"`.
 
-## What was already tried (2026-09-09)
+Chain: `web/src/preview/sampleData.test.ts` and `PreviewSheet.test.tsx`
+import fixtures from ROOT `src/systems/...` (introduced in `1aa95d9`;
+first present in run 8's tree — run 7 was green, runs 8+ red). Root
+`canonical.ts` imports `json-canonicalize`, a root-only dependency. The
+`web` CI job installed only `web/` dependencies, so root `node_modules`
+was absent and the import was unresolvable. Local checkouts always have
+root `node_modules`, so upward resolution hid it locally every time.
 
-- Hardened two observed flakes and pushed as `9df92eb` (run 11 still fails):
-  - `web/src/router.test.tsx` "creates through the router…": synchronous
-    `getByRole("Look up version")` raced the metadata pending-label swap;
-    now `findByRole`.
-  - `web/src/characters/session.test.ts` "never starts a second send…":
-    fixed 5 ms sleep raced the IDB/lock pipeline; now `vi.waitFor`
-    (file's own convention). Sequential-send semantics preserved.
-- Ruled out by local reproduction (~25 full-suite greens, plus targeted runs):
-  worker-count flags, 4-core and 1-core `taskset`, `TZ=UTC` (one coincidental
-  single-run flake, then green incl. a base-file control run), fresh `npm ci`
-  vs stale `node_modules`, `CI=true`, 3× concurrent suites, and the G4
-  `CreateCharacter` render change (base-file swap control: 760/760).
+Reproduced locally by moving root `node_modules` aside and running the
+web suite: identical `FAIL … json-canonicalize` errors in both preview
+test files; restored immediately after.
 
-## Suspected area
+## Fix
 
-A *different*, rarely-locally-flaky timing test that the slower/shared CI
-runner hits reliably — or CI-runner conditions exceeding the 1 s default
-`vi.waitFor`/`findByRole` waits. Remaining fixed-sleep races in `web/src`
-(not yet hardened): `session.test.ts:770` (5 ms), `:2154/:2188` (10 ms),
-`CreateCharacter.test.tsx` several 20 ms sleeps, `listVersions`/`listTemplates`
-25 ms, `CharacterRoute.test.tsx:273` (50 ms), plus `setTimeout(0)` yields.
+`.github/workflows/ci.yml`, `web` job: added root `npm ci` before the
+`web/` install — mirroring the `web-e2e`/`web-offline` jobs, which always
+had it. Docs/CI-only change; no product or test code touched.
 
-## Next steps for whoever takes this
+## Earlier flake hardening (kept, still valid)
 
-1. Open Actions → latest run → `web` job → copy the `FAIL …` block (names
-   the test; everything above is blind without it).
-2. Harden exactly that test (poll/wait instead of fixed sleeps or
-   synchronous queries); do not bulk-rewrite all sleeps blind.
-3. If the failure is a >1 s stall on CI only, raise that test's timeout
-   explicitly rather than loosening the whole suite.
-4. Re-push and confirm the `web` job green; CI has been red since run 8,
-   so any green run also needs a glance at whether earlier failures were
-   the same test.
+Commit `9df92eb` hardened two genuine timing races observed locally
+(router lookup-button label swap → `findByRole`; session 5 ms sleep →
+`vi.waitFor`). Those were real but incidental to the deterministic CI
+failure. Full web suite repeatedly green locally (760/760).
+
+## Watch
+
+Next CI run should go fully green. If `web` fails again, copy the new
+`FAIL` block — do not re-chase the flake theory without it.

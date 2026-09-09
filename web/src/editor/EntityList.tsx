@@ -303,7 +303,7 @@ function EntityDetail({
         <div className={styles.labelField}>
           <FormField label={t("editor.fields.label")}>
             <input
-              id={`entity-label-input-${entity.id}`}
+              id={`entity-label-${entity.id}`}
               type="text"
               value={entity.label}
               maxLength={120}

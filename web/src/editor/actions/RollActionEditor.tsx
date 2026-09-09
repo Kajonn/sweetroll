@@ -4,7 +4,7 @@ import { evaluateRoll } from "../../api/evaluateExpression.js";
 import type { ApiClient } from "../../api/client.js";
 import { t } from "../../i18n/index.js";
 import type { ScalarValue, ValueType } from "../../ports/evaluateExpression.js";
-import { Button, Checkbox, FormField, Select } from "../../ui/index.js";
+import { Button, Checkbox, FormField, NumberInput, Select } from "../../ui/index.js";
 import { ExpressionEditor } from "../expressions/ExpressionEditor.js";
 import styles from "./RollActionEditor.module.css";
 
@@ -315,20 +315,41 @@ export function RollActionEditor({
                     />
                   </div>
                   <div className={styles.field}>
-                    <FormField label={t("editor.action.roll.inputs.default")}>
-                      <input
+                    {input.valueType === "integer" || input.valueType === "decimal" ? (
+                      <NumberInput
+                        label={t("editor.action.roll.inputs.default")}
                         id={`roll-action-input-default-${input.id}`}
-                        type={input.valueType === "boolean" ? "text" : input.valueType === "text" ? "text" : "number"}
-                        value={input.valueType === "boolean" ? String(input.default) : String(input.default ?? "")}
-                        onChange={(e) =>
+                        testId={`roll-action-input-default-${input.id}`}
+                        value={
+                          typeof input.default === "number"
+                            ? input.default
+                            : Number.isFinite(Number(input.default))
+                              ? Number(input.default)
+                              : 0
+                        }
+                        onChange={(v) =>
                           updateInput(input.id, {
-                            default: coerceDefault(e.target.value, input.valueType),
+                            default: v ?? 0,
                           })
                         }
-                        data-testid={`roll-action-input-default-${input.id}`}
-                        disabled={disabled}
+                        disabled={disabled === true}
                       />
-                    </FormField>
+                    ) : (
+                      <FormField label={t("editor.action.roll.inputs.default")}>
+                        <input
+                          id={`roll-action-input-default-${input.id}`}
+                          type="text"
+                          value={String(input.default ?? "")}
+                          onChange={(e) =>
+                            updateInput(input.id, {
+                              default: coerceDefault(e.target.value, input.valueType),
+                            })
+                          }
+                          data-testid={`roll-action-input-default-${input.id}`}
+                          disabled={disabled}
+                        />
+                      </FormField>
+                    )}
                   </div>
                   <Button
                     variant="secondary"

@@ -5,6 +5,7 @@ import styles from "./fields.module.css";
 export type NumberInputProps = {
   label: string;
   id?: string;
+  testId?: string;
   value?: number;
   defaultValue?: number;
   min?: number;
@@ -29,6 +30,7 @@ export type NumberInputProps = {
 export function NumberInput({
   label,
   id: idProp,
+  testId,
   value,
   defaultValue,
   min,
@@ -91,6 +93,7 @@ export function NumberInput({
           ref={inputRef}
           id={id}
           type="number"
+          data-testid={testId}
           className={styles.input}
           value={value}
           defaultValue={value === undefined ? defaultValue : undefined}

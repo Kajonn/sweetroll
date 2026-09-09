@@ -190,6 +190,13 @@ describe("NumberInput", () => {
     rerender(<NumberInput label="Ammo" defaultValue={2} error="Out of range." />);
     expect(screen.getByRole("alert")).toHaveTextContent("Out of range.");
   });
+
+  it("passes testId through to the native input as data-testid", () => {
+    render(<NumberInput label="Ammo" defaultValue={2} testId="ammo-input" />);
+    const input = screen.getByTestId("ammo-input");
+    expect(input).toHaveAttribute("type", "number");
+    expect(screen.getByLabelText("Ammo")).toBe(input);
+  });
 });
 
 describe("Select", () => {

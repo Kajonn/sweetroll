@@ -1,6 +1,6 @@
 import { t } from "../../i18n/index.js";
 import type { ResourceFieldV1 } from "../../state/documentFieldTypes.js";
-import { FormField, Select } from "../../ui/index.js";
+import { FormField, NumberInput, Select } from "../../ui/index.js";
 import styles from "./RollActionEditor.module.css";
 
 export type DefinitionId = string;
@@ -129,17 +129,15 @@ export function ResourceBumpEditor({
         <>
           <div className={styles.row}>
             <div className={styles.field}>
-              <FormField label={t("editor.action.resourceBump.amount")}>
-                <input
-                  id={`resource-bump-action-amount-${action.id}`}
-                  type="number"
-                  step={selectedResource?.step ?? 1}
-                  value={action.operation.amount}
-                  onChange={(e) => setDeltaAmount(Number(e.target.value))}
-                  data-testid={`resource-bump-action-amount-${action.id}`}
-                  disabled={disabled}
-                />
-              </FormField>
+              <NumberInput
+                label={t("editor.action.resourceBump.amount")}
+                id={`resource-bump-action-amount-${action.id}`}
+                testId={`resource-bump-action-amount-${action.id}`}
+                step={selectedResource?.step ?? 1}
+                value={action.operation.amount}
+                onChange={(v) => setDeltaAmount(v ?? 0)}
+                disabled={disabled === true}
+              />
             </div>
           </div>
           <p

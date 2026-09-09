@@ -106,6 +106,25 @@ describe("creator pages own their editor/preview columns", () => {
     expect(ruleBlock(editor, ".header")).toMatch(/flex-wrap:\s*wrap/);
   });
 
+  it("switches a single editor/preview pane below desktop widths", () => {
+    const editor = cssOf("./DocumentEditor.module.css");
+    // Stacked single column by default: the split grid lives only in the
+    // desktop block, never in the base .bodySplit rule.
+    expect(ruleBlock(editor, ".bodySplit")).not.toMatch(/display:\s*grid/);
+    // The switch is a narrow-layout control: hidden where the desktop split
+    // shows both panes side-by-side.
+    const desktop = editor.slice(editor.indexOf("@media (min-width: 1024px)"));
+    expect(desktop).toMatch(/\.previewSwitch/);
+    expect(desktop).toMatch(/display:\s*none/);
+    // Below desktop the switch selects one visible pane via data-mobile-view,
+    // and the editor pane stays in the min-width:0 chain so it cannot force
+    // page-level horizontal scroll.
+    expect(ruleBlock(editor, ".editorPane")).toMatch(/min-width:\s*0/);
+    expect(editor).toMatch(/@media\s*\(\s*max-width:\s*1023px\s*\)/);
+    expect(editor).toMatch(/\.body\[data-mobile-view="preview"\]\s*\.editorPane[\s\S]*?display:\s*none/);
+    expect(editor).toMatch(/\.body\[data-mobile-view="editor"\]\s*\.previewPane[\s\S]*?display:\s*none/);
+  });
+
   it("applies the split class only while the preview pane is visible", async () => {
     const user = userEvent.setup();
     const doc = {

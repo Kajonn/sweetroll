@@ -42,6 +42,15 @@ import styles from "./DocumentEditor.module.css";
 export type CreatorTabId = "basics" | "attributes" | "dice" | "sections" | "advanced";
 
 /**
+ * Narrow-layout pane selection for the editor/preview switch (Task 4).
+ * Below the 1024px desktop boundary the switch selects a single visible
+ * pane (`editor` for small edits, `preview` for review); at desktop widths
+ * the `bodySplit` grid keeps both panes side-by-side regardless of this
+ * value. Full layout authoring stays desktop/tablet-oriented per spec.
+ */
+export type PreviewMobileView = "editor" | "preview";
+
+/**
  * Pre-Task-2 tab ids, kept as URL aliases so `?tab=` deep links and
  * `focus-editor:{path}` events issued against the old six-tab layout keep
  * resolving to the matching basics-first tab.
@@ -218,6 +227,7 @@ export function DocumentEditorBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws.draft?.revision, ws.draft?.document]);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [mobileView, setMobileView] = useState<PreviewMobileView>("editor");
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
@@ -377,11 +387,42 @@ export function DocumentEditorBody({
           variant="secondary"
           data-testid="document-editor-preview-toggle"
           aria-pressed={previewOpen}
-          onClick={() => setPreviewOpen((v) => !v)}
+          onClick={() => {
+            // Opening the preview selects the preview view so narrow
+            // layouts land on what was asked for; desktop still shows both
+            // panes side-by-side. Closing keeps the switch state.
+            if (!previewOpen) setMobileView("preview");
+            setPreviewOpen((v) => !v);
+          }}
           title={t("editor.preview.buttonShortcut")}
         >
           {t("editor.preview.buttonLabel")}
         </Button>
+        {previewVisible ? (
+          <div
+            role="group"
+            aria-label={t("editor.preview.viewLabel")}
+            className={styles.previewSwitch}
+            data-testid="document-editor-preview-switch"
+          >
+            <Button
+              variant="secondary"
+              data-testid="document-editor-preview-view-editor"
+              aria-pressed={mobileView === "editor"}
+              onClick={() => setMobileView("editor")}
+            >
+              {t("editor.preview.viewEditor")}
+            </Button>
+            <Button
+              variant="secondary"
+              data-testid="document-editor-preview-view-preview"
+              aria-pressed={mobileView === "preview"}
+              onClick={() => setMobileView("preview")}
+            >
+              {t("editor.preview.viewPreview")}
+            </Button>
+          </div>
+        ) : null}
         <Button
           variant="secondary"
           data-testid="document-editor-diagnostics-toggle"
@@ -446,6 +487,7 @@ export function DocumentEditorBody({
         className={previewVisible ? `${styles.body} ${styles.bodySplit}` : styles.body}
         ref={bodyRef}
         data-testid={`document-editor-body-${active}`}
+        data-mobile-view={previewVisible ? mobileView : undefined}
       >
         {previewOpen && previewPackage !== null && previewSample !== null ? (
           <div className={styles.previewPane} data-testid="document-editor-preview">
@@ -459,6 +501,7 @@ export function DocumentEditorBody({
             <DiagnosticsDrawer assessment={assessment} />
           </div>
         ) : null}
+        <div className={styles.editorPane} data-testid="document-editor-editor-pane">
         {active === "basics" ? (
           <BasicsTab
             document={document}
@@ -483,6 +526,7 @@ export function DocumentEditorBody({
             defaultOpen={advancedDefaultOpen}
           />
         ) : null}
+        </div>
       </main>
       <PublishDialog
         client={client}

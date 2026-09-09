@@ -130,6 +130,42 @@
   }
 }
 
+/* Phone/tablet portrait switch: an explicit Editor/Preview segmented
+   control built from shared Buttons (44px targets and :focus-visible come
+   from the Button styles; this wrapper only lays them out). Hidden on
+   desktop, where the side-by-side split shows both panes at once. */
+.previewSwitch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .previewSwitch {
+    display: none;
+  }
+}
+
+/* Narrow layouts (<1024px) show a single switched pane: the switch selects
+   which one via data-mobile-view on the body. Desktop keeps the side-by-side
+   grid above regardless of the switch state. The editor pane joins the
+   min-width:0 chain so it can never force page-level horizontal scroll. */
+.editorPane {
+  min-width: 0;
+}
+
+@media (max-width: 1023px) {
+  .body[data-mobile-view="preview"] .editorPane {
+    display: none;
+  }
+
+  .body[data-mobile-view="editor"] .previewPane {
+    display: none;
+  }
+}
+
 /* Phone 320-599px: single column, tighter gutters so forms never
    clip or force horizontal scrolling. */
 @media (max-width: 599px) {

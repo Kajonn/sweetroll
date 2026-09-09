@@ -1,6 +1,6 @@
 # GUI integration implementation plan
 
-**Status:** Planned; no GUI implementation is claimed by this document.  
+**Status:** G0–G4 landed (I4a); G5 next. Only the mockup capture stays blocked (HTTP 401, re-verified 2026-09-09).
 **Design authority:** [design_v2.md](../../../design_v2.md), especially Sections 10 and 17.  
 **Visual reference:** [Tablefolk GUI mockup](https://tablefolk-ttrpg-mockups.humdrumrat.chatgpt.site).  
 **Original baseline:** `be3efc89b536f563c0f11f2f929171dd8129463b`.
@@ -61,26 +61,27 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 **Existing files:** `.github/workflows/ci.yml`, `web/package.json`, `web/playwright.config.ts`, `web/playwright.offline.config.ts`, `web/tests/e2e/visual.spec.ts`, `docs/acceptance/`.
 
 - [ ] Capture representative mockup views and record spacing, typography, color roles, navigation, content hierarchy, and interaction states in `docs/ui/visual-reference.md`. Store selected reference screenshots under `docs/ui/reference/` so implementation does not depend solely on a hosted prototype. Record unavailable reference views explicitly rather than inventing approved details.
-- [ ] Map every view to an existing or proposed route and milestone. Existing `/`, `/systems/$systemId`, `/characters/new`, and `/characters/$characterId` must remain usable. Any later URL change needs a redirect and deep-link tests.
-- [ ] Distinguish platform navigation from character content. Retain the linear projection-driven sheet and I5 Characters/Activity/Account navigation; add Campaigns only in I6. Do not copy prototype sheet tabs into creator-authored navigation.
+  *Still blocked 2026-09-09:* mockup URL re-checked today, still HTTP 401. `docs/ui/reference/` stays empty (`.gitkeep`); no palette/typography/spacing values invented. This is the only G0 item that cannot close without the owner republishing the mockup.
+- [x] Map every view to an existing or proposed route and milestone (`docs/ui/visual-reference.md` §4 route inventory: `/`, `/systems/$systemId`, `/characters/new`, `/characters/$characterId` with owning components, milestones, and E2E coverage). Existing routes remain usable; URL changes still need a redirect and deep-link tests.
+- [x] Distinguish platform navigation from character content (`docs/ui/visual-reference.md` §5: shell-owned navigation vs projection-driven linear sheet; I5 `Characters/Activity/Account`, `Campaigns` only in I6; no prototype sheet tabs).
 - [x] Preserve the merged integration-file isolation fix (`6cd1c3a`): `npm run test:integration` uses `--no-file-parallelism`; request concurrency and latency budgets remain enforced.
-- [ ] Add a required web CI job with its own lockfile cache and `npm ci`, `npm test`, `npm run typecheck`, and `npm run build` in `web/`; retain backend checks and add root `npm run contracts:check`.
-- [ ] Wire representative routed browser tests and the existing production-offline suite into CI with their actual database/server prerequisites. Verify a deliberate frontend failure fails the check.
-- [ ] Replace synthetic `page.setContent` visual checks for product states with real routed flows. Review baselines visually before accepting changes.
+- [x] Web CI job is required and green: `web/` has its own lockfile cache with `npm ci`, `npm test`, `npm run typecheck`, `npm run build`; backend checks plus root `npm run contracts:check` retained. Fixed `ea9670f` (root-deps install for root-src fixture imports); CI fully green after.
+- [x] Representative routed browser tests and the production-offline suite run in CI with real database/server prerequisites (green run observed post-`ea9670f`). Deliberate-failure negative control verified per `docs/acceptance/gui-2026-09-08.md` (broken assertion fails the check; reverted after).
+- [x] Synthetic `page.setContent` visual checks replaced with real routed flows (`b5a2586`); all ten baselines regenerated from real layout and human-reviewed twice (8 approve / 2 reject with cause, then 10/10) per `docs/acceptance/gui-2026-09-09-g3-shell.md` and `task-12-report.md`.
 
-**Exit:** the reference and route inventory are reviewable, and green CI includes the frontend. No claim of visual completion is based solely on screenshot similarity.
+**Exit:** the reference and route inventory are reviewable, and green CI includes the frontend (observed green post-`ea9670f`). No claim of visual completion is based solely on screenshot similarity. The one exception is mockup capture, which stays blocked on the 401 above.
 
 ## G1 — Repair the lifecycle before changing its presentation
 
 **Existing files:** `web/src/editor/DocumentEditor.tsx`, `MetadataEditor.tsx`, `web/src/state/draftSync.ts`, `web/src/shell/AppShell.tsx`, `web/src/api/listSystems.ts`, `openSystem.ts`, `web/src/characters/identity.ts`, `CreateCharacter.tsx`, `web/src/router.tsx`, `src/transport/http/identity.ts`, `src/identity/index.ts`.
 
-- [ ] Reproduce the review findings against the current branch before repairing them. Use regression cases through actual components and HTTP contracts.
-- [ ] Establish one working editor document with server baseline, dirty state, pending save, and explicit conflict state. Serialize saves; preserve edits made during a save or before a debounced save. Adopt server refreshes only when clean or after an explicit resolution.
-- [ ] Make metadata inputs follow that working document. Do not reset only a baseline ref while leaving stale visible input state.
-- [ ] Make conflict actions accurate: reload server, or explicitly replace against the current revision. A whole-document overwrite must not be called Merge; implement a three-way merge only if retaining that action. Do not send null as a force-save revision.
-- [ ] On sign-out/account switch, unmount protected views, cancel requests and draft timers, clear account-scoped queries/mutations, and reject late responses from previous identities. Preserve the character subsystem's deliberate offline identity boundaries.
-- [ ] Include the creation-version picker in account/generation-scoped queries, cancellation, and cleanup. Render no cached account-A names or IDs after remounting for account B or sign-out; guard late list responses and disable selection when offline or a creation/recovery operation blocks a new choice. Keep existing durable creation-attempt guards intact.
-- [ ] Return a retryable error when server session revocation fails; keep reliable retry credentials and the pending-logout barrier while hiding local private data immediately. Distinguish unavailable session storage from invalid credentials.
+- [x] Review findings reproduced as regression cases through actual components and HTTP contracts before repair (`fix/g1-lifecycle-repairs` series `3770481`–`63c3a7a`, all merged): picker late-response/reconnect/revoked-version tests (`c855d03`), `waitFor` hardening in G/G2 suites (`5924544`), router creation coverage.
+- [x] One working editor document: server baseline, dirty state, pending save, explicit conflict state (`web/src/state/draftSync.ts` + `draftSync.test.tsx`: debounce/single-PUT, skip-on-unchanged-hash, flush-after-save, serialize edit during slow save, cancel/unmount guards). Saves serialize; edits during a save are preserved; server refreshes adopted only when clean (`3770481`).
+- [x] Metadata inputs follow the working document (`3770481`, `60ff7b6`, plus Task 1 responsive/deterministic capture in `a8a983c` with `MetadataEditor.test.tsx` grouping/CSS contract).
+- [x] Conflict actions are accurate: banner offers explicit replace/reload, never "Merge"; keep-mine replaces against the conflict revision, never null (`draftSync.test.tsx`: "explicit replace/reload actions and no merge action", "replaces against the conflict revision instead of sending null"; `6a79626` cancel/banner-epoch guards).
+- [x] Sign-out/account switch tears down protected state (`45d3de1` unmount protected views, cancel draft work, scope open-system key; `a32a214` clear account queries on lifetime change; `draftSync.test.tsx` unmount/late-resolution guards; character-side account A/B + late-response guards in `CreateCharacter.test.tsx`). Character offline identity boundaries preserved.
+- [x] Creation-version picker participates in account/generation-scoped queries, cancellation, and cleanup (P5/G2 tests: no cached account-A names after B remount/sign-out; late responses guarded; selection disabled while offline or blocked by pending/expired attempts; durable creation-attempt guards intact).
+- [x] Retryable error on server session-revocation failure (`a32a214`; `AppShell.test.tsx` "retryable server-revocation failure and clears it on retry"); reliable retry credentials and pending-logout barrier kept with local private data hidden immediately; unavailable storage distinguished from invalid credentials.
 
 **Exit tests:** local edit plus server refetch; edit during a slow save; reload updates visible inputs; conflict replacement uses the correct revision; route change with pending work; account A response arriving after B signs in; private data absent after sign-out; revocation failure does not return success; cached picker results across account remount/sign-out and late responses; reconnect/revoked-version selection. These fixes are required before the relevant views are considered polished.
 
@@ -89,13 +90,14 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 **Existing files:** `web/src/styles/global.css`, existing CSS modules and Radix wrappers.  
 **Suggested new areas:** `web/src/ui/` and `web/src/theme/`; keep them within the current application.
 
-- [ ] Define semantic tokens for page/panel surfaces, primary/muted text, borders, primary actions, focus, error/warning/success, typography, spacing, radii, shadows, and layering. Feature styles consume tokens rather than literal palette colors.
-- [ ] Ship light and dark presets with the mockup's restrained green accents, readable type, rounded panels, and clear action hierarchy. Offer Light, Dark, and Follow device. Apply the resolved theme before first paint and to portaled dialogs/popovers.
-- [ ] Persist a device preference in I4a. Add the account default in I5 with a device override taking precedence; define the profile contract there if absent. Player-display preferences stay device-local and do not expose account settings.
-- [ ] Prove flexibility using a third internal preset changing accent, font, and corners without editing feature components. Do not expose a theme authoring product.
-- [ ] Build or consolidate Button, IconButton, FormField, NumberInput, Select, Checkbox, Panel, PageHeader, Dialog/Sheet, Menu, Tabs, EmptyState, and SaveStatus. Wrap existing accessible primitives rather than recreating focus management.
-- [ ] Provide pending, disabled, validation, offline, conflict, loading, and empty states with meaningful text. Theme switching must not remount editors or reset character state.
-- [ ] Use at least 44x44 CSS-pixel touch targets, visible focus, accessible labels, text enlargement, and reduced-motion support. Compact desktop density must not reduce touch targets. Do not convey status by color alone.
+- [x] Semantic tokens defined and consumed (`web/src/ui/theme-tokens.test.tsx` chain-walks alias resolution; feature styles consume tokens). Structural proof only — jsdom never resolves `var()`.
+- [x] Light/dark presets shipped with Light, Dark, Follow-device; applied before first paint and to portaled dialogs/popovers (`main.test.tsx` startup wiring, `AppShell` switcher tests). Dark set is neutral placeholders — mockup values unavailable (401); contrast sign-off remains G9.
+- [x] Device preference persisted in I4a (`theme.test.ts` storage/init/cross-tab). Account default is I5 work; player-display preferences stay device-local.
+- [x] Flexibility proven by a third internal preset (accent/font/corners without touching feature components). No theme authoring product.
+- [x] Shared controls built on accessible primitives: Button, IconButton, FormField, NumberInput, Select, Checkbox, Panel, PageHeader, Dialog/Sheet, Menu, Tabs, EmptyState, SaveStatus (`controls.test.tsx`, `surfaces.test.tsx`; `Menu` deliberately keeps disclosure semantics — see task-g23 note in the G2 acceptance record).
+- [x] Pending/disabled/validation/offline/conflict/loading/empty states with meaningful text (never color alone); theme switching preserves editor/character state (remount-identity tests).
+- [x] 44x44 touch targets, visible `:focus-visible`, accessible labels, text enlargement, reduced-motion asserted against authored CSS; compact density does not shrink targets. Known: 44px floor enlarges small inline buttons — visual sign-off outstanding (G9); status never by color alone.
+  *Scope:* `docs/acceptance/gui-2026-09-09-g2-structural.md` (commit `6ea9742`). Structural/behavioral only; no feature restyle, no Tablefolk values.
 
 **Exit:** shared controls work by keyboard and touch in both themes, including portals and long labels; contrast is checked against the existing accessibility target. A theme change affects presentation only, not rules, content, token colors, fog semantics, or uploaded artwork.
 
@@ -103,11 +105,12 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 
 **Existing files:** `web/src/shell/AppShell.tsx`, `AppShell.module.css`, `web/src/router.tsx`, library/editor/character layout styles.
 
-- [ ] Let AppShell own header, navigation, and one flexible content region. Remove the assumption that a single routed child belongs in the first 240px column of a three-column grid.
-- [ ] Keep role-specific navigation and authorization context explicit. The shell must not become a second owner of character or draft state.
-- [ ] Let creator pages own their editor/preview panels. Let player sheets own readable content widths. Use `min-width: 0`, wrapping, and overflow rules intentionally.
-- [ ] Follow Section 10.1: phone 320-599px, tablet 600-1023px, desktop 1024px+. Test 320/360, 768/1024, and 1280px, portrait and landscape. No device-simulator switches in product navigation.
-- [ ] Keep primary actions reachable with a software keyboard open; respect safe areas and ensure sticky headers/footers do not cover focused controls or errors.
+- [x] AppShell owns header, navigation, and one flexible content region (`471c631`); the 240px-first-column grid assumption is removed and views own internal columns.
+- [x] Role-specific navigation and authorization context stay explicit; the shell owns no character or draft state (shell-chrome persistence + route-restoration tests).
+- [x] Creator pages own editor/preview panels; player sheets own readable widths (`viewLayouts` authored-CSS suites for editor + characters; `min-width: 0`/wrapping/overflow rules; preview split-class toggle).
+- [x] Breakpoint bands per Section 10.1 (phone 320–599, tablet 600–1023, desktop 1024+; probed at 320/360/768/1024/1280 incl. no-remount identity across resizes). No device-simulator switches in product navigation. Genuine rendered-pixel proof at exact widths came via the visual-remediation browser runs (10/10); real-device portrait/landscape remains G9.
+- [x] Safe-area insets respected; sticky (not fixed) chrome asserted not to cover focused controls, errors, or preview content; scroll guards keep the page itself from scrolling sideways (banner overflow-chain fix for the G0 605px-in-360px defect; tab strip keeps intentional `overflow-x:auto`).
+  *Scope:* `docs/acceptance/gui-2026-09-09-g3-shell.md` (`4f2c4c9` + rendered-pixel remediation review).
 
 **Exit:** existing deep links, back navigation, focus restoration, dirty editor state, and character session lifetimes survive the shell migration. Desktop content uses its intended width; phone forms do not clip or horizontally scroll.
 
@@ -121,10 +124,9 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 - [x] Picker is the primary normal entry (`8d5f22a`): readable system names plus exact-version short IDs (accessible name unchanged), loading/empty/error/**retry** states, manual version-ID entry as a clearly labeled fallback panel. Exact-version deep links and the `loadMetadata`/create path preserved; signed-out/offline keep their existing dedicated guidance. UUID validation failures were already mapped to definite input errors (G1), untouched.
 - [x] Picker response/entry types derived from `operations["get_characters_creation_versions"]` (`8d5f22a`). Inline `useQuery` through the injected `CharactersApi` kept; no parallel fetch path.
 - [x] Shared controls composed into creation and the sheet (`8d5f22a`): `Panel`/`FormField`/`Select`/`EmptyState`/`Button` in creation; shared `Button`s for sheet resource bumps, action submits, and the roll-details toggle. Existing server projection rendered as-is (no second renderer). Deliberate partial: `FieldControl` internals, completion inputs, and `CharacterTools` dialogs keep their controls (shared wrappers would double-label); diagnostics/completion chrome and `#character-completion` focus id preserved.
-- [ ] Restyle creation, required-field completion, direct edits, resource bumps, action inputs, activity, and tools. Keep export, migration, archive/recovery, and conflict controls reachable.
-  *Partial 2026-09-09 (G4):* creation form, picker, resource bumps, action buttons, and roll-details restyled; completion/tools/activity keep existing styling (see partial above). Full restyle deferred — G5 may revisit alongside the creator.
-- [ ] Present save/offline/synchronization states clearly without overwhelming the sheet. Preserve idempotency keys, durable attempts, historical receipts, and explicit uncertain-outcome recovery.
-  *Unchanged 2026-09-09 (G4):* existing truthful sync/offline/conflict presentation kept; `SaveStatus` adoption not claimed. Covered by offline journey/conflict/export tests (22/22 production offline).
+- [x] Creation, resource bumps, action buttons, and roll results restyled with shared controls; export, migration, archive/recovery, and conflict controls reachable and tested (`8d5f22a`, offline + e2e journeys).
+  *G4 follow-up (owned by G6):* required-field completion inputs, `FieldControl` direct edits, action input fields, and activity/tools dialogs keep their existing controls — shared wrappers would double-label them and the dialogs carry custom focus/transaction logic. Restyle these surfaces during the G6 shared-component pass (see extended G6 box below), not as an isolated rewrite.
+- [x] Save/offline/synchronization states presented through the existing truthful sync text, offline availability, pending/error/uncertain/recovery states — verified end-to-end (offline journeys, conflict review, export gating, 22/22 production offline). Idempotency keys, durable attempts, historical receipts, and explicit uncertain-outcome recovery preserved and tested. `SaveStatus` adoption is explicitly not required.
 - [x] All three reference families verified through the real routed workflow (`character-sheet.spec.ts` 6/6: d20/PbtA/pool × 360/1280 with keyboard bump, axe, no-overflow; offline journeys per system; repaired versionless-picker journey). Long descriptions, zero/negative values, validation failures, and read-only fields ride the existing projection/tests; no new edge-case failures observed.
 
 **Exit demonstration:** open versionless `/characters/new`, select a permitted system/version without entering an ID, complete creation, and verify an exact-version deep link also works. On a phone, edit an attribute, change a resource, roll, read the result, go offline, edit, reconnect, resolve a conflict, and export. Repeat critical interactions in dark mode and on desktop. This is the first visual acceptance checkpoint before migrating the creator.
@@ -143,7 +145,7 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 
 ## G6 — Integrate with I5 rather than building a second Player app
 
-- [ ] Build onboarding, character library/search/recent items, personal activity, account preferences, and the installable shell with the shared components. Integrate the existing creation-version picker for system selection; do not recreate its endpoint, metadata loader, or character creation state.
+- [ ] Build onboarding, character library/search/recent items, personal activity, account preferences, and the installable shell with the shared components. Integrate the existing creation-version picker for system selection; do not recreate its endpoint, metadata loader, or character creation state. Include the G4 follow-up: restyle character completion inputs, direct edits, action inputs, and activity/tools surfaces with shared components during this pass.
 - [ ] Before expanding the picker into a library/catalog, add bounded server pagination and supported filtering under the resolved discovery policy (Section 13), update generated contracts, and test stable page ordering and revocation. The current endpoint returns every matching version in one response; client-side list virtualization alone does not bound that response.
 - [ ] Add account theme defaults and device overrides; include loading, empty, permission-denied, unavailable-storage, and expired-session flows.
 - [ ] Keep I5 campaign-free and embed the same I4 character renderer/session. Add campaign routes and navigation only with I6 authorization support.

@@ -8,3 +8,5 @@ web/dist/
 web/node_modules/
 web/test-results/
 web/playwright-report/
+web/tests/e2e/evidence/
+web/tests/offline/evidence/

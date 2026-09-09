@@ -365,8 +365,9 @@ describe("AppShell responsive shell (G3-1)", () => {
     expect(css).toMatch(/env\(safe-area-inset-bottom\)/);
     expect(css).toMatch(/env\(safe-area-inset-left\)/);
     expect(css).toMatch(/env\(safe-area-inset-right\)/);
-    // Sticky (never fixed) header/footer so a software keyboard or viewport
-    // resize cannot trap primary actions behind an overlay.
+    // Sticky (never fixed) header so a software keyboard or viewport
+    // resize cannot trap primary actions behind an overlay. The footer
+    // is ordinary flow, not sticky.
     expect(css).not.toMatch(/position\s*:\s*fixed/);
     expect(css).toMatch(/position\s*:\s*sticky/);
     // Sticky chrome must not cover focused controls or errors.
@@ -374,6 +375,28 @@ describe("AppShell responsive shell (G3-1)", () => {
     expect(css).toMatch(/scroll-padding-top/);
     // Views own their widths: content children participate with min-width 0.
     expect(css).toMatch(/min-width\s*:\s*0/);
+  });
+
+  it("keeps the header sticky while the status footer stays in ordinary flow", () => {
+    const css = readShellCss();
+    expect(css).toMatch(/\.header\s*\{[^}]*position\s*:\s*sticky/s);
+    const footerStart = css.indexOf(".shell > footer");
+    expect(footerStart).toBeGreaterThanOrEqual(0);
+    const open = css.indexOf("{", footerStart);
+    let depth = 0;
+    let footerBlock = "";
+    for (let i = open; i < css.length; i++) {
+      if (css[i] === "{") depth++;
+      if (css[i] === "}") {
+        depth--;
+        if (depth === 0) {
+          footerBlock = css.slice(open + 1, i);
+          break;
+        }
+      }
+    }
+    expect(footerBlock).not.toMatch(/position\s*:\s*sticky/);
+    expect(footerBlock).not.toMatch(/position\s*:\s*fixed/);
   });
 
   it("does not remount children across viewport changes (320/768/1280)", async () => {

@@ -176,6 +176,14 @@ describe("PreviewSheet", () => {
         .toBeInTheDocument();
     });
 
+    it("nests an exact-width canvas inside a scrolling viewport", () => {
+      renderInFrame();
+      const viewport = screen.getByTestId("preview-frame-viewport");
+      const canvas = screen.getByTestId("preview-frame-container");
+      expect(viewport).toContainElement(canvas);
+      expect(canvas).toHaveStyle({ width: "360px" });
+    });
+
     it("displays the Alt+P shortcut label", () => {
       renderInFrame();
       expect(screen.getByTestId("preview-frame-shortcut")).toHaveTextContent("Alt+P");

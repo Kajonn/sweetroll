@@ -112,20 +112,18 @@
   max-inline-size: 100%;
 }
 
-/* Sticky header/footer must not cover focused controls, validation
-   errors, or status messages when the browser scrolls them into view. */
+/* The sticky header must not cover focused controls, validation
+   errors, or status messages when the browser scrolls them into view.
+   The footer is ordinary flow and needs no such guard. */
 .main :is(:focus-visible, [aria-invalid="true"], [role="alert"], [role="status"]) {
   scroll-margin-top: 72px;
   scroll-margin-bottom: 56px;
 }
 
-/* The StatusBar footer stays in normal flow (sticky, never fixed) so a
+/* The header is sticky; the StatusBar footer stays in ordinary flow so a
    software keyboard or viewport resize cannot trap primary actions
    behind an overlay. Styled here so StatusBar itself stays untouched. */
 .shell > footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 20;
   background: var(--color-bg);
   padding-bottom: env(safe-area-inset-bottom);
   padding-inline-start: max(12px, env(safe-area-inset-left));

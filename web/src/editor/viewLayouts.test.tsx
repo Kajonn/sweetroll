@@ -203,8 +203,12 @@ describe("creator-adjacent views stay within the viewport", () => {
     expect(ruleBlock(library, ".list li")).toMatch(/flex-wrap:\s*wrap/);
   });
 
-  it("clamps the fixed-width preview canvas instead of clipping the page", () => {
+  it("scrolls the exact-width preview canvas inside its viewport", () => {
     const frame = cssOf("../preview/PreviewFrame.module.css");
-    expect(ruleBlock(frame, ".container")).toMatch(/max-width:\s*100%/);
+    expect(ruleBlock(frame, ".viewport")).toMatch(/width:\s*100%/);
+    expect(ruleBlock(frame, ".viewport")).toMatch(/max-width:\s*100%/);
+    expect(ruleBlock(frame, ".viewport")).toMatch(/min-width:\s*0/);
+    expect(ruleBlock(frame, ".viewport")).toMatch(/overflow-x:\s*auto/);
+    expect(ruleBlock(frame, ".container")).not.toMatch(/max-width:\s*100%/);
   });
 });

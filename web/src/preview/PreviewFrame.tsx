@@ -52,13 +52,15 @@ export function PreviewFrame({
           {t("preview.frame.toggleShortcut")}
         </span>
       </div>
-      <div
-        className={styles.container}
-        data-testid="preview-frame-container"
-        data-width={width}
-        style={{ width: `${width}px` }}
-      >
-        {children}
+      <div className={styles.viewport} data-testid="preview-frame-viewport">
+        <div
+          className={styles.container}
+          data-testid="preview-frame-container"
+          data-width={width}
+          style={{ width: `${width}px` }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

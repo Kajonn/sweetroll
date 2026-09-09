@@ -3,6 +3,7 @@
   flex-direction: column;
   gap: 8px;
   align-items: flex-start;
+  width: 100%;
   min-width: 0;
   max-width: 100%;
   font-family: var(--font-sans);
@@ -54,9 +55,16 @@
   border-radius: var(--radius-md);
   box-shadow: 0 2px 8px rgba(23, 23, 23, 0.08);
   background: var(--color-surface);
-  /* The fixed preview width is a canvas, not the page: clamp it to the
-     viewport and scroll inside the pane instead of clipping the page. */
-  max-width: 100%;
-  overflow: auto;
+  /* The fixed preview width is an exact-width canvas, left-aligned inside
+     the scrolling viewport below. It is never clamped: the viewport owns
+     horizontal scrolling so a 1280px canvas keeps its width in a narrow
+     editor pane. */
   transition: width 0.2s ease;
+}
+
+.viewport {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
 }

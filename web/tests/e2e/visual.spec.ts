@@ -135,7 +135,7 @@ test.describe("visual: sheet preview", () => {
         viewport.scrollLeft = 0;
         const canvasRect = canvas.getBoundingClientRect();
         const viewportRect = viewport.getBoundingClientRect();
-        const body = document.querySelector('[data-testid="document-editor-body-metadata"]');
+        const body = document.querySelector('[data-testid="document-editor-body-sheets"]');
         const app = document.querySelector('[data-testid="app-content"]');
         const maxScroll = viewport.scrollWidth - viewport.clientWidth;
         viewport.scrollLeft = viewport.scrollWidth;
@@ -189,7 +189,24 @@ test.describe("visual: sheet preview", () => {
       expect(intersectionArea(checkRect!, headerRect!)).toBe(0);
       expect(intersectionArea(checkRect!, statusAfterScroll!)).toBe(0);
 
-      await expect(frame).toHaveScreenshot(`sheet-preview-${width}.png`);
+      // The overlap guard deliberately scrolls the bottom action into view.
+      // Restore the editor pane before capture so the baseline represents the
+      // preview entry state, including its width controls, rather than a
+      // transient post-assertion scroll position.
+      await page.getByTestId("document-editor-body-sheets").evaluate((element) => {
+        element.scrollTop = 0;
+      });
+      const header = page.getByTestId("app-header");
+      await header.evaluate((element) => {
+        element.style.position = "static";
+      });
+      try {
+        await expect(frame).toHaveScreenshot(`sheet-preview-${width}.png`);
+      } finally {
+        await header.evaluate((element) => {
+          element.style.removeProperty("position");
+        });
+      }
     });
   }
 });

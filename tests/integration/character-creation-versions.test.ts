@@ -93,13 +93,15 @@ describeWithDatabase("Character creation versions", () => {
     return { systems: systems.rows[0]!.count, versions: versions.rows[0]!.count };
   }
 
-  it("lists exactly the authorized published versions ordered by system name without writing rows", async () => {
+  it("lists exactly the discoverable published versions ordered by system name without writing rows", async () => {
     const app = await makeApp();
     const ada = app.users.ada;
     const bob = app.users.bob;
 
     const own = await insertVersion(app, ada.actorId, { name: "Alpha Private", access: "private" });
     const pub = await insertVersion(app, bob.actorId, { name: "Beta Public", access: "public" });
+    // OD-01 option A: another owner's link-access system is usable via a known
+    // version ID but is NOT enumerated.
     const link = await insertVersion(app, bob.actorId, { name: "Gamma Link", access: "link" });
     await insertVersion(app, bob.actorId, { name: "Delta Private", access: "private" });
     await insertVersion(app, ada.actorId, { name: "Epsilon Deprecated", versionLifecycle: "deprecated" });
@@ -131,14 +133,13 @@ describeWithDatabase("Character creation versions", () => {
       own.versionId,
       pub.versionId,
       pubOlder.versionId,
-      link.versionId,
     ]);
     expect(body.data.versions.map((v) => v.systemName)).toEqual([
       "Alpha Private",
       "Beta Public",
       "Beta Public",
-      "Gamma Link",
     ]);
+    expect(body.data.versions.map((v) => v.versionId)).not.toContain(link.versionId);
     const beta = body.data.versions.filter((v) => v.systemName === "Beta Public");
     expect(beta[0]!.versionId).toBe(pub.versionId);
     expect(beta[0]!.createdAt > beta[1]!.createdAt).toBe(true);
@@ -146,13 +147,84 @@ describeWithDatabase("Character creation versions", () => {
       "1.0.0",
       "1.0.0",
       "2.0.0",
-      "1.0.0",
     ]);
     for (const entry of body.data.versions) {
       expect(entry.systemId).toBeTypeOf("string");
       expect(entry.createdAt).toBeTypeOf("string");
     }
     expect(await rowCounts(app)).toEqual(before);
+  });
+
+  it("hides another owner's link-only and private systems from enumeration but keeps known-version use", async () => {
+    const app = await makeApp();
+    const ada = app.users.ada;
+    const bob = app.users.bob;
+
+    // Owned/private/link/public matrix across two accounts.
+    const adaPrivate = await insertVersion(app, ada.actorId, { name: "Ada Private", access: "private" });
+    const adaLink = await insertVersion(app, ada.actorId, { name: "Ada Link", access: "link" });
+    const bobPrivate = await insertVersion(app, bob.actorId, { name: "Bob Private", access: "private" });
+    const bobLink = await insertVersion(app, bob.actorId, { name: "Bob Link", access: "link" });
+    const sharedPublic = await insertVersion(app, ada.actorId, { name: "Shared Public", access: "public" });
+
+    const listAs = async (user: I3Users[keyof I3Users]) => {
+      const response = await app.app.inject({
+        method: "GET",
+        url: "/characters/creation-versions",
+        headers: cookieHeader(user),
+      });
+      expect(response.statusCode, response.body).toBe(200);
+      return (response.json() as { data: { versions: Array<{ versionId: string }> } }).data.versions.map(
+        (v) => v.versionId,
+      );
+    };
+
+    // B's list contains B's owned (private + link) + public systems only.
+    const bobList = await listAs(bob);
+    expect(bobList).toContain(bobPrivate.versionId);
+    expect(bobList).toContain(bobLink.versionId);
+    expect(bobList).toContain(sharedPublic.versionId);
+    expect(bobList).not.toContain(adaPrivate.versionId);
+    expect(bobList).not.toContain(adaLink.versionId);
+
+    // A's list mirrors: A's owned (private + link) + public, not B's.
+    const adaList = await listAs(ada);
+    expect(adaList).toContain(adaPrivate.versionId);
+    expect(adaList).toContain(adaLink.versionId);
+    expect(adaList).toContain(sharedPublic.versionId);
+    expect(adaList).not.toContain(bobPrivate.versionId);
+    expect(adaList).not.toContain(bobLink.versionId);
+
+    // Use-permission intact: B can still resolve metadata and create from A's
+    // link-only version via its exact known version ID.
+    const metadata = await app.app.inject({
+      method: "GET",
+      url: `/characters/creation-options?systemVersionId=${adaLink.versionId}`,
+      headers: cookieHeader(bob),
+    });
+    expect(metadata.statusCode, metadata.body).toBe(200);
+
+    const created = await app.app.inject({
+      method: "POST",
+      url: "/characters",
+      headers: cookieHeader(bob),
+      payload: {
+        systemVersionId: adaLink.versionId,
+        entityDefinitionId: "character",
+        name: "Bob From Link",
+        idempotencyKey: randomUUID(),
+      },
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    expect(created.json().character.systemVersionId).toBe(adaLink.versionId);
+
+    // A's private system stays closed to B even with a known version ID.
+    const privateMetadata = await app.app.inject({
+      method: "GET",
+      url: `/characters/creation-options?systemVersionId=${adaPrivate.versionId}`,
+      headers: cookieHeader(bob),
+    });
+    expect(privateMetadata.statusCode).toBe(404);
   });
 
   it("rejects anonymous listing with 401", async () => {

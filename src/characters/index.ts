@@ -545,6 +545,22 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     };
   }
 
+  // I6 Task 1: a completed execution must never disclose its saved sheet/roll
+  // to an actor who no longer owns the character. Executions are actor-scoped,
+  // but ownership can move (transfer) after completion, so every early replay
+  // reauthorizes current ownership before replayStoredOutcome/replayDuplicateOutcome.
+  // Denied replays return the same generic inaccessible error the method uses
+  // for a foreign character, without invoking Runtime.
+  async function denyReplayUnlessOwner(
+    ctx: RequestContext,
+    characterId: CharacterId,
+    denied: () => CharacterError,
+  ): Promise<CharacterResult<never> | null> {
+    const current = await repo.openOwnedCharacter(characterId, ctx.actorId);
+    if (current !== null) return null;
+    return { ok: false, error: denied() };
+  }
+
   function replayStoredOutcome(resultJson: unknown): CharacterResult<CharacterCommandResult> {
     const stored = resultJson as StoredCommandOutcome;
     if (!stored.ok) return { ok: false, error: stored.error };
@@ -613,6 +629,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           if (existing.inputHash !== inputHash) return { ok: false, error: errors.mismatch() };
           if (existing.expiresAt.getTime() <= now().getTime()) return { ok: false, error: errors.replayExpired() };
           const replayedView = deserializeView(existing.resultJson);
+          const denial = await denyReplayUnlessOwner(ctx, replayedView.characterId, () => errors.not_found());
+          if (denial !== null) return denial;
           return {
             ok: true,
             value: { ...replayedView, reconciliation: { ...replayedView.reconciliation, replayed: true } },
@@ -793,7 +811,15 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (claimed.status === "mismatch") return { ok: false, error: errors.mismatch() };
         if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
         if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
-        if (claimed.status === "replay") return replayDuplicateOutcome(claimed.resultJson);
+        if (claimed.status === "replay") {
+          const stored = claimed.resultJson as StoredDuplicateOutcome;
+          if (stored.ok) {
+            const duplicateId = (stored.value.character as { characterId: CharacterId }).characterId;
+            const denial = await denyReplayUnlessOwner(ctx, duplicateId, () => errors.notFoundPurge());
+            if (denial !== null) return denial;
+          }
+          return replayDuplicateOutcome(claimed.resultJson);
+        }
 
         const executionId = claimed.executionId;
         const replayExpiresAt = new Date(claimStartedAt.getTime() + REPLAY_TTL_MS);
@@ -965,6 +991,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
         if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
         if (claimed.status === "replay") {
+          const denial = await denyReplayUnlessOwner(ctx, command.characterId, () => errors.not_found());
+          if (denial !== null) return denial;
           return replayStoredOutcome(claimed.resultJson);
         }
 
@@ -1149,6 +1177,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
         if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
         if (claimed.status === "replay") {
+          const denial = await denyReplayUnlessOwner(ctx, command.characterId, () => errors.notFoundPurge());
+          if (denial !== null) return denial;
           return replayStoredOutcome(claimed.resultJson);
         }
 
@@ -1493,7 +1523,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (claimed.status === "mismatch") return { ok: false, error: errors.mismatch() };
         if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
         if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
-        if (claimed.status === "replay") return replayStoredOutcome(claimed.resultJson);
+        if (claimed.status === "replay") {
+          const denial = await denyReplayUnlessOwner(ctx, commitInput.characterId, () => errors.not_found());
+          if (denial !== null) return denial;
+          return replayStoredOutcome(claimed.resultJson);
+        }
         const executionId = claimed.executionId;
         const replayExpiresAt = new Date(claimStartedAt.getTime() + REPLAY_TTL_MS);
 
@@ -1646,7 +1680,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (claimed.status === "mismatch") return { ok: false, error: errors.mismatch() };
         if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
         if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
-        if (claimed.status === "replay") return replayStoredOutcome(claimed.resultJson);
+        if (claimed.status === "replay") {
+          const denial = await denyReplayUnlessOwner(ctx, rollbackInput.characterId, () => errors.notFoundPurge());
+          if (denial !== null) return denial;
+          return replayStoredOutcome(claimed.resultJson);
+        }
         const executionId = claimed.executionId;
         const replayExpiresAt = new Date(claimStartedAt.getTime() + REPLAY_TTL_MS);
 

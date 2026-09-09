@@ -1,0 +1,71 @@
+.menuWrap {
+  position: relative;
+  display: inline-block;
+}
+
+.content {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--surface-overlay);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  padding: 8px;
+  min-width: 200px;
+  max-width: calc(100vw - 32px);
+  z-index: var(--layer-dialog-content);
+  display: grid;
+  gap: 4px;
+  font-family: var(--font-body);
+  box-shadow: var(--shadow-dialog);
+}
+
+.content[data-align="start"] {
+  left: 0;
+  right: auto;
+}
+
+.content[data-align="center"] {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item:hover {
+  background: var(--surface-page);
+}
+
+.item:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.item:focus-visible,
+.content:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content,
+  .item {
+    transition: none;
+  }
+}

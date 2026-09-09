@@ -1,0 +1,83 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--surface-scrim);
+  z-index: var(--layer-dialog-overlay);
+}
+
+.content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--surface-overlay);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-dialog);
+  padding: 24px;
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  box-shadow: var(--shadow-dialog);
+  z-index: var(--layer-dialog-content);
+  display: grid;
+  gap: 16px;
+  font-family: var(--font-body);
+}
+
+.sheet {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, calc(100vw - 32px));
+  background: var(--surface-overlay);
+  color: var(--text-primary);
+  border-left: 1px solid var(--border-default);
+  padding: 24px;
+  overflow: auto;
+  box-shadow: var(--shadow-dialog);
+  z-index: var(--layer-dialog-content);
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  font-family: var(--font-body);
+}
+
+.title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.description {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.body {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.content:focus-visible,
+.sheet:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content,
+  .sheet {
+    transition: none;
+  }
+}

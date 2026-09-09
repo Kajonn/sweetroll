@@ -87,15 +87,15 @@
 }
 
 .badgeActive {
-  color: #166534;
-  background: rgba(34, 197, 94, 0.12);
-  border-color: rgba(34, 197, 94, 0.4);
+  color: var(--status-success-fg);
+  background: var(--status-success-bg);
+  border-color: var(--status-success-border);
 }
 
 .badgeDeprecated {
-  color: #92400e;
-  background: rgba(217, 119, 6, 0.12);
-  border-color: rgba(217, 119, 6, 0.4);
+  color: var(--status-warning-fg);
+  background: var(--status-warning-soft-bg);
+  border-color: var(--status-warning-soft-border);
 }
 
 .dateCell {
@@ -146,7 +146,7 @@
 
 .actionDanger:hover:not(:disabled) {
   border-color: var(--color-error);
-  background: rgba(220, 38, 38, 0.06);
+  background: var(--status-error-bg);
 }
 
 .actionMuted {
@@ -156,8 +156,8 @@
 .dialogOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(23, 23, 23, 0.45);
-  z-index: 1000;
+  background: var(--surface-scrim);
+  z-index: var(--layer-dialog-overlay);
 }
 
 .dialogContent {
@@ -171,8 +171,8 @@
   border-radius: var(--radius-lg);
   padding: 24px;
   width: min(440px, calc(100vw - 32px));
-  box-shadow: 0 12px 32px rgba(23, 23, 23, 0.2);
-  z-index: 1001;
+  box-shadow: var(--shadow-dialog);
+  z-index: var(--layer-dialog-content);
   display: grid;
   gap: 12px;
 }
@@ -217,7 +217,7 @@
 
 .dialogConfirm {
   background: var(--color-error);
-  color: #fff;
+  color: var(--action-danger-fg);
   border-color: var(--color-error);
 }
 

@@ -1,4 +1,6 @@
 :root {
+  /* G2-structural primitives. Existing names/values are frozen; the semantic
+     alias layer below references them via var(). */
   --color-bg: #fafafa;
   --color-surface: #ffffff;
   --color-fg: #171717;
@@ -10,12 +12,130 @@
   --color-warning: #d97706;
   --color-warning-fg: #92400e;
   --color-success: #059669;
+  /* Additional neutral primitives, valued from literals already in use in
+     feature styles so token migration stays pixel-identical. */
+  --color-error-fg: #ffffff;
+  --color-error-bg: rgba(220, 38, 38, 0.06);
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #fcd34d;
+  --color-warning-soft-bg: rgba(217, 119, 6, 0.12);
+  --color-warning-soft-border: rgba(217, 119, 6, 0.4);
+  --color-success-fg: #166534;
+  --color-success-bg: rgba(34, 197, 94, 0.12);
+  --color-success-border: rgba(34, 197, 94, 0.4);
+  --color-overlay: rgba(23, 23, 23, 0.45);
+  --color-shadow: rgba(23, 23, 23, 0.2);
+  --color-wash: rgba(0, 0, 0, 0.05);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, sans-serif;
   --font-mono: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
   --radius-xl: 12px;
+
+  /* Semantic alias layer. Feature styles consume these, never literals. */
+  --surface-page: var(--color-bg);
+  --surface-panel: var(--color-surface);
+  --surface-overlay: var(--color-surface);
+  --surface-scrim: var(--color-overlay);
+  --surface-hover: var(--color-wash);
+  --text-primary: var(--color-fg);
+  --text-muted: var(--color-fg-muted);
+  --text-on-action: var(--color-accent-fg);
+  --text-on-danger: var(--color-error-fg);
+  --border-default: var(--color-border);
+  --action-primary: var(--color-accent);
+  --action-primary-fg: var(--color-accent-fg);
+  --action-danger: var(--color-error);
+  --action-danger-fg: var(--color-error-fg);
+  --focus-ring: 2px solid var(--color-accent);
+  --status-error: var(--color-error);
+  --status-error-bg: var(--color-error-bg);
+  --status-warning: var(--color-warning);
+  --status-warning-fg: var(--color-warning-fg);
+  --status-warning-bg: var(--color-warning-bg);
+  --status-warning-border: var(--color-warning-border);
+  --status-warning-soft-bg: var(--color-warning-soft-bg);
+  --status-warning-soft-border: var(--color-warning-soft-border);
+  --status-success: var(--color-success);
+  --status-success-fg: var(--color-success-fg);
+  --status-success-bg: var(--color-success-bg);
+  --status-success-border: var(--color-success-border);
+  --font-body: var(--font-sans);
+  --font-heading: var(--font-sans);
+  --font-code: var(--font-mono);
+  --font-size-sm: 12px;
+  --font-size-md: 13px;
+  --font-size-base: 14px;
+  --font-size-lg: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --radius-control: var(--radius-sm);
+  --radius-panel: var(--radius-md);
+  --radius-dialog: var(--radius-lg);
+  --radius-pill: 999px;
+  --shadow-dialog: 0 12px 32px var(--color-shadow);
+  --layer-dialog-overlay: 1000;
+  --layer-dialog-content: 1001;
+
+  color-scheme: light;
+}
+
+/* Neutral dark token set: neutral placeholders pending mockup reference.
+   They keep the current neutral palette readable on dark surfaces and are
+   explicitly NOT Tablefolk styling (mockup unreachable, HTTP 401). Revisit
+   once a mockup reference is available. */
+[data-theme="dark"] {
+  --color-bg: #171717;
+  --color-surface: #262626;
+  --color-fg: #fafafa;
+  --color-fg-muted: #d4d4d4;
+  --color-border: #404040;
+  --color-accent: #818cf8;
+  --color-accent-fg: #171717;
+  --color-error: #f87171;
+  --color-error-fg: #171717;
+  --color-error-bg: rgba(248, 113, 113, 0.12);
+  --color-warning: #fbbf24;
+  --color-warning-fg: #fcd34d;
+  --color-warning-bg: #451a03;
+  --color-warning-border: #b45309;
+  --color-warning-soft-bg: rgba(251, 191, 36, 0.12);
+  --color-warning-soft-border: rgba(251, 191, 36, 0.4);
+  --color-success: #34d399;
+  --color-success-fg: #a7f3d0;
+  --color-success-bg: rgba(52, 211, 153, 0.12);
+  --color-success-border: rgba(52, 211, 153, 0.4);
+  --color-overlay: rgba(0, 0, 0, 0.6);
+  --color-shadow: rgba(0, 0, 0, 0.5);
+  --color-wash: rgba(255, 255, 255, 0.08);
+
+  color-scheme: dark;
+}
+
+/* Third internal preset proving token flexibility (NOT a product theme).
+   Changes accent, font stack, and corner radii via token overrides only;
+   no feature-component edits are needed because aliases follow primitives. */
+[data-theme="contrast"] {
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-fg: #000000;
+  --color-fg-muted: #1f1f1f;
+  --color-border: #525252;
+  --color-accent: #1e40af;
+  --color-accent-fg: #ffffff;
+  --color-error: #b91c1c;
+  --color-warning-fg: #78350f;
+  --font-sans: Verdana, Geneva, "DejaVu Sans", sans-serif;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -32,4 +152,26 @@ html, body, #root {
 }
 
 button { font: inherit; cursor: pointer; }
-:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+/* 44x44 CSS-pixel touch-target floor for button-ish controls. Compact
+   desktop density must not reduce touch targets (see design Section 10.1). */
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+[role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

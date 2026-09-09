@@ -46,9 +46,41 @@ mandates "create and publish a simple system … create and use a character").
   card showing "Published / Version 1.0.0 is live.", version ID + checksum rows,
   primary `Create test character` CTA beside `Close`. Inspected: layout correct,
   no clipped actions. No "before" shot (new element; before = no CTA).
-- No full-page journey PNGs kept (matches G4 artifact policy). Visual baselines
-  untouched: `visual.spec.ts` screenshots only the publish *form*, not the
-  success view, so no baseline drift.
+- No full-page journey PNGs kept (matches G4 artifact policy).
+- Visual baselines regenerated with owner approval (see below): the 8 stale
+  `visual.spec.ts` PNGs (library, document-editor, sheet-preview,
+  publish-dialog × 360/1280) now match the creator UI; both
+  `conflict-banner-*` PNGs passed unchanged against the existing baselines.
+
+## Visual baseline regeneration (human-approved, 2026-09-09)
+
+The owner HUMAN-APPROVED regenerating the 8 stale visual baselines
+(approval recorded in the controller session). The actuals were inspected
+before approval: new basics-first tabs, readiness row, taller publish
+dialog with readiness summary; doubled preview headings verified
+pre-existing from the old expected PNG. No source changes were made to get
+green (locator migration only, already landed in `8705a56`).
+
+Commands actually run (branch `feat/g5-simple-creator`, commit `617eb03`):
+
+- Prerequisites per `web/playwright.config.ts:17-47`: `npm run migrate` from
+  root (DB `postgres://sweetroll:sweetroll@localhost:5432/sweetroll`,
+  default ports BACKEND_PORT=3000/WEB_PORT=5173); backend (`npm run
+  dev:http`) + web (`npm run web:dev`) auto-started by Playwright
+  `webServer`, same pattern as the CI `web-e2e` job.
+- From `web/`: `npx playwright test tests/e2e/visual.spec.ts
+  --update-snapshots --reporter=list` → 8 PNGs re-generated
+  (`conflict-banner-360/1280` passed against existing baselines, untouched),
+  10 passed.
+- Re-run from `web/`: `npx playwright test tests/e2e/visual.spec.ts
+  --reporter=list` → **10/10 pass**.
+- `git status --short` confirmed ONLY the 8 expected PNGs under
+  `web/tests/visual/__screenshots__/` changed; committed alone as
+  `617eb03 test(gui): regenerate visual baselines for G5 creator`.
+- Spot-check: regenerated `publish-dialog-1280.png` shows the readiness
+  summary (Draft rev / Unsaved changes / No blocking issues / Not published
+  yet), semver input + Patch/Minor/Major, release notes, and
+  Cancel/Confirm publish.
 
 ## Manual findings
 
@@ -67,11 +99,12 @@ mandates "create and publish a simple system … create and use a character").
 
 ## Remaining limitations (not run / not fixed)
 
-- `acceptance.spec.ts` clone-flow is red on stale Task-2 tab locators (see
-  above); `visual.spec.ts` references the stale `document-editor-body-sheets`
-  testid (observed by reading, not run). Both pre-date Task 6; CI's
-  `smoke+acceptance+character-sheet+visual` line stays red until a follow-up
-  migrates those locators (explicitly out of Task 6 scope).
+- `acceptance.spec.ts` clone-flow was red on stale Task-2 tab locators (see
+  above); fixed by the locator-only migration in `8705a56`
+  (`creatorToCharacter + acceptance` 4/4 green there), and `visual.spec.ts`
+  is now 10/10 green on the regenerated baselines above. `smoke.spec.ts` /
+  `character-sheet.spec.ts` were not re-run here; any red there is
+  pre-existing and out of Task 6 scope.
 - No dark-mode, 200% text, long-label, touch, or real-device (Android/iPad)
   runs — remains G9 work. No axe run inside the new spec (library axe still
   passes in `acceptance.spec.ts`).

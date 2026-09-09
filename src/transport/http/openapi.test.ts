@@ -15,6 +15,8 @@ const testIdentity: Identity = {
   },
   resolveSession: async () => ({ state: "anonymous" }),
   signOut: async () => ({ ok: true, value: undefined }),
+  getThemeDefault: async () => ({ ok: true, value: null }),
+  setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
 };
 
 describe("buildOpenApiDocument", () => {
@@ -33,6 +35,7 @@ describe("buildOpenApiDocument", () => {
       "/characters/{characterId}",
       "/characters/{characterId}/actions/{actionId}",
       "/characters/{characterId}/activity",
+      "/characters/{characterId}/duplicate",
       "/characters/{characterId}/exports",
       "/characters/{characterId}/fields/{fieldId}/set",
       "/characters/{characterId}/migration-previews",
@@ -41,6 +44,7 @@ describe("buildOpenApiDocument", () => {
       "/characters/{characterId}/ownership-transfer",
       "/characters/{characterId}/resources/{resourceId}/bump",
       "/me",
+      "/me/preferences",
       "/signout",
       "/system-versions/{versionId}",
       "/system-versions/{versionId}/export",
@@ -91,5 +95,11 @@ describe("buildOpenApiDocument", () => {
       | { required?: string[]; properties?: Record<string, unknown> }
       | undefined;
     expect(setFieldSchema?.required).toContain("idempotencyKey");
+
+    const duplicate = paths["/characters/{characterId}/duplicate"]?.post;
+    const duplicateSchema = duplicate?.requestBody?.content?.["application/json"]?.schema as
+      | { required?: string[]; properties?: Record<string, unknown> }
+      | undefined;
+    expect(duplicateSchema?.required).toContain("idempotencyKey");
   });
 });

@@ -7,8 +7,39 @@ export type BrowserChannel = {
   postMessage(message: unknown): void;
   close(): void;
 };
-export type IdentitySnapshot = { actorId: string | null; verified: boolean; generation: number; pendingLogout: boolean };
+export type IdentitySnapshot = { actorId: string | null; verified: boolean; generation: number; pendingLogout: boolean; sessionExpired: boolean };
 export type IdentityGate = ReturnType<typeof createIdentityGate>;
+
+/**
+ * Post-sign-in return path for the `/cb` route. The Account screen's
+ * re-auth entry stores the pre-sign-in path here; `/cb` consumes it once
+ * (default `/characters`). Provider-agnostic by design: `/cb` validates
+ * nothing provider-specific, so any configured OIDC adapter (test adapter
+ * today) can use the same return journey.
+ */
+export const POST_SIGNIN_STORAGE_KEY = "sweetroll:postSignin";
+export const POST_SIGNIN_DEFAULT_PATH = "/characters";
+
+export function storePostSigninPath(path: string): void {
+  try {
+    sessionStorage.setItem(POST_SIGNIN_STORAGE_KEY, path);
+  } catch {
+    // Best-effort only: a missing store just falls back to the default path.
+  }
+}
+
+export function takePostSigninPath(): string {
+  let stored: string | null = null;
+  try {
+    stored = sessionStorage.getItem(POST_SIGNIN_STORAGE_KEY);
+    sessionStorage.removeItem(POST_SIGNIN_STORAGE_KEY);
+  } catch {
+    stored = null;
+  }
+  // Same-app paths only; anything else falls back to the default.
+  if (stored !== null && stored.startsWith("/") && !stored.startsWith("//")) return stored;
+  return POST_SIGNIN_DEFAULT_PATH;
+}
 
 export function createIdentityGate(input: {
   store: CharacterStore | null; client: ApiClient; online?: () => boolean; channel?: BrowserChannel | null; locks?: LockManager | null;
@@ -19,15 +50,15 @@ export function createIdentityGate(input: {
   const lifetime = new AbortController();
   const channel = input.channel === undefined && typeof BroadcastChannel !== "undefined"
     ? new BroadcastChannel("character-identity") : input.channel;
-  let snapshot: IdentitySnapshot = { actorId: null, verified: false, generation: 0, pendingLogout: false };
+  let snapshot: IdentitySnapshot = { actorId: null, verified: false, generation: 0, pendingLogout: false, sessionExpired: false };
   let disposed = false;
   let epoch = 0;
   let lastConfirmed: string | null = null;
   let durableGeneration: number | null = null;
   let work: Promise<void> = Promise.resolve();
   const listeners = new Set<() => void>();
-  const publish = (actorId: string | null, verified: boolean, pendingLogout: boolean, invalidate = false) => {
-    snapshot = { actorId, verified, pendingLogout, generation: snapshot.generation + (invalidate || actorId !== snapshot.actorId ? 1 : 0) };
+  const publish = (actorId: string | null, verified: boolean, pendingLogout: boolean, invalidate = false, sessionExpired = false) => {
+    snapshot = { actorId, verified, pendingLogout, sessionExpired, generation: snapshot.generation + (invalidate || actorId !== snapshot.actorId ? 1 : 0) };
     for (const listener of listeners) listener();
   };
   const serialize = (run: () => Promise<void>) => {
@@ -62,7 +93,7 @@ export function createIdentityGate(input: {
           return;
         }
         // Do not expose a startup cache until this request confirms its account.
-        publish(snapshot.actorId, false, false);
+        publish(snapshot.actorId, false, false, false, snapshot.sessionExpired);
         const previous = await store?.readIdentity();
         if (disposed || token !== epoch) return;
         if (previous && (previous.pendingLogout !== null || previous.generation !== state?.generation)) {
@@ -83,10 +114,17 @@ export function createIdentityGate(input: {
           lastConfirmed = null;
           publish(null, false, false);
           if (changed) channel?.postMessage({ type: "identity-changed" });
+        } else if (me.state === "session_expired") {
+          // Expired sessions read as signed-out (no actor, unverified) but
+          // carry the expired entry the Account screen owns for re-auth.
+          const changed = lastConfirmed !== null;
+          lastConfirmed = null;
+          publish(null, false, false, false, true);
+          if (changed) channel?.postMessage({ type: "identity-changed" });
         } else throw new Error("Invalid identity response");
       } catch (error) {
         if (!disposed && token === epoch) {
-          publish(error instanceof Error && error.message.startsWith("stale ") ? null : snapshot.actorId, false, snapshot.pendingLogout);
+          publish(error instanceof Error && error.message.startsWith("stale ") ? null : snapshot.actorId, false, snapshot.pendingLogout, false, snapshot.sessionExpired);
         }
       }
     }).catch(() => {});

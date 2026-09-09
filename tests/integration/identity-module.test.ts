@@ -140,7 +140,7 @@ describeWithDatabase("Identity module", () => {
     expect(await identity.resolveSession("no-such-token")).toEqual({ state: "anonymous" });
   });
 
-  it("returns anonymous for an expired session token", async () => {
+  it("returns session_expired for an expired session token", async () => {
     const identity = module();
     const result = await identity.completeSignIn({
       code: "code-ada",
@@ -157,7 +157,7 @@ describeWithDatabase("Identity module", () => {
       tokenHash: hashToken(token),
       expiresAt: new Date(Date.now() - 10_000),
     });
-    expect(await identity.resolveSession(token)).toEqual({ state: "anonymous" });
+    expect(await identity.resolveSession(token)).toEqual({ state: "session_expired" });
   });
 
   it("rejects an invalid authorization code", async () => {

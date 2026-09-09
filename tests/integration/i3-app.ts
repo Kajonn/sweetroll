@@ -51,6 +51,12 @@ export const I3_SCHEMA_DDL = `
   );
   CREATE INDEX sessions_user_id_idx ON sessions (user_id);
 
+  CREATE TABLE user_preferences (
+    user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    theme_default text CHECK (theme_default IN ('light', 'dark', 'system')),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  );
+
   CREATE TABLE systems (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,

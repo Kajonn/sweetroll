@@ -130,6 +130,24 @@
   padding-inline-end: max(12px, env(safe-area-inset-right));
 }
 
+/* Player bottom nav: hidden on tablet/desktop, where the header keeps
+   serving. Phone-only (320-599px): sticky bottom bar with 44px targets and
+   safe-area padding. Attribute/media-query driven only: no JS resize
+   listeners, so children are never remounted on viewport changes. */
+.bottomNav {
+  display: none;
+}
+
+.installBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  padding: 8px max(16px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-right));
+  border-top: 1px solid var(--border-default);
+  background: var(--surface-panel);
+}
+
 /* Phone: 320-599px. Single column, compact chrome, wrapping nav. */
 @media (max-width: 599px) {
   .header {
@@ -142,6 +160,28 @@
   }
   .main {
     padding-top: 12px;
+  }
+  .bottomNav {
+    display: flex;
+    align-items: stretch;
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    margin-top: 12px;
+    border-top: 1px solid var(--border-default);
+    background: var(--surface-page);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .bottomNavLink {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 10px 4px;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--text-primary);
   }
 }
 

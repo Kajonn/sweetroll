@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { createApiClient } from "../api/client.js";
 import { DocumentEditor } from "../editor/DocumentEditor.js";
@@ -15,6 +15,17 @@ import { AppShell, useAuth } from "./AppShell.js";
 import styles from "./AppShell.module.css";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+
+/**
+ * G6 Task 4: the shell ThemeSwitcher reads the cached account default
+ * through the shared ["preferences"] query, so every shell render needs a
+ * QueryClientProvider (production always provides one in main.tsx). A
+ * cleared shared client keeps the per-test request sequences deterministic.
+ */
+function renderShell(node: ReactNode) {
+  queryClient.clear();
+  return render(<QueryClientProvider client={queryClient}>{node}</QueryClientProvider>);
+}
 
 describe("AppShell", () => {
   it("keeps real dev sign-in working when character IndexedDB cannot open", async () => {
@@ -28,15 +39,26 @@ describe("AppShell", () => {
       return new Response(JSON.stringify(signedIn ? { state: "authenticated", userId: "real-without-idb" } : { state: "anonymous" }));
     }));
     function Identity() { const auth = useAuth(); return <p>{auth.state === "authenticated" ? auth.userId : auth.state}</p>; }
-    render(<AppShell><Identity /></AppShell>);
+    renderShell(<AppShell><Identity /></AppShell>);
     expect(await screen.findByText(/offline character storage is unavailable/i)).toBeInTheDocument();
     await userEvent.setup().click(await screen.findByTestId("dev-signin"));
     expect(await screen.findByText("real-without-idb")).toBeInTheDocument();
-    expect(paths).toEqual(["/api/me", "/dev/signin", "/api/me"]);
+    // G6 Task 4: the shell ThemeSwitcher loads the cached account default on
+    // mount (first entry) and refetches it on the null->actor settle after
+    // sign-in (last entry); the shared query is purged on sign-out.
+    expect(paths).toEqual([
+      "/api/me/preferences",
+      "/api/me",
+      "/dev/signin",
+      "/api/me",
+      "/api/me/preferences",
+    ]);
     vi.spyOn(window, "confirm").mockReturnValue(true);
     await userEvent.setup().click(screen.getByRole("button", { name: "Sign out" }));
     expect(await screen.findByText(/local sign-out could not be saved/i)).toBeInTheDocument();
-    expect(paths.at(-1)).toBe("/api/signout");
+    // Sign-out stays the last meaningful request; background preferences
+    // hygiene may refetch after it and is filtered out here.
+    expect(paths.filter((path) => path !== "/api/me/preferences").at(-1)).toBe("/api/signout");
   });
   it("preserves dev sign-in but verifies me instead of inventing an account", async () => {
     vi.stubEnv("MODE", "development");
@@ -48,10 +70,19 @@ describe("AppShell", () => {
       return new Response(JSON.stringify(signedIn ? { state: "authenticated", userId: "real-dev-account" } : { state: "anonymous" }));
     }));
     function Identity() { const auth = useAuth(); return <p>{auth.state === "authenticated" ? auth.userId : auth.state}</p>; }
-    render(<AppShell><Identity /></AppShell>);
+    renderShell(<AppShell><Identity /></AppShell>);
     await userEvent.setup().click(await screen.findByTestId("dev-signin"));
     expect(await screen.findByText("real-dev-account")).toBeInTheDocument();
-    expect(paths).toEqual(["/api/me", "/dev/signin", "/api/me"]);
+    // G6 Task 4: the shell ThemeSwitcher loads the cached account default on
+    // mount (first entry) and refetches it on the null->actor settle after
+    // sign-in (last entry); the shared query is purged on sign-out.
+    expect(paths).toEqual([
+      "/api/me/preferences",
+      "/api/me",
+      "/dev/signin",
+      "/api/me",
+      "/api/me/preferences",
+    ]);
   });
 
   it("warns before clearing edits and distinguishes pending server signout", async () => {
@@ -60,7 +91,7 @@ describe("AppShell", () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => url.endsWith("/signout")
       ? new Promise<Response>(resolve => { finish = resolve; })
       : new Response(JSON.stringify({ state: "authenticated", userId: "signed-in" }))));
-    render(<AppShell>builder</AppShell>);
+    renderShell(<AppShell>builder</AppShell>);
     await userEvent.setup().click(await screen.findByRole("button", { name: "Sign out" }));
     expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/unsynchronized/i));
     expect(await screen.findByText(/server sign-out is pending/i)).toBeInTheDocument();
@@ -72,12 +103,12 @@ describe("AppShell", () => {
   it("passes the real me identity through AuthProvider", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ state: "authenticated", userId: "actual-account" }))));
     function Identity() { const auth = useAuth(); return <p>{auth.state === "authenticated" ? auth.userId : auth.state}</p>; }
-    render(<AppShell><Identity /></AppShell>);
+    renderShell(<AppShell><Identity /></AppShell>);
     expect(screen.queryByText("dev")).not.toBeInTheDocument();
     expect(await screen.findByText("actual-account")).toBeInTheDocument();
   });
   it("renders header, main, and footer landmarks", () => {
-    render(<AppShell>content</AppShell>);
+    renderShell(<AppShell>content</AppShell>);
     expect(screen.getByRole("banner")).toBeInTheDocument();
     expect(screen.getByRole("main")).toBeInTheDocument();
     expect(screen.getByRole("contentinfo")).toBeInTheDocument();
@@ -85,7 +116,7 @@ describe("AppShell", () => {
   });
 
   it("renders children in the main region", async () => {
-    render(<AppShell><span data-testid="child">x</span></AppShell>);
+    renderShell(<AppShell><span data-testid="child">x</span></AppShell>);
     expect(screen.getByTestId("child")).toBeInTheDocument();
   });
 
@@ -96,7 +127,7 @@ describe("AppShell", () => {
       : new Response(JSON.stringify({ state: "authenticated", userId: "signed-in" }))));
     const qc = queryClient;
     qc.clear();
-    render(<AppShell>builder</AppShell>);
+    renderShell(<AppShell>builder</AppShell>);
     // Seed previous-identity cache entries only after sign-in settles, so the
     // sign-in lifetime change cannot clear them vacuously.
     await screen.findByRole("button", { name: "Sign out" });
@@ -269,7 +300,7 @@ describe("AppShell", () => {
       }
       return new Response(JSON.stringify({ state: "authenticated", userId: "signed-in" }));
     }));
-    render(<AppShell>builder</AppShell>);
+    renderShell(<AppShell>builder</AppShell>);
     await userEvent.setup().click(await screen.findByRole("button", { name: "Sign out" }));
     // Server failure is distinct from local-storage failure: retryable
     // message, and the sign-out action stays available as the retry.
@@ -292,7 +323,7 @@ describe("AppShell", () => {
       return <input data-testid="probe-input" defaultValue="draft-title" />;
     }
     try {
-      render(<AppShell><Probe /></AppShell>);
+      renderShell(<AppShell><Probe /></AppShell>);
       // Wait for the auth lifecycle (loading -> authenticated) to settle:
       // children mount during loading and remount across that transition,
       // so the no-remount assertion must start from the settled tree.
@@ -363,7 +394,7 @@ describe("AppShell responsive shell (G3-1)", () => {
 
   it("renders a single flexible content region with no column-grid assumption", async () => {
     stubAuthenticated();
-    render(<AppShell><section data-testid="view">view body</section></AppShell>);
+    renderShell(<AppShell><section data-testid="view">view body</section></AppShell>);
     await screen.findByRole("button", { name: "Sign out" });
     expect(screen.getAllByRole("main")).toHaveLength(1);
     const main = screen.getByTestId("app-content");
@@ -381,7 +412,7 @@ describe("AppShell responsive shell (G3-1)", () => {
 
   it("keeps header/nav chrome, gates, switcher, and status intact", async () => {
     stubAuthenticated();
-    render(<AppShell><span data-testid="child">x</span></AppShell>);
+    renderShell(<AppShell><span data-testid="child">x</span></AppShell>);
     await screen.findByRole("button", { name: "Sign out" });
     expect(screen.getByRole("banner")).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Primary" });
@@ -411,7 +442,7 @@ describe("AppShell responsive shell (G3-1)", () => {
         "shell.nav.home": "Start",
       });
       stubAuthenticated();
-      render(<AppShell><span data-testid="child">x</span></AppShell>);
+      renderShell(<AppShell><span data-testid="child">x</span></AppShell>);
       await screen.findByRole("button", { name: "Sign out" });
       expect(screen.getByRole("link", { name: "Zum Inhalt springen" })).toHaveAttribute("href", "#main-content");
       expect(screen.getByRole("navigation", { name: "Primär" })).toBeInTheDocument();
@@ -474,7 +505,7 @@ describe("AppShell responsive shell (G3-1)", () => {
       useEffect(() => { if (!seen.current) { seen.current = true; mounts += 1; } }, []);
       return <input data-testid="viewport-probe" defaultValue="keep-me" />;
     }
-    render(<AppShell><Probe /></AppShell>);
+    renderShell(<AppShell><Probe /></AppShell>);
     await screen.findByRole("button", { name: "Sign out" });
     mounts = 0;
     const before = screen.getByTestId("viewport-probe");

@@ -81,6 +81,42 @@ export type AuthorizedCreationVersion = {
   createdAt: string;
 };
 
+export type CreationVersionsCursor = {
+  name: string;
+  createdAt: string;
+  versionId: string;
+};
+
+export function encodeCreationVersionsCursor(cursor: CreationVersionsCursor): string {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+export function decodeCreationVersionsCursor(cursor: string | null): CreationVersionsCursor | null {
+  if (cursor === null) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as {
+      name: unknown;
+      createdAt: unknown;
+      versionId: unknown;
+    };
+    if (
+      typeof payload.name !== "string" ||
+      typeof payload.createdAt !== "string" ||
+      typeof payload.versionId !== "string" ||
+      Number.isNaN(Date.parse(payload.createdAt))
+    ) {
+      return null;
+    }
+    return { name: payload.name, createdAt: payload.createdAt, versionId: payload.versionId };
+  } catch {
+    return null;
+  }
+}
+
+function escapeLike(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
+}
+
 export type DeleteOwnedSystemResult =
   | { ok: true }
   | { ok: false; code: "not_found" | "referenced" };
@@ -150,7 +186,10 @@ export interface SystemPersistenceRepository {
   loadVersion(versionId: VersionId): Promise<VersionRecord | null>;
   listVersions(systemId: SystemId): Promise<VersionRecord[]>;
   authorizeVersionUse(actorId: UserId, versionId: VersionId): Promise<AuthorizedVersionUse | null>;
-  listAuthorizedVersions(actorId: UserId): Promise<AuthorizedCreationVersion[]>;
+  listAuthorizedVersions(
+    actorId: UserId,
+    page: { limit: number; cursor: CreationVersionsCursor | null; q: string | null; systemId: string | null },
+  ): Promise<{ versions: AuthorizedCreationVersion[]; nextCursor: string | null }>;
 
   recordReceipt(input: RecordReceiptInput): Promise<RecordReceiptResult>;
   loadReceipt(input: {
@@ -293,11 +332,30 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
         : { systemId: row.system_id, versionId: row.version_id, checksum: row.checksum };
     },
 
-    async listAuthorizedVersions(actorId) {
+    async listAuthorizedVersions(actorId, page) {
       // OD-01 option A (unlisted/link-only): enumeration exposes only systems
       // owned by the actor plus explicitly discoverable (public) systems.
       // Other owners' link-access systems stay usable via a known version ID
       // through authorizeVersionUse, but are excluded here.
+      // Ordering is s.name ASC, v.created_at DESC, v.id DESC; the keyset
+      // cursor assumes names are stable across pages (renames-may-move: a
+      // concurrent rename can shift rows between pages; not solved here).
+      const params: unknown[] = [actorId];
+      let where = `(s.owner_id = $1 OR s.access = 'public')`;
+      if (page.q !== null) {
+        params.push(`%${escapeLike(page.q)}%`);
+        where += ` AND s.name ILIKE $${params.length}`;
+      }
+      if (page.systemId !== null) {
+        params.push(page.systemId);
+        where += ` AND s.id = $${params.length}`;
+      }
+      if (page.cursor !== null) {
+        params.push(page.cursor.name, page.cursor.createdAt, page.cursor.versionId);
+        const base = params.length - 2;
+        where += ` AND (s.name > $${base} OR (s.name = $${base} AND v.created_at < $${base + 1}) OR (s.name = $${base} AND v.created_at = $${base + 1} AND v.id < $${base + 2}))`;
+      }
+      params.push(page.limit + 1);
       const result = await pool.query<AuthorizedCreationVersionRow>(
         `SELECT v.id AS version_id, s.id AS system_id, s.name AS system_name,
                 v.semantic_version, v.created_at
@@ -305,17 +363,31 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
            JOIN systems s ON s.id = v.system_id
           WHERE v.lifecycle = 'published'
             AND s.lifecycle = 'active'
-            AND (s.owner_id = $1 OR s.access = 'public')
-          ORDER BY s.name ASC, v.created_at DESC, v.id DESC`,
-        [actorId],
+            AND ${where}
+          ORDER BY s.name ASC, v.created_at DESC, v.id DESC
+          LIMIT $${params.length}`,
+        params,
       );
-      return result.rows.map((row) => ({
-        versionId: row.version_id,
-        systemId: row.system_id,
-        systemName: row.system_name,
-        semanticVersion: row.semantic_version,
-        createdAt: row.created_at.toISOString(),
-      }));
+      const hasMore = result.rows.length > page.limit;
+      const pageRows = hasMore ? result.rows.slice(0, page.limit) : result.rows;
+      const last = pageRows[pageRows.length - 1];
+      return {
+        versions: pageRows.map((row) => ({
+          versionId: row.version_id,
+          systemId: row.system_id,
+          systemName: row.system_name,
+          semanticVersion: row.semantic_version,
+          createdAt: row.created_at.toISOString(),
+        })),
+        nextCursor:
+          hasMore && last !== undefined
+            ? encodeCreationVersionsCursor({
+                name: last.system_name,
+                createdAt: last.created_at.toISOString(),
+                versionId: last.version_id,
+              })
+            : null,
+      };
     },
 
     async recordReceipt(input) {

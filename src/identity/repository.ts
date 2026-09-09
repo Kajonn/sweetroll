@@ -18,6 +18,9 @@ export type CreateSessionInput = {
   expiresAt: Date;
 };
 
+/** Account-level theme default. Null means no default is set. */
+export type ThemeDefault = "light" | "dark" | "system";
+
 export type SessionRecord = {
   sessionId: SessionId;
   userId: UserId;
@@ -31,6 +34,8 @@ export interface IdentityRepository {
   createSession(input: CreateSessionInput): Promise<{ sessionId: SessionId }>;
   findSessionByTokenHash(tokenHash: string): Promise<SessionRecord | null>;
   revokeSessionByTokenHash(tokenHash: string): Promise<void>;
+  getThemeDefault(userId: UserId): Promise<ThemeDefault | null>;
+  setThemeDefault(userId: UserId, value: ThemeDefault | null): Promise<ThemeDefault | null>;
 }
 
 export function createIdentityRepository(pool: Pool): IdentityRepository {
@@ -81,6 +86,34 @@ export function createIdentityRepository(pool: Pool): IdentityRepository {
         [tokenHash],
       );
     },
+
+    async getThemeDefault(userId) {
+      const result = await pool.query<{ theme_default: ThemeDefault | null }>(
+        "SELECT theme_default FROM user_preferences WHERE user_id = $1",
+        [userId],
+      );
+      const row = result.rows[0];
+      if (row === undefined) {
+        return null;
+      }
+      return row.theme_default;
+    },
+
+    async setThemeDefault(userId, value) {
+      const result = await pool.query<{ theme_default: ThemeDefault | null }>(
+        `INSERT INTO user_preferences (user_id, theme_default, updated_at)
+         VALUES ($1, $2, now())
+         ON CONFLICT (user_id)
+         DO UPDATE SET theme_default = EXCLUDED.theme_default, updated_at = now()
+         RETURNING theme_default`,
+        [userId, value],
+      );
+      const row = result.rows[0];
+      if (row === undefined) {
+        throw new Error("setThemeDefault returned no row");
+      }
+      return row.theme_default;
+    },
   };
 }
 
@@ -91,6 +124,15 @@ async function upsertExternalIdentityImpl(
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    // Serialize concurrent first-sign-ins for the same external identity.
+    // The second caller blocks here until the first commits, then observes
+    // the committed row in the SELECT below and returns the canonical userId
+    // instead of inserting an orphan user. Transaction-scoped, so no schema
+    // change and no explicit unlock is needed.
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", [
+      input.provider,
+      input.subject,
+    ]);
     const existing = await client.query<{ id: string }>(
       `SELECT u.id
          FROM users u

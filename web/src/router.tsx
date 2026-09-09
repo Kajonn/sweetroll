@@ -1,12 +1,17 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { createRootRoute, createRoute, createRouter, Outlet, useNavigate, useParams } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createRootRoute, createRoute, createRouter, Outlet, useNavigate, useParams, useRouter } from "@tanstack/react-router";
 
 import { createApiClient, type ApiClient } from "./api/client.js";
 import { createCharactersApi, type CharactersApi } from "./characters/api.js";
 import { createCoordination } from "./characters/coordination.js";
 import type { BrowserChannel } from "./characters/identity.js";
 import type { IdentityGate } from "./characters/identity.js";
+import { takePostSigninPath } from "./characters/identity.js";
 import { CharacterDetail, NewCharacterRoute, useSharedCharacterStore } from "./characters/CharacterRoute.js";
+import { CharacterLibrary } from "./player/CharacterLibrary.js";
+import { Account } from "./player/Account.js";
+import { Onboarding } from "./player/Onboarding.js";
+import { PersonalActivity } from "./player/PersonalActivity.js";
 import { t } from "./i18n/index.js";
 import { DocumentEditor } from "./editor/DocumentEditor.js";
 import { CloneFromTemplate } from "./library/CloneFromTemplate.js";
@@ -87,6 +92,36 @@ const charactersNewRoute = createRoute({
   }),
   component: NewCharacterRouteView,
 });
+const charactersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/characters",
+  component: CharacterLibraryRouteView,
+});
+const welcomeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/welcome",
+  component: WelcomeRouteView,
+});
+const activityRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/activity",
+  component: ActivityRouteView,
+});
+const accountRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/account",
+  component: AccountRouteView,
+});
+const signInCallbackRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/cb",
+  // Read the provider redirect params without validating anything
+  // provider-specific: the return leg only refreshes the session and
+  // restores the pre-sign-in path, so any configured OIDC adapter
+  // (test adapter today) can use the same journey.
+  validateSearch: (search: Record<string, unknown>) => search,
+  component: SignInCallbackRouteView,
+});
 const characterDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/characters/$characterId",
@@ -132,6 +167,146 @@ function LibraryRoute({ client }: { client: ApiClient }) {
       <CloneFromTemplate client={client} />
     </div>
   );
+}
+
+function CharacterLibraryRouteView() {
+  const identity = useIdentity();
+  useIdentityTick(identity);
+  const api = useCharactersApi();
+  const navigate = useNavigate();
+  if (identity === null) {
+    return <p role="status">{t("character.loading")}</p>;
+  }
+  return (
+    <CharacterLibrary
+      key={libraryViewKey(identity.getActorId(), identity.getGeneration?.() ?? 0)}
+      api={api}
+      identity={identity}
+      navigation={{
+        onOpenCharacter: characterId => {
+          void navigate({ to: "/characters/$characterId", params: { characterId } });
+        },
+        onCreateNew: () => {
+          void navigate({ to: "/characters/new" });
+        },
+      }}
+    />
+  );
+}
+
+/**
+ * First-run welcome. Renders for any identity state (including anonymous):
+ * AppShell exempts /welcome from the anonymous gate, and the screen itself
+ * never blocks sign-in.
+ */
+function WelcomeRouteView() {
+  const identity = useIdentity();
+  useIdentityTick(identity);
+  if (identity === null) {
+    return <p role="status">{t("character.loading")}</p>;
+  }
+  return (
+    <Onboarding
+      key={libraryViewKey(identity.getActorId(), identity.getGeneration?.() ?? 0)}
+      actorId={identity.getActorId()}
+    />
+  );
+}
+
+/**
+ * Cross-character activity. Anonymous sees the sign-in prompt (matching the
+ * character detail route); the feed itself fans out Task 2's library ids.
+ */
+function ActivityRouteView() {
+  const identity = useIdentity();
+  useIdentityTick(identity);
+  const api = useCharactersApi();
+  if (identity === null) {
+    return <p role="status">{t("character.loading")}</p>;
+  }
+  if (identity.getActorId() === null) {
+    return (
+      <section aria-labelledby="personal-activity-title">
+        <h1 id="personal-activity-title">{t("player.activity.title")}</h1>
+        <p role="status">{t("character.detail.signIn")}</p>
+      </section>
+    );
+  }
+  return (
+    <PersonalActivity
+      key={libraryViewKey(identity.getActorId(), identity.getGeneration?.() ?? 0)}
+      api={api}
+      identity={identity}
+    />
+  );
+}
+
+/** Player account. Anonymous sees the sign-in prompt; storage state follows the shared store. */
+function AccountRouteView() {
+  const identity = useIdentity();
+  useIdentityTick(identity);
+  const store = useSharedCharacterStore();
+  if (identity === null || store === undefined) {
+    return <p role="status">{t("character.loading")}</p>;
+  }
+  if (identity.getActorId() === null) {
+    // Expired sessions render the Account screen's re-auth entry instead of
+    // the generic prompt; every other anonymous state keeps the prompt.
+    if (identity.getSnapshot().sessionExpired) {
+      return (
+        <Account
+          key={libraryViewKey(identity.getActorId(), identity.getGeneration?.() ?? 0)}
+          client={apiClient}
+          identity={identity}
+          storageUnavailable={store === null}
+        />
+      );
+    }
+    return (
+      <section aria-labelledby="account-title">
+        <h1 id="account-title">{t("player.account.title")}</h1>
+        <p role="status">{t("character.detail.signIn")}</p>
+      </section>
+    );
+  }
+  return (
+    <Account
+      key={libraryViewKey(identity.getActorId(), identity.getGeneration?.() ?? 0)}
+      client={apiClient}
+      identity={identity}
+      storageUnavailable={store === null}
+    />
+  );
+}
+/**
+ * Provider-agnostic sign-in return leg. Validates nothing provider-specific:
+ * whatever the provider appended to the query is ignored. Refreshes the
+ * session (the completed sign-in already set the cookie), then restores the
+ * pre-sign-in path stashed by the re-auth entry (default `/characters`,
+ * consumed once).
+ */
+function SignInCallbackRouteView() {
+  const identity = useIdentity();
+  const router = useRouter();
+  const started = useRef(false);
+  useEffect(() => {
+    if (identity === null || started.current) return;
+    started.current = true;
+    const target = takePostSigninPath();
+    void identity.refresh().then(() => {
+      router.history.push(target);
+    });
+  }, [identity, router]);
+  return <p role="status">{t("player.account.signingIn")}</p>;
+}
+/**
+ * Account-lifetime key for the library view: the infinite-query cache is
+ * already lifetime scoped (see characterLibraryKey), and the route remounts
+ * on lifetime change so search/filter/duplicate state never leaks across
+ * accounts.
+ */
+export function libraryViewKey(actorId: string | null, generation: number): string {
+  return `${actorId ?? "signed-out"}:${generation}`;
 }
 
 function NewCharacterRouteView() {
@@ -219,7 +394,7 @@ function CharacterDetailRouteView() {
   );
 }
 
-const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersNewRoute, characterDetailRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute, welcomeRoute, activityRoute, accountRoute, signInCallbackRoute]);
 
 export function createAppRouter() { return createRouter({ routeTree }); }
 export const router = createAppRouter();

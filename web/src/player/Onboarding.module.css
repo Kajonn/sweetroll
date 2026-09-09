@@ -1,0 +1,21 @@
+.welcome {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 40rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+}
+
+.createLink,
+.libraryLink {
+  padding: 10px 4px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}

@@ -1,9 +1,11 @@
 export {
   createSystemPersistenceRepository,
+  decodeCreationVersionsCursor,
   REFERENCE_TEMPLATES,
   seedReferenceTemplates,
   type AuthorizedVersionUse,
   type AuthorizedCreationVersion,
+  type CreationVersionsCursor,
   type AuditRecord,
   type DeleteOwnedSystemResult,
   type DraftRecord,

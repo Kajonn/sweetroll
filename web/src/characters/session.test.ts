@@ -4,9 +4,11 @@ import { ApiError } from "../api/client.js";
 import type {
   ActivityResponse,
   CharacterExport,
+  CharacterList,
   CharacterView,
   CreationOptions,
   CreationVersions,
+  DuplicateCharacterResponse,
   FrozenRequest,
   MigrationPreviewBody,
   MigrationPreviewResponse,
@@ -239,6 +241,12 @@ class FakeApi implements CharactersApi {
     throw new Error("unused");
   }
   listCreationVersions(): Promise<CreationVersions> {
+    throw new Error("unused");
+  }
+  listCharacters(): Promise<CharacterList> {
+    throw new Error("unused");
+  }
+  duplicateCharacter(): Promise<DuplicateCharacterResponse> {
     throw new Error("unused");
   }
   activityScript: Array<ActivityResponse | { __error: Error }> = [];

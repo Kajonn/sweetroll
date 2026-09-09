@@ -159,11 +159,12 @@ function makeCharacters(overrides: Partial<Characters> = {}): Characters {
         entities: [{ id: "character", label: "Character" }],
       },
     }),
-    listCreationVersions: async () => ({ ok: true, value: { versions: [] } }),
+    listCreationVersions: async () => ({ ok: true, value: { versions: [], nextCursor: null } }),
     list: async () => ({ ok: true, value: { characters: [], nextCursor: null } }),
     open: async () => ({ ok: true, value: characterView() }),
     apply: async () => ({ ok: true, value: commandResult() }),
     manage: async () => ({ ok: true, value: commandResult() }),
+    duplicate: async () => ({ ok: true, value: characterView() }),
     listActivity: async () => ({ ok: true, value: { events: [], nextCursor: null } }),
     exportCharacter: async () => ({ ok: true, value: characterExport() }),
     previewMigration: async () => ({ ok: true, value: migrationPreview() }),
@@ -210,6 +211,7 @@ describe("character HTTP routes", () => {
       { method: "post", url: `/characters/${randomUUID()}/actions/check`, payload: { inputs: {}, expectedRevision: 1, idempotencyKey: "key-1" } },
       { method: "patch", url: `/characters/${randomUUID()}`, payload: { command: "archive", expectedRevision: 1, idempotencyKey: "key-1" } },
       { method: "post", url: `/characters/${randomUUID()}/ownership-transfer`, payload: { toUserId: randomUUID(), expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "post", url: `/characters/${randomUUID()}/duplicate`, payload: { idempotencyKey: "key-1" } },
       { method: "get", url: `/characters/${randomUUID()}/activity` },
       { method: "post", url: `/characters/${randomUUID()}/exports` },
       { method: "post", url: `/characters/${randomUUID()}/migration-previews`, payload: { targetVersionId: randomUUID() } },
@@ -393,7 +395,7 @@ describe("character HTTP routes", () => {
     ];
     const app = await build(
       makeCharacters({
-        listCreationVersions: async () => ({ ok: true, value: { versions } }),
+        listCreationVersions: async () => ({ ok: true, value: { versions, nextCursor: null } }),
       }),
     );
     const response = await app.inject({
@@ -402,7 +404,7 @@ describe("character HTTP routes", () => {
       headers: cookie,
     });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ data: { versions }, requestId: expect.any(String) });
+    expect(response.json()).toEqual({ data: { versions, nextCursor: null }, requestId: expect.any(String) });
   });
 
   it("maps internal creation-versions failures to 500", async () => {
@@ -850,6 +852,7 @@ describe("character HTTP routes", () => {
         open: notFound,
         apply: notFound,
         manage: notFound,
+        duplicate: notFound,
         listActivity: notFound,
         exportCharacter: notFound,
         previewMigration: notFound,
@@ -866,6 +869,7 @@ describe("character HTTP routes", () => {
       { method: "post", url: `/characters/${randomUUID()}/actions/check`, payload: { inputs: {}, expectedRevision: 1, idempotencyKey: "key-1" } },
       { method: "patch", url: `/characters/${randomUUID()}`, payload: { command: "archive", expectedRevision: 1, idempotencyKey: "key-1" } },
       { method: "post", url: `/characters/${randomUUID()}/ownership-transfer`, payload: { toUserId: randomUUID(), expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "post", url: `/characters/${randomUUID()}/duplicate`, payload: { idempotencyKey: "key-1" } },
       { method: "get", url: `/characters/${randomUUID()}/activity` },
       { method: "post", url: `/characters/${randomUUID()}/exports` },
       { method: "post", url: `/characters/${randomUUID()}/migration-previews`, payload: { targetVersionId: randomUUID() } },

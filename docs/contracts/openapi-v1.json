@@ -4171,6 +4171,18 @@
                           "type": "string"
                         }
                       }
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "state"
+                      ],
+                      "properties": {
+                        "state": {
+                          "const": "session_expired",
+                          "type": "string"
+                        }
+                      }
                     }
                   ]
                 }
@@ -4212,6 +4224,229 @@
                       ],
                       "properties": {
                         "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/preferences": {
+      "get": {
+        "operationId": "get_me_preferences",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "theme_default"
+                  ],
+                  "properties": {
+                    "theme_default": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "const": "light",
+                              "type": "string"
+                            },
+                            {
+                              "const": "dark",
+                              "type": "string"
+                            },
+                            {
+                              "const": "system",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "const": "unauthorized",
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patch_me_preferences",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "theme_default": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "const": "light",
+                            "type": "string"
+                          },
+                          {
+                            "const": "dark",
+                            "type": "string"
+                          },
+                          {
+                            "const": "system",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "theme_default"
+                  ],
+                  "properties": {
+                    "theme_default": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "const": "light",
+                              "type": "string"
+                            },
+                            {
+                              "const": "dark",
+                              "type": "string"
+                            },
+                            {
+                              "const": "system",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "const": "unauthorized",
                           "type": "string"
                         },
                         "message": {
@@ -7089,7 +7324,44 @@
     "/characters/creation-versions": {
       "get": {
         "operationId": "get_characters_creation_versions",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "name": "systemId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -7104,7 +7376,8 @@
                     "data": {
                       "type": "object",
                       "required": [
-                        "versions"
+                        "versions",
+                        "nextCursor"
                       ],
                       "properties": {
                         "versions": {
@@ -7141,6 +7414,126 @@
                               }
                             }
                           }
+                        },
+                        "nextCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
                         }
                       }
                     },
@@ -17365,6 +17758,1727 @@
                               "type": "null"
                             }
                           ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "const": "unauthorized",
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/characters/{characterId}/duplicate": {
+      "post": {
+        "operationId": "post_characters_characterId_duplicate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "idempotencyKey"
+                ],
+                "properties": {
+                  "idempotencyKey": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "character",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "character": {
+                      "type": "object",
+                      "required": [
+                        "characterId",
+                        "ownerId",
+                        "name",
+                        "systemVersionId",
+                        "entityDefinitionId",
+                        "revision",
+                        "lifecycle",
+                        "archivedAt",
+                        "createdAt",
+                        "updatedAt",
+                        "state",
+                        "derivedValues",
+                        "validations",
+                        "projection",
+                        "reconciliation"
+                      ],
+                      "properties": {
+                        "characterId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "ownerId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "systemVersionId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "entityDefinitionId": {
+                          "type": "string"
+                        },
+                        "revision": {
+                          "type": "integer"
+                        },
+                        "lifecycle": {
+                          "anyOf": [
+                            {
+                              "const": "active",
+                              "type": "string"
+                            },
+                            {
+                              "const": "archived",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "archivedAt": {
+                          "anyOf": [
+                            {
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "createdAt": {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "object",
+                          "required": [
+                            "schemaVersion",
+                            "values"
+                          ],
+                          "properties": {
+                            "schemaVersion": {
+                              "const": "1.0",
+                              "type": "string"
+                            },
+                            "values": {
+                              "additionalProperties": true,
+                              "type": "object",
+                              "properties": {}
+                            }
+                          }
+                        },
+                        "derivedValues": {
+                          "type": "object",
+                          "patternProperties": {
+                            "^(.*)$": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "validations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "projection": {
+                          "type": "object",
+                          "required": [
+                            "projectionVersion",
+                            "systemId",
+                            "versionId",
+                            "packageChecksum",
+                            "entityId",
+                            "entityLabel",
+                            "sheets",
+                            "derivedValues",
+                            "validations"
+                          ],
+                          "properties": {
+                            "projectionVersion": {
+                              "const": "1.0",
+                              "type": "string"
+                            },
+                            "systemId": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "versionId": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "packageChecksum": {
+                              "type": "string"
+                            },
+                            "entityId": {
+                              "type": "string"
+                            },
+                            "entityLabel": {
+                              "type": "string"
+                            },
+                            "completionFields": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "kind",
+                                  "id",
+                                  "fieldId",
+                                  "label",
+                                  "fieldKind",
+                                  "value",
+                                  "editable",
+                                  "constraints",
+                                  "validations"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "const": "field",
+                                    "type": "string"
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "fieldId": {
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "fieldKind": {
+                                    "anyOf": [
+                                      {
+                                        "const": "text",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "integer",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "decimal",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "boolean",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "singleChoice",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "multiChoice",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "computed",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "image",
+                                        "type": "string"
+                                      }
+                                    ]
+                                  },
+                                  "value": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "null"
+                                      },
+                                      {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  "editable": {
+                                    "type": "boolean"
+                                  },
+                                  "constraints": {
+                                    "type": "object",
+                                    "properties": {
+                                      "required": {
+                                        "type": "boolean"
+                                      },
+                                      "min": {
+                                        "type": "number"
+                                      },
+                                      "max": {
+                                        "type": "number"
+                                      },
+                                      "step": {
+                                        "type": "number"
+                                      },
+                                      "minLength": {
+                                        "type": "integer"
+                                      },
+                                      "maxLength": {
+                                        "type": "integer"
+                                      },
+                                      "options": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "id",
+                                            "label"
+                                          ],
+                                          "properties": {
+                                            "id": {
+                                              "type": "string"
+                                            },
+                                            "label": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "validations": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "validationId",
+                                        "severity",
+                                        "message",
+                                        "targetDefinitionId"
+                                      ],
+                                      "properties": {
+                                        "validationId": {
+                                          "type": "string"
+                                        },
+                                        "severity": {
+                                          "anyOf": [
+                                            {
+                                              "const": "error",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "warning",
+                                              "type": "string"
+                                            }
+                                          ]
+                                        },
+                                        "message": {
+                                          "type": "string"
+                                        },
+                                        "targetDefinitionId": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "sheets": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "label",
+                                  "sections"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "sections": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "id",
+                                        "label",
+                                        "elements"
+                                      ],
+                                      "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        },
+                                        "elements": {
+                                          "type": "array",
+                                          "items": {
+                                            "anyOf": [
+                                              {
+                                                "type": "object",
+                                                "required": [
+                                                  "kind",
+                                                  "id",
+                                                  "text",
+                                                  "level"
+                                                ],
+                                                "properties": {
+                                                  "kind": {
+                                                    "const": "heading",
+                                                    "type": "string"
+                                                  },
+                                                  "id": {
+                                                    "type": "string"
+                                                  },
+                                                  "text": {
+                                                    "type": "string"
+                                                  },
+                                                  "level": {
+                                                    "anyOf": [
+                                                      {
+                                                        "const": 2,
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "const": 3,
+                                                        "type": "number"
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              },
+                                              {
+                                                "type": "object",
+                                                "required": [
+                                                  "kind",
+                                                  "id",
+                                                  "fieldId",
+                                                  "label",
+                                                  "fieldKind",
+                                                  "value",
+                                                  "editable",
+                                                  "constraints",
+                                                  "validations"
+                                                ],
+                                                "properties": {
+                                                  "kind": {
+                                                    "const": "field",
+                                                    "type": "string"
+                                                  },
+                                                  "id": {
+                                                    "type": "string"
+                                                  },
+                                                  "fieldId": {
+                                                    "type": "string"
+                                                  },
+                                                  "label": {
+                                                    "type": "string"
+                                                  },
+                                                  "fieldKind": {
+                                                    "anyOf": [
+                                                      {
+                                                        "const": "text",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "integer",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "decimal",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "boolean",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "singleChoice",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "multiChoice",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "computed",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "image",
+                                                        "type": "string"
+                                                      }
+                                                    ]
+                                                  },
+                                                  "value": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "boolean"
+                                                      },
+                                                      {
+                                                        "type": "null"
+                                                      },
+                                                      {
+                                                        "type": "array",
+                                                        "items": {
+                                                          "type": "string"
+                                                        }
+                                                      }
+                                                    ]
+                                                  },
+                                                  "editable": {
+                                                    "type": "boolean"
+                                                  },
+                                                  "constraints": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "required": {
+                                                        "type": "boolean"
+                                                      },
+                                                      "min": {
+                                                        "type": "number"
+                                                      },
+                                                      "max": {
+                                                        "type": "number"
+                                                      },
+                                                      "step": {
+                                                        "type": "number"
+                                                      },
+                                                      "minLength": {
+                                                        "type": "integer"
+                                                      },
+                                                      "maxLength": {
+                                                        "type": "integer"
+                                                      },
+                                                      "options": {
+                                                        "type": "array",
+                                                        "items": {
+                                                          "type": "object",
+                                                          "required": [
+                                                            "id",
+                                                            "label"
+                                                          ],
+                                                          "properties": {
+                                                            "id": {
+                                                              "type": "string"
+                                                            },
+                                                            "label": {
+                                                              "type": "string"
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  },
+                                                  "validations": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "object",
+                                                      "required": [
+                                                        "validationId",
+                                                        "severity",
+                                                        "message",
+                                                        "targetDefinitionId"
+                                                      ],
+                                                      "properties": {
+                                                        "validationId": {
+                                                          "type": "string"
+                                                        },
+                                                        "severity": {
+                                                          "anyOf": [
+                                                            {
+                                                              "const": "error",
+                                                              "type": "string"
+                                                            },
+                                                            {
+                                                              "const": "warning",
+                                                              "type": "string"
+                                                            }
+                                                          ]
+                                                        },
+                                                        "message": {
+                                                          "type": "string"
+                                                        },
+                                                        "targetDefinitionId": {
+                                                          "type": "string"
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              },
+                                              {
+                                                "type": "object",
+                                                "required": [
+                                                  "kind",
+                                                  "id",
+                                                  "resourceId",
+                                                  "label",
+                                                  "value",
+                                                  "min",
+                                                  "max",
+                                                  "step",
+                                                  "resetTo",
+                                                  "validations"
+                                                ],
+                                                "properties": {
+                                                  "kind": {
+                                                    "const": "resource",
+                                                    "type": "string"
+                                                  },
+                                                  "id": {
+                                                    "type": "string"
+                                                  },
+                                                  "resourceId": {
+                                                    "type": "string"
+                                                  },
+                                                  "label": {
+                                                    "type": "string"
+                                                  },
+                                                  "value": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "current",
+                                                      "max"
+                                                    ],
+                                                    "properties": {
+                                                      "current": {
+                                                        "type": "number"
+                                                      },
+                                                      "max": {
+                                                        "type": "number"
+                                                      }
+                                                    }
+                                                  },
+                                                  "min": {
+                                                    "type": "number"
+                                                  },
+                                                  "max": {
+                                                    "type": "number"
+                                                  },
+                                                  "step": {
+                                                    "type": "number"
+                                                  },
+                                                  "resetTo": {
+                                                    "anyOf": [
+                                                      {
+                                                        "const": "min",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "max",
+                                                        "type": "string"
+                                                      }
+                                                    ]
+                                                  },
+                                                  "validations": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "object",
+                                                      "required": [
+                                                        "validationId",
+                                                        "severity",
+                                                        "message",
+                                                        "targetDefinitionId"
+                                                      ],
+                                                      "properties": {
+                                                        "validationId": {
+                                                          "type": "string"
+                                                        },
+                                                        "severity": {
+                                                          "anyOf": [
+                                                            {
+                                                              "const": "error",
+                                                              "type": "string"
+                                                            },
+                                                            {
+                                                              "const": "warning",
+                                                              "type": "string"
+                                                            }
+                                                          ]
+                                                        },
+                                                        "message": {
+                                                          "type": "string"
+                                                        },
+                                                        "targetDefinitionId": {
+                                                          "type": "string"
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              },
+                                              {
+                                                "type": "object",
+                                                "required": [
+                                                  "kind",
+                                                  "id",
+                                                  "actionId",
+                                                  "label",
+                                                  "actionKind",
+                                                  "inputs",
+                                                  "validations"
+                                                ],
+                                                "properties": {
+                                                  "kind": {
+                                                    "const": "action",
+                                                    "type": "string"
+                                                  },
+                                                  "id": {
+                                                    "type": "string"
+                                                  },
+                                                  "actionId": {
+                                                    "type": "string"
+                                                  },
+                                                  "label": {
+                                                    "type": "string"
+                                                  },
+                                                  "actionKind": {
+                                                    "anyOf": [
+                                                      {
+                                                        "const": "roll",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "resourceBump",
+                                                        "type": "string"
+                                                      }
+                                                    ]
+                                                  },
+                                                  "inputs": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "object",
+                                                      "required": [
+                                                        "id",
+                                                        "label",
+                                                        "valueType",
+                                                        "required",
+                                                        "default"
+                                                      ],
+                                                      "properties": {
+                                                        "id": {
+                                                          "type": "string"
+                                                        },
+                                                        "label": {
+                                                          "type": "string"
+                                                        },
+                                                        "valueType": {
+                                                          "anyOf": [
+                                                            {
+                                                              "const": "integer",
+                                                              "type": "string"
+                                                            },
+                                                            {
+                                                              "const": "decimal",
+                                                              "type": "string"
+                                                            },
+                                                            {
+                                                              "const": "boolean",
+                                                              "type": "string"
+                                                            },
+                                                            {
+                                                              "const": "text",
+                                                              "type": "string"
+                                                            }
+                                                          ]
+                                                        },
+                                                        "required": {
+                                                          "type": "boolean"
+                                                        },
+                                                        "default": {
+                                                          "anyOf": [
+                                                            {
+                                                              "type": "string"
+                                                            },
+                                                            {
+                                                              "type": "number"
+                                                            },
+                                                            {
+                                                              "type": "boolean"
+                                                            },
+                                                            {
+                                                              "type": "null"
+                                                            }
+                                                          ]
+                                                        }
+                                                      }
+                                                    }
+                                                  },
+                                                  "validations": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "object",
+                                                      "required": [
+                                                        "validationId",
+                                                        "severity",
+                                                        "message",
+                                                        "targetDefinitionId"
+                                                      ],
+                                                      "properties": {
+                                                        "validationId": {
+                                                          "type": "string"
+                                                        },
+                                                        "severity": {
+                                                          "anyOf": [
+                                                            {
+                                                              "const": "error",
+                                                              "type": "string"
+                                                            },
+                                                            {
+                                                              "const": "warning",
+                                                              "type": "string"
+                                                            }
+                                                          ]
+                                                        },
+                                                        "message": {
+                                                          "type": "string"
+                                                        },
+                                                        "targetDefinitionId": {
+                                                          "type": "string"
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "derivedValues": {
+                              "type": "object",
+                              "patternProperties": {
+                                "^(.*)$": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            "validations": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "validationId",
+                                  "severity",
+                                  "message",
+                                  "targetDefinitionId"
+                                ],
+                                "properties": {
+                                  "validationId": {
+                                    "type": "string"
+                                  },
+                                  "severity": {
+                                    "anyOf": [
+                                      {
+                                        "const": "error",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "warning",
+                                        "type": "string"
+                                      }
+                                    ]
+                                  },
+                                  "message": {
+                                    "type": "string"
+                                  },
+                                  "targetDefinitionId": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "reconciliation": {
+                          "type": "object",
+                          "required": [
+                            "characterId",
+                            "baseRevision",
+                            "revision",
+                            "packageChecksum",
+                            "projectionVersion",
+                            "commandExecutionId",
+                            "replayExpiresAt",
+                            "replayed",
+                            "changedDefinitionIds",
+                            "activityCursor",
+                            "cacheDisposition"
+                          ],
+                          "properties": {
+                            "characterId": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "baseRevision": {
+                              "anyOf": [
+                                {
+                                  "type": "integer"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "revision": {
+                              "type": "integer"
+                            },
+                            "packageChecksum": {
+                              "type": "string"
+                            },
+                            "projectionVersion": {
+                              "const": "1.0",
+                              "type": "string"
+                            },
+                            "commandExecutionId": {
+                              "type": "string"
+                            },
+                            "replayExpiresAt": {
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            "replayed": {
+                              "type": "boolean"
+                            },
+                            "changedDefinitionIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "activityCursor": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "cacheDisposition": {
+                              "anyOf": [
+                                {
+                                  "const": "retain",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "replace",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "purge",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
                         }
                       }
                     },

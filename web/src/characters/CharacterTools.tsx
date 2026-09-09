@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { t } from "../i18n/index.js";
+import { Button } from "../ui/Button.js";
 import type { CharactersApi } from "./api.js";
 import { captureOpener, focusFirst, restoreOpener, trapTabKey } from "./dialogTrap.js";
 import type { CharacterSession } from "./session.js";
@@ -52,22 +53,22 @@ export function CharacterTools({ characterId, api, session, now = () => new Date
   };
 
   return (
-    <section aria-label={t("character.tools.title")}>
-      <button type="button" className={styles.toolButton} onClick={() => openDialog("activity")}>
+    <section aria-label={t("character.tools.title")} className={styles.toolGroup}>
+      <Button type="button" variant="primary" onClick={() => openDialog("activity")}>
         {t("character.tools.activity")}
-      </button>
-      <button type="button" className={styles.toolButton} disabled={manageBlocked || lifecycle === "archived"} onClick={() => openDialog("archive")}>
+      </Button>
+      <Button type="button" variant="primary" disabled={manageBlocked || lifecycle === "archived"} onClick={() => openDialog("archive")}>
         {t("character.tools.archive")}
-      </button>
-      <button type="button" className={styles.toolButton} disabled={manageBlocked || lifecycle !== "archived"} onClick={() => openDialog("recover")}>
+      </Button>
+      <Button type="button" variant="primary" disabled={manageBlocked || lifecycle !== "archived"} onClick={() => openDialog("recover")}>
         {t("character.tools.recover")}
-      </button>
-      <button type="button" className={styles.toolButton} disabled={blocked} onClick={() => openDialog("export")}>
+      </Button>
+      <Button type="button" variant="primary" disabled={blocked} onClick={() => openDialog("export")}>
         {t("character.tools.export")}
-      </button>
-      <button type="button" className={styles.toolButton} onClick={() => openDialog("migration")}>
+      </Button>
+      <Button type="button" variant="primary" onClick={() => openDialog("migration")}>
         {t("character.tools.migration")}
-      </button>
+      </Button>
       {lifecycle === "archived" ? <p>{t("character.tools.archivedReadOnly")}</p> : null}
       {dialog === "activity" ? (
         <ActivityDialog characterId={characterId} session={session} onClose={closeDialog} />
@@ -124,6 +125,7 @@ function ConfirmDialog({ title, confirmLabel, onConfirm, onClose }: { title: str
       role="dialog"
       aria-modal="true"
       aria-label={title}
+      className={styles.dialog}
       onKeyDown={(event) => {
         if (event.key === "Escape") onClose();
         trapTabKey(event, dialogRef.current);
@@ -131,10 +133,11 @@ function ConfirmDialog({ title, confirmLabel, onConfirm, onClose }: { title: str
     >
       <h2>{title}</h2>
       {error !== null ? <p role="alert">{error}</p> : null}
-      <button
+      <div className={styles.dialogActions}>
+      <Button
         ref={confirmRef}
         type="button"
-        className={styles.dialogButton}
+        variant="primary"
         disabled={busy}
         onClick={() =>
           void (async () => {
@@ -152,10 +155,11 @@ function ConfirmDialog({ title, confirmLabel, onConfirm, onClose }: { title: str
         }
       >
         {confirmLabel}
-      </button>
-      <button type="button" className={styles.dialogButton} disabled={busy} onClick={onClose}>
+      </Button>
+      <Button type="button" variant="secondary" disabled={busy} onClick={onClose}>
         {t("character.conflict.cancel")}
-      </button>
+      </Button>
+      </div>
     </div>
   );
 }
@@ -217,6 +221,7 @@ function ActivityDialog({ characterId, session, onClose }: { characterId: string
       role="dialog"
       aria-modal="true"
       aria-label={t("character.tools.activityTitle")}
+      className={styles.dialog}
       onKeyDown={(event) => {
         if (event.key === "Escape") onClose();
         trapTabKey(event, dialogRef.current);
@@ -230,17 +235,19 @@ function ActivityDialog({ characterId, session, onClose }: { characterId: string
           <ActivityRow key={event.id} event={event} />
         ))}
       </ul>
+      <div className={styles.dialogActions}>
       {cursor !== null ? (
-        <button type="button" className={styles.dialogButton} disabled={loading} onClick={() => void load(cursor, true)}>
+        <Button type="button" variant="primary" disabled={loading} onClick={() => void load(cursor, true)}>
           {t("character.tools.activityLoadMore")}
-        </button>
+        </Button>
       ) : null}
-      <button type="button" className={styles.dialogButton} disabled={loading} onClick={() => void load(null, false)}>
+      <Button type="button" variant="secondary" disabled={loading} onClick={() => void load(null, false)}>
         {t("character.tools.activityRefresh")}
-      </button>
-      <button type="button" className={styles.dialogButton} onClick={onClose}>
+      </Button>
+      <Button type="button" variant="secondary" onClick={onClose}>
         {t("character.tools.close")}
-      </button>
+      </Button>
+      </div>
     </div>
   );
 }
@@ -312,6 +319,7 @@ function ExportDialog({ characterId, api, session, onClose }: { characterId: str
       role="dialog"
       aria-modal="true"
       aria-label={t("character.tools.exportTitle")}
+      className={styles.dialog}
       onKeyDown={(event) => {
         if (event.key === "Escape") onClose();
         trapTabKey(event, dialogRef.current);
@@ -320,12 +328,14 @@ function ExportDialog({ characterId, api, session, onClose }: { characterId: str
       <h2>{t("character.tools.exportTitle")}</h2>
       {error !== null ? <p ref={errorRef} tabIndex={-1} role="alert">{error}</p> : null}
       {blockReason !== null ? <p>{blockReason}</p> : null}
-      <button type="button" className={styles.dialogButton} disabled={blocked || busy} onClick={() => void download()}>
+      <div className={styles.dialogActions}>
+      <Button type="button" variant="primary" disabled={blocked || busy} onClick={() => void download()}>
         {t("character.tools.exportDownload")}
-      </button>
-      <button type="button" className={styles.dialogButton} onClick={onClose}>
+      </Button>
+      <Button type="button" variant="secondary" onClick={onClose}>
         {t("character.tools.close")}
-      </button>
+      </Button>
+      </div>
     </div>
   );
 }
@@ -434,6 +444,7 @@ function MigrationDialog({
       role="dialog"
       aria-modal="true"
       aria-label={t("character.tools.migrationTitle")}
+      className={styles.dialog}
       onKeyDown={(event) => {
         if (event.key === "Escape") onClose();
         trapTabKey(event, dialogRef.current);
@@ -445,9 +456,11 @@ function MigrationDialog({
       {previewBlockReason !== null ? <p>{previewBlockReason}</p> : null}
       <label htmlFor="migration-target">{t("character.tools.migrationTargetVersion")}</label>
       <input id="migration-target" className={styles.dialogField} value={targetVersionId} onChange={(event) => setTargetVersionId(event.target.value)} />
-      <button type="button" className={styles.dialogButton} disabled={busy || targetVersionId.trim() === "" || manageBlocked} onClick={() => void loadPreview()}>
+      <div className={styles.dialogActions}>
+      <Button type="button" variant="primary" disabled={busy || targetVersionId.trim() === "" || manageBlocked} onClick={() => void loadPreview()}>
         {t("character.tools.migrationPreviewAction")}
-      </button>
+      </Button>
+      </div>
       {preview !== null ? (
         <section aria-label="Migration preview">
           <h3>{t("character.tools.migrationCandidateTitle")}</h3>
@@ -480,32 +493,36 @@ function MigrationDialog({
             />
             <span>{t("character.tools.migrationConfirm")}</span>
           </label>
-          <button
+          <div className={styles.dialogActions}>
+          <Button
             type="button"
-            className={styles.dialogButton}
+            variant="primary"
             disabled={busy || expired || staleRevision || manageBlocked || !confirmedPreview}
             onClick={() => void commit()}
           >
             {t("character.tools.migrationCommit")}
-          </button>
+          </Button>
+          </div>
         </section>
       ) : null}
       {lastMigrationId !== null ? (
         <p>
           {t("character.tools.migrationLastId", { id: lastMigrationId })}{" "}
-          <button type="button" className={styles.dialogButton} onClick={() => setMigrationId(lastMigrationId)}>
+          <Button type="button" variant="secondary" onClick={() => setMigrationId(lastMigrationId)}>
             {t("character.tools.migrationUseLast")}
-          </button>
+          </Button>
         </p>
       ) : null}
       <label htmlFor="migration-id">{t("character.tools.migrationIdLabel")}</label>
       <input id="migration-id" className={styles.dialogField} value={migrationId} onChange={(event) => setMigrationId(event.target.value)} />
-      <button type="button" className={styles.dialogButton} disabled={busy || migrationId.trim() === "" || manageBlocked} onClick={() => void rollback()}>
+      <div className={styles.dialogActions}>
+      <Button type="button" variant="primary" disabled={busy || migrationId.trim() === "" || manageBlocked} onClick={() => void rollback()}>
         {t("character.tools.migrationRollback")}
-      </button>
-      <button type="button" className={styles.dialogButton} onClick={onClose}>
+      </Button>
+      <Button type="button" variant="secondary" onClick={onClose}>
         {t("character.tools.close")}
-      </button>
+      </Button>
+      </div>
     </div>
   );
 }

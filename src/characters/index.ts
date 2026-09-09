@@ -33,6 +33,7 @@ export type UserId = string;
 export type ExecutionId = string;
 
 const CREATE_COMMAND_KIND = "character_create";
+const DUPLICATE_COMMAND_KIND = "character_duplicate";
 const COMMAND_KIND: Record<CharacterCommand["kind"], string> = {
   setField: "character_set_field",
   bumpResource: "character_bump_resource",
@@ -172,11 +173,24 @@ export type CreationVersionEntry = {
 
 export type CreationVersions = {
   versions: CreationVersionEntry[];
+  nextCursor: string | null;
+};
+
+export type ListCreationVersions = {
+  limit?: number;
+  cursor?: string | null;
+  q?: string | null;
+  systemId?: string | null;
 };
 
 export type ListCharacters = {
   limit: number;
   cursor: string | null;
+};
+
+export type DuplicateCharacter = {
+  characterId: CharacterId;
+  idempotencyKey: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -337,8 +351,12 @@ export interface Characters {
     ctx: RequestContext,
     input: CreationOptionsInput,
   ): Promise<CharacterResult<CharacterCreationOptions>>;
-  listCreationVersions(ctx: RequestContext): Promise<CharacterResult<CreationVersions>>;
+  listCreationVersions(
+    ctx: RequestContext,
+    input: ListCreationVersions,
+  ): Promise<CharacterResult<CreationVersions>>;
   list(ctx: RequestContext, input: ListCharacters): Promise<CharacterResult<CharacterPage>>;
+  duplicate(ctx: RequestContext, input: DuplicateCharacter): Promise<CharacterResult<CharacterView>>;
   open(ctx: RequestContext, characterId: CharacterId): Promise<CharacterResult<CharacterView>>;
 
   apply(ctx: RequestContext, input: CharacterCommand): Promise<CharacterResult<CharacterCommandResult>>;
@@ -505,8 +523,26 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     | { ok: true; value: { character: unknown; roll: NormalizedRoll | null } }
     | { ok: false; error: CharacterError };
 
+  type StoredDuplicateOutcome =
+    | { ok: true; value: { character: unknown } }
+    | { ok: false; error: CharacterError };
+
   function serializeCommandError(error: CharacterError): StoredCommandOutcome {
     return { ok: false, error };
+  }
+
+  function serializeDuplicateError(error: CharacterError): StoredDuplicateOutcome {
+    return { ok: false, error };
+  }
+
+  function replayDuplicateOutcome(resultJson: unknown): CharacterResult<CharacterView> {
+    const stored = resultJson as StoredDuplicateOutcome;
+    if (!stored.ok) return { ok: false, error: stored.error };
+    const view = deserializeView(stored.value.character);
+    return {
+      ok: true,
+      value: { ...view, reconciliation: { ...view.reconciliation, replayed: true } },
+    };
   }
 
   function replayStoredOutcome(resultJson: unknown): CharacterResult<CharacterCommandResult> {
@@ -692,11 +728,19 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       }
     },
 
-    async listCreationVersions(ctx) {
+    async listCreationVersions(ctx, listInput) {
       try {
-        const authorized = await input.listAuthorizedVersions(ctx);
-        if (!authorized.ok) return { ok: false, error: errors.internal() };
-        return { ok: true, value: { versions: authorized.value } };
+        const authorized = await input.listAuthorizedVersions(ctx, listInput);
+        if (!authorized.ok) {
+          if (authorized.error.code === "bad_request") {
+            return { ok: false, error: errors.bad_request(authorized.error.message) };
+          }
+          return { ok: false, error: errors.internal() };
+        }
+        return {
+          ok: true,
+          value: { versions: authorized.value.versions, nextCursor: authorized.value.nextCursor },
+        };
       } catch {
         return { ok: false, error: errors.internal() };
       }
@@ -725,6 +769,126 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           ok: true,
           value: { characters: page.map(toSummary), nextCursor },
         };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async duplicate(ctx, duplicateInput) {
+      try {
+        const claimStartedAt = now();
+        const claimed = await claimExecution(input.pool, {
+          actorId: ctx.actorId,
+          commandKind: DUPLICATE_COMMAND_KIND,
+          idempotencyKey: duplicateInput.idempotencyKey,
+          inputHash: hashInput({
+            commandKind: DUPLICATE_COMMAND_KIND,
+            characterId: duplicateInput.characterId,
+          }),
+          newExecutionId,
+          now: claimStartedAt,
+          leaseMs: LEASE_MS,
+          replayTtlMs: REPLAY_TTL_MS,
+        });
+        if (claimed.status === "mismatch") return { ok: false, error: errors.mismatch() };
+        if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
+        if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
+        if (claimed.status === "replay") return replayDuplicateOutcome(claimed.resultJson);
+
+        const executionId = claimed.executionId;
+        const replayExpiresAt = new Date(claimStartedAt.getTime() + REPLAY_TTL_MS);
+
+        // Owner-only: a foreign id reads as generic not_found (purge) so the
+        // response never leaks whether the character exists.
+        const source = await repo.openOwnedCharacter(duplicateInput.characterId, ctx.actorId);
+        if (source === null) {
+          const error = errors.notFoundPurge();
+          await repo.finalizeExecutionError({
+            executionId,
+            resultJson: serializeDuplicateError(error),
+            expiresAt: replayExpiresAt,
+          });
+          return { ok: false, error };
+        }
+        if (source.lifecycle === "archived") {
+          const error = errors.archived();
+          await repo.finalizeExecutionError({
+            executionId,
+            resultJson: serializeDuplicateError(error),
+            expiresAt: replayExpiresAt,
+          });
+          return { ok: false, error };
+        }
+
+        const resolved = await input.runtime.resolve({
+          versionId: source.systemVersionId,
+          entityId: source.entityDefinitionId,
+          state: source.state,
+          intent: { kind: "observe" },
+        });
+        if (!resolved.ok) {
+          const error = mapRuntimeError(resolved.error);
+          if (isFinalizableRuntimeError(resolved.error.code)) {
+            await repo.finalizeExecutionError({
+              executionId,
+              resultJson: serializeDuplicateError(error),
+              expiresAt: replayExpiresAt,
+            });
+          }
+          return { ok: false, error };
+        }
+
+        const duplicateId = newId();
+        const createdAt = now();
+        // Detach from the source record: the copy owns its state object.
+        const copiedState = structuredClone(source.state);
+        const outcome = await repo.duplicateCharacterTx({
+          executionId,
+          duplicate: {
+            characterId: duplicateId,
+            ownerId: ctx.actorId,
+            systemVersionId: source.systemVersionId,
+            entityDefinitionId: source.entityDefinitionId,
+            name: source.name,
+            state: copiedState,
+            createdAt,
+          },
+          activity: {
+            kind: "character_duplicated",
+            payloadJson: { sourceCharacterId: source.characterId },
+            requestId: ctx.requestId,
+          },
+          audit: {
+            kind: "character_duplicated",
+            summary: "Character duplicated",
+            requestId: ctx.requestId,
+          },
+          resultExpiresAt: replayExpiresAt,
+          buildResult: ({ record }) => {
+            const view = toView(
+              record,
+              {
+                derivedValues: resolved.value.derivedValues,
+                validations: resolved.value.validations,
+                projection: resolved.value.projection,
+                packageChecksum: resolved.value.packageChecksum,
+                changedDefinitionIds: [],
+              },
+              {
+                baseRevision: null,
+                commandExecutionId: executionId,
+                replayExpiresAt: replayExpiresAt.toISOString(),
+                replayed: false,
+              },
+            );
+            return { ok: true, value: { character: serializeView(view) } };
+          },
+        });
+
+        if (outcome.kind === "already_completed") return replayDuplicateOutcome(outcome.resultJson);
+        const stored = outcome.resultJson as StoredDuplicateOutcome;
+        if (!stored.ok) return { ok: false, error: stored.error };
+        return { ok: true, value: deserializeView(stored.value.character) };
       } catch {
         return { ok: false, error: errors.internal() };
       }

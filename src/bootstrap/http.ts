@@ -10,7 +10,7 @@ import {
 import { createSystemRuntime } from "../systems/runtime.js";
 import { createPostgresPublishedPackageLoader } from "../systems/implementation/runtime/package-loader.js";
 import { buildAuthHook } from "../transport/http/auth-hook.js";
-import { buildDevSignInRoutes } from "../transport/http/dev-signin.js";
+import { buildDevSignInRoutes, resolveAuthMode } from "../transport/http/dev-signin.js";
 import {
   buildCharactersRoutes,
   buildHttpApp,
@@ -46,6 +46,20 @@ if (seeded.systemsInserted > 0 || seeded.versionsReplaced > 0) {
 // directly via the offline test-auth fixture — never through a production
 // synthetic user or production UI affordance.
 const testAuthEnabled = process.env.SWEETROLL_TEST_AUTH === "1";
+// Single rule for `/dev/*` registration (shared with dev-signin via
+// resolveAuthMode): non-production, or production with explicit
+// SWEETROLL_TEST_AUTH=1 for offline/prod-test configs. No production OIDC
+// provider adapter exists; this only gates the deterministic test adapter.
+const authMode = resolveAuthMode(config.nodeEnv, testAuthEnabled);
+logger.info(
+  {
+    authMode,
+    devRoutes: authMode !== "locked",
+    nodeEnv: config.nodeEnv,
+    testAuth: testAuthEnabled,
+  },
+  `auth mode active: ${authMode} (dev sign-in routes ${authMode !== "locked" ? "enabled" : "disabled"})`,
+);
 const seed = new Map([
   ["code-dev", { displayName: "Dev User", email: "dev@example.com", provider: "test", subject: "dev-1" }],
   ["code-test-a", { displayName: "Offline Test A", email: "offline-a@example.com", provider: "test", subject: "offline-test-a" }],
@@ -54,7 +68,7 @@ const seed = new Map([
 
 const identity = createIdentityModule({
   oidc:
-    config.nodeEnv === "production" && !testAuthEnabled
+    authMode === "locked"
       ? createTestOidcClient(new Map())
       : createTestOidcClient(seed),
   pool,

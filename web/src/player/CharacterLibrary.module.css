@@ -1,0 +1,124 @@
+.library {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  width: min(100%, 720px);
+  max-width: 100%;
+  min-width: 0;
+  margin: 0 auto;
+  padding: 12px;
+  color: var(--text-primary);
+}
+
+.library h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.createLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid var(--action-primary);
+  border-radius: var(--radius-sm);
+  background: var(--action-primary);
+  color: var(--action-primary-fg);
+  text-decoration: none;
+  font: inherit;
+}
+
+.createLink:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.recentList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recentList a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-page);
+  color: var(--text-primary);
+  text-decoration: none;
+  font: inherit;
+}
+
+.recentList a:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.rowList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+}
+
+.rowLink {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  min-height: 44px;
+  min-width: 0;
+  color: var(--text-primary);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.rowLink:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.rowName {
+  font-weight: 600;
+}
+
+.rowMeta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow-wrap: break-word;
+}
+
+@media (max-width: 420px) {
+  .library {
+    padding: 8px;
+  }
+
+  .row {
+    flex-wrap: wrap;
+  }
+}

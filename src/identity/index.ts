@@ -6,11 +6,13 @@ import {
   createIdentityRepository,
   type IdentityRepository,
   type SessionId,
+  type ThemeDefault,
   type UserId,
 } from "./repository.js";
 import { hashToken, newSessionToken } from "./util.js";
 
 export type { AppError } from "./errors.js";
+export type { ThemeDefault } from "./repository.js";
 export type Result<T> = { ok: true; value: T } | { ok: false; error: AppError };
 
 export type SessionHandle = {
@@ -22,7 +24,8 @@ export type SessionHandle = {
 
 export type AuthContext =
   | { state: "authenticated"; actorId: UserId; sessionId: SessionId }
-  | { state: "anonymous" };
+  | { state: "anonymous" }
+  | { state: "session_expired" };
 
 export interface Identity {
   completeSignIn(input: {
@@ -32,6 +35,8 @@ export interface Identity {
   }): Promise<Result<SessionHandle>>;
   resolveSession(token: string): Promise<AuthContext>;
   signOut(token: string): Promise<Result<void>>;
+  getThemeDefault(actorId: UserId): Promise<Result<ThemeDefault | null>>;
+  setThemeDefault(actorId: UserId, value: ThemeDefault | null): Promise<Result<ThemeDefault | null>>;
 }
 
 export type CreateIdentityModuleInput = {
@@ -87,8 +92,14 @@ export function createIdentityModule(input: CreateIdentityModuleInput): Identity
     async resolveSession(token) {
       try {
         const session = await repo.findSessionByTokenHash(hashToken(token));
-        if (session === null || session.revokedAt !== null || session.expiresAt.getTime() < Date.now()) {
+        // Unknown and revoked tokens are anonymous. An expired (but otherwise
+        // valid) session resolves distinctly so the UI can offer re-auth
+        // instead of a generic signed-out view.
+        if (session === null || session.revokedAt !== null) {
           return { state: "anonymous" as const };
+        }
+        if (session.expiresAt.getTime() < Date.now()) {
+          return { state: "session_expired" as const };
         }
         return {
           state: "authenticated" as const,
@@ -104,6 +115,22 @@ export function createIdentityModule(input: CreateIdentityModuleInput): Identity
       try {
         await repo.revokeSessionByTokenHash(hashToken(token));
         return { ok: true, value: undefined };
+      } catch {
+        return { ok: false, error: { code: "internal", message: "An internal error occurred." } };
+      }
+    },
+
+    async getThemeDefault(actorId) {
+      try {
+        return { ok: true, value: await repo.getThemeDefault(actorId) };
+      } catch {
+        return { ok: false, error: { code: "internal", message: "An internal error occurred." } };
+      }
+    },
+
+    async setThemeDefault(actorId, value) {
+      try {
+        return { ok: true, value: await repo.setThemeDefault(actorId, value) };
       } catch {
         return { ok: false, error: { code: "internal", message: "An internal error occurred." } };
       }

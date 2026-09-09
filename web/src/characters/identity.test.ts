@@ -84,6 +84,14 @@ it("does not reveal the last account after an online fetch failure", async () =>
   gate.dispose(); await store.close();
 });
 
+it("maps session_expired to a signed-out snapshot carrying the re-auth entry", async () => {
+  const store = await openCharacterStore(crypto.randomUUID());
+  const gate = createIdentityGate({ store, client: { fetch: async () => ({ state: "session_expired" }) as never }, online: () => true, channel: null });
+  await gate.refresh();
+  expect(gate.getSnapshot()).toMatchObject({ actorId: null, verified: false, sessionExpired: true });
+  gate.dispose(); await store.close();
+});
+
 it("clears locally without waiting for an already hanging me and ignores its late identity", async () => {
   const store = await openCharacterStore(crypto.randomUUID());
   await store.setLastAccount("a");

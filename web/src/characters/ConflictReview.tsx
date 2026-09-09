@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import { t } from "../i18n/index.js";
+import { Button } from "../ui/Button.js";
 import { captureOpener, focusFirst, restoreOpener, trapTabKey } from "./dialogTrap.js";
 import type { CharacterSnapshot } from "./session.js";
 import type { OnlineAttempt } from "./store.js";
@@ -329,14 +330,16 @@ export function ConflictReview({ snapshot, onResolve, onClose, now: nowProp, onR
                 <span>{t("character.conflict.acknowledgeUnknown")}</span>
               </label>
               {reviewError !== null ? <p role="alert">{reviewError}</p> : null}
-              <button
+              <div className={styles.dialogActions}>
+              <Button
                 type="button"
-                className={styles.dialogButton}
+                variant="primary"
                 disabled={!acknowledged || reviewBusy}
                 onClick={() => void reviewExpired()}
               >
                 {t("character.conflict.retireExpired")}
-              </button>
+              </Button>
+              </div>
             </>
           )}
         </section>
@@ -416,21 +419,21 @@ export function ConflictReview({ snapshot, onResolve, onClose, now: nowProp, onR
         })}
       </ul>
       {submitError !== null ? <p role="alert">{submitError}</p> : null}
-      <div>
-        <button type="button" className={styles.dialogButton} disabled={ordinaryDisabled} onClick={() => setPendingMode("discard")}>
+      <div className={styles.dialogActions}>
+        <Button type="button" variant="primary" disabled={ordinaryDisabled} onClick={() => setPendingMode("discard")}>
           {t("character.conflict.discard")}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className={styles.dialogButton}
+          variant="primary"
           disabled={reapplyDisabled}
           onClick={() => setPendingMode("reapply")}
         >
           {t("character.conflict.reapply")}
-        </button>
-        <button type="button" className={styles.dialogButton} onClick={onClose}>
+        </Button>
+        <Button type="button" variant="secondary" onClick={onClose}>
           {t("character.conflict.close")}
-        </button>
+        </Button>
       </div>
       {pendingMode !== null ? (
         <div
@@ -438,6 +441,7 @@ export function ConflictReview({ snapshot, onResolve, onClose, now: nowProp, onR
           role="dialog"
           aria-modal="true"
           aria-labelledby={`${dialogId}-confirm`}
+          className={styles.dialog}
           onKeyDown={(event) => {
             if (event.key === "Escape") closeDialog();
             trapTabKey(event, confirmDialogRef.current);
@@ -456,12 +460,14 @@ export function ConflictReview({ snapshot, onResolve, onClose, now: nowProp, onR
             </p>
           ) : null}
           {correctionError !== null ? <p role="alert">{correctionError}</p> : null}
-          <button type="button" className={styles.dialogButton} disabled={busy} onClick={() => void confirm()}>
+          <div className={styles.dialogActions}>
+          <Button type="button" variant="primary" disabled={busy} onClick={() => void confirm()}>
             {pendingMode === "discard" ? t("character.conflict.confirmDiscardButton") : t("character.conflict.confirmReapplyButton")}
-          </button>
-          <button type="button" className={styles.dialogButton} disabled={busy} onClick={closeDialog}>
+          </Button>
+          <Button type="button" variant="secondary" disabled={busy} onClick={closeDialog}>
             {t("character.conflict.cancel")}
-          </button>
+          </Button>
+          </div>
         </div>
       ) : null}
     </section>

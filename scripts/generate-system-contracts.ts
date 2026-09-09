@@ -55,6 +55,8 @@ async function emitOpenApi(): Promise<void> {
     },
     resolveSession: async () => ({ state: "anonymous" }),
     signOut: async () => ({ ok: true, value: undefined }),
+    getThemeDefault: async () => ({ ok: true, value: null }),
+    setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
   };
   void app.register(buildIdentityRoutes({ identity, cookieName: "session", secure: true }));
   void app.register(buildSystemsRoutes({ authoring: {} as SystemAuthoring }));

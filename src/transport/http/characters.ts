@@ -208,6 +208,7 @@ const CharacterCreationVersionsDto = Type.Object({
       createdAt: Type.String({ format: DATE_TIME_FORMAT }),
     }),
   ),
+  nextCursor: Type.Union([Type.String(), Type.Null()]),
 });
 
 const DiceDto = Type.Object({
@@ -333,6 +334,13 @@ const CreationOptionsQuery = Type.Object({
   systemVersionId: Type.String({ format: UUID_FORMAT }),
 });
 
+const ListCreationVersionsQuery = Type.Object({
+  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+  cursor: Type.Optional(Type.String()),
+  q: Type.Optional(Type.String({ minLength: 1 })),
+  systemId: Type.Optional(Type.String({ format: UUID_FORMAT })),
+});
+
 const CharacterIdParams = Type.Object({ characterId: Type.String({ format: UUID_FORMAT }) });
 const FieldSetParams = Type.Object({
   characterId: Type.String({ format: UUID_FORMAT }),
@@ -391,6 +399,9 @@ const ManageCharacterBody = Type.Union([
 const TransferOwnershipBody = Type.Object({
   toUserId: Type.String({ format: UUID_FORMAT }),
   expectedRevision: Type.Integer(),
+  idempotencyKey: Type.String({ minLength: 1 }),
+});
+const DuplicateCharacterBody = Type.Object({
   idempotencyKey: Type.String({ minLength: 1 }),
 });
 const CreateMigrationPreviewBody = Type.Object({
@@ -475,8 +486,10 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
     path: "/characters/creation-versions",
     operationId: "get_characters_creation_versions",
     schema: {
+      querystring: ListCreationVersionsQuery,
       response: {
         "200": Type.Object({ data: CharacterCreationVersionsDto, requestId: Type.String() }),
+        "400": CharacterErrorEnvelope,
         "401": UnauthorizedEnvelope,
         "500": CharacterErrorEnvelope,
         "503": CharacterErrorEnvelope,
@@ -559,6 +572,19 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
       body: TransferOwnershipBody,
       response: {
         "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/characters/:characterId/duplicate",
+    operationId: "post_characters_characterId_duplicate",
+    schema: {
+      params: CharacterIdParams,
+      body: DuplicateCharacterBody,
+      response: {
+        "201": Type.Object({ character: CharacterViewDto, requestId: Type.String() }),
         ...ErrorResponses,
       },
     },
@@ -798,7 +824,20 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
       },
 
       get_characters_creation_versions: async (request, reply) => {
-        const result = await characters.listCreationVersions(ctxOf(request));
+        const query = request.query as
+          | { limit?: string | number; cursor?: string; q?: string; systemId?: string }
+          | undefined;
+        const rawLimit = query?.limit;
+        const limit = rawLimit === undefined ? 20 : Number(rawLimit);
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+          return sendError(reply, badRequest("limit must be an integer from 1 through 100."), request.id);
+        }
+        const result = await characters.listCreationVersions(ctxOf(request), {
+          limit,
+          cursor: query?.cursor ?? null,
+          q: query?.q ?? null,
+          systemId: query?.systemId ?? null,
+        });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { data: result.value, requestId: request.id };
       },
@@ -921,6 +960,17 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         const result = await characters.manage(ctxOf(request), command);
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
+      post_characters_characterId_duplicate: async (request, reply) => {
+        const params = request.params as { characterId: string };
+        const body = request.body as { idempotencyKey: string };
+        const result = await characters.duplicate(ctxOf(request), {
+          characterId: params.characterId,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return reply.code(201).send({ character: toCharacterDto(result.value), requestId: request.id });
       },
 
       get_characters_characterId_activity: async (request, reply) => {

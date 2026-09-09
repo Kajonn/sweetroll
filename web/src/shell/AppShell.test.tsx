@@ -1,4 +1,4 @@
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
@@ -109,6 +109,73 @@ describe("AppShell", () => {
       expect(qc.getQueryData(["system", "library"])).toBeUndefined();
     });
     qc.clear();
+  });
+
+  it("null→actor settle refetches under the fresh lifetime and leaks no account-A cache into account B", async () => {
+    // G1 regression for the Task 6 exit-path hygiene split: away-from-account
+    // transitions cancel+purge, while null→actor settle only invalidates so a
+    // reload/direct-link open fetch is never stranded. Two accounts prove the
+    // invalidate path never resurrects purged data: A → signed-out/null → B.
+    vi.stubEnv("MODE", "development");
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    let account: string | null = "user-a";
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const path = new URL(url, window.location.origin).pathname;
+      if (path === "/dev/signin") return new Response("{}");
+      if (path === "/api/signout") { account = null; return new Response(null, { status: 204 }); }
+      if (path === "/api/me") {
+        return new Response(JSON.stringify(
+          account === null ? { state: "anonymous" } : { state: "authenticated", userId: account },
+        ));
+      }
+      if (path === "/api/account-label") {
+        if (account === null) return new Response("unauthorized", { status: 401 });
+        return new Response(JSON.stringify({ label: account === "user-a" ? "Private A" : "Private B" }));
+      }
+      return new Response(JSON.stringify({ state: "anonymous" }));
+    }));
+    function AccountLabel() {
+      const label = useQuery({
+        queryKey: ["account-label"],
+        queryFn: async () => {
+          const res = await fetch("/api/account-label");
+          if (!res.ok) throw new Error(`label fetch failed: ${res.status}`);
+          return (await res.json() as { label: string }).label;
+        },
+      });
+      return <p data-testid="account-label">{label.data ?? "loading"}</p>;
+    }
+    const qc = queryClient;
+    qc.clear();
+    try {
+      render(
+        <QueryClientProvider client={qc}>
+          <AppShell><AccountLabel /></AppShell>
+        </QueryClientProvider>,
+      );
+      // Initial null→actor settle (initial load): the fresh fetch resolves
+      // under account A instead of stranding. Settle on the authenticated
+      // chrome first: the gate publishes a transient null snapshot during
+      // refresh, so an early label node can detach on remount — assertions
+      // must run against the settled tree. (Generous timeout: the gate
+      // refresh opens real IndexedDB and shares CPU with parallel suites.)
+      await screen.findByRole("button", { name: "Sign out" }, { timeout: 10_000 });
+      expect(screen.getByTestId("account-label")).toHaveTextContent("Private A");
+      expect(qc.getQueryData(["account-label"])).toBe("Private A");
+      // Sign out: the away-from-account transition purges cached account data.
+      await userEvent.setup().click(await screen.findByRole("button", { name: "Sign out" }, { timeout: 10_000 }));
+      await screen.findByTestId("dev-signin", undefined, { timeout: 10_000 });
+      await vi.waitFor(() => expect(qc.getQueryData(["account-label"])).toBeUndefined(), { timeout: 10_000 });
+      // Sign in as a different account: the null→actor settle invalidates
+      // (refetching under B) without resurrecting A's cache.
+      account = "user-b";
+      await userEvent.setup().click(screen.getByTestId("dev-signin"));
+      expect(await screen.findByText("Private B", undefined, { timeout: 10_000 })).toBeInTheDocument();
+      expect(screen.queryByText("Private A")).not.toBeInTheDocument();
+      expect(qc.getQueryData(["account-label"])).toBe("Private B");
+    } finally {
+      qc.clear();
+    }
   });
 
   it("unmounts the system editor on sign-out with no system data or further fetches", async () => {

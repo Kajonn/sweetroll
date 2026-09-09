@@ -11,10 +11,17 @@ import type {
   OpenCharacterResponse,
 } from "./types.js";
 
+export type VersionCatalogQuery = {
+  cursor?: string | null;
+  limit?: number;
+  q?: string | null;
+  systemId?: string | null;
+};
+
 export type CharactersApi = {
   open(characterId: string): Promise<OpenCharacterResponse>;
   creationOptions(versionId: string): Promise<CreationOptions>;
-  listCreationVersions(): Promise<CreationVersions>;
+  listCreationVersions(input?: VersionCatalogQuery): Promise<CreationVersions>;
   activity(characterId: string, cursor: string | null): Promise<ActivityResponse>;
   send(request: FrozenRequest): Promise<CommandResultResponse>;
   export(characterId: string): Promise<CharacterExport>;
@@ -46,8 +53,17 @@ export function createCharactersApi(client: ApiClient): CharactersApi {
       client.fetch<CreationOptions>("GET", "/characters/creation-options", {
         query: { systemVersionId: versionId },
       }),
-    listCreationVersions: () =>
-      client.fetch<CreationVersions>("GET", "/characters/creation-versions"),
+    listCreationVersions: (input) =>
+      input === undefined
+        ? client.fetch<CreationVersions>("GET", "/characters/creation-versions")
+        : client.fetch<CreationVersions>("GET", "/characters/creation-versions", {
+          query: {
+            cursor: input.cursor ?? undefined,
+            limit: input.limit ?? undefined,
+            q: input.q ?? undefined,
+            systemId: input.systemId ?? undefined,
+          },
+        }),
     activity: (characterId, cursor) =>
       client.fetch<ActivityResponse>("GET", `/characters/${characterId}/activity`, {
         query: { cursor },

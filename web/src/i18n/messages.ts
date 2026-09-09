@@ -443,6 +443,7 @@ export const defaultMessages: MessageTable = {
   "character.create.pickVersion.error": "Available versions could not be loaded. Enter a system version ID manually.",
   "character.create.pickVersion.empty": "No system versions are available for character creation.",
   "character.create.pickVersion.retry": "Retry loading versions",
+  "character.create.pickVersion.loadMore": "Load more versions",
   "character.create.pickVersion.manualTitle": "Or enter a system version ID manually",
   "character.create.pickVersion.manualHint": "Use an exact version link shared with you.",
   "character.detail.signIn": "Sign in to open this character.",

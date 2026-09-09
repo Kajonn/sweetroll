@@ -2562,7 +2562,12 @@ export interface operations {
     };
     get_characters_creation_versions: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                cursor?: string;
+                q?: string;
+                systemId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2586,6 +2591,31 @@ export interface operations {
                                 /** Format: date-time */
                                 createdAt: string;
                             }[];
+                            nextCursor: string | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
                         };
                         requestId: string;
                     };

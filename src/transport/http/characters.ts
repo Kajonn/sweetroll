@@ -208,6 +208,7 @@ const CharacterCreationVersionsDto = Type.Object({
       createdAt: Type.String({ format: DATE_TIME_FORMAT }),
     }),
   ),
+  nextCursor: Type.Union([Type.String(), Type.Null()]),
 });
 
 const DiceDto = Type.Object({
@@ -331,6 +332,13 @@ const ListCharactersQuery = Type.Object({
 
 const CreationOptionsQuery = Type.Object({
   systemVersionId: Type.String({ format: UUID_FORMAT }),
+});
+
+const ListCreationVersionsQuery = Type.Object({
+  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+  cursor: Type.Optional(Type.String()),
+  q: Type.Optional(Type.String({ minLength: 1 })),
+  systemId: Type.Optional(Type.String({ format: UUID_FORMAT })),
 });
 
 const CharacterIdParams = Type.Object({ characterId: Type.String({ format: UUID_FORMAT }) });
@@ -475,8 +483,10 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
     path: "/characters/creation-versions",
     operationId: "get_characters_creation_versions",
     schema: {
+      querystring: ListCreationVersionsQuery,
       response: {
         "200": Type.Object({ data: CharacterCreationVersionsDto, requestId: Type.String() }),
+        "400": CharacterErrorEnvelope,
         "401": UnauthorizedEnvelope,
         "500": CharacterErrorEnvelope,
         "503": CharacterErrorEnvelope,
@@ -798,7 +808,20 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
       },
 
       get_characters_creation_versions: async (request, reply) => {
-        const result = await characters.listCreationVersions(ctxOf(request));
+        const query = request.query as
+          | { limit?: string | number; cursor?: string; q?: string; systemId?: string }
+          | undefined;
+        const rawLimit = query?.limit;
+        const limit = rawLimit === undefined ? 20 : Number(rawLimit);
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+          return sendError(reply, badRequest("limit must be an integer from 1 through 100."), request.id);
+        }
+        const result = await characters.listCreationVersions(ctxOf(request), {
+          limit,
+          cursor: query?.cursor ?? null,
+          q: query?.q ?? null,
+          systemId: query?.systemId ?? null,
+        });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { data: result.value, requestId: request.id };
       },

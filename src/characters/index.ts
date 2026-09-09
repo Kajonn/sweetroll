@@ -172,6 +172,14 @@ export type CreationVersionEntry = {
 
 export type CreationVersions = {
   versions: CreationVersionEntry[];
+  nextCursor: string | null;
+};
+
+export type ListCreationVersions = {
+  limit?: number;
+  cursor?: string | null;
+  q?: string | null;
+  systemId?: string | null;
 };
 
 export type ListCharacters = {
@@ -337,7 +345,10 @@ export interface Characters {
     ctx: RequestContext,
     input: CreationOptionsInput,
   ): Promise<CharacterResult<CharacterCreationOptions>>;
-  listCreationVersions(ctx: RequestContext): Promise<CharacterResult<CreationVersions>>;
+  listCreationVersions(
+    ctx: RequestContext,
+    input: ListCreationVersions,
+  ): Promise<CharacterResult<CreationVersions>>;
   list(ctx: RequestContext, input: ListCharacters): Promise<CharacterResult<CharacterPage>>;
   open(ctx: RequestContext, characterId: CharacterId): Promise<CharacterResult<CharacterView>>;
 
@@ -692,11 +703,19 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       }
     },
 
-    async listCreationVersions(ctx) {
+    async listCreationVersions(ctx, listInput) {
       try {
-        const authorized = await input.listAuthorizedVersions(ctx);
-        if (!authorized.ok) return { ok: false, error: errors.internal() };
-        return { ok: true, value: { versions: authorized.value } };
+        const authorized = await input.listAuthorizedVersions(ctx, listInput);
+        if (!authorized.ok) {
+          if (authorized.error.code === "bad_request") {
+            return { ok: false, error: errors.bad_request(authorized.error.message) };
+          }
+          return { ok: false, error: errors.internal() };
+        }
+        return {
+          ok: true,
+          value: { versions: authorized.value.versions, nextCursor: authorized.value.nextCursor },
+        };
       } catch {
         return { ok: false, error: errors.internal() };
       }

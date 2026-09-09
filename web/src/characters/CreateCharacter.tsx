@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 
 import { ApiError } from "../api/client.js";
 import { t } from "../i18n/index.js";
@@ -11,6 +10,7 @@ import { Select } from "../ui/Select.js";
 import type { CharactersApi } from "./api.js";
 import type { CharacterStore, OnlineAttempt } from "./store.js";
 import type { CreationOptions, CreationVersionEntry, FrozenRequest, ReviewExpiredAttemptInput } from "./types.js";
+import { flattenCatalogPages, useVersionCatalog } from "./versionCatalog.js";
 import styles from "./characters.module.css";
 
 export type CreateCharacterIdentity = {
@@ -150,20 +150,15 @@ export function CreateCharacter({
    * all guards still apply untouched.
    */
   const showPicker = initialSystemVersionId === undefined && metadata === null;
-  const pickerQuery = useQuery<CreationVersionEntry[]>({
-    // Account-lifetime scope: the shared QueryClient outlives the route
-    // remount on sign-out/switch, so an unscoped key would keep serving
-    // account A's cached names to account B (or after sign-out) until the
-    // stale time lapses. Scoping by actor and generation gives each lifetime
-    // its own cache entry and discards late responses for old lifetimes.
-    queryKey: ["characters", "creation-versions", actorId, generation],
-    queryFn: async () => api.listCreationVersions().then(r => r.data.versions),
-    enabled: showPicker && online && actorId !== null,
-    staleTime: 30_000,
+  const pickerQuery = useVersionCatalog(api, actorId, generation, {
+    enabled: showPicker,
+    online,
   });
-  const pickerVersions = pickerQuery.data;
+  const pickerVersions: CreationVersionEntry[] = flattenCatalogPages(pickerQuery.data);
   const pickerLoading = pickerQuery.isLoading;
   const pickerError = pickerQuery.isError;
+  const pickerHasMore = pickerQuery.hasNextPage === true;
+  const pickerFetchingMore = pickerQuery.isFetchingNextPage;
 
   const restoreFromAttempt = (attempt: OnlineAttempt) => {
     const body = attempt.request.body as { systemVersionId?: unknown; entityDefinitionId?: unknown; name?: unknown };
@@ -751,6 +746,17 @@ export function CreateCharacter({
                 </li>
               ))}
             </ul>
+            {pickerHasMore ? (
+              <Button
+                variant="secondary"
+                disabled={pickerFetchingMore || busy}
+                pending={pickerFetchingMore}
+                pendingText={t("character.create.pickVersion.loading")}
+                onClick={() => void pickerQuery.fetchNextPage()}
+              >
+                {t("character.create.pickVersion.loadMore")}
+              </Button>
+            ) : null}
           </Panel>
         ) : null}
         {showPicker ? (

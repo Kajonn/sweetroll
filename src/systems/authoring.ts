@@ -17,6 +17,7 @@ import type {
 } from "./implementation/package/schema/index.js";
 import type {
   AuthorizedCreationVersion,
+  CreationVersionsCursor,
   DraftRecord,
   SystemId,
   SystemPersistenceRepository,
@@ -25,6 +26,7 @@ import type {
   VersionId,
   VersionRecord,
 } from "./implementation/persistence/index.js";
+import { decodeCreationVersionsCursor } from "./implementation/persistence/index.js";
 import { compileDocument } from "./implementation/rules/compile-document.js";
 import { comparePackages, type CompatibilityFinding } from "./implementation/package/compatibility.js";
 
@@ -87,6 +89,18 @@ export type AuthoringWorkspace = {
 export type ListSystemsResult = {
   systems: SystemSummary[];
   nextCursor: SystemId | null;
+};
+
+export type ListCreationVersionsInput = {
+  limit?: number;
+  cursor?: string | null;
+  q?: string | null;
+  systemId?: string | null;
+};
+
+export type ListCreationVersionsResult = {
+  versions: AuthorizedCreationVersion[];
+  nextCursor: string | null;
 };
 
 export type PreviewSnapshot = {
@@ -171,7 +185,8 @@ export interface SystemAuthoring {
   ): Promise<Result<{ systemId: SystemId; versionId: VersionId; checksum: string }>>;
   listAuthorizedVersions(
     ctx: RequestContext,
-  ): Promise<Result<AuthorizedCreationVersion[]>>;
+    input: { limit?: number; cursor?: string | null; q?: string | null; systemId?: string | null },
+  ): Promise<Result<ListCreationVersionsResult>>;
   exportVersion(ctx: RequestContext, versionId: VersionId): Promise<Result<ExportedPackage>>;
   listVersions(
     ctx: RequestContext,
@@ -584,10 +599,28 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
       }
     },
 
-    async listAuthorizedVersions(ctx) {
+    async listAuthorizedVersions(ctx, input) {
       try {
-        const versions = await repo.listAuthorizedVersions(ctx.actorId);
-        return { ok: true, value: versions };
+        const limit = input.limit === undefined ? 20 : Math.trunc(input.limit);
+        if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PAGE_LIMIT) {
+          return {
+            ok: false,
+            error: errors.bad_request(`limit must be an integer from 1 through ${MAX_PAGE_LIMIT}.`),
+          };
+        }
+        const rawCursor = input.cursor ?? null;
+        const cursor: CreationVersionsCursor | null =
+          rawCursor === null ? null : decodeCreationVersionsCursor(rawCursor);
+        if (rawCursor !== null && cursor === null) {
+          return { ok: false, error: errors.bad_request("cursor is malformed.") };
+        }
+        const page = await repo.listAuthorizedVersions(ctx.actorId, {
+          limit,
+          cursor,
+          q: input.q ?? null,
+          systemId: input.systemId ?? null,
+        });
+        return { ok: true, value: { versions: page.versions, nextCursor: page.nextCursor } };
       } catch {
         return { ok: false, error: errors.internal() };
       }

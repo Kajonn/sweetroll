@@ -159,7 +159,7 @@ function makeCharacters(overrides: Partial<Characters> = {}): Characters {
         entities: [{ id: "character", label: "Character" }],
       },
     }),
-    listCreationVersions: async () => ({ ok: true, value: { versions: [] } }),
+    listCreationVersions: async () => ({ ok: true, value: { versions: [], nextCursor: null } }),
     list: async () => ({ ok: true, value: { characters: [], nextCursor: null } }),
     open: async () => ({ ok: true, value: characterView() }),
     apply: async () => ({ ok: true, value: commandResult() }),
@@ -393,7 +393,7 @@ describe("character HTTP routes", () => {
     ];
     const app = await build(
       makeCharacters({
-        listCreationVersions: async () => ({ ok: true, value: { versions } }),
+        listCreationVersions: async () => ({ ok: true, value: { versions, nextCursor: null } }),
       }),
     );
     const response = await app.inject({
@@ -402,7 +402,7 @@ describe("character HTTP routes", () => {
       headers: cookie,
     });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ data: { versions }, requestId: expect.any(String) });
+    expect(response.json()).toEqual({ data: { versions, nextCursor: null }, requestId: expect.any(String) });
   });
 
   it("maps internal creation-versions failures to 500", async () => {

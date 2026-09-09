@@ -63,6 +63,33 @@ describe("createCharactersApi", () => {
     expect(client.fetch).toHaveBeenCalledWith("GET", "/characters/creation-versions");
   });
 
+  it("listCreationVersions forwards cursor, limit, q and systemId filters", async () => {
+    const client = makeClient();
+    const envelope = { data: { versions: [], nextCursor: null }, requestId: "r-1" };
+    client.fetch.mockResolvedValueOnce(envelope);
+    const api = createCharactersApi(client);
+    await expect(
+      api.listCreationVersions({ cursor: "cursor-1", limit: 2, q: "alp", systemId: "system-1" }),
+    ).resolves.toBe(envelope);
+    expect(client.fetch).toHaveBeenCalledWith(
+      "GET",
+      "/characters/creation-versions",
+      { query: { cursor: "cursor-1", limit: 2, q: "alp", systemId: "system-1" } },
+    );
+  });
+
+  it("listCreationVersions omits unset filters from the query", async () => {
+    const client = makeClient();
+    client.fetch.mockResolvedValueOnce({ data: { versions: [], nextCursor: null }, requestId: "r-1" });
+    const api = createCharactersApi(client);
+    await api.listCreationVersions({ cursor: null, limit: 20, q: null, systemId: null });
+    expect(client.fetch).toHaveBeenCalledWith(
+      "GET",
+      "/characters/creation-versions",
+      { query: { cursor: undefined, limit: 20, q: undefined, systemId: undefined } },
+    );
+  });
+
   it("activity forwards the cursor query parameter", async () => {
     const client = makeClient();
     const envelope = { events: [], nextCursor: null, requestId: "r-1" };

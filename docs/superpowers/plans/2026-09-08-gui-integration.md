@@ -145,11 +145,16 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 
 ## G6 — Integrate with I5 rather than building a second Player app
 
-- [ ] Build onboarding, character library/search/recent items, personal activity, account preferences, and the installable shell with the shared components. Integrate the existing creation-version picker for system selection; do not recreate its endpoint, metadata loader, or character creation state. Include the G4 follow-up: restyle character completion inputs, direct edits, action inputs, and activity/tools surfaces with shared components during this pass.
-- [ ] Before expanding the picker into a library/catalog, add bounded server pagination and supported filtering under the resolved discovery policy (Section 13), update generated contracts, and test stable page ordering and revocation. The current endpoint returns every matching version in one response; client-side list virtualization alone does not bound that response.
-- [ ] Add account theme defaults and device overrides; include loading, empty, permission-denied, unavailable-storage, and expired-session flows.
-- [ ] Keep I5 campaign-free and embed the same I4 character renderer/session. Add campaign routes and navigation only with I6 authorization support.
+- [x] Build onboarding, character library/search/recent items, personal activity, account preferences, and the installable shell with the shared components. Integrate the existing creation-version picker for system selection; do not recreate its endpoint, metadata loader, or character creation state. Include the G4 follow-up: restyle character completion inputs, direct edits, action inputs, and activity/tools surfaces with shared components during this pass.
+  *Closed 2026-09-09 (G6, Tasks 2/3/5/7: `b1acf8a` library, `a5b4f72` shell/onboarding/activity/account/PWA, `ceda932` G4 follow-up restyle; exit e2e `playerJourney` + `playerLibrary` + `playerShell` 6/6 green; acceptance `docs/acceptance/gui-2026-09-09-g6-player.md`).*
+- [x] Before expanding the picker into a library/catalog, add bounded server pagination and supported filtering under the resolved discovery policy (Section 13), update generated contracts, and test stable page ordering and revocation. The current endpoint returns every matching version in one response; client-side list virtualization alone does not bound that response.
+  *Closed 2026-09-09 (G6 Task 1, `557de16`: paginated catalog with name/system filters, regenerated contracts, ordering/revocation tests).*
+- [x] Add account theme defaults and device overrides; include loading, empty, permission-denied, unavailable-storage, and expired-session flows.
+  *Closed 2026-09-09 (G6 Tasks 3/4/6: `a5b4f72` mounts, `112cb16` account default + device override precedence, `ddc0929` expired-session flow; unit + e2e coverage re-run green in Task 7).*
+- [x] Keep I5 campaign-free and embed the same I4 character renderer/session. Add campaign routes and navigation only with I6 authorization support.
+  *Closed 2026-09-09 (G6 Tasks 2/3: no `campaign` string in `web/src/player/`, `router.tsx`, or `AppShell.tsx` — verified 2026-09-09; detail route reuses `CharacterDetail`/`CharacterRoute` session; no campaign code anywhere).*
 - [ ] Complete real production sign-in and its return journey before I5 acceptance; separate test authentication from production startup. Verify first-sign-in concurrency resolves to one canonical user.
+  *Partial 2026-09-09 (G6 Task 6, `ddc0929`: test/prod separation via `resolveAuthMode`, provider-agnostic `/cb` return, first-sign-in advisory-lock concurrency test — all green on the deterministic test adapter; expired-session flow covered). Still open: real production sign-in validation (no real provider by owner decision — see `docs/acceptance/gui-2026-09-09-g6-player.md` limitations).*
 
 **Exit:** the I5 end-to-end demonstration passes in the visual design without custom HTTP calls or test-only login shortcuts.
 

@@ -151,7 +151,7 @@ describe("creator pages own their editor/preview columns", () => {
       </QueryClientProvider>,
     );
     const toggle = await screen.findByTestId("document-editor-preview-toggle");
-    const body = await screen.findByTestId("document-editor-body-metadata");
+    const body = await screen.findByTestId("document-editor-body-basics");
     const bodyClass = editorStyles.body as string;
     const splitClass = editorStyles.bodySplit as string;
     expect(body.classList.contains(splitClass)).toBe(false);

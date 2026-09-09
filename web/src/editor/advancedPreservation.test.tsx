@@ -112,9 +112,12 @@ function renderActionsEditor(onPut: (body: PutBody) => void) {
   });
   const client = createApiClient({ baseUrl: "http://x", fetch: fetch_ as typeof fetch });
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // Legacy ?tab=actions resolves to the guided dice tab; the expression
+  // source itself lives behind the Advanced disclosure (?tab=validations
+  // lands with it open), which is where this test edits it.
   Object.defineProperty(window, "location", {
     configurable: true,
-    value: { ...window.location, search: "?tab=actions" },
+    value: { ...window.location, search: "?tab=validations" },
   });
   render(
     <QueryClientProvider client={qc}>
@@ -138,13 +141,13 @@ describe("advanced definition round-trip preservation (G5 task 1)", () => {
     fireEvent.change(source, { target: { value: "2 + 3" } });
     expect(screen.getByTestId("expression-editor-source")).toHaveValue("2 + 3");
 
-    // Force a full remount of the actions tab (switch tabs and back). A
+    // Force a full remount of the advanced tab (switch tabs and back). A
     // render-local Map would be rebuilt from the unedited document here and
     // the edit would be lost.
-    fireEvent.click(screen.getByRole("link", { name: "Validations" }));
-    expect(await screen.findByTestId("validations-tab")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("link", { name: "Actions" }));
-    expect(await screen.findByTestId("actions-tab")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Dice" }));
+    expect(await screen.findByTestId("dice-tab")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Advanced" }));
+    expect(await screen.findByTestId("advanced-disclosure")).toBeInTheDocument();
     expect(screen.getByTestId("expression-editor-source")).toHaveValue("2 + 3");
 
     // The autosaved document must carry the edited source for E1.

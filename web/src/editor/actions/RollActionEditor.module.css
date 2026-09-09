@@ -44,6 +44,23 @@
   outline-offset: 1px;
 }
 
+/* Guided dice-kind picker: semantic tokens only, 44px target. */
+.guidedSelect {
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  padding: 6px 8px;
+  width: 100%;
+  min-height: 44px;
+}
+
+.guidedSelect:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
 .inputsList {
   display: grid;
   gap: 8px;

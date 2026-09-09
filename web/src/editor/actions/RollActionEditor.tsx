@@ -35,7 +35,18 @@ export type RollActionEditorProps = {
   onExpressionSourceChange: (next: string) => void;
   fieldTypes: Record<string, ValueType>;
   disabled?: boolean | undefined;
+  /**
+   * Guided (basics-first) mode for the dice tab: hides the grammar surfaces
+   * (expression-id input + ExpressionEditor) and shows a dice-kind picker
+   * instead. The full expression source stays editable in Advanced.
+   */
+  guided?: boolean | undefined;
+  diceKind?: string | undefined;
+  onDiceKindChange?: ((next: string) => void) | undefined;
 };
+
+/** Canned dice sources offered by the guided dice-kind picker. */
+export const GUIDED_DICE_KINDS: ReadonlyArray<string> = ["d4", "d6", "d8", "d10", "d12", "d20"];
 
 function nextInputId(existing: ReadonlyArray<ActionInputV1>): DefinitionId {
   for (let i = 1; i < 10_000; i++) {
@@ -106,6 +117,9 @@ export function RollActionEditor({
   onExpressionSourceChange,
   fieldTypes,
   disabled,
+  guided,
+  diceKind,
+  onDiceKindChange,
 }: RollActionEditorProps) {
   const [tryItResult, setTryItResult] = useState<ReturnType<typeof evaluateRoll> | null>(null);
 
@@ -170,25 +184,49 @@ export function RollActionEditor({
             disabled={disabled}
           />
         </label>
-        <label className={styles.field} htmlFor={`roll-action-expression-id-${action.id}`}>
-          {t("editor.action.roll.expressionId")}
-          <input
-            id={`roll-action-expression-id-${action.id}`}
-            type="text"
-            value={action.expressionId}
-            onChange={(e) => onChange({ ...action, expressionId: e.target.value })}
-            data-testid={`roll-action-expression-id-${action.id}`}
-            disabled={disabled}
-          />
-        </label>
+        {guided === true ? (
+          <label className={styles.field} htmlFor={`dice-kind-${action.id}`}>
+            {t("editor.action.roll.diceKind")}
+            <select
+              id={`dice-kind-${action.id}`}
+              className={styles.guidedSelect}
+              value={diceKind ?? "custom"}
+              onChange={(e) => onDiceKindChange?.(e.target.value)}
+              data-testid={`dice-kind-${action.id}`}
+              disabled={disabled}
+              title={t("editor.action.roll.diceKind.hint")}
+            >
+              {GUIDED_DICE_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {kind}
+                </option>
+              ))}
+              <option value="custom">{t("editor.action.roll.diceKind.custom")}</option>
+            </select>
+          </label>
+        ) : (
+          <label className={styles.field} htmlFor={`roll-action-expression-id-${action.id}`}>
+            {t("editor.action.roll.expressionId")}
+            <input
+              id={`roll-action-expression-id-${action.id}`}
+              type="text"
+              value={action.expressionId}
+              onChange={(e) => onChange({ ...action, expressionId: e.target.value })}
+              data-testid={`roll-action-expression-id-${action.id}`}
+              disabled={disabled}
+            />
+          </label>
+        )}
       </div>
-      <ExpressionEditor
-        client={client}
-        systemId={systemId}
-        source={expressionSource}
-        onSourceChange={onExpressionSourceChange}
-        disabled={disabled === true}
-      />
+      {guided === true ? null : (
+        <ExpressionEditor
+          client={client}
+          systemId={systemId}
+          source={expressionSource}
+          onSourceChange={onExpressionSourceChange}
+          disabled={disabled === true}
+        />
+      )}
       <div className={styles.row}>
         <label className={styles.field} htmlFor={`roll-action-output-${action.id}`}>
           {t("editor.action.roll.outputTemplate")}

@@ -48,7 +48,13 @@ export type DocumentAction =
    * to the latest state, so two rapid edits (or an edit racing an unrelated
    * update) cannot clobber each other. Unknown ids are a no-op (same state).
    */
-  | { type: "setExpressionSource"; expressionId: string; source?: string; fallback?: unknown; hasFallback?: boolean };
+  | { type: "setExpressionSource"; expressionId: string; source?: string; fallback?: unknown; hasFallback?: boolean }
+  /**
+   * Append a new source-expression entry (e.g. the guided dice tab creating
+   * a roll expression for a new action). Duplicate ids are a no-op (same
+   * state) so double-submits cannot fork the list.
+   */
+  | { type: "addExpression"; expression: SourceExpressionV1 };
 
 export function blankDocument(): SystemDocumentV1 {
   return {
@@ -121,6 +127,10 @@ export function documentReducer(state: SystemDocumentV1, action: DocumentAction)
       });
       if (!mutated) return state;
       return { ...state, expressions };
+    }
+    case "addExpression": {
+      if (state.expressions.some((entry) => entry.id === action.expression.id)) return state;
+      return { ...state, expressions: [...state.expressions, action.expression] };
     }
   }
 }

@@ -9,10 +9,11 @@ import type { DocumentAssessment } from "../api/server.js";
 import { t } from "../i18n/index.js";
 import type { ScalarValue, ValueType } from "../ports/evaluateExpression.js";
 import { ResourceBumpEditor, type ResourceBumpActionV1 } from "./actions/ResourceBumpEditor.js";
-import { RollActionEditor, type RollActionV1 } from "./actions/RollActionEditor.js";
+import { GUIDED_DICE_KINDS, RollActionEditor, type RollActionV1 } from "./actions/RollActionEditor.js";
 import { ConflictBanner } from "./ConflictBanner.js";
 import { DiagnosticsDrawer } from "./DiagnosticsDrawer.js";
 import { EntityList, type EntityListEntity } from "./EntityList.js";
+import { ExpressionEditor } from "./expressions/ExpressionEditor.js";
 import { MetadataEditor } from "./MetadataEditor.js";
 import { PreviewFrame } from "../preview/PreviewFrame.js";
 import { PreviewSheet } from "../preview/PreviewSheet.js";
@@ -36,9 +37,27 @@ import { useShortcut } from "../shell/useShortcut.js";
 import { ValidationEditor } from "./validations/ValidationEditor.js";
 import styles from "./DocumentEditor.module.css";
 
-type TabId = "metadata" | "entities" | "sheets" | "actions" | "validations" | "referenceData";
+/** Basics-first creator tabs in workflow order. */
+export type CreatorTabId = "basics" | "attributes" | "dice" | "sections" | "advanced";
 
-const TABS: ReadonlyArray<TabId> = [
+/**
+ * Pre-Task-2 tab ids, kept as URL aliases so `?tab=` deep links and
+ * `focus-editor:{path}` events issued against the old six-tab layout keep
+ * resolving to the matching basics-first tab.
+ */
+type LegacyTabId = "metadata" | "entities" | "sheets" | "actions" | "validations" | "referenceData";
+
+export type TabId = CreatorTabId | LegacyTabId;
+
+export const CREATOR_TABS: ReadonlyArray<CreatorTabId> = [
+  "basics",
+  "attributes",
+  "dice",
+  "sections",
+  "advanced",
+];
+
+const LEGACY_TABS: ReadonlyArray<LegacyTabId> = [
   "metadata",
   "entities",
   "sheets",
@@ -47,16 +66,40 @@ const TABS: ReadonlyArray<TabId> = [
   "referenceData",
 ];
 
-function isTabId(value: string): value is TabId {
-  return (TABS as ReadonlyArray<string>).includes(value);
+const LEGACY_TAB_ALIASES: Record<LegacyTabId, CreatorTabId> = {
+  metadata: "basics",
+  entities: "attributes",
+  sheets: "sections",
+  actions: "dice",
+  validations: "advanced",
+  referenceData: "advanced",
+};
+
+function isCreatorTabId(value: string): value is CreatorTabId {
+  return (CREATOR_TABS as ReadonlyArray<string>).includes(value);
 }
 
-function readActiveTab(): TabId {
-  if (typeof window === "undefined") return "metadata";
-  const params = new URLSearchParams(window.location.search);
-  const tab = params.get("tab");
-  if (tab !== null && isTabId(tab)) return tab;
-  return "metadata";
+function isLegacyTabId(value: string): value is LegacyTabId {
+  return (LEGACY_TABS as ReadonlyArray<string>).includes(value);
+}
+
+function readRawTabParam(): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("tab");
+}
+
+function readActiveTab(): CreatorTabId {
+  const tab = readRawTabParam();
+  if (tab === null) return "basics";
+  if (isCreatorTabId(tab)) return tab;
+  if (isLegacyTabId(tab)) return LEGACY_TAB_ALIASES[tab];
+  return "basics";
+}
+
+/** Legacy advanced tabs land with the disclosure open so their controls stay visible. */
+function readAdvancedDefaultOpen(): boolean {
+  const tab = readRawTabParam();
+  return tab === "validations" || tab === "referenceData";
 }
 
 export function DocumentEditor({
@@ -74,7 +117,7 @@ export function DocumentEditor({
     actorId: actorId ?? null,
     generation: generation ?? 0,
   });
-  const [active, setActive] = useState<TabId>(() => readActiveTab());
+  const [active, setActive] = useState<CreatorTabId>(() => readActiveTab());
 
   if (query.isPending) {
     return (
@@ -109,6 +152,7 @@ export function DocumentEditor({
       onActiveChange={setActive}
       initialDoc={initialDoc}
       assessment={ws.assessment}
+      advancedDefaultOpen={readAdvancedDefaultOpen()}
     />
   );
 }
@@ -128,20 +172,22 @@ function autosaveLabel(status: ReturnType<typeof useDraftSync>["status"]): strin
   }
 }
 
-function DocumentEditorBody({
+export function DocumentEditorBody({
   client,
   ws,
   active,
   onActiveChange,
   initialDoc,
   assessment,
+  advancedDefaultOpen,
 }: {
   client: ApiClient;
   ws: NonNullable<ReturnType<typeof useOpenSystem>["data"]>;
-  active: TabId;
-  onActiveChange: (next: TabId) => void;
+  active: CreatorTabId;
+  onActiveChange: (next: CreatorTabId) => void;
   initialDoc: SystemDocumentV1;
   assessment: DocumentAssessment;
+  advancedDefaultOpen?: boolean | undefined;
 }) {
   const [document, dispatch] = useReducer(documentReducer, initialDoc);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(
@@ -380,7 +426,7 @@ function DocumentEditorBody({
         />
       )}
       <nav className={styles.tabs} aria-label={t("editor.tabsAriaLabel")}>
-        {TABS.map((tab) => {
+        {CREATOR_TABS.map((tab) => {
           const isActive = tab === active;
           return (
             <a
@@ -416,29 +462,29 @@ function DocumentEditorBody({
             <DiagnosticsDrawer assessment={assessment} />
           </div>
         ) : null}
-        {active === "metadata" ? (
-          <MetadataEditor
+        {active === "basics" ? (
+          <BasicsTab
             document={document}
-            onChange={(next) => {
-              const patch = diffMetadata(document.metadata, next.metadata);
-              if (patch !== null) dispatch({ type: "setMetadata", patch });
-            }}
+            dispatch={dispatch}
           />
-        ) : active === "entities" ? (
+        ) : active === "attributes" ? (
           <EntitiesTab
             entities={document.entities}
             selectedEntityId={selectedEntityId}
             onSelectEntity={setSelectedEntityId}
             dispatch={dispatch}
           />
-        ) : active === "sheets" ? (
+        ) : active === "dice" ? (
+          <DiceTab client={client} document={document} dispatch={dispatch} />
+        ) : active === "sections" ? (
           <SheetsTab document={document} dispatch={dispatch} />
-        ) : active === "actions" ? (
-          <ActionsTab client={client} document={document} dispatch={dispatch} />
-        ) : active === "validations" ? (
-          <ValidationsTab client={client} document={document} dispatch={dispatch} />
-        ) : active === "referenceData" ? (
-          <ReferenceDataTab document={document} dispatch={dispatch} />
+        ) : active === "advanced" ? (
+          <AdvancedTab
+            client={client}
+            document={document}
+            dispatch={dispatch}
+            defaultOpen={advancedDefaultOpen}
+          />
         ) : null}
       </main>
       <PublishDialog
@@ -474,6 +520,30 @@ function diffMetadata(
   return changed ? patch : null;
 }
 
+/**
+ * Basics tab: the existing MetadataEditor fields (name, description,
+ * language, default dice) with stable IDs — no new API, no expressions.
+ */
+function BasicsTab({
+  document,
+  dispatch,
+}: {
+  document: SystemDocumentV1;
+  dispatch: React.Dispatch<DocumentAction>;
+}) {
+  return (
+    <section data-testid="basics-tab" data-path="/basics">
+      <MetadataEditor
+        document={document}
+        onChange={(next) => {
+          const patch = diffMetadata(document.metadata, next.metadata);
+          if (patch !== null) dispatch({ type: "setMetadata", patch });
+        }}
+      />
+    </section>
+  );
+}
+
 function EntitiesTab({
   entities,
   selectedEntityId,
@@ -491,17 +561,19 @@ function EntitiesTab({
     fields: entity.fields as unknown as EntityListEntity["fields"],
   }));
   return (
-    <EntityList
-      entities={entityList}
-      selectedEntityId={selectedEntityId}
-      onSelectEntity={onSelectEntity}
-      onChange={(next) => {
-        dispatch({
-          type: "setEntities",
-          entities: next as unknown as EntityDefinitionV1[],
-        });
-      }}
-    />
+    <section data-testid="attributes-tab" data-path="/attributes">
+      <EntityList
+        entities={entityList}
+        selectedEntityId={selectedEntityId}
+        onSelectEntity={onSelectEntity}
+        onChange={(next) => {
+          dispatch({
+            type: "setEntities",
+            entities: next as unknown as EntityDefinitionV1[],
+          });
+        }}
+      />
+    </section>
   );
 }
 
@@ -540,7 +612,8 @@ function SheetsTab({
     });
   };
   return (
-    <section data-testid="sheets-tab" data-path="/sheets">
+    <section data-testid="sections-tab" data-path="/sections">
+      <section data-testid="sheets-tab" data-path="/sheets">
       <header className={styles.tabHeader}>
         <h2 className={styles.tabTitle}>{t("editor.sheet.label")}</h2>
         <button
@@ -573,6 +646,7 @@ function SheetsTab({
           ))}
         </ul>
       )}
+      </section>
     </section>
   );
 }
@@ -631,7 +705,14 @@ export function commitComputedSource(
   });
 }
 
-function ActionsTab({
+/**
+ * Dice tab: guided roll-action editing (label + dice-kind + inputs) with no
+ * grammar input. Each roll owns a `document.expressions` entry created at
+ * add time; the dice-kind picker writes canned sources through
+ * `persistExpressionSource`, and the full source stays editable in Advanced.
+ * Resource-bump actions are grammar-free and stay fully editable here.
+ */
+function DiceTab({
   client,
   document,
   dispatch,
@@ -650,12 +731,23 @@ function ActionsTab({
   }>) ?? [];
 
   const addRoll = () => {
+    const expressionId = nextExpressionId(expressions.map((e) => e.id));
+    dispatch({
+      type: "addExpression",
+      expression: {
+        id: expressionId,
+        context: "roll",
+        resultType: "number",
+        source: "d20",
+        fallback: 0,
+      },
+    });
     const id = nextActionId(actions.map((a) => a.id));
     const next: RollActionV1 = {
       kind: "roll",
       id,
       label: t("editor.actions.kind.roll"),
-      expressionId: expressions[0]?.id ?? "",
+      expressionId,
       inputs: [],
       outputTemplate: "Result: {total}",
     };
@@ -695,7 +787,11 @@ function ActionsTab({
   const expressionSourceFor = (expressionId: string): string =>
     expressions.find((entry) => entry.id === expressionId)?.source ?? "";
 
+  const hasExpression = (expressionId: string): boolean =>
+    expressions.some((entry) => entry.id === expressionId);
+
   return (
+    <section data-testid="dice-tab" data-path="/dice">
     <section data-testid="actions-tab" data-path="/actions">
       <header className={styles.tabHeader}>
         <h2 className={styles.tabTitle}>{t("editor.actions.addTitle")}</h2>
@@ -723,6 +819,13 @@ function ActionsTab({
                     persistExpressionSource(document, dispatch, action.expressionId, next);
                   }}
                   fieldTypes={buildFieldTypeMap(document)}
+                  guided
+                  diceKind={diceKindFor(expressionSourceFor(action.expressionId))}
+                  onDiceKindChange={hasExpression(action.expressionId)
+                    ? (kind) => {
+                        persistExpressionSource(document, dispatch, action.expressionId, kind);
+                      }
+                    : undefined}
                 />
               ) : (
                 <ResourceBumpEditor
@@ -744,7 +847,21 @@ function ActionsTab({
         </ul>
       )}
     </section>
+    </section>
   );
+}
+
+/** Guided dice-kind for a roll source: canned kind, else custom (Advanced edit). */
+function diceKindFor(source: string): string {
+  return (GUIDED_DICE_KINDS as ReadonlyArray<string>).includes(source) ? source : "custom";
+}
+
+function nextExpressionId(existing: ReadonlyArray<string>): string {
+  for (let i = 1; i < 10_000; i++) {
+    const candidate = `expr_${i}`;
+    if (!existing.some((id) => id === candidate)) return candidate;
+  }
+  return `expr_${Date.now()}`;
 }
 
 function nextActionId(existing: ReadonlyArray<string>): string {
@@ -968,6 +1085,100 @@ function nextReferenceDataId(existing: ReadonlyArray<string>): string {
     if (!existing.some((id) => id === candidate)) return candidate;
   }
   return `reference_${Date.now()}`;
+}
+
+/**
+ * Advanced tab: validations, reference data, and expression editors behind
+ * a collapsed-by-default labeled disclosure. Untouched advanced definitions
+ * stay byte-for-byte intact (Task 1): this tab only reads them through the
+ * same functional `persistExpressionSource` path the basics tabs use.
+ */
+function AdvancedTab({
+  client,
+  document,
+  dispatch,
+  defaultOpen,
+}: {
+  client: ApiClient;
+  document: SystemDocumentV1;
+  dispatch: React.Dispatch<DocumentAction>;
+  defaultOpen?: boolean | undefined;
+}) {
+  const [open, setOpen] = useState(defaultOpen ?? false);
+  return (
+    <section data-testid="advanced-tab" data-path="/advanced">
+      <details
+        className={styles.advancedDisclosure}
+        data-testid="advanced-disclosure"
+        data-path="/advanced/disclosure"
+        open={open}
+      >
+        <summary
+          className={styles.advancedSummary}
+          data-testid="advanced-disclosure-toggle"
+          aria-expanded={open ? "true" : "false"}
+          onClick={(e) => {
+            // Drive the disclosure from state (instead of the native toggle)
+            // so keyboard/click behavior is identical in browsers and jsdom.
+            e.preventDefault();
+            setOpen((v) => !v);
+          }}
+        >
+          {t("editor.advanced.disclosure")}
+        </summary>
+        {open ? (
+          <div className={styles.advancedBody}>
+            <ExpressionsSection client={client} document={document} dispatch={dispatch} />
+            <ValidationsTab client={client} document={document} dispatch={dispatch} />
+            <ReferenceDataTab document={document} dispatch={dispatch} />
+          </div>
+        ) : null}
+      </details>
+    </section>
+  );
+}
+
+function ExpressionsSection({
+  client,
+  document,
+  dispatch,
+}: {
+  client: ApiClient;
+  document: SystemDocumentV1;
+  dispatch: React.Dispatch<DocumentAction>;
+}) {
+  const expressions = (document.expressions as unknown as Array<{
+    id: string;
+    source: string;
+  }>) ?? [];
+  return (
+    <section data-testid="expressions-section" data-path="/expressions">
+      <header className={styles.tabHeader}>
+        <h2 className={styles.tabTitle}>{t("editor.advanced.expressions.title")}</h2>
+      </header>
+      {expressions.length === 0 ? (
+        <p className={styles.placeholder} data-testid="expressions-section-empty">
+          {t("editor.advanced.expressions.empty")}
+        </p>
+      ) : (
+        <ul className={styles.expressionList}>
+          {expressions.map((entry, idx) => (
+            <li key={entry.id} data-path={`/expressions/${idx}`}>
+              <ExpressionEditor
+                client={client}
+                systemId="s1"
+                expressionId={entry.id}
+                source={entry.source ?? ""}
+                onSourceChange={(next) => {
+                  persistExpressionSource(document, dispatch, entry.id, next);
+                }}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 export function buildPreviewPackage(document: SystemDocumentV1): import("../preview/sampleData.js").SystemPackageV1 | null {
@@ -1215,15 +1426,25 @@ function useFocusEditorListener(bodyRef: React.RefObject<HTMLDivElement>): void 
       if (target === null) return;
       if (!event.type.startsWith("focus-editor:")) return;
       const path = event.type.replace(/^focus-editor:/, "");
-      const selector = `[data-path="${path}"]`;
-      const el = target.querySelector(selector) ?? window.document.querySelector(selector);
-      if (el instanceof HTMLElement) {
-        el.scrollIntoView({ block: "center" });
-        el.focus({ preventScroll: true });
+      // Legacy six-tab deep links resolve to their basics-first successor:
+      // inner sections keep the legacy data-paths (/sheets, /actions,
+      // /validations, /referenceData), while /metadata and /entities map to
+      // the basics/attributes wrappers.
+      const candidates = [path, FOCUS_PATH_ALIASES[path]].filter(
+        (candidate): candidate is string => candidate !== undefined,
+      );
+      for (const candidate of candidates) {
+        const selector = `[data-path="${candidate}"]`;
+        const el = target.querySelector(selector) ?? window.document.querySelector(selector);
+        if (el instanceof HTMLElement) {
+          el.scrollIntoView({ block: "center" });
+          el.focus({ preventScroll: true });
+          return;
+        }
       }
     };
     const events: string[] = [];
-    for (const tab of TABS) {
+    for (const tab of [...CREATOR_TABS, ...LEGACY_TABS]) {
       events.push(`focus-editor:/${tab}`);
       events.push(`focus-editor:/${tab}/0`);
     }
@@ -1233,3 +1454,9 @@ function useFocusEditorListener(bodyRef: React.RefObject<HTMLDivElement>): void 
     };
   }, [bodyRef]);
 }
+
+/** Legacy `focus-editor:{path}` targets without a same-named data-path. */
+const FOCUS_PATH_ALIASES: Record<string, string> = {
+  "/metadata": "/basics",
+  "/entities": "/attributes",
+};

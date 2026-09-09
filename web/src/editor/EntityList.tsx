@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { useState } from "react";
 
 import { t } from "../i18n/index.js";
 import type { FieldV1 } from "../state/documentFieldTypes.js";
@@ -197,13 +198,13 @@ export function EntityList({
     onChange(entities.filter((e) => e.id !== id));
     if (selectedEntityId === id) onSelectEntity(null);
   };
-  const addField = (entityId: string) => {
+  const addField = (entityId: string, kind: FieldV1["kind"] = "text") => {
     const entity = entities.find((e) => e.id === entityId);
     if (entity === undefined) return;
     const baseId = "field";
     let id = baseId;
     for (let i = 1; entity.fields.some((f) => f.id === id); i++) id = `${baseId}_${i}`;
-    const field = defaultField("text");
+    const field = defaultField(kind);
     field.id = id;
     field.label = t("editor.entity.newFieldLabel");
     replaceEntity(entityId, { fields: [...entity.fields, field] });
@@ -270,7 +271,7 @@ export function EntityList({
             entity={selected}
             onChange={(patch) => replaceEntity(selected.id, patch)}
             onFieldChange={(field) => replaceField(selected.id, field)}
-            onAddField={() => addField(selected.id)}
+            onAddField={(kind) => addField(selected.id, kind)}
             onRemove={(id) => removeEntity(id)}
           />
         )}
@@ -289,9 +290,13 @@ function EntityDetail({
   entity: EntityListEntity;
   onChange: (patch: Partial<EntityListEntity>) => void;
   onFieldChange: (field: FieldV1) => void;
-  onAddField: () => void;
+  onAddField: (kind: FieldV1["kind"]) => void;
   onRemove: (id: string) => void;
 }) {
+  // Guided kind picker for the add-field flow: defaults to text so the
+  // simple path never asks for grammar, with number/choice/resource
+  // reachable without leaving basics.
+  const [fieldKind, setFieldKind] = useState<FieldV1["kind"]>("text");
   return (
     <div className={styles.detailInner}>
       <header className={styles.detailHeader}>
@@ -313,10 +318,25 @@ function EntityDetail({
       </header>
       <div className={styles.fieldsHeader}>
         <h3 className={styles.fieldsTitle}>{t("editor.entities.fields")}</h3>
+        <label className={styles.kindField} htmlFor={`entity-field-kind-${entity.id}`}>
+          {t("editor.entities.fieldKind")}
+          <select
+            id={`entity-field-kind-${entity.id}`}
+            className={styles.kindPicker}
+            value={fieldKind}
+            onChange={(e) => setFieldKind(e.target.value as FieldV1["kind"])}
+            data-testid={`entity-field-kind-picker-${entity.id}`}
+          >
+            <option value="text">{t("editor.fields.kind.text")}</option>
+            <option value="integer">{t("editor.fields.kind.integer")}</option>
+            <option value="singleChoice">{t("editor.fields.kind.singleChoice")}</option>
+            <option value="resource">{t("editor.fields.kind.resource")}</option>
+          </select>
+        </label>
         <button
           type="button"
           className={styles.addButton}
-          onClick={onAddField}
+          onClick={() => onAddField(fieldKind)}
           data-testid={`entity-add-field-${entity.id}`}
         >
           {t("editor.entities.addField")}

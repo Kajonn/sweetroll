@@ -83,9 +83,14 @@ describe("DocumentEditor", () => {
     expect(await screen.findByTestId("document-editor-name")).toHaveTextContent("Test System");
     expect(screen.getByTestId("document-editor-lifecycle")).toHaveTextContent("Active");
     expect(screen.getByTestId("document-editor-autosave")).toHaveTextContent("Not saved yet");
-    for (const label of ["Metadata", "Entities", "Sheets", "Actions", "Validations", "Reference data"]) {
+    for (const label of ["Basics", "Attributes", "Dice", "Sections", "Advanced"]) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }
+  });
+
+  it("resolves legacy tab params to their basics-first tabs", async () => {
+    renderEditor("http://localhost/?tab=entities");
+    expect(await screen.findByTestId("attributes-tab")).toBeInTheDocument();
   });
 
   it("renders the EntityList inside the entities tab when tab=entities", async () => {

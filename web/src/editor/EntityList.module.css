@@ -206,6 +206,32 @@
   font-weight: 600;
 }
 
+/* Guided kind picker beside "Add field": semantic tokens only, 44px
+   target, visible focus. */
+.kindField {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.kindPicker {
+  min-height: 44px;
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  padding: 6px 8px;
+}
+
+.kindPicker:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
 .placeholder {
   margin: 0;
   font-size: 13px;

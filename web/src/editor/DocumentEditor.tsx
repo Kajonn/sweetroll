@@ -705,6 +705,26 @@ function SheetsTab({
   dispatch: React.Dispatch<DocumentAction>;
 }) {
   const sheets = (document.sheets as unknown as SheetEditorView[]) ?? [];
+  // Document-wide section/element-id allocation: definition IDs must be
+  // unique across the whole document (duplicate_definition_id blocks saves),
+  // so IDs for newly added sections/elements are drawn from the union of all
+  // sheets — never per sheet or per section.
+  const allocateSheetChildId = (prefix: "section" | "element"): string => {
+    const used = new Set<string>();
+    for (const sheet of sheets) {
+      for (const section of sheet.sections) {
+        used.add(section.id);
+        if (prefix === "element") {
+          for (const element of section.elements) used.add(element.id);
+        }
+      }
+    }
+    for (let i = 1; i < 10_000; i++) {
+      const candidate = `${prefix}_${i}`;
+      if (!used.has(candidate)) return candidate;
+    }
+    return `${prefix}_${Date.now()}`;
+  };
   const addSheet = () => {
     const id = nextSheetId(sheets.map((s) => s.id));
     const next: SheetEditorView = {
@@ -755,6 +775,8 @@ function SheetsTab({
               <SheetEditor
                 sheet={sheet}
                 onChange={(next) => replaceSheet(idx, next)}
+                allocateSectionId={() => allocateSheetChildId("section")}
+                allocateElementId={() => allocateSheetChildId("element")}
               />
               <Button
                 variant="secondary"

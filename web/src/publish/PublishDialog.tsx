@@ -146,6 +146,17 @@ export function PublishDialog({
               </div>
             </dl>
             <div className={styles.actions}>
+              {/* Intentional plain anchor: the success card also renders
+                  outside a RouterProvider (standalone/tests), where TanStack
+                  Link has no router context and crashes — same pattern as
+                  VersionHistory.tsx:171-177. */}
+              <a
+                className={styles.createLink}
+                href={`/characters/new?systemVersionId=${published.versionId}`}
+                data-testid="publish-dialog-create-character"
+              >
+                {t("publish.success.createCharacter")}
+              </a>
               <Button
                 variant="secondary"
                 onClick={close}

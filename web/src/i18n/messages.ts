@@ -351,6 +351,7 @@ export const defaultMessages: MessageTable = {
   "publish.success.message": "Version {version} is live.",
   "publish.success.versionId": "Version ID",
   "publish.success.checksum": "Checksum",
+  "publish.success.createCharacter": "Create test character",
   "publish.error.generic": "Publish failed.",
   "publish.error.withCode": "Publish failed ({code}): {message}",
   "publish.readiness.title": "Publish readiness",

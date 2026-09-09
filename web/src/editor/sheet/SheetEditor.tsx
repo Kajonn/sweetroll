@@ -13,13 +13,19 @@ import type { SheetEditorV1, SheetSectionV1 } from "./sheetTypes.js";
 export type SheetEditorProps = {
   sheet: SheetEditorV1;
   onChange: (next: SheetEditorV1) => void;
+  /**
+   * Document-wide section/element-id allocators (see SectionEditor's
+   * allocateElementId). Fall back to sheet-local allocation when absent.
+   */
+  allocateSectionId?: (() => DefinitionId) | undefined;
+  allocateElementId?: (() => DefinitionId) | undefined;
 };
 
 type Focus =
   | { kind: "section"; sectionIdx: number; elementIdx: number | null }
   | null;
 
-export function SheetEditor({ sheet, onChange }: SheetEditorProps) {
+export function SheetEditor({ sheet, onChange, allocateSectionId, allocateElementId }: SheetEditorProps) {
   const [focus, setFocus] = useState<Focus>(null);
 
   const replaceSheet = (patch: Partial<SheetEditorV1>) => {
@@ -88,7 +94,7 @@ export function SheetEditor({ sheet, onChange }: SheetEditorProps) {
   });
 
   const addSection = () => {
-    const id = nextSectionId(sheet.sections);
+    const id = allocateSectionId?.() ?? nextSectionId(sheet.sections);
     const section: SheetSectionV1 = {
       id,
       label: defaultSectionLabel(sheet.sections),
@@ -180,6 +186,7 @@ export function SheetEditor({ sheet, onChange }: SheetEditorProps) {
               onRemove={() => removeSection(idx)}
               onMoveUp={() => moveSection(idx, -1)}
               onMoveDown={() => moveSection(idx, 1)}
+              allocateElementId={allocateElementId}
             />
           ))}
         </ul>

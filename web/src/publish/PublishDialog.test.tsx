@@ -249,4 +249,38 @@ describe("PublishDialog", () => {
     expect(screen.getByTestId("publish-dialog-success")).toHaveTextContent("1.0.0");
     expect(screen.getByTestId("publish-dialog-success")).toHaveTextContent("deadbeef");
   });
+
+  it("success card links to character creation for the published version", async () => {
+    const user = userEvent.setup();
+    const fetch_ = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/publish") && init?.method === "POST") {
+        return new Response(
+          JSON.stringify({
+            version: {
+              versionId: "v1",
+              systemId: "s1",
+              semanticVersion: "1.0.0",
+              checksum: "deadbeef",
+              package: {},
+              releaseNotes: "init",
+              lifecycle: "active",
+              createdAt: "2026-01-01T00:00:00Z",
+            },
+            requestId: "r",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response("{}", { status: 200 });
+    });
+    renderDialog({ fetch_ });
+    await user.click(screen.getByTestId("publish-dialog-submit"));
+    const cta = await screen.findByTestId("publish-dialog-create-character");
+    expect(cta).toHaveAttribute("href", "/characters/new?systemVersionId=v1");
+    expect(cta).toHaveTextContent("Create test character");
+    // versionId/checksum display + Close are preserved alongside the CTA.
+    expect(screen.getByTestId("publish-dialog-success")).toHaveTextContent("v1");
+    expect(screen.getByTestId("publish-dialog-success")).toHaveTextContent("deadbeef");
+    expect(screen.getByTestId("publish-dialog-close")).toBeInTheDocument();
+  });
 });

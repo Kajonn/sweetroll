@@ -119,13 +119,29 @@ export function AppShell({ children }: { children: ReactNode }) {
     const snapshot = identity.getSnapshot();
     const previous = lastLifetimeRef.current;
     lastLifetimeRef.current = { actor: snapshot.actorId, generation: snapshot.generation };
+    // Lifetime transitions and query hygiene:
+    // - AWAY from a previous account (switch, sign-out, generation bump):
+    //   cancel in-flight work and purge cached account data so the next
+    //   lifetime never reads it.
+    // - NULL → actor settle (initial load, reload, direct link, sign-in):
+    //   only invalidate. The editor/library may already be fetching under
+    //   the fresh lifetime, and cancelling then strands the open query
+    //   pending forever; invalidation still refetches error-state queries
+    //   (e.g. the library's anonymous 401) without killing live fetches.
+    //   Skipping the purge here is safe: sign-out already purged the previous
+    //   account on its actor→null transition, and anonymous flights only
+    //   ever 401.
     if (
       previous !== null &&
       (previous.actor !== snapshot.actorId || previous.generation !== snapshot.generation)
     ) {
-      void queryClient.cancelQueries().then(() => {
-        queryClient.removeQueries();
-      });
+      if (previous.actor !== null) {
+        void queryClient.cancelQueries().then(() => {
+          queryClient.removeQueries();
+        });
+      } else {
+        void queryClient.invalidateQueries();
+      }
     }
   });
   useShortcut("?", () => setHelpOpen(true));

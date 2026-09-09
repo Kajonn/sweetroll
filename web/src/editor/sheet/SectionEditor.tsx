@@ -25,6 +25,13 @@ export type SectionEditorProps = {
   onRemove: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  /**
+   * Document-wide element-id allocator. Definition IDs must be unique
+   * across the whole document (`duplicate_definition_id` blocks saves), so
+   * the sheet owner passes an allocator that sees every section. Falls back
+   * to section-local allocation when absent (standalone/test use).
+   */
+  allocateElementId?: (() => DefinitionId) | undefined;
 };
 
 export function SectionEditor({
@@ -39,6 +46,7 @@ export function SectionEditor({
   onRemove,
   onMoveUp,
   onMoveDown,
+  allocateElementId,
 }: SectionEditorProps) {
   const replaceSection = (patch: Partial<SheetSectionV1>) => {
     onChange({ ...section, ...patch });
@@ -80,7 +88,7 @@ export function SectionEditor({
   });
 
   const addElement = (kind: SheetElementKind) => {
-    const id = nextElementId(section.elements);
+    const id = allocateElementId?.() ?? nextElementId(section.elements);
     const element = makeElementOfKind(kind, id);
     replaceSection({ elements: [...section.elements, element] });
     onActivateElement(section.elements.length);

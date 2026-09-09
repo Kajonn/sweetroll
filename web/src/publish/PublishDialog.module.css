@@ -242,6 +242,31 @@
   gap: 8px;
 }
 
+/* Post-publish handoff: plain anchor (Router-less safe, see
+   VersionHistory) styled as the primary action. Semantic tokens only. */
+.createLink {
+  font: inherit;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--action-primary);
+  background: var(--action-primary);
+  color: var(--action-primary-fg);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.createLink:hover {
+  filter: brightness(0.95);
+}
+
+.createLink:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .cancel,
 .submit {
   font: inherit;

@@ -2,6 +2,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .toolbar {
@@ -25,15 +27,18 @@
   padding: 0;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .list li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 4px 12px;
   padding: 8px 12px;
   border-bottom: 1px solid var(--color-border);
+  min-width: 0;
 }
 
 .list li:focus,
@@ -45,6 +50,8 @@
 .list a {
   color: var(--color-fg);
   text-decoration: none;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .list a:hover {

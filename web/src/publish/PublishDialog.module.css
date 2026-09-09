@@ -65,6 +65,7 @@
 
 .bumps {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: 4px;
 }
@@ -169,10 +170,17 @@
 
 .metaRow {
   display: grid;
-  grid-template-columns: 120px 1fr;
+  grid-template-columns: 120px minmax(0, 1fr);
   gap: 8px;
   align-items: baseline;
   margin: 0;
+}
+
+/* Phone: stack the version-id/checksum rows single-column. */
+@media (max-width: 399px) {
+  .metaRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .metaKey {
@@ -202,6 +210,7 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
 }

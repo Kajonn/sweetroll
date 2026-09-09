@@ -1,16 +1,74 @@
 .shell {
-  display: grid;
-  grid-template-rows: 48px 1fr 28px;
-  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
+
+.skipLink {
+  position: absolute;
+  inset-inline-start: 8px;
+  top: -48px;
+  z-index: 50;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-fg);
+  color: var(--color-bg);
+  transition: top 0.15s ease;
+}
+
+.skipLink:focus-visible {
+  top: 8px;
+}
+
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  padding-top: env(safe-area-inset-top);
+  padding-inline-start: max(16px, env(safe-area-inset-left));
+  padding-inline-end: max(16px, env(safe-area-inset-right));
+  padding-bottom: 8px;
+  min-height: 48px;
   border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
   font-weight: 600;
 }
+
+.brand {
+  white-space: nowrap;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.navLink {
+  white-space: nowrap;
+  padding: 10px 4px;
+}
+
+.actions {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.signOutStatus {
+  white-space: nowrap;
+}
+
 .helpButton {
   display: inline-flex;
   align-items: center;
@@ -20,20 +78,94 @@
   color: var(--color-fg-muted);
   border-radius: var(--radius-sm);
   padding: 4px;
+  min-width: 44px;
+  min-height: 44px;
 }
 .helpButton:hover {
   color: var(--color-fg);
   background: var(--color-bg);
 }
+
+/* Single neutral content region. Views own their internal columns; the
+   shell never imposes a column grid here (no 240px first-column
+   assumption). Attribute/media-query driven only: no JS resize listeners,
+   so children are never remounted on viewport or theme changes. */
 .main {
-  display: grid;
-  grid-template-columns: 240px minmax(280px, 360px) 1fr;
+  flex: 1 1 auto;
+  display: block;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding-inline-start: max(16px, env(safe-area-inset-left));
+  padding-inline-end: max(16px, env(safe-area-inset-right));
+  padding-top: 16px;
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  scroll-padding-top: 72px;
+  scroll-padding-bottom: 56px;
 }
-@media (max-width: 1023px) {
-  .main { grid-template-columns: 240px 1fr; }
+
+.main > * {
+  min-width: 0;
+  min-inline-size: 0;
+  max-inline-size: 100%;
 }
-@media (max-width: 767px) {
-  .main { grid-template-columns: 1fr; }
+
+/* Sticky header/footer must not cover focused controls, validation
+   errors, or status messages when the browser scrolls them into view. */
+.main :is(:focus-visible, [aria-invalid="true"], [role="alert"], [role="status"]) {
+  scroll-margin-top: 72px;
+  scroll-margin-bottom: 56px;
+}
+
+/* The StatusBar footer stays in normal flow (sticky, never fixed) so a
+   software keyboard or viewport resize cannot trap primary actions
+   behind an overlay. Styled here so StatusBar itself stays untouched. */
+.shell > footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  background: var(--color-bg);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-inline-start: max(12px, env(safe-area-inset-left));
+  padding-inline-end: max(12px, env(safe-area-inset-right));
+}
+
+/* Phone: 320-599px. Single column, compact chrome, wrapping nav. */
+@media (max-width: 599px) {
+  .header {
+    row-gap: 4px;
+    font-size: 15px;
+  }
+  .nav {
+    order: 3;
+    flex-basis: 100%;
+  }
+  .main {
+    padding-top: 12px;
+  }
+}
+
+/* Tablet: 600-1023px. Header and nav share one row where they fit. */
+@media (min-width: 600px) and (max-width: 1023px) {
+  .header {
+    padding-bottom: 10px;
+  }
+  .main {
+    padding-top: 16px;
+  }
+}
+
+/* Desktop: 1024px+. Persistent chrome, comfortable content padding. */
+@media (min-width: 1024px) {
+  .main {
+    padding-top: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skipLink {
+    transition: none;
+  }
 }

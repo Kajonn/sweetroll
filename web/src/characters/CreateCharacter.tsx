@@ -6,6 +6,7 @@ import { t } from "../i18n/index.js";
 import type { CharactersApi } from "./api.js";
 import type { CharacterStore, OnlineAttempt } from "./store.js";
 import type { CreationOptions, CreationVersionEntry, FrozenRequest, ReviewExpiredAttemptInput } from "./types.js";
+import styles from "./characters.module.css";
 
 export type CreateCharacterIdentity = {
   getActorId(): string | null;
@@ -708,7 +709,7 @@ export function CreateCharacter({
   const expiredAttempt = expired;
 
   return (
-    <section aria-labelledby="create-character-title">
+    <section aria-labelledby="create-character-title" className={styles.create}>
       <h1 id="create-character-title">{t("character.create.title")}</h1>
       {pending !== null && expiredAttempt === null ? <p role="status">{t("character.create.pending")}</p> : null}
       <form

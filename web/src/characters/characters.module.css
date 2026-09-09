@@ -1,4 +1,11 @@
-.sheet { display: flex; flex-direction: column; gap: 16px; width: min(100%, 720px); margin: 0 auto; padding: 12px; color: var(--color-fg); }
+.sheet { display: flex; flex-direction: column; gap: 16px; width: min(100%, 720px); max-width: 100%; min-width: 0; margin: 0 auto; padding: 12px; color: var(--color-fg); }
+/* View-owned readable widths: the routed detail and creation views stay
+   in the same centered column as the sheet instead of sprawling. */
+.detail, .create { display: grid; gap: 12px; align-content: start; width: min(100%, 720px); max-width: 100%; min-width: 0; margin: 0 auto; padding: 12px; color: var(--color-fg); }
+.create form { display: grid; gap: 8px; min-width: 0; }
+.create input, .create select { max-width: 100%; min-width: 0; }
+.create ul { margin: 0; padding-left: 18px; min-width: 0; }
+.create li { overflow-wrap: break-word; }
 .header, .sheetSection, .section, .completion { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
 .header { position: sticky; top: 0; z-index: 1; }
 .header h1, .sheetSection h2, .section h3, .completion h2, .heading2, .heading3 { margin: 0; }
@@ -8,13 +15,13 @@
 .checkboxLabel { display: flex; align-items: center; gap: 8px; min-height: 44px; }.checkboxLabel input { min-height: auto; }.choiceList { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 6px 0; border: 0; }.choiceList label { display: flex; gap: 4px; align-items: center; min-height: 44px; }.validationList { margin: 0; padding-left: 18px; color: var(--color-error); font-size: 12px; }
 .readOnlyField, .imageUnavailable, .resource { display: flex; align-items: center; gap: 8px; min-height: 36px; }.readOnlyField > span, .imageUnavailable > span:first-child { font-size: 12px; color: var(--color-fg-muted); }.imageUnavailable > span:last-child { color: var(--color-warning-fg); font-size: 12px; }
 .resourceGroup { display: flex; flex-direction: column; gap: 4px; }.resourceValue { margin-right: auto; font-variant-numeric: tabular-nums; font-weight: 600; }.resource button, .actionButton, .detailButton { min-height: 44px; padding: 6px 10px; border: 1px solid var(--color-accent); border-radius: var(--radius-sm); background: var(--color-accent); color: var(--color-accent-fg); }.resource button:disabled, .actionButton:disabled { border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg-muted); cursor: not-allowed; }.stale, .actionUnavailable, .completionUnavailable { margin: 0; color: var(--color-warning-fg); font-size: 12px; }
-.meta, .estimateNote { margin: 0; font-size: 12px; color: var(--color-fg-muted); }
-.commandError, .fieldError { margin: 0; color: var(--color-error); font-size: 12px; }
+.meta, .estimateNote { margin: 0; font-size: 12px; color: var(--color-fg-muted); overflow-wrap: break-word; }
+.commandError, .fieldError { margin: 0; color: var(--color-error); font-size: 12px; overflow-wrap: break-word; }
 .diagnostics { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }.diagnostics h2 { margin: 0; font-size: 16px; }
-.rollResult { padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }.rollResult h2 { margin: 0 0 8px; font-size: 16px; }.rollResult dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; }.rollResult dt { color: var(--color-fg-muted); font-size: 12px; }.rollResult dd { margin: 0; font-family: var(--font-mono); }.rollDetails ul { margin: 8px 0 0; padding-left: 18px; font-family: var(--font-mono); font-size: 12px; }
+.rollResult { padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); min-width: 0; }.rollResult h2 { margin: 0 0 8px; font-size: 16px; }.rollResult dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; min-width: 0; }.rollResult dt { color: var(--color-fg-muted); font-size: 12px; }.rollResult dd { margin: 0; font-family: var(--font-mono); min-width: 0; overflow-wrap: anywhere; }.rollDetails ul { margin: 8px 0 0; padding-left: 18px; font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
 /* Recovery and management controls keep phone-usable touch targets. */
 .toolButton, .dialogButton { min-height: 44px; min-width: 44px; padding: 8px 12px; border: 1px solid var(--color-accent); border-radius: var(--radius-sm); background: var(--color-accent); color: var(--color-accent-fg); font: inherit; }
 .toolButton:disabled, .dialogButton:disabled { border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg-muted); cursor: not-allowed; }
 .checkRow { display: flex; align-items: center; gap: 8px; min-height: 44px; }
-.dialogField { min-height: 44px; padding: 6px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-fg); font: inherit; }
-@media (max-width: 420px) { .sheet { padding: 8px; }.resource { flex-wrap: wrap; }.resourceValue { flex-basis: 100%; order: 2; }.resource button { flex: 1; } }
+.dialogField { max-width: 100%; min-width: 0; min-height: 44px; padding: 6px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-fg); font: inherit; }
+@media (max-width: 420px) { .sheet { padding: 8px; }.detail, .create { padding: 8px; }.resource { flex-wrap: wrap; }.resourceValue { flex-basis: 100%; order: 2; }.resource button { flex: 1; } }

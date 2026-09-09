@@ -264,6 +264,10 @@ function DocumentEditorBody({
   useShortcut("Alt+D", () => setDiagnosticsOpen((v) => !v));
   useShortcut("Alt+V", () => setVersionHistoryOpen((v) => !v));
 
+  // Layout only: when the preview pane is visible, the body switches to a
+  // side-by-side editor/preview grid on desktop widths (stacked below).
+  const previewVisible = previewOpen && previewPackage !== null && previewSample !== null;
+
   return (
     <section className={styles.container}>
       <header className={styles.header} data-testid="document-editor-header">
@@ -393,7 +397,11 @@ function DocumentEditorBody({
           );
         })}
       </nav>
-      <main className={styles.body} ref={bodyRef} data-testid={`document-editor-body-${active}`}>
+      <main
+        className={previewVisible ? `${styles.body} ${styles.bodySplit}` : styles.body}
+        ref={bodyRef}
+        data-testid={`document-editor-body-${active}`}
+      >
         {previewOpen && previewPackage !== null && previewSample !== null ? (
           <div className={styles.previewPane} data-testid="document-editor-preview">
             <PreviewFrame>
@@ -963,7 +971,12 @@ function VersionHistoryOverlay({
   onClose: () => void;
 }) {
   return (
-    <div role="dialog" aria-label={t("editor.versionHistory.titleInHeader")} data-testid="document-editor-version-history">
+    <div
+      role="dialog"
+      aria-label={t("editor.versionHistory.titleInHeader")}
+      data-testid="document-editor-version-history"
+      className={styles.versionOverlay}
+    >
       <header>
         <h2>{t("editor.versionHistory.titleInHeader")}</h2>
         <button type="button" onClick={onClose} data-testid="document-editor-version-history-close">

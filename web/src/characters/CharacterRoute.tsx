@@ -10,6 +10,7 @@ import { createCharacterSession, type CoordinationPort, type IdentityPort } from
 import { openCharacterStore, type CharacterStore } from "./store.js";
 import { useCharacterSession } from "./useCharacterSession.js";
 import { useOfflineAvailability } from "../offline/useOfflineAvailability.js";
+import styles from "./characters.module.css";
 
 /**
  * SPA navigation callbacks for the character detail surface. The route
@@ -234,7 +235,7 @@ function CharacterDetailLoaded({
     );
   }
   return (
-    <div>
+    <div className={styles.detail}>
       {!online ? <p role="status">{t("character.detail.offlineCached")}</p> : null}
       <p role="status">{snapshot.editing.owned ? t("character.detail.editing") : t("character.detail.readOnly")}</p>
       {readOnly ? (

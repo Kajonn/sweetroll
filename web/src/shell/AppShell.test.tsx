@@ -1,13 +1,18 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { useEffect, useRef } from "react";
 
 import { createApiClient } from "../api/client.js";
 import { DocumentEditor } from "../editor/DocumentEditor.js";
+import { registerLocale, resetLocale } from "../i18n/index.js";
+import { defaultMessages } from "../i18n/messages.js";
 import { queryClient } from "../queryClient.js";
 import { AppShell, useAuth } from "./AppShell.js";
+import styles from "./AppShell.module.css";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
@@ -245,5 +250,157 @@ describe("AppShell", () => {
       else document.documentElement.setAttribute("data-theme", previousTheme);
       document.documentElement.style.colorScheme = "";
     }
+  });
+});
+
+// G3-1: AppShell owns header/nav + ONE flexible content region. Views own
+// their internal columns. jsdom has no layout engine, so viewport coverage
+// is: (a) real computed-style assertions from the injected stylesheet,
+// (b) CSS-text assertions for breakpoint bands/safe areas/scroll guards,
+// (c) mount-identity assertions across simulated 320/768/1280 resizes.
+const SHELL_CSS_PATH = join(process.cwd(), "src/shell/AppShell.module.css");
+
+function readShellCss(): string {
+  return readFileSync(SHELL_CSS_PATH, "utf8");
+}
+
+describe("AppShell responsive shell (G3-1)", () => {
+  let styleEl: HTMLStyleElement | null = null;
+
+  beforeAll(() => {
+    // CSS modules hash class names: rewrite the raw selectors to the mapped
+    // names so computed-style assertions exercise the real rules. Sort long
+    // names first so `.nav` never corrupts `.navLink`.
+    let css = readShellCss();
+    const entries = Object.entries(styles as Record<string, string>)
+      .sort((a, b) => b[0].length - a[0].length);
+    for (const [local, mapped] of entries) {
+      css = css.split(`.${local}`).join(`.${mapped}`);
+    }
+    styleEl = document.createElement("style");
+    styleEl.setAttribute("data-testid", "g3-shell-test-style");
+    styleEl.textContent = css;
+    document.head.appendChild(styleEl);
+  });
+
+  afterAll(() => {
+    styleEl?.remove();
+    styleEl = null;
+  });
+
+  function stubAuthenticated(userId = "shell-user"): void {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      JSON.stringify({ state: "authenticated", userId }),
+    )));
+  }
+
+  it("renders a single flexible content region with no column-grid assumption", async () => {
+    stubAuthenticated();
+    render(<AppShell><section data-testid="view">view body</section></AppShell>);
+    await screen.findByRole("button", { name: "Sign out" });
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+    const main = screen.getByTestId("app-content");
+    expect(main).toContainElement(screen.getByTestId("view"));
+    // Neutral flexible container: block flow the view fills, never a routed
+    // child pinned to the first column of a multi-column grid. (jsdom does
+    // not expose min-width through getComputedStyle, so that half of the
+    // assertion reads the stylesheet text below.)
+    expect(getComputedStyle(main).display).toBe("block");
+    const css = readShellCss();
+    expect(css).toMatch(/\.main\s*\{[^}]*min-width\s*:\s*0/s);
+    expect(css).not.toMatch(/grid-template-columns\s*:\s*240px/);
+    expect(css).not.toMatch(/minmax\(280px, ?360px\)/);
+  });
+
+  it("keeps header/nav chrome, gates, switcher, and status intact", async () => {
+    stubAuthenticated();
+    render(<AppShell><span data-testid="child">x</span></AppShell>);
+    await screen.findByRole("button", { name: "Sign out" });
+    expect(screen.getByRole("banner")).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Primary" });
+    expect(nav).toBeInTheDocument();
+    // Plain-anchor deep links (no router context required).
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "New character" })).toHaveAttribute("href", "/characters/new");
+    expect(screen.getByRole("link", { name: "Skip to main content" })).toHaveAttribute("href", "#main-content");
+    // Authorization context stays explicit: sign-out + pending-status slot,
+    // device theme switcher, shortcut help, and status bar.
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Theme")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show keyboard shortcuts" })).toBeInTheDocument();
+    expect(screen.getByTestId("status-bar")).toHaveTextContent("Online");
+    expect(screen.getByTestId("child")).toBeInTheDocument();
+  });
+
+  it("resolves shell chrome strings through the i18n message table", async () => {
+    // G3-3: the three G3-1 chrome literals now live in the message table.
+    expect(defaultMessages["shell.skipToContent"]).toBe("Skip to main content");
+    expect(defaultMessages["shell.nav.label"]).toBe("Primary");
+    expect(defaultMessages["shell.nav.home"]).toBe("Home");
+    try {
+      registerLocale({
+        "shell.skipToContent": "Zum Inhalt springen",
+        "shell.nav.label": "Primär",
+        "shell.nav.home": "Start",
+      });
+      stubAuthenticated();
+      render(<AppShell><span data-testid="child">x</span></AppShell>);
+      await screen.findByRole("button", { name: "Sign out" });
+      expect(screen.getByRole("link", { name: "Zum Inhalt springen" })).toHaveAttribute("href", "#main-content");
+      expect(screen.getByRole("navigation", { name: "Primär" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Start" })).toHaveAttribute("href", "/");
+    } finally {
+      resetLocale();
+    }
+  });
+
+  it("adapts shell chrome by breakpoint with safe areas and scroll guards", () => {
+    const css = readShellCss();
+    // Phone 320-599 / tablet 600-1023 / desktop 1024px+ bands.
+    expect(css).toMatch(/@media\s*\(\s*max-width\s*:\s*599px\s*\)/);
+    expect(css).toMatch(/@media\s*\(\s*min-width\s*:\s*600px\s*\)\s*and\s*\(\s*max-width\s*:\s*1023px\s*\)/);
+    expect(css).toMatch(/@media\s*\(\s*min-width\s*:\s*1024px\s*\)/);
+    // Safe-area insets respected in chrome and content padding.
+    expect(css).toMatch(/env\(safe-area-inset-top\)/);
+    expect(css).toMatch(/env\(safe-area-inset-bottom\)/);
+    expect(css).toMatch(/env\(safe-area-inset-left\)/);
+    expect(css).toMatch(/env\(safe-area-inset-right\)/);
+    // Sticky (never fixed) header/footer so a software keyboard or viewport
+    // resize cannot trap primary actions behind an overlay.
+    expect(css).not.toMatch(/position\s*:\s*fixed/);
+    expect(css).toMatch(/position\s*:\s*sticky/);
+    // Sticky chrome must not cover focused controls or errors.
+    expect(css).toMatch(/scroll-margin-top/);
+    expect(css).toMatch(/scroll-padding-top/);
+    // Views own their widths: content children participate with min-width 0.
+    expect(css).toMatch(/min-width\s*:\s*0/);
+  });
+
+  it("does not remount children across viewport changes (320/768/1280)", async () => {
+    stubAuthenticated();
+    let mounts = 0;
+    function Probe() {
+      const seen = useRef(false);
+      useEffect(() => { if (!seen.current) { seen.current = true; mounts += 1; } }, []);
+      return <input data-testid="viewport-probe" defaultValue="keep-me" />;
+    }
+    render(<AppShell><Probe /></AppShell>);
+    await screen.findByRole("button", { name: "Sign out" });
+    mounts = 0;
+    const before = screen.getByTestId("viewport-probe");
+    await userEvent.setup().type(before, "+edited");
+    for (const width of [320, 768, 1280]) {
+      Object.defineProperty(window, "innerWidth", { value: width, configurable: true, writable: true });
+      window.dispatchEvent(new Event("resize"));
+      // Let any resize-driven React work flush.
+      await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
+      // Attribute/media-query driven only: same node, same state, no remount.
+      expect(screen.getByTestId("viewport-probe")).toBe(before);
+      expect(screen.getByTestId("viewport-probe")).toHaveValue("keep-me+edited");
+    }
+    expect(mounts).toBe(0);
+    // Single region still holds the view after every resize.
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+    expect(screen.getByTestId("app-content")).toContainElement(before);
   });
 });

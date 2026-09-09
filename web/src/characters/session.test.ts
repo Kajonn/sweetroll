@@ -1158,9 +1158,10 @@ describe("CharacterSession serialization", () => {
     api.setSendFallback(async () => d.promise);
     const first = session.setField("health", 13).catch(() => {});
     const second = session.setField("gold", 10).catch(() => {});
-    await new Promise((r) => setTimeout(r, 5));
+    // Poll for the first send instead of a fixed sleep: under full-suite
+    // load the IndexedDB/lock pipeline may take longer than a few ms.
+    await vi.waitFor(() => expect(api.sent).toHaveLength(1));
 
-    expect(api.sent).toHaveLength(1);
     d.release(viewFor("char-1", 2));
     await session.whenIdle();
     expect(api.sent.length).toBeGreaterThanOrEqual(2);

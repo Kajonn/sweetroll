@@ -306,7 +306,7 @@ describe("character routes", () => {
     try {
       renderAt("/characters/new?systemVersionId=v-1");
       expect(await screen.findByLabelText("System version ID")).toHaveValue("v-1");
-      await user.click(screen.getByRole("button", { name: "Look up version" }));
+      await user.click(await screen.findByRole("button", { name: "Look up version" }));
       await user.selectOptions(await screen.findByLabelText("Entity"), "hero");
       await user.type(screen.getByLabelText("Character name"), "Briar");
       await user.click(screen.getByRole("button", { name: "Create character" }));

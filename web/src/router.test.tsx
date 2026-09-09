@@ -104,7 +104,17 @@ describe("router", () => {
     globalThis.fetch = fetch_ as unknown as typeof fetch;
     try {
       renderAt("/systems/sys-1");
-      expect(await screen.findByText(/sign in to open this character/i)).toBeInTheDocument();
+      // The anonymous prompt arrives through several async gate publishes,
+      // and AppShell re-renders can REPLACE the <p> node between
+      // findByText's resolve and toBeInTheDocument (proven: found node
+      // detached while an equivalent node is attached). Re-query inside
+      // waitFor so find and attach-check happen in the same poll; the
+      // generous timeout covers slow gate convergence (IndexedDB + /me)
+      // under CI parallel load (proven CI failure at the default timeout).
+      await waitFor(
+        () => expect(screen.getByText(/sign in to open this character/i)).toBeInTheDocument(),
+        { timeout: 10000 },
+      );
       expect(screen.queryByTestId("document-editor-loading")).not.toBeInTheDocument();
       expect(fetch_.mock.calls.some(([input]) => String(input).includes("/systems/sys-1"))).toBe(false);
     } finally {

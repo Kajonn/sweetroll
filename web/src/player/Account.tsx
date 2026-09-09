@@ -76,7 +76,7 @@ export function Account({ client, identity, storageUnavailable }: AccountProps) 
         </div>
       ) : status === 401 ? (
         <section aria-labelledby="account-expired-title">
-          <h2 id="account-expired-title">{t("player.account.title")}</h2>
+          <h2 id="account-expired-title">{t("player.account.expired")}</h2>
           <p role="status">{t("character.detail.signIn")}</p>
           {/* Task 6 owns the expired-session re-auth entry; mount point only. */}
           <div data-testid="account-reauth-mount" />
@@ -84,7 +84,7 @@ export function Account({ client, identity, storageUnavailable }: AccountProps) 
       ) : status === 403 ? (
         <p role="status">{t("character.detail.signIn")}</p>
       ) : me.isError ? (
-        <Panel title={t("player.account.title")}>
+        <Panel>
           <p role="alert">{t("player.library.loadFailed")}</p>
           <p>{t("player.library.retryHint")}</p>
           <Button type="button" variant="secondary" onClick={() => void me.refetch()}>
@@ -92,7 +92,7 @@ export function Account({ client, identity, storageUnavailable }: AccountProps) 
           </Button>
         </Panel>
       ) : me.data === undefined || me.data.state === "anonymous" || me.data.userId === "" ? (
-        <Panel title={t("player.account.title")}>
+        <Panel>
           <p role="status">{t("player.account.empty")}</p>
         </Panel>
       ) : (

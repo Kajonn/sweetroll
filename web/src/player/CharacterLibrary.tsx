@@ -143,7 +143,7 @@ export function CharacterLibrary({ api, identity, navigation }: CharacterLibrary
       />
       {library.isLoading ? <p role="status">{t("player.library.loading")}</p> : null}
       {library.isError ? (
-        <Panel title={t("player.library.title")}>
+        <Panel>
           <p role="alert">{t("player.library.loadFailed")}</p>
           <p>{t("player.library.retryHint")}</p>
           <Button type="button" variant="secondary" onClick={() => void library.refetch()}>

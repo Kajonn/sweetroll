@@ -96,7 +96,7 @@ export function PersonalActivity({ api, identity }: PersonalActivityProps) {
     return (
       <div data-testid="personal-activity">
         <PageHeader title={t("player.activity.title")} description={t("player.activity.description")} />
-        <Panel title={t("player.activity.title")}>
+        <Panel>
           <p role="alert">{t("character.tools.activityFailed")}</p>
         </Panel>
       </div>
@@ -116,11 +116,11 @@ export function PersonalActivity({ api, identity }: PersonalActivityProps) {
     <div data-testid="personal-activity">
       <PageHeader title={t("player.activity.title")} description={t("player.activity.description")} />
       {items.length === 0 ? (
-        <Panel title={t("player.activity.title")}>
+        <Panel>
           <EmptyState title={t("player.activity.empty")} description={t("player.activity.emptyHint")} />
         </Panel>
       ) : (
-        <Panel title={t("player.activity.title")}>
+        <Panel>
           <ul className={styles.feed}>
             {items.map(({ event, character }) => (
               <li

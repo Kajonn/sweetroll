@@ -294,6 +294,10 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
     },
 
     async listAuthorizedVersions(actorId) {
+      // OD-01 option A (unlisted/link-only): enumeration exposes only systems
+      // owned by the actor plus explicitly discoverable (public) systems.
+      // Other owners' link-access systems stay usable via a known version ID
+      // through authorizeVersionUse, but are excluded here.
       const result = await pool.query<AuthorizedCreationVersionRow>(
         `SELECT v.id AS version_id, s.id AS system_id, s.name AS system_name,
                 v.semantic_version, v.created_at
@@ -301,7 +305,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
            JOIN systems s ON s.id = v.system_id
           WHERE v.lifecycle = 'published'
             AND s.lifecycle = 'active'
-            AND (s.owner_id = $1 OR s.access IN ('public', 'link'))
+            AND (s.owner_id = $1 OR s.access = 'public')
           ORDER BY s.name ASC, v.created_at DESC, v.id DESC`,
         [actorId],
       );

@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { t } from "../i18n/index.js";
 import type { FieldV1 } from "../state/documentFieldTypes.js";
+import { Button, EmptyState, FormField, Select } from "../ui/index.js";
 
 import { BooleanFieldEditor } from "./fields/BooleanFieldEditor.js";
 import { ChoiceFieldEditor } from "./fields/ChoiceFieldEditor.js";
@@ -215,19 +216,18 @@ export function EntityList({
       <aside className={styles.sidebar} aria-label={t("editor.entities.title")} data-testid="entity-list-sidebar">
         <header className={styles.sidebarHeader}>
           <h2 className={styles.sidebarTitle}>{t("editor.entities.title")}</h2>
-          <button
-            type="button"
-            className={styles.addButton}
+          <Button
+            variant="secondary"
             onClick={addEntity}
             data-testid="entity-list-add"
           >
             {t("editor.entities.add")}
-          </button>
+          </Button>
         </header>
         {entities.length === 0 ? (
-          <p className={styles.empty} data-testid="entity-list-empty">
-            {t("editor.entities.empty")}
-          </p>
+          <div data-testid="entity-list-empty">
+            <EmptyState title={t("editor.entities.empty")} />
+          </div>
         ) : (
           <ul className={styles.entityList}>
             {entities.map((entity) => {
@@ -243,8 +243,8 @@ export function EntityList({
                   data-testid={`entity-row-${entity.id}`}
                   data-selected={isSelected}
                 >
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
                     className={styles.entitySelect}
                     onClick={() => onSelectEntity(entity.id)}
                     aria-current={isSelected ? "true" : undefined}
@@ -254,7 +254,7 @@ export function EntityList({
                     <span className={styles.entityMeta}>
                       {entity.fields.length} {countLabel}
                     </span>
-                  </button>
+                  </Button>
                 </li>
               );
             })}
@@ -263,9 +263,9 @@ export function EntityList({
       </aside>
       <section className={styles.detail} data-testid="entity-list-detail">
         {selected === null ? (
-          <p className={styles.placeholder} data-testid="entity-list-no-selection">
-            {t("editor.entities.empty")}
-          </p>
+          <div data-testid="entity-list-no-selection">
+            <EmptyState title={t("editor.entities.empty")} />
+          </div>
         ) : (
           <EntityDetail
             entity={selected}
@@ -300,17 +300,18 @@ function EntityDetail({
   return (
     <div className={styles.detailInner}>
       <header className={styles.detailHeader}>
-        <label className={styles.labelField} htmlFor={`entity-label-${entity.id}`}>
-          {t("editor.fields.label")}
-          <input
-            id={`entity-label-${entity.id}`}
-            type="text"
-            value={entity.label}
-            maxLength={120}
-            onChange={(e) => onChange({ label: e.target.value })}
-            data-testid={`entity-label-input-${entity.id}`}
-          />
-        </label>
+        <div className={styles.labelField}>
+          <FormField label={t("editor.fields.label")}>
+            <input
+              id={`entity-label-input-${entity.id}`}
+              type="text"
+              value={entity.label}
+              maxLength={120}
+              onChange={(e) => onChange({ label: e.target.value })}
+              data-testid={`entity-label-input-${entity.id}`}
+            />
+          </FormField>
+        </div>
         <div className={styles.detailMeta}>
           <span className={styles.monoLabel}>{t("editor.entity.idLabel")} {entity.id}</span>
           <RemoveEntityButton entity={entity} onRemove={onRemove} />
@@ -318,34 +319,31 @@ function EntityDetail({
       </header>
       <div className={styles.fieldsHeader}>
         <h3 className={styles.fieldsTitle}>{t("editor.entities.fields")}</h3>
-        <label className={styles.kindField} htmlFor={`entity-field-kind-${entity.id}`}>
-          {t("editor.entities.fieldKind")}
-          <select
-            id={`entity-field-kind-${entity.id}`}
-            className={styles.kindPicker}
-            value={fieldKind}
-            onChange={(e) => setFieldKind(e.target.value as FieldV1["kind"])}
-            data-testid={`entity-field-kind-picker-${entity.id}`}
-          >
-            <option value="text">{t("editor.fields.kind.text")}</option>
-            <option value="integer">{t("editor.fields.kind.integer")}</option>
-            <option value="singleChoice">{t("editor.fields.kind.singleChoice")}</option>
-            <option value="resource">{t("editor.fields.kind.resource")}</option>
-          </select>
-        </label>
-        <button
-          type="button"
-          className={styles.addButton}
+        <Select
+          label={t("editor.entities.fieldKind")}
+          id={`entity-field-kind-${entity.id}`}
+          value={fieldKind}
+          onChange={(e) => setFieldKind(e.target.value as FieldV1["kind"])}
+          data-testid={`entity-field-kind-picker-${entity.id}`}
+          options={[
+            { value: "text", label: t("editor.fields.kind.text") },
+            { value: "integer", label: t("editor.fields.kind.integer") },
+            { value: "singleChoice", label: t("editor.fields.kind.singleChoice") },
+            { value: "resource", label: t("editor.fields.kind.resource") },
+          ]}
+        />
+        <Button
+          variant="secondary"
           onClick={() => onAddField(fieldKind)}
           data-testid={`entity-add-field-${entity.id}`}
         >
           {t("editor.entities.addField")}
-        </button>
+        </Button>
       </div>
       {entity.fields.length === 0 ? (
-        <p className={styles.placeholder} data-testid={`entity-fields-empty-${entity.id}`}>
-          {t("editor.entities.noFields")}
-        </p>
+        <div data-testid={`entity-fields-empty-${entity.id}`}>
+          <EmptyState title={t("editor.entities.noFields")} />
+        </div>
       ) : (
         <div className={styles.fieldsList}>
           {entity.fields.map((field) => (
@@ -372,14 +370,13 @@ function RemoveEntityButton({
   return (
     <Dialog.Root>
       <Dialog.Trigger asChild>
-        <button
-          type="button"
-          className={styles.removeButton}
+        <Button
+          variant="secondary"
           aria-label={t("editor.entity.removeAria", { label: entity.label })}
           data-testid={`entity-row-${entity.id}-remove`}
         >
           {t("editor.entities.removeConfirm.confirm")}
-        </button>
+        </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className={styles.dialogOverlay} />
@@ -397,23 +394,21 @@ function RemoveEntityButton({
           </p>
           <div className={styles.dialogActions}>
             <Dialog.Close asChild>
-              <button
-                type="button"
-                className={styles.dialogCancel}
+              <Button
+                variant="secondary"
                 data-testid="entity-remove-confirm-cancel"
               >
                 {t("editor.entities.removeConfirm.cancel")}
-              </button>
+              </Button>
             </Dialog.Close>
             <Dialog.Close asChild>
-              <button
-                type="button"
-                className={styles.dialogDestructive}
+              <Button
+                variant="danger"
                 onClick={() => onRemove(entity.id)}
                 data-testid="entity-remove-confirm-submit"
               >
                 {t("editor.entities.removeConfirm.confirm")}
-              </button>
+              </Button>
             </Dialog.Close>
           </div>
         </Dialog.Content>

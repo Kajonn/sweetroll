@@ -1,10 +1,13 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { EntityList } from "./EntityList.js";
 import type { FieldV1 } from "../state/documentFieldTypes.js";
+import buttonStyles from "../ui/Button.module.css";
 
 function makeEntity(id: string, label: string, fields: FieldV1[] = []) {
   return { id, label, fields };
@@ -185,8 +188,7 @@ describe("EntityList", () => {
     expect(npc?.label).toBe("Foe");
   });
 
-  it("adds a new field via 'Add field'", async () => {
-    const user = userEvent.setup();
+  it("adds a new field via 'Add field'", async () => {    const user = userEvent.setup();
     const { onChange } = renderList([makeEntity("character", "Character")]);
     await user.click(screen.getByTestId("entity-add-field-character"));
     expect(onChange).toHaveBeenCalled();
@@ -194,5 +196,22 @@ describe("EntityList", () => {
     const character = lastCall?.find((e: { id: string }) => e.id === "character");
     expect(character?.fields).toHaveLength(1);
     expect(character?.fields[0]?.kind).toBe("text");
+  });
+
+  it("associates exactly one label with the entity name input (no double-label)", () => {
+    renderList([makeEntity("npc", "NPC")]);
+    const input = screen.getByTestId("entity-label-input-npc");
+    expect(input.id).not.toBe("");
+    expect(document.querySelectorAll(`label[for="${input.id}"]`)).toHaveLength(1);
+  });
+
+  it("renders creator actions on shared Button roles with semantic tokens only", () => {
+    renderList([makeEntity("npc", "NPC")]);
+    for (const testid of ["entity-list-add", "entity-add-field-npc"]) {
+      const button = screen.getByTestId(testid);
+      expect(button.className.split(/\s+/)).toContain(buttonStyles.button);
+    }
+    const css = readFileSync(resolve(process.cwd(), "src/editor/EntityList.module.css"), "utf8");
+    expect(css).not.toMatch(/var\(--color-/);
   });
 });

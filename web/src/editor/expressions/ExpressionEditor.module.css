@@ -15,40 +15,40 @@
   display: grid;
   gap: 12px;
   padding: 12px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-page);
 }
 
 .sourceLabel {
   display: grid;
   gap: 6px;
   font-size: 12px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   font-weight: 500;
 }
 
-.sourceLabel textarea {
+.pane textarea {
   font: inherit;
-  font-family: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
-  color: var(--color-fg);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  font-family: var(--font-code);
+  color: var(--text-primary);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
   padding: 8px 10px;
   min-height: 8em;
   width: 100%;
   resize: vertical;
 }
 
-.sourceLabel textarea:focus-visible {
-  outline: 2px solid var(--color-accent);
+.pane textarea:focus-visible {
+  outline: var(--focus-ring);
   outline-offset: 1px;
 }
 
 .sourceError textarea {
-  text-decoration: underline wavy var(--color-error, #dc2626);
-  border-color: var(--color-error, #dc2626);
+  text-decoration: underline wavy var(--status-error);
+  border-color: var(--status-error);
 }
 
 .actions {
@@ -59,10 +59,10 @@
 
 .checkButton {
   font: inherit;
-  color: var(--color-bg);
-  background: var(--color-accent);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-sm);
+  color: var(--action-primary-fg);
+  background: var(--action-primary);
+  border: 1px solid var(--action-primary);
+  border-radius: var(--radius-control);
   padding: 6px 14px;
   cursor: pointer;
 }
@@ -78,14 +78,14 @@
 
 .shortcutHint {
   font-size: 11px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
 }
 
 .section {
   display: grid;
   gap: 6px;
   font-size: 12px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   font-weight: 500;
 }
 
@@ -96,29 +96,29 @@
   display: grid;
   gap: 4px;
   font-size: 13px;
-  color: var(--color-fg);
+  color: var(--text-primary);
 }
 
 .diagnostics li {
   padding: 6px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--surface-panel);
 }
 
 .diagnostics li[data-severity="error"] {
-  border-color: var(--color-error, #dc2626);
-  background: rgba(220, 38, 38, 0.06);
+  border-color: var(--status-error);
+  background: var(--status-error-bg);
 }
 
 .diagnostics li[data-severity="warning"] {
-  border-color: var(--color-warning, #d97706);
-  background: rgba(217, 119, 6, 0.06);
+  border-color: var(--status-warning);
+  background: var(--status-warning-soft-bg);
 }
 
 .noIssues {
   font-size: 13px;
-  color: var(--color-success, #059669);
+  color: var(--status-success);
 }
 
 .dependencyList {
@@ -131,26 +131,33 @@
 }
 
 .dependencyList li {
-  font-family: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-code);
   font-size: 12px;
-  color: var(--color-fg);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
   padding: 2px 8px;
 }
 
 .ast {
   margin: 0;
   padding: 8px 10px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-family: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  font-family: var(--font-code);
   font-size: 12px;
-  color: var(--color-fg);
+  color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 12em;
   overflow: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layout,
+  .pane {
+    transition: none;
+  }
 }

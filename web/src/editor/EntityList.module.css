@@ -21,9 +21,9 @@
   display: grid;
   gap: 12px;
   padding: 16px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-panel);
   height: fit-content;
   min-width: 0;
 }
@@ -42,10 +42,10 @@
 }
 
 .addButton {
-  background: var(--color-accent);
-  color: var(--color-accent-fg);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-sm);
+  background: var(--action-primary);
+  color: var(--action-primary-fg);
+  border: 1px solid var(--action-primary);
+  border-radius: var(--radius-control);
   padding: 4px 10px;
   font: inherit;
   font-size: 12px;
@@ -59,7 +59,7 @@
 .empty {
   margin: 0;
   font-size: 13px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   font-style: italic;
 }
 
@@ -76,14 +76,14 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-default);
+  background: var(--surface-page);
 }
 
 .entityRowActive {
-  border-color: var(--color-accent);
-  background: var(--color-surface);
+  border-color: var(--action-primary);
+  background: var(--surface-panel);
 }
 
 .entitySelect {
@@ -97,14 +97,14 @@
   border: none;
   cursor: pointer;
   font: inherit;
-  color: var(--color-fg);
+  color: var(--text-primary);
   text-align: left;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   min-width: 0;
 }
 
 .entitySelect:hover {
-  background: var(--color-surface);
+  background: var(--surface-panel);
 }
 
 .entityLabel {
@@ -115,29 +115,29 @@
 
 .entityMeta {
   font-size: 11px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
 }
 
 .removeButton {
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   padding: 4px 8px;
   font-size: 13px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   cursor: pointer;
 }
 
 .removeButton:hover {
-  background: var(--color-bg);
+  background: var(--surface-page);
   color: var(--status-error);
 }
 
 .detail {
   padding: 16px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-panel);
   min-height: 200px;
   min-width: 0;
   max-width: 100%;
@@ -161,7 +161,7 @@
   display: grid;
   gap: 4px;
   font-size: 12px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   font-weight: 500;
   flex: 1 1 240px;
   min-width: 0;
@@ -169,11 +169,19 @@
 
 .labelField input {
   font: inherit;
-  color: var(--color-fg);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--surface-page);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
   padding: 6px 8px;
+  width: 100%;
+  min-height: 44px;
+}
+
+.labelField input:focus-visible,
+.entitySelect:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .detailMeta {
@@ -185,7 +193,7 @@
 .monoLabel {
   font-family: var(--font-code);
   font-size: 12px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   min-width: 0;
   overflow-wrap: break-word;
 }
@@ -196,7 +204,7 @@
   justify-content: space-between;
   gap: 8px;
   padding-top: 4px;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--border-default);
   padding-top: 12px;
 }
 
@@ -235,7 +243,7 @@
 .placeholder {
   margin: 0;
   font-size: 13px;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
   font-style: italic;
 }
 
@@ -249,9 +257,9 @@
   display: grid;
   gap: 8px;
   padding: 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-page);
   min-width: 0;
 }
 
@@ -266,7 +274,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--color-fg-muted);
+  color: var(--text-muted);
 }
 
 .unsupported {
@@ -287,10 +295,10 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: var(--color-surface);
-  color: var(--color-fg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  background: var(--surface-overlay);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-dialog);
   padding: 24px;
   width: min(440px, calc(100vw - 32px));
   box-shadow: var(--shadow-dialog);
@@ -321,19 +329,19 @@
 .dialogDestructive {
   font: inherit;
   padding: 6px 14px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   border: 1px solid transparent;
   cursor: pointer;
 }
 
 .dialogCancel {
   background: transparent;
-  color: var(--color-fg);
-  border-color: var(--color-border);
+  color: var(--text-primary);
+  border-color: var(--border-default);
 }
 
 .dialogCancel:hover {
-  background: var(--color-bg);
+  background: var(--surface-page);
 }
 
 .dialogDestructive {
@@ -344,4 +352,12 @@
 
 .dialogDestructive:hover {
   filter: brightness(0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layout,
+  .sidebar,
+  .detail {
+    transition: none;
+  }
 }

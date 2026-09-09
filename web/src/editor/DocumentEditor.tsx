@@ -34,6 +34,7 @@ import {
   type ValidationV1,
 } from "../state/documentReducer.js";
 import { useShortcut } from "../shell/useShortcut.js";
+import { Button, EmptyState } from "../ui/index.js";
 import { ValidationEditor } from "./validations/ValidationEditor.js";
 import styles from "./DocumentEditor.module.css";
 
@@ -372,38 +373,34 @@ export function DocumentEditorBody({
           <Check aria-hidden size={14} />
           {autosaveLabel(sync.status)}
         </span>
-        <button
-          type="button"
-          className={styles.secondary}
+        <Button
+          variant="secondary"
           data-testid="document-editor-preview-toggle"
           aria-pressed={previewOpen}
           onClick={() => setPreviewOpen((v) => !v)}
           title={t("editor.preview.buttonShortcut")}
         >
           {t("editor.preview.buttonLabel")}
-        </button>
-        <button
-          type="button"
-          className={styles.secondary}
+        </Button>
+        <Button
+          variant="secondary"
           data-testid="document-editor-diagnostics-toggle"
           aria-pressed={diagnosticsOpen}
           onClick={() => setDiagnosticsOpen((v) => !v)}
         >
           {t("editor.diagnostics.buttonLabel")}
           {errorCount > 0 ? ` (${errorCount})` : ""}
-        </button>
-        <button
-          type="button"
-          className={styles.secondary}
+        </Button>
+        <Button
+          variant="secondary"
           data-testid="document-editor-version-history-toggle"
           aria-pressed={versionHistoryOpen}
           onClick={() => setVersionHistoryOpen((v) => !v)}
         >
           {t("editor.versionHistory.buttonLabel")}
-        </button>
-        <button
-          type="button"
-          className={styles.publish}
+        </Button>
+        <Button
+          variant="primary"
           data-testid="document-editor-publish"
           disabled={publishDisabled}
           aria-disabled={publishDisabled ? "true" : undefined}
@@ -415,7 +412,7 @@ export function DocumentEditorBody({
           }
         >
           {t("editor.publish.label")}
-        </button>
+        </Button>
       </header>
       {sync.banner !== null && (
         <ConflictBanner
@@ -616,16 +613,18 @@ function SheetsTab({
       <section data-testid="sheets-tab" data-path="/sheets">
       <header className={styles.tabHeader}>
         <h2 className={styles.tabTitle}>{t("editor.sheet.label")}</h2>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           onClick={addSheet}
           data-testid="sheet-add-button"
         >
           {t("editor.sheets.addSheet")}
-        </button>
+        </Button>
       </header>
       {sheets.length === 0 ? (
-        <p className={styles.placeholder} data-testid="sheets-tab-empty">{t("editor.sheets.empty")}</p>
+        <div data-testid="sheets-tab-empty">
+          <EmptyState title={t("editor.sheets.empty")} />
+        </div>
       ) : (
         <ul className={styles.sheetList}>
           {sheets.map((sheet, idx) => (
@@ -634,14 +633,14 @@ function SheetsTab({
                 sheet={sheet}
                 onChange={(next) => replaceSheet(idx, next)}
               />
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                className={styles.removeButton}
                 onClick={() => removeSheet(idx)}
                 data-testid={`sheets-tab-remove-${idx}`}
-                className={styles.removeButton}
               >
                 {t("editor.sheet.removeConfirm.confirm")}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -795,15 +794,17 @@ function DiceTab({
     <section data-testid="actions-tab" data-path="/actions">
       <header className={styles.tabHeader}>
         <h2 className={styles.tabTitle}>{t("editor.actions.addTitle")}</h2>
-        <button type="button" onClick={addRoll} data-testid="actions-add-roll">
+        <Button variant="secondary" onClick={addRoll} data-testid="actions-add-roll">
           {t("editor.actions.addRoll")}
-        </button>
-        <button type="button" onClick={addResourceBump} data-testid="actions-add-resource-bump">
+        </Button>
+        <Button variant="secondary" onClick={addResourceBump} data-testid="actions-add-resource-bump">
           {t("editor.actions.addResourceBump")}
-        </button>
+        </Button>
       </header>
       {actions.length === 0 ? (
-        <p className={styles.placeholder} data-testid="actions-tab-empty">{t("editor.actions.empty")}</p>
+        <div data-testid="actions-tab-empty">
+          <EmptyState title={t("editor.actions.empty")} />
+        </div>
       ) : (
         <ul className={styles.actionList}>
           {actions.map((action, idx) => (
@@ -834,14 +835,14 @@ function DiceTab({
                   availableResources={collectResourceFields(document)}
                 />
               )}
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                className={styles.removeButton}
                 onClick={() => removeAction(idx)}
                 data-testid={`actions-tab-remove-${idx}`}
-                className={styles.removeButton}
               >
                 {t("editor.sheet.removeConfirm.confirm")}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -968,12 +969,14 @@ function ValidationsTab({
     <section data-testid="validations-tab" data-path="/validations">
       <header className={styles.tabHeader}>
         <h2 className={styles.tabTitle}>{t("editor.actions.addTitle")}</h2>
-        <button type="button" onClick={addValidation} data-testid="validations-add-button">
+        <Button variant="secondary" onClick={addValidation} data-testid="validations-add-button">
           {t("editor.validations.add")}
-        </button>
+        </Button>
       </header>
       {validations.length === 0 ? (
-        <p className={styles.placeholder} data-testid="validations-tab-empty">{t("editor.validations.empty")}</p>
+        <div data-testid="validations-tab-empty">
+          <EmptyState title={t("editor.validations.empty")} />
+        </div>
       ) : (
         <ul className={styles.validationList}>
           {validations.map((v, idx) => (
@@ -990,14 +993,14 @@ function ValidationsTab({
                 availableExpressions={expressionOptions}
                 availableTargets={targetOptions}
               />
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                className={styles.removeButton}
                 onClick={() => removeValidation(idx)}
                 data-testid={`validations-tab-remove-${idx}`}
-                className={styles.removeButton}
               >
                 {t("editor.sheet.removeConfirm.confirm")}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -1050,27 +1053,27 @@ function ReferenceDataTab({
     <section data-testid="reference-data-tab" data-path="/referenceData">
       <header className={styles.tabHeader}>
         <h2 className={styles.tabTitle}>{t("editor.referenceData.addTitle")}</h2>
-        <button type="button" onClick={addReferenceData} data-testid="reference-data-add-button">
+        <Button variant="secondary" onClick={addReferenceData} data-testid="reference-data-add-button">
           {t("editor.referenceData.add")}
-        </button>
+        </Button>
       </header>
       {referenceData.length === 0 ? (
-        <p className={styles.placeholder} data-testid="reference-data-tab-empty">
-          {t("editor.referenceData.empty")}
-        </p>
+        <div data-testid="reference-data-tab-empty">
+          <EmptyState title={t("editor.referenceData.empty")} />
+        </div>
       ) : (
         <ul className={styles.referenceList}>
           {referenceData.map((r, idx) => (
             <li key={r.id} data-path={`/referenceData/${idx}`}>
               <ReferenceDataEditor referenceData={r} onChange={(next) => replaceReferenceData(idx, next)} />
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                className={styles.removeButton}
                 onClick={() => removeReferenceData(idx)}
                 data-testid={`reference-data-tab-remove-${idx}`}
-                className={styles.removeButton}
               >
                 {t("editor.sheet.removeConfirm.confirm")}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -1157,9 +1160,9 @@ function ExpressionsSection({
         <h2 className={styles.tabTitle}>{t("editor.advanced.expressions.title")}</h2>
       </header>
       {expressions.length === 0 ? (
-        <p className={styles.placeholder} data-testid="expressions-section-empty">
-          {t("editor.advanced.expressions.empty")}
-        </p>
+        <div data-testid="expressions-section-empty">
+          <EmptyState title={t("editor.advanced.expressions.empty")} />
+        </div>
       ) : (
         <ul className={styles.expressionList}>
           {expressions.map((entry, idx) => (
@@ -1410,9 +1413,9 @@ function VersionHistoryOverlay({
     >
       <header>
         <h2>{t("editor.versionHistory.titleInHeader")}</h2>
-        <button type="button" onClick={onClose} data-testid="document-editor-version-history-close">
+        <Button variant="secondary" onClick={onClose} data-testid="document-editor-version-history-close">
           {t("publish.close")}
-        </button>
+        </Button>
       </header>
       <VersionHistory client={client} systemId={systemId} />
     </div>

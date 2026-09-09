@@ -1,9 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { createApiClient } from "../api/client.js";
+import buttonStyles from "../ui/Button.module.css";
 import { PublishDialog } from "./PublishDialog.js";
 
 type RenderOptions = {
@@ -41,6 +44,24 @@ describe("PublishDialog", () => {
     expect(screen.getByTestId("publish-dialog-semver")).toBeInTheDocument();
     expect(screen.getByTestId("publish-dialog-release-notes")).toBeInTheDocument();
     expect(screen.getByTestId("publish-dialog-submit")).toBeInTheDocument();
+  });
+
+  it("publish dialog uses shared Button roles", () => {
+    renderDialog();
+    // submit button with accessible name /Publish/i using shared Button variant=primary
+    const submit = screen.getByRole("button", { name: /publish/i });
+    expect(submit).toHaveAttribute("data-testid", "publish-dialog-submit");
+    expect(submit.className.split(/\s+/)).toContain(buttonStyles.button);
+    expect(submit.className.split(/\s+/)).toContain(buttonStyles.buttonPrimary);
+  });
+
+  it("labels each publish field once and consumes semantic tokens only", () => {
+    renderDialog();
+    const semver = screen.getByTestId("publish-dialog-semver");
+    expect(semver.id).not.toBe("");
+    expect(document.querySelectorAll(`label[for="${semver.id}"]`)).toHaveLength(1);
+    const css = readFileSync(resolve(process.cwd(), "src/publish/PublishDialog.module.css"), "utf8");
+    expect(css).not.toMatch(/var\(--color-/);
   });
 
   it("defaults the semver input to 0.1.0", () => {

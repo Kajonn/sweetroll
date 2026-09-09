@@ -4,6 +4,7 @@ import { evaluateRoll } from "../../api/evaluateExpression.js";
 import type { ApiClient } from "../../api/client.js";
 import { t } from "../../i18n/index.js";
 import type { ScalarValue, ValueType } from "../../ports/evaluateExpression.js";
+import { Button, Checkbox, FormField, Select } from "../../ui/index.js";
 import { ExpressionEditor } from "../expressions/ExpressionEditor.js";
 import styles from "./RollActionEditor.module.css";
 
@@ -172,50 +173,48 @@ export function RollActionEditor({
   return (
     <section className={styles.layout} data-testid={`roll-action-${action.id}`} aria-label={action.label}>
       <div className={styles.row}>
-        <label className={styles.field} htmlFor={`roll-action-label-${action.id}`}>
-          {t("editor.action.roll.label")}
-          <input
-            id={`roll-action-label-${action.id}`}
-            type="text"
-            value={action.label}
-            maxLength={120}
-            onChange={(e) => onChange({ ...action, label: e.target.value })}
-            data-testid={`roll-action-label-${action.id}`}
-            disabled={disabled}
-          />
-        </label>
+        <div className={styles.field}>
+          <FormField label={t("editor.action.roll.label")}>
+            <input
+              id={`roll-action-label-${action.id}`}
+              type="text"
+              value={action.label}
+              maxLength={120}
+              onChange={(e) => onChange({ ...action, label: e.target.value })}
+              data-testid={`roll-action-label-${action.id}`}
+              disabled={disabled}
+            />
+          </FormField>
+        </div>
         {guided === true ? (
-          <label className={styles.field} htmlFor={`dice-kind-${action.id}`}>
-            {t("editor.action.roll.diceKind")}
-            <select
+          <div className={styles.field}>
+            <Select
+              label={t("editor.action.roll.diceKind")}
               id={`dice-kind-${action.id}`}
-              className={styles.guidedSelect}
               value={diceKind ?? "custom"}
               onChange={(e) => onDiceKindChange?.(e.target.value)}
               data-testid={`dice-kind-${action.id}`}
               disabled={disabled}
               title={t("editor.action.roll.diceKind.hint")}
-            >
-              {GUIDED_DICE_KINDS.map((kind) => (
-                <option key={kind} value={kind}>
-                  {kind}
-                </option>
-              ))}
-              <option value="custom">{t("editor.action.roll.diceKind.custom")}</option>
-            </select>
-          </label>
-        ) : (
-          <label className={styles.field} htmlFor={`roll-action-expression-id-${action.id}`}>
-            {t("editor.action.roll.expressionId")}
-            <input
-              id={`roll-action-expression-id-${action.id}`}
-              type="text"
-              value={action.expressionId}
-              onChange={(e) => onChange({ ...action, expressionId: e.target.value })}
-              data-testid={`roll-action-expression-id-${action.id}`}
-              disabled={disabled}
+              options={[
+                ...GUIDED_DICE_KINDS.map((kind) => ({ value: kind, label: kind })),
+                { value: "custom", label: t("editor.action.roll.diceKind.custom") },
+              ]}
             />
-          </label>
+          </div>
+        ) : (
+          <div className={styles.field}>
+            <FormField label={t("editor.action.roll.expressionId")}>
+              <input
+                id={`roll-action-expression-id-${action.id}`}
+                type="text"
+                value={action.expressionId}
+                onChange={(e) => onChange({ ...action, expressionId: e.target.value })}
+                data-testid={`roll-action-expression-id-${action.id}`}
+                disabled={disabled}
+              />
+            </FormField>
+          </div>
         )}
       </div>
       {guided === true ? null : (
@@ -228,19 +227,20 @@ export function RollActionEditor({
         />
       )}
       <div className={styles.row}>
-        <label className={styles.field} htmlFor={`roll-action-output-${action.id}`}>
-          {t("editor.action.roll.outputTemplate")}
-          <input
-            id={`roll-action-output-${action.id}`}
-            type="text"
-            value={action.outputTemplate}
-            maxLength={2000}
-            onChange={(e) => onChange({ ...action, outputTemplate: e.target.value })}
-            placeholder={t("editor.action.roll.outputTemplate.placeholder")}
-            data-testid={`roll-action-output-${action.id}`}
-            disabled={disabled}
-          />
-        </label>
+        <div className={styles.field}>
+          <FormField label={t("editor.action.roll.outputTemplate")}>
+            <input
+              id={`roll-action-output-${action.id}`}
+              type="text"
+              value={action.outputTemplate}
+              maxLength={2000}
+              onChange={(e) => onChange({ ...action, outputTemplate: e.target.value })}
+              placeholder={t("editor.action.roll.outputTemplate.placeholder")}
+              data-testid={`roll-action-output-${action.id}`}
+              disabled={disabled}
+            />
+          </FormField>
+        </div>
       </div>
       <div className={styles.row} data-testid={`roll-action-inputs-${action.id}`}>
         <div className={styles.field}>
@@ -257,32 +257,34 @@ export function RollActionEditor({
                   className={styles.inputItem}
                   data-testid={`roll-action-input-${input.id}`}
                 >
-                  <label className={styles.field} htmlFor={`roll-action-input-id-${input.id}`}>
-                    {t("editor.action.roll.inputs.id")}
-                    <input
-                      id={`roll-action-input-id-${input.id}`}
-                      type="text"
-                      value={input.id}
-                      onChange={(e) => updateInput(input.id, { id: e.target.value })}
-                      data-testid={`roll-action-input-id-${input.id}`}
-                      disabled={disabled}
-                    />
-                  </label>
-                  <label className={styles.field} htmlFor={`roll-action-input-label-${input.id}`}>
-                    {t("editor.action.roll.inputs.label")}
-                    <input
-                      id={`roll-action-input-label-${input.id}`}
-                      type="text"
-                      value={input.label}
-                      maxLength={120}
-                      onChange={(e) => updateInput(input.id, { label: e.target.value })}
-                      data-testid={`roll-action-input-label-${input.id}`}
-                      disabled={disabled}
-                    />
-                  </label>
-                  <label className={styles.field} htmlFor={`roll-action-input-type-${input.id}`}>
-                    {t("editor.action.roll.inputs.valueType")}
-                    <select
+                  <div className={styles.field}>
+                    <FormField label={t("editor.action.roll.inputs.id")}>
+                      <input
+                        id={`roll-action-input-id-${input.id}`}
+                        type="text"
+                        value={input.id}
+                        onChange={(e) => updateInput(input.id, { id: e.target.value })}
+                        data-testid={`roll-action-input-id-${input.id}`}
+                        disabled={disabled}
+                      />
+                    </FormField>
+                  </div>
+                  <div className={styles.field}>
+                    <FormField label={t("editor.action.roll.inputs.label")}>
+                      <input
+                        id={`roll-action-input-label-${input.id}`}
+                        type="text"
+                        value={input.label}
+                        maxLength={120}
+                        onChange={(e) => updateInput(input.id, { label: e.target.value })}
+                        data-testid={`roll-action-input-label-${input.id}`}
+                        disabled={disabled}
+                      />
+                    </FormField>
+                  </div>
+                  <div className={styles.field}>
+                    <Select
+                      label={t("editor.action.roll.inputs.valueType")}
                       id={`roll-action-input-type-${input.id}`}
                       value={input.valueType}
                       onChange={(e) => {
@@ -294,41 +296,42 @@ export function RollActionEditor({
                       }}
                       data-testid={`roll-action-input-type-${input.id}`}
                       disabled={disabled}
-                    >
-                      <option value="integer">{t("editor.action.roll.inputs.valueType.integer")}</option>
-                      <option value="decimal">{t("editor.action.roll.inputs.valueType.decimal")}</option>
-                      <option value="boolean">{t("editor.action.roll.inputs.valueType.boolean")}</option>
-                      <option value="text">{t("editor.action.roll.inputs.valueType.text")}</option>
-                    </select>
-                  </label>
-                  <label className={styles.field} htmlFor={`roll-action-input-required-${input.id}`}>
-                    {t("editor.action.roll.inputs.required")}
-                    <input
+                      options={[
+                        { value: "integer", label: t("editor.action.roll.inputs.valueType.integer") },
+                        { value: "decimal", label: t("editor.action.roll.inputs.valueType.decimal") },
+                        { value: "boolean", label: t("editor.action.roll.inputs.valueType.boolean") },
+                        { value: "text", label: t("editor.action.roll.inputs.valueType.text") },
+                      ]}
+                    />
+                  </div>
+                  <div className={styles.field}>
+                    <Checkbox
+                      label={t("editor.action.roll.inputs.required")}
                       id={`roll-action-input-required-${input.id}`}
-                      type="checkbox"
                       checked={input.required}
                       onChange={(e) => updateInput(input.id, { required: e.target.checked })}
                       data-testid={`roll-action-input-required-${input.id}`}
                       disabled={disabled}
                     />
-                  </label>
-                  <label className={styles.field} htmlFor={`roll-action-input-default-${input.id}`}>
-                    {t("editor.action.roll.inputs.default")}
-                    <input
-                      id={`roll-action-input-default-${input.id}`}
-                      type={input.valueType === "boolean" ? "text" : input.valueType === "text" ? "text" : "number"}
-                      value={input.valueType === "boolean" ? String(input.default) : String(input.default ?? "")}
-                      onChange={(e) =>
-                        updateInput(input.id, {
-                          default: coerceDefault(e.target.value, input.valueType),
-                        })
-                      }
-                      data-testid={`roll-action-input-default-${input.id}`}
-                      disabled={disabled}
-                    />
-                  </label>
-                  <button
-                    type="button"
+                  </div>
+                  <div className={styles.field}>
+                    <FormField label={t("editor.action.roll.inputs.default")}>
+                      <input
+                        id={`roll-action-input-default-${input.id}`}
+                        type={input.valueType === "boolean" ? "text" : input.valueType === "text" ? "text" : "number"}
+                        value={input.valueType === "boolean" ? String(input.default) : String(input.default ?? "")}
+                        onChange={(e) =>
+                          updateInput(input.id, {
+                            default: coerceDefault(e.target.value, input.valueType),
+                          })
+                        }
+                        data-testid={`roll-action-input-default-${input.id}`}
+                        disabled={disabled}
+                      />
+                    </FormField>
+                  </div>
+                  <Button
+                    variant="secondary"
                     className={styles.removeButton}
                     onClick={() => removeInput(input.id)}
                     aria-label={t("editor.action.roll.inputs.remove", { id: input.id })}
@@ -336,7 +339,7 @@ export function RollActionEditor({
                     disabled={disabled}
                   >
                     {t("editor.action.roll.inputs.remove.label")}
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -344,26 +347,24 @@ export function RollActionEditor({
         </div>
       </div>
       <div className={styles.row}>
-        <button
-          type="button"
-          className={styles.addButton}
+        <Button
+          variant="secondary"
           onClick={addInput}
           data-testid={`roll-action-inputs-add-${action.id}`}
           disabled={disabled}
         >
           {t("editor.action.roll.inputs.add")}
-        </button>
+        </Button>
       </div>
       <div className={styles.tryItRow}>
-        <button
-          type="button"
-          className={styles.tryItButton}
+        <Button
+          variant="secondary"
           onClick={runTryIt}
           data-testid={`roll-action-try-${action.id}`}
           disabled={disabled}
         >
           {t("editor.action.roll.tryIt")}
-        </button>
+        </Button>
       </div>
       {showEmpty ? (
         <p data-testid={`roll-action-try-empty-${action.id}`}>

@@ -1,4 +1,5 @@
 import { listKeys, t } from "../../i18n/index.js";
+import { FormField, Select } from "../../ui/index.js";
 import { ExpressionEditor } from "../expressions/ExpressionEditor.js";
 import styles from "../actions/RollActionEditor.module.css";
 
@@ -70,68 +71,48 @@ export function ValidationEditor({
       aria-label={validation.message || validation.id}
     >
       <div className={styles.row}>
-        <label
-          className={styles.field}
-          htmlFor={`validation-severity-${validation.id}`}
-        >
-          {t("editor.validation.severity")}
-          <select
+        <div className={styles.field}>
+          <Select
+            label={t("editor.validation.severity")}
             id={`validation-severity-${validation.id}`}
             value={validation.severity}
             onChange={(e) => setSeverity(e.target.value as ValidationSeverityV1)}
             data-testid={`validation-severity-${validation.id}`}
             disabled={disabled}
-          >
-            <option value="error">{t("editor.validation.severity.error")}</option>
-            <option value="warning">
-              {t("editor.validation.severity.warning")}
-            </option>
-          </select>
-        </label>
-        <label
-          className={styles.field}
-          htmlFor={`validation-expression-id-${validation.id}`}
-        >
-          {t("editor.validation.expressionId")}
-          <select
+            options={[
+              { value: "error", label: t("editor.validation.severity.error") },
+              { value: "warning", label: t("editor.validation.severity.warning") },
+            ]}
+          />
+        </div>
+        <div className={styles.field}>
+          <Select
+            label={t("editor.validation.expressionId")}
             id={`validation-expression-id-${validation.id}`}
             value={validation.expressionId}
             onChange={(e) => setExpressionId(e.target.value)}
             data-testid={`validation-expression-id-${validation.id}`}
             disabled={disabled}
-          >
-            <option value="">
-              {t("editor.validation.expressionId.empty")}
-            </option>
-            {availableExpressions.map((expr) => (
-              <option key={expr.id} value={expr.id}>
-                {expr.label} ({expr.id})
-              </option>
-            ))}
-          </select>
-        </label>
-        <label
-          className={styles.field}
-          htmlFor={`validation-target-id-${validation.id}`}
-        >
-          {t("editor.validation.targetId")}
-          <select
+            options={[
+              { value: "", label: t("editor.validation.expressionId.empty") },
+              ...availableExpressions.map((expr) => ({ value: expr.id, label: `${expr.label} (${expr.id})` })),
+            ]}
+          />
+        </div>
+        <div className={styles.field}>
+          <Select
+            label={t("editor.validation.targetId")}
             id={`validation-target-id-${validation.id}`}
             value={validation.targetId}
             onChange={(e) => setTargetId(e.target.value)}
             data-testid={`validation-target-id-${validation.id}`}
             disabled={disabled}
-          >
-            <option value="">
-              {t("editor.validation.targetId.empty")}
-            </option>
-            {availableTargets.map((target) => (
-              <option key={target.id} value={target.id}>
-                {target.label} ({target.id})
-              </option>
-            ))}
-          </select>
-        </label>
+            options={[
+              { value: "", label: t("editor.validation.targetId.empty") },
+              ...availableTargets.map((target) => ({ value: target.id, label: `${target.label} (${target.id})` })),
+            ]}
+          />
+        </div>
       </div>
       <ExpressionEditor
         client={client}
@@ -142,22 +123,20 @@ export function ValidationEditor({
         disabled={disabled === true}
       />
       <div className={styles.row}>
-        <label
-          className={styles.field}
-          htmlFor={`validation-message-${validation.id}`}
-        >
-          {t("editor.validation.message")}
-          <input
-            id={`validation-message-${validation.id}`}
-            type="text"
-            list={`validation-message-options-${validation.id}`}
-            value={validation.message}
-            maxLength={2000}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder={t("editor.validation.message.placeholder")}
-            data-testid={`validation-message-${validation.id}`}
-            disabled={disabled}
-          />
+        <div className={styles.field}>
+          <FormField label={t("editor.validation.message")}>
+            <input
+              id={`validation-message-${validation.id}`}
+              type="text"
+              list={`validation-message-options-${validation.id}`}
+              value={validation.message}
+              maxLength={2000}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder={t("editor.validation.message.placeholder")}
+              data-testid={`validation-message-${validation.id}`}
+              disabled={disabled}
+            />
+          </FormField>
           <datalist
             id={`validation-message-options-${validation.id}`}
             data-testid={`validation-message-options-${validation.id}`}
@@ -166,7 +145,7 @@ export function ValidationEditor({
               <option key={key} value={key} />
             ))}
           </datalist>
-        </label>
+        </div>
       </div>
     </section>
   );

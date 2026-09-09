@@ -5,6 +5,7 @@ import { ApiError, type ApiClient, type ApiDiagnostic } from "../api/client.js";
 import { usePublish, type PublishInput } from "../api/publish.js";
 import type { PublishedVersion } from "../api/server.js";
 import { t } from "../i18n/index.js";
+import { Button, Checkbox, FormField } from "../ui/index.js";
 
 import styles from "./PublishDialog.module.css";
 
@@ -131,14 +132,13 @@ export function PublishDialog({
               </div>
             </dl>
             <div className={styles.actions}>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={close}
-                className={styles.submit}
                 data-testid="publish-dialog-close"
               >
                 {t("publish.close")}
-              </button>
+              </Button>
             </div>
           </Dialog.Content>
         </Dialog.Portal>
@@ -156,9 +156,9 @@ export function PublishDialog({
           data-testid="publish-dialog"
         >
           <Dialog.Title className={styles.title}>{t("publish.title")}</Dialog.Title>
-          <label className={styles.field}>
-            <span className={styles.label}>{t("publish.semver")}</span>
+          <FormField label={t("publish.semver")}>
             <input
+              id="publish-dialog-semver"
               value={semver}
               onChange={(e) => setSemver(e.target.value)}
               data-testid="publish-dialog-semver"
@@ -166,30 +166,29 @@ export function PublishDialog({
               spellCheck={false}
               autoComplete="off"
             />
-            <div className={styles.bumps}>
-              {BUMP_KINDS.map((k) => (
-                <button
-                  type="button"
-                  key={k}
-                  onClick={() => setSemver(bumpSemver(semver, k))}
-                  data-testid={`publish-dialog-bump-${k}`}
-                  className={styles.bump}
-                >
-                  {t(`publish.bump.${k}`)}
-                </button>
-              ))}
-            </div>
-          </label>
-          <label className={styles.field}>
-            <span className={styles.label}>{t("publish.releaseNotes")}</span>
+          </FormField>
+          <div className={styles.bumps}>
+            {BUMP_KINDS.map((k) => (
+              <Button
+                key={k}
+                variant="secondary"
+                onClick={() => setSemver(bumpSemver(semver, k))}
+                data-testid={`publish-dialog-bump-${k}`}
+              >
+                {t(`publish.bump.${k}`)}
+              </Button>
+            ))}
+          </div>
+          <FormField label={t("publish.releaseNotes")}>
             <textarea
+              id="publish-dialog-release-notes"
               value={releaseNotes}
               onChange={(e) => setReleaseNotes(e.target.value)}
               rows={6}
               data-testid="publish-dialog-release-notes"
               className={styles.textarea}
             />
-          </label>
+          </FormField>
           {breakingFindings !== null && breakingFindings.length > 0 && (
             <section className={styles.findings} data-testid="publish-dialog-findings">
               <h3 className={styles.findingsTitle}>{t("publish.findings.title")}</h3>
@@ -201,19 +200,18 @@ export function PublishDialog({
                   const testid = `publish-dialog-finding-${f.code}-${f.path}`;
                   return (
                     <li key={key} className={styles.finding} data-testid={testid}>
-                      <label className={styles.findingRow}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleAcknowledged(key)}
-                          data-testid={`publish-dialog-finding-checkbox-${f.code}-${f.path}`}
-                        />
-                        <span className={styles.findingBody}>
-                          <span className={styles.findingCode}>{f.code}</span>
-                          <span className={styles.findingPath}>{f.path}</span>
-                          <span className={styles.findingMessage}>{f.message}</span>
-                        </span>
-                      </label>
+                      <Checkbox
+                        label={
+                          <span className={styles.findingBody}>
+                            <span className={styles.findingCode}>{f.code}</span>
+                            <span className={styles.findingPath}>{f.path}</span>
+                            <span className={styles.findingMessage}>{f.message}</span>
+                          </span>
+                        }
+                        checked={checked}
+                        onChange={() => toggleAcknowledged(key)}
+                        data-testid={`publish-dialog-finding-checkbox-${f.code}-${f.path}`}
+                      />
                     </li>
                   );
                 })}
@@ -228,23 +226,21 @@ export function PublishDialog({
             </p>
           )}
           <div className={styles.actions}>
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={close}
-              className={styles.cancel}
               data-testid="publish-dialog-cancel"
             >
               {t("publish.cancel")}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="primary"
               onClick={submit}
               disabled={submitDisabled}
               data-testid="publish-dialog-submit"
-              className={styles.submit}
             >
               {mutation.isPending ? t("publish.submitting") : t("publish.submit")}
-            </button>
+            </Button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

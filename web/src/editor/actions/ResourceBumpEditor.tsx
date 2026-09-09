@@ -1,5 +1,6 @@
 import { t } from "../../i18n/index.js";
 import type { ResourceFieldV1 } from "../../state/documentFieldTypes.js";
+import { FormField, Select } from "../../ui/index.js";
 import styles from "./RollActionEditor.module.css";
 
 export type DefinitionId = string;
@@ -65,43 +66,33 @@ export function ResourceBumpEditor({
       aria-label={action.label}
     >
       <div className={styles.row}>
-        <label
-          className={styles.field}
-          htmlFor={`resource-bump-action-label-${action.id}`}
-        >
-          {t("editor.action.resourceBump.label")}
-          <input
-            id={`resource-bump-action-label-${action.id}`}
-            type="text"
-            value={action.label}
-            maxLength={120}
-            onChange={(e) => setLabel(e.target.value)}
-            data-testid={`resource-bump-action-label-${action.id}`}
-            disabled={disabled}
-          />
-        </label>
-        <label
-          className={styles.field}
-          htmlFor={`resource-bump-action-resource-id-${action.id}`}
-        >
-          {t("editor.action.resourceBump.resourceId")}
-          <select
+        <div className={styles.field}>
+          <FormField label={t("editor.action.resourceBump.label")}>
+            <input
+              id={`resource-bump-action-label-${action.id}`}
+              type="text"
+              value={action.label}
+              maxLength={120}
+              onChange={(e) => setLabel(e.target.value)}
+              data-testid={`resource-bump-action-label-${action.id}`}
+              disabled={disabled}
+            />
+          </FormField>
+        </div>
+        <div className={styles.field}>
+          <Select
+            label={t("editor.action.resourceBump.resourceId")}
             id={`resource-bump-action-resource-id-${action.id}`}
             value={action.resourceId}
             onChange={(e) => setResourceId(e.target.value)}
             data-testid={`resource-bump-action-resource-id-${action.id}`}
             disabled={disabled}
-          >
-            <option value="">
-              {t("editor.action.resourceBump.resourceId.empty")}
-            </option>
-            {availableResources.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.label} ({r.id})
-              </option>
-            ))}
-          </select>
-        </label>
+            options={[
+              { value: "", label: t("editor.action.resourceBump.resourceId.empty") },
+              ...availableResources.map((r) => ({ value: r.id, label: `${r.label} (${r.id})` })),
+            ]}
+          />
+        </div>
       </div>
       <div className={styles.row}>
         <fieldset
@@ -137,21 +128,19 @@ export function ResourceBumpEditor({
       {action.operation.kind === "delta" ? (
         <>
           <div className={styles.row}>
-            <label
-              className={styles.field}
-              htmlFor={`resource-bump-action-amount-${action.id}`}
-            >
-              {t("editor.action.resourceBump.amount")}
-              <input
-                id={`resource-bump-action-amount-${action.id}`}
-                type="number"
-                step={selectedResource?.step ?? 1}
-                value={action.operation.amount}
-                onChange={(e) => setDeltaAmount(Number(e.target.value))}
-                data-testid={`resource-bump-action-amount-${action.id}`}
-                disabled={disabled}
-              />
-            </label>
+            <div className={styles.field}>
+              <FormField label={t("editor.action.resourceBump.amount")}>
+                <input
+                  id={`resource-bump-action-amount-${action.id}`}
+                  type="number"
+                  step={selectedResource?.step ?? 1}
+                  value={action.operation.amount}
+                  onChange={(e) => setDeltaAmount(Number(e.target.value))}
+                  data-testid={`resource-bump-action-amount-${action.id}`}
+                  disabled={disabled}
+                />
+              </FormField>
+            </div>
           </div>
           <p
             className={styles.field}

@@ -148,8 +148,17 @@ describe("MetadataEditor", () => {
     expect(settings).not.toContainElement(screen.getByLabelText("Description"));
   });
 
+  it("metadata fields use one label each (no double-label)", () => {
+    render(<MetadataEditor document={docWithName("Pocket Quest")} onChange={() => {}} />);
+    const name = screen.getByLabelText(/name/i);
+    // expect exactly one label element associated with the name input
+    expect(name.id).not.toBe("");
+    expect(document.querySelectorAll(`label[for="${name.id}"]`)).toHaveLength(1);
+  });
+
   it("authors touch-sized responsive metadata controls", () => {
     const css = readFileSync(resolve(process.cwd(), "src/editor/MetadataEditor.module.css"), "utf8");
+    expect(css).not.toMatch(/var\(--color-/);
     expect(css).toMatch(/min-height:\s*44px/);
     expect(css).toMatch(/width:\s*100%/);
     expect(css).toMatch(/min-width:\s*0/);

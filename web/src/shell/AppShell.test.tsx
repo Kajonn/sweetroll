@@ -2,6 +2,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useEffect, useRef } from "react";
 
 import { createApiClient } from "../api/client.js";
 import { DocumentEditor } from "../editor/DocumentEditor.js";
@@ -207,5 +208,42 @@ describe("AppShell", () => {
     await userEvent.setup().click(retry);
     expect(await screen.findByText("Signed out.")).toBeInTheDocument();
     expect(signouts).toBe(2);
+  });
+
+  it("switches the device theme without remounting content", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ state: "authenticated", userId: "theme-user" }))));
+    const previousTheme = document.documentElement.getAttribute("data-theme");
+    let mounts = 0;
+    function Probe() {
+      const seen = useRef(false);
+      useEffect(() => { if (!seen.current) { seen.current = true; mounts += 1; } }, []);
+      return <input data-testid="probe-input" defaultValue="draft-title" />;
+    }
+    try {
+      render(<AppShell><Probe /></AppShell>);
+      // Wait for the auth lifecycle (loading -> authenticated) to settle:
+      // children mount during loading and remount across that transition,
+      // so the no-remount assertion must start from the settled tree.
+      await screen.findByRole("button", { name: "Sign out" });
+      mounts = 0;
+      const input = await screen.findByTestId("probe-input");
+      const user = userEvent.setup();
+      await user.click(input);
+      await user.type(input, "+edited");
+      const theme = screen.getByLabelText("Theme");
+      await user.selectOptions(theme, "dark");
+      expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+      expect(document.documentElement.style.colorScheme).toBe("dark");
+      await user.selectOptions(theme, "light");
+      expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+      // Attribute-only switch: content is neither remounted nor reset.
+      expect(mounts).toBe(0);
+      expect(screen.getByTestId("probe-input")).toHaveValue("draft-title+edited");
+    } finally {
+      window.localStorage.removeItem("sweetroll:theme");
+      if (previousTheme === null) document.documentElement.removeAttribute("data-theme");
+      else document.documentElement.setAttribute("data-theme", previousTheme);
+      document.documentElement.style.colorScheme = "";
+    }
   });
 });

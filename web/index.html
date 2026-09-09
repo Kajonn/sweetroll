@@ -3,8 +3,43 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
     <title>Sweetroll</title>
+    <script>
+      // G2-structural: resolve the device theme preference (I4a device-local,
+      // key shared with web/src/theme/theme.ts) before first paint so the
+      // correct token preset applies without a flash. Minimal and CSP-safe:
+      // no external resources, no DOM injection. A "system" preference
+      // follows the OS and stays in sync via the media listener below.
+      (function () {
+        try {
+          var key = "sweetroll:theme";
+          var preference = null;
+          try { preference = window.localStorage.getItem(key); } catch (e) {}
+          if (preference !== "light" && preference !== "dark" && preference !== "system") {
+            preference = "system";
+          }
+          var media = null;
+          try {
+            media = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+          } catch (e) {}
+          var apply = function (dark) {
+            document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+          };
+          if (preference === "light") { apply(false); return; }
+          if (preference === "dark") { apply(true); return; }
+          apply(media !== null && media.matches === true);
+          if (media !== null) {
+            var follow = function (event) { apply(event.matches === true); };
+            if (typeof media.addEventListener === "function") {
+              media.addEventListener("change", follow);
+            } else if (typeof media.addListener === "function") {
+              media.addListener(follow);
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root" data-testid="app-root"></div>

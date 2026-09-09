@@ -1,0 +1,131 @@
+.field {
+  display: grid;
+  gap: 4px;
+  font-family: var(--font-body);
+}
+
+.label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.optional {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.error {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--status-error);
+}
+
+.input,
+.select {
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  padding: 8px 12px;
+  min-height: 44px;
+  min-width: 44px;
+  width: 100%;
+}
+
+.input:disabled,
+.select:disabled {
+  background: var(--surface-page);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.input[aria-invalid="true"],
+.select[aria-invalid="true"] {
+  border-color: var(--status-error);
+}
+
+.input:focus-visible,
+.select:focus-visible,
+.stepButton:focus-visible,
+.checkboxInput:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.numberWrap {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.numberWrap .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.stepButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stepButton:disabled {
+  background: var(--surface-page);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.checkboxInput {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  accent-color: var(--action-primary);
+  cursor: pointer;
+}
+
+.checkboxInput:disabled {
+  cursor: not-allowed;
+}
+
+.checkboxText {
+  display: grid;
+  gap: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .input,
+  .select,
+  .stepButton {
+    transition: none;
+  }
+}

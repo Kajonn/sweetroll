@@ -1,0 +1,79 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--action-primary);
+  border-radius: var(--radius-panel);
+  background: var(--action-primary);
+  color: var(--action-primary-fg);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.buttonSecondary {
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+
+.buttonDanger {
+  background: var(--action-danger);
+  border-color: var(--action-danger);
+  color: var(--action-danger-fg);
+}
+
+.buttonPrimary {
+  background: var(--action-primary);
+  border-color: var(--action-primary);
+  color: var(--action-primary-fg);
+}
+
+.button:disabled,
+.iconButton:disabled {
+  border-color: var(--border-default);
+  background: var(--surface-page);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.button:focus-visible,
+.iconButton:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.iconGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  .iconButton {
+    transition: none;
+  }
+}

@@ -117,7 +117,7 @@
 
 .removeButton:hover {
   background: var(--color-bg);
-  color: var(--color-error, #dc2626);
+  color: var(--status-error);
 }
 
 .detail {
@@ -167,7 +167,7 @@
 }
 
 .monoLabel {
-  font-family: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-code);
   font-size: 12px;
   color: var(--color-fg-muted);
 }
@@ -216,7 +216,7 @@
 }
 
 .fieldKind {
-  font-family: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-code);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -226,14 +226,14 @@
 .unsupported {
   margin: 0;
   font-size: 13px;
-  color: var(--color-warning-fg, #92400e);
+  color: var(--status-warning-fg);
 }
 
 .dialogOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(23, 23, 23, 0.45);
-  z-index: 1000;
+  background: var(--surface-scrim);
+  z-index: var(--layer-dialog-overlay);
 }
 
 .dialogContent {
@@ -247,8 +247,8 @@
   border-radius: var(--radius-lg);
   padding: 24px;
   width: min(440px, calc(100vw - 32px));
-  box-shadow: 0 12px 32px rgba(23, 23, 23, 0.2);
-  z-index: 1001;
+  box-shadow: var(--shadow-dialog);
+  z-index: var(--layer-dialog-content);
   display: grid;
   gap: 16px;
 }
@@ -291,9 +291,9 @@
 }
 
 .dialogDestructive {
-  background: var(--color-error, #dc2626);
-  color: #fff;
-  border-color: var(--color-error, #dc2626);
+  background: var(--action-danger);
+  color: var(--action-danger-fg);
+  border-color: var(--action-danger);
 }
 
 .dialogDestructive:hover {

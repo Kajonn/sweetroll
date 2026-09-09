@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { HelpCircle } from "lucide-react";
 
 import { t } from "../i18n/index.js";
+import { getStoredPreference, normalizePreference, persistPreference, THEME_STORAGE_KEY, type ThemePreference } from "../theme/theme.js";
+import { Select } from "../ui/Select.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { DevSignInPanel } from "./DevSignInPanel.js";
 import { ShortcutHelp } from "./ShortcutHelp.js";
@@ -30,6 +32,41 @@ const isDevMode = (): boolean => {
 
 export function AuthProvider({ initial, children }: { initial: AuthState; children: ReactNode }) {
   return <AuthContext.Provider value={initial}>{children}</AuthContext.Provider>;
+}
+
+/**
+ * Minimal device-theme switcher (G2-structural, reversible). Attribute-only:
+ * switching sets data-theme via theme.ts, so no React tree remounts and no
+ * editor/character state resets. Stays in sync with cross-tab updates.
+ */
+function ThemeSwitcher() {
+  const [preference, setPreference] = useState<ThemePreference>(() => getStoredPreference());
+  useEffect(() => {
+    const onStorage = (event: StorageEvent): void => {
+      if (event.key !== null && event.key !== THEME_STORAGE_KEY) return;
+      setPreference(getStoredPreference());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+  return (
+    <span style={{ display: "inline-block", minWidth: 160 }}>
+      <Select
+        label={t("shell.theme.label")}
+        value={preference}
+        onChange={(event) => {
+          const next = normalizePreference(event.target.value);
+          setPreference(next);
+          persistPreference(next);
+        }}
+        options={[
+          { value: "light", label: t("shell.theme.light") },
+          { value: "dark", label: t("shell.theme.dark") },
+          { value: "system", label: t("shell.theme.system") },
+        ]}
+      />
+    </span>
+  );
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -130,6 +167,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <button type="button" onClick={() => { void signOut(); }}>{t("shell.signOut.button")}</button>
             )}
             {logoutStatus && <span role="status">{t(`shell.signOut.${logoutStatus}`)}</span>}
+            <ThemeSwitcher />
             <button
               type="button"
               aria-label={t("shortcutHelp.open")}

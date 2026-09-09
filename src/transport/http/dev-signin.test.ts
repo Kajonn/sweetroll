@@ -12,6 +12,8 @@ const buildIdentity = (): Identity => ({
   }),
   resolveSession: async () => ({ state: "anonymous" }),
   signOut: async () => ({ ok: true, value: undefined }),
+  getThemeDefault: async () => ({ ok: true, value: null }),
+  setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
 });
 
 async function buildApp(nodeEnv: "development" | "production" | "test") {

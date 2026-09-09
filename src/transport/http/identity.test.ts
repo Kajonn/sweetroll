@@ -14,6 +14,7 @@ const COOKIE_NAME = "session";
 function makeStatefulIdentity() {
   const revoked = new Set<string>();
   const validToken = randomUUID();
+  let themeDefault: "light" | "dark" | "system" | null = null;
   const identity: Identity = {
     completeSignIn: async () => {
       throw new Error("not used");
@@ -27,6 +28,11 @@ function makeStatefulIdentity() {
       revoked.add(token);
       return { ok: true, value: undefined };
     },
+    getThemeDefault: async () => ({ ok: true, value: themeDefault }),
+    setThemeDefault: async (_actorId, value) => {
+      themeDefault = value;
+      return { ok: true, value: themeDefault };
+    },
   };
   return { identity, validToken, revoked, getRevoked: () => revoked };
 }
@@ -38,6 +44,8 @@ function makeAnonymousIdentity() {
     },
     resolveSession: async () => ({ state: "anonymous" }),
     signOut: async () => ({ ok: true, value: undefined }),
+    getThemeDefault: async () => ({ ok: true, value: null }),
+    setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
   };
   return { identity };
 }

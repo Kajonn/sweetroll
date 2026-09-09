@@ -603,6 +603,9 @@ export const defaultMessages: MessageTable = {
   "player.account.sessions": "Sessions",
   "player.account.currentSession": "This device",
   "player.account.sync": "Storage and sync",
+  "player.account.themeDefault": "Account default",
+  "player.account.themeUnavailable": "Account theme default unavailable — using this device's setting.",
+  "player.account.themeSaveFailed": "Account theme default could not be saved.",
   "pwa.install": "Install",
   "pwa.dismiss": "Not now",
 };

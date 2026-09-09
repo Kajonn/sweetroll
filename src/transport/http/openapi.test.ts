@@ -15,6 +15,8 @@ const testIdentity: Identity = {
   },
   resolveSession: async () => ({ state: "anonymous" }),
   signOut: async () => ({ ok: true, value: undefined }),
+  getThemeDefault: async () => ({ ok: true, value: null }),
+  setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
 };
 
 describe("buildOpenApiDocument", () => {
@@ -42,6 +44,7 @@ describe("buildOpenApiDocument", () => {
       "/characters/{characterId}/ownership-transfer",
       "/characters/{characterId}/resources/{resourceId}/bump",
       "/me",
+      "/me/preferences",
       "/signout",
       "/system-versions/{versionId}",
       "/system-versions/{versionId}/export",

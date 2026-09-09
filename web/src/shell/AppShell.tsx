@@ -3,7 +3,8 @@ import { HelpCircle } from "lucide-react";
 
 import { t } from "../i18n/index.js";
 import { isOnboardingComplete, Onboarding } from "../player/Onboarding.js";
-import { getStoredPreference, normalizePreference, persistPreference, THEME_STORAGE_KEY, type ThemePreference } from "../theme/theme.js";
+import { getStoredPreference, normalizePreference, THEME_STORAGE_KEY, applyDeviceSelection, applyEffectiveTheme, subscribeMatchesDark, toDevicePreference, type ThemePreference } from "../theme/theme.js";
+import { usePreferences } from "../theme/accountTheme.js";
 import { Button } from "../ui/Button.js";
 import { Select } from "../ui/Select.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
@@ -63,12 +64,22 @@ export function AuthProvider({ initial, children }: { initial: AuthState; childr
 }
 
 /**
- * Minimal device-theme switcher (G2-structural, reversible). Attribute-only:
- * switching sets data-theme via theme.ts, so no React tree remounts and no
- * editor/character state resets. Stays in sync with cross-tab updates.
+ * Minimal device-theme switcher (G2-structural, reversible) layered with the
+ * G6 account default. Attribute-only: switching sets data-theme via theme.ts,
+ * so no React tree remounts and no editor/character state resets. Stays in
+ * sync with cross-tab updates. Resolves through the single shared
+ * `resolveTheme` (device > account > system) -- the same function the account
+ * screen uses, never a fork: an anonymous or failed account load simply
+ * resolves device-only.
  */
 function ThemeSwitcher() {
+  const client = useMemo(() => createApiClient({ baseUrl: "/api" }), []);
+  const preferences = usePreferences(client);
   const [preference, setPreference] = useState<ThemePreference>(() => getStoredPreference());
+  // A failed load is device-only; a pending one resolves once it settles.
+  const accountDefault = preferences.isError ? null : (preferences.data ?? null);
+  const accountRef = useRef(accountDefault);
+  accountRef.current = accountDefault;
   useEffect(() => {
     const onStorage = (event: StorageEvent): void => {
       if (event.key !== null && event.key !== THEME_STORAGE_KEY) return;
@@ -76,6 +87,23 @@ function ThemeSwitcher() {
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
+  }, []);
+  // Re-apply the effective theme as the cached account default settles.
+  // initTheme (main.tsx) still owns device-only application at startup; this
+  // upgrades to the effective value once the account is known, on hydration.
+  useEffect(() => {
+    applyEffectiveTheme({ device: toDevicePreference(preference), accountDefault });
+  }, [preference, accountDefault]);
+  // OS changes re-apply device-only via initTheme's listener; this listener
+  // (registered later) corrects to the effective value when an account
+  // default is set, so Follow-device + account-default stays exact.
+  useEffect(() => {
+    return subscribeMatchesDark(() => {
+      applyEffectiveTheme({
+        device: toDevicePreference(getStoredPreference()),
+        accountDefault: accountRef.current,
+      });
+    });
   }, []);
   return (
     <span style={{ display: "inline-block", minWidth: 160 }}>
@@ -85,7 +113,7 @@ function ThemeSwitcher() {
         onChange={(event) => {
           const next = normalizePreference(event.target.value);
           setPreference(next);
-          persistPreference(next);
+          applyDeviceSelection({ preference: next, accountDefault: accountRef.current });
         }}
         options={[
           { value: "light", label: t("shell.theme.light") },

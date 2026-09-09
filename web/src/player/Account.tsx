@@ -1,10 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
+
+import { useQueryClient } from "@tanstack/react-query";
 
 import { ApiError, type ApiClient } from "../api/client.js";
 import { useMe } from "../api/hooks.js";
 import { t } from "../i18n/index.js";
 import { useOfflineAvailability } from "../offline/useOfflineAvailability.js";
-import { Button, PageHeader, Panel } from "../ui/index.js";
+import {
+  PREFERENCES_QUERY_KEY,
+  patchPreferences,
+  usePreferences,
+  type AccountThemeDefault,
+} from "../theme/accountTheme.js";
+import {
+  THEME_STORAGE_KEY,
+  applyDeviceSelection,
+  applyEffectiveTheme,
+  getStoredPreference,
+  normalizePreference,
+  toDevicePreference,
+  type ThemePreference,
+} from "../theme/theme.js";
+import { Button, PageHeader, Panel, Select } from "../ui/index.js";
 
 export type AccountIdentity = {
   getActorId(): string | null;
@@ -19,12 +36,102 @@ export type AccountProps = {
 };
 
 /**
- * Task 4 mount point: the account screen owns the theme-default control
- * added there. This task provides the section only; the control and its
- * behavior land in Task 4.
+ * Account theme controls (G6 Task 4): the per-device override plus the
+ * account-level default. Both selects share the `Select` control and the
+ * `shell.theme.*` option labels with the shell ThemeSwitcher, and both apply
+ * through the single `resolveTheme` resolver -- device override wins, then
+ * the account default, then the OS setting. A failed account load maps to a
+ * null default (device-only) with an inline notice and never blocks theme
+ * application.
  */
-export function AccountThemeSection() {
-  return <section aria-label={t("shell.theme.label")} data-testid="account-theme-section" />;
+export function AccountThemeSection({ client }: { client: ApiClient }) {
+  const queryClient = useQueryClient();
+  const preferences = usePreferences(client);
+  const [device, setDevice] = useState<ThemePreference>(() => getStoredPreference());
+  const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+
+  // A failed load is device-only; a pending one resolves once it settles.
+  const accountDefault: AccountThemeDefault =
+    preferences.isError ? null : (preferences.data ?? null);
+
+  // Apply on hydration and whenever either input settles.
+  useEffect(() => {
+    applyEffectiveTheme({ device: toDevicePreference(device), accountDefault });
+  }, [device, accountDefault]);
+
+  // Stay in sync with device changes from other tabs (same as the switcher).
+  useEffect(() => {
+    const onStorage = (event: StorageEvent): void => {
+      if (event.key !== null && event.key !== THEME_STORAGE_KEY) return;
+      setDevice(getStoredPreference());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const onDeviceChange = (event: ChangeEvent<HTMLSelectElement>): void => {
+    const next = normalizePreference(event.target.value);
+    setDevice(next);
+    applyDeviceSelection({ preference: next, accountDefault });
+  };
+
+  const onAccountChange = (event: ChangeEvent<HTMLSelectElement>): void => {
+    const next = normalizePreference(event.target.value);
+    setSaving(true);
+    setSaveFailed(false);
+    void patchPreferences(client, next).then(
+      (saved) => {
+        queryClient.setQueryData<AccountThemeDefault>(PREFERENCES_QUERY_KEY, saved);
+        applyEffectiveTheme({ device: toDevicePreference(device), accountDefault: saved });
+        setSaving(false);
+      },
+      () => {
+        // The select stays controlled by the last saved value, so a failed
+        // save visibly reverts; only the error text persists.
+        setSaveFailed(true);
+        setSaving(false);
+      },
+    );
+  };
+
+  const options = [
+    { value: "light", label: t("shell.theme.light") },
+    { value: "dark", label: t("shell.theme.dark") },
+    { value: "system", label: t("shell.theme.system") },
+  ];
+
+  return (
+    <section aria-label={t("shell.theme.label")} data-testid="account-theme-section">
+      <Select
+        label={t("shell.theme.label")}
+        value={device}
+        onChange={onDeviceChange}
+        options={options}
+      />
+      {preferences.isLoading ? (
+        <Select
+          label={t("player.account.themeDefault")}
+          value="system"
+          disabled
+          hint={t("player.account.loading")}
+          onChange={() => {}}
+          options={options}
+        />
+      ) : preferences.isError ? (
+        <p role="alert">{t("player.account.themeUnavailable")}</p>
+      ) : (
+        <Select
+          label={t("player.account.themeDefault")}
+          value={accountDefault ?? "system"}
+          pending={saving}
+          {...(saveFailed ? { error: t("player.account.themeSaveFailed") } : {})}
+          onChange={onAccountChange}
+          options={options}
+        />
+      )}
+    </section>
+  );
 }
 
 function deviceLocale(): string {
@@ -127,7 +234,7 @@ export function Account({ client, identity, storageUnavailable }: AccountProps) 
             <p>{offline.available ? t("character.offline.available") : t("character.offline.unavailable")}</p>
             <p>{t("player.library.manageHint")}</p>
           </Panel>
-          <AccountThemeSection />
+          <AccountThemeSection client={client} />
         </>
       )}
     </div>

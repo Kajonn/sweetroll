@@ -13,6 +13,7 @@ import {
   exportCharacter,
   newSignedInContext,
   publishCompletionVariant,
+  publishOwnedClone,
   readActivity,
   readCharacter,
   testSignIn,
@@ -122,21 +123,33 @@ test.describe("full production UI journey per system", () => {
     test.setTimeout(180_000);
     const system = D20_REFERENCE_SYSTEM;
     const { context } = await newSignedInContext(browser, TEST_USER_A.code);
+    // OD-01 (unlisted/link-only): the seeded reference templates are
+    // link-access, so enumeration never offers them. Publish an actor-owned
+    // clone first; the picker lists it under the kept source name.
+    const setup = await context.newPage();
+    const ownedVersionId = await publishOwnedClone(setup.request, system.systemVersionId);
+    await setup.close();
     try {
       const page = await context.newPage();
       await page.setViewportSize({ width: 360, height: 740 });
-      // No search input: the picker alone must offer the seeded versions.
+      // No search input: the picker alone must offer the owned clone.
       await page.goto("/characters/new");
       await expect(
         page.getByRole("heading", { name: "Choose a system version" }),
       ).toBeVisible({ timeout: 30_000 });
       // Button label contract is `{systemName} {semanticVersion}`; the
-      // reference seed publishes "Template: d20" at 1.0.0.
-      await page.getByRole("button", { name: "Template: d20 1.0.0" }).click();
+      // owned clone keeps the source document name "D20 System" at 1.0.0.
+      // OD-01: the link-only "Template: d20" seed stays unlisted.
+      await expect(page.getByRole("button", { name: "Template: d20 1.0.0" })).toHaveCount(0);
+      const choice = page
+        .locator("li", { has: page.locator(`span[title="${ownedVersionId}"]`) })
+        .getByRole("button");
+      await expect(choice).toContainText("D20 System 1.0.0");
+      await choice.click();
       await page.getByLabel("Entity").selectOption("character");
-      // The picker fills the manual box with the chosen reference version,
-      // so the unchanged lookup/create path below runs on the d20 seed.
-      await expect(page.getByLabel("System version ID")).toHaveValue(system.systemVersionId);
+      // The picker fills the manual box with the chosen owned version,
+      // so the unchanged lookup/create path below runs on the clone.
+      await expect(page.getByLabel("System version ID")).toHaveValue(ownedVersionId);
       const characterName = `Picker ${uid()}`;
       await page.getByLabel("Character name").fill(characterName);
       await page.getByRole("button", { name: "Create character", exact: true }).click();

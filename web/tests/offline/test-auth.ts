@@ -250,6 +250,52 @@ export async function publishCompletionVariant(
   return body.version.versionId;
 }
 
+/**
+ * Owned, enumerable clone for picker coverage (OD-01): reference seeds are
+ * link-access/unlisted, so versionless enumeration never offers them.
+ * Cloning through the real System Builder API (link use stays authorized)
+ * produces an actor-owned system that the picker lists under its kept
+ * source name. The document is republished unchanged. Returns the new
+ * published version id.
+ */
+export async function publishOwnedClone(
+  request: APIRequestContext,
+  sourceVersionId: string,
+): Promise<string> {
+  const created = await request.post("/api/systems", {
+    data: { source: { kind: "clone", versionId: sourceVersionId }, idempotencyKey: `clone-${uid()}` },
+  });
+  if (created.status() !== 201) {
+    throw new Error(`clone system failed: ${created.status()} ${await created.text()}`);
+  }
+  const workspace = ((await created.json()) as WorkspaceEnvelope).workspace;
+  const systemId = workspace.system.systemId;
+  const draft = workspace.draft;
+  if (draft === null) throw new Error("clone produced no draft");
+  const saved = await request.put(`/api/systems/${systemId}/draft`, {
+    data: { expectedRevision: draft.revision, document: draft.document },
+  });
+  if (saved.status() !== 200) {
+    throw new Error(`save clone draft failed: ${saved.status()} ${await saved.text()}`);
+  }
+  const nextRevision = ((await saved.json()) as WorkspaceEnvelope).workspace.draft?.revision;
+  if (typeof nextRevision !== "number") throw new Error("saved draft has no revision");
+  const published = await request.post(`/api/systems/${systemId}/publish`, {
+    data: {
+      expectedRevision: nextRevision,
+      semanticVersion: "1.0.0",
+      releaseNotes: "picker coverage clone",
+      idempotencyKey: `clone-publish-${uid()}`,
+      acknowledgeBreaking: true,
+    },
+  });
+  if (published.status() !== 200) {
+    throw new Error(`publish clone failed: ${published.status()} ${await published.text()}`);
+  }
+  const body = (await published.json()) as { version: { versionId: string } };
+  return body.version.versionId;
+}
+
 /** Independent-writer field set through the real API (same owner, fresh key). */
 export async function apiSetField(
   request: APIRequestContext,

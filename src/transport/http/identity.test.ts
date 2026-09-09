@@ -90,6 +90,27 @@ describe("identity HTTP routes", () => {
     expect(response.json().userId).toBeTypeOf("string");
   });
 
+  it("GET /me returns session_expired distinctly while preferences stay 401", async () => {
+    const expired: Identity = {
+      completeSignIn: async () => {
+        throw new Error("not used");
+      },
+      resolveSession: async () => ({ state: "session_expired" }),
+      signOut: async () => ({ ok: true, value: undefined }),
+      getThemeDefault: async () => ({ ok: true, value: null }),
+      setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
+    };
+    const app = await build(expired);
+    const me = await app.inject({ method: "GET", url: "/me", headers: cookie("expired-token") });
+    expect(me.statusCode).toBe(200);
+    expect(me.json()).toEqual({ state: "session_expired" });
+    // The dead cookie is still cleared on expired sessions.
+    const cleared: Array<{ name: string; maxAge?: number }> = me.cookies;
+    expect(cleared.some((entry) => entry.name === COOKIE_NAME && entry.maxAge === 0)).toBe(true);
+    const prefs = await app.inject({ method: "GET", url: "/me/preferences", headers: cookie("expired-token") });
+    expect(prefs.statusCode).toBe(401);
+  });
+
   it("POST /signout revokes the token and clears the cookie with the configured flags", async () => {
     const { identity, validToken } = makeStatefulIdentity();
     const app = await build(identity);

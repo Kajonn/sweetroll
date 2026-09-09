@@ -124,6 +124,15 @@ async function upsertExternalIdentityImpl(
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    // Serialize concurrent first-sign-ins for the same external identity.
+    // The second caller blocks here until the first commits, then observes
+    // the committed row in the SELECT below and returns the canonical userId
+    // instead of inserting an orphan user. Transaction-scoped, so no schema
+    // change and no explicit unlock is needed.
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", [
+      input.provider,
+      input.subject,
+    ]);
     const existing = await client.query<{ id: string }>(
       `SELECT u.id
          FROM users u

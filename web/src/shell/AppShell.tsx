@@ -131,6 +131,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [auth, setAuth] = useState<AuthState>({ state: "loading" });
   const [identity, setIdentity] = useState<IdentityGate | null>(null);
   const [storageUnavailable, setStorageUnavailable] = useState(false);
+  // Expired sessions read as anonymous but render children so the Account
+  // screen owns the re-auth entry (G6 Task 6) instead of the generic prompt.
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [logoutStatus, setLogoutStatus] = useState<"pending" | "complete" | "error" | "serverError" | null>(null);
   const [, setOnboardingTick] = useState(0);
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
@@ -152,6 +155,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         if (snapshot.pendingLogout) setLogoutStatus(previous => previous === "error" || previous === "serverError" ? previous : "pending");
         else setLogoutStatus(previous => previous === "pending" || previous === "serverError" ? "complete" : previous);
         setAuth(snapshot.actorId ? { state: "authenticated", userId: snapshot.actorId } : { state: "anonymous" });
+        setSessionExpired(snapshot.sessionExpired);
         setOnline(navigator.onLine);
       };
       const unsubscribe = gate.subscribe(update);
@@ -253,7 +257,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
   const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
   const showFirstRunWelcome =
-    auth.state === "anonymous" && pathname !== "/welcome" && isPlayerPath(pathname) && !isOnboardingComplete(null);
+    auth.state === "anonymous" && !sessionExpired && pathname !== "/welcome" && isPlayerPath(pathname) && !isOnboardingComplete(null);
   return (
     <IdentityContext.Provider value={identity}>
       <AuthProvider initial={auth}>
@@ -305,6 +309,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                 // blocks sign-in.
                 <Onboarding actorId={null} onDismiss={() => setOnboardingTick(tick => tick + 1)} />
               ) : auth.state === "anonymous" && pathname === "/welcome" ? (
+                children
+              ) : auth.state === "anonymous" && (pathname === "/cb" || sessionExpired) ? (
+                // /cb is the provider-agnostic sign-in return leg and must
+                // render while anonymous; expired sessions render children so
+                // the Account screen owns the re-auth entry.
                 children
               ) : auth.state === "anonymous" && isDevMode() ? (
                 <DevSignInPanel onSignedIn={markSignedIn} />

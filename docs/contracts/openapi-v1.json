@@ -4171,6 +4171,18 @@
                           "type": "string"
                         }
                       }
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "state"
+                      ],
+                      "properties": {
+                        "state": {
+                          "const": "session_expired",
+                          "type": "string"
+                        }
+                      }
                     }
                   ]
                 }

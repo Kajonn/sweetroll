@@ -24,7 +24,8 @@ export type SessionHandle = {
 
 export type AuthContext =
   | { state: "authenticated"; actorId: UserId; sessionId: SessionId }
-  | { state: "anonymous" };
+  | { state: "anonymous" }
+  | { state: "session_expired" };
 
 export interface Identity {
   completeSignIn(input: {
@@ -91,8 +92,14 @@ export function createIdentityModule(input: CreateIdentityModuleInput): Identity
     async resolveSession(token) {
       try {
         const session = await repo.findSessionByTokenHash(hashToken(token));
-        if (session === null || session.revokedAt !== null || session.expiresAt.getTime() < Date.now()) {
+        // Unknown and revoked tokens are anonymous. An expired (but otherwise
+        // valid) session resolves distinctly so the UI can offer re-auth
+        // instead of a generic signed-out view.
+        if (session === null || session.revokedAt !== null) {
           return { state: "anonymous" as const };
+        }
+        if (session.expiresAt.getTime() < Date.now()) {
+          return { state: "session_expired" as const };
         }
         return {
           state: "authenticated" as const,

@@ -1891,6 +1891,9 @@ export interface operations {
                     } | {
                         /** @constant */
                         state: "anonymous";
+                    } | {
+                        /** @constant */
+                        state: "session_expired";
                     };
                 };
             };

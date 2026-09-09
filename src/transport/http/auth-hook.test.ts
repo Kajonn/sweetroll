@@ -74,4 +74,18 @@ describe("buildAuthHook", () => {
     expect(response.cookies.some((cookie) => cookie.name === "session" && cookie.maxAge === 0)).toBe(true);
     expect(response.json<{ auth: AuthContext }>().auth).toEqual({ state: "anonymous" });
   });
+
+  it("clears the cookie but surfaces an expired session distinctly", async () => {
+    const identity = fakeIdentity(async () => ({ state: "session_expired" }));
+    const app = await build(identity);
+    apps.push(app);
+
+    const response = await app.inject({
+      headers: { cookie: "session=expired-token" },
+      method: "GET",
+      url: "/auth-test",
+    });
+    expect(response.cookies.some((cookie) => cookie.name === "session" && cookie.maxAge === 0)).toBe(true);
+    expect(response.json<{ auth: AuthContext }>().auth).toEqual({ state: "session_expired" });
+  });
 });

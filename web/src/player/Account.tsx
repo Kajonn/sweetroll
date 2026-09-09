@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { ApiError, type ApiClient } from "../api/client.js";
 import { useMe } from "../api/hooks.js";
+import { storePostSigninPath } from "../characters/identity.js";
 import { t } from "../i18n/index.js";
 import { useOfflineAvailability } from "../offline/useOfflineAvailability.js";
 import {
@@ -172,6 +173,23 @@ export function Account({ client, identity, storageUnavailable }: AccountProps) 
   };
 
   const status = ApiErrorStatus(me.error);
+  // Expired reads as signed-out with a re-auth entry: a 401 from the query
+  // (Task 3 mount point) or an explicit session_expired payload (Task 6).
+  const expired = status === 401 || me.data?.state === "session_expired";
+
+  // Provider-agnostic re-auth entry: stash the current path for the `/cb`
+  // return journey, then fall back to the environment's sign-in entry
+  // (whatever adapter is configured) by returning to the signed-out state.
+  // No provider specifics here: no issuer URLs, no PKCE, no credentials.
+  const startReauth = async () => {
+    storePostSigninPath(window.location.pathname);
+    try {
+      await identity.signOut();
+    } catch {
+      // Local/server sign-out failures keep their existing handling (shell
+      // status, retryable barrier); the stashed path survives for the retry.
+    }
+  };
 
   return (
     <div data-testid="account">
@@ -181,12 +199,16 @@ export function Account({ client, identity, storageUnavailable }: AccountProps) 
         <div data-testid="account-loading" role="status" aria-busy="true">
           {t("player.account.loading")}
         </div>
-      ) : status === 401 ? (
+      ) : expired ? (
         <section aria-labelledby="account-expired-title">
           <h2 id="account-expired-title">{t("player.account.expired")}</h2>
           <p role="status">{t("character.detail.signIn")}</p>
-          {/* Task 6 owns the expired-session re-auth entry; mount point only. */}
-          <div data-testid="account-reauth-mount" />
+          <div data-testid="account-reauth-mount">
+            <p>{t("character.sync.reauthenticate")}</p>
+            <Button type="button" variant="primary" onClick={() => void startReauth()}>
+              {t("player.account.signInAgain")}
+            </Button>
+          </div>
         </section>
       ) : status === 403 ? (
         <p role="status">{t("character.detail.signIn")}</p>
@@ -198,7 +220,7 @@ export function Account({ client, identity, storageUnavailable }: AccountProps) 
             {t("player.library.retry")}
           </Button>
         </Panel>
-      ) : me.data === undefined || me.data.state === "anonymous" || me.data.userId === "" ? (
+      ) : me.data === undefined || me.data.state !== "authenticated" || me.data.userId === "" ? (
         <Panel>
           <p role="status">{t("player.account.empty")}</p>
         </Panel>

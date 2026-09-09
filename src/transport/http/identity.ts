@@ -14,6 +14,9 @@ const MeResponseDto = Type.Union([
   Type.Object({
     state: Type.Literal("anonymous"),
   }),
+  Type.Object({
+    state: Type.Literal("session_expired"),
+  }),
 ]);
 
 const ErrorEnvelopeDto = Type.Object({
@@ -165,10 +168,16 @@ export const buildIdentityRoutes: (input: BuildIdentityRoutesInput) => FastifyPl
       { schema: { response: { "200": MeResponseDto } } },
       async (request) => {
         const auth = request.auth;
-        if (auth.state === "anonymous") {
-          return { state: "anonymous" as const };
+        // Expired sessions surface distinctly (with the dead cookie already
+        // cleared by the auth hook) so the UI can offer re-auth. Anything
+        // else unauthenticated stays anonymous.
+        if (auth.state === "authenticated") {
+          return { state: "authenticated" as const, userId: auth.actorId };
         }
-        return { state: "authenticated" as const, userId: auth.actorId };
+        if (auth.state === "session_expired") {
+          return { state: "session_expired" as const };
+        }
+        return { state: "anonymous" as const };
       },
     );
 
@@ -197,7 +206,9 @@ export const buildIdentityRoutes: (input: BuildIdentityRoutesInput) => FastifyPl
       reply: FastifyReply,
     ): Promise<string | null> => {
       const auth = request.auth;
-      if (auth.state === "anonymous") {
+      // Expired sessions are still unauthenticated: preferences stay 401 so
+      // the Task 4 anonymous handling applies unchanged.
+      if (auth.state !== "authenticated") {
         await reply.code(401).send({
           error: { code: "unauthorized", message: "Authentication is required." },
           requestId: request.id,

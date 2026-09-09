@@ -598,6 +598,8 @@ export const defaultMessages: MessageTable = {
   "player.account.loading": "Loading account…",
   "player.account.empty": "No profile details are available.",
   "player.account.expired": "Session expired",
+  "player.account.signInAgain": "Sign in again",
+  "player.account.signingIn": "Completing sign-in…",
   "player.account.userId": "User ID",
   "player.account.locale": "Locale",
   "player.account.sessions": "Sessions",

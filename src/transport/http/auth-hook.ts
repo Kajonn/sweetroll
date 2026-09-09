@@ -26,9 +26,12 @@ export const buildAuthHook: (input: BuildAuthHookInput) => FastifyPluginCallback
         return;
       }
       const result = await identity.resolveSession(raw);
-      if (result.state === "anonymous") {
+      // Unresolvable sessions clear the cookie. Expired sessions surface
+      // distinctly (so the UI can offer re-auth) while still clearing the
+      // dead cookie like anonymous ones.
+      if (result.state === "anonymous" || result.state === "session_expired") {
         reply.clearCookie(cookieName, { httpOnly: true, sameSite: "lax", path: "/", secure });
-        request.auth = { state: "anonymous" };
+        request.auth = result;
         return;
       }
       reply.setCookie(cookieName, raw, {

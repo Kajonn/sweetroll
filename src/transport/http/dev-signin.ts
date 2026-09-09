@@ -27,14 +27,42 @@ export type BuildDevSignInRoutesInput = {
    * sign-in panel (it mounts only when `import.meta.env.MODE ===
    * "development"`), so browser contexts authenticate through this endpoint
    * directly via the test-auth fixture instead of any production UI.
+   *
+   * Callers derive this from `resolveAuthMode()` (single rule, shared with
+   * bootstrap): pass `testAuthEnabled` (i.e. `SWEETROLL_TEST_AUTH=1`).
    */
   allowInProduction?: boolean;
 };
 
+/**
+ * Auth mode for `/dev/*` registration. One rule, two call sites (this
+ * plugin and `src/bootstrap/http.ts`):
+ * - non-production → "dev": dev sign-in routes are registered.
+ * - production + explicit `SWEETROLL_TEST_AUTH=1` → "test-auth": dev sign-in
+ *   routes are registered for offline/prod-test configs only.
+ * - production otherwise → "locked": no `/dev/*` routes.
+ *
+ * No production OIDC provider adapter exists; this gate only controls the
+ * deterministic test adapter's sign-in route, never provider credentials
+ * (there are none in-repo and none are invented here).
+ */
+export type AuthMode = "dev" | "test-auth" | "locked";
+
+export function resolveAuthMode(
+  nodeEnv: "development" | "production" | "test",
+  testAuthEnabled: boolean,
+): AuthMode {
+  if (nodeEnv !== "production") return "dev";
+  if (testAuthEnabled) return "test-auth";
+  return "locked";
+}
+
 export const buildDevSignInRoutes: (input: BuildDevSignInRoutesInput) => FastifyPluginCallback =
   ({ identity, nodeEnv, cookieName = "session", secure = false, maxAgeSeconds = 30 * 86_400, allowInProduction = false }) =>
   fp(async (app) => {
-    if (nodeEnv === "production" && !allowInProduction) return;
+    // `/dev/*` registers ONLY when nodeEnv !== "production" OR explicit
+    // SWEETROLL_TEST_AUTH=1 (see resolveAuthMode).
+    if (resolveAuthMode(nodeEnv, allowInProduction) === "locked") return;
     app.post(
       "/dev/signin",
       {

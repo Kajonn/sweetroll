@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { createRootRoute, createRoute, createRouter, Outlet, useNavigate, useParams } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createRootRoute, createRoute, createRouter, Outlet, useNavigate, useParams, useRouter } from "@tanstack/react-router";
 
 import { createApiClient, type ApiClient } from "./api/client.js";
 import { createCharactersApi, type CharactersApi } from "./characters/api.js";
 import { createCoordination } from "./characters/coordination.js";
 import type { BrowserChannel } from "./characters/identity.js";
 import type { IdentityGate } from "./characters/identity.js";
+import { takePostSigninPath } from "./characters/identity.js";
 import { CharacterDetail, NewCharacterRoute, useSharedCharacterStore } from "./characters/CharacterRoute.js";
 import { CharacterLibrary } from "./player/CharacterLibrary.js";
 import { Account } from "./player/Account.js";
@@ -110,6 +111,16 @@ const accountRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/account",
   component: AccountRouteView,
+});
+const signInCallbackRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/cb",
+  // Read the provider redirect params without validating anything
+  // provider-specific: the return leg only refreshes the session and
+  // restores the pre-sign-in path, so any configured OIDC adapter
+  // (test adapter today) can use the same journey.
+  validateSearch: (search: Record<string, unknown>) => search,
+  component: SignInCallbackRouteView,
 });
 const characterDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -239,6 +250,18 @@ function AccountRouteView() {
     return <p role="status">{t("character.loading")}</p>;
   }
   if (identity.getActorId() === null) {
+    // Expired sessions render the Account screen's re-auth entry instead of
+    // the generic prompt; every other anonymous state keeps the prompt.
+    if (identity.getSnapshot().sessionExpired) {
+      return (
+        <Account
+          key={libraryViewKey(identity.getActorId(), identity.getGeneration?.() ?? 0)}
+          client={apiClient}
+          identity={identity}
+          storageUnavailable={store === null}
+        />
+      );
+    }
     return (
       <section aria-labelledby="account-title">
         <h1 id="account-title">{t("player.account.title")}</h1>
@@ -254,6 +277,27 @@ function AccountRouteView() {
       storageUnavailable={store === null}
     />
   );
+}
+/**
+ * Provider-agnostic sign-in return leg. Validates nothing provider-specific:
+ * whatever the provider appended to the query is ignored. Refreshes the
+ * session (the completed sign-in already set the cookie), then restores the
+ * pre-sign-in path stashed by the re-auth entry (default `/characters`,
+ * consumed once).
+ */
+function SignInCallbackRouteView() {
+  const identity = useIdentity();
+  const router = useRouter();
+  const started = useRef(false);
+  useEffect(() => {
+    if (identity === null || started.current) return;
+    started.current = true;
+    const target = takePostSigninPath();
+    void identity.refresh().then(() => {
+      router.history.push(target);
+    });
+  }, [identity, router]);
+  return <p role="status">{t("player.account.signingIn")}</p>;
 }
 /**
  * Account-lifetime key for the library view: the infinite-query cache is
@@ -350,7 +394,7 @@ function CharacterDetailRouteView() {
   );
 }
 
-const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute, welcomeRoute, activityRoute, accountRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute, welcomeRoute, activityRoute, accountRoute, signInCallbackRoute]);
 
 export function createAppRouter() { return createRouter({ routeTree }); }
 export const router = createAppRouter();

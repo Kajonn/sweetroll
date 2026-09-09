@@ -2,7 +2,10 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import type { ApiClient } from "./client.js";
 
-export type MeState = { state: "authenticated"; userId: string } | { state: "anonymous" };
+export type MeState =
+  | { state: "authenticated"; userId: string }
+  | { state: "anonymous" }
+  | { state: "session_expired" };
 
 export function useMe(client: ApiClient): UseQueryResult<MeState> {
   return useQuery({

@@ -79,6 +79,13 @@ describe("loadCampaignLimits", () => {
       maxDescriptionLength: 10_000,
       invitationExpiryDefaultDays: 7,
       invitationExpiryMaxDays: 30,
+      maxContentTitleLength: 200,
+      maxContentBodyLength: 100_000,
+      maxContentTags: 20,
+      maxContentTagLength: 50,
+      maxContentGrants: 100,
+      exportMaxBytes: 10 * 1024 * 1024,
+      exportMaxRecords: 10_000,
     });
     expect(loadCampaignLimits({})).toEqual(DEFAULT_CAMPAIGN_LIMITS);
   });
@@ -94,6 +101,13 @@ describe("loadCampaignLimits", () => {
         CAMPAIGN_MAX_DESCRIPTION_LENGTH: "5000",
         CAMPAIGN_INVITATION_EXPIRY_DEFAULT_DAYS: "3",
         CAMPAIGN_INVITATION_EXPIRY_MAX_DAYS: "14",
+        CAMPAIGN_MAX_CONTENT_TITLE_LENGTH: "120",
+        CAMPAIGN_MAX_CONTENT_BODY_LENGTH: "5000",
+        CAMPAIGN_MAX_CONTENT_TAGS: "10",
+        CAMPAIGN_MAX_CONTENT_TAG_LENGTH: "30",
+        CAMPAIGN_MAX_CONTENT_GRANTS: "25",
+        CAMPAIGN_EXPORT_MAX_BYTES: "65536",
+        CAMPAIGN_EXPORT_MAX_RECORDS: "500",
       }),
     ).toEqual({
       pageDefault: 10,
@@ -104,6 +118,13 @@ describe("loadCampaignLimits", () => {
       maxDescriptionLength: 5000,
       invitationExpiryDefaultDays: 3,
       invitationExpiryMaxDays: 14,
+      maxContentTitleLength: 120,
+      maxContentBodyLength: 5000,
+      maxContentTags: 10,
+      maxContentTagLength: 30,
+      maxContentGrants: 25,
+      exportMaxBytes: 65536,
+      exportMaxRecords: 500,
     });
   });
 
@@ -126,6 +147,18 @@ describe("loadCampaignLimits", () => {
     [
       { CAMPAIGN_INVITATION_EXPIRY_DEFAULT_DAYS: "30", CAMPAIGN_INVITATION_EXPIRY_MAX_DAYS: "7" },
       "CAMPAIGN_INVITATION_EXPIRY_DEFAULT_DAYS must not exceed CAMPAIGN_INVITATION_EXPIRY_MAX_DAYS",
+    ],
+    [
+      { CAMPAIGN_MAX_CONTENT_GRANTS: "0" },
+      "CAMPAIGN_MAX_CONTENT_GRANTS must be a positive integer",
+    ],
+    [
+      { CAMPAIGN_EXPORT_MAX_BYTES: "huge" },
+      "CAMPAIGN_EXPORT_MAX_BYTES must be a positive integer",
+    ],
+    [
+      { CAMPAIGN_EXPORT_MAX_RECORDS: "-1" },
+      "CAMPAIGN_EXPORT_MAX_RECORDS must be a positive integer",
     ],
   ])("rejects invalid limits %#", (env, message) => {
     expect(() => loadCampaignLimits(env)).toThrow(message);

@@ -126,9 +126,13 @@ export const I3_SCHEMA_DDL = `
     archived_at       timestamptz,
     created_at        timestamptz NOT NULL DEFAULT now(),
     updated_at        timestamptz NOT NULL DEFAULT now(),
+    -- Test-fixture copy pinned to migrations/0015_campaign_content_activity.sql:
+    -- roll audience default is storage only until Task 8 wires behavior.
+    roll_audience_default text NOT NULL DEFAULT 'campaign',
     CHECK (revision > 0),
     CHECK (access_revision > 0),
-    CHECK (status IN ('active', 'archived'))
+    CHECK (status IN ('active', 'archived')),
+    CHECK (roll_audience_default IN ('owner_only', 'gm_only', 'campaign'))
   );
   CREATE INDEX campaigns_owner_page_idx
     ON campaigns (owner_id, created_at DESC, id DESC);
@@ -195,6 +199,59 @@ export const I3_SCHEMA_DDL = `
   );
   CREATE INDEX campaign_invitations_campaign_page_idx
     ON campaign_invitations (campaign_id, created_at DESC, id DESC);
+  CREATE TABLE campaign_content_items (
+    -- Test-fixture copy pinned to migrations/0015_campaign_content_activity.sql:
+    -- keep the content/grant/activity definitions below identical to that
+    -- production migration. Activity rows carry source references only.
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    creator_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    audience text NOT NULL,
+    title text NOT NULL DEFAULT '',
+    body text NOT NULL DEFAULT '',
+    tags text[] NOT NULL DEFAULT '{}',
+    revision integer NOT NULL DEFAULT 1,
+    access_revision integer NOT NULL DEFAULT 1,
+    status text NOT NULL DEFAULT 'active',
+    deleted_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CHECK (audience IN ('gm_only', 'all_players', 'selected_players', 'owner_only')),
+    CHECK (status IN ('active', 'deleted')),
+    CHECK (revision > 0),
+    CHECK (access_revision > 0),
+    CHECK (deleted_at IS NULL OR status = 'deleted')
+  );
+  CREATE INDEX campaign_content_items_page_idx
+    ON campaign_content_items (campaign_id, created_at DESC, id DESC);
+  CREATE TABLE campaign_content_grants (
+    content_id uuid NOT NULL REFERENCES campaign_content_items(id) ON DELETE CASCADE,
+    campaign_id uuid NOT NULL,
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (content_id, user_id),
+    FOREIGN KEY (campaign_id, user_id) REFERENCES campaign_members (campaign_id, user_id) ON DELETE CASCADE
+  );
+  CREATE INDEX campaign_content_grants_member_idx
+    ON campaign_content_grants (campaign_id, user_id);
+  CREATE TABLE campaign_activity_events (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    actor_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    kind text NOT NULL,
+    source_content_id uuid REFERENCES campaign_content_items(id) ON DELETE RESTRICT,
+    request_id text NOT NULL,
+    occurred_at timestamptz NOT NULL DEFAULT now(),
+    CHECK (kind IN (
+      'content_created',
+      'content_updated',
+      'content_deleted',
+      'content_recovered',
+      'content_grants_replaced'
+    ))
+  );
+  CREATE INDEX campaign_activity_events_page_idx
+    ON campaign_activity_events (campaign_id, occurred_at DESC, id DESC);
 
   CREATE TABLE characters (
     id                   uuid PRIMARY KEY,

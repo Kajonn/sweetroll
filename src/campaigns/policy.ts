@@ -1,6 +1,6 @@
-import type { CampaignRecord, MembershipRecord } from "./persistence.js";
+import type { CampaignRecord, ContentAudience, MembershipRecord } from "./persistence.js";
 
-export type { MembershipRecord };
+export type { ContentAudience, MembershipRecord };
 
 /**
  * Task 2 policy base: current membership/role decisions for the campaign
@@ -70,8 +70,7 @@ export function authorizeRoleChange(input: {
  * Removal: the owner can never be removed (not even by self; archive the
  * campaign instead), co-GMs cannot remove the owner or peer co-GMs, and a
  * player may remove only themselves. Returns null when permitted.
- */
-export function authorizeRemoval(input: {
+ */export function authorizeRemoval(input: {
   caller: MembershipRecord | null;
   target: MembershipRecord | null;
 }): "not_member" | "not_manager" | "owner_immutable" | "owner_only" | "self_only" | null {
@@ -82,4 +81,70 @@ export function authorizeRemoval(input: {
   if (!isGameMaster(input.caller)) return "self_only";
   if (input.target.role === "co_gm" && input.caller.role !== "owner") return "owner_only";
   return null;
+}
+
+export type ContentRecordLike = {
+  campaignId: string;
+  creatorId: string;
+  audience: ContentAudience;
+  status: "active" | "deleted";
+};
+
+/**
+ * Task 7 content visibility, evaluated against CURRENT content state
+ * (audience, grants, soft-delete) on every read. The creator has no
+ * standing once removed: every branch requires active membership,
+ * including creator access. Soft-deleted rows are hidden from ordinary
+ * reads; recovery reuses this same policy with the deletion ignored.
+ */
+export function canReadContent(input: {
+  content: ContentRecordLike;
+  membership: MembershipRecord | null;
+  /** Active granted user IDs for selected_players content. */
+  grantedUserIds: ReadonlySet<string>;
+}): boolean {
+  if (!isActiveMember(input.membership)) return false;
+  switch (input.content.audience) {
+    case "gm_only":
+      return isGameMaster(input.membership);
+    case "all_players":
+      return true;
+    case "selected_players":
+      return isGameMaster(input.membership) || input.grantedUserIds.has(input.membership.userId);
+    case "owner_only":
+      return input.membership.userId === input.content.creatorId;
+  }
+}
+
+/**
+ * Edit/delete: the creator may manage their own notes while an active
+ * member; GMs may manage content they can currently read. Nobody may act
+ * on an inaccessible note by guessing its ID.
+ */
+export function canManageContent(input: {
+  content: ContentRecordLike;
+  membership: MembershipRecord | null;
+  grantedUserIds: ReadonlySet<string>;
+}): boolean {
+  if (!isActiveMember(input.membership)) return false;
+  if (input.membership.userId === input.content.creatorId) return true;
+  return isGameMaster(input.membership) && canReadContent(input);
+}
+
+/**
+ * Sharing administration (audience changes, grant replacement) is GM-only
+ * and additionally requires the GM to currently read the note: another
+ * actor's inaccessible owner-only note cannot be shared by guessing its ID.
+ */
+export function canAdministerContentSharing(input: {
+  content: ContentRecordLike;
+  membership: MembershipRecord | null;
+  grantedUserIds: ReadonlySet<string>;
+}): boolean {
+  return isGameMaster(input.membership) && canReadContent(input);
+}
+
+/** Campaign export is a GM-only authorized projection. */
+export function canExportCampaign(membership: MembershipRecord | null): boolean {
+  return isGameMaster(membership);
 }

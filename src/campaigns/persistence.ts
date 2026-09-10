@@ -14,6 +14,11 @@ export type CampaignRecord = {
   archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  /**
+   * Task 7 storage only: the roll audience default Task 8 wires into roll
+   * behavior. No command reads or writes it yet; the DB default applies.
+   */
+  rollAudienceDefault: "owner_only" | "gm_only" | "campaign";
 };
 
 export type MembershipRecord = {
@@ -24,6 +29,43 @@ export type MembershipRecord = {
   generation: number;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type ContentAudience = "gm_only" | "all_players" | "selected_players" | "owner_only";
+
+export type ContentStatus = "active" | "deleted";
+
+export type ContentRecord = {
+  contentId: string;
+  campaignId: string;
+  creatorId: string;
+  audience: ContentAudience;
+  title: string;
+  body: string;
+  tags: string[];
+  revision: number;
+  accessRevision: number;
+  status: ContentStatus;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ActivityEventKind =
+  | "content_created"
+  | "content_updated"
+  | "content_deleted"
+  | "content_recovered"
+  | "content_grants_replaced";
+
+export type ActivityEventRecord = {
+  eventId: string;
+  campaignId: string;
+  actorId: string;
+  kind: ActivityEventKind;
+  sourceContentId: string | null;
+  requestId: string;
+  occurredAt: Date;
 };
 
 export type AccessibleVersion = {
@@ -69,6 +111,7 @@ type CampaignRow = {
   archived_at: Date | null;
   created_at: Date;
   updated_at: Date;
+  roll_audience_default: string;
 };
 
 type MembershipRow = {
@@ -96,9 +139,42 @@ type InvitationRow = {
   updated_at: Date;
 };
 
+type ContentRow = {
+  id: string;
+  campaign_id: string;
+  creator_id: string;
+  audience: string;
+  title: string;
+  body: string;
+  tags: string[];
+  revision: number;
+  access_revision: number;
+  status: string;
+  deleted_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+};
+
+type ActivityEventRow = {
+  id: string;
+  campaign_id: string;
+  actor_id: string;
+  kind: string;
+  source_content_id: string | null;
+  request_id: string;
+  occurred_at: Date;
+};
+
 function toCampaignRecord(row: CampaignRow): CampaignRecord {
   if (row.status !== "active" && row.status !== "archived") {
     throw new Error(`Unknown campaign status: ${row.status}`);
+  }
+  if (
+    row.roll_audience_default !== "owner_only" &&
+    row.roll_audience_default !== "gm_only" &&
+    row.roll_audience_default !== "campaign"
+  ) {
+    throw new Error(`Unknown roll audience default: ${row.roll_audience_default}`);
   }
   return {
     campaignId: row.id,
@@ -112,6 +188,7 @@ function toCampaignRecord(row: CampaignRow): CampaignRecord {
     archivedAt: row.archived_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    rollAudienceDefault: row.roll_audience_default,
   };
 }
 
@@ -134,8 +211,77 @@ function toMembershipRecord(row: MembershipRow): MembershipRecord {
 }
 
 const CAMPAIGN_COLUMNS =
-  "id, owner_id, system_version_id, title, description, status, revision, access_revision, archived_at, created_at, updated_at";
+  "id, owner_id, system_version_id, title, description, status, revision, access_revision, archived_at, created_at, updated_at, roll_audience_default";
 const MEMBERSHIP_COLUMNS = "campaign_id, user_id, role, status, generation, created_at, updated_at";
+const CONTENT_COLUMNS =
+  "id, campaign_id, creator_id, audience, title, body, tags, revision, access_revision, status, deleted_at, created_at, updated_at";
+const ACTIVITY_COLUMNS = "id, campaign_id, actor_id, kind, source_content_id, request_id, occurred_at";
+
+function toContentRecord(row: ContentRow): ContentRecord {
+  if (
+    row.audience !== "gm_only" &&
+    row.audience !== "all_players" &&
+    row.audience !== "selected_players" &&
+    row.audience !== "owner_only"
+  ) {
+    throw new Error(`Unknown content audience: ${row.audience}`);
+  }
+  if (row.status !== "active" && row.status !== "deleted") {
+    throw new Error(`Unknown content status: ${row.status}`);
+  }
+  return {
+    contentId: row.id,
+    campaignId: row.campaign_id,
+    creatorId: row.creator_id,
+    audience: row.audience,
+    title: row.title,
+    body: row.body,
+    tags: [...row.tags],
+    revision: row.revision,
+    accessRevision: row.access_revision,
+    status: row.status,
+    deletedAt: row.deleted_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toActivityEventRecord(row: ActivityEventRow): ActivityEventRecord {
+  switch (row.kind) {
+    case "content_created":
+    case "content_updated":
+    case "content_deleted":
+    case "content_recovered":
+    case "content_grants_replaced":
+      break;
+    default:
+      throw new Error(`Unknown activity kind: ${row.kind}`);
+  }
+  return {
+    eventId: row.id,
+    campaignId: row.campaign_id,
+    actorId: row.actor_id,
+    kind: row.kind,
+    sourceContentId: row.source_content_id,
+    requestId: row.request_id,
+    occurredAt: row.occurred_at,
+  };
+}
+
+/**
+ * Current-state content visibility predicate for the aliased content table
+ * `c`. Never paginate-then-filter: every list/export query applies this in
+ * SQL. $1 is the actor ID, $2 the GM flag.
+ */
+const CONTENT_VISIBILITY_PREDICATE = `(
+  c.audience = 'all_players'
+  OR ($2::boolean AND c.audience IN ('gm_only', 'selected_players'))
+  OR (c.audience = 'selected_players' AND EXISTS (
+    SELECT 1 FROM campaign_content_grants g
+     WHERE g.content_id = c.id AND g.user_id = $1
+  ))
+  OR (c.audience = 'owner_only' AND c.creator_id = $1)
+)`;
 const INVITATION_COLUMNS =
   "id, campaign_id, issued_by, intended_role, token_hash, status, revision, consuming_actor_id, accepted_membership_generation, expires_at, created_at, updated_at";
 
@@ -650,6 +796,353 @@ export function createCampaignPersistenceRepository(pool: Pool) {
         [userId],
       );
       return result.rows[0]?.display_name ?? null;
+    },
+
+    async insertContent(
+      client: PoolClient,
+      input: {
+        contentId: string;
+        campaignId: string;
+        creatorId: string;
+        audience: ContentAudience;
+        title: string;
+        body: string;
+        tags: string[];
+        now: Date;
+      },
+    ): Promise<ContentRecord> {
+      const result = await client.query<ContentRow>(
+        `INSERT INTO campaign_content_items
+            (id, campaign_id, creator_id, audience, title, body, tags, created_at, updated_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $8::timestamptz)
+          RETURNING ${CONTENT_COLUMNS}`,
+        [
+          input.contentId,
+          input.campaignId,
+          input.creatorId,
+          input.audience,
+          input.title,
+          input.body,
+          input.tags,
+          input.now.toISOString(),
+        ],
+      );
+      const row = result.rows[0];
+      if (row === undefined) throw new Error("insertContent returned no row");
+      return toContentRecord(row);
+    },
+
+    async loadContent(client: DbClient, contentId: string): Promise<ContentRecord | null> {
+      const result = await client.query<ContentRow>(
+        `SELECT ${CONTENT_COLUMNS} FROM campaign_content_items WHERE id = $1`,
+        [contentId],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toContentRecord(row);
+    },
+
+    async lockContent(client: PoolClient, contentId: string): Promise<ContentRecord | null> {
+      const result = await client.query<ContentRow>(
+        `SELECT ${CONTENT_COLUMNS} FROM campaign_content_items WHERE id = $1 FOR UPDATE`,
+        [contentId],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toContentRecord(row);
+    },
+
+    /**
+     * Revision-checked content patch. Null fields keep their values. Bumps
+     * revision always; access_revision only when the audience changed (or
+     * when forced for delete/recover, which hide or restore rows).
+     */
+    async updateContent(
+      client: PoolClient,
+      input: {
+        contentId: string;
+        title: string | null;
+        body: string | null;
+        tags: string[] | null;
+        audience: ContentAudience | null;
+        bumpAccess: boolean;
+        expectedRevision: number;
+        now: Date;
+      },
+    ): Promise<ContentRecord | null> {
+      const result = await client.query<ContentRow>(
+        `UPDATE campaign_content_items
+            SET title = COALESCE($2, title),
+                body = COALESCE($3, body),
+                tags = COALESCE($4, tags),
+                audience = COALESCE($5, audience),
+                revision = revision + 1,
+                access_revision = access_revision + CASE WHEN $6::boolean THEN 1 ELSE 0 END,
+                updated_at = $7::timestamptz
+          WHERE id = $1 AND revision = $8
+          RETURNING ${CONTENT_COLUMNS}`,
+        [
+          input.contentId,
+          input.title,
+          input.body,
+          input.tags,
+          input.audience,
+          input.bumpAccess,
+          input.now.toISOString(),
+          input.expectedRevision,
+        ],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toContentRecord(row);
+    },
+
+    async setContentStatus(
+      client: PoolClient,
+      input: { contentId: string; status: ContentStatus; expectedRevision: number; now: Date },
+    ): Promise<ContentRecord | null> {
+      const result = await client.query<ContentRow>(
+        `UPDATE campaign_content_items
+            SET status = $2,
+                deleted_at = CASE WHEN $2 = 'deleted' THEN $3::timestamptz ELSE NULL END,
+                revision = revision + 1,
+                access_revision = access_revision + 1,
+                updated_at = $3::timestamptz
+          WHERE id = $1 AND revision = $4
+          RETURNING ${CONTENT_COLUMNS}`,
+        [input.contentId, input.status, input.now.toISOString(), input.expectedRevision],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toContentRecord(row);
+    },
+
+    /**
+     * Atomic grant replacement: clears every grant, inserts the new set
+     * (none when empty), and increments content revision and authorization
+     * generation together. Revision-checked so a concurrent patch conflicts.
+     */
+    async replaceContentGrants(
+      client: PoolClient,
+      input: {
+        contentId: string;
+        campaignId: string;
+        userIds: string[];
+        expectedRevision: number;
+        now: Date;
+      },
+    ): Promise<ContentRecord | null> {
+      await client.query(`DELETE FROM campaign_content_grants WHERE content_id = $1`, [input.contentId]);
+      for (const userId of [...input.userIds].sort()) {
+        await client.query(
+          `INSERT INTO campaign_content_grants (content_id, campaign_id, user_id)
+           VALUES ($1, $2, $3)`,
+          [input.contentId, input.campaignId, userId],
+        );
+      }
+      const result = await client.query<ContentRow>(
+        `UPDATE campaign_content_items
+            SET revision = revision + 1,
+                access_revision = access_revision + 1,
+                updated_at = $2::timestamptz
+          WHERE id = $1 AND revision = $3
+          RETURNING ${CONTENT_COLUMNS}`,
+        [input.contentId, input.now.toISOString(), input.expectedRevision],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toContentRecord(row);
+    },
+
+    async loadContentGrantUserIds(client: DbClient, contentId: string): Promise<string[]> {
+      const result = await client.query<{ user_id: string }>(
+        `SELECT user_id FROM campaign_content_grants WHERE content_id = $1 ORDER BY user_id`,
+        [contentId],
+      );
+      return result.rows.map(({ user_id }) => user_id);
+    },
+
+    /**
+     * Active, currently-visible content page. Authorization precedes
+     * pagination: the visibility predicate is part of the query, so
+     * unauthorized rows never affect counts or cursors.
+     */
+    async listContentPage(
+      client: DbClient,
+      input: {
+        campaignId: string;
+        actorId: string;
+        isGm: boolean;
+        limit: number;
+        cursorCreatedAt: string | null;
+        cursorId: string | null;
+      },
+    ): Promise<ContentRecord[]> {
+      const params: unknown[] = [input.actorId, input.isGm, input.campaignId];
+      let cursorClause = "";
+      if (input.cursorCreatedAt !== null && input.cursorId !== null) {
+        params.push(input.cursorCreatedAt, input.cursorId);
+        cursorClause = `AND (c.created_at < $4::timestamptz OR (c.created_at = $4::timestamptz AND c.id < $5))`;
+      }
+      params.push(input.limit + 1);
+      const result = await client.query<ContentRow>(
+        `SELECT ${CONTENT_COLUMNS.split(", ").map((column) => `c.${column}`).join(", ")}
+           FROM campaign_content_items c
+          WHERE c.campaign_id = $3 AND c.status = 'active' AND ${CONTENT_VISIBILITY_PREDICATE}
+            ${cursorClause}
+          ORDER BY c.created_at DESC, c.id DESC
+          LIMIT $${params.length}`,
+        params,
+      );
+      return result.rows.map(toContentRecord);
+    },
+
+    /**
+     * Departure cleanup: destroys every grant naming the departing member in
+     * this campaign. Rejoin mints a new membership generation and never
+     * reactivates these rows (they are gone, not flagged).
+     */
+    async deleteContentGrantsForMember(
+      client: PoolClient,
+      input: { campaignId: string; userId: string },
+    ): Promise<number> {
+      const result = await client.query(
+        `DELETE FROM campaign_content_grants WHERE campaign_id = $1 AND user_id = $2`,
+        [input.campaignId, input.userId],
+      );
+      return result.rowCount ?? 0;
+    },
+
+    async appendActivity(
+      client: PoolClient,
+      input: {
+        eventId: string;
+        campaignId: string;
+        actorId: string;
+        kind: ActivityEventKind;
+        sourceContentId: string | null;
+        requestId: string;
+        occurredAt: Date;
+      },
+    ): Promise<ActivityEventRecord> {
+      const result = await client.query<ActivityEventRow>(
+        `INSERT INTO campaign_activity_events
+            (id, campaign_id, actor_id, kind, source_content_id, request_id, occurred_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz)
+          RETURNING ${ACTIVITY_COLUMNS}`,
+        [
+          input.eventId,
+          input.campaignId,
+          input.actorId,
+          input.kind,
+          input.sourceContentId,
+          input.requestId,
+          input.occurredAt.toISOString(),
+        ],
+      );
+      const row = result.rows[0];
+      if (row === undefined) throw new Error("appendActivity returned no row");
+      return toActivityEventRecord(row);
+    },
+
+    /**
+     * Source-policy-filtered activity page: events whose current source
+     * state the caller can no longer read (grant removed, note deleted or
+     * narrowed) are excluded in SQL before pagination. Request IDs only
+     * correlate events; several rows may share one.
+     */
+    async listActivityPage(
+      client: DbClient,
+      input: {
+        campaignId: string;
+        actorId: string;
+        isGm: boolean;
+        limit: number;
+        cursorOccurredAt: string | null;
+        cursorId: string | null;
+      },
+    ): Promise<ActivityEventRecord[]> {
+      const params: unknown[] = [input.actorId, input.isGm, input.campaignId];
+      let cursorClause = "";
+      if (input.cursorOccurredAt !== null && input.cursorId !== null) {
+        params.push(input.cursorOccurredAt, input.cursorId);
+        cursorClause = `AND (e.occurred_at < $4::timestamptz OR (e.occurred_at = $4::timestamptz AND e.id < $5))`;
+      }
+      params.push(input.limit + 1);
+      const result = await client.query<ActivityEventRow>(
+        `SELECT ${ACTIVITY_COLUMNS.split(", ").map((column) => `e.${column}`).join(", ")}
+           FROM campaign_activity_events e
+           LEFT JOIN campaign_content_items c ON c.id = e.source_content_id
+          WHERE e.campaign_id = $3
+            AND (c.id IS NULL OR (c.status = 'active' AND ${CONTENT_VISIBILITY_PREDICATE}))
+            ${cursorClause}
+          ORDER BY e.occurred_at DESC, e.id DESC
+          LIMIT $${params.length}`,
+        params,
+      );
+      return result.rows.map(toActivityEventRecord);
+    },
+
+    /** Full roster (any status) for the export projection, ordered by user. */
+    async loadMembershipsForExport(client: DbClient, campaignId: string): Promise<MembershipRecord[]> {
+      const result = await client.query<MembershipRow>(
+        `SELECT ${MEMBERSHIP_COLUMNS}
+           FROM campaign_members
+          WHERE campaign_id = $1
+          ORDER BY user_id`,
+        [campaignId],
+      );
+      return result.rows.map(toMembershipRecord);
+    },
+
+    /**
+     * Visible content for the export projection in deterministic ID order.
+     * Bounded: pass exportMaxRecords + 1 and treat overflow as too large.
+     */
+    async loadVisibleContentForExport(
+      client: DbClient,
+      input: { campaignId: string; actorId: string; isGm: boolean; limit: number },
+    ): Promise<ContentRecord[]> {
+      const result = await client.query<ContentRow>(
+        `SELECT ${CONTENT_COLUMNS.split(", ").map((column) => `c.${column}`).join(", ")}
+           FROM campaign_content_items c
+          WHERE c.campaign_id = $3 AND c.status = 'active' AND ${CONTENT_VISIBILITY_PREDICATE}
+          ORDER BY c.id
+          LIMIT $4`,
+        [input.actorId, input.isGm, input.campaignId, input.limit],
+      );
+      return result.rows.map(toContentRecord);
+    },
+
+    async loadVisibleActivityForExport(
+      client: DbClient,
+      input: { campaignId: string; actorId: string; isGm: boolean; limit: number },
+    ): Promise<ActivityEventRecord[]> {
+      const result = await client.query<ActivityEventRow>(
+        `SELECT ${ACTIVITY_COLUMNS.split(", ").map((column) => `e.${column}`).join(", ")}
+           FROM campaign_activity_events e
+           LEFT JOIN campaign_content_items c ON c.id = e.source_content_id
+          WHERE e.campaign_id = $3
+            AND (c.id IS NULL OR (c.status = 'active' AND ${CONTENT_VISIBILITY_PREDICATE}))
+          ORDER BY e.occurred_at, e.id
+          LIMIT $4`,
+        [input.actorId, input.isGm, input.campaignId, input.limit],
+      );
+      return result.rows.map(toActivityEventRecord);
+    },
+
+    async loadGrantsForContents(
+      client: DbClient,
+      contentIds: string[],
+    ): Promise<Map<string, string[]>> {
+      const grants = new Map<string, string[]>();
+      if (contentIds.length === 0) return grants;
+      const result = await client.query<{ content_id: string; user_id: string }>(
+        `SELECT content_id, user_id FROM campaign_content_grants
+          WHERE content_id = ANY($1) ORDER BY content_id, user_id`,
+        [contentIds],
+      );
+      for (const row of result.rows) {
+        const list = grants.get(row.content_id) ?? [];
+        list.push(row.user_id);
+        grants.set(row.content_id, list);
+      }
+      return grants;
     },
   };
 }

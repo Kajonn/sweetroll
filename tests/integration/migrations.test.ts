@@ -178,8 +178,11 @@ describeWithDatabase("runMigrations", () => {
       [schema],
     );
     expect(tables.rows.map(({ table_name }) => table_name)).toEqual([
+      "campaign_activity_events",
       "campaign_audit_records",
       "campaign_command_executions",
+      "campaign_content_grants",
+      "campaign_content_items",
       "campaign_invitations",
       "campaign_members",
       "campaigns",
@@ -189,7 +192,8 @@ describeWithDatabase("runMigrations", () => {
       `SELECT pg_get_constraintdef(oid) AS definition
          FROM pg_constraint
         WHERE connamespace = $1::regnamespace
-          AND conrelid IN ('campaigns'::regclass, 'campaign_members'::regclass, 'campaign_invitations'::regclass)`,
+          AND conrelid IN ('campaigns'::regclass, 'campaign_members'::regclass, 'campaign_invitations'::regclass,
+                           'campaign_content_items'::regclass, 'campaign_activity_events'::regclass)`,
       [schema],
     );
     const definitions = constraints.rows.map(({ definition }) => definition);
@@ -202,6 +206,13 @@ describeWithDatabase("runMigrations", () => {
     expect(definitions).toContain("CHECK ((intended_role = ANY (ARRAY['player'::text, 'co_gm'::text])))");
     expect(definitions).toContain(
       "CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'declined'::text, 'revoked'::text])))",
+    );
+    expect(definitions).toContain(
+      "CHECK ((audience = ANY (ARRAY['gm_only'::text, 'all_players'::text, 'selected_players'::text, 'owner_only'::text])))",
+    );
+    expect(definitions).toContain("CHECK ((status = ANY (ARRAY['active'::text, 'deleted'::text])))");
+    expect(definitions).toContain(
+      "CHECK ((roll_audience_default = ANY (ARRAY['owner_only'::text, 'gm_only'::text, 'campaign'::text])))",
     );
 
     const versionForeignKey = await client.query<{ delete_action: string }>(
@@ -248,10 +259,16 @@ describeWithDatabase("runMigrations", () => {
       [schema],
     );
     expect(indexes.rows.map(({ indexname }) => indexname)).toEqual([
+      "campaign_activity_events_page_idx",
+      "campaign_activity_events_pkey",
       "campaign_audit_records_page_idx",
       "campaign_audit_records_pkey",
       "campaign_command_executions_expiry_idx",
       "campaign_command_executions_pkey",
+      "campaign_content_grants_member_idx",
+      "campaign_content_grants_pkey",
+      "campaign_content_items_page_idx",
+      "campaign_content_items_pkey",
       "campaign_invitations_campaign_page_idx",
       "campaign_invitations_pkey",
       "campaign_members_pkey",
@@ -647,6 +664,155 @@ describeWithDatabase("runMigrations", () => {
     // (This test seeds then applies the file directly, so no
     // schema_migrations row exists here; full-directory double-apply
     // including 0014 is covered by the production campaign-tables test.)
+  });
+
+  it("applies the 0015 content, grant and activity tables with relational guards", async () => {
+    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
+    const filenames = (await readdir(productionDirectory)).sort();
+    // 0015 must be a fresh number: no other migration may claim it.
+    expect(filenames.filter((name) => name.startsWith("0015"))).toEqual([
+      "0015_campaign_content_activity.sql",
+    ]);
+    for (const filename of filenames.filter((name) => name < "0015_campaign_content_activity.sql")) {
+      await client.query(await readFile(join(productionDirectory, filename), "utf8"));
+    }
+
+    const userId = randomUUID();
+    const systemId = randomUUID();
+    const versionId = randomUUID();
+    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Pre-0015')", [userId]);
+    await client.query(
+      `INSERT INTO systems (id, owner_id, name, access, lifecycle)
+       VALUES ($1, $2, 'Pre-0015 system', 'private', 'active')`,
+      [systemId, userId],
+    );
+    await client.query(
+      `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle)
+       VALUES ($1, $2, '1.0.0', $3, '{}'::jsonb, '', 'published')`,
+      [versionId, systemId, `pre-0015-${randomUUID()}`],
+    );
+    const campaignId = randomUUID();
+    await client.query(
+      `INSERT INTO campaigns (id, owner_id, system_version_id, title) VALUES ($1, $2, $3, 'Content campaign')`,
+      [campaignId, userId, versionId],
+    );
+    await client.query(
+      `INSERT INTO campaign_members (campaign_id, user_id, role) VALUES ($1, $2, 'owner')`,
+      [campaignId, userId],
+    );
+
+    await client.query(await readFile(join(productionDirectory, "0015_campaign_content_activity.sql"), "utf8"));
+
+    // The roll audience default is storage: existing rows read 'campaign'.
+    const campaign = await client.query(
+      `SELECT roll_audience_default, revision, access_revision FROM campaigns WHERE id = $1`,
+      [campaignId],
+    );
+    expect(campaign.rows).toEqual([{ roll_audience_default: "campaign", revision: 1, access_revision: 1 }]);
+    await expect(
+      client.query(`UPDATE campaigns SET roll_audience_default = 'everyone' WHERE id = $1`, [campaignId]),
+    ).rejects.toThrow();
+
+    // Content defaults to active revision 1/1 with empty tags.
+    const contentId = randomUUID();
+    await client.query(
+      `INSERT INTO campaign_content_items (id, campaign_id, creator_id, audience, title, body)
+       VALUES ($1, $2, $3, 'selected_players', 'Hello', 'World')`,
+      [contentId, campaignId, userId],
+    );
+    const content = await client.query(
+      `SELECT audience, title, body, tags, revision, access_revision, status, deleted_at
+         FROM campaign_content_items WHERE id = $1`,
+      [contentId],
+    );
+    expect(content.rows).toEqual([
+      {
+        audience: "selected_players",
+        title: "Hello",
+        body: "World",
+        tags: [],
+        revision: 1,
+        access_revision: 1,
+        status: "active",
+        deleted_at: null,
+      },
+    ]);
+    await expect(
+      client.query(
+        `INSERT INTO campaign_content_items (campaign_id, creator_id, audience) VALUES ($1, $2, 'everyone')`,
+        [campaignId, userId],
+      ),
+    ).rejects.toThrow();
+    await expect(
+      client.query(
+        `INSERT INTO campaign_content_items (campaign_id, creator_id, audience, status, deleted_at)
+         VALUES ($1, $2, 'gm_only', 'active', now())`,
+        [campaignId, userId],
+      ),
+    ).rejects.toThrow();
+
+    // Grants pair content with a membership in the SAME campaign.
+    await client.query(
+      `INSERT INTO campaign_content_grants (content_id, campaign_id, user_id)
+       VALUES ($1, $2, $3)`,
+      [contentId, campaignId, userId],
+    );
+    const strangerId = randomUUID();
+    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Stranger')", [strangerId]);
+    await expect(
+      client.query(
+        `INSERT INTO campaign_content_grants (content_id, campaign_id, user_id)
+         VALUES ($1, $2, $3)`,
+        [contentId, campaignId, strangerId],
+      ),
+    ).rejects.toThrow();
+    const otherCampaignId = randomUUID();
+    await client.query(
+      `INSERT INTO campaigns (id, owner_id, system_version_id, title) VALUES ($1, $2, $3, 'Other')`,
+      [otherCampaignId, userId, versionId],
+    );
+    await client.query(
+      `INSERT INTO campaign_members (campaign_id, user_id, role) VALUES ($1, $2, 'player')`,
+      [otherCampaignId, strangerId],
+    );
+    // Stranger is a member elsewhere: pairing them with this campaign fails.
+    await expect(
+      client.query(
+        `INSERT INTO campaign_content_grants (content_id, campaign_id, user_id)
+         VALUES ($1, $2, $3)`,
+        [contentId, campaignId, strangerId],
+      ),
+    ).rejects.toThrow();
+    // Deleting the content cascades its grants.
+    await client.query(`DELETE FROM campaign_content_items WHERE id = $1`, [contentId]);
+    const grants = await client.query(`SELECT COUNT(*)::int AS count FROM campaign_content_grants`);
+    expect(grants.rows).toEqual([{ count: 0 }]);
+
+    // Activity rows correlate on request ID without a uniqueness rule.
+    const noteId = randomUUID();
+    await client.query(
+      `INSERT INTO campaign_content_items (id, campaign_id, creator_id, audience)
+       VALUES ($1, $2, $3, 'all_players')`,
+      [noteId, campaignId, userId],
+    );
+    const requestId = randomUUID();
+    await client.query(
+      `INSERT INTO campaign_activity_events (campaign_id, actor_id, kind, source_content_id, request_id)
+       VALUES ($1, $2, 'content_created', $3, $4), ($1, $2, 'content_updated', $3, $4)`,
+      [campaignId, userId, noteId, requestId],
+    );
+    const events = await client.query(
+      `SELECT COUNT(*)::int AS count FROM campaign_activity_events WHERE request_id = $1`,
+      [requestId],
+    );
+    expect(events.rows).toEqual([{ count: 2 }]);
+    await expect(
+      client.query(
+        `INSERT INTO campaign_activity_events (campaign_id, actor_id, kind, request_id)
+         VALUES ($1, $2, 'roll_committed', $3)`,
+        [campaignId, userId, randomUUID()],
+      ),
+    ).rejects.toThrow();
   });
 
   it("normalizes existing active system versions during the 0009 upgrade", async () => {

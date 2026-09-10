@@ -14,6 +14,24 @@ import {
   type MembershipRecord,
 } from "./persistence.js";
 import {
+  createContentCommands,
+  type ActivityEventView,
+  type CampaignExportSnapshot,
+  type ContentSummary,
+  type ContentView,
+  type CreateContentInput,
+  type DeleteContentInput,
+  type ExportCampaignInput,
+  type ListActivityInput,
+  type ListActivityResult,
+  type ListContentInput,
+  type ListContentResult,
+  type OpenContentInput,
+  type RecoverContentInput,
+  type ReplaceGrantsInput,
+  type UpdateContentInput,
+} from "./content.js";
+import {
   createInvitationCommands,
   DEFAULT_INVITATION_RATE_LIMIT,
   type ConsumeInvitationInput,
@@ -53,6 +71,7 @@ export type CampaignErrorCode =
   | "conflict"
   | "idempotency_mismatch"
   | "result_unavailable"
+  | "export_too_large"
   | "rate_limited"
   | "internal";
 
@@ -202,10 +221,29 @@ export interface Campaigns {
     ctx: RequestContext,
     input: RevokeInvitationInput,
   ): Promise<CampaignResult<InvitationMetadata>>;
+  createContent(ctx: RequestContext, input: CreateContentInput): Promise<CampaignResult<ContentView>>;
+  openContent(ctx: RequestContext, input: OpenContentInput): Promise<CampaignResult<ContentView>>;
+  listContent(ctx: RequestContext, input: ListContentInput): Promise<CampaignResult<ListContentResult>>;
+  updateContent(ctx: RequestContext, input: UpdateContentInput): Promise<CampaignResult<ContentView>>;
+  deleteContent(ctx: RequestContext, input: DeleteContentInput): Promise<CampaignResult<ContentView>>;
+  recoverContent(ctx: RequestContext, input: RecoverContentInput): Promise<CampaignResult<ContentView>>;
+  replaceGrants(ctx: RequestContext, input: ReplaceGrantsInput): Promise<CampaignResult<ContentView>>;
+  listActivity(ctx: RequestContext, input: ListActivityInput): Promise<CampaignResult<ListActivityResult>>;
+  exportCampaign(
+    ctx: RequestContext,
+    input: ExportCampaignInput,
+  ): Promise<CampaignResult<CampaignExportSnapshot>>;
 }
 
 export type {
+  ActivityEventView,
+  CampaignExportSnapshot,
   ConsumeInvitationInput,
+  ContentSummary,
+  ContentView,
+  CreateContentInput,
+  DeleteContentInput,
+  ExportCampaignInput,
   InvitationAcceptSuccess,
   InvitationDeclineSuccess,
   InvitationIssueReplay,
@@ -217,11 +255,19 @@ export type {
   InvitationRotateReplay,
   InvitationRotateSuccess,
   IssueInvitationInput,
+  ListActivityInput,
+  ListActivityResult,
+  ListContentInput,
+  ListContentResult,
   ListInvitationsInput,
   ListInvitationsResult,
+  OpenContentInput,
+  RecoverContentInput,
+  ReplaceGrantsInput,
   ReviewInvitationInput,
   RevokeInvitationInput,
   RotateInvitationInput,
+  UpdateContentInput,
 };
 
 export type CreateCampaignsModuleInput = {
@@ -548,6 +594,11 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     rateLimit: input.invitationRateLimit ?? DEFAULT_INVITATION_RATE_LIMIT,
   });
 
+  // Task 7 content/grants/activity/export. Same shared dependencies; the
+  // commands own audience validation, grant atomicity, source-filtered
+  // reads and the bounded deterministic export projection.
+  const content = createContentCommands({ pool: input.pool, repo, limits, now, newId });
+
   return {
     issueInvitation: invitations.issueInvitation,
     listInvitations: invitations.listInvitations,
@@ -556,6 +607,15 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     declineInvitation: invitations.declineInvitation,
     rotateInvitation: invitations.rotateInvitation,
     revokeInvitation: invitations.revokeInvitation,
+    createContent: content.createContent,
+    openContent: content.openContent,
+    listContent: content.listContent,
+    updateContent: content.updateContent,
+    deleteContent: content.deleteContent,
+    recoverContent: content.recoverContent,
+    replaceGrants: content.replaceGrants,
+    listActivity: content.listActivity,
+    exportCampaign: content.exportCampaign,
     async create(ctx, createInput) {
       try {
         const keyError = checkIdempotencyKey(createInput.idempotencyKey);
@@ -1402,6 +1462,15 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             return { committed: false as const, failure: errors.internal() as CampaignError };
           }
           const value = toMemberView(updated);
+          // Task 7 departure cleanup: destroy every content grant naming the
+          // departing member in this campaign, in the same transaction.
+          // Rejoin mints a new membership generation and never reactivates
+          // these rows (they are deleted, not flagged). This always runs,
+          // even when tests override afterMemberRemoved below.
+          await repo.deleteContentGrantsForMember(client, {
+            campaignId: campaign.campaignId,
+            userId: removeInput.userId,
+          });
           // Task 4 member return: adopted sheets detach to their original
           // owner (current state, revision/generation bumps) and campaign
           // sheets stay, inside the same transaction. An explicit hook

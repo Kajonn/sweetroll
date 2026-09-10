@@ -21,6 +21,20 @@ export type CampaignLimits = {
   invitationExpiryDefaultDays: number;
   /** Maximum invitation expiry in days. */
   invitationExpiryMaxDays: number;
+  /** Maximum campaign content title length in characters. */
+  maxContentTitleLength: number;
+  /** Maximum campaign content body length in characters (plain text only). */
+  maxContentBodyLength: number;
+  /** Maximum tags per campaign content item. */
+  maxContentTags: number;
+  /** Maximum length of a single campaign content tag in characters. */
+  maxContentTagLength: number;
+  /** Maximum grants per campaign content item. */
+  maxContentGrants: number;
+  /** Maximum campaign export payload size in UTF-8 bytes. */
+  exportMaxBytes: number;
+  /** Maximum projected records per campaign export. */
+  exportMaxRecords: number;
 };
 
 export const DEFAULT_CAMPAIGN_LIMITS: CampaignLimits = {
@@ -32,6 +46,13 @@ export const DEFAULT_CAMPAIGN_LIMITS: CampaignLimits = {
   maxDescriptionLength: 10_000,
   invitationExpiryDefaultDays: 7,
   invitationExpiryMaxDays: 30,
+  maxContentTitleLength: 200,
+  maxContentBodyLength: 100_000,
+  maxContentTags: 20,
+  maxContentTagLength: 50,
+  maxContentGrants: 100,
+  exportMaxBytes: 10 * 1024 * 1024,
+  exportMaxRecords: 10_000,
 };
 
 function parseLimit(env: NodeJS.ProcessEnv, name: string, fallback: number): number {
@@ -73,6 +94,41 @@ export function loadCampaignLimits(env: NodeJS.ProcessEnv = process.env): Campai
       env,
       "CAMPAIGN_INVITATION_EXPIRY_MAX_DAYS",
       DEFAULT_CAMPAIGN_LIMITS.invitationExpiryMaxDays,
+    ),
+    maxContentTitleLength: parseLimit(
+      env,
+      "CAMPAIGN_MAX_CONTENT_TITLE_LENGTH",
+      DEFAULT_CAMPAIGN_LIMITS.maxContentTitleLength,
+    ),
+    maxContentBodyLength: parseLimit(
+      env,
+      "CAMPAIGN_MAX_CONTENT_BODY_LENGTH",
+      DEFAULT_CAMPAIGN_LIMITS.maxContentBodyLength,
+    ),
+    maxContentTags: parseLimit(
+      env,
+      "CAMPAIGN_MAX_CONTENT_TAGS",
+      DEFAULT_CAMPAIGN_LIMITS.maxContentTags,
+    ),
+    maxContentTagLength: parseLimit(
+      env,
+      "CAMPAIGN_MAX_CONTENT_TAG_LENGTH",
+      DEFAULT_CAMPAIGN_LIMITS.maxContentTagLength,
+    ),
+    maxContentGrants: parseLimit(
+      env,
+      "CAMPAIGN_MAX_CONTENT_GRANTS",
+      DEFAULT_CAMPAIGN_LIMITS.maxContentGrants,
+    ),
+    exportMaxBytes: parseLimit(
+      env,
+      "CAMPAIGN_EXPORT_MAX_BYTES",
+      DEFAULT_CAMPAIGN_LIMITS.exportMaxBytes,
+    ),
+    exportMaxRecords: parseLimit(
+      env,
+      "CAMPAIGN_EXPORT_MAX_RECORDS",
+      DEFAULT_CAMPAIGN_LIMITS.exportMaxRecords,
     ),
   };
   if (limits.pageDefault > limits.pageMax) {

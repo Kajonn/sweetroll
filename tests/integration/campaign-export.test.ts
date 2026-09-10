@@ -490,4 +490,216 @@ describeWithDatabase("campaign export projection (Task 7)", () => {
       expect.objectContaining({ ok: false }),
     );
   });
+
+  it("orders deterministically and excludes private material by content with SQL-proven persistence (Task 10)", async () => {
+    const campaignId = await createCampaign();
+    await seedMember(campaignId, h.users.player.actorId);
+    await seedMember(campaignId, h.users.other.actorId);
+    await h.pool.query(`UPDATE systems SET access = 'public'`);
+
+    // Deliberate private markers: every secret below is asserted absent by
+    // content (not shape), while SQL proves it actually persisted.
+    const tag = randomUUID().slice(0, 8);
+    const ownerSecret = `owner-only-secret-${tag}`;
+    const deletedSecret = `deleted-body-secret-${tag}`;
+    const preAdoptionName = `pre-adoption-secret-${tag}`;
+    const privateBonus = 7311;
+
+    // Other actor's owner-only note (player) + a deleted GM note whose
+    // receipt still carries its secret body.
+    const diary = await h.campaigns.createContent(ctxFor(h.users.player), {
+      campaignId,
+      title: "diary",
+      body: ownerSecret,
+      idempotencyKey: randomUUID(),
+    });
+    expect(diary.ok).toBe(true);
+    const doomed = await h.campaigns.createContent(ctxFor(h.users.gm), {
+      campaignId,
+      title: "doomed",
+      body: deletedSecret,
+      audience: "all_players",
+      idempotencyKey: randomUUID(),
+    });
+    expect(doomed.ok).toBe(true);
+    if (!doomed.ok) throw new Error("doomed create failed");
+    const deleted = await h.campaigns.deleteContent(ctxFor(h.users.gm), {
+      contentId: doomed.value.contentId,
+      expectedContentRevision: doomed.value.revision,
+      idempotencyKey: randomUUID(),
+    });
+    expect(deleted.ok).toBe(true);
+
+    // Permitted content in non-creation order: export must sort by contentId.
+    const titles = [`gamma-${tag}`, `alpha-${tag}`, `beta-${tag}`];
+    for (const title of titles) {
+      const created = await h.campaigns.createContent(ctxFor(h.users.gm), {
+        campaignId,
+        title,
+        body: `shared body ${title}`,
+        audience: "all_players",
+        idempotencyKey: randomUUID(),
+      });
+      expect(created.ok).toBe(true);
+    }
+
+    // Standalone sheet with personal pre-adoption history, then adopted.
+    const standalone = await h.characters.create(ctxFor(h.users.player), {
+      systemVersionId: h.versionId,
+      entityDefinitionId: "character",
+      name: preAdoptionName,
+      idempotencyKey: randomUUID(),
+    });
+    expect(standalone.ok).toBe(true);
+    if (!standalone.ok) throw new Error("standalone create failed");
+    const standaloneId = standalone.value.characterId;
+    const renamed = await h.characters.manage(ctxFor(h.users.player), {
+      kind: "rename",
+      characterId: standaloneId,
+      name: `${preAdoptionName}-renamed`,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(renamed.ok).toBe(true);
+    const adopted = await h.campaigns.adoptCampaignCharacter(ctxFor(h.users.player), {
+      campaignId,
+      expectedCampaignRevision: await revision(campaignId),
+      characterId: standaloneId,
+      expectedCharacterRevision: 2,
+      acknowledgedDisclosure: true,
+      idempotencyKey: randomUUID(),
+    });
+    expect(adopted.ok).toBe(true);
+
+    // Controlled campaign sheet for roll fixtures.
+    const characterId = await createControlledSheet(campaignId);
+    const privateRoll = await h.characters.apply(ctxFor(h.users.player), {
+      kind: "executeAction",
+      characterId,
+      actionId: "check",
+      inputs: { bonus: privateBonus },
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+      audience: "owner_only",
+    });
+    expect(privateRoll.ok).toBe(true);
+    const sharedRoll = await h.characters.apply(ctxFor(h.users.player), {
+      kind: "executeAction",
+      characterId,
+      actionId: "check",
+      inputs: { bonus: 2 },
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+      audience: "campaign",
+    });
+    expect(sharedRoll.ok).toBe(true);
+
+    // Invitation secret: token + hash persist, never export.
+    const issued = await h.campaigns.issueInvitation(ctxFor(h.users.gm), {
+      campaignId,
+      intendedRole: "player",
+      expectedCampaignRevision: await revision(campaignId),
+      idempotencyKey: randomUUID(),
+    });
+    expect(issued.ok).toBe(true);
+    if (!issued.ok || !("token" in issued.value)) throw new Error("issue failed");
+    const token = issued.value.token;
+
+    // SQL proves every secret actually persisted (nonzero counts): the
+    // absence assertions below are content proofs, not vacuous passes.
+    const persisted = await h.pool.query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM campaign_content_items WHERE campaign_id = $1 AND body IN ($2, $3)`,
+      [campaignId, ownerSecret, deletedSecret],
+    );
+    expect(persisted.rows[0]?.n).toBe(2);
+    const receiptWithSecret = await h.pool.query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM campaign_command_executions
+        WHERE campaign_id = $1 AND result_json::text LIKE '%' || $2 || '%'`,
+      [campaignId, deletedSecret],
+    );
+    expect(receiptWithSecret.rows[0]?.n).toBeGreaterThan(0);
+    const privateRollRow = await h.pool.query<{ id: string }>(
+      `SELECT id FROM character_rolls WHERE character_id = $1 AND audience = 'owner_only'`,
+      [characterId],
+    );
+    expect(privateRollRow.rows).toHaveLength(1);
+    const privateRollId = privateRollRow.rows[0]?.id;
+    const historyRows = await h.pool.query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM character_activity_events WHERE character_id = $1`,
+      [standaloneId],
+    );
+    expect(historyRows.rows[0]?.n).toBeGreaterThan(0);
+    const tokenRows = await h.pool.query<{ token_hash: string }>(
+      `SELECT token_hash FROM campaign_invitations WHERE campaign_id = $1`,
+      [campaignId],
+    );
+    expect(tokenRows.rows).toHaveLength(1);
+    const tokenHash = tokenRows.rows[0]?.token_hash as string;
+    expect(tokenHash).toBeTruthy();
+
+    // Equivalent authorized snapshots compare byte-identical: different
+    // idempotency keys, same state, no random timestamps/IDs leak.
+    const first = await exportAs("gm", campaignId);
+    const second = await exportAs("gm", campaignId);
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    if (!first.ok || !second.ok) throw new Error("export failed");
+    expect(JSON.stringify(second.value)).toBe(JSON.stringify(first.value));
+
+    // Deterministic ordering: members by user, content/rolls by id,
+    // activity by (occurredAt, id).
+    const memberIds = first.value.members.map((m) => m.userId);
+    expect(memberIds).toEqual([...memberIds].sort());
+    const contentIds = first.value.content.map((c) => c.contentId);
+    expect(contentIds).toEqual([...contentIds].sort());
+    const rollIds = first.value.rolls.map((r) => r.rollId);
+    expect(rollIds).toEqual([...rollIds].sort());
+    const activityKeys = first.value.activity.map((e) => `${e.occurredAt}|${e.eventId}`);
+    expect(activityKeys).toEqual([...activityKeys].sort());
+    expect(first.value.content.map((c) => c.title)).toEqual(
+      expect.arrayContaining(titles),
+    );
+
+    // Content assertions: permitted material present, private absent.
+    const serialized = JSON.stringify(first.value);
+    for (const title of titles) expect(serialized).toContain(title);
+    expect(serialized).not.toContain(ownerSecret);
+    expect(serialized).not.toContain(deletedSecret);
+    expect(serialized).not.toContain(preAdoptionName);
+    expect(serialized).not.toContain(token);
+    expect(serialized).not.toContain(tokenHash);
+    // The adopted sheet cut no visible rolls, so its ID stays out of the
+    // projection entirely. The controlled sheet's ID legitimately appears
+    // as the permitted campaign roll's characterId (projection key, not a
+    // sheet payload leak), so only the private roll ID must be absent.
+    expect(serialized).not.toContain(standaloneId);
+    expect(serialized).toContain(characterId);
+    if (privateRollId !== undefined) expect(serialized).not.toContain(privateRollId);
+    for (const forbidden of [
+      "token",
+      "token_hash",
+      "tokenHash",
+      "secret",
+      "password",
+      "credential",
+      "result_json",
+      "bindings_json",
+      "dice_json",
+      "state_json",
+      "character_id",
+      "scope_campaign_id",
+    ]) {
+      expect(serialized).not.toContain(forbidden);
+    }
+    expect(first.value.rolls.map((r) => r.audience)).not.toContain("owner_only");
+    expect(first.value.activity.map((e) => e.sourceRollId)).not.toContain(privateRollId ?? "missing");
+    expect(Object.keys(first.value).sort()).toEqual([
+      "activity",
+      "campaign",
+      "content",
+      "exportVersion",
+      "members",
+      "rolls",
+    ]);
+  });
 });

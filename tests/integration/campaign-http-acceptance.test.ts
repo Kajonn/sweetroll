@@ -305,6 +305,7 @@ describeWithDatabase("campaign HTTP acceptance demonstration (Task 10)", () => {
     expect(returnedRes.statusCode, returnedRes.body).toBe(200);
     const returned = (returnedRes.json() as any).character;
     expect(returned.ownerId).toBe(player.actorId);
+    expect(returned.campaignId).toBeNull();
     expect(returned.systemVersionId).toBe(adoptedSystemVersionId);
     if (writeRes.statusCode === 200) {
       const lastCommittedState = (writeRes.json() as any).result.character.state;
@@ -319,6 +320,8 @@ describeWithDatabase("campaign HTTP acceptance demonstration (Task 10)", () => {
     expect((gmParty.json() as any).character.campaignId).toBe(campaignId);
     const removedParty = await get("player", `/characters/${partyId}`);
     expect(removedParty.statusCode).toBe(404);
+    const gmAdopted = await get("gm", `/characters/${adoptId}`);
+    expect(gmAdopted.statusCode).toBe(404);
 
     // Prior campaign URLs, history and receipts are denied for the removed player.
     const removedCampaignRead = await get("player", `/campaigns/${campaignId}`);
@@ -515,14 +518,21 @@ describeWithDatabase("campaign HTTP acceptance demonstration (Task 10)", () => {
       });
       expect(res.statusCode, `bulk content ${i}: ${res.body.slice(0, 200)}`).toBe(201);
     }
+    const byteBudgetKey = randomUUID();
     const tooBig = await h.app.inject({
       method: "POST",
       url: `/campaigns/${campaignId}/exports`,
       headers: cookie("gm"),
-      payload: { idempotencyKey: randomUUID() },
+      payload: { idempotencyKey: byteBudgetKey },
     });
     expect(tooBig.statusCode).toBe(413);
     expect((tooBig.json() as any).error.code).toBe("export_too_large");
+    const byteReceipt = await h.pool.query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM campaign_command_executions
+        WHERE actor_id = $1 AND command_kind = 'campaign_export' AND idempotency_key = $2`,
+      [h.users.gm.actorId, byteBudgetKey],
+    );
+    expect(byteReceipt.rows[0]?.n).toBe(0);
 
     // Record budget shares the same 413 path at the module seam (tiny
     // limits reject without partial success and leave no receipt).
@@ -536,11 +546,18 @@ describeWithDatabase("campaign HTTP acceptance demonstration (Task 10)", () => {
       charactersPlacement: placement,
     });
     const { ctxFor } = await import("./i6-app.js");
+    const recordBudgetKey = randomUUID();
     const tinyDenied = await tiny.exportCampaign(ctxFor(h.users.gm), {
       campaignId,
-      idempotencyKey: randomUUID(),
+      idempotencyKey: recordBudgetKey,
     });
     expect(tinyDenied.ok).toBe(false);
     if (!tinyDenied.ok) expect(tinyDenied.error.code).toBe("export_too_large");
+    const recordReceipt = await h.pool.query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM campaign_command_executions
+        WHERE actor_id = $1 AND command_kind = 'campaign_export' AND idempotency_key = $2`,
+      [h.users.gm.actorId, recordBudgetKey],
+    );
+    expect(recordReceipt.rows[0]?.n).toBe(0);
   }, 180_000);
 });

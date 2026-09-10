@@ -157,7 +157,34 @@ export type CreateCampaignsModuleInput = {
   limits: CampaignLimits;
   now?: () => Date;
   newId?: () => string;
+  hooks?: {
+    /**
+     * Task 4 seam: invoked inside the removeMember transaction after the
+     * membership row flips to removed and before audit/receipt commit.
+     * A throw rolls the whole removal back. Task 4 plugs adopted-character
+     * return through this hook; no public removal route may be registered
+     * until the hook performs that return.
+     */
+    afterMemberRemoved?: MemberRemovalHook;
+  };
 };
+
+/**
+ * Task 4 extension point for departure: runs on the caller's transaction
+ * client inside removeMember, after the membership status flips to removed
+ * and before audit/receipt rows commit, so character return (Task 4) is
+ * all-or-nothing with the removal itself.
+ */
+export type MemberRemovalHook = (
+  client: PoolClient,
+  removal: {
+    campaignId: CampaignId;
+    userId: UserId;
+    actorId: UserId;
+    requestId: string;
+    membership: MemberView;
+  },
+) => Promise<void>;
 
 const NOT_FOUND_MESSAGE = "The requested campaign does not exist.";
 const MISMATCH_MESSAGE = "This idempotency key was already used with different input.";
@@ -170,7 +197,7 @@ const RECOVER_KIND = "campaign_recover";
 const CHANGE_ROLE_KIND = "campaign_change_role";
 const REMOVE_MEMBER_KIND = "campaign_remove_member";
 
-type ListCursor = { createdAt: string; id: string };
+type ListCursor = { createdAt: string; id: string; scope: string };
 
 /**
  * Thrown inside a transaction when the idempotency receipt insert loses a
@@ -188,6 +215,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
   const limits = input.limits;
   const now = input.now ?? (() => new Date());
   const newId = input.newId ?? (() => randomUUID());
+  const hooks = input.hooks;
 
   const errors = {
     bad_request: (message: string): CampaignError => ({ code: "bad_request", message }),
@@ -312,19 +340,28 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     return { limit: value };
   }
 
-  function decodeCursor(raw: string | null | undefined): { cursor: ListCursor | null } | { error: CampaignError } {
+  function decodeCursor(
+    raw: string | null | undefined,
+    expectedScope: string,
+  ): { cursor: ListCursor | null } | { error: CampaignError } {
     if (raw === undefined || raw === null) return { cursor: null };
     try {
       const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as Partial<ListCursor>;
       if (
         typeof parsed.createdAt !== "string" ||
         typeof parsed.id !== "string" ||
+        typeof parsed.scope !== "string" ||
         Number.isNaN(Date.parse(parsed.createdAt)) ||
         parsed.id.length === 0
       ) {
         return { error: errors.bad_request("cursor is malformed.") };
       }
-      return { cursor: { createdAt: parsed.createdAt, id: parsed.id } };
+      // Cursors never cross scopes: a members cursor is bound to its
+      // campaign, a campaigns cursor to the actor it was issued to.
+      if (parsed.scope !== expectedScope) {
+        return { error: errors.bad_request("cursor is not valid for this query.") };
+      }
+      return { cursor: { createdAt: parsed.createdAt, id: parsed.id, scope: parsed.scope } };
     } catch {
       return { error: errors.bad_request("cursor is malformed.") };
     }
@@ -332,6 +369,15 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
 
   function encodeCursor(cursor: ListCursor): string {
     return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+  }
+
+  async function withClient<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+    const client = await input.pool.connect();
+    try {
+      return await work(client);
+    } finally {
+      client.release();
+    }
   }
 
   async function withTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -373,13 +419,17 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     ctx: RequestContext,
     campaignId: string,
   ): Promise<CampaignError | null> {
-    const campaign = await repo.openCampaign(input.pool, campaignId);
-    const membership =
-      campaign === null ? null : await repo.loadMembership(input.pool, campaignId, ctx.actorId);
-    if (campaign === null || !canReadCampaign(campaign, membership)) {
-      return errors.not_found();
-    }
-    return null;
+    // One connection for both reads so the campaign row and the caller
+    // membership share a consistent snapshot.
+    return await withClient(async (client) => {
+      const campaign = await repo.openCampaign(client, campaignId);
+      const membership =
+        campaign === null ? null : await repo.loadMembership(client, campaignId, ctx.actorId);
+      if (campaign === null || !canReadCampaign(campaign, membership)) {
+        return errors.not_found();
+      }
+      return null;
+    });
   }
 
   return {
@@ -486,15 +536,20 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
 
     async open(ctx, openInput) {
       try {
-        const campaign = await repo.openCampaign(input.pool, openInput.campaignId);
-        const membership =
-          campaign === null
-            ? null
-            : await repo.loadMembership(input.pool, openInput.campaignId, ctx.actorId);
-        if (campaign === null || !canReadCampaign(campaign, membership)) {
+        // Single-client snapshot: campaign identity and caller membership
+        // are resolved together, never on independently pooled connections.
+        const outcome = await withClient(async (client) => {
+          const campaign = await repo.openCampaign(client, openInput.campaignId);
+          const membership =
+            campaign === null
+              ? null
+              : await repo.loadMembership(client, openInput.campaignId, ctx.actorId);
+          return { campaign, membership };
+        });
+        if (outcome.campaign === null || !canReadCampaign(outcome.campaign, outcome.membership)) {
           return { ok: false, error: errors.not_found() };
         }
-        return { ok: true, value: toView(campaign) };
+        return { ok: true, value: toView(outcome.campaign) };
       } catch {
         return { ok: false, error: errors.internal() };
       }
@@ -504,7 +559,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
       try {
         const checked = checkLimit(listInput.limit);
         if ("error" in checked) return { ok: false, error: checked.error };
-        const decoded = decodeCursor(listInput.cursor);
+        const decoded = decodeCursor(listInput.cursor, ctx.actorId);
         if ("error" in decoded) return { ok: false, error: decoded.error };
         const rows = await repo.listCampaignsPage(input.pool, ctx.actorId, {
           limit: checked.limit,
@@ -527,7 +582,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             })),
             nextCursor:
               hasMore && last !== undefined
-                ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.campaignId })
+                ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.campaignId, scope: ctx.actorId })
                 : null,
           },
         };
@@ -942,23 +997,32 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
       try {
         const checked = checkLimit(listInput.limit);
         if ("error" in checked) return { ok: false, error: checked.error };
-        const decoded = decodeCursor(listInput.cursor);
+        const decoded = decodeCursor(listInput.cursor, listInput.campaignId);
         if ("error" in decoded) return { ok: false, error: decoded.error };
-        const campaign = await repo.openCampaign(input.pool, listInput.campaignId);
-        const membership =
-          campaign === null
-            ? null
-            : await repo.loadMembership(input.pool, listInput.campaignId, ctx.actorId);
-        if (campaign === null || !canReadCampaign(campaign, membership)) {
+        // Authorization precedes pagination on one snapshot: the roster page
+        // is selected with the campaign predicate already applied, never by
+        // paginating first and filtering unauthorized rows in memory.
+        const outcome = await withClient(async (client) => {
+          const campaign = await repo.openCampaign(client, listInput.campaignId);
+          const membership =
+            campaign === null
+              ? null
+              : await repo.loadMembership(client, listInput.campaignId, ctx.actorId);
+          if (campaign === null || !canReadCampaign(campaign, membership)) {
+            return { authorized: false as const };
+          }
+          const rows = await repo.listMembersPage(client, listInput.campaignId, {
+            limit: checked.limit,
+            cursorCreatedAt: decoded.cursor?.createdAt ?? null,
+            cursorUserId: decoded.cursor?.id ?? null,
+          });
+          return { authorized: true as const, rows };
+        });
+        if (!outcome.authorized) {
           return { ok: false, error: errors.not_found() };
         }
-        const rows = await repo.listMembersPage(input.pool, listInput.campaignId, {
-          limit: checked.limit,
-          cursorCreatedAt: decoded.cursor?.createdAt ?? null,
-          cursorUserId: decoded.cursor?.id ?? null,
-        });
-        const hasMore = rows.length > checked.limit;
-        const page = hasMore ? rows.slice(0, checked.limit) : rows;
+        const hasMore = outcome.rows.length > checked.limit;
+        const page = hasMore ? outcome.rows.slice(0, checked.limit) : outcome.rows;
         const last = page[page.length - 1];
         return {
           ok: true,
@@ -966,7 +1030,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             members: page.map(toMemberView),
             nextCursor:
               hasMore && last !== undefined
-                ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.userId })
+                ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.userId, scope: listInput.campaignId })
                 : null,
           },
         };
@@ -1208,6 +1272,19 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
           if (updated === null) {
             return { committed: false as const, failure: errors.internal() as CampaignError };
           }
+          const value = toMemberView(updated);
+          // Task 4 seam: member-return plugs in here, inside the same
+          // transaction, so removal, controller/grant cleanup, audit and
+          // receipt stay all-or-nothing. A throw rolls everything back.
+          if (hooks?.afterMemberRemoved !== undefined) {
+            await hooks.afterMemberRemoved(client, {
+              campaignId: campaign.campaignId,
+              userId: removeInput.userId,
+              actorId: ctx.actorId,
+              requestId: ctx.requestId,
+              membership: value,
+            });
+          }
           await repo.appendAudit(client, {
             campaignId: campaign.campaignId,
             actorId: ctx.actorId,
@@ -1215,7 +1292,6 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             summary: "Campaign member removed",
             requestId: ctx.requestId,
           });
-          const value = toMemberView(updated);
           const stored = {
             campaignId: campaign.campaignId,
             value: serializeMember(value),

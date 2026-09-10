@@ -17,6 +17,10 @@ export type CampaignLimits = {
   maxTitleLength: number;
   /** Maximum campaign description length in characters. */
   maxDescriptionLength: number;
+  /** Default invitation expiry in days. */
+  invitationExpiryDefaultDays: number;
+  /** Maximum invitation expiry in days. */
+  invitationExpiryMaxDays: number;
 };
 
 export const DEFAULT_CAMPAIGN_LIMITS: CampaignLimits = {
@@ -26,6 +30,8 @@ export const DEFAULT_CAMPAIGN_LIMITS: CampaignLimits = {
   maxAttachedCharacters: 200,
   maxTitleLength: 200,
   maxDescriptionLength: 10_000,
+  invitationExpiryDefaultDays: 7,
+  invitationExpiryMaxDays: 30,
 };
 
 function parseLimit(env: NodeJS.ProcessEnv, name: string, fallback: number): number {
@@ -58,9 +64,24 @@ export function loadCampaignLimits(env: NodeJS.ProcessEnv = process.env): Campai
       "CAMPAIGN_MAX_DESCRIPTION_LENGTH",
       DEFAULT_CAMPAIGN_LIMITS.maxDescriptionLength,
     ),
+    invitationExpiryDefaultDays: parseLimit(
+      env,
+      "CAMPAIGN_INVITATION_EXPIRY_DEFAULT_DAYS",
+      DEFAULT_CAMPAIGN_LIMITS.invitationExpiryDefaultDays,
+    ),
+    invitationExpiryMaxDays: parseLimit(
+      env,
+      "CAMPAIGN_INVITATION_EXPIRY_MAX_DAYS",
+      DEFAULT_CAMPAIGN_LIMITS.invitationExpiryMaxDays,
+    ),
   };
   if (limits.pageDefault > limits.pageMax) {
     throw new Error("CAMPAIGN_PAGE_DEFAULT must not exceed CAMPAIGN_PAGE_MAX");
+  }
+  if (limits.invitationExpiryDefaultDays > limits.invitationExpiryMaxDays) {
+    throw new Error(
+      "CAMPAIGN_INVITATION_EXPIRY_DEFAULT_DAYS must not exceed CAMPAIGN_INVITATION_EXPIRY_MAX_DAYS",
+    );
   }
   return limits;
 }

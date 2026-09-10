@@ -14,6 +14,27 @@ import {
   type MembershipRecord,
 } from "./persistence.js";
 import {
+  createInvitationCommands,
+  DEFAULT_INVITATION_RATE_LIMIT,
+  type ConsumeInvitationInput,
+  type InvitationAcceptSuccess,
+  type InvitationDeclineSuccess,
+  type InvitationIssueReplay,
+  type InvitationIssueSuccess,
+  type InvitationListItem,
+  type InvitationMetadata,
+  type InvitationRateLimit,
+  type InvitationReview,
+  type InvitationRotateReplay,
+  type InvitationRotateSuccess,
+  type IssueInvitationInput,
+  type ListInvitationsInput,
+  type ListInvitationsResult,
+  type ReviewInvitationInput,
+  type RevokeInvitationInput,
+  type RotateInvitationInput,
+} from "./invitations.js";
+import {
   authorizeRemoval,
   authorizeRoleChange,
   canChangeLifecycle,
@@ -31,6 +52,8 @@ export type CampaignErrorCode =
   | "not_found"
   | "conflict"
   | "idempotency_mismatch"
+  | "result_unavailable"
+  | "rate_limited"
   | "internal";
 
 export type CampaignError = {
@@ -151,7 +174,55 @@ export interface Campaigns {
   listMembers(ctx: RequestContext, input: ListMembersInput): Promise<CampaignResult<ListMembersResult>>;
   changeRole(ctx: RequestContext, input: ChangeRoleInput): Promise<CampaignResult<MemberView>>;
   removeMember(ctx: RequestContext, input: RemoveMemberInput): Promise<CampaignResult<MemberView>>;
+  issueInvitation(
+    ctx: RequestContext,
+    input: IssueInvitationInput,
+  ): Promise<CampaignResult<InvitationIssueSuccess | InvitationIssueReplay>>;
+  listInvitations(
+    ctx: RequestContext,
+    input: ListInvitationsInput,
+  ): Promise<CampaignResult<ListInvitationsResult>>;
+  reviewInvitation(
+    ctx: RequestContext,
+    input: ReviewInvitationInput,
+  ): Promise<CampaignResult<InvitationReview>>;
+  acceptInvitation(
+    ctx: RequestContext,
+    input: ConsumeInvitationInput,
+  ): Promise<CampaignResult<InvitationAcceptSuccess>>;
+  declineInvitation(
+    ctx: RequestContext,
+    input: ConsumeInvitationInput,
+  ): Promise<CampaignResult<InvitationDeclineSuccess>>;
+  rotateInvitation(
+    ctx: RequestContext,
+    input: RotateInvitationInput,
+  ): Promise<CampaignResult<InvitationRotateSuccess | InvitationRotateReplay>>;
+  revokeInvitation(
+    ctx: RequestContext,
+    input: RevokeInvitationInput,
+  ): Promise<CampaignResult<InvitationMetadata>>;
 }
+
+export type {
+  ConsumeInvitationInput,
+  InvitationAcceptSuccess,
+  InvitationDeclineSuccess,
+  InvitationIssueReplay,
+  InvitationIssueSuccess,
+  InvitationListItem,
+  InvitationMetadata,
+  InvitationRateLimit,
+  InvitationReview,
+  InvitationRotateReplay,
+  InvitationRotateSuccess,
+  IssueInvitationInput,
+  ListInvitationsInput,
+  ListInvitationsResult,
+  ReviewInvitationInput,
+  RevokeInvitationInput,
+  RotateInvitationInput,
+};
 
 export type CreateCampaignsModuleInput = {
   pool: Pool;
@@ -165,6 +236,17 @@ export type CreateCampaignsModuleInput = {
   charactersPlacement: CampaignCharacterPlacement;
   now?: () => Date;
   newId?: () => string;
+  /**
+   * Task 6 token generator override (tests use real randomness by default).
+   * Must produce 32-byte base64url tokens; only the SHA-256 hash persists.
+   */
+  newToken?: (() => string) | undefined;
+  /**
+   * Task 6 adapter-level rate limit for issue/review/consume. No HTTP
+   * rate-limit mechanism exists in this slice, so the module bounds attempts
+   * per actor in memory.
+   */
+  invitationRateLimit?: InvitationRateLimit | undefined;
   hooks?: {
     /**
      * Overrides the default Task 4 member return (tests use this to observe
@@ -452,7 +534,28 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     });
   }
 
+  // Task 6 single-use invitations and lost-response recovery. The commands
+  // own token randomness (32-byte), hash-only storage, metadata-only replays
+  // and campaign-then-invitation locking; the factory only injects shared
+  // dependencies here.
+  const invitations = createInvitationCommands({
+    pool: input.pool,
+    repo,
+    limits,
+    now,
+    newId,
+    newToken: input.newToken,
+    rateLimit: input.invitationRateLimit ?? DEFAULT_INVITATION_RATE_LIMIT,
+  });
+
   return {
+    issueInvitation: invitations.issueInvitation,
+    listInvitations: invitations.listInvitations,
+    reviewInvitation: invitations.reviewInvitation,
+    acceptInvitation: invitations.acceptInvitation,
+    declineInvitation: invitations.declineInvitation,
+    rotateInvitation: invitations.rotateInvitation,
+    revokeInvitation: invitations.revokeInvitation,
     async create(ctx, createInput) {
       try {
         const keyError = checkIdempotencyKey(createInput.idempotencyKey);

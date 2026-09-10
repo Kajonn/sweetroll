@@ -334,14 +334,31 @@ describeWithDatabase("campaign membership races and owner protection (Task 3)", 
     expect(await openRevision(campaignId)).toEqual({ revision: 2, accessRevision: 2 });
     expect(await auditCount(campaignId, "campaign_member_removed")).toBe(1);
 
-    // Rejoin (Task 6 invitation accept) mints a new generation: it never
-    // reactivates the removed row in place.
-    await h.pool.query(
-      `UPDATE campaign_members
-          SET status = 'active', generation = generation + 1, updated_at = now()
-        WHERE campaign_id = $1 AND user_id = $2`,
-      [campaignId, h.users.player.actorId],
-    );
+    // Rejoin via a fresh Task 6 invitation-accept mints a new generation: it
+    // never reactivates the removed row in place.
+    const rejoinIssue = await h.campaigns.issueInvitation(ctxFor(h.users.gm), {
+      campaignId,
+      intendedRole: "player",
+      expectedCampaignRevision: 2,
+      idempotencyKey: randomUUID(),
+    });
+    expect(rejoinIssue.ok).toBe(true);
+    if (!rejoinIssue.ok || !("token" in rejoinIssue.value)) throw new Error("rejoin issue failed");
+    const rejoinReview = await h.campaigns.reviewInvitation(ctxFor(h.users.player), {
+      token: rejoinIssue.value.token,
+    });
+    expect(rejoinReview.ok).toBe(true);
+    if (!rejoinReview.ok) throw new Error("rejoin review failed");
+    const rejoined = await h.campaigns.acceptInvitation(ctxFor(h.users.player), {
+      campaignId,
+      token: rejoinIssue.value.token,
+      expectedInvitationRevision: rejoinReview.value.invitationRevision,
+      reviewedAccessRevision: rejoinReview.value.accessRevision,
+      idempotencyKey: randomUUID(),
+    });
+    expect(rejoined.ok).toBe(true);
+    if (!rejoined.ok) return;
+    expect(rejoined.value.membershipGeneration).toBe(3);
     const roster = await h.campaigns.listMembers(ctxFor(h.users.gm), { campaignId });
     expect(roster.ok).toBe(true);
     if (!roster.ok) return;
@@ -363,13 +380,13 @@ describeWithDatabase("campaign membership races and owner protection (Task 3)", 
     const secondLeave = await h.campaigns.removeMember(ctxFor(h.users.player), {
       campaignId,
       userId: h.users.player.actorId,
-      expectedCampaignRevision: 2,
+      expectedCampaignRevision: 4,
       idempotencyKey: randomUUID(),
     });
     expect(secondLeave.ok).toBe(true);
     if (!secondLeave.ok) return;
     expect(secondLeave.value).toMatchObject({ status: "removed", generation: 4 });
-    expect(await openRevision(campaignId)).toEqual({ revision: 3, accessRevision: 3 });
+    expect(await openRevision(campaignId)).toEqual({ revision: 5, accessRevision: 5 });
   });
 
   it("allows non-owner departure while archived but rejects role changes", async () => {

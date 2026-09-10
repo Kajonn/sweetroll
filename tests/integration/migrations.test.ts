@@ -180,6 +180,7 @@ describeWithDatabase("runMigrations", () => {
     expect(tables.rows.map(({ table_name }) => table_name)).toEqual([
       "campaign_audit_records",
       "campaign_command_executions",
+      "campaign_invitations",
       "campaign_members",
       "campaigns",
     ]);
@@ -188,7 +189,7 @@ describeWithDatabase("runMigrations", () => {
       `SELECT pg_get_constraintdef(oid) AS definition
          FROM pg_constraint
         WHERE connamespace = $1::regnamespace
-          AND conrelid IN ('campaigns'::regclass, 'campaign_members'::regclass)`,
+          AND conrelid IN ('campaigns'::regclass, 'campaign_members'::regclass, 'campaign_invitations'::regclass)`,
       [schema],
     );
     const definitions = constraints.rows.map(({ definition }) => definition);
@@ -198,6 +199,10 @@ describeWithDatabase("runMigrations", () => {
     expect(definitions).toContain("CHECK ((role = ANY (ARRAY['owner'::text, 'co_gm'::text, 'player'::text])))");
     expect(definitions).toContain("CHECK ((status = ANY (ARRAY['active'::text, 'removed'::text])))");
     expect(definitions).toContain("CHECK ((generation >= 1))");
+    expect(definitions).toContain("CHECK ((intended_role = ANY (ARRAY['player'::text, 'co_gm'::text])))");
+    expect(definitions).toContain(
+      "CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'declined'::text, 'revoked'::text])))",
+    );
 
     const versionForeignKey = await client.query<{ delete_action: string }>(
       `SELECT rc.delete_rule AS delete_action
@@ -247,6 +252,8 @@ describeWithDatabase("runMigrations", () => {
       "campaign_audit_records_pkey",
       "campaign_command_executions_expiry_idx",
       "campaign_command_executions_pkey",
+      "campaign_invitations_campaign_page_idx",
+      "campaign_invitations_pkey",
       "campaign_members_pkey",
       "campaign_members_user_idx",
       "campaigns_owner_page_idx",
@@ -548,6 +555,98 @@ describeWithDatabase("runMigrations", () => {
 
     // Full-directory double-apply (including 0013) is covered by the
     // production-schema tests above; here the file applied once after seeding.
+  });
+
+  it("applies the 0014 invitation table with hash-only storage and lifecycle guards", async () => {
+    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
+    const filenames = (await readdir(productionDirectory)).sort();
+    // 0014 must be a fresh number: no other migration may claim it.
+    expect(filenames.filter((name) => name.startsWith("0014"))).toEqual(["0014_campaign_invitations.sql"]);
+    for (const filename of filenames.filter((name) => name < "0014_campaign_invitations.sql")) {
+      await client.query(await readFile(join(productionDirectory, filename), "utf8"));
+    }
+
+    const userId = randomUUID();
+    const systemId = randomUUID();
+    const versionId = randomUUID();
+    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Pre-0014')", [userId]);
+    await client.query(
+      `INSERT INTO systems (id, owner_id, name, access, lifecycle)
+       VALUES ($1, $2, 'Pre-0014 system', 'private', 'active')`,
+      [systemId, userId],
+    );
+    await client.query(
+      `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle)
+       VALUES ($1, $2, '1.0.0', $3, '{}'::jsonb, '', 'published')`,
+      [versionId, systemId, `pre-0014-${randomUUID()}`],
+    );
+    const campaignId = randomUUID();
+    await client.query(
+      `INSERT INTO campaigns (id, owner_id, system_version_id, title) VALUES ($1, $2, $3, 'Invite campaign')`,
+      [campaignId, userId, versionId],
+    );
+
+    await client.query(await readFile(join(productionDirectory, "0014_campaign_invitations.sql"), "utf8"));
+
+    // Hash-only storage: no plaintext token column exists.
+    const columns = await client.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_schema = $1 AND table_name = 'campaign_invitations'
+        ORDER BY column_name`,
+      [schema],
+    );
+    expect(columns.rows.map(({ column_name }) => column_name)).toEqual([
+      "accepted_membership_generation",
+      "campaign_id",
+      "consuming_actor_id",
+      "created_at",
+      "expires_at",
+      "id",
+      "intended_role",
+      "issued_by",
+      "revision",
+      "status",
+      "token_hash",
+      "updated_at",
+    ]);
+
+    // The token hash is globally unique: a duplicate hash is rejected.
+    const invitationId = randomUUID();
+    await client.query(
+      `INSERT INTO campaign_invitations (id, campaign_id, issued_by, intended_role, token_hash, expires_at)
+       VALUES ($1, $2, $3, 'player', 'hash-one', now() + interval '7 days')`,
+      [invitationId, campaignId, userId],
+    );
+    await expect(
+      client.query(
+        `INSERT INTO campaign_invitations (campaign_id, issued_by, intended_role, token_hash, expires_at)
+         VALUES ($1, $2, 'player', 'hash-one', now() + interval '7 days')`,
+        [campaignId, userId],
+      ),
+    ).rejects.toThrow();
+    // Invalid role/status rows are rejected.
+    await expect(
+      client.query(
+        `INSERT INTO campaign_invitations (campaign_id, issued_by, intended_role, token_hash, expires_at)
+         VALUES ($1, $2, 'owner', 'hash-two', now() + interval '7 days')`,
+        [campaignId, userId],
+      ),
+    ).rejects.toThrow();
+    await expect(
+      client.query(
+        `INSERT INTO campaign_invitations (campaign_id, issued_by, intended_role, token_hash, expires_at, status)
+         VALUES ($1, $2, 'player', 'hash-three', now() + interval '7 days', 'consumed')`,
+        [campaignId, userId],
+      ),
+    ).rejects.toThrow();
+
+    // Deleting the campaign cascades its invitations.
+    await client.query("DELETE FROM campaigns WHERE id = $1", [campaignId]);
+    const remaining = await client.query("SELECT COUNT(*)::int AS count FROM campaign_invitations");
+    expect(remaining.rows).toEqual([{ count: 0 }]);
+    // (This test seeds then applies the file directly, so no
+    // schema_migrations row exists here; full-directory double-apply
+    // including 0014 is covered by the production campaign-tables test.)
   });
 
   it("normalizes existing active system versions during the 0009 upgrade", async () => {

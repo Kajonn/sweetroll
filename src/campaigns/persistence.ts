@@ -38,6 +38,25 @@ export type CampaignReceipt = {
   resultJson: unknown;
 };
 
+export type CampaignReceiptWithExpiry = CampaignReceipt & {
+  expiresAt: Date;
+};
+
+export type InvitationRecord = {
+  invitationId: string;
+  campaignId: string;
+  issuedBy: string;
+  intendedRole: "player" | "co_gm";
+  tokenHash: string;
+  status: "pending" | "accepted" | "declined" | "revoked";
+  revision: number;
+  consumingActorId: string | null;
+  acceptedMembershipGeneration: number | null;
+  expiresAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 type CampaignRow = {
   id: string;
   owner_id: string;
@@ -58,6 +77,21 @@ type MembershipRow = {
   role: string;
   status: string;
   generation: number;
+  created_at: Date;
+  updated_at: Date;
+};
+
+type InvitationRow = {
+  id: string;
+  campaign_id: string;
+  issued_by: string;
+  intended_role: string;
+  token_hash: string;
+  status: string;
+  revision: number;
+  consuming_actor_id: string | null;
+  accepted_membership_generation: number | null;
+  expires_at: Date;
   created_at: Date;
   updated_at: Date;
 };
@@ -102,6 +136,31 @@ function toMembershipRecord(row: MembershipRow): MembershipRecord {
 const CAMPAIGN_COLUMNS =
   "id, owner_id, system_version_id, title, description, status, revision, access_revision, archived_at, created_at, updated_at";
 const MEMBERSHIP_COLUMNS = "campaign_id, user_id, role, status, generation, created_at, updated_at";
+const INVITATION_COLUMNS =
+  "id, campaign_id, issued_by, intended_role, token_hash, status, revision, consuming_actor_id, accepted_membership_generation, expires_at, created_at, updated_at";
+
+function toInvitationRecord(row: InvitationRow): InvitationRecord {
+  if (row.intended_role !== "player" && row.intended_role !== "co_gm") {
+    throw new Error(`Unknown invitation role: ${row.intended_role}`);
+  }
+  if (row.status !== "pending" && row.status !== "accepted" && row.status !== "declined" && row.status !== "revoked") {
+    throw new Error(`Unknown invitation status: ${row.status}`);
+  }
+  return {
+    invitationId: row.id,
+    campaignId: row.campaign_id,
+    issuedBy: row.issued_by,
+    intendedRole: row.intended_role,
+    tokenHash: row.token_hash,
+    status: row.status,
+    revision: row.revision,
+    consumingActorId: row.consuming_actor_id,
+    acceptedMembershipGeneration: row.accepted_membership_generation,
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
 
 export function createCampaignPersistenceRepository(pool: Pool) {
   return {
@@ -367,6 +426,230 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       return row === undefined
         ? null
         : { inputHash: row.input_hash, campaignId: row.campaign_id, resultJson: row.result_json };
+    },
+
+    async loadReceiptWithExpiry(
+      client: DbClient,
+      input: { actorId: string; commandKind: string; idempotencyKey: string },
+    ): Promise<CampaignReceiptWithExpiry | null> {
+      const result = await client.query<{
+        input_hash: string;
+        campaign_id: string | null;
+        result_json: unknown;
+        expires_at: Date;
+      }>(
+        `SELECT input_hash, campaign_id, result_json, expires_at
+           FROM campaign_command_executions
+          WHERE actor_id = $1 AND command_kind = $2 AND idempotency_key = $3`,
+        [input.actorId, input.commandKind, input.idempotencyKey],
+      );
+      const row = result.rows[0];
+      return row === undefined
+        ? null
+        : {
+            inputHash: row.input_hash,
+            campaignId: row.campaign_id,
+            resultJson: row.result_json,
+            expiresAt: row.expires_at,
+          };
+    },
+
+    async insertInvitation(
+      client: PoolClient,
+      input: {
+        invitationId: string;
+        campaignId: string;
+        issuedBy: string;
+        intendedRole: InvitationRecord["intendedRole"];
+        tokenHash: string;
+        expiresAt: Date;
+      },
+    ): Promise<InvitationRecord> {
+      const result = await client.query<InvitationRow>(
+        `INSERT INTO campaign_invitations
+           (id, campaign_id, issued_by, intended_role, token_hash, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6::timestamptz)
+         RETURNING ${INVITATION_COLUMNS}`,
+        [
+          input.invitationId,
+          input.campaignId,
+          input.issuedBy,
+          input.intendedRole,
+          input.tokenHash,
+          input.expiresAt.toISOString(),
+        ],
+      );
+      const row = result.rows[0];
+      if (row === undefined) throw new Error("insertInvitation returned no row");
+      return toInvitationRecord(row);
+    },
+
+    async loadInvitation(client: DbClient, invitationId: string): Promise<InvitationRecord | null> {
+      const result = await client.query<InvitationRow>(
+        `SELECT ${INVITATION_COLUMNS} FROM campaign_invitations WHERE id = $1`,
+        [invitationId],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toInvitationRecord(row);
+    },
+
+    async lockInvitation(client: PoolClient, invitationId: string): Promise<InvitationRecord | null> {
+      const result = await client.query<InvitationRow>(
+        `SELECT ${INVITATION_COLUMNS} FROM campaign_invitations WHERE id = $1 FOR UPDATE`,
+        [invitationId],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toInvitationRecord(row);
+    },
+
+    async findInvitationByHash(client: DbClient, tokenHash: string): Promise<InvitationRecord | null> {
+      const result = await client.query<InvitationRow>(
+        `SELECT ${INVITATION_COLUMNS} FROM campaign_invitations WHERE token_hash = $1`,
+        [tokenHash],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toInvitationRecord(row);
+    },
+
+    async rotateInvitationToken(
+      client: PoolClient,
+      input: { invitationId: string; newTokenHash: string; expiresAt: Date; expectedRevision: number; now: Date },
+    ): Promise<InvitationRecord | null> {
+      const result = await client.query<InvitationRow>(
+        `UPDATE campaign_invitations
+            SET token_hash = $2,
+                expires_at = $3::timestamptz,
+                revision = revision + 1,
+                updated_at = $4::timestamptz
+          WHERE id = $1 AND revision = $5
+          RETURNING ${INVITATION_COLUMNS}`,
+        [
+          input.invitationId,
+          input.newTokenHash,
+          input.expiresAt.toISOString(),
+          input.now.toISOString(),
+          input.expectedRevision,
+        ],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toInvitationRecord(row);
+    },
+
+    async consumeInvitation(
+      client: PoolClient,
+      input: {
+        invitationId: string;
+        status: "accepted" | "declined";
+        consumingActorId: string;
+        acceptedMembershipGeneration: number | null;
+        expectedRevision: number;
+        now: Date;
+      },
+    ): Promise<InvitationRecord | null> {
+      const result = await client.query<InvitationRow>(
+        `UPDATE campaign_invitations
+            SET status = $2,
+                consuming_actor_id = $3,
+                accepted_membership_generation = $4,
+                revision = revision + 1,
+                updated_at = $5::timestamptz
+          WHERE id = $1 AND revision = $6
+          RETURNING ${INVITATION_COLUMNS}`,
+        [
+          input.invitationId,
+          input.status,
+          input.consumingActorId,
+          input.acceptedMembershipGeneration,
+          input.now.toISOString(),
+          input.expectedRevision,
+        ],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toInvitationRecord(row);
+    },
+
+    async revokePendingInvitation(
+      client: PoolClient,
+      input: { invitationId: string; expectedRevision: number; now: Date },
+    ): Promise<InvitationRecord | null> {
+      const result = await client.query<InvitationRow>(
+        `UPDATE campaign_invitations
+            SET status = 'revoked',
+                revision = revision + 1,
+                updated_at = $2::timestamptz
+          WHERE id = $1 AND revision = $3 AND status = 'pending'
+          RETURNING ${INVITATION_COLUMNS}`,
+        [input.invitationId, input.now.toISOString(), input.expectedRevision],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toInvitationRecord(row);
+    },
+
+    async listInvitationsPage(
+      client: DbClient,
+      campaignId: string,
+      input: { limit: number; cursorCreatedAt: string | null; cursorId: string | null },
+    ): Promise<InvitationRecord[]> {
+      const params: unknown[] = [campaignId];
+      let cursorClause = "";
+      if (input.cursorCreatedAt !== null && input.cursorId !== null) {
+        params.push(input.cursorCreatedAt, input.cursorId);
+        cursorClause = `AND (created_at < $2::timestamptz OR (created_at = $2::timestamptz AND id < $3))`;
+      }
+      params.push(input.limit + 1);
+      const result = await client.query<InvitationRow>(
+        `SELECT ${INVITATION_COLUMNS}
+           FROM campaign_invitations
+          WHERE campaign_id = $1
+            ${cursorClause}
+          ORDER BY created_at DESC, id DESC
+          LIMIT $${params.length}`,
+        params,
+      );
+      return result.rows.map(toInvitationRecord);
+    },
+
+    async countActiveMembers(client: DbClient, campaignId: string): Promise<number> {
+      const result = await client.query<{ count: string }>(
+        `SELECT COUNT(*) AS count FROM campaign_members WHERE campaign_id = $1 AND status = 'active'`,
+        [campaignId],
+      );
+      return Number(result.rows[0]?.count ?? 0);
+    },
+
+    async upsertMembershipForAccept(
+      client: PoolClient,
+      input: { campaignId: string; userId: string; role: MembershipRecord["role"] },
+    ): Promise<MembershipRecord> {
+      const reactivated = await client.query<MembershipRow>(
+        `UPDATE campaign_members
+            SET role = $3,
+                status = 'active',
+                generation = generation + 1,
+                updated_at = now()
+          WHERE campaign_id = $1 AND user_id = $2 AND status = 'removed'
+          RETURNING ${MEMBERSHIP_COLUMNS}`,
+        [input.campaignId, input.userId, input.role],
+      );
+      const existing = reactivated.rows[0];
+      if (existing !== undefined) return toMembershipRecord(existing);
+      const inserted = await client.query<MembershipRow>(
+        `INSERT INTO campaign_members (campaign_id, user_id, role, status, generation)
+         VALUES ($1, $2, $3, 'active', 1)
+         RETURNING ${MEMBERSHIP_COLUMNS}`,
+        [input.campaignId, input.userId, input.role],
+      );
+      const row = inserted.rows[0];
+      if (row === undefined) throw new Error("upsertMembershipForAccept returned no row");
+      return toMembershipRecord(row);
+    },
+
+    async loadUserDisplayName(client: DbClient, userId: string): Promise<string | null> {
+      const result = await client.query<{ display_name: string }>(
+        `SELECT display_name FROM users WHERE id = $1`,
+        [userId],
+      );
+      return result.rows[0]?.display_name ?? null;
     },
   };
 }

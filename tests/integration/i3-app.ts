@@ -172,6 +172,29 @@ export const I3_SCHEMA_DDL = `
   );
   CREATE INDEX campaign_command_executions_expiry_idx
     ON campaign_command_executions (expires_at);
+  CREATE TABLE campaign_invitations (
+    -- Test-fixture copy pinned to migrations/0014_campaign_invitations.sql:
+    -- keep the invitation table/constraint/index definitions below identical
+    -- to that production migration. Hash-only storage: no token column.
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    issued_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    intended_role text NOT NULL,
+    token_hash text NOT NULL UNIQUE,
+    status text NOT NULL DEFAULT 'pending',
+    revision integer NOT NULL DEFAULT 1,
+    consuming_actor_id uuid REFERENCES users(id) ON DELETE RESTRICT,
+    accepted_membership_generation integer,
+    expires_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CHECK (intended_role IN ('player', 'co_gm')),
+    CHECK (status IN ('pending', 'accepted', 'declined', 'revoked')),
+    CHECK (revision > 0),
+    CHECK (accepted_membership_generation IS NULL OR accepted_membership_generation >= 1)
+  );
+  CREATE INDEX campaign_invitations_campaign_page_idx
+    ON campaign_invitations (campaign_id, created_at DESC, id DESC);
 
   CREATE TABLE characters (
     id                   uuid PRIMARY KEY,

@@ -77,6 +77,8 @@ describe("loadCampaignLimits", () => {
       maxAttachedCharacters: 200,
       maxTitleLength: 200,
       maxDescriptionLength: 10_000,
+      invitationExpiryDefaultDays: 7,
+      invitationExpiryMaxDays: 30,
     });
     expect(loadCampaignLimits({})).toEqual(DEFAULT_CAMPAIGN_LIMITS);
   });
@@ -90,6 +92,8 @@ describe("loadCampaignLimits", () => {
         CAMPAIGN_MAX_ATTACHED_CHARACTERS: "40",
         CAMPAIGN_MAX_TITLE_LENGTH: "120",
         CAMPAIGN_MAX_DESCRIPTION_LENGTH: "5000",
+        CAMPAIGN_INVITATION_EXPIRY_DEFAULT_DAYS: "3",
+        CAMPAIGN_INVITATION_EXPIRY_MAX_DAYS: "14",
       }),
     ).toEqual({
       pageDefault: 10,
@@ -98,6 +102,8 @@ describe("loadCampaignLimits", () => {
       maxAttachedCharacters: 40,
       maxTitleLength: 120,
       maxDescriptionLength: 5000,
+      invitationExpiryDefaultDays: 3,
+      invitationExpiryMaxDays: 14,
     });
   });
 
@@ -108,6 +114,18 @@ describe("loadCampaignLimits", () => {
     [
       { CAMPAIGN_PAGE_DEFAULT: "50", CAMPAIGN_PAGE_MAX: "10" },
       "CAMPAIGN_PAGE_DEFAULT must not exceed CAMPAIGN_PAGE_MAX",
+    ],
+    [
+      { CAMPAIGN_INVITATION_EXPIRY_DEFAULT_DAYS: "0" },
+      "CAMPAIGN_INVITATION_EXPIRY_DEFAULT_DAYS must be a positive integer",
+    ],
+    [
+      { CAMPAIGN_INVITATION_EXPIRY_MAX_DAYS: "many" },
+      "CAMPAIGN_INVITATION_EXPIRY_MAX_DAYS must be a positive integer",
+    ],
+    [
+      { CAMPAIGN_INVITATION_EXPIRY_DEFAULT_DAYS: "30", CAMPAIGN_INVITATION_EXPIRY_MAX_DAYS: "7" },
+      "CAMPAIGN_INVITATION_EXPIRY_DEFAULT_DAYS must not exceed CAMPAIGN_INVITATION_EXPIRY_MAX_DAYS",
     ],
   ])("rejects invalid limits %#", (env, message) => {
     expect(() => loadCampaignLimits(env)).toThrow(message);

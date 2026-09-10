@@ -16,8 +16,9 @@ import type {
  * I6 Task 4 scope gate for the migration feature: attached characters must
  * deny preview/commit/rollback instead of repinning or copying campaign
  * state. Owner-only lookups already reject attached rows (their owner_id is
- * NULL), so this is defense-in-depth documentation enforced right after the
- * ownership check in each migration path.
+ * NULL), so commit/rollback check this gate scope-first (before the ownership
+ * lookup) and keep a second identical check right after it; preview checks it
+ * right after its ownership lookup. Either layer denies on its own.
  */
 export function denyAttachedMigrationScope(record: {
   ownerId: string | null;

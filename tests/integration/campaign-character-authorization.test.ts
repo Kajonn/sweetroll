@@ -680,15 +680,21 @@ describeWithDatabase("campaign character authorization matrix (Task 5)", () => {
         idempotencyKey: randomUUID(),
       }),
     );
-    const commit = await h.characters.commitMigration(ctxFor(unassigned), {
-      characterId: personal.value.characterId,
-      previewId: preview.value.previewId,
-      expectedRevision: personal.value.revision,
-      idempotencyKey: randomUUID(),
-    });
-    expect(commit.ok).toBe(false);
-    if (commit.ok) throw new Error("attached commit must deny");
-    expect(commit.error.code).toBe("not_found");
+    // A preview built before adoption cannot commit once attached. The
+    // scope-first explicit gate denies before the owner-only lookup, so every
+    // capable role (return owner, GM) gets the explicit attached-denial code.
+    for (const actor of [unassigned, h.users.gm]) {
+      const commit = await h.characters.commitMigration(ctxFor(actor), {
+        characterId: personal.value.characterId,
+        previewId: preview.value.previewId,
+        expectedRevision: personal.value.revision,
+        idempotencyKey: randomUUID(),
+      });
+      expect(commit.ok).toBe(false);
+      if (commit.ok) throw new Error("attached commit must deny");
+      expect(commit.error.code).toBe("not_found");
+    }
+    expect(await count("character_migrations", "character_id = $1", [personal.value.characterId])).toBe(0);
   });
 
   it("denies attached rollback", async () => {
@@ -743,14 +749,23 @@ describeWithDatabase("campaign character authorization matrix (Task 5)", () => {
     );
     expect(adopted.ok).toBe(true);
 
-    const rollback = await h.characters.rollbackMigration(ctxFor(h.users.player), {
-      characterId: personal.value.characterId,
-      migrationId,
-      idempotencyKey: randomUUID(),
-    });
-    expect(rollback.ok).toBe(false);
-    if (rollback.ok) throw new Error("attached rollback must deny");
-    expect(rollback.error.code).toBe("not_found");
+    // Attached rollback denies via the scope-first explicit gate for every
+    // capable role (controller/return owner, GM), not via null-lookup failure.
+    for (const actor of [h.users.player, h.users.gm]) {
+      const rollback = await h.characters.rollbackMigration(ctxFor(actor), {
+        characterId: personal.value.characterId,
+        migrationId,
+        idempotencyKey: randomUUID(),
+      });
+      expect(rollback.ok).toBe(false);
+      if (rollback.ok) throw new Error("attached rollback must deny");
+      expect(rollback.error.code).toBe("not_found");
+    }
+    const rolledBack = await h.pool.query<{ rolled_back_at: string | null }>(
+      `SELECT rolled_back_at FROM character_migrations WHERE id = $1`,
+      [migrationId],
+    );
+    expect(rolledBack.rows[0]?.rolled_back_at).toBeNull();
   });
 
   it("denies duplicating attached sheets into personal libraries", async () => {

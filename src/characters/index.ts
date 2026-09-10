@@ -1993,13 +1993,25 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const executionId = claimed.executionId;
         const replayExpiresAt = new Date(claimStartedAt.getTime() + REPLAY_TTL_MS);
 
+        // Explicit attached-scope gate first (defense-in-depth): attached
+        // sheets deny migration commit instead of repinning campaign state.
+        // The owner-only lookup below already rejects attached rows (their
+        // owner_id is NULL), so without this scope-first check the explicit
+        // gate after it would never execute.
+        const commitScope = await repo.loadCharacterScope(commitInput.characterId);
+        if (commitScope !== null && denyAttachedMigrationScope(commitScope) !== null) {
+          const error = errors.not_found();
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+
         const character = await repo.openOwnedCharacter(commitInput.characterId, ctx.actorId);
         if (character === null) {
           const error = errors.not_found();
           await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
           return { ok: false, error };
         }
-        // Attached sheets deny migration commit instead of repinning campaign state.
+        // Second layer: holds even if the owner-only lookup above ever widens.
         if (denyAttachedMigrationScope(character) !== null) {
           const error = errors.not_found();
           await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
@@ -2175,13 +2187,25 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           return { ok: false, error };
         }
 
+        // Explicit attached-scope gate first (defense-in-depth): attached
+        // sheets deny migration rollback instead of restoring campaign state.
+        // The owner-only lookup below already rejects attached rows (their
+        // owner_id is NULL), so without this scope-first check the explicit
+        // gate after it would never execute.
+        const rollbackScope = await repo.loadCharacterScope(rollbackInput.characterId);
+        if (rollbackScope !== null && denyAttachedMigrationScope(rollbackScope) !== null) {
+          const error = errors.notFoundPurge();
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+
         const character = await repo.openOwnedCharacter(rollbackInput.characterId, ctx.actorId);
         if (character === null) {
           const error = errors.notFoundPurge();
           await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
           return { ok: false, error };
         }
-        // Attached sheets deny migration rollback instead of restoring campaign state.
+        // Second layer: holds even if the owner-only lookup above ever widens.
         if (denyAttachedMigrationScope(character) !== null) {
           const error = errors.notFoundPurge();
           await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });

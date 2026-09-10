@@ -110,118 +110,11 @@ export const I3_SCHEMA_DDL = `
   CREATE INDEX system_versions_system_id_idx ON system_versions (system_id, created_at DESC);
   CREATE INDEX system_audit_records_system_id_idx ON system_audit_records (system_id, occurred_at DESC);
 
-  CREATE TABLE characters (
-    id                   uuid PRIMARY KEY,
-    owner_id             uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    system_version_id    uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
-    entity_definition_id text NOT NULL,
-    name                 text NOT NULL,
-    revision             integer NOT NULL DEFAULT 1 CHECK (revision >= 1),
-    state_json           jsonb NOT NULL,
-    visibility           text NOT NULL DEFAULT 'owner_only' CHECK (visibility = 'owner_only'),
-    lifecycle            text NOT NULL DEFAULT 'active' CHECK (lifecycle IN ('active', 'archived')),
-    archived_at          timestamptz,
-    created_at           timestamptz NOT NULL DEFAULT now(),
-    updated_at           timestamptz NOT NULL DEFAULT now()
-  );
-  CREATE INDEX characters_owner_page_idx
-    ON characters (owner_id, lifecycle, updated_at DESC, id DESC);
-  CREATE TABLE character_command_executions (
-    id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    actor_id              uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    command_kind          text NOT NULL,
-    idempotency_key       text NOT NULL,
-    input_hash            text NOT NULL,
-    character_id          uuid REFERENCES characters(id) ON DELETE RESTRICT,
-    preallocated_ids_json jsonb NOT NULL DEFAULT '{}'::jsonb,
-    execution_id          uuid NOT NULL UNIQUE,
-    status                text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed')),
-    lease_expires_at      timestamptz NOT NULL,
-    result_json           jsonb,
-    created_at            timestamptz NOT NULL DEFAULT now(),
-    expires_at            timestamptz NOT NULL,
-    UNIQUE (actor_id, command_kind, idempotency_key)
-  );
-  CREATE INDEX character_command_executions_expiry_idx
-    ON character_command_executions (expires_at);
-  CREATE TABLE character_rolls (
-    id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    character_id       uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
-    actor_id           uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    action_id          text NOT NULL,
-    execution_id       uuid NOT NULL UNIQUE,
-    expression         text NOT NULL,
-    dice_json          jsonb NOT NULL,
-    bindings_json      jsonb NOT NULL,
-    total              double precision NOT NULL,
-    rendered_output    text NOT NULL,
-    audience           text NOT NULL DEFAULT 'owner_only' CHECK (audience = 'owner_only'),
-    request_id         text NOT NULL,
-    occurred_at        timestamptz NOT NULL DEFAULT now()
-  );
-  CREATE TABLE character_activity_events (
-    id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    character_id       uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
-    character_revision integer NOT NULL CHECK (character_revision >= 1),
-    kind               text NOT NULL,
-    payload_json       jsonb NOT NULL,
-    roll_id            uuid REFERENCES character_rolls(id) ON DELETE RESTRICT,
-    request_id         text NOT NULL,
-    occurred_at        timestamptz NOT NULL DEFAULT now()
-  );
-  CREATE INDEX character_activity_events_page_idx
-    ON character_activity_events (character_id, occurred_at DESC, id DESC);
-  CREATE TABLE character_audit_records (
-    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    character_id uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
-    actor_id     uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    kind         text NOT NULL,
-    summary      text NOT NULL,
-    request_id   text NOT NULL,
-    occurred_at  timestamptz NOT NULL DEFAULT now()
-  );
-  CREATE TABLE character_migration_previews (
-    id                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    character_id             uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
-    owner_id                 uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    source_revision          integer NOT NULL CHECK (source_revision >= 1),
-    source_version_id        uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
-    source_checksum          text NOT NULL,
-    target_version_id        uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
-    target_checksum          text NOT NULL,
-    mapping_json             jsonb NOT NULL,
-    candidate_state_json     jsonb NOT NULL,
-    candidate_projection_json jsonb NOT NULL,
-    warnings_json            jsonb NOT NULL,
-    preview_checksum         text NOT NULL,
-    created_at               timestamptz NOT NULL DEFAULT now(),
-    expires_at               timestamptz NOT NULL,
-    consumed_at              timestamptz
-  );
-  CREATE INDEX character_migration_previews_expiry_idx
-    ON character_migration_previews (expires_at)
-    WHERE consumed_at IS NULL;
-  CREATE TABLE character_migrations (
-    id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    character_id          uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
-    preview_id            uuid NOT NULL UNIQUE REFERENCES character_migration_previews(id) ON DELETE RESTRICT,
-    source_version_id     uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
-    target_version_id     uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
-    before_state_json     jsonb NOT NULL,
-    after_state_json      jsonb NOT NULL,
-    commit_revision       integer NOT NULL CHECK (commit_revision >= 2),
-    rollback_deadline     timestamptz NOT NULL,
-    actor_id              uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    request_id            text NOT NULL,
-    committed_at          timestamptz NOT NULL DEFAULT now(),
-    rollback_revision     integer CHECK (rollback_revision >= 1),
-    rolled_back_at        timestamptz
-  );
-
   CREATE TABLE campaigns (
     -- Test-fixture copy pinned to migrations/0012_campaigns.sql: keep the
     -- campaign table/constraint/index definitions below identical to that
     -- production migration. This DDL only seeds historical test schemas.
+    -- Defined before characters so the 0013 ownership-union FK resolves.
     id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id          uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     system_version_id uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
@@ -279,6 +172,162 @@ export const I3_SCHEMA_DDL = `
   );
   CREATE INDEX campaign_command_executions_expiry_idx
     ON campaign_command_executions (expires_at);
+
+  CREATE TABLE characters (
+    id                   uuid PRIMARY KEY,
+    -- Test-fixture copy pinned to migrations/0009_create_characters.sql plus
+    -- the 0013 ownership-union columns: keep in sync with
+    -- migrations/0013_campaign_character_scope.sql. This DDL only seeds
+    -- historical test schemas.
+    owner_id             uuid REFERENCES users(id) ON DELETE RESTRICT,
+    campaign_id          uuid REFERENCES campaigns(id) ON DELETE RESTRICT,
+    placement_generation integer NOT NULL DEFAULT 1 CHECK (placement_generation >= 1),
+    return_owner_id      uuid REFERENCES users(id) ON DELETE RESTRICT,
+    system_version_id    uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+    entity_definition_id text NOT NULL,
+    name                 text NOT NULL,
+    revision             integer NOT NULL DEFAULT 1 CHECK (revision >= 1),
+    state_json           jsonb NOT NULL,
+    visibility           text NOT NULL DEFAULT 'owner_only' CHECK (visibility = 'owner_only'),
+    lifecycle            text NOT NULL DEFAULT 'active' CHECK (lifecycle IN ('active', 'archived')),
+    archived_at          timestamptz,
+    created_at           timestamptz NOT NULL DEFAULT now(),
+    updated_at           timestamptz NOT NULL DEFAULT now(),
+    CHECK ((owner_id IS NOT NULL AND campaign_id IS NULL)
+        OR (owner_id IS NULL AND campaign_id IS NOT NULL)),
+    CHECK (return_owner_id IS NULL OR campaign_id IS NOT NULL)
+  );
+  CREATE INDEX characters_owner_page_idx
+    ON characters (owner_id, lifecycle, updated_at DESC, id DESC);
+  CREATE INDEX characters_campaign_page_idx
+    ON characters (campaign_id, updated_at DESC, id DESC)
+    WHERE campaign_id IS NOT NULL;
+  CREATE TABLE character_placements (
+    id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id      uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    generation        integer NOT NULL CHECK (generation >= 1),
+    campaign_id       uuid NOT NULL REFERENCES campaigns(id) ON DELETE RESTRICT,
+    return_owner_id   uuid REFERENCES users(id) ON DELETE RESTRICT,
+    started_at        timestamptz NOT NULL DEFAULT now(),
+    ended_at          timestamptz,
+    UNIQUE (character_id, generation)
+  );
+  CREATE INDEX character_placements_character_idx
+    ON character_placements (character_id, generation DESC);
+  CREATE TABLE character_controllers (
+    character_id uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    campaign_id  uuid NOT NULL,
+    user_id      uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (character_id, user_id),
+    FOREIGN KEY (campaign_id, user_id) REFERENCES campaign_members (campaign_id, user_id) ON DELETE CASCADE
+  );
+  CREATE INDEX character_controllers_member_idx
+    ON character_controllers (campaign_id, user_id);
+  CREATE TABLE character_claim_designations (
+    character_id  uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    campaign_id   uuid NOT NULL,
+    user_id       uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    designated_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (character_id, user_id),
+    FOREIGN KEY (campaign_id, user_id) REFERENCES campaign_members (campaign_id, user_id) ON DELETE CASCADE
+  );
+  CREATE TABLE character_command_executions (
+    id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    actor_id              uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    command_kind          text NOT NULL,
+    idempotency_key       text NOT NULL,
+    input_hash            text NOT NULL,
+    character_id          uuid REFERENCES characters(id) ON DELETE RESTRICT,
+    preallocated_ids_json jsonb NOT NULL DEFAULT '{}'::jsonb,
+    execution_id          uuid NOT NULL UNIQUE,
+    status                text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed')),
+    lease_expires_at      timestamptz NOT NULL,
+    result_json           jsonb,
+    created_at            timestamptz NOT NULL DEFAULT now(),
+    expires_at            timestamptz NOT NULL,
+    scope_campaign_id     uuid REFERENCES campaigns(id) ON DELETE RESTRICT,
+    UNIQUE (actor_id, command_kind, idempotency_key)
+  );
+  CREATE INDEX character_command_executions_expiry_idx
+    ON character_command_executions (expires_at);
+  CREATE TABLE character_rolls (
+    id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id       uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
+    actor_id           uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    action_id          text NOT NULL,
+    execution_id       uuid NOT NULL UNIQUE,
+    expression         text NOT NULL,
+    dice_json          jsonb NOT NULL,
+    bindings_json      jsonb NOT NULL,
+    total              double precision NOT NULL,
+    rendered_output    text NOT NULL,
+    audience           text NOT NULL DEFAULT 'owner_only' CHECK (audience = 'owner_only'),
+    request_id         text NOT NULL,
+    scope_campaign_id  uuid REFERENCES campaigns(id) ON DELETE RESTRICT,
+    occurred_at        timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE TABLE character_activity_events (
+    id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id       uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
+    character_revision integer NOT NULL CHECK (character_revision >= 1),
+    kind               text NOT NULL,
+    payload_json       jsonb NOT NULL,
+    roll_id            uuid REFERENCES character_rolls(id) ON DELETE RESTRICT,
+    request_id         text NOT NULL,
+    scope_campaign_id  uuid REFERENCES campaigns(id) ON DELETE RESTRICT,
+    occurred_at        timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX character_activity_events_page_idx
+    ON character_activity_events (character_id, occurred_at DESC, id DESC);
+  CREATE TABLE character_audit_records (
+    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
+    actor_id     uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    kind         text NOT NULL,
+    summary      text NOT NULL,
+    request_id   text NOT NULL,
+    occurred_at  timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE TABLE character_migration_previews (
+    id                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id             uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
+    owner_id                 uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    source_revision          integer NOT NULL CHECK (source_revision >= 1),
+    source_version_id        uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+    source_checksum          text NOT NULL,
+    target_version_id        uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+    target_checksum          text NOT NULL,
+    mapping_json             jsonb NOT NULL,
+    candidate_state_json     jsonb NOT NULL,
+    candidate_projection_json jsonb NOT NULL,
+    warnings_json            jsonb NOT NULL,
+    preview_checksum         text NOT NULL,
+    created_at               timestamptz NOT NULL DEFAULT now(),
+    expires_at               timestamptz NOT NULL,
+    consumed_at              timestamptz
+  );
+  CREATE INDEX character_migration_previews_expiry_idx
+    ON character_migration_previews (expires_at)
+    WHERE consumed_at IS NULL;
+  CREATE TABLE character_migrations (
+    id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id          uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
+    preview_id            uuid NOT NULL UNIQUE REFERENCES character_migration_previews(id) ON DELETE RESTRICT,
+    source_version_id     uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+    target_version_id     uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+    before_state_json     jsonb NOT NULL,
+    after_state_json      jsonb NOT NULL,
+    commit_revision       integer NOT NULL CHECK (commit_revision >= 2),
+    rollback_deadline     timestamptz NOT NULL,
+    actor_id              uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    request_id            text NOT NULL,
+    scope_campaign_id     uuid REFERENCES campaigns(id) ON DELETE RESTRICT,
+    committed_at          timestamptz NOT NULL DEFAULT now(),
+    rollback_revision     integer CHECK (rollback_revision >= 1),
+    rolled_back_at        timestamptz
+  );
 `;
 
 export async function createI3Schema(databaseUrl: string, schema: string): Promise<void> {

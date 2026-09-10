@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 
 export type ExecutionId = string;
 
@@ -45,8 +45,7 @@ function isUniqueViolation(error: unknown): boolean {
  * - Returns `in_progress` when another non-expired lease owns the pending execution.
  * - Atomically reclaims an expired pending lease while preserving the original execution ID.
  */
-export async function claimExecution(pool: Pool, input: ClaimExecutionInput): Promise<ClaimExecutionResult> {
-  const leaseExpiresAt = new Date(input.now.getTime() + input.leaseMs);
+export async function claimExecution(pool: Pool, input: ClaimExecutionInput): Promise<ClaimExecutionResult> {  const leaseExpiresAt = new Date(input.now.getTime() + input.leaseMs);
   const provisionalExpiresAt = new Date(input.now.getTime() + input.replayTtlMs);
   const client = await pool.connect();
   try {
@@ -117,4 +116,73 @@ export async function claimExecution(pool: Pool, input: ClaimExecutionInput): Pr
   } finally {
     client.release();
   }
+}
+
+/**
+ * Caller-owned variant of {@link claimExecution} for work that participates
+ * in a transaction owned by the caller (campaign placement/membership
+ * commands). Identical claim/replay/mismatch/lease semantics, but the INSERT
+ * is protected by a savepoint instead of owning BEGIN/COMMIT, and the
+ * transaction is never committed or rolled back here.
+ */
+export async function claimExecutionOnClient(
+  client: PoolClient,
+  input: ClaimExecutionInput,
+): Promise<ClaimExecutionResult> {
+  const leaseExpiresAt = new Date(input.now.getTime() + input.leaseMs);
+  const provisionalExpiresAt = new Date(input.now.getTime() + input.replayTtlMs);
+  const newExecutionId = input.newExecutionId();
+  await client.query("SAVEPOINT placement_claim");
+  try {
+    await client.query(
+      `INSERT INTO character_command_executions
+         (actor_id, command_kind, idempotency_key, input_hash, execution_id, status, lease_expires_at, expires_at)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7)`,
+      [
+        input.actorId,
+        input.commandKind,
+        input.idempotencyKey,
+        input.inputHash,
+        newExecutionId,
+        leaseExpiresAt,
+        provisionalExpiresAt,
+      ],
+    );
+    await client.query("RELEASE SAVEPOINT placement_claim");
+    return { status: "claimed", executionId: newExecutionId };
+  } catch (error) {
+    if (!isUniqueViolation(error)) throw error;
+    await client.query("ROLLBACK TO SAVEPOINT placement_claim");
+  }
+
+  const existing = await client.query<ExecutionRow>(
+    `SELECT execution_id, status, input_hash, result_json, lease_expires_at, expires_at
+       FROM character_command_executions
+      WHERE actor_id = $1 AND command_kind = $2 AND idempotency_key = $3
+      FOR UPDATE`,
+    [input.actorId, input.commandKind, input.idempotencyKey],
+  );
+  const row = existing.rows[0];
+  if (row === undefined) {
+    throw new Error("claimExecutionOnClient: execution row vanished after unique violation");
+  }
+  if (row.input_hash !== input.inputHash) {
+    return { status: "mismatch" };
+  }
+  if (row.status === "completed") {
+    if (new Date(row.expires_at).getTime() <= input.now.getTime()) {
+      return { status: "expired", executionId: row.execution_id, resultJson: row.result_json };
+    }
+    return { status: "replay", executionId: row.execution_id, resultJson: row.result_json };
+  }
+  if (new Date(row.lease_expires_at).getTime() > input.now.getTime()) {
+    return { status: "in_progress" };
+  }
+  await client.query(
+    `UPDATE character_command_executions
+        SET lease_expires_at = $1, expires_at = $2
+      WHERE execution_id = $3`,
+    [leaseExpiresAt, provisionalExpiresAt, row.execution_id],
+  );
+  return { status: "claimed", executionId: row.execution_id };
 }

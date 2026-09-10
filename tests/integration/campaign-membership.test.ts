@@ -865,6 +865,7 @@ describeWithDatabase("campaign membership races and owner protection (Task 3)", 
     const hooked: Campaigns = createCampaignsModule({
       pool: h.pool,
       limits: DEFAULT_CAMPAIGN_LIMITS,
+      charactersPlacement: h.placement,
       hooks: {
         afterMemberRemoved: async (client, removal) => {
           const rows = await client.query(
@@ -903,6 +904,7 @@ describeWithDatabase("campaign membership races and owner protection (Task 3)", 
     const failing: Campaigns = createCampaignsModule({
       pool: h.pool,
       limits: DEFAULT_CAMPAIGN_LIMITS,
+      charactersPlacement: h.placement,
       hooks: {
         afterMemberRemoved: async () => {
           throw new Error("Task 4 return failed");

@@ -60,6 +60,10 @@ const DDL = `
   CREATE TABLE characters (
     id                   uuid PRIMARY KEY,
     owner_id             uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    -- 0013 ownership-union columns (standalone-only suite: no campaigns table, so no FK here).
+    campaign_id          uuid,
+    placement_generation integer NOT NULL DEFAULT 1,
+    return_owner_id      uuid,
     system_version_id    uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
     entity_definition_id text NOT NULL,
     name                 text NOT NULL,

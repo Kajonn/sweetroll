@@ -82,6 +82,10 @@ function characterView(overrides: Partial<CharacterView> = {}): CharacterView {
   return {
     characterId,
     ownerId: actorId,
+    campaignId: null,
+    controllers: [],
+    placementGeneration: 1,
+    returnOwnerId: null,
     name: "Aria",
     systemVersionId,
     entityDefinitionId: "character",

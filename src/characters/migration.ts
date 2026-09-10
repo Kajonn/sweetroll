@@ -12,6 +12,21 @@ import type {
  * SystemRuntime for final validation. No executable migration code is stored.
  */
 
+/**
+ * I6 Task 4 scope gate for the migration feature: attached characters must
+ * deny preview/commit/rollback instead of repinning or copying campaign
+ * state. Owner-only lookups already reject attached rows (their owner_id is
+ * NULL), so this is defense-in-depth documentation enforced right after the
+ * ownership check in each migration path.
+ */
+export function denyAttachedMigrationScope(record: {
+  ownerId: string | null;
+  campaignId: string | null;
+}): { attached: true } | null {
+  if (record.campaignId !== null) return { attached: true };
+  return null;
+}
+
 export type EditableFieldDef = {
   id: DefinitionId;
   fieldKind: string;

@@ -5,6 +5,7 @@ import type { Pool, PoolClient } from "pg";
 import type { RequestContext } from "../systems/authoring.js";
 import { hashInput } from "../systems/implementation/authoring/assess.js";
 import type { CampaignLimits } from "../platform/config.js";
+import type { CampaignCharacterPlacement } from "../characters/campaignPlacement.js";
 
 import {
   createCampaignPersistenceRepository,
@@ -155,15 +156,19 @@ export interface Campaigns {
 export type CreateCampaignsModuleInput = {
   pool: Pool;
   limits: CampaignLimits;
+  /**
+   * I6 Task 4: required character-placement dependency. Member removal runs
+   * the adopted-character return through it by default, inside the same
+   * transaction, so removal, controller/claim cleanup, detachment and receipt
+   * stay all-or-nothing.
+   */
+  charactersPlacement: CampaignCharacterPlacement;
   now?: () => Date;
   newId?: () => string;
   hooks?: {
     /**
-     * Task 4 seam: invoked inside the removeMember transaction after the
-     * membership row flips to removed and before audit/receipt commit.
-     * A throw rolls the whole removal back. Task 4 plugs adopted-character
-     * return through this hook; no public removal route may be registered
-     * until the hook performs that return.
+     * Overrides the default Task 4 member return (tests use this to observe
+     * the removed row or to prove hook-failure rollback).
      */
     afterMemberRemoved?: MemberRemovalHook;
   };
@@ -1294,18 +1299,34 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             return { committed: false as const, failure: errors.internal() as CampaignError };
           }
           const value = toMemberView(updated);
-          // Task 4 seam: member-return plugs in here, inside the same
-          // transaction, so removal, controller/grant cleanup, audit and
-          // receipt stay all-or-nothing. A throw rolls everything back.
-          if (hooks?.afterMemberRemoved !== undefined) {
-            await hooks.afterMemberRemoved(client, {
-              campaignId: campaign.campaignId,
-              userId: removeInput.userId,
-              actorId: ctx.actorId,
-              requestId: ctx.requestId,
-              membership: value,
-            });
-          }
+          // Task 4 member return: adopted sheets detach to their original
+          // owner (current state, revision/generation bumps) and campaign
+          // sheets stay, inside the same transaction. An explicit hook
+          // overrides the default (tests); a throw rolls everything back.
+          const afterMemberRemoved =
+            hooks?.afterMemberRemoved ??
+            ((client: PoolClient, removal: {
+              campaignId: CampaignId;
+              userId: UserId;
+              actorId: UserId;
+              requestId: string;
+              membership: MemberView;
+            }) =>
+              input.charactersPlacement
+                .returnForMember(client, {
+                  campaignId: removal.campaignId,
+                  userId: removal.userId,
+                  actorId: removal.actorId,
+                  requestId: removal.requestId,
+                })
+                .then(() => undefined));
+          await afterMemberRemoved(client, {
+            campaignId: campaign.campaignId,
+            userId: removeInput.userId,
+            actorId: ctx.actorId,
+            requestId: ctx.requestId,
+            membership: value,
+          });
           await repo.appendAudit(client, {
             campaignId: campaign.campaignId,
             actorId: ctx.actorId,

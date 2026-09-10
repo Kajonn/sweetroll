@@ -4,8 +4,14 @@ import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 
 import { createCampaignsModule, type Campaigns } from "../../src/campaigns/index.js";
+import {
+  createCampaignPlacement,
+  type CampaignPlacement,
+} from "../../src/characters/campaignPlacement.js";
+import type { Characters } from "../../src/characters/index.js";
 import { DEFAULT_CAMPAIGN_LIMITS } from "../../src/platform/config.js";
 import type { RequestContext } from "../../src/systems/authoring.js";
+import type { SystemRuntime } from "../../src/systems/runtime.js";
 import {
   d20Document,
   d6SuccessPoolDocument,
@@ -26,6 +32,9 @@ export type I6Harness = {
   app: FastifyInstance;
   pool: Pool;
   campaigns: Campaigns;
+  characters: Characters;
+  placement: CampaignPlacement;
+  runtime: SystemRuntime;
   users: { gm: TestActor; player: TestActor; other: TestActor; outsider: TestActor };
   /** A real published fixture version owned by gm. */
   versionId: string;
@@ -100,7 +109,10 @@ function cookieFromSignIn(response: {
   return header.split(";")[0] ?? "";
 }
 
-export async function buildI6Harness(): Promise<I6Harness> {
+export async function buildI6Harness(input?: {
+  /** Wraps the runtime (e.g. to stall resolution for race tests). */
+  wrapRuntime?: (runtime: SystemRuntime) => SystemRuntime;
+}): Promise<I6Harness> {
   const databaseUrl = process.env.TEST_DATABASE_URL;
   if (databaseUrl === undefined || databaseUrl.length === 0) {
     throw new Error("TEST_DATABASE_URL is required for the I6 harness");
@@ -108,7 +120,7 @@ export async function buildI6Harness(): Promise<I6Harness> {
   const schema = `i6_${randomUUID().replaceAll("-", "")}`;
   await createI3Schema(databaseUrl, schema);
   const pool = createI3Pool(databaseUrl, schema);
-  const handle = await buildI3App({ pool });
+  const handle = await buildI3App({ pool, wrapRuntime: input?.wrapRuntime });
 
   async function signIn(code: string): Promise<TestActor> {
     const response = await handle.app.inject({
@@ -132,7 +144,12 @@ export async function buildI6Harness(): Promise<I6Harness> {
     outsider,
   };
 
-  const campaigns = createCampaignsModule({ pool, limits: DEFAULT_CAMPAIGN_LIMITS });
+  const placement = createCampaignPlacement({ pool, runtime: handle.runtime });
+  const campaigns = createCampaignsModule({
+    pool,
+    limits: DEFAULT_CAMPAIGN_LIMITS,
+    charactersPlacement: placement,
+  });
 
   const gmVersion = await publishVersion(handle, users.gm, d20Document, {
     name: "GM d20",
@@ -147,6 +164,9 @@ export async function buildI6Harness(): Promise<I6Harness> {
     app: handle.app,
     pool,
     campaigns,
+    characters: handle.characters,
+    placement,
+    runtime: handle.runtime,
     users,
     versionId: gmVersion.versionId,
     systemId: gmVersion.systemId,

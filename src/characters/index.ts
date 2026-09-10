@@ -24,7 +24,7 @@ import {
 } from "./persistence.js";
 import { claimExecution } from "./idempotency.js";
 import { buildCharacterExportDocument } from "./export.js";
-import { buildCandidateValues, collectEditableFields } from "./migration.js";
+import { buildCandidateValues, collectEditableFields, denyAttachedMigrationScope } from "./migration.js";
 
 export type { RequestContext } from "../systems/authoring.js";
 
@@ -114,7 +114,19 @@ export type Reconciliation = {
 
 export type CharacterView = {
   characterId: CharacterId;
-  ownerId: UserId;
+  /**
+   * Standalone owner. NULL while attached to a campaign: attached views
+   * represent campaign custody (campaignId/controllers) rather than
+   * inventing an owner user. Existing standalone views keep this populated.
+   */
+  ownerId: UserId | null;
+  /** Campaign custody; NULL for standalone characters (ownership union). */
+  campaignId: string | null;
+  /** Active controllers; empty for standalone characters. */
+  controllers: UserId[];
+  placementGeneration: number;
+  /** Immutable adopter; NULL for standalone and campaign-created sheets. */
+  returnOwnerId: UserId | null;
   name: string;
   systemVersionId: VersionId;
   entityDefinitionId: DefinitionId;
@@ -464,10 +476,15 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       replayExpiresAt: string;
       replayed: boolean;
     },
+    placement?: { controllers: UserId[] },
   ): CharacterView {
     return {
       characterId: record.characterId,
       ownerId: record.ownerId,
+      campaignId: record.campaignId,
+      controllers: placement?.controllers ?? [],
+      placementGeneration: record.placementGeneration,
+      returnOwnerId: record.returnOwnerId,
       name: record.name,
       systemVersionId: record.systemVersionId,
       entityDefinitionId: record.entityDefinitionId,
@@ -551,6 +568,13 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
   // reauthorizes current ownership before replayStoredOutcome/replayDuplicateOutcome.
   // Denied replays return the same generic inaccessible error the method uses
   // for a foreign character, without invoking Runtime.
+  //
+  // I6 Task 4 extends the same discipline to placement scope: a stored
+  // standalone outcome must never replay once the character is attached to a
+  // campaign (ownership alone cannot authorize attached data), and the
+  // in-transaction already_completed path rechecks scope instead of trusting
+  // the pre-transaction snapshot. Denied replays use the method's existing
+  // foreign-character error, without invoking Runtime.
   async function denyReplayUnlessOwner(
     ctx: RequestContext,
     characterId: CharacterId,
@@ -559,6 +583,21 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     const current = await repo.openOwnedCharacter(characterId, ctx.actorId);
     if (current !== null) return null;
     return { ok: false, error: denied() };
+  }
+
+  async function denyStoredOutcomeUnlessStandaloneOwned(
+    ctx: RequestContext,
+    characterId: CharacterId,
+    denied: () => CharacterError,
+  ): Promise<CharacterResult<never> | null> {
+    const scope = await repo.loadCharacterScope(characterId);
+    if (scope === null) return null;
+    // Attached since the claim: the standalone receipt is inert. The caller
+    // may still be the return owner or a controller, but this method cannot
+    // serve campaign-placed data, so it denies exactly like a foreign id.
+    if (scope.campaignId !== null) return { ok: false, error: denied() };
+    if (scope.ownerId !== ctx.actorId) return { ok: false, error: denied() };
+    return null;
   }
 
   function replayStoredOutcome(resultJson: unknown): CharacterResult<CharacterCommandResult> {
@@ -658,6 +697,9 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const provisionalRecord: CharacterRecord = {
           characterId,
           ownerId: ctx.actorId,
+          campaignId: null,
+          placementGeneration: 1,
+          returnOwnerId: null,
           systemVersionId: resolved.value.versionId,
           entityDefinitionId: createInput.entityDefinitionId,
           name: createInput.name,
@@ -911,7 +953,22 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           },
         });
 
-        if (outcome.kind === "already_completed") return replayDuplicateOutcome(outcome.resultJson);
+        if (outcome.kind === "already_completed") {
+          // The duplicate copy may have been adopted since the claim: recheck
+          // placement scope before disclosing the stored sheet. Stored error
+          // outcomes carry no sheet and replay unchanged.
+          const stored = outcome.resultJson as StoredDuplicateOutcome;
+          if (stored.ok) {
+            const duplicateId = (stored.value.character as { characterId: CharacterId }).characterId;
+            const placementDenial = await denyStoredOutcomeUnlessStandaloneOwned(
+              ctx,
+              duplicateId,
+              () => errors.notFoundPurge(),
+            );
+            if (placementDenial !== null) return placementDenial;
+          }
+          return replayDuplicateOutcome(outcome.resultJson);
+        }
         const stored = outcome.resultJson as StoredDuplicateOutcome;
         if (!stored.ok) return { ok: false, error: stored.error };
         return { ok: true, value: deserializeView(stored.value.character) };
@@ -1094,6 +1151,12 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         });
 
         if (outcome.kind === "already_completed") {
+          const placementDenial = await denyStoredOutcomeUnlessStandaloneOwned(
+            ctx,
+            command.characterId,
+            () => errors.not_found(),
+          );
+          if (placementDenial !== null) return placementDenial;
           return replayStoredOutcome(outcome.resultJson);
         }
         if (outcome.kind === "not_found") {
@@ -1264,6 +1327,12 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         });
 
         if (outcome.kind === "already_completed") {
+          const placementDenial = await denyStoredOutcomeUnlessStandaloneOwned(
+            ctx,
+            command.characterId,
+            () => errors.notFoundPurge(),
+          );
+          if (placementDenial !== null) return placementDenial;
           return replayStoredOutcome(outcome.resultJson);
         }
         if (outcome.kind === "not_found") {
@@ -1383,6 +1452,15 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       try {
         const character = await repo.openOwnedCharacter(migrationInput.characterId, ctx.actorId);
         if (character === null) return { ok: false, error: errors.notFoundPurge() };
+        // Attached sheets deny migration preview instead of repinning: the
+        // owner-only lookup above already rejects them (NULL owner_id), this
+        // gate holds even if that lookup ever widens.
+        if (denyAttachedMigrationScope(character) !== null) {
+          return { ok: false, error: errors.notFoundPurge() };
+        }
+        // Standalone rows always carry an owner; the lookup above guarantees it.
+        const previewOwnerId = character.ownerId;
+        if (previewOwnerId === null) return { ok: false, error: errors.notFoundPurge() };
 
         const authorized = await input.authorizeVersionUse(ctx, migrationInput.targetVersionId);
         if (!authorized.ok) return { ok: false, error: errors.not_found() };
@@ -1453,14 +1531,14 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           candidateState: candidate.value.state,
           candidateProjection: candidate.value.projection,
           warnings: built.warnings,
-          owner: character.ownerId,
+          owner: previewOwnerId,
           expiresAt: expiresAt.toISOString(),
         });
 
         await repo.insertMigrationPreview({
           previewId,
           characterId: character.characterId,
-          ownerId: character.ownerId,
+          ownerId: previewOwnerId,
           sourceRevision: character.revision,
           sourceVersionId: character.systemVersionId,
           sourceChecksum: sourceIdentity.checksum,
@@ -1533,6 +1611,12 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
 
         const character = await repo.openOwnedCharacter(commitInput.characterId, ctx.actorId);
         if (character === null) {
+          const error = errors.not_found();
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+        // Attached sheets deny migration commit instead of repinning campaign state.
+        if (denyAttachedMigrationScope(character) !== null) {
           const error = errors.not_found();
           await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
           return { ok: false, error };
@@ -1635,7 +1719,15 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           },
         });
 
-        if (outcome.kind === "already_completed") return replayStoredOutcome(outcome.resultJson);
+        if (outcome.kind === "already_completed") {
+          const placementDenial = await denyStoredOutcomeUnlessStandaloneOwned(
+            ctx,
+            commitInput.characterId,
+            () => errors.not_found(),
+          );
+          if (placementDenial !== null) return placementDenial;
+          return replayStoredOutcome(outcome.resultJson);
+        }
         if (outcome.kind === "not_found") {
           const error = errors.not_found();
           await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
@@ -1701,6 +1793,12 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
 
         const character = await repo.openOwnedCharacter(rollbackInput.characterId, ctx.actorId);
         if (character === null) {
+          const error = errors.notFoundPurge();
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+          return { ok: false, error };
+        }
+        // Attached sheets deny migration rollback instead of restoring campaign state.
+        if (denyAttachedMigrationScope(character) !== null) {
           const error = errors.notFoundPurge();
           await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
           return { ok: false, error };
@@ -1776,7 +1874,15 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           },
         });
 
-        if (outcome.kind === "already_completed") return replayStoredOutcome(outcome.resultJson);
+        if (outcome.kind === "already_completed") {
+          const placementDenial = await denyStoredOutcomeUnlessStandaloneOwned(
+            ctx,
+            rollbackInput.characterId,
+            () => errors.notFoundPurge(),
+          );
+          if (placementDenial !== null) return placementDenial;
+          return replayStoredOutcome(outcome.resultJson);
+        }
         if (outcome.kind === "not_found") {
           const error = errors.not_found();
           await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });

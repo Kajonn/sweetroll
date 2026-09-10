@@ -66,9 +66,12 @@ describeWithDatabase("runMigrations", () => {
     expect(tables.rows.map(({ table_name }) => table_name)).toEqual([
       "character_activity_events",
       "character_audit_records",
+      "character_claim_designations",
       "character_command_executions",
+      "character_controllers",
       "character_migration_previews",
       "character_migrations",
+      "character_placements",
       "character_rolls",
       "characters",
     ]);
@@ -375,6 +378,176 @@ describeWithDatabase("runMigrations", () => {
     expect(member.rows).toEqual([
       { role: "owner", status: "active", generation: 1, revision: 1, access_revision: 1 },
     ]);
+  });
+
+  it("applies the 0013 ownership union, backfills standalone scope and rejects invalid placement", async () => {
+    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
+    const filenames = (await readdir(productionDirectory)).sort();
+    // 0013 must be a fresh number: no other migration may claim it.
+    expect(filenames.filter((name) => name.startsWith("0013"))).toEqual(["0013_campaign_character_scope.sql"]);
+    for (const filename of filenames.filter((name) => name < "0013_campaign_character_scope.sql")) {
+      await client.query(await readFile(join(productionDirectory, filename), "utf8"));
+    }
+
+    // Seed a full standalone footprint before 0013: user, system, version,
+    // character plus history/receipt rows that must backfill to standalone scope.
+    const userId = randomUUID();
+    const systemId = randomUUID();
+    const versionId = randomUUID();
+    const characterId = randomUUID();
+    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Pre-0013')", [userId]);
+    await client.query(
+      `INSERT INTO systems (id, owner_id, name, access, lifecycle)
+       VALUES ($1, $2, 'Pre-0013 system', 'private', 'active')`,
+      [systemId, userId],
+    );
+    await client.query(
+      `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle)
+       VALUES ($1, $2, '1.0.0', $3, '{}'::jsonb, '', 'published')`,
+      [versionId, systemId, `pre-0013-${randomUUID()}`],
+    );
+    await client.query(
+      `INSERT INTO characters (id, owner_id, system_version_id, entity_definition_id, name, state_json)
+       VALUES ($1, $2, $3, 'character', 'Pre-0013 hero', '{"schemaVersion":"1.0","values":{}}'::jsonb)`,
+      [characterId, userId, versionId],
+    );
+    const executionId = randomUUID();
+    await client.query(
+      `INSERT INTO character_command_executions
+         (actor_id, command_kind, idempotency_key, input_hash, character_id, execution_id,
+          status, lease_expires_at, result_json, expires_at)
+       VALUES ($1, 'character_create', $2, 'hash', $3, $4, 'completed', now(), '{}'::jsonb, now() + interval '1 day')`,
+      [userId, `pre-0013-${randomUUID()}`, characterId, executionId],
+    );
+    await client.query(
+      `INSERT INTO character_rolls
+         (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json,
+          total, rendered_output, request_id)
+       VALUES ($1, $2, 'check', $3, '1d20', '[]'::jsonb, '{}'::jsonb, 10, '10', $4)`,
+      [characterId, userId, randomUUID(), randomUUID()],
+    );
+    await client.query(
+      `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, request_id)
+       VALUES ($1, 1, 'character_created', '{}'::jsonb, $2)`,
+      [characterId, randomUUID()],
+    );
+    const before = await client.query(
+      `SELECT id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle
+         FROM characters WHERE id = $1`,
+      [characterId],
+    );
+
+    await client.query(await readFile(join(productionDirectory, "0013_campaign_character_scope.sql"), "utf8"));
+
+    // Standalone rows survive byte-identical: same IDs, same owner, same state.
+    const after = await client.query(
+      `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id,
+              system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle
+         FROM characters WHERE id = $1`,
+      [characterId],
+    );
+    expect(after.rows).toEqual([
+      {
+        ...before.rows[0],
+        campaign_id: null,
+        placement_generation: 1,
+        return_owner_id: null,
+      },
+    ]);
+
+    // History/receipts backfill to standalone scope (NULL) without rewrites.
+    for (const table of ["character_command_executions", "character_rolls", "character_activity_events"]) {
+      const scopes = await client.query(`SELECT DISTINCT scope_campaign_id FROM ${table}`);
+      expect(scopes.rows).toEqual([{ scope_campaign_id: null }]);
+    }
+
+    // The union rejects neither scope and both scopes at once.
+    await expect(
+      client.query(
+        `INSERT INTO characters (id, system_version_id, entity_definition_id, name, state_json)
+         VALUES ($1, $2, 'character', 'Neither', '{}'::jsonb)`,
+        [randomUUID(), versionId],
+      ),
+    ).rejects.toThrow();
+    await expect(
+      client.query(
+        `INSERT INTO characters (id, owner_id, campaign_id, system_version_id, entity_definition_id, name, state_json)
+         VALUES ($1, $2, $3, $4, 'character', 'Both', '{}'::jsonb)`,
+        [randomUUID(), userId, randomUUID(), versionId],
+      ),
+    ).rejects.toThrow();
+    // A return owner without campaign custody is rejected.
+    await expect(
+      client.query(
+        `INSERT INTO characters (id, owner_id, return_owner_id, system_version_id, entity_definition_id, name, state_json)
+         VALUES ($1, $2, $3, $4, 'character', 'ReturnWithoutCampaign', '{}'::jsonb)`,
+        [randomUUID(), userId, randomUUID(), versionId],
+      ),
+    ).rejects.toThrow();
+
+    // Campaign attachment works end to end: zero controllers is valid (no
+    // dummy owner), controllers must reference same-campaign memberships.
+    const campaignId = randomUUID();
+    const otherCampaignId = randomUUID();
+    await client.query(
+      `INSERT INTO campaigns (id, owner_id, system_version_id, title) VALUES ($1, $2, $3, 'Scope campaign')`,
+      [campaignId, userId, versionId],
+    );
+    await client.query(
+      `INSERT INTO campaigns (id, owner_id, system_version_id, title) VALUES ($1, $2, $3, 'Other campaign')`,
+      [otherCampaignId, userId, versionId],
+    );
+    await client.query(
+      `INSERT INTO campaign_members (campaign_id, user_id, role) VALUES ($1, $2, 'owner')`,
+      [campaignId, userId],
+    );
+    await client.query(
+      `INSERT INTO campaign_members (campaign_id, user_id, role) VALUES ($1, $2, 'player')`,
+      [otherCampaignId, userId],
+    );
+    const attachedId = randomUUID();
+    await client.query(
+      `INSERT INTO characters (id, campaign_id, system_version_id, entity_definition_id, name, state_json)
+       VALUES ($1, $2, $3, 'character', 'Unclaimed', '{}'::jsonb)`,
+      [attachedId, campaignId, versionId],
+    );
+    // Zero controllers: valid GM-controlled/unclaimed sheet, NULL owner.
+    const attached = await client.query(`SELECT owner_id FROM characters WHERE id = $1`, [attachedId]);
+    expect(attached.rows).toEqual([{ owner_id: null }]);
+    // A controller must reference a real membership: a user with no
+    // membership in the claimed campaign violates the FK. (Same-campaign
+    // pairing beyond that is module-enforced and covered in placement tests.)
+    const strangerId = randomUUID();
+    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Stranger')", [strangerId]);
+    await expect(
+      client.query(
+        `INSERT INTO character_controllers (character_id, campaign_id, user_id)
+         VALUES ($1, $2, $3)`,
+        [attachedId, otherCampaignId, strangerId],
+      ),
+    ).rejects.toThrow();
+    // Same-campaign controller and claim designation succeed.
+    await client.query(
+      `INSERT INTO character_controllers (character_id, campaign_id, user_id)
+       VALUES ($1, $2, $3)`,
+      [attachedId, campaignId, userId],
+    );
+    await client.query(
+      `INSERT INTO character_claim_designations (character_id, campaign_id, user_id, designated_by)
+       VALUES ($1, $2, $3, $4)`,
+      [attachedId, campaignId, userId, userId],
+    );
+    // Duplicate controller pairs are rejected.
+    await expect(
+      client.query(
+        `INSERT INTO character_controllers (character_id, campaign_id, user_id)
+         VALUES ($1, $2, $3)`,
+        [attachedId, campaignId, userId],
+      ),
+    ).rejects.toThrow();
+
+    // Full-directory double-apply (including 0013) is covered by the
+    // production-schema tests above; here the file applied once after seeding.
   });
 
   it("normalizes existing active system versions during the 0009 upgrade", async () => {

@@ -161,6 +161,201 @@ describeWithDatabase("runMigrations", () => {
     );
   });
 
+  it("applies the production campaign tables and enforces aggregate constraints", async () => {
+    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
+    await runMigrations(client, productionDirectory);
+    await runMigrations(client, productionDirectory);
+
+    const tables = await client.query<{ table_name: string }>(
+      `SELECT table_name
+         FROM information_schema.tables
+        WHERE table_schema = $1
+          AND table_name LIKE 'campaign%'
+        ORDER BY table_name`,
+      [schema],
+    );
+    expect(tables.rows.map(({ table_name }) => table_name)).toEqual([
+      "campaign_audit_records",
+      "campaign_command_executions",
+      "campaign_members",
+      "campaigns",
+    ]);
+
+    const constraints = await client.query<{ definition: string }>(
+      `SELECT pg_get_constraintdef(oid) AS definition
+         FROM pg_constraint
+        WHERE connamespace = $1::regnamespace
+          AND conrelid IN ('campaigns'::regclass, 'campaign_members'::regclass)`,
+      [schema],
+    );
+    const definitions = constraints.rows.map(({ definition }) => definition);
+    expect(definitions).toContain("CHECK ((revision > 0))");
+    expect(definitions).toContain("CHECK ((access_revision > 0))");
+    expect(definitions).toContain("CHECK ((status = ANY (ARRAY['active'::text, 'archived'::text])))");
+    expect(definitions).toContain("CHECK ((role = ANY (ARRAY['owner'::text, 'co_gm'::text, 'player'::text])))");
+    expect(definitions).toContain("CHECK ((status = ANY (ARRAY['active'::text, 'removed'::text])))");
+    expect(definitions).toContain("CHECK ((generation >= 1))");
+
+    const versionForeignKey = await client.query<{ delete_action: string }>(
+      `SELECT rc.delete_rule AS delete_action
+         FROM information_schema.referential_constraints rc
+         JOIN information_schema.table_constraints tc
+           ON tc.constraint_catalog = rc.constraint_catalog
+          AND tc.constraint_schema = rc.constraint_schema
+          AND tc.constraint_name = rc.constraint_name
+        WHERE tc.table_schema = $1
+          AND tc.table_name = $2
+          AND tc.constraint_name = $3`,
+      [schema, "campaigns", "campaigns_system_version_id_fkey"],
+    );
+    expect(versionForeignKey.rows).toEqual([{ delete_action: "RESTRICT" }]);
+
+    const memberForeignKey = await client.query<{ delete_action: string }>(
+      `SELECT rc.delete_rule AS delete_action
+         FROM information_schema.referential_constraints rc
+         JOIN information_schema.table_constraints tc
+           ON tc.constraint_catalog = rc.constraint_catalog
+          AND tc.constraint_schema = rc.constraint_schema
+          AND tc.constraint_name = rc.constraint_name
+        WHERE tc.table_schema = $1
+          AND tc.table_name = $2
+          AND tc.constraint_name = $3`,
+      [schema, "campaign_members", "campaign_members_campaign_id_fkey"],
+    );
+    expect(memberForeignKey.rows).toEqual([{ delete_action: "CASCADE" }]);
+
+    const indexes = await client.query<{ indexname: string }>(
+      `SELECT indexname
+         FROM pg_indexes
+        WHERE schemaname = $1
+          AND tablename LIKE 'campaign%'
+        ORDER BY indexname`,
+      [schema],
+    );
+    expect(indexes.rows.map(({ indexname }) => indexname)).toEqual([
+      "campaign_audit_records_page_idx",
+      "campaign_audit_records_pkey",
+      "campaign_command_executions_actor_id_command_kind_idempoten_key",
+      "campaign_command_executions_expiry_idx",
+      "campaign_command_executions_pkey",
+      "campaign_members_pkey",
+      "campaign_members_user_idx",
+      "campaigns_owner_page_idx",
+      "campaigns_pkey",
+    ]);
+
+    const records = await client.query<{ filename: string }>(
+      "SELECT filename FROM schema_migrations WHERE filename = '0012_campaigns.sql'",
+    );
+    expect(records.rows).toEqual([{ filename: "0012_campaigns.sql" }]);
+  });
+
+  it("upgrades a pre-I6 schema without changing standalone data and rolls back invalid campaign writes", async () => {
+    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
+    const filenames = (await readdir(productionDirectory)).sort();
+    for (const filename of filenames.filter((name) => name < "0012_campaigns.sql")) {
+      await client.query(await readFile(join(productionDirectory, filename), "utf8"));
+    }
+
+    const userId = randomUUID();
+    const systemId = randomUUID();
+    const versionId = randomUUID();
+    const characterId = randomUUID();
+    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Pre-I6')", [userId]);
+    await client.query(
+      `INSERT INTO systems (id, owner_id, name, access, lifecycle)
+       VALUES ($1, $2, 'Pre-I6 system', 'private', 'active')`,
+      [systemId, userId],
+    );
+    await client.query(
+      `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle)
+       VALUES ($1, $2, '1.0.0', $3, '{}'::jsonb, '', 'published')`,
+      [versionId, systemId, `pre-i6-${randomUUID()}`],
+    );
+    await client.query(
+      `INSERT INTO characters (id, owner_id, system_version_id, entity_definition_id, name, state_json)
+       VALUES ($1, $2, $3, 'character', 'Pre-I6 hero', '{}'::jsonb)`,
+      [characterId, userId, versionId],
+    );
+    const before = {
+      users: (await client.query("SELECT id, display_name FROM users")).rows,
+      systems: (await client.query("SELECT id, owner_id, name FROM systems")).rows,
+      versions: (await client.query("SELECT id, system_id, semantic_version FROM system_versions")).rows,
+      characters: (await client.query("SELECT id, owner_id, name FROM characters")).rows,
+    };
+
+    await client.query(await readFile(join(productionDirectory, "0012_campaigns.sql"), "utf8"));
+
+    expect((await client.query("SELECT id, display_name FROM users")).rows).toEqual(before.users);
+    expect((await client.query("SELECT id, owner_id, name FROM systems")).rows).toEqual(before.systems);
+    expect((await client.query("SELECT id, system_id, semantic_version FROM system_versions")).rows).toEqual(
+      before.versions,
+    );
+    expect((await client.query("SELECT id, owner_id, name FROM characters")).rows).toEqual(before.characters);
+
+    await expect(
+      client.query(
+        `INSERT INTO campaigns (owner_id, system_version_id, title) VALUES ($1, $2, 'Bad version')`,
+        [userId, randomUUID()],
+      ),
+    ).rejects.toThrow();
+    await expect(
+      client.query(
+        `INSERT INTO campaigns (owner_id, system_version_id, title, revision) VALUES ($1, $2, 'Bad rev', 0)`,
+        [userId, versionId],
+      ),
+    ).rejects.toThrow();
+    await expect(
+      client.query(
+        `INSERT INTO campaigns (owner_id, system_version_id, title, status) VALUES ($1, $2, 'Bad status', 'draft')`,
+        [userId, versionId],
+      ),
+    ).rejects.toThrow();
+
+    const campaignId = randomUUID();
+    await client.query(
+      `INSERT INTO campaigns (id, owner_id, system_version_id, title) VALUES ($1, $2, $3, 'Good campaign')`,
+      [campaignId, userId, versionId],
+    );
+    await expect(
+      client.query(
+        `INSERT INTO campaign_members (campaign_id, user_id, role) VALUES ($1, $2, 'gm')`,
+        [campaignId, userId],
+      ),
+    ).rejects.toThrow();
+
+    await client.query("BEGIN");
+    try {
+      await client.query(
+        `INSERT INTO campaigns (id, owner_id, system_version_id, title) VALUES ($1, $2, $3, 'Rolled back')`,
+        [randomUUID(), userId, versionId],
+      );
+      await client.query(
+        `INSERT INTO campaign_members (campaign_id, user_id, role) VALUES ($1, $2, 'gm')`,
+        [campaignId, userId],
+      );
+      await client.query("COMMIT");
+    } catch {
+      await client.query("ROLLBACK");
+    }
+    const campaigns = await client.query<{ title: string }>("SELECT title FROM campaigns ORDER BY title");
+    expect(campaigns.rows).toEqual([{ title: "Good campaign" }]);
+
+    await client.query(
+      `INSERT INTO campaign_members (campaign_id, user_id, role) VALUES ($1, $2, 'owner')`,
+      [campaignId, userId],
+    );
+    const member = await client.query(
+      `SELECT m.role, m.status, m.generation, c.revision, c.access_revision
+         FROM campaign_members m JOIN campaigns c ON c.id = m.campaign_id
+        WHERE m.campaign_id = $1`,
+      [campaignId],
+    );
+    expect(member.rows).toEqual([
+      { role: "owner", status: "active", generation: 1, revision: 1, access_revision: 1 },
+    ]);
+  });
+
   it("normalizes existing active system versions during the 0009 upgrade", async () => {
     const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
     const filenames = (await readdir(productionDirectory)).sort();

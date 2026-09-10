@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { loadConfig } from "./config.js";
+import { DEFAULT_CAMPAIGN_LIMITS, loadCampaignLimits, loadConfig } from "./config.js";
 
 describe("loadConfig", () => {
   it("loads explicit settings", () => {
@@ -65,5 +65,51 @@ describe("loadConfig", () => {
     [{ DATABASE_URL: "postgres://localhost/db", AUTHORITATIVE_ROLL_SECRET: "short" }, "AUTHORITATIVE_ROLL_SECRET must be at least 32 UTF-8 bytes"],
   ])("rejects invalid environment %#", (env, message) => {
     expect(() => loadConfig(env)).toThrow(message);
+  });
+});
+
+describe("loadCampaignLimits", () => {
+  it("returns the supported defaults", () => {
+    expect(loadCampaignLimits({})).toEqual({
+      pageDefault: 25,
+      pageMax: 100,
+      maxMembers: 100,
+      maxAttachedCharacters: 200,
+      maxTitleLength: 200,
+      maxDescriptionLength: 10_000,
+    });
+    expect(loadCampaignLimits({})).toEqual(DEFAULT_CAMPAIGN_LIMITS);
+  });
+
+  it("accepts explicit overrides", () => {
+    expect(
+      loadCampaignLimits({
+        CAMPAIGN_PAGE_DEFAULT: "10",
+        CAMPAIGN_PAGE_MAX: "50",
+        CAMPAIGN_MAX_MEMBERS: "20",
+        CAMPAIGN_MAX_ATTACHED_CHARACTERS: "40",
+        CAMPAIGN_MAX_TITLE_LENGTH: "120",
+        CAMPAIGN_MAX_DESCRIPTION_LENGTH: "5000",
+      }),
+    ).toEqual({
+      pageDefault: 10,
+      pageMax: 50,
+      maxMembers: 20,
+      maxAttachedCharacters: 40,
+      maxTitleLength: 120,
+      maxDescriptionLength: 5000,
+    });
+  });
+
+  it.each([
+    [{ CAMPAIGN_PAGE_DEFAULT: "0" }, "CAMPAIGN_PAGE_DEFAULT must be a positive integer"],
+    [{ CAMPAIGN_PAGE_MAX: "many" }, "CAMPAIGN_PAGE_MAX must be a positive integer"],
+    [{ CAMPAIGN_MAX_MEMBERS: "-3" }, "CAMPAIGN_MAX_MEMBERS must be a positive integer"],
+    [
+      { CAMPAIGN_PAGE_DEFAULT: "50", CAMPAIGN_PAGE_MAX: "10" },
+      "CAMPAIGN_PAGE_DEFAULT must not exceed CAMPAIGN_PAGE_MAX",
+    ],
+  ])("rejects invalid limits %#", (env, message) => {
+    expect(() => loadCampaignLimits(env)).toThrow(message);
   });
 });

@@ -4,6 +4,67 @@ export type LogLevel = (typeof LOG_LEVELS)[number];
 
 export type NodeEnv = "development" | "production" | "test";
 
+export type CampaignLimits = {
+  /** Default page size for campaign and member lists. */
+  pageDefault: number;
+  /** Maximum page size for campaign and member lists. */
+  pageMax: number;
+  /** Maximum active members per campaign (supported load-test bound). */
+  maxMembers: number;
+  /** Maximum attached characters per campaign (supported load-test bound). */
+  maxAttachedCharacters: number;
+  /** Maximum campaign title length in characters. */
+  maxTitleLength: number;
+  /** Maximum campaign description length in characters. */
+  maxDescriptionLength: number;
+};
+
+export const DEFAULT_CAMPAIGN_LIMITS: CampaignLimits = {
+  pageDefault: 25,
+  pageMax: 100,
+  maxMembers: 100,
+  maxAttachedCharacters: 200,
+  maxTitleLength: 200,
+  maxDescriptionLength: 10_000,
+};
+
+function parseLimit(env: NodeJS.ProcessEnv, name: string, fallback: number): number {
+  const raw = env[name];
+  if (raw === undefined || raw.length === 0) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  return parsed;
+}
+
+export function loadCampaignLimits(env: NodeJS.ProcessEnv = process.env): CampaignLimits {
+  const limits: CampaignLimits = {
+    pageDefault: parseLimit(env, "CAMPAIGN_PAGE_DEFAULT", DEFAULT_CAMPAIGN_LIMITS.pageDefault),
+    pageMax: parseLimit(env, "CAMPAIGN_PAGE_MAX", DEFAULT_CAMPAIGN_LIMITS.pageMax),
+    maxMembers: parseLimit(env, "CAMPAIGN_MAX_MEMBERS", DEFAULT_CAMPAIGN_LIMITS.maxMembers),
+    maxAttachedCharacters: parseLimit(
+      env,
+      "CAMPAIGN_MAX_ATTACHED_CHARACTERS",
+      DEFAULT_CAMPAIGN_LIMITS.maxAttachedCharacters,
+    ),
+    maxTitleLength: parseLimit(
+      env,
+      "CAMPAIGN_MAX_TITLE_LENGTH",
+      DEFAULT_CAMPAIGN_LIMITS.maxTitleLength,
+    ),
+    maxDescriptionLength: parseLimit(
+      env,
+      "CAMPAIGN_MAX_DESCRIPTION_LENGTH",
+      DEFAULT_CAMPAIGN_LIMITS.maxDescriptionLength,
+    ),
+  };
+  if (limits.pageDefault > limits.pageMax) {
+    throw new Error("CAMPAIGN_PAGE_DEFAULT must not exceed CAMPAIGN_PAGE_MAX");
+  }
+  return limits;
+}
+
 export type AppConfig = {
   allowedOrigins: string[];
   authoritativeRollSecret: string;

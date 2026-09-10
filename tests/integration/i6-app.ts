@@ -8,6 +8,7 @@ import {
   createCampaignPlacement,
   type CampaignPlacement,
 } from "../../src/characters/campaignPlacement.js";
+import { buildCampaignsRoutes } from "../../src/transport/http/campaigns.js";
 import type { Characters } from "../../src/characters/index.js";
 import { DEFAULT_CAMPAIGN_LIMITS } from "../../src/platform/config.js";
 import type { RequestContext } from "../../src/systems/authoring.js";
@@ -120,7 +121,26 @@ export async function buildI6Harness(input?: {
   const schema = `i6_${randomUUID().replaceAll("-", "")}`;
   await createI3Schema(databaseUrl, schema);
   const pool = createI3Pool(databaseUrl, schema);
-  const handle = await buildI3App({ pool, wrapRuntime: input?.wrapRuntime });
+
+  // I6 Task 9: campaign HTTP registers pre-boot through extraRoutes
+  // (Fastify forbids register() after boot). The factory closes over pool
+  // and stashes the single shared placement/module pair used by both the
+  // Campaigns module and the placement HTTP paths.
+  let placement!: CampaignPlacement;
+  let campaigns!: Campaigns;
+  const handle = await buildI3App({
+    pool,
+    wrapRuntime: input?.wrapRuntime,
+    extraRoutes: ({ characters, runtime }) => {
+      placement = createCampaignPlacement({ pool, runtime });
+      campaigns = createCampaignsModule({
+        pool,
+        limits: DEFAULT_CAMPAIGN_LIMITS,
+        charactersPlacement: placement,
+      });
+      return buildCampaignsRoutes({ campaigns, characters, placement, runtime, pool });
+    },
+  });
 
   async function signIn(code: string): Promise<TestActor> {
     const response = await handle.app.inject({
@@ -143,13 +163,6 @@ export async function buildI6Harness(input?: {
     other,
     outsider,
   };
-
-  const placement = createCampaignPlacement({ pool, runtime: handle.runtime });
-  const campaigns = createCampaignsModule({
-    pool,
-    limits: DEFAULT_CAMPAIGN_LIMITS,
-    charactersPlacement: placement,
-  });
 
   const gmVersion = await publishVersion(handle, users.gm, d20Document, {
     name: "GM d20",

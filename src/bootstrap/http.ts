@@ -1,8 +1,11 @@
 import { loadConfig, createLogger, createPool } from "../platform/index.js";
+import { loadCampaignLimits } from "../platform/config.js";
 import { createIdentityModule } from "../identity/index.js";
 import { createTestOidcClient } from "../identity/adapters/test.js";
 import { createSystemAuthoringModule } from "../systems/authoring.js";
 import { createCharactersModule } from "../characters/index.js";
+import { createCampaignPlacement } from "../characters/campaignPlacement.js";
+import { createCampaignsModule } from "../campaigns/index.js";
 import {
   createSystemPersistenceRepository,
   seedReferenceTemplates,
@@ -12,6 +15,7 @@ import { createPostgresPublishedPackageLoader } from "../systems/implementation/
 import { buildAuthHook } from "../transport/http/auth-hook.js";
 import { buildDevSignInRoutes, resolveAuthMode } from "../transport/http/dev-signin.js";
 import {
+  buildCampaignsRoutes,
   buildCharactersRoutes,
   buildHttpApp,
   buildIdentityRoutes,
@@ -91,6 +95,17 @@ const characters = createCharactersModule({
   listAuthorizedVersions: authoring.listAuthorizedVersions,
 });
 
+// I6 Task 9: one shared campaign policy/placement implementation. The same
+// instance backs the Campaigns module (departure return) and the campaign
+// HTTP placement paths; Characters resolves campaign authorization through
+// the same relational policy tables and predicates, never a second copy.
+const placement = createCampaignPlacement({ pool, runtime });
+const campaigns = createCampaignsModule({
+  pool,
+  limits: loadCampaignLimits(),
+  charactersPlacement: placement,
+});
+
 const app = buildHttpApp({
   logger,
   pool,
@@ -112,6 +127,7 @@ void app.register(
 );
 void app.register(buildSystemsRoutes({ authoring }));
 void app.register(buildCharactersRoutes({ characters }));
+void app.register(buildCampaignsRoutes({ campaigns, characters, placement, runtime, pool }));
 void app.register(
   buildDevSignInRoutes({
     identity,

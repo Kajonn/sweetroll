@@ -1,10 +1,15 @@
 import type { FastifyInstance } from "fastify";
 
+import { campaignsRouteDefinitions, type CampaignsRouteDefinition } from "./campaigns.js";
 import { charactersRouteDefinitions, type CharactersRouteDefinition } from "./characters.js";
 import { identityRouteDefinitions, type IdentityRouteDefinition } from "./identity.js";
 import { systemsRouteDefinitions, type SystemsRouteDefinition } from "./systems.js";
 
-type RouteDefinition = SystemsRouteDefinition | IdentityRouteDefinition | CharactersRouteDefinition;
+type RouteDefinition =
+  | SystemsRouteDefinition
+  | IdentityRouteDefinition
+  | CharactersRouteDefinition
+  | CampaignsRouteDefinition;
 
 export type OpenApiDocument = {
   openapi: "3.1.0";
@@ -101,6 +106,7 @@ export function buildOpenApiDocument(_app: FastifyInstance): OpenApiDocument {
     ...systemsRouteDefinitions,
     ...identityRouteDefinitions,
     ...charactersRouteDefinitions,
+    ...campaignsRouteDefinitions,
   ];
   for (const definition of routeDefinitions) {
     const path = toOpenApiPath(definition.path);

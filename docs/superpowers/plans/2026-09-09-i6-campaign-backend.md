@@ -202,7 +202,7 @@ expect(replayedIssue).not.toHaveProperty('token');
 
 ## Task 7: Content, Grants and Source-Scoped History
 
-**Files:** Create `migrations/0014_campaign_content_rolls.sql`, `src/campaigns/content.ts`, `tests/integration/campaign-content.test.ts`, `tests/integration/campaign-export.test.ts`; modify campaign factory/policy/persistence, fixture DDL and migration tests.
+**Files:** Create `migrations/0015_campaign_content_activity.sql`, `src/campaigns/content.ts`, `tests/integration/campaign-content.test.ts`, `tests/integration/campaign-export.test.ts`; modify campaign factory/policy/persistence, fixture DDL and migration tests.
 
 **Interfaces:** `createContent`, `openContent`, `listContent`, `updateContent`, `deleteContent`, `recoverContent`, `replaceGrants`, `listActivity` use current membership and source visibility. Grant replacement takes `expectedContentRevision`; transaction increments content/access revisions together. Only minimal source references belong in campaign activity payloads.
 

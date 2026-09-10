@@ -1,6 +1,6 @@
 import { Client, Pool } from "pg";
 import pino from "pino";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyPluginCallback } from "fastify";
 
 import { createTestOidcClient } from "../../src/identity/adapters/test.js";
 import { createIdentityModule, type Identity } from "../../src/identity/index.js";
@@ -471,6 +471,12 @@ export type BuildI3AppInput = {
   /** Wraps the runtime (e.g. to count resolve calls); defaults to identity. */
   wrapRuntime?: (runtime: SystemRuntime) => SystemRuntime;
   rollSecret?: string;
+  /**
+   * I6 Task 9: extra route plugins needing the built modules. Fastify
+   * forbids register() after boot, so dependents (campaign HTTP) register
+   * here, before ready(), instead of after buildI3App returns.
+   */
+  extraRoutes?: (modules: { characters: Characters; runtime: SystemRuntime }) => FastifyPluginCallback | FastifyPluginCallback[];
 };
 
 export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
@@ -531,6 +537,13 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
       maxAgeSeconds: 3600,
     }),
   );
+
+  if (input.extraRoutes !== undefined) {
+    const routes = input.extraRoutes({ characters, runtime });
+    for (const plugin of Array.isArray(routes) ? routes : [routes]) {
+      void app.register(plugin);
+    }
+  }
 
   await app.ready();
 

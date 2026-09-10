@@ -59,6 +59,7 @@ import {
   canManageCampaign,
   canReadCampaign,
   isActiveMember,
+  isGameMaster,
 } from "./policy.js";
 
 export type { RequestContext };
@@ -168,6 +169,36 @@ export type ListMembersResult = {
   nextCursor: string | null;
 };
 
+/**
+ * I6 Task 9: attached-character roster read backing
+ * `GET /campaigns/{id}/characters`. GMs see every attached sheet; active
+ * players see only sheets they control. Summaries carry no Runtime-derived
+ * projection: full sheets stay on the existing Characters read paths.
+ */
+export type ListCampaignCharactersInput = {
+  campaignId: CampaignId;
+  limit?: number;
+  cursor?: string | null;
+};
+
+export type CampaignCharacterSummary = {
+  characterId: string;
+  campaignId: CampaignId;
+  name: string;
+  entityDefinitionId: string;
+  systemVersionId: string;
+  revision: number;
+  lifecycle: "active" | "archived";
+  placementGeneration: number;
+  controllers: UserId[];
+  updatedAt: Date;
+};
+
+export type ListCampaignCharactersResult = {
+  characters: CampaignCharacterSummary[];
+  nextCursor: string | null;
+};
+
 export type ChangeRoleInput = {
   campaignId: CampaignId;
   userId: UserId;
@@ -191,6 +222,10 @@ export interface Campaigns {
   archive(ctx: RequestContext, input: ArchiveCampaignInput): Promise<CampaignResult<CampaignView>>;
   recover(ctx: RequestContext, input: RecoverCampaignInput): Promise<CampaignResult<CampaignView>>;
   listMembers(ctx: RequestContext, input: ListMembersInput): Promise<CampaignResult<ListMembersResult>>;
+  listCharacters(
+    ctx: RequestContext,
+    input: ListCampaignCharactersInput,
+  ): Promise<CampaignResult<ListCampaignCharactersResult>>;
   changeRole(ctx: RequestContext, input: ChangeRoleInput): Promise<CampaignResult<MemberView>>;
   removeMember(ctx: RequestContext, input: RemoveMemberInput): Promise<CampaignResult<MemberView>>;
   issueInvitation(
@@ -1220,6 +1255,67 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             nextCursor:
               hasMore && last !== undefined
                 ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.userId, scope: listInput.campaignId })
+                : null,
+          },
+        };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async listCharacters(ctx, listInput) {
+      try {
+        const checked = checkLimit(listInput.limit);
+        if ("error" in checked) return { ok: false, error: checked.error };
+        const decoded = decodeCursor(listInput.cursor, listInput.campaignId);
+        if ("error" in decoded) return { ok: false, error: decoded.error };
+        // Same authorize-before-paginate discipline as listMembers: the caller
+        // must actively belong to the campaign, and the page is selected in
+        // SQL with the caller capability (GM sees all, players controlled
+        // only) already applied.
+        const outcome = await withClient(async (client) => {
+          const campaign = await repo.openCampaign(client, listInput.campaignId);
+          const membership =
+            campaign === null
+              ? null
+              : await repo.loadMembership(client, listInput.campaignId, ctx.actorId);
+          if (campaign === null || !canReadCampaign(campaign, membership)) {
+            return { authorized: false as const };
+          }
+          const rows = await repo.listAttachedCharactersPage(client, {
+            campaignId: listInput.campaignId,
+            actorId: ctx.actorId,
+            isGm: isGameMaster(membership),
+            limit: checked.limit,
+            cursorCreatedAt: decoded.cursor?.createdAt ?? null,
+            cursorId: decoded.cursor?.id ?? null,
+          });
+          return { authorized: true as const, rows };
+        });
+        if (!outcome.authorized) {
+          return { ok: false, error: errors.not_found() };
+        }
+        const hasMore = outcome.rows.length > checked.limit;
+        const page = hasMore ? outcome.rows.slice(0, checked.limit) : outcome.rows;
+        const last = page[page.length - 1];
+        return {
+          ok: true,
+          value: {
+            characters: page.map((record) => ({
+              characterId: record.characterId,
+              campaignId: record.campaignId,
+              name: record.name,
+              entityDefinitionId: record.entityDefinitionId,
+              systemVersionId: record.systemVersionId,
+              revision: record.revision,
+              lifecycle: record.lifecycle,
+              placementGeneration: record.placementGeneration,
+              controllers: record.controllers,
+              updatedAt: record.updatedAt,
+            })),
+            nextCursor:
+              hasMore && last !== undefined
+                ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.characterId, scope: listInput.campaignId })
                 : null,
           },
         };

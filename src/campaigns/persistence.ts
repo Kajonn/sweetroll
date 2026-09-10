@@ -97,6 +97,25 @@ export type AccessibleVersion = {
   checksum: string;
 };
 
+/**
+ * I6 Task 9: one attached character for the campaign roster read. GMs see
+ * every attached sheet; players see only sheets they control (enforced in
+ * SQL by listAttachedCharactersPage, never paginate-then-filter).
+ */
+export type AttachedCharacterRecord = {
+  characterId: string;
+  campaignId: string;
+  name: string;
+  entityDefinitionId: string;
+  systemVersionId: string;
+  revision: number;
+  lifecycle: "active" | "archived";
+  placementGeneration: number;
+  controllers: string[];
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export type CampaignReceipt = {
   inputHash: string;
   campaignId: string | null;
@@ -587,6 +606,80 @@ export function createCampaignPersistenceRepository(pool: Pool) {
         params,
       );
       return result.rows.map(toMembershipRecord);
+    },
+
+    /**
+     * I6 Task 9: attached-character page for `GET /campaigns/{id}/characters`.
+     * Authorization precedes pagination in SQL: GMs read every attached
+     * sheet, players only sheets they control. $1 is the actor ID, $2 the
+     * GM flag. Controllers ride along as an ordered array so the roster
+     * read stays a single bounded query.
+     */
+    async listAttachedCharactersPage(
+      client: DbClient,
+      input: {
+        campaignId: string;
+        actorId: string;
+        isGm: boolean;
+        limit: number;
+        cursorCreatedAt: string | null;
+        cursorId: string | null;
+      },
+    ): Promise<AttachedCharacterRecord[]> {
+      const params: unknown[] = [input.actorId, input.isGm, input.campaignId];
+      let cursorClause = "";
+      if (input.cursorCreatedAt !== null && input.cursorId !== null) {
+        params.push(input.cursorCreatedAt, input.cursorId);
+        cursorClause = `AND (ch.created_at < $4::timestamptz OR (ch.created_at = $4::timestamptz AND ch.id < $5))`;
+      }
+      params.push(input.limit + 1);
+      const result = await client.query<{
+        id: string;
+        campaign_id: string;
+        name: string;
+        entity_definition_id: string;
+        system_version_id: string;
+        revision: number;
+        lifecycle: string;
+        placement_generation: number;
+        controllers: string[];
+        created_at: Date;
+        updated_at: Date;
+      }>(
+        `SELECT ch.id, ch.campaign_id, ch.name, ch.entity_definition_id, ch.system_version_id,
+                ch.revision, ch.lifecycle, ch.placement_generation,
+                ARRAY(SELECT cc.user_id FROM character_controllers cc
+                       WHERE cc.character_id = ch.id ORDER BY cc.user_id) AS controllers,
+                ch.created_at, ch.updated_at
+           FROM characters ch
+          WHERE ch.campaign_id = $3
+            AND ($2::boolean OR EXISTS (
+              SELECT 1 FROM character_controllers cc
+               WHERE cc.character_id = ch.id AND cc.user_id = $1
+            ))
+            ${cursorClause}
+          ORDER BY ch.created_at DESC, ch.id DESC
+          LIMIT $${params.length}`,
+        params,
+      );
+      return result.rows.map((row) => {
+        if (row.lifecycle !== "active" && row.lifecycle !== "archived") {
+          throw new Error(`Unknown character lifecycle: ${row.lifecycle}`);
+        }
+        return {
+          characterId: row.id,
+          campaignId: row.campaign_id,
+          name: row.name,
+          entityDefinitionId: row.entity_definition_id,
+          systemVersionId: row.system_version_id,
+          revision: row.revision,
+          lifecycle: row.lifecycle,
+          placementGeneration: row.placement_generation,
+          controllers: row.controllers,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        };
+      });
     },
 
     async appendAudit(

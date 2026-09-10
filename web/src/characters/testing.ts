@@ -42,6 +42,10 @@ import type {
 export function makeView(overrides: Partial<CharacterView> & { characterId: string; revision: number }): CharacterView {
   return {
     ownerId: "00000000-0000-4000-8000-000000000000",
+    campaignId: null,
+    controllers: [],
+    placementGeneration: 1,
+    returnOwnerId: null,
     name: "Aria",
     systemVersionId: "11111111-1111-4000-8000-000000000000",
     entityDefinitionId: "hero",

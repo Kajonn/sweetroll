@@ -162,7 +162,11 @@ const ProjectionDto = Type.Object({
   validations: Type.Array(RuntimeValidationDto),
 });
 
-const CharacterViewDto = Type.Object({
+/**
+ * I6 Task 9: shared with the Campaigns adapter so placement responses reuse
+ * the exact standalone wire shape (single source of truth, no DTO drift).
+ */
+export const CharacterViewDto = Type.Object({
   characterId: Type.String({ format: UUID_FORMAT }),
   // I6 Task 5 ownership union: standalone views populate ownerId with NULL
   // campaign fields; attached views carry campaign custody (NULL ownerId,
@@ -699,6 +703,19 @@ function toFastifyResponses(response: Record<string, RouteResponse> | undefined)
   return out;
 }
 
+/**
+ * I6 Task 9: shared CharacterView wire serializer (Date -> ISO string) so
+ * the Campaigns placement adapter reuses the exact standalone shape.
+ */
+export function toCharacterViewDto(view: CharacterView): unknown {
+  return {
+    ...view,
+    archivedAt: view.archivedAt === null ? null : view.archivedAt.toISOString(),
+    createdAt: view.createdAt.toISOString(),
+    updatedAt: view.updatedAt.toISOString(),
+  };
+}
+
 export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => FastifyPluginCallback =
   ({ characters }) =>
   async (app) => {
@@ -779,12 +796,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
       reply.header("x-resource-revision", String(revision));
     };
 
-    const toCharacterDto = (view: CharacterView): unknown => ({
-      ...view,
-      archivedAt: view.archivedAt === null ? null : view.archivedAt.toISOString(),
-      createdAt: view.createdAt.toISOString(),
-      updatedAt: view.updatedAt.toISOString(),
-    });
+    const toCharacterDto = (view: CharacterView): unknown => toCharacterViewDto(view);
 
     const toCommandResultDto = (result: CharacterCommandResult): unknown => ({
       character: toCharacterDto(result.character),

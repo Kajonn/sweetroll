@@ -9,7 +9,12 @@ import { SystemExportV1Schema } from "../src/systems/implementation/package/sche
 import { SystemPackageV1Schema } from "../src/systems/implementation/package/schema/package.js";
 import { d20Export } from "../src/systems/implementation/package/fixtures/d20.js";
 import type { Characters } from "../src/characters/index.js";
+import type { Campaigns } from "../src/campaigns/index.js";
+import type { CampaignPlacement } from "../src/characters/campaignPlacement.js";
+import type { SystemRuntime } from "../src/systems/runtime.js";
+import type { Pool } from "pg";
 import type { Identity } from "../src/identity/index.js";
+import { buildCampaignsRoutes } from "../src/transport/http/campaigns.js";
 import { buildCharactersRoutes } from "../src/transport/http/characters.js";
 import { buildIdentityRoutes } from "../src/transport/http/identity.js";
 import { buildOpenApiDocument } from "../src/transport/http/openapi.js";
@@ -61,6 +66,18 @@ async function emitOpenApi(): Promise<void> {
   void app.register(buildIdentityRoutes({ identity, cookieName: "session", secure: true }));
   void app.register(buildSystemsRoutes({ authoring: {} as SystemAuthoring }));
   void app.register(buildCharactersRoutes({ characters: {} as Characters }));
+  // I6 Task 9: campaign routes ship in the same document. The handlers never
+  // run during generation, so stub modules suffice (mirrors the Characters
+  // stub above); the document itself comes from campaignsRouteDefinitions.
+  void app.register(
+    buildCampaignsRoutes({
+      campaigns: {} as Campaigns,
+      characters: {} as Characters,
+      placement: {} as CampaignPlacement,
+      runtime: {} as SystemRuntime,
+      pool: {} as Pool,
+    }),
+  );
   await app.ready();
   try {
     const doc = buildOpenApiDocument(app);

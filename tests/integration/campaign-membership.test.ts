@@ -909,11 +909,12 @@ describeWithDatabase("campaign membership races and owner protection (Task 3)", 
         },
       },
     });
+    const doomedIdempotencyKey = randomUUID();
     const failed = await failing.removeMember(ctxFor(h.users.gm), {
       campaignId: doomedId,
       userId: h.users.player.actorId,
       expectedCampaignRevision: 1,
-      idempotencyKey: randomUUID(),
+      idempotencyKey: doomedIdempotencyKey,
     });
     expect(failed).toEqual({
       ok: false,
@@ -926,5 +927,57 @@ describeWithDatabase("campaign membership races and owner protection (Task 3)", 
     expect(row.rows[0]).toMatchObject({ status: "active", generation: 1 });
     expect(await openRevision(doomedId)).toEqual({ revision: 1, accessRevision: 1 });
     expect(await auditCount(doomedId, "campaign_member_removed")).toBe(0);
+    expect(await receiptCount(h.users.gm.actorId, "campaign_remove_member", doomedIdempotencyKey)).toBe(0);
+  });
+
+  it("shares one read-only transaction across snapshot reads", async () => {
+    const created = await createCampaign();
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const campaignId = created.value.campaignId;
+    await seedMember(campaignId, h.users.player.actorId);
+
+    // Spy on the checked-out client: record every query text per connect so
+    // the test proves each read bundle runs behind a single BEGIN READ ONLY.
+    const originalConnect = h.pool.connect.bind(h.pool);
+    const transcripts: string[][] = [];
+    h.pool.connect = (async () => {
+      const client = await originalConnect();
+      const transcript: string[] = [];
+      transcripts.push(transcript);
+      const originalQuery = client.query.bind(client);
+      client.query = (async (text: unknown, ...rest: never[]) => {
+        if (typeof text === "string") transcript.push(text);
+        return (originalQuery as (...args: never[]) => never)(text as never, ...rest);
+      }) as typeof client.query;
+      return client;
+    }) as typeof h.pool.connect;
+
+    try {
+      const base = transcripts.length;
+      const opened = await h.campaigns.open(ctxFor(h.users.gm), { campaignId });
+      expect(opened.ok).toBe(true);
+      const members = await h.campaigns.listMembers(ctxFor(h.users.gm), { campaignId, limit: 10 });
+      expect(members.ok).toBe(true);
+      const listed = await h.campaigns.list(ctxFor(h.users.gm), { limit: 10 });
+      expect(listed.ok).toBe(true);
+
+      // Each read bundle checks out exactly one client (proving list uses the
+      // shared client instead of pool.query) and wraps it in one READ ONLY
+      // transaction: BEGIN first, COMMIT last.
+      const bundles = transcripts.slice(base);
+      expect(bundles).toHaveLength(3);
+      for (const transcript of bundles) {
+        expect(transcript[0]).toBe("BEGIN READ ONLY");
+        expect(transcript[transcript.length - 1]).toBe("COMMIT");
+        expect(transcript.some((text) => text.startsWith("SELECT"))).toBe(true);
+      }
+      // open + listMembers issue multiple SELECTs on the same client behind
+      // one BEGIN (campaign + membership [+ roster page]).
+      expect(bundles[0]?.filter((text) => text.startsWith("SELECT")).length).toBeGreaterThanOrEqual(2);
+      expect(bundles[1]?.filter((text) => text.startsWith("SELECT")).length).toBeGreaterThanOrEqual(3);
+    } finally {
+      h.pool.connect = originalConnect as typeof h.pool.connect;
+    }
   });
 });

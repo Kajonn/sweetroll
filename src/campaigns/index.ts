@@ -372,9 +372,24 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
   }
 
   async function withClient<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+    // Read-only snapshot: one checked-out connection wrapped in a single
+    // READ ONLY transaction so sequential SELECTs share one snapshot
+    // instead of per-statement READ-COMMITTED reads.
     const client = await input.pool.connect();
     try {
-      return await work(client);
+      await client.query("BEGIN READ ONLY");
+      try {
+        const value = await work(client);
+        await client.query("COMMIT");
+        return value;
+      } catch (error) {
+        try {
+          await client.query("ROLLBACK");
+        } catch {
+          // Preserve the original failure when rollback itself errors.
+        }
+        throw error;
+      }
     } finally {
       client.release();
     }
@@ -419,8 +434,8 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     ctx: RequestContext,
     campaignId: string,
   ): Promise<CampaignError | null> {
-    // One connection for both reads so the campaign row and the caller
-    // membership share a consistent snapshot.
+    // One read-only transaction for both reads so the campaign row and the
+    // caller membership share a consistent snapshot.
     return await withClient(async (client) => {
       const campaign = await repo.openCampaign(client, campaignId);
       const membership =
@@ -536,8 +551,9 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
 
     async open(ctx, openInput) {
       try {
-        // Single-client snapshot: campaign identity and caller membership
-        // are resolved together, never on independently pooled connections.
+        // Single-client read-only snapshot: campaign identity and caller
+        // membership are resolved together in one READ ONLY transaction,
+        // never on independently pooled connections.
         const outcome = await withClient(async (client) => {
           const campaign = await repo.openCampaign(client, openInput.campaignId);
           const membership =
@@ -561,11 +577,16 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
         if ("error" in checked) return { ok: false, error: checked.error };
         const decoded = decodeCursor(listInput.cursor, ctx.actorId);
         if ("error" in decoded) return { ok: false, error: decoded.error };
-        const rows = await repo.listCampaignsPage(input.pool, ctx.actorId, {
-          limit: checked.limit,
-          cursorCreatedAt: decoded.cursor?.createdAt ?? null,
-          cursorId: decoded.cursor?.id ?? null,
-        });
+        // Same shared-client read-only snapshot pattern as open/listMembers:
+        // the roster page is selected on the checked-out transaction client,
+        // never on an independently pooled connection.
+        const rows = await withClient((client) =>
+          repo.listCampaignsPage(client, ctx.actorId, {
+            limit: checked.limit,
+            cursorCreatedAt: decoded.cursor?.createdAt ?? null,
+            cursorId: decoded.cursor?.id ?? null,
+          }),
+        );
         const hasMore = rows.length > checked.limit;
         const page = hasMore ? rows.slice(0, checked.limit) : rows;
         const last = page[page.length - 1];
@@ -999,7 +1020,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
         if ("error" in checked) return { ok: false, error: checked.error };
         const decoded = decodeCursor(listInput.cursor, listInput.campaignId);
         if ("error" in decoded) return { ok: false, error: decoded.error };
-        // Authorization precedes pagination on one snapshot: the roster page
+        // Authorization precedes pagination on one read-only snapshot: the roster page
         // is selected with the campaign predicate already applied, never by
         // paginating first and filtering unauthorized rows in memory.
         const outcome = await withClient(async (client) => {

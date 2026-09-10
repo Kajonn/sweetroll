@@ -103,10 +103,15 @@ const characters = createCharactersModule({
 // and the post-commit reads reuse the Characters entry point. Characters
 // resolves campaign authorization through the same relational policy
 // tables and predicates, never a second copy.
-const placement = createCampaignPlacement({ pool, runtime });
+const placementLimits = loadCampaignLimits();
+const placement = createCampaignPlacement({
+  pool,
+  runtime,
+  maxAttachedCharacters: placementLimits.maxAttachedCharacters,
+});
 const campaigns = createCampaignsModule({
   pool,
-  limits: loadCampaignLimits(),
+  limits: placementLimits,
   charactersPlacement: placement,
 });
 

@@ -173,6 +173,27 @@ describeWithDatabase("campaign aggregate (Task 2)", () => {
     expect(mismatch.error.code).toBe("idempotency_mismatch");
   });
 
+  it("expires campaign receipts into result_unavailable without stale replay or re-execution", async () => {
+    const key = randomUUID();
+    const first = await createCampaign({ title: "Lapsing", key });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+
+    await h.pool.query(
+      `UPDATE campaign_command_executions SET expires_at = now() - interval '1 second'
+        WHERE actor_id = $1 AND command_kind = 'campaign_create' AND idempotency_key = $2`,
+      [h.users.gm.actorId, key],
+    );
+    // Same input hash, but the receipt lapsed: no stale campaign replay.
+    const replay = await createCampaign({ title: "Lapsing", key });
+    expect(replay.ok).toBe(false);
+    if (replay.ok) return;
+    expect(replay.error.code).toBe("result_unavailable");
+    // The lapsed replay commits nothing further.
+    const rows = await h.pool.query("SELECT id FROM campaigns WHERE title = 'Lapsing'");
+    expect(rows.rows).toHaveLength(1);
+  });
+
   it("replays update on the same key without double-applying", async () => {
     const created = await createCampaign();
     expect(created.ok).toBe(true);

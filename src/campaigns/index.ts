@@ -452,6 +452,10 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     bad_request: (message: string): CampaignError => ({ code: "bad_request", message }),
     not_found: (message: string = NOT_FOUND_MESSAGE): CampaignError => ({ code: "not_found", message }),
     mismatch: (): CampaignError => ({ code: "idempotency_mismatch", message: MISMATCH_MESSAGE }),
+    result_unavailable: (): CampaignError => ({
+      code: "result_unavailable",
+      message: "The original result is no longer available.",
+    }),
     conflict: (message: string, latestRevision?: number | null): CampaignError => ({
       code: "conflict",
       message,
@@ -647,12 +651,15 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     commandKind: string;
     idempotencyKey: string;
     inputHash: string;
-    receipt: { inputHash: string; resultJson: unknown } | null;
+    receipt: { inputHash: string; resultJson: unknown; expiresAt: Date } | null;
     deserialize: (stored: unknown) => T;
     reauthorize: (campaignId: string) => Promise<CampaignError | null>;
   }): Promise<CampaignResult<T>> {
     if (options.receipt === null) return { ok: false, error: errors.internal() };
     if (options.receipt.inputHash !== options.inputHash) return { ok: false, error: errors.mismatch() };
+    if (options.receipt.expiresAt.getTime() <= now().getTime()) {
+      return { ok: false, error: errors.result_unavailable() };
+    }
     const stored = options.receipt.resultJson as { campaignId?: string; value?: unknown };
     if (typeof stored.campaignId === "string") {
       const denial = await options.reauthorize(stored.campaignId);
@@ -777,7 +784,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
 
         // Receipt-first: an exact replay returns the stored value without
         // inserting a second campaign row.
-        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
         if (preExisting !== null) {
           return await resolveReplay<CampaignView>({
             commandKind: CREATE_KIND,
@@ -792,7 +799,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
         const outcome = await withTransaction(async (client) => {
           // Re-check inside the transaction: a concurrent identical request
           // may have committed between the pre-check and our inserts.
-          const raced = await repo.loadReceipt(client, receiptKey);
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
           if (raced !== null) {
             return { committed: false as const, receipt: raced };
           }
@@ -832,7 +839,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
           return { committed: true as const, value };
         }).catch(async (error) => {
           if (error instanceof ReceiptRace) {
-            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
             return { committed: false as const, receipt };
           }
           throw error;
@@ -947,7 +954,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
 
         // Receipt-first: an exact replay returns the stored value without
         // re-applying the mutation.
-        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
         if (preExisting !== null) {
           return await resolveReplay<CampaignView>({
             commandKind: UPDATE_KIND,
@@ -967,7 +974,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
               : await repo.loadMembership(client, updateInput.campaignId, ctx.actorId);
           // Re-check before any mutation: a waiter behind the row lock must
           // replay instead of re-applying or hitting a revision conflict.
-          const raced = await repo.loadReceipt(client, receiptKey);
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
           if (raced !== null) {
             return { committed: false as const, receipt: raced };
           }
@@ -1038,7 +1045,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
           return { committed: true as const, value };
         }).catch(async (error) => {
           if (error instanceof ReceiptRace) {
-            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
             return { committed: false as const, receipt };
           }
           throw error;
@@ -1077,7 +1084,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
 
         // Receipt-first: an exact replay returns the stored value without
         // re-applying the mutation.
-        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
         if (preExisting !== null) {
           return await resolveReplay<CampaignView>({
             commandKind: ARCHIVE_KIND,
@@ -1097,7 +1104,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
               : await repo.loadMembership(client, archiveInput.campaignId, ctx.actorId);
           // Re-check before any mutation: a waiter behind the row lock must
           // replay instead of re-applying or hitting a revision conflict.
-          const raced = await repo.loadReceipt(client, receiptKey);
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
           if (raced !== null) {
             return { committed: false as const, receipt: raced };
           }
@@ -1167,7 +1174,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
           return { committed: true as const, value };
         }).catch(async (error) => {
           if (error instanceof ReceiptRace) {
-            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
             return { committed: false as const, receipt };
           }
           throw error;
@@ -1206,7 +1213,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
 
         // Receipt-first: an exact replay returns the stored value without
         // re-applying the mutation.
-        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
         if (preExisting !== null) {
           return await resolveReplay<CampaignView>({
             commandKind: RECOVER_KIND,
@@ -1226,7 +1233,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
               : await repo.loadMembership(client, recoverInput.campaignId, ctx.actorId);
           // Re-check before any mutation: a waiter behind the row lock must
           // replay instead of re-applying or hitting a revision conflict.
-          const raced = await repo.loadReceipt(client, receiptKey);
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
           if (raced !== null) {
             return { committed: false as const, receipt: raced };
           }
@@ -1296,7 +1303,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
           return { committed: true as const, value };
         }).catch(async (error) => {
           if (error instanceof ReceiptRace) {
-            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
             return { committed: false as const, receipt };
           }
           throw error;
@@ -1447,7 +1454,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
 
         // Receipt-first: an exact replay returns the stored value without
         // re-applying the mutation.
-        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
         if (preExisting !== null) {
           return await resolveReplay<MemberView>({
             commandKind: CHANGE_ROLE_KIND,
@@ -1467,7 +1474,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             campaign === null ? null : await repo.loadMembership(client, roleInput.campaignId, roleInput.userId);
           // Re-check before any mutation: a waiter behind the row lock must
           // replay instead of re-applying or hitting a revision conflict.
-          const raced = await repo.loadReceipt(client, receiptKey);
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
           if (raced !== null) {
             return { committed: false as const, receipt: raced };
           }
@@ -1548,7 +1555,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
           return { committed: true as const, value };
         }).catch(async (error) => {
           if (error instanceof ReceiptRace) {
-            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
             return { committed: false as const, receipt };
           }
           throw error;
@@ -1588,17 +1595,20 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
         // Leave/removal replays a minimal own-command acknowledgement without
         // requiring current membership: the caller may have departed already.
         const replayRemoval = (
-          receipt: { inputHash: string; resultJson: unknown } | null,
+          receipt: { inputHash: string; resultJson: unknown; expiresAt: Date } | null,
         ): CampaignResult<MemberView> => {
           if (receipt === null) return { ok: false, error: errors.internal() };
           if (receipt.inputHash !== inputHash) return { ok: false, error: errors.mismatch() };
+          if (receipt.expiresAt.getTime() <= now().getTime()) {
+            return { ok: false, error: errors.result_unavailable() };
+          }
           const stored = receipt.resultJson as { value?: unknown };
           return { ok: true, value: deserializeMember(stored.value) };
         };
 
         // Receipt-first: an exact replay returns the stored acknowledgement
         // without re-applying the removal.
-        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
         if (preExisting !== null) {
           return replayRemoval(preExisting);
         }
@@ -1612,7 +1622,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             campaign === null ? null : await repo.loadMembership(client, removeInput.campaignId, removeInput.userId);
           // Re-check before any mutation: a waiter behind the row lock must
           // replay instead of re-applying or hitting a revision conflict.
-          const raced = await repo.loadReceipt(client, receiptKey);
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
           if (raced !== null) {
             return { committed: false as const, receipt: raced };
           }
@@ -1724,7 +1734,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
           return { committed: true as const, value };
         }).catch(async (error) => {
           if (error instanceof ReceiptRace) {
-            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
             return { committed: false as const, receipt };
           }
           throw error;

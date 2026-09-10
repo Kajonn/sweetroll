@@ -475,7 +475,7 @@ Use Node.js LTS, TypeScript, Fastify, a thin PostgreSQL driver, explicit SQL mig
 | content_grants      | content to selected member                   | content_id, member_id                                               |
 | file_objects        | content/avatar/system asset                  | storage_key, media_type, size, scan_status, checksum                |
 | activity_events     | actor and campaign/resource                  | type, audience, payload, occurred_at, request_id                    |
-| outbox_events       | First concrete asynchronous consumer         | topic, payload, attempt_count, available_at, published_at           |
+| outbox_events       | Deferred with invitation email to I6 follow-up; absent from token-only backend slice | topic, payload, attempt_count, available_at, published_at |
 | invitations         | campaign and inviter                         | token_hash, intended_role, expires_at, accepted_by                  |
 
 ## 12.1 JSON document placement
@@ -583,6 +583,8 @@ Foundational work belongs to the first increment that needs it. For example, rep
 ## 17.1 Increment definition of done
 
 Every increment must meet all applicable criteria before work begins on the next increment:
+
+**Owner-approved exception (2026-09-09):** The I6 backend-only slice may proceed before full I5 acceptance, using the existing deterministic authentication adapter and license-neutral reference fixtures. This permits backend development and HTTP verification only: it does not close I5, authorize production deployment, or satisfy full I6 acceptance. Real production sign-in and its return journey remain required for production readiness and full I6 acceptance. OD-03 and OD-08 dispositions for this slice are recorded in Section 18.1; all other applicable criteria below remain in force.
 
 - Its primary workflow runs end to end without direct database changes or unpublished internal procedures.
 - Public interfaces are documented and versioned. Backend-only workflows are usable through the OpenAPI contract.
@@ -723,12 +725,14 @@ Apply GUI plan G7 to the player campaign routes using I4a components and the own
 **Backend tasks:**
 
 1. Persist campaigns pinned to immutable system versions, campaign settings, memberships, roles, invitations, campaign-owned characters, text content, grants, and campaign activity using explicit relational authorization columns.
-2. Implement the documented HTTP interface for campaign create/read/update/archive, membership and co-GM management, expiring invitation issue/accept/revoke, and campaign policy configuration. Introduce the transactional outbox with invitation email delivery as its first concrete asynchronous consumer.
+2. Implement the documented HTTP interface for campaign create/read/update/archive, membership and co-GM management, expiring invitation issue/review/accept/decline/rotate/revoke, and campaign policy configuration. Owner decision 2026-09-09: the first I6 backend slice uses out-of-band token-only invitations, with no outbox or email delivery. Issue/rotation receipts contain only non-secret metadata; a lost token response requires explicit rotation. Introduce the transactional outbox with invitation email delivery in a separately planned I6 follow-up, not as unused infrastructure in this slice.
 3. Implement character creation, assignment, claiming, multiple-owner rules, and standalone-to-campaign adoption without changing a character's pinned version implicitly.
 4. Implement GM-only, all-player, selected-player, and owner-only text content with deny-by-default scoped queries, audited visibility changes, and no UI-only enforcement.
 5. Implement campaign and character policy decisions for read, edit, roll audience, and GM visibility; generate direct-object-reference and role/membership/ownership matrix tests.
 6. Implement campaign activity reads, poll-on-view revision behavior, authorized notifications without secret payload broadcast, membership revocation, and cache-invalidation signals.
 7. Add invitation idempotency, concurrent membership and content tests, expired/replayed token tests, revocation tests, campaign export, and four-player session-burst load tests.
+
+**Backend slice policy (2026-09-09):** [Campaign backend spec](docs/superpowers/specs/2026-09-09-i6-campaign-backend-design.md) defines the backend-only contracts; it does not close I6 or its Player acceptance gates. Active GMs/co-GMs see full attached sheet state, disclosed before join/claim/adoption, with no I6 visibility toggle. This does not grant access to owner-only notes or actor-private rolls. Campaign-created characters have campaign custody and zero or more active member controllers; they stay in the campaign when controllers leave. Controller records survive role promotion, and a GM adopting their own character retains the return-owner controller invariant. Adoption requires the exact pinned version and explicit current-owner consent. On the original owner's departure/removal, the adopted character returns to that owner with its current sheet values and unchanged pin; all other campaign controllers lose live access. This return right cannot be reassigned. Adoption discloses that GM edits to sheet values return too: secrets belong in separately authorized content, not that sheet. Historical campaign rolls, activity and receipts remain campaign-scoped and do not return as personal history. Full membership revocation therefore removes campaign data access, with this explicit returned-sheet exception. Independent migration/rollback is denied while attached; I7 owns campaign upgrades. Existing Characters routes, exports and idempotency/recovery responses must enforce current policy and original placement scope, not just standalone ownership. Membership removal and character return are one revision-safe transaction.
 
 **Player integration tasks:**
 
@@ -790,13 +794,13 @@ Complete GUI plan G8: define media/scene/display contracts and persistence; add 
 | **ID** | **Decision**   | **Question**                                                                      | **Working recommendation**                                        |
 |--------|----------------|-----------------------------------------------------------------------------------|-------------------------------------------------------------------|
 | OD-01  | Sharing model  | Which systems may be enumerated by the creation picker versus used from a known link?         | Private plus unlisted links; resolve picker enumeration before G4 acceptance.                    |
-| OD-02  | GM visibility  | Do campaign GMs always see full character state?                                  | Disclosed campaign policy; default yes.                           |
-| OD-03  | Collaboration  | Can several creators edit one system draft concurrently?                          | Named collaborators; serialize draft edits in MVP.                |
+| OD-02 (resolved 2026-09-09) | GM visibility | Do campaign GMs always see full character state? | Yes for attached sheet state, disclosed; no I6 toggle. Owner-only notes and actor-private rolls have separate policies. See Section 17.8. |
+| OD-03 (deferred 2026-09-09) | Collaboration | Can several creators edit one system draft concurrently? | Named collaborators and multi-creator editing are deferred. Retain current creator ownership and revision-safe saves; campaign membership/co-GM roles confer no system-authoring permissions. Not a blocker for the I6 backend-only slice. |
 | OD-04  | Rules ceiling (resolved) | Grammar v0.1 covers d20, 2d6, keep-high/low, advantage helpers, and threshold-counted dynamic d6 pools. | Defer reroll, explode, push, custom faces, lookups, and effects. |
 | OD-05  | Authentication | Passwordless email, social sign-in, or both?                                      | OIDC social plus email magic link.                                |
 | OD-06  | Business model | Free, subscription, paid storage, or marketplace?                                 | Do not couple MVP data ownership to an unvalidated payment model. |
 | OD-07  | Public content | What moderation/takedown is required before public discovery?                     | Keep discovery out of MVP unless staffing and process exist.      |
-| OD-08  | Templates      | Which open-license systems to ship as launch templates (license review pending)?  | Start with OGL/CC systems listed in 6.6; verify each license.     |
+| OD-08 (launch decision deferred 2026-09-09) | Templates | Which open-license systems to ship as launch templates? | Use existing license-neutral reference fixtures for I6 backend development/tests and accessible published versions for campaigns; no launch catalog is required for this slice. Template selection/license review remains open before shipped-template claims or acceptance requiring licensed launch templates. |
 
 > **Note.** Offline support is now a requirement (Section 8), not an open decision.
 
@@ -813,7 +817,7 @@ Complete GUI plan G8: define media/scene/display contracts and persistence; add 
 7. Run five moderated creator tests during I2 and measure time to first published playable system.
 8. Create the ownership authorization table in I3, then extend it with campaign membership, audience, and GM-policy cases before I6 implementation.
 9. Keep the I5 Player app campaign-free; add all player campaign workflows together with their backend support in I6.
-10. Resolve OD-01 discovery before G4 picker acceptance; resolve OD-02, OD-03, and OD-08 before I6; settle the GM visibility policy before I7. Keep commercial features and a public catalog outside the critical path.
+10. Resolve OD-01 discovery before G4 picker acceptance. OD-02 is resolved; the owner-approved OD-03/OD-08 deferrals and I5 prerequisite exception permit the I6 backend-only slice (Sections 17.1 and 18.1), not full I6 acceptance or production deployment. Settle launch-template licensing before demonstrations requiring shipped licensed templates. Keep commercial features and a public catalog outside the critical path.
 
 ## Appendix A. System package outline
 

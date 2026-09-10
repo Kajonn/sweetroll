@@ -145,6 +145,8 @@ Scope keys by actor, operation and target; hash normalized input including preco
 
 Before returning any saved result, reauthorize its original resource, audience and placement scope. This applies to existing Characters replay/recovery, exports, migration results and new Campaigns commands. A current right to the returned standalone character is not permission to read campaign-era receipts. Removed users get generic denial for campaign payloads. When an otherwise-authorized result no longer has the same policy/placement generation, return a documented non-sensitive `result_unavailable` outcome rather than replaying stale state or re-executing the command. A mutation already committed stays committed even when its original result can no longer be disclosed.
 
+Failure memoization differs by path: placement transactions roll back pending idempotency rows on failure (a changed-input retry claims fresh, never `idempotency_mismatch`), while Characters commands finalize errors into receipts (a changed-input retry is `idempotency_mismatch`).
+
 Invitation issue/rotation uses the non-secret replay exception in Section 5. Successful leave/removal can replay a minimal own-command acknowledgement without fetching campaign data or recreating side effects. Acceptance replay additionally checks consumed-token actor and original membership generation. Cache validators, conflicts, command-status endpoints and download responses cannot bypass these checks. Tests must exercise the existing early-replay paths before any owner-only lookup.
 
 ## 8. Complete HTTP surface

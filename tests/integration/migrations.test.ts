@@ -7,6 +7,7 @@ import { Client } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { runMigrations } from "../../src/platform/migrations.js";
+import { createCampaignPersistenceRepository } from "../../src/campaigns/persistence.js";
 import {
   REFERENCE_TEMPLATES,
   seedReferenceTemplates,
@@ -910,6 +911,89 @@ describeWithDatabase("runMigrations", () => {
         [campaignId, userId, randomUUID(), randomUUID()],
       ),
     ).rejects.toThrow();
+  });
+
+  it("applies the 0017 campaign export roll index and keeps scoped export correct", async () => {
+    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
+    const filenames = (await readdir(productionDirectory)).sort();
+    // 0017 must be a fresh number: no other migration may claim it.
+    expect(filenames.filter((name) => name.startsWith("0017"))).toEqual([
+      "0017_campaign_export_roll_index.sql",
+    ]);
+    await runMigrations(client, productionDirectory);
+    await runMigrations(client, productionDirectory);
+
+    const indexes = await client.query<{ indexdef: string }>(
+      `SELECT indexdef
+         FROM pg_indexes
+        WHERE schemaname = $1
+          AND indexname = 'character_rolls_scope_campaign_page_idx'`,
+      [schema],
+    );
+    expect(indexes.rows.map(({ indexdef }) => indexdef)).toEqual([
+      expect.stringContaining("(scope_campaign_id, id)"),
+    ]);
+
+    // Scoped export stays correct with the index in place: the campaign roll
+    // projects, the other campaign's roll does not.
+    const userId = randomUUID();
+    const systemId = randomUUID();
+    const versionId = randomUUID();
+    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Pre-0017')", [userId]);
+    await client.query(
+      `INSERT INTO systems (id, owner_id, name, access, lifecycle)
+       VALUES ($1, $2, 'Pre-0017 system', 'private', 'active')`,
+      [systemId, userId],
+    );
+    await client.query(
+      `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle)
+       VALUES ($1, $2, '1.0.0', $3, '{}'::jsonb, '', 'published')`,
+      [versionId, systemId, `pre-0017-${randomUUID()}`],
+    );
+    const campaignId = randomUUID();
+    const otherCampaignId = randomUUID();
+    for (const id of [campaignId, otherCampaignId]) {
+      await client.query(
+        `INSERT INTO campaigns (id, owner_id, system_version_id, title) VALUES ($1, $2, $3, 'Export campaign')`,
+        [id, userId, versionId],
+      );
+      await client.query(
+        `INSERT INTO campaign_members (campaign_id, user_id, role, status, generation)
+         VALUES ($1, $2, 'owner', 'active', 1)`,
+        [id, userId],
+      );
+    }
+    const characterId = randomUUID();
+    await client.query(
+      `INSERT INTO characters (id, campaign_id, system_version_id, entity_definition_id, name, state_json)
+       VALUES ($1, $2, $3, 'character', 'Export hero', '{}'::jsonb)`,
+      [characterId, campaignId, versionId],
+    );
+    const requestId = randomUUID();
+    await client.query(
+      `INSERT INTO character_rolls
+         (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json,
+          total, rendered_output, audience, request_id, scope_campaign_id)
+       VALUES ($1, $2, 'check', $3, 'd20', '[]'::jsonb, '{}'::jsonb, 12, 'Result: 12', 'campaign', $4, $5)`,
+      [characterId, userId, randomUUID(), requestId, campaignId],
+    );
+    await client.query(
+      `INSERT INTO character_rolls
+         (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json,
+          total, rendered_output, audience, request_id, scope_campaign_id)
+       VALUES ($1, $2, 'check', $3, 'd20', '[]'::jsonb, '{}'::jsonb, 7, 'Result: 7', 'campaign', $4, $5)`,
+      [characterId, userId, randomUUID(), randomUUID(), otherCampaignId],
+    );
+    const repo = createCampaignPersistenceRepository(client as unknown as import("pg").Pool);
+    const rolls = await repo.loadVisibleRollsForExport(client as unknown as import("pg").Pool, {
+      campaignId,
+      actorId: userId,
+      isGm: true,
+      limit: 10,
+    });
+    expect(rolls.map((roll) => roll.expression)).toEqual(["d20"]);
+    expect(rolls).toHaveLength(1);
+    expect(rolls[0]).toMatchObject({ characterId, actorId: userId, audience: "campaign" });
   });
 
   it("normalizes existing active system versions during the 0009 upgrade", async () => {

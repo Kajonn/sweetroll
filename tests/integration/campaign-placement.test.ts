@@ -503,6 +503,53 @@ describeWithDatabase("campaign character placement and atomic return (Task 4)", 
     expect(outsider).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
   });
 
+  it("enforces a shared operator override for maxAttachedCharacters on the placement path", async () => {
+    const limited = await buildI6Harness({
+      limits: { ...DEFAULT_CAMPAIGN_LIMITS, maxAttachedCharacters: 1 },
+    });
+    try {
+      await limited.pool.query(`UPDATE systems SET access = 'public'`);
+      const created = await limited.campaigns.create(ctxFor(limited.users.gm), {
+        systemVersionId: limited.versionId,
+        title: `Limited ${randomUUID()}`,
+        description: "",
+        idempotencyKey: randomUUID(),
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+      const campaignId = created.value.campaignId;
+      const prepared = await prepareCampaignCharacter(limited.runtime, {
+        systemVersionId: limited.versionId,
+        entityDefinitionId: "character",
+      });
+      expect(prepared.ok).toBe(true);
+      if (!prepared.ok) return;
+      const first = await limited.campaigns.createCampaignCharacter(ctxFor(limited.users.gm), {
+        campaignId,
+        expectedCampaignRevision: 1,
+        idempotencyKey: randomUUID(),
+        name: "First sheet",
+        entityDefinitionId: "character",
+        prepared: prepared.value,
+      });
+      expect(first.ok).toBe(true);
+      if (!first.ok) return;
+      // The tiny operator limit — not the 200 default — rejects the second
+      // sheet through the module-owned placement transaction.
+      const second = await limited.campaigns.createCampaignCharacter(ctxFor(limited.users.gm), {
+        campaignId,
+        expectedCampaignRevision: 2,
+        idempotencyKey: randomUUID(),
+        name: "Second sheet",
+        entityDefinitionId: "character",
+        prepared: prepared.value,
+      });
+      expect(second).toEqual({ ok: false, error: expect.objectContaining({ code: "bad_request" }) });
+    } finally {
+      await limited.close();
+    }
+  });
+
   it("assigns shared controllers, designates claimants and guards the return owner", async () => {
     const campaignId = await createCampaign();
     await seedMember(campaignId, h.users.player.actorId);

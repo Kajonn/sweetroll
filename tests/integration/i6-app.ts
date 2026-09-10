@@ -10,7 +10,7 @@ import {
 } from "../../src/characters/campaignPlacement.js";
 import { buildCampaignsRoutes } from "../../src/transport/http/campaigns.js";
 import type { Characters } from "../../src/characters/index.js";
-import { DEFAULT_CAMPAIGN_LIMITS } from "../../src/platform/config.js";
+import { DEFAULT_CAMPAIGN_LIMITS, type CampaignLimits } from "../../src/platform/config.js";
 import type { RequestContext } from "../../src/systems/authoring.js";
 import type { SystemRuntime } from "../../src/systems/runtime.js";
 import {
@@ -113,6 +113,8 @@ function cookieFromSignIn(response: {
 export async function buildI6Harness(input?: {
   /** Wraps the runtime (e.g. to stall resolution for race tests). */
   wrapRuntime?: (runtime: SystemRuntime) => SystemRuntime;
+  /** Overrides the shared campaign limits (e.g. tiny maxAttachedCharacters). */
+  limits?: CampaignLimits;
 }): Promise<I6Harness> {
   const databaseUrl = process.env.TEST_DATABASE_URL;
   if (databaseUrl === undefined || databaseUrl.length === 0) {
@@ -134,10 +136,15 @@ export async function buildI6Harness(input?: {
     pool,
     wrapRuntime: input?.wrapRuntime,
     extraRoutes: ({ characters, runtime }) => {
-      placement = createCampaignPlacement({ pool, runtime });
+      const limits = input?.limits ?? DEFAULT_CAMPAIGN_LIMITS;
+      placement = createCampaignPlacement({
+        pool,
+        runtime,
+        maxAttachedCharacters: limits.maxAttachedCharacters,
+      });
       campaigns = createCampaignsModule({
         pool,
-        limits: DEFAULT_CAMPAIGN_LIMITS,
+        limits,
         charactersPlacement: placement,
       });
       return buildCampaignsRoutes({ campaigns, characters, runtime });

@@ -496,12 +496,15 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
     ctx: RequestContext,
     options: {
       inputHash: string;
-      receipt: { inputHash: string; resultJson: unknown } | null;
+      receipt: { inputHash: string; resultJson: unknown; expiresAt: Date } | null;
       campaignId: string;
     },
   ): Promise<CampaignResult<ContentView>> {
     if (options.receipt === null) return { ok: false, error: errors.internal() };
     if (options.receipt.inputHash !== options.inputHash) return { ok: false, error: errors.mismatch() };
+    if (options.receipt.expiresAt.getTime() <= now().getTime()) {
+      return { ok: false, error: errors.result_unavailable() };
+    }
     const stored = options.receipt.resultJson as { contentId?: string; value?: unknown };
     if (typeof stored.contentId !== "string") return { ok: false, error: errors.internal() };
     const denial = await reauthorizeContent(ctx, stored.contentId, options.campaignId, false);
@@ -642,7 +645,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           idempotencyKey: createInput.idempotencyKey,
         };
 
-        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
         if (preExisting !== null) {
           return await resolveReplay(ctx, {
             inputHash,
@@ -660,7 +663,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
             campaign === null
               ? null
               : await repo.loadMembership(client, createInput.campaignId, ctx.actorId);
-          const raced = await repo.loadReceipt(client, receiptKey);
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
           if (raced !== null) {
             return { committed: false as const, receipt: raced };
           }
@@ -752,7 +755,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           return { committed: true as const, value };
         }).catch(async (error) => {
           if (error instanceof ReceiptRace) {
-            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
             return { committed: false as const, receipt };
           }
           throw error;
@@ -894,7 +897,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           idempotencyKey: updateInput.idempotencyKey,
         };
 
-        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
         if (preExisting !== null) {
           const stored = preExisting.resultJson as { campaignId?: string };
           return await resolveReplay(ctx, {
@@ -921,7 +924,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           }
           const membership =
             campaign === null ? null : await repo.loadMembership(client, locked.campaignId, ctx.actorId);
-          const raced = await repo.loadReceipt(client, receiptKey);
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
           if (raced !== null) {
             return { committed: false as const, receipt: raced };
           }
@@ -1009,7 +1012,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           return { committed: true as const, value };
         }).catch(async (error) => {
           if (error instanceof ReceiptRace) {
-            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
             return { committed: false as const, receipt };
           }
           throw error;
@@ -1045,7 +1048,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           idempotencyKey: deleteInput.idempotencyKey,
         };
 
-        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
         if (preExisting !== null) {
           const stored = preExisting.resultJson as { campaignId?: string };
           return await resolveReplay(ctx, {
@@ -1068,7 +1071,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           }
           const membership =
             campaign === null ? null : await repo.loadMembership(client, locked.campaignId, ctx.actorId);
-          const raced = await repo.loadReceipt(client, receiptKey);
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
           if (raced !== null) {
             return { committed: false as const, receipt: raced };
           }
@@ -1145,7 +1148,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           return { committed: true as const, value };
         }).catch(async (error) => {
           if (error instanceof ReceiptRace) {
-            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
             return { committed: false as const, receipt };
           }
           throw error;
@@ -1194,7 +1197,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           idempotencyKey: recoverInput.idempotencyKey,
         };
 
-        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
         if (preExisting !== null) {
           const stored = preExisting.resultJson as { campaignId?: string };
           return await resolveReplay(ctx, {
@@ -1217,7 +1220,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           }
           const membership =
             campaign === null ? null : await repo.loadMembership(client, locked.campaignId, ctx.actorId);
-          const raced = await repo.loadReceipt(client, receiptKey);
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
           if (raced !== null) {
             return { committed: false as const, receipt: raced };
           }
@@ -1301,7 +1304,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           return { committed: true as const, value };
         }).catch(async (error) => {
           if (error instanceof ReceiptRace) {
-            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
             return { committed: false as const, receipt };
           }
           throw error;
@@ -1341,7 +1344,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           idempotencyKey: grantsInput.idempotencyKey,
         };
 
-        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
         if (preExisting !== null) {
           const stored = preExisting.resultJson as { campaignId?: string };
           return await resolveReplay(ctx, {
@@ -1364,7 +1367,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           }
           const membership =
             campaign === null ? null : await repo.loadMembership(client, locked.campaignId, ctx.actorId);
-          const raced = await repo.loadReceipt(client, receiptKey);
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
           if (raced !== null) {
             return { committed: false as const, receipt: raced };
           }
@@ -1448,7 +1451,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           return { committed: true as const, value };
         }).catch(async (error) => {
           if (error instanceof ReceiptRace) {
-            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
             return { committed: false as const, receipt };
           }
           throw error;

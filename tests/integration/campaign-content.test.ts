@@ -765,6 +765,36 @@ describeWithDatabase("campaign content, grants and source-scoped history (Task 7
     if (updateReplay.ok) expect(updateReplay.value.revision).toBe(updated.value.revision);
   });
 
+  it("expires content receipts into result_unavailable without stale replay or re-execution", async () => {
+    const campaignId = await createCampaign();
+    const key = randomUUID();
+    const first = await createNote(campaignId, "gm", { key, title: "ttl note" });
+
+    await h.pool.query(
+      `UPDATE campaign_command_executions SET expires_at = now() - interval '1 second'
+        WHERE actor_id = $1 AND command_kind = 'content_create' AND idempotency_key = $2`,
+      [h.users.gm.actorId, key],
+    );
+    const replayed = await h.campaigns.createContent(ctxFor(h.users.gm), {
+      campaignId,
+      title: "ttl note",
+      body: "plain text body",
+      idempotencyKey: key,
+    });
+    // Same input hash, but the receipt lapsed: no stale content replay.
+    expect(replayed.ok).toBe(false);
+    if (replayed.ok) return;
+    expect(replayed.error.code).toBe("result_unavailable");
+    // The lapsed replay executes nothing further: still exactly the one
+    // committed note, at its original revision.
+    const rows = await h.pool.query(
+      `SELECT COUNT(*)::int AS count FROM campaign_content_items WHERE campaign_id = $1`,
+      [campaignId],
+    );
+    expect(rows.rows[0].count).toBe(1);
+    expect(first.revision).toBe(1);
+  });
+
   it("blocks content writes in archived campaigns but allows reads", async () => {
     const campaignId = await createCampaign();
     await seedMember(campaignId, h.users.player.actorId);

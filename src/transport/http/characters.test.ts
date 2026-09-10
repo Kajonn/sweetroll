@@ -585,6 +585,50 @@ describe("character HTTP routes", () => {
     });
   });
 
+  it("forwards the requested roll audience and serves campaign audiences", async () => {
+    let received: unknown;
+    const app = await build(
+      makeCharacters({
+        apply: async (_ctx, input) => {
+          received = input;
+          return { ok: true, value: commandResult({
+            actionId: "check", expression: "d20", dice: [], bindings: [], total: 12, output: "12", audience: "campaign",
+          } as CharacterCommandResult["roll"]) };
+        },
+      }),
+    );
+    const id = randomUUID();
+    const response = await app.inject({
+      method: "POST",
+      url: `/characters/${id}/actions/check`,
+      headers: cookie,
+      payload: { inputs: {}, audience: "campaign", expectedRevision: 1, idempotencyKey: "key-2" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().result.roll).toMatchObject({ audience: "campaign" });
+    expect(received).toEqual({
+      kind: "executeAction",
+      characterId: id,
+      actionId: "check",
+      inputs: {},
+      audience: "campaign",
+      expectedRevision: 1,
+      idempotencyKey: "key-2",
+    });
+  });
+
+  it("rejects unknown roll audiences at the wire boundary", async () => {
+    const app = await build(makeCharacters({}));
+    const response = await app.inject({
+      method: "POST",
+      url: `/characters/${randomUUID()}/actions/check`,
+      headers: cookie,
+      payload: { inputs: {}, audience: "everyone", expectedRevision: 1, idempotencyKey: "key-3" },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe("bad_request");
+  });
+
   it("maps PATCH /characters/:characterId to manage for rename/archive/recover", async () => {
     const seen: unknown[] = [];
     const app = await build(

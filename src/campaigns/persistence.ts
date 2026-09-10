@@ -56,7 +56,8 @@ export type ActivityEventKind =
   | "content_updated"
   | "content_deleted"
   | "content_recovered"
-  | "content_grants_replaced";
+  | "content_grants_replaced"
+  | "roll_executed";
 
 export type ActivityEventRecord = {
   eventId: string;
@@ -64,7 +65,29 @@ export type ActivityEventRecord = {
   actorId: string;
   kind: ActivityEventKind;
   sourceContentId: string | null;
+  /** Roll source for `roll_executed` events; NULL for content events. */
+  sourceRollId: string | null;
   requestId: string;
+  occurredAt: Date;
+};
+
+/**
+ * I6 Task 8: one visible campaign roll for the export projection. Full
+ * details (dice, bindings, output) are included only when the exporter may
+ * read the roll under the same source policy as activity; private rolls of
+ * other members never enter the projection.
+ */
+export type RollExportRecord = {
+  rollId: string;
+  characterId: string;
+  actorId: string;
+  actionId: string;
+  audience: "owner_only" | "gm_only" | "campaign";
+  expression: string;
+  dice: unknown;
+  bindings: unknown;
+  total: number;
+  output: string;
   occurredAt: Date;
 };
 
@@ -161,7 +184,22 @@ type ActivityEventRow = {
   actor_id: string;
   kind: string;
   source_content_id: string | null;
+  source_roll_id: string | null;
   request_id: string;
+  occurred_at: Date;
+};
+
+type RollExportRow = {
+  id: string;
+  character_id: string;
+  actor_id: string;
+  action_id: string;
+  audience: string;
+  expression: string;
+  dice_json: unknown;
+  bindings_json: unknown;
+  total: number;
+  rendered_output: string;
   occurred_at: Date;
 };
 
@@ -215,7 +253,7 @@ const CAMPAIGN_COLUMNS =
 const MEMBERSHIP_COLUMNS = "campaign_id, user_id, role, status, generation, created_at, updated_at";
 const CONTENT_COLUMNS =
   "id, campaign_id, creator_id, audience, title, body, tags, revision, access_revision, status, deleted_at, created_at, updated_at";
-const ACTIVITY_COLUMNS = "id, campaign_id, actor_id, kind, source_content_id, request_id, occurred_at";
+const ACTIVITY_COLUMNS = "id, campaign_id, actor_id, kind, source_content_id, source_roll_id, request_id, occurred_at";
 
 function toContentRecord(row: ContentRow): ContentRecord {
   if (
@@ -253,6 +291,7 @@ function toActivityEventRecord(row: ActivityEventRow): ActivityEventRecord {
     case "content_deleted":
     case "content_recovered":
     case "content_grants_replaced":
+    case "roll_executed":
       break;
     default:
       throw new Error(`Unknown activity kind: ${row.kind}`);
@@ -263,7 +302,27 @@ function toActivityEventRecord(row: ActivityEventRow): ActivityEventRecord {
     actorId: row.actor_id,
     kind: row.kind,
     sourceContentId: row.source_content_id,
+    sourceRollId: row.source_roll_id,
     requestId: row.request_id,
+    occurredAt: row.occurred_at,
+  };
+}
+
+function toRollExportRecord(row: RollExportRow): RollExportRecord {
+  if (row.audience !== "owner_only" && row.audience !== "gm_only" && row.audience !== "campaign") {
+    throw new Error(`Unknown roll audience: ${row.audience}`);
+  }
+  return {
+    rollId: row.id,
+    characterId: row.character_id,
+    actorId: row.actor_id,
+    actionId: row.action_id,
+    audience: row.audience,
+    expression: row.expression,
+    dice: row.dice_json,
+    bindings: row.bindings_json,
+    total: row.total,
+    output: row.rendered_output,
     occurredAt: row.occurred_at,
   };
 }
@@ -281,6 +340,19 @@ const CONTENT_VISIBILITY_PREDICATE = `(
      WHERE g.content_id = c.id AND g.user_id = $1
   ))
   OR (c.audience = 'owner_only' AND c.creator_id = $1)
+)`;
+
+/**
+ * I6 Task 8: current-state roll visibility predicate for the aliased roll
+ * table `r`, mirroring `canReadRoll` in policy.ts. $1 is the actor ID, $2
+ * the GM flag. Private rolls belong to the rolling actor only (no GM
+ * override); `gm_only` admits the roller plus current GMs; `campaign`
+ * admits every active member (callers already require active membership).
+ */
+const ROLL_VISIBILITY_PREDICATE = `(
+  r.audience = 'campaign'
+  OR (r.audience = 'gm_only' AND ($2::boolean OR r.actor_id = $1))
+  OR (r.audience = 'owner_only' AND r.actor_id = $1)
 )`;
 const INVITATION_COLUMNS =
   "id, campaign_id, issued_by, intended_role, token_hash, status, revision, consuming_actor_id, accepted_membership_generation, expires_at, created_at, updated_at";
@@ -1016,14 +1088,16 @@ export function createCampaignPersistenceRepository(pool: Pool) {
         actorId: string;
         kind: ActivityEventKind;
         sourceContentId: string | null;
+        /** Roll source for `roll_executed` events; NULL otherwise. */
+        sourceRollId?: string | null;
         requestId: string;
         occurredAt: Date;
       },
     ): Promise<ActivityEventRecord> {
       const result = await client.query<ActivityEventRow>(
         `INSERT INTO campaign_activity_events
-            (id, campaign_id, actor_id, kind, source_content_id, request_id, occurred_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz)
+            (id, campaign_id, actor_id, kind, source_content_id, source_roll_id, request_id, occurred_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz)
           RETURNING ${ACTIVITY_COLUMNS}`,
         [
           input.eventId,
@@ -1031,6 +1105,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
           input.actorId,
           input.kind,
           input.sourceContentId,
+          input.sourceRollId ?? null,
           input.requestId,
           input.occurredAt.toISOString(),
         ],
@@ -1043,8 +1118,9 @@ export function createCampaignPersistenceRepository(pool: Pool) {
     /**
      * Source-policy-filtered activity page: events whose current source
      * state the caller can no longer read (grant removed, note deleted or
-     * narrowed) are excluded in SQL before pagination. Request IDs only
-     * correlate events; several rows may share one.
+     * narrowed, or a roll outside the reader's audience) are excluded in SQL
+     * before pagination. Request IDs only correlate events; several rows may
+     * share one.
      */
     async listActivityPage(
       client: DbClient,
@@ -1068,8 +1144,10 @@ export function createCampaignPersistenceRepository(pool: Pool) {
         `SELECT ${ACTIVITY_COLUMNS.split(", ").map((column) => `e.${column}`).join(", ")}
            FROM campaign_activity_events e
            LEFT JOIN campaign_content_items c ON c.id = e.source_content_id
+           LEFT JOIN character_rolls r ON r.id = e.source_roll_id
           WHERE e.campaign_id = $3
             AND (c.id IS NULL OR (c.status = 'active' AND ${CONTENT_VISIBILITY_PREDICATE}))
+            AND (r.id IS NULL OR ${ROLL_VISIBILITY_PREDICATE})
             ${cursorClause}
           ORDER BY e.occurred_at DESC, e.id DESC
           LIMIT $${params.length}`,
@@ -1117,13 +1195,39 @@ export function createCampaignPersistenceRepository(pool: Pool) {
         `SELECT ${ACTIVITY_COLUMNS.split(", ").map((column) => `e.${column}`).join(", ")}
            FROM campaign_activity_events e
            LEFT JOIN campaign_content_items c ON c.id = e.source_content_id
+           LEFT JOIN character_rolls r ON r.id = e.source_roll_id
           WHERE e.campaign_id = $3
             AND (c.id IS NULL OR (c.status = 'active' AND ${CONTENT_VISIBILITY_PREDICATE}))
+            AND (r.id IS NULL OR ${ROLL_VISIBILITY_PREDICATE})
           ORDER BY e.occurred_at, e.id
           LIMIT $4`,
         [input.actorId, input.isGm, input.campaignId, input.limit],
       );
       return result.rows.map(toActivityEventRecord);
+    },
+
+    /**
+     * I6 Task 8: visible campaign rolls for the export projection in
+     * deterministic ID order, using the same source policy as activity
+     * (no unrestricted export query). Rolls are pinned to their ORIGINAL
+     * campaign scope, so a returned character never breaks authorization of
+     * its historical rolls. Bounded: pass exportMaxRecords + 1 and treat
+     * overflow as too large.
+     */
+    async loadVisibleRollsForExport(
+      client: DbClient,
+      input: { campaignId: string; actorId: string; isGm: boolean; limit: number },
+    ): Promise<RollExportRecord[]> {
+      const result = await client.query<RollExportRow>(
+        `SELECT r.id, r.character_id, r.actor_id, r.action_id, r.audience,
+                r.expression, r.dice_json, r.bindings_json, r.total, r.rendered_output, r.occurred_at
+           FROM character_rolls r
+          WHERE r.scope_campaign_id = $3 AND ${ROLL_VISIBILITY_PREDICATE}
+          ORDER BY r.id
+          LIMIT $4`,
+        [input.actorId, input.isGm, input.campaignId, input.limit],
+      );
+      return result.rows.map(toRollExportRecord);
     },
 
     async loadGrantsForContents(

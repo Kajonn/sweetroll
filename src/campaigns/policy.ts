@@ -148,3 +148,34 @@ export function canAdministerContentSharing(input: {
 export function canExportCampaign(membership: MembershipRecord | null): boolean {
   return isGameMaster(membership);
 }
+
+export type RollAudience = "owner_only" | "gm_only" | "campaign";
+
+export type RollRecordLike = {
+  campaignId: string;
+  actorId: string;
+  audience: RollAudience;
+};
+
+/**
+ * Task 8 roll visibility, evaluated against CURRENT membership on every
+ * read (activity, export). `owner_only` means the rolling actor only,
+ * subject to active campaign membership: it does not mean every controller,
+ * and full-sheet GM visibility never overrides a private roll. `gm_only`
+ * means the rolling actor plus current owner/co-GMs. `campaign` means all
+ * active members. Removed members and outsiders see no rolls.
+ */
+export function canReadRoll(input: {
+  roll: RollRecordLike;
+  membership: MembershipRecord | null;
+}): boolean {
+  if (!isActiveMember(input.membership)) return false;
+  switch (input.roll.audience) {
+    case "campaign":
+      return true;
+    case "gm_only":
+      return isGameMaster(input.membership) || input.membership.userId === input.roll.actorId;
+    case "owner_only":
+      return input.membership.userId === input.roll.actorId;
+  }
+}

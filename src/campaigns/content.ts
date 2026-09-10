@@ -116,6 +116,8 @@ export type ActivityEventView = {
   kind: ActivityEventKind;
   actorId: string;
   sourceContentId: string | null;
+  /** Roll source for `roll_executed` events; NULL for content events. */
+  sourceRollId: string | null;
   requestId: string;
   occurredAt: Date;
 };
@@ -158,7 +160,27 @@ export type CampaignExportSnapshot = {
     kind: ActivityEventKind;
     actorId: string;
     sourceContentId: string | null;
+    sourceRollId: string | null;
     requestId: string;
+    occurredAt: string;
+  }[];
+  /**
+   * I6 Task 8: campaign rolls visible to the exporter under the same source
+   * policy as activity. Other members' actor-private rolls are omitted
+   * entirely (no row, no referencing activity); permitted campaign/gm_only
+   * rolls carry their full details.
+   */
+  rolls: {
+    rollId: string;
+    characterId: string;
+    actorId: string;
+    actionId: string;
+    audience: "owner_only" | "gm_only" | "campaign";
+    expression: string;
+    dice: unknown;
+    bindings: unknown;
+    total: number;
+    output: string;
     occurredAt: string;
   }[];
 };
@@ -459,6 +481,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
       kind: record.kind,
       actorId: record.actorId,
       sourceContentId: record.sourceContentId,
+      sourceRollId: record.sourceRollId,
       requestId: record.requestId,
       occurredAt: record.occurredAt,
     };
@@ -1550,19 +1573,29 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
             isGm: gm,
             limit: bound,
           });
+          // I6 Task 8: campaign rolls under the same source policy as
+          // activity (never an unrestricted roll query); private rolls of
+          // other members stay out of the projection entirely.
+          const rolls = await repo.loadVisibleRollsForExport(client, {
+            campaignId: campaign.campaignId,
+            actorId: ctx.actorId,
+            isGm: gm,
+            limit: bound,
+          });
           const grants = await repo.loadGrantsForContents(
             client,
             content.map((record) => record.contentId),
           );
-          return { authorized: true as const, campaign, members, content, activity, grants };
+          return { authorized: true as const, campaign, members, content, activity, rolls, grants };
         });
         if (!snapshot.authorized) return { ok: false, error: errors.campaign_not_found() };
 
         const recordCount =
-          1 + snapshot.members.length + snapshot.content.length + snapshot.activity.length;
+          1 + snapshot.members.length + snapshot.content.length + snapshot.activity.length + snapshot.rolls.length;
         if (
           snapshot.content.length > limits.exportMaxRecords ||
           snapshot.activity.length > limits.exportMaxRecords ||
+          snapshot.rolls.length > limits.exportMaxRecords ||
           recordCount > limits.exportMaxRecords
         ) {
           return {
@@ -1576,7 +1609,9 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
         // Deterministic projection: fixed key order, ID/occurred-at ordering
         // from the queries, ISO timestamps, no random IDs, no wall-clock
         // stamps, no receipts, no token hashes, no credentials, no character
-        // payloads (Task 8 extends this projection to campaign rolls).
+        // sheet payloads. Campaign rolls visible under the exporter's source
+        // policy carry their details; other members' private rolls are
+        // omitted with their referencing activity.
         // Canonicalized so the bytes survive the jsonb receipt round-trip
         // unchanged: same key plus same input always replays byte-identical.
         const value = canonicalizeJson({
@@ -1618,8 +1653,22 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
             kind: event.kind,
             actorId: event.actorId,
             sourceContentId: event.sourceContentId,
+            sourceRollId: event.sourceRollId,
             requestId: event.requestId,
             occurredAt: event.occurredAt.toISOString(),
+          })),
+          rolls: snapshot.rolls.map((roll) => ({
+            rollId: roll.rollId,
+            characterId: roll.characterId,
+            actorId: roll.actorId,
+            actionId: roll.actionId,
+            audience: roll.audience,
+            expression: roll.expression,
+            dice: roll.dice,
+            bindings: roll.bindings,
+            total: roll.total,
+            output: roll.output,
+            occurredAt: roll.occurredAt.toISOString(),
           })),
         }) as CampaignExportSnapshot;
         const payloadBytes = Buffer.byteLength(JSON.stringify(value), "utf8");

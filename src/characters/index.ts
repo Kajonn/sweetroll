@@ -23,6 +23,7 @@ import {
   type CharacterPersistenceRepository,
   type CharacterRecord,
   type ManagementMutation,
+  type RollAudience,
   type StoredResultScope,
 } from "./persistence.js";
 import { isActiveMember, isGameMaster, type MembershipRecord } from "../campaigns/policy.js";
@@ -31,6 +32,7 @@ import { buildAttachedCharacterExportDocument, buildCharacterExportDocument } fr
 import { buildCandidateValues, collectEditableFields, denyAttachedMigrationScope } from "./migration.js";
 
 export type { RequestContext } from "../systems/authoring.js";
+export type { RollAudience } from "./persistence.js";
 
 export type CharacterId = string;
 export type UserId = string;
@@ -245,6 +247,16 @@ export type CharacterActionCommand = {
   inputs: Record<DefinitionId, unknown>;
   expectedRevision: number;
   idempotencyKey: string;
+  /**
+   * I6 Task 8: requested roll audience. Standalone actions accept only
+   * `owner_only`/omitted. Attached actions accept the full vocabulary; when
+   * omitted the campaign default applies. The requested value (or its
+   * omission) is part of the idempotency input hash: a changed explicit
+   * audience on the same key mismatches instead of widening the stored roll.
+   * The effective audience is fixed at first claim and recorded in the
+   * receipt scope; same-key replays reuse it even if the default changes.
+   */
+  audience?: RollAudience;
 };
 
 export type CharacterCommand =
@@ -1226,6 +1238,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (!Number.isInteger(command.expectedRevision) || command.expectedRevision < 1) {
           return { ok: false, error: errors.bad_request("expectedRevision must be a positive integer.") };
         }
+        // I6 Task 8: unknown audiences fail validation before claim and
+        // never fall back to a wider audience.
+        if (command.kind === "executeAction" && command.audience !== undefined && !isRollAudience(command.audience)) {
+          return { ok: false, error: errors.bad_request("audience must be owner_only, gm_only or campaign.") };
+        }
 
         const commandKind = COMMAND_KIND[command.kind];
         const payload =
@@ -1234,11 +1251,16 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             : command.kind === "bumpResource"
               ? { resourceId: command.resourceId, direction: command.direction }
               : { actionId: command.actionId, inputs: command.inputs };
+        // I6 Task 8: the requested audience (or its omission) is part of the
+        // input hash. The effective default is NOT hashed: an omitted
+        // audience replays from the recorded receipt even after the campaign
+        // default changes, while a changed explicit audience mismatches.
         const inputHash = hashInput({
           commandKind,
           characterId: command.characterId,
           expectedRevision: command.expectedRevision,
           ...payload,
+          ...(command.kind === "executeAction" ? { audience: command.audience ?? null } : {}),
         });
 
         const claimStartedAt = now();
@@ -1327,6 +1349,22 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           return { ok: false, error };
         }
 
+        // I6 Task 8: standalone actions accept only `owner_only` and retain
+        // existing behavior. Attached sheets accept the full vocabulary
+        // (resolved to the effective audience inside the transaction).
+        if (attachedCampaignId === null && command.kind === "executeAction") {
+          const requested = command.audience ?? null;
+          if (requested !== null && requested !== "owner_only") {
+            const error = errors.bad_request("Standalone actions accept only the owner_only audience.");
+            await repo.finalizeExecutionError({
+              executionId,
+              resultJson: serializeCommandError(error),
+              expiresAt: replayExpiresAt,
+            });
+            return { ok: false, error };
+          }
+        }
+
         const intent =
           command.kind === "setField"
             ? ({ kind: "set", fieldId: command.fieldId, value: command.value } as const)
@@ -1382,7 +1420,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           },
           resultExpiresAt: replayExpiresAt,
           ...(attachedCampaignId === null ? {} : { campaign: { campaignId: attachedCampaignId } }),
-          buildResult: ({ record, controllers, scope }) => {
+          ...(command.kind === "executeAction" ? { rollAudience: { requested: command.audience ?? null } } : {}),
+          buildResult: ({ record, controllers, scope, rollAudience }) => {
             const view = toView(
               record,
               {
@@ -1399,7 +1438,14 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
                 replayed: false,
               },
             );
-            return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)), roll } };
+            // I6 Task 8: compose the authorized audience onto the normalized
+            // runtime output. The Runtime stamp (`owner_only`) is never
+            // authoritative for attached rolls; the transaction-fixed
+            // effective audience is. The Runtime itself never queries
+            // membership.
+            const composedRoll =
+              roll === null ? null : { ...roll, audience: rollAudience ?? ("owner_only" as const) };
+            return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)), roll: composedRoll } };
           },
         });
 
@@ -2330,6 +2376,12 @@ function decodeActivityCursor(cursor: string | null): { occurredAtText: string; 
   } catch {
     return null;
   }
+}
+
+// I6 Task 8: shared roll-audience vocabulary guard. Unknown values fail
+// validation and never fall back to a wider audience.
+function isRollAudience(value: unknown): value is RollAudience {
+  return value === "owner_only" || value === "gm_only" || value === "campaign";
 }
 
 // Activity pagination must never expose raw state values (or other stored input like action

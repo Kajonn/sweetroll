@@ -1,7 +1,22 @@
 import type { Pool, PoolClient } from "pg";
 
 import { hashInput } from "../systems/implementation/authoring/assess.js";
-import type { DefinitionId, NormalizedRoll, RuntimeStateV1, VersionId } from "../systems/runtime.js";
+import type {
+  DefinitionId,
+  NormalizedRoll,
+  NormalizedRollAudience,
+  RuntimeStateV1,
+  VersionId,
+} from "../systems/runtime.js";
+
+/**
+ * I6 Task 8: one shared wire/storage vocabulary for roll audiences
+ * (`owner_only` | `gm_only` | `campaign`). Standalone rolls are always
+ * `owner_only`; attached rolls carry the effective audience fixed at first
+ * claim. The Runtime never decides this; Characters composes it after
+ * resolution.
+ */
+export type RollAudience = NormalizedRollAudience;
 
 export type CharacterId = string;
 export type UserId = string;
@@ -86,11 +101,20 @@ export type CharacterPageCursor = {
  * campaign, the character placement generation and the actor's membership
  * generation at commit time. Replays reauthorize against CURRENT scope and
  * never trust the stored bytes alone.
+ *
+ * I6 Task 8: attached roll commits additionally fix the effective audience
+ * (explicit per-roll audience, else the campaign default read under the
+ * campaign lock) in `audience`. Same-key replays reuse this recorded value
+ * even when the campaign default later changes; a changed explicit audience
+ * hashes differently and mismatches instead of widening the stored roll.
+ * NULL for non-roll commands and standalone commits (standalone is always
+ * `owner_only`).
  */
 export type StoredResultScope = {
   campaignId: string;
   placementGeneration: number;
   membershipGeneration: number;
+  audience: RollAudience | null;
 } | null;
 
 export type TxBuildArgs = {
@@ -98,6 +122,13 @@ export type TxBuildArgs = {
   /** Active controllers at commit; empty for standalone records. */
   controllers: UserId[];
   scope: StoredResultScope;
+  /**
+   * I6 Task 8: effective roll audience for this commit (NULL when the
+   * command produced no roll). The receipt's roll is composed with this
+   * value; the Runtime's own `owner_only` stamp is never authoritative for
+   * attached rolls.
+   */
+  rollAudience?: RollAudience | null;
 };
 
 export type ApplyCommandInput = {
@@ -121,8 +152,20 @@ export type ApplyCommandInput = {
    * controller capability in-transaction, stores the placement scope on
    * activity and receipt, and never bumps the campaign revision for
    * ordinary sheet edits.
+   *
+   * I6 Task 8: also resolves the effective roll audience in-transaction
+   * (explicit request, else the locked campaign default) and commits the
+   * roll, the campaign activity reference and the receipt atomically. The
+   * Runtime calculation already ran outside the campaign lock.
    */
   campaign?: { campaignId: string };
+  /**
+   * I6 Task 8: requested roll audience (`null` when the command omitted it
+   * and the locked campaign default applies). Validated before claim;
+   * unknown values never reach the transaction. Standalone commits accept
+   * only `owner_only`/omitted and retain existing behavior.
+   */
+  rollAudience?: { requested: RollAudience | null };
 };
 
 export type ApplyCommandOutcome =
@@ -328,7 +371,7 @@ export type CampaignMembershipSnapshot = {
  */
 export type AttachedAuthorization = {
   record: CharacterRecord;
-  campaign: { id: string; status: string } | null;
+  campaign: { id: string; status: string; rollAudienceDefault: RollAudience } | null;
   membership: CampaignMembershipSnapshot | null;
   controllers: UserId[];
 };
@@ -542,12 +585,20 @@ async function applyCommandCampaignTx(
     updatedRow = requireRow(updated.rows[0], "applyCommandCampaignTx.update");
   }
 
+  // I6 Task 8: the effective audience is fixed here, under the campaign
+  // lock, at first claim: an explicit permitted audience wins, otherwise the
+  // current campaign default applies. Same-key replays never reach this
+  // path (early replay / already_completed), so later default changes
+  // cannot move the recorded audience or dice.
+  const requested = input.rollAudience?.requested ?? null;
+  const effectiveAudience: RollAudience = requested ?? campaign.rollAudienceDefault;
+
   let rollId: string | null = null;
   if (input.roll !== null) {
     const insertedRoll = await client.query<{ id: string }>(
       `INSERT INTO character_rolls
-         (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11)
+         (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id, scope_campaign_id)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12)
        RETURNING id`,
       [
         updatedRow.id,
@@ -559,8 +610,9 @@ async function applyCommandCampaignTx(
         JSON.stringify(input.roll.bindings),
         input.roll.total,
         input.roll.output,
-        input.roll.audience,
+        effectiveAudience,
         input.activity.requestId,
+        campaignId,
       ],
     );
     rollId = requireRow(insertedRoll.rows[0], "applyCommandCampaignTx.roll").id;
@@ -580,13 +632,26 @@ async function applyCommandCampaignTx(
     ],
   );
 
+  // I6 Task 8: the campaign activity reference commits in the same
+  // transaction: one minimal `roll_executed` event per campaign roll carrying
+  // the roll source only (never bindings, inputs or sheet state). A denied
+  // permission or failed roll insert rolls everything back: no partial event.
+  if (rollId !== null) {
+    await client.query(
+      `INSERT INTO campaign_activity_events (campaign_id, actor_id, kind, source_content_id, source_roll_id, request_id)
+       VALUES ($1, $2, 'roll_executed', NULL, $3, $4)`,
+      [campaignId, input.actorId, rollId, input.activity.requestId],
+    );
+  }
+
   const record = toCharacterRecord(updatedRow);
   const scope: StoredResultScope = {
     campaignId,
     placementGeneration: updatedRow.placement_generation,
     membershipGeneration: membership.generation,
+    audience: rollId === null ? null : effectiveAudience,
   };
-  const resultJson = input.buildResult({ record, controllers, scope });
+  const resultJson = input.buildResult({ record, controllers, scope, rollAudience: rollId === null ? null : effectiveAudience });
   await client.query(
     `UPDATE character_command_executions
         SET status = 'completed', result_json = $1::jsonb, expires_at = $2
@@ -691,6 +756,8 @@ async function applyManagementCampaignTx(
     campaignId,
     placementGeneration: updatedRow.placement_generation,
     membershipGeneration: membership.generation,
+    // I6 Task 8: management commands produce no roll.
+    audience: null,
   };
   const resultJson = input.buildResult({ record, controllers, scope });
   await client.query(
@@ -904,13 +971,17 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         let membership: AttachedAuthorization["membership"] = null;
         let controllers: UserId[] = [];
         if (record.campaignId !== null) {
-          const campaignResult = await client.query<{ id: string; status: string }>(
-            `SELECT id, status FROM campaigns WHERE id = $1`,
+          const campaignResult = await client.query<{ id: string; status: string; roll_audience_default: string }>(
+            `SELECT id, status, roll_audience_default FROM campaigns WHERE id = $1`,
             [record.campaignId],
           );
           const campaignRow = campaignResult.rows[0];
           if (campaignRow !== undefined) {
-            campaign = { id: campaignRow.id, status: campaignRow.status };
+            campaign = {
+              id: campaignRow.id,
+              status: campaignRow.status,
+              rollAudienceDefault: parseRollAudienceDefault(campaignRow.roll_audience_default),
+            };
           }
           const membershipResult = await client.query<{
             role: string;
@@ -991,6 +1062,15 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           return await applyCommandCampaignTx(client, input, input.campaign.campaignId);
         }
 
+        // I6 Task 8: standalone commits accept only `owner_only`/omitted and
+        // retain existing behavior. The module validates before claim; this
+        // second layer holds even if that check ever widens.
+        const standaloneRequested = input.rollAudience?.requested ?? null;
+        if (standaloneRequested !== null && standaloneRequested !== "owner_only") {
+          await client.query("ROLLBACK");
+          return { kind: "not_found" };
+        }
+
         const charResult = await client.query<CharacterRow>(
           `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
              FROM characters WHERE id = $1 FOR UPDATE`,
@@ -1061,7 +1141,14 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         );
 
         const record = toCharacterRecord(updatedRow);
-        const resultJson = input.buildResult({ record, controllers: [], scope: null });
+        // I6 Task 8: standalone rolls are always `owner_only`; the composed
+        // receipt roll carries it explicitly.
+        const resultJson = input.buildResult({
+          record,
+          controllers: [],
+          scope: null,
+          rollAudience: input.roll === null ? null : "owner_only",
+        });
         await client.query(
           `UPDATE character_command_executions
               SET status = 'completed', result_json = $1::jsonb, expires_at = $2
@@ -1720,12 +1807,20 @@ function requireRow<T>(row: T | undefined, where: string): T {
 async function lockCampaignForWrite(
   client: PoolClient,
   campaignId: string,
-): Promise<{ id: string; status: string } | null> {
-  const result = await client.query<{ id: string; status: string }>(
-    `SELECT id, status FROM campaigns WHERE id = $1 FOR UPDATE`,
+): Promise<{ id: string; status: string; rollAudienceDefault: RollAudience } | null> {
+  const result = await client.query<{ id: string; status: string; roll_audience_default: string }>(
+    `SELECT id, status, roll_audience_default FROM campaigns WHERE id = $1 FOR UPDATE`,
     [campaignId],
   );
-  return result.rows[0] ?? null;
+  const row = result.rows[0] ?? null;
+  if (row === null) return null;
+  return { id: row.id, status: row.status, rollAudienceDefault: parseRollAudienceDefault(row.roll_audience_default) };
+}
+
+/** I6 Task 8: storage CHECK guarantees the vocabulary; fail closed here. */
+function parseRollAudienceDefault(value: string): RollAudience {
+  if (value === "owner_only" || value === "gm_only" || value === "campaign") return value;
+  throw new Error(`Unknown roll audience default: ${value}`);
 }
 
 async function loadTxMembership(

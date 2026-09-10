@@ -232,6 +232,11 @@ const RollBindingDto = Type.Object({
   definitionId: Type.String(),
   value: RuntimeScalarDto,
 });
+const RollAudienceDto = Type.Union([
+  Type.Literal("owner_only"),
+  Type.Literal("gm_only"),
+  Type.Literal("campaign"),
+]);
 const RollDto = Type.Object({
   actionId: Type.String(),
   expression: Type.String(),
@@ -239,7 +244,7 @@ const RollDto = Type.Object({
   bindings: Type.Array(RollBindingDto),
   total: Type.Number(),
   output: Type.String(),
-  audience: Type.Literal("owner_only"),
+  audience: RollAudienceDto,
 });
 
 const CharacterCommandResultDto = Type.Object({
@@ -386,6 +391,10 @@ const BumpResourceBody = Type.Object({
 });
 const ExecuteActionBody = Type.Object({
   inputs: Type.Optional(Type.Object({}, { additionalProperties: true })),
+  // I6 Task 8: optional requested roll audience. Unknown values fail schema
+  // validation (400) and never fall back to a wider audience. Standalone
+  // sheets still accept only `owner_only`.
+  audience: Type.Optional(RollAudienceDto),
   expectedRevision: Type.Integer(),
   idempotencyKey: Type.String({ minLength: 1 }),
 });
@@ -907,6 +916,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         const params = request.params as { characterId: string; actionId: string };
         const body = request.body as {
           inputs?: Record<string, unknown>;
+          audience?: "owner_only" | "gm_only" | "campaign";
           expectedRevision: number;
           idempotencyKey: string;
         };
@@ -917,6 +927,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
           inputs: body.inputs ?? {},
           expectedRevision: body.expectedRevision,
           idempotencyKey: body.idempotencyKey,
+          ...(body.audience === undefined ? {} : { audience: body.audience }),
         };
         const result = await characters.apply(ctxOf(request), command);
         if (!result.ok) return sendError(reply, result.error, request.id);

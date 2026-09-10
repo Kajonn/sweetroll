@@ -126,8 +126,9 @@ export const I3_SCHEMA_DDL = `
     archived_at       timestamptz,
     created_at        timestamptz NOT NULL DEFAULT now(),
     updated_at        timestamptz NOT NULL DEFAULT now(),
-    -- Test-fixture copy pinned to migrations/0015_campaign_content_activity.sql:
-    -- roll audience default is storage only until Task 8 wires behavior.
+    -- Test-fixture copy pinned to migrations/0015_campaign_content_activity.sql
+    -- plus the 0016 roll-audience wiring: omitted per-roll audiences resolve
+    -- once from this default at first claim.
     roll_audience_default text NOT NULL DEFAULT 'campaign',
     CHECK (revision > 0),
     CHECK (access_revision > 0),
@@ -240,6 +241,11 @@ export const I3_SCHEMA_DDL = `
     actor_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     kind text NOT NULL,
     source_content_id uuid REFERENCES campaign_content_items(id) ON DELETE RESTRICT,
+    -- Test-fixture copy pinned to migrations/0016_campaign_roll_audiences.sql:
+    -- roll source for atomic campaign roll activity (references only, never
+    -- bindings, inputs or sheet state). The FK is added after character_rolls
+    -- below because this table is created first in fixture order.
+    source_roll_id uuid,
     request_id text NOT NULL,
     occurred_at timestamptz NOT NULL DEFAULT now(),
     CHECK (kind IN (
@@ -247,7 +253,8 @@ export const I3_SCHEMA_DDL = `
       'content_updated',
       'content_deleted',
       'content_recovered',
-      'content_grants_replaced'
+      'content_grants_replaced',
+      'roll_executed'
     ))
   );
   CREATE INDEX campaign_activity_events_page_idx
@@ -343,7 +350,9 @@ export const I3_SCHEMA_DDL = `
     bindings_json      jsonb NOT NULL,
     total              double precision NOT NULL,
     rendered_output    text NOT NULL,
-    audience           text NOT NULL DEFAULT 'owner_only' CHECK (audience = 'owner_only'),
+    -- Test-fixture copy pinned to migrations/0016_campaign_roll_audiences.sql:
+    -- one shared wire/storage vocabulary for roll audiences.
+    audience           text NOT NULL DEFAULT 'owner_only' CHECK (audience IN ('owner_only', 'gm_only', 'campaign')),
     request_id         text NOT NULL,
     scope_campaign_id  uuid REFERENCES campaigns(id) ON DELETE RESTRICT,
     occurred_at        timestamptz NOT NULL DEFAULT now()
@@ -359,6 +368,11 @@ export const I3_SCHEMA_DDL = `
     scope_campaign_id  uuid REFERENCES campaigns(id) ON DELETE RESTRICT,
     occurred_at        timestamptz NOT NULL DEFAULT now()
   );
+  -- Test-fixture FK pinned to migrations/0016_campaign_roll_audiences.sql
+  -- (deferred: campaign_activity_events is created before character_rolls).
+  ALTER TABLE campaign_activity_events
+    ADD CONSTRAINT campaign_activity_events_source_roll_id_fkey
+    FOREIGN KEY (source_roll_id) REFERENCES character_rolls(id) ON DELETE RESTRICT;
   CREATE INDEX character_activity_events_page_idx
     ON character_activity_events (character_id, occurred_at DESC, id DESC);
   CREATE TABLE character_audit_records (

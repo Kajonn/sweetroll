@@ -815,6 +815,103 @@ describeWithDatabase("runMigrations", () => {
     ).rejects.toThrow();
   });
 
+  it("applies the 0016 roll audiences and roll activity references", async () => {
+    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
+    const filenames = (await readdir(productionDirectory)).sort();
+    // 0016 must be a fresh number: no other migration may claim it.
+    expect(filenames.filter((name) => name.startsWith("0016"))).toEqual([
+      "0016_campaign_roll_audiences.sql",
+    ]);
+    for (const filename of filenames.filter((name) => name < "0016_campaign_roll_audiences.sql")) {
+      await client.query(await readFile(join(productionDirectory, filename), "utf8"));
+    }
+
+    const userId = randomUUID();
+    const systemId = randomUUID();
+    const versionId = randomUUID();
+    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Pre-0016')", [userId]);
+    await client.query(
+      `INSERT INTO systems (id, owner_id, name, access, lifecycle)
+       VALUES ($1, $2, 'Pre-0016 system', 'private', 'active')`,
+      [systemId, userId],
+    );
+    await client.query(
+      `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle)
+       VALUES ($1, $2, '1.0.0', $3, '{}'::jsonb, '', 'published')`,
+      [versionId, systemId, `pre-0016-${randomUUID()}`],
+    );
+    const characterId = randomUUID();
+    await client.query(
+      `INSERT INTO characters (id, owner_id, system_version_id, entity_definition_id, name, state_json)
+       VALUES ($1, $2, $3, 'character', 'Pre-0016 hero', '{}'::jsonb)`,
+      [characterId, userId, versionId],
+    );
+    const executionId = randomUUID();
+    const legacyRollId = randomUUID();
+    await client.query(
+      `INSERT INTO character_rolls
+         (id, character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, request_id)
+       VALUES ($1, $2, $3, 'check', $4, 'd20', '[]', '[]', 12, 'Result: 12', $5)`,
+      [legacyRollId, characterId, userId, executionId, randomUUID()],
+    );
+
+    await client.query(await readFile(join(productionDirectory, "0016_campaign_roll_audiences.sql"), "utf8"));
+
+    // Legacy owner-only rows survive byte-identical; the campaign vocabulary
+    // inserts while unknown values still reject.
+    const legacy = await client.query(`SELECT audience FROM character_rolls WHERE id = $1`, [legacyRollId]);
+    expect(legacy.rows).toEqual([{ audience: "owner_only" }]);
+    for (const audience of ["gm_only", "campaign"] as const) {
+      await client.query(
+        `INSERT INTO character_rolls
+           (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id)
+         VALUES ($1, $2, 'check', $3, 'd20', '[]', '[]', 12, 'Result: 12', $4, $5)`,
+        [characterId, userId, randomUUID(), audience, randomUUID()],
+      );
+    }
+    await expect(
+      client.query(
+        `INSERT INTO character_rolls
+           (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id)
+         VALUES ($1, $2, 'check', $3, 'd20', '[]', '[]', 12, 'Result: 12', 'everyone', $4)`,
+        [characterId, userId, randomUUID(), randomUUID()],
+      ),
+    ).rejects.toThrow();
+
+    // Roll activity references the roll row; unknown kinds and dangling
+    // roll references still reject.
+    const campaignId = randomUUID();
+    await client.query(
+      `INSERT INTO campaigns (id, owner_id, system_version_id, title) VALUES ($1, $2, $3, 'Roll campaign')`,
+      [campaignId, userId, versionId],
+    );
+    const requestId = randomUUID();
+    await client.query(
+      `INSERT INTO campaign_activity_events (campaign_id, actor_id, kind, source_roll_id, request_id)
+       VALUES ($1, $2, 'roll_executed', $3, $4)`,
+      [campaignId, userId, legacyRollId, requestId],
+    );
+    const events = await client.query(
+      `SELECT kind, source_roll_id, source_content_id FROM campaign_activity_events WHERE request_id = $1`,
+      [requestId],
+    );
+    expect(events.rows).toEqual([{ kind: "roll_executed", source_roll_id: legacyRollId, source_content_id: null }]);
+    await expect(
+      client.query(
+        `INSERT INTO campaign_activity_events (campaign_id, actor_id, kind, request_id)
+         VALUES ($1, $2, 'roll_committed', $3)`,
+        [campaignId, userId, randomUUID()],
+      ),
+    ).rejects.toThrow();
+    await expect(
+      client.query(
+        `INSERT INTO campaign_activity_events (campaign_id, actor_id, kind, source_roll_id, request_id)
+         VALUES ($1, $2, 'roll_executed', $3, $4)`,
+        [campaignId, userId, randomUUID(), randomUUID()],
+      ),
+    ).rejects.toThrow();
+  });
+
   it("normalizes existing active system versions during the 0009 upgrade", async () => {
     const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
     const filenames = (await readdir(productionDirectory)).sort();

@@ -3,7 +3,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createCampaignsModule } from "../../src/campaigns/index.js";
-import { createCampaignPlacement } from "../../src/characters/campaignPlacement.js";
+import {
+  createCampaignPlacement,
+  prepareCampaignCharacter,
+} from "../../src/characters/campaignPlacement.js";
 import { DEFAULT_CAMPAIGN_LIMITS } from "../../src/platform/config.js";
 import { buildI6Harness, ctxFor, type I6Harness } from "./i6-app.js";
 
@@ -54,6 +57,45 @@ describeWithDatabase("campaign export projection (Task 7)", () => {
 
   async function exportAs(who: keyof I6Harness["users"], campaignId: string, key: string = randomUUID()) {
     return h.campaigns.exportCampaign(ctxFor(h.users[who]), { campaignId, idempotencyKey: key });
+  }
+
+  /** Campaign-created d20 sheet controlled by the player, for roll fixtures. */
+  async function createControlledSheet(campaignId: string): Promise<string> {
+    await h.pool.query(`UPDATE systems SET access = 'public'`);
+    const prepared = await prepareCampaignCharacter(h.runtime, {
+      systemVersionId: h.versionId,
+      entityDefinitionId: "character",
+    });
+    if (!prepared.ok) throw new Error("prepare failed");
+    const generation = (
+      await h.pool.query<{ generation: number }>(
+        `SELECT generation FROM campaign_members WHERE campaign_id = $1 AND user_id = $2`,
+        [campaignId, h.users.gm.actorId],
+      )
+    ).rows[0]?.generation;
+    const client = await h.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const createdSheet = await h.placement.createInCampaign(client, ctxFor(h.users.gm), {
+        campaignId,
+        expectedCampaignRevision: await revision(campaignId),
+        membershipGeneration: generation ?? 1,
+        idempotencyKey: randomUUID(),
+        name: `Export sheet ${randomUUID().slice(0, 8)}`,
+        entityDefinitionId: "character",
+        prepared: prepared.value,
+        controllerUserIds: [h.users.player.actorId],
+      });
+      expect(createdSheet.ok).toBe(true);
+      if (!createdSheet.ok) throw new Error("createInCampaign failed");
+      await client.query("COMMIT");
+      return createdSheet.value.characterId;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   it("exports a deterministic snapshot that replays byte-identical", async () => {
@@ -271,7 +313,10 @@ describeWithDatabase("campaign export projection (Task 7)", () => {
       "password",
       "credential",
       "result_json",
-      "bindings",
+      // Roll bindings/dice use camelCase projection keys; the snake_case
+      // storage columns must never leak.
+      "bindings_json",
+      "dice_json",
       "state_json",
       "character_id",
       "scope_campaign_id",
@@ -279,12 +324,14 @@ describeWithDatabase("campaign export projection (Task 7)", () => {
       expect(serialized).not.toContain(forbidden);
     }
     // Shape is exactly the documented projection: no extra tables leak in.
+    // Task 8 adds the `rolls` section (same source policy as activity).
     expect(Object.keys(exported.value).sort()).toEqual([
       "activity",
       "campaign",
       "content",
       "exportVersion",
       "members",
+      "rolls",
     ]);
     expect(createHash("sha256").update(serialized, "utf8").digest("hex")).toHaveLength(64);
   });
@@ -351,5 +398,96 @@ describeWithDatabase("campaign export projection (Task 7)", () => {
     if (!before.ok || !after.ok) throw new Error("export failed");
     expect(JSON.stringify(after.value)).not.toBe(JSON.stringify(before.value));
     expect(after.value.content.map((item) => item.title)).toContain("after the snapshot");
+  });
+
+  it("excludes other actors' private rolls while retaining permitted campaign and gm-only rolls", async () => {
+    const campaignId = await createCampaign();
+    await seedMember(campaignId, h.users.player.actorId);
+    const characterId = await createControlledSheet(campaignId);
+
+    const applyRoll = (who: keyof I6Harness["users"], audience: "owner_only" | "gm_only" | "campaign") =>
+      h.characters.apply(ctxFor(h.users[who]), {
+        kind: "executeAction",
+        characterId,
+        actionId: "check",
+        inputs: { bonus: 2 },
+        expectedRevision: 1,
+        idempotencyKey: randomUUID(),
+        audience,
+      });
+
+    const privateRoll = await applyRoll("player", "owner_only");
+    expect(privateRoll.ok).toBe(true);
+    const sharedRoll = await applyRoll("player", "campaign");
+    expect(sharedRoll.ok).toBe(true);
+    const gmRoll = await applyRoll("gm", "gm_only");
+    expect(gmRoll.ok).toBe(true);
+
+    const privateId = (
+      await h.pool.query<{ id: string }>(
+        `SELECT id FROM character_rolls WHERE character_id = $1 AND audience = 'owner_only'`,
+        [characterId],
+      )
+    ).rows[0]?.id;
+    if (privateId === undefined) throw new Error("private roll row missing");
+
+    const exported = await exportAs("gm", campaignId);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) throw new Error("export failed");
+
+    // Permitted rolls carry their details; the other actor's private roll
+    // is omitted entirely, with its referencing activity.
+    expect(exported.value.rolls.map((roll) => roll.audience).sort()).toEqual(["campaign", "gm_only"]);
+    const shared = exported.value.rolls.find((roll) => roll.audience === "campaign");
+    expect(shared).toMatchObject({ actorId: h.users.player.actorId, actionId: "check" });
+    expect(shared?.bindings).toEqual(
+      expect.arrayContaining([{ scope: "inputs", definitionId: "bonus", value: 2 }]),
+    );
+    expect(exported.value.rolls.map((roll) => roll.rollId)).not.toContain(privateId);
+    expect(exported.value.activity.map((event) => event.sourceRollId)).not.toContain(privateId);
+    expect(exported.value.activity.map((event) => event.sourceRollId)).toContain(shared?.rollId ?? "missing");
+
+    // The roller still replays their own private receipt through Characters.
+    expect(privateRoll.ok).toBe(true);
+  });
+
+  it("omits departed members' rolls from a narrowing export without leaking rows", async () => {
+    const campaignId = await createCampaign();
+    await seedMember(campaignId, h.users.player.actorId);
+    const characterId = await createControlledSheet(campaignId);
+
+    const rolled = await h.characters.apply(ctxFor(h.users.player), {
+      kind: "executeAction",
+      characterId,
+      actionId: "check",
+      inputs: { bonus: 2 },
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+      audience: "campaign",
+    });
+    expect(rolled.ok).toBe(true);
+
+    const before = await exportAs("gm", campaignId);
+    expect(before.ok).toBe(true);
+    if (!before.ok) throw new Error("export failed");
+    expect(before.value.rolls).toHaveLength(1);
+
+    const departed = await h.campaigns.removeMember(ctxFor(h.users.gm), {
+      campaignId,
+      userId: h.users.player.actorId,
+      expectedCampaignRevision: await revision(campaignId),
+      idempotencyKey: randomUUID(),
+    });
+    expect(departed.ok).toBe(true);
+
+    // The departed player's campaign roll stays pinned to its original scope
+    // and remains visible to the GM; the departed actor is denied outright.
+    const after = await exportAs("gm", campaignId);
+    expect(after.ok).toBe(true);
+    if (!after.ok) throw new Error("export failed");
+    expect(after.value.rolls).toHaveLength(1);
+    expect(await exportAs("player", campaignId)).toEqual(
+      expect.objectContaining({ ok: false }),
+    );
   });
 });

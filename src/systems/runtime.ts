@@ -60,8 +60,13 @@ export type NormalizedRollBinding = {
   value: RuntimeScalar;
 };
 
-/** Standalone I4 characters expose authoritative rolls only to their owner. */
-export type NormalizedRollAudience = "owner_only";
+/**
+ * Roll visibility vocabulary shared by storage, DTOs and policy (I6 Task 8).
+ * The Runtime itself is a rules evaluator, never a campaign policy engine:
+ * it always stamps freshly evaluated rolls `owner_only`, and the Characters
+ * module composes the authorized campaign audience after resolution.
+ */
+export type NormalizedRollAudience = "owner_only" | "gm_only" | "campaign";
 
 export type NormalizedRoll = {
   actionId: DefinitionId;

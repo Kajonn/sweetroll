@@ -114,6 +114,8 @@ const DDL = `
     payload_json       jsonb NOT NULL,
     roll_id            uuid REFERENCES character_rolls(id) ON DELETE RESTRICT,
     request_id         text NOT NULL,
+    -- I6 Task 5 history scope (standalone-only suite: no campaigns table, so no FK here).
+    scope_campaign_id  uuid,
     occurred_at        timestamptz NOT NULL DEFAULT now()
   );
   CREATE INDEX character_activity_events_page_idx
@@ -557,6 +559,150 @@ describeWithDatabase("Character replay authorization (I6 Task 1)", () => {
       [characterId],
     );
     expect(migrations.rows[0]!.count).toBe("1");
+  });
+
+  it("denies create replay to the previous owner after transfer", async () => {
+    const ownerA = await createUser("Ada");
+    const ownerB = await createUser("Bob");
+    const { versionId } = await publishVersion(ownerA);
+    const key = randomUUID();
+    const created = await characters.create(ctx(ownerA), {
+      systemVersionId: versionId,
+      entityDefinitionId: "character",
+      name: "Aria",
+      idempotencyKey: key,
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) throw new Error("unexpected");
+    const characterId = created.value.characterId;
+
+    await transferOwnership(ownerA, characterId, ownerB);
+
+    const replay = await characters.create(ctx(ownerA), {
+      systemVersionId: versionId,
+      entityDefinitionId: "character",
+      name: "Aria",
+      idempotencyKey: key,
+    });
+    expect(replay.ok).toBe(false);
+    if (replay.ok) throw new Error("previous owner create replay must be denied");
+    expect(replay.error.code).toBe("not_found");
+    expect(replay).not.toHaveProperty("value");
+  });
+
+  it("denies duplicate replay after the copy is transferred away", async () => {
+    const ownerA = await createUser("Ada");
+    const ownerB = await createUser("Bob");
+    const { versionId } = await publishVersion(ownerA);
+    const characterId = await createCharacter(ownerA, versionId);
+    const key = randomUUID();
+
+    const first = await characters.duplicate(ctx(ownerA), { characterId, idempotencyKey: key });
+    expect(first.ok).toBe(true);
+    if (!first.ok) throw new Error("unexpected");
+    await transferOwnership(ownerA, first.value.characterId, ownerB);
+
+    const replay = await characters.duplicate(ctx(ownerA), { characterId, idempotencyKey: key });
+    expect(replay.ok).toBe(false);
+    if (replay.ok) throw new Error("duplicate replay after copy transfer must be denied");
+    expect(replay.error.code).toBe("not_found");
+    expect(replay).not.toHaveProperty("value");
+  });
+
+  it("denies rollback replay to the previous owner after transfer", async () => {
+    const ownerA = await createUser("Ada");
+    const ownerB = await createUser("Bob");
+    const { systemId, versionId } = await publishVersion(ownerA);
+    const targetVersionId = await publishV2Version(ownerA, systemId);
+    const characterId = await createCharacter(ownerA, versionId);
+
+    const preview = await characters.previewMigration(ctx(ownerA), {
+      characterId,
+      targetVersionId,
+      mappings: { ability: "ability_score" },
+    });
+    if (!preview.ok) throw new Error(`unexpected preview failure: ${JSON.stringify(preview.error)}`);
+    const commit = await characters.commitMigration(ctx(ownerA), {
+      characterId,
+      previewId: preview.value.previewId,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(commit.ok).toBe(true);
+    if (!commit.ok) throw new Error("unexpected");
+    const migrationRows = await pool.query<{ id: string }>(
+      "SELECT id FROM character_migrations WHERE character_id = $1",
+      [characterId],
+    );
+    const migrationId = migrationRows.rows[0]?.id;
+    if (migrationId === undefined) throw new Error("migration row missing");
+
+    const rollbackKey = randomUUID();
+    const rollback = await characters.rollbackMigration(ctx(ownerA), {
+      characterId,
+      migrationId,
+      idempotencyKey: rollbackKey,
+    });
+    expect(rollback.ok).toBe(true);
+    if (!rollback.ok) throw new Error("unexpected");
+
+    await transferOwnership(ownerA, characterId, ownerB);
+
+    const replay = await characters.rollbackMigration(ctx(ownerA), {
+      characterId,
+      migrationId,
+      idempotencyKey: rollbackKey,
+    });
+    expect(replay.ok).toBe(false);
+    if (replay.ok) throw new Error("previous owner rollback replay must be denied");
+    expect(replay.error.code).toBe("not_found");
+    expect(replay).not.toHaveProperty("value");
+  });
+
+  it("replays stored duplicate errors without a sheet, and denies them after transfer", async () => {
+    const ownerA = await createUser("Ada");
+    const ownerB = await createUser("Bob");
+    const { versionId } = await publishVersion(ownerA);
+
+    // Stored error for a missing source replays identically: no sheet leaks.
+    const missingKey = randomUUID();
+    const missingId = randomUUID();
+    const missing = await characters.duplicate(ctx(ownerA), { characterId: missingId, idempotencyKey: missingKey });
+    expect(missing.ok).toBe(false);
+    if (missing.ok) throw new Error("unexpected");
+    const missingReplay = await characters.duplicate(ctx(ownerA), {
+      characterId: missingId,
+      idempotencyKey: missingKey,
+    });
+    expect(missingReplay.ok).toBe(false);
+    if (missingReplay.ok) throw new Error("unexpected");
+    expect(missingReplay.error).toEqual(missing.error);
+
+    // A stored archived-source error denies once the source moves away: the
+    // error alone must not confirm the archived lifecycle to the old owner.
+    const characterId = await createCharacter(ownerA, versionId);
+    const opened = await characters.open(ctx(ownerA), characterId);
+    if (!opened.ok) throw new Error("unexpected");
+    const archived = await characters.manage(ctx(ownerA), {
+      kind: "archive",
+      characterId,
+      expectedRevision: opened.value.revision,
+      idempotencyKey: randomUUID(),
+    });
+    expect(archived.ok).toBe(true);
+    const archivedKey = randomUUID();
+    const failed = await characters.duplicate(ctx(ownerA), { characterId, idempotencyKey: archivedKey });
+    expect(failed.ok).toBe(false);
+    if (failed.ok) throw new Error("unexpected");
+    expect(failed.error.code).toBe("conflict");
+
+    await transferOwnership(ownerA, characterId, ownerB);
+
+    const denied = await characters.duplicate(ctx(ownerA), { characterId, idempotencyKey: archivedKey });
+    expect(denied.ok).toBe(false);
+    if (denied.ok) throw new Error("post-transfer error replay must be denied");
+    expect(denied.error.code).toBe("not_found");
+    expect(denied).not.toHaveProperty("value");
   });
 
   it("enumerates the Characters public method inventory for later campaign extension", async () => {

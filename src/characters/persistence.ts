@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 
 import { hashInput } from "../systems/implementation/authoring/assess.js";
 import type { DefinitionId, NormalizedRoll, RuntimeStateV1, VersionId } from "../systems/runtime.js";
@@ -80,6 +80,26 @@ export type CharacterPageCursor = {
   characterId: CharacterId;
 };
 
+/**
+ * I6 Task 5: original placement/policy scope carried inside every stored
+ * command result. Standalone commits store NULL; attached commits store the
+ * campaign, the character placement generation and the actor's membership
+ * generation at commit time. Replays reauthorize against CURRENT scope and
+ * never trust the stored bytes alone.
+ */
+export type StoredResultScope = {
+  campaignId: string;
+  placementGeneration: number;
+  membershipGeneration: number;
+} | null;
+
+export type TxBuildArgs = {
+  record: CharacterRecord;
+  /** Active controllers at commit; empty for standalone records. */
+  controllers: UserId[];
+  scope: StoredResultScope;
+};
+
 export type ApplyCommandInput = {
   executionId: ExecutionId;
   characterId: CharacterId;
@@ -94,7 +114,15 @@ export type ApplyCommandInput = {
     requestId: string;
   };
   resultExpiresAt: Date;
-  buildResult: (args: { record: CharacterRecord }) => unknown;
+  buildResult: (args: TxBuildArgs) => unknown;
+  /**
+   * I6 Task 5: attached-sheet path. Locks the campaign row BEFORE the
+   * character row (campaign → character order), rechecks membership and
+   * controller capability in-transaction, stores the placement scope on
+   * activity and receipt, and never bumps the campaign revision for
+   * ordinary sheet edits.
+   */
+  campaign?: { campaignId: string };
 };
 
 export type ApplyCommandOutcome =
@@ -127,7 +155,13 @@ export type ApplyManagementCommandInput = {
     requestId: string;
   };
   resultExpiresAt: Date;
-  buildResult: (args: { record: CharacterRecord }) => unknown;
+  buildResult: (args: TxBuildArgs) => unknown;
+  /**
+   * I6 Task 5: attached-sheet path (rename/archive/recover; transfer is
+   * always denied before reaching the transaction). Lifecycle mutations
+   * additionally require a game-master role when requireManager is set.
+   */
+  campaign?: { campaignId: string; requireManager: boolean };
 };
 
 export type ApplyManagementCommandOutcome =
@@ -139,6 +173,12 @@ export type ApplyManagementCommandOutcome =
 
 export type DuplicateCharacterInput = {
   executionId: ExecutionId;
+  /**
+   * I6 Task 5: the duplication source, locked and rechecked in-transaction
+   * so an adoption racing the snapshot cannot leak attached state into a
+   * personal copy.
+   */
+  source: { characterId: CharacterId; actorId: UserId };
   duplicate: {
     characterId: CharacterId;
     ownerId: UserId;
@@ -159,12 +199,14 @@ export type DuplicateCharacterInput = {
     requestId: string;
   };
   resultExpiresAt: Date;
-  buildResult: (args: { record: CharacterRecord }) => unknown;
+  buildResult: (args: TxBuildArgs) => unknown;
 };
 
 export type DuplicateCharacterOutcome =
   | { kind: "applied"; record: CharacterRecord; resultJson: unknown }
-  | { kind: "already_completed"; resultJson: unknown };
+  | { kind: "already_completed"; resultJson: unknown }
+  | { kind: "not_found" }
+  | { kind: "archived" };
 
 export type MigrationPreviewRecord = {
   previewId: string;
@@ -222,7 +264,7 @@ export type CommitMigrationInput = {
   activity: { kind: string; payloadJson: unknown; requestId: string };
   audit: { actorId: UserId; kind: string; summary: string; requestId: string };
   resultExpiresAt: Date;
-  buildResult: (args: { record: CharacterRecord }) => unknown;
+  buildResult: (args: TxBuildArgs) => unknown;
 };
 
 export type CommitMigrationOutcome =
@@ -260,7 +302,7 @@ export type RollbackMigrationInput = {
   activity: { kind: string; payloadJson: unknown; requestId: string };
   audit: { actorId: UserId; kind: string; summary: string; requestId: string };
   resultExpiresAt: Date;
-  buildResult: (args: { record: CharacterRecord }) => unknown;
+  buildResult: (args: TxBuildArgs) => unknown;
 };
 
 export type RollbackMigrationOutcome =
@@ -268,6 +310,31 @@ export type RollbackMigrationOutcome =
   | { kind: "already_completed"; resultJson: unknown }
   | { kind: "not_found" }
   | { kind: "conflict"; latestRevision: number };
+
+export type CampaignMembershipSnapshot = {
+  campaignId: string;
+  userId: UserId;
+  role: "owner" | "co_gm" | "player";
+  status: "active" | "removed";
+  generation: number;
+};
+
+/**
+ * I6 Task 5: one consistent read-only snapshot for campaign authorization:
+ * the character row in any scope, its campaign status, the actor's
+ * membership and the current controllers. NULL when the character is
+ * missing. Callers combine this with the pure `campaigns/policy.ts`
+ * predicates; no owner-only helper authorizes attached data.
+ */
+export type AttachedAuthorization = {
+  record: CharacterRecord;
+  campaign: { id: string; status: string } | null;
+  membership: CampaignMembershipSnapshot | null;
+  controllers: UserId[];
+};
+
+/** Scope filter for history reads: undefined = unfiltered (legacy), NULL = standalone, id = one campaign. */
+export type ActivityScopeFilter = { scopeCampaignId?: string | null };
 
 export type CharacterActivityRow = {
   id: string;
@@ -331,12 +398,23 @@ export interface CharacterPersistenceRepository {
   changedDefinitionIdsSinceRevision(
     characterId: CharacterId,
     sinceRevision: number,
+    scope?: ActivityScopeFilter,
   ): Promise<{ changedDefinitionIds: DefinitionId[]; latestActivity: { id: string; occurredAtText: string } | null }>;
 
   listActivityPage(
     characterId: CharacterId,
     page: { limit: number; cursor: CharacterActivityCursor | null },
+    scope?: ActivityScopeFilter,
   ): Promise<CharacterActivityRow[]>;
+
+  /**
+   * I6 Task 5 campaign authorization snapshot (single read-only
+   * transaction). Reads only; callers recheck inside write transactions.
+   */
+  loadCampaignAuthorization(
+    characterId: CharacterId,
+    actorId: UserId,
+  ): Promise<AttachedAuthorization | null>;
 
   recordAudit(input: { characterId: CharacterId; actorId: UserId; kind: string; summary: string; requestId: string }): Promise<void>;
 
@@ -402,6 +480,228 @@ type MigrationPreviewRow = {
   expires_at: Date;
   consumed_at: Date | null;
 };
+
+/**
+ * I6 Task 5 attached-sheet command path. The caller holds an open
+ * transaction with the execution row already locked; this locks the campaign
+ * row BEFORE the character row, rechecks membership/capability/revision, and
+ * commits state, roll, campaign-scoped activity and the scope-carrying receipt
+ * together. Ordinary sheet edits never bump the campaign revision. A scope
+ * change racing the pre-transaction snapshot (return/detach, or a move to a
+ * different campaign) denies rather than executing against the wrong scope.
+ */
+async function applyCommandCampaignTx(
+  client: PoolClient,
+  input: ApplyCommandInput,
+  campaignId: string,
+): Promise<ApplyCommandOutcome> {
+  const campaign = await lockCampaignForWrite(client, campaignId);
+  const membership = campaign === null ? null : await loadTxMembership(client, campaignId, input.actorId);
+  if (campaign === null || membership === null || membership.status !== "active") {
+    await client.query("ROLLBACK");
+    return { kind: "not_found" };
+  }
+  const charResult = await client.query<CharacterRow>(
+    `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+       FROM characters WHERE id = $1 FOR UPDATE`,
+    [input.characterId],
+  );
+  const charRow = charResult.rows[0];
+  if (charRow === undefined || charRow.campaign_id !== campaignId) {
+    await client.query("ROLLBACK");
+    return { kind: "not_found" };
+  }
+  const controllers = await loadTxControllers(client, input.characterId);
+  if (!isTxManager(membership.role) && !controllers.includes(input.actorId)) {
+    await client.query("ROLLBACK");
+    return { kind: "not_found" };
+  }
+  if (campaign.status !== "active") {
+    await client.query("ROLLBACK");
+    return { kind: "conflict", latestRevision: charRow.revision };
+  }
+  if (charRow.lifecycle === "archived") {
+    await client.query("ROLLBACK");
+    return { kind: "archived" };
+  }
+  if (charRow.revision !== input.expectedRevision) {
+    const latestRevision = charRow.revision;
+    await client.query("ROLLBACK");
+    return { kind: "conflict", latestRevision };
+  }
+
+  let updatedRow = charRow;
+  if (input.stateChanged) {
+    const updated = await client.query<CharacterRow>(
+      `UPDATE characters
+          SET state_json = $1::jsonb, revision = revision + 1, updated_at = now()
+        WHERE id = $2
+        RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+      [JSON.stringify(input.nextState), input.characterId],
+    );
+    updatedRow = requireRow(updated.rows[0], "applyCommandCampaignTx.update");
+  }
+
+  let rollId: string | null = null;
+  if (input.roll !== null) {
+    const insertedRoll = await client.query<{ id: string }>(
+      `INSERT INTO character_rolls
+         (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11)
+       RETURNING id`,
+      [
+        updatedRow.id,
+        input.actorId,
+        input.roll.actionId,
+        input.executionId,
+        input.roll.expression,
+        JSON.stringify(input.roll.dice),
+        JSON.stringify(input.roll.bindings),
+        input.roll.total,
+        input.roll.output,
+        input.roll.audience,
+        input.activity.requestId,
+      ],
+    );
+    rollId = requireRow(insertedRoll.rows[0], "applyCommandCampaignTx.roll").id;
+  }
+
+  await client.query(
+    `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, roll_id, request_id, scope_campaign_id)
+     VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)`,
+    [
+      updatedRow.id,
+      updatedRow.revision,
+      input.activity.kind,
+      JSON.stringify(input.activity.payloadJson),
+      rollId,
+      input.activity.requestId,
+      campaignId,
+    ],
+  );
+
+  const record = toCharacterRecord(updatedRow);
+  const scope: StoredResultScope = {
+    campaignId,
+    placementGeneration: updatedRow.placement_generation,
+    membershipGeneration: membership.generation,
+  };
+  const resultJson = input.buildResult({ record, controllers, scope });
+  await client.query(
+    `UPDATE character_command_executions
+        SET status = 'completed', result_json = $1::jsonb, expires_at = $2
+      WHERE execution_id = $3`,
+    [JSON.stringify(resultJson), input.resultExpiresAt, input.executionId],
+  );
+  await client.query("COMMIT");
+  return { kind: "applied", record, resultJson };
+}
+
+/**
+ * I6 Task 5 attached-sheet management path (rename, archive, recover).
+ * Transfer never reaches a transaction while attached. Lifecycle mutations
+ * require a game-master role when requireManager is set; renames admit
+ * controllers as well. Same lock order and scope-deny discipline as the
+ * command path above.
+ */
+async function applyManagementCampaignTx(
+  client: PoolClient,
+  input: ApplyManagementCommandInput,
+  campaignId: string,
+  requireManager: boolean,
+): Promise<ApplyManagementCommandOutcome> {
+  if (input.mutation.kind === "transferOwnership") {
+    await client.query("ROLLBACK");
+    return { kind: "not_found" };
+  }
+  const campaign = await lockCampaignForWrite(client, campaignId);
+  const membership = campaign === null ? null : await loadTxMembership(client, campaignId, input.actorId);
+  if (campaign === null || membership === null || membership.status !== "active") {
+    await client.query("ROLLBACK");
+    return { kind: "not_found" };
+  }
+  const charResult = await client.query<CharacterRow>(
+    `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+       FROM characters WHERE id = $1 FOR UPDATE`,
+    [input.characterId],
+  );
+  const charRow = charResult.rows[0];
+  if (charRow === undefined || charRow.campaign_id !== campaignId) {
+    await client.query("ROLLBACK");
+    return { kind: "not_found" };
+  }
+  const controllers = await loadTxControllers(client, input.characterId);
+  const manager = isTxManager(membership.role);
+  if (requireManager ? !manager : !manager && !controllers.includes(input.actorId)) {
+    await client.query("ROLLBACK");
+    return { kind: "not_found" };
+  }
+  if (campaign.status !== "active") {
+    await client.query("ROLLBACK");
+    return { kind: "conflict", latestRevision: charRow.revision };
+  }
+  if (charRow.revision !== input.expectedRevision) {
+    const latestRevision = charRow.revision;
+    await client.query("ROLLBACK");
+    return { kind: "conflict", latestRevision };
+  }
+
+  let updated: { rows: CharacterRow[] };
+  switch (input.mutation.kind) {
+    case "rename":
+      updated = await client.query<CharacterRow>(
+        `UPDATE characters SET name = $1, revision = revision + 1, updated_at = now()
+          WHERE id = $2
+        RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+        [input.mutation.name, input.characterId],
+      );
+      break;
+    case "archive":
+      updated = await client.query<CharacterRow>(
+        `UPDATE characters SET lifecycle = 'archived', archived_at = now(), revision = revision + 1, updated_at = now()
+          WHERE id = $1
+        RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+        [input.characterId],
+      );
+      break;
+    case "recover":
+      updated = await client.query<CharacterRow>(
+        `UPDATE characters SET lifecycle = 'active', archived_at = null, revision = revision + 1, updated_at = now()
+          WHERE id = $1
+        RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+        [input.characterId],
+      );
+      break;
+  }
+  const updatedRow = requireRow(updated.rows[0], "applyManagementCampaignTx.update");
+
+  await client.query(
+    `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, request_id, scope_campaign_id)
+     VALUES ($1, $2, $3, $4::jsonb, $5, $6)`,
+    [updatedRow.id, updatedRow.revision, input.activity.kind, JSON.stringify(input.activity.payloadJson), input.activity.requestId, campaignId],
+  );
+  await client.query(
+    `INSERT INTO character_audit_records (character_id, actor_id, kind, summary, request_id)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [updatedRow.id, input.actorId, input.audit.kind, input.audit.summary, input.audit.requestId],
+  );
+
+  const record = toCharacterRecord(updatedRow);
+  const scope: StoredResultScope = {
+    campaignId,
+    placementGeneration: updatedRow.placement_generation,
+    membershipGeneration: membership.generation,
+  };
+  const resultJson = input.buildResult({ record, controllers, scope });
+  await client.query(
+    `UPDATE character_command_executions
+        SET status = 'completed', result_json = $1::jsonb, expires_at = $2
+      WHERE execution_id = $3`,
+    [JSON.stringify(resultJson), input.resultExpiresAt, input.executionId],
+  );
+  await client.query("COMMIT");
+  return { kind: "applied", record, resultJson };
+}
 
 export function createCharacterPersistenceRepository(pool: Pool): CharacterPersistenceRepository {
   return {
@@ -486,6 +786,25 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           return { kind: "already_completed", resultJson: execRow.result_json };
         }
 
+        // I6 Task 5: lock the source and recheck standalone ownership
+        // in-transaction. An adoption racing the pre-transaction snapshot
+        // must deny instead of copying attached state into a personal
+        // library sheet.
+        const sourceResult = await client.query<CharacterRow>(
+          `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+             FROM characters WHERE id = $1 FOR UPDATE`,
+          [input.source.characterId],
+        );
+        const sourceRow = sourceResult.rows[0];
+        if (sourceRow === undefined || sourceRow.owner_id !== input.source.actorId || sourceRow.campaign_id !== null) {
+          await client.query("ROLLBACK");
+          return { kind: "not_found" };
+        }
+        if (sourceRow.lifecycle === "archived") {
+          await client.query("ROLLBACK");
+          return { kind: "archived" };
+        }
+
         const inserted = await client.query<CharacterRow>(
           `INSERT INTO characters (id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, created_at, updated_at)
            VALUES ($1, $2, $3, $4, $5, 1, $6::jsonb, 'owner_only', 'active', $7, $7)
@@ -513,7 +832,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         );
 
         const record = toCharacterRecord(characterRow);
-        const resultJson = input.buildResult({ record });
+        const resultJson = input.buildResult({ record, controllers: [], scope: null });
         await client.query(
           `UPDATE character_command_executions
               SET status = 'completed', result_json = $1::jsonb, expires_at = $2
@@ -565,6 +884,72 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       };
     },
 
+    async loadCampaignAuthorization(characterId, actorId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN READ ONLY");
+        const charResult = await client.query<CharacterRow>(
+          `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+             FROM characters
+            WHERE id = $1`,
+          [characterId],
+        );
+        const row = charResult.rows[0];
+        if (row === undefined) {
+          await client.query("ROLLBACK");
+          return null;
+        }
+        const record = toCharacterRecord(row);
+        let campaign: AttachedAuthorization["campaign"] = null;
+        let membership: AttachedAuthorization["membership"] = null;
+        let controllers: UserId[] = [];
+        if (record.campaignId !== null) {
+          const campaignResult = await client.query<{ id: string; status: string }>(
+            `SELECT id, status FROM campaigns WHERE id = $1`,
+            [record.campaignId],
+          );
+          const campaignRow = campaignResult.rows[0];
+          if (campaignRow !== undefined) {
+            campaign = { id: campaignRow.id, status: campaignRow.status };
+          }
+          const membershipResult = await client.query<{
+            role: string;
+            status: string;
+            generation: number;
+          }>(
+            `SELECT role, status, generation FROM campaign_members WHERE campaign_id = $1 AND user_id = $2`,
+            [record.campaignId, actorId],
+          );
+          const membershipRow = membershipResult.rows[0];
+          if (
+            membershipRow !== undefined
+            && (membershipRow.role === "owner" || membershipRow.role === "co_gm" || membershipRow.role === "player")
+            && (membershipRow.status === "active" || membershipRow.status === "removed")
+          ) {
+            membership = {
+              campaignId: record.campaignId,
+              userId: actorId,
+              role: membershipRow.role,
+              status: membershipRow.status,
+              generation: membershipRow.generation,
+            };
+          }
+          const controllersResult = await client.query<{ user_id: string }>(
+            `SELECT user_id FROM character_controllers WHERE character_id = $1 ORDER BY user_id`,
+            [characterId],
+          );
+          controllers = controllersResult.rows.map((entry) => entry.user_id);
+        }
+        await client.query("COMMIT");
+        return { record, campaign, membership, controllers };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
     async listOwnedCharactersPage(ownerId, page) {
       const rows =
         page.cursor === null
@@ -600,6 +985,10 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         if (execRow.status === "completed") {
           await client.query("COMMIT");
           return { kind: "already_completed", resultJson: execRow.result_json };
+        }
+
+        if (input.campaign !== undefined) {
+          return await applyCommandCampaignTx(client, input, input.campaign.campaignId);
         }
 
         const charResult = await client.query<CharacterRow>(
@@ -672,7 +1061,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         );
 
         const record = toCharacterRecord(updatedRow);
-        const resultJson = input.buildResult({ record });
+        const resultJson = input.buildResult({ record, controllers: [], scope: null });
         await client.query(
           `UPDATE character_command_executions
               SET status = 'completed', result_json = $1::jsonb, expires_at = $2
@@ -702,6 +1091,15 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         if (execRow.status === "completed") {
           await client.query("COMMIT");
           return { kind: "already_completed", resultJson: execRow.result_json };
+        }
+
+        if (input.campaign !== undefined) {
+          return await applyManagementCampaignTx(
+            client,
+            input,
+            input.campaign.campaignId,
+            input.campaign.requireManager,
+          );
         }
 
         const charResult = await client.query<CharacterRow>(
@@ -777,7 +1175,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         );
 
         const record = toCharacterRecord(updatedRow);
-        const resultJson = input.buildResult({ record });
+        const resultJson = input.buildResult({ record, controllers: [], scope: null });
         await client.query(
           `UPDATE character_command_executions
               SET status = 'completed', result_json = $1::jsonb, expires_at = $2
@@ -794,45 +1192,48 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       }
     },
 
-    async listActivityPage(characterId, page) {
+    async listActivityPage(characterId, page, scope) {
       const rowShape = `id, character_revision, kind, payload_json, roll_id, request_id,
              occurred_at, to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS occurred_at_cursor`;
-      const rows =
-        page.cursor === null
-          ? await pool.query<{
-              id: string;
-              character_revision: number;
-              kind: string;
-              payload_json: unknown;
-              roll_id: string | null;
-              request_id: string;
-              occurred_at: Date;
-              occurred_at_cursor: string;
-            }>(
-              `SELECT ${rowShape}
-                 FROM character_activity_events
-                WHERE character_id = $1
-                ORDER BY occurred_at DESC, id DESC
-                LIMIT $2`,
-              [characterId, page.limit],
-            )
-          : await pool.query<{
-              id: string;
-              character_revision: number;
-              kind: string;
-              payload_json: unknown;
-              roll_id: string | null;
-              request_id: string;
-              occurred_at: Date;
-              occurred_at_cursor: string;
-            }>(
-              `SELECT ${rowShape}
-                 FROM character_activity_events
-                WHERE character_id = $1 AND (occurred_at, id) < ($2::timestamptz, $3)
-                ORDER BY occurred_at DESC, id DESC
-                LIMIT $4`,
-              [characterId, page.cursor.occurredAtText, page.cursor.id, page.limit],
-            );
+      // I6 Task 5 history scoping: standalone reads see only unscoped
+      // (personal) events, attached reads only their campaign's events.
+      // Pre-adoption personal history stays hidden while attached and
+      // returns after detachment; campaign history never relabels into the
+      // personal scope.
+      type ActivityRowShape = {
+        id: string;
+        character_revision: number;
+        kind: string;
+        payload_json: unknown;
+        roll_id: string | null;
+        request_id: string;
+        occurred_at: Date;
+        occurred_at_cursor: string;
+      };
+      const scopeValue = scope?.scopeCampaignId;
+      const filters: string[] = [`character_id = $1`];
+      const params: unknown[] = [characterId];
+      if (page.cursor !== null) {
+        params.push(page.cursor.occurredAtText, page.cursor.id);
+        filters.push(`(occurred_at, id) < ($2::timestamptz, $3)`);
+      }
+      if (scopeValue !== undefined) {
+        if (scopeValue === null) {
+          filters.push(`scope_campaign_id IS NULL`);
+        } else {
+          params.push(scopeValue);
+          filters.push(`scope_campaign_id = $${params.length}`);
+        }
+      }
+      params.push(page.limit);
+      const rows = await pool.query<ActivityRowShape>(
+        `SELECT ${rowShape}
+           FROM character_activity_events
+          WHERE ${filters.join(" AND ")}
+          ORDER BY occurred_at DESC, id DESC
+          LIMIT $${params.length}`,
+        params,
+      );
       return rows.rows.map((row) => ({
         id: row.id,
         characterRevision: row.character_revision,
@@ -862,13 +1263,24 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       );
     },
 
-    async changedDefinitionIdsSinceRevision(characterId, sinceRevision) {
+    async changedDefinitionIdsSinceRevision(characterId, sinceRevision, scope) {
+      const scopeValue = scope?.scopeCampaignId;
+      const params: unknown[] = [characterId, sinceRevision];
+      let scopeClause = "";
+      if (scopeValue !== undefined) {
+        if (scopeValue === null) {
+          scopeClause = " AND scope_campaign_id IS NULL";
+        } else {
+          params.push(scopeValue);
+          scopeClause = ` AND scope_campaign_id = $${params.length}`;
+        }
+      }
       const result = await pool.query<{ id: string; payload_json: unknown; occurred_at_cursor: string }>(
         `SELECT id, payload_json, to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS occurred_at_cursor
           FROM character_activity_events
-          WHERE character_id = $1 AND character_revision > $2
+          WHERE character_id = $1 AND character_revision > $2${scopeClause}
           ORDER BY character_revision ASC`,
-        [characterId, sinceRevision],
+        params,
       );
       const ids = new Set<DefinitionId>();
       for (const row of result.rows) {
@@ -1086,7 +1498,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         );
 
         const record = toCharacterRecord(updatedRow);
-        const resultJson = input.buildResult({ record });
+        const resultJson = input.buildResult({ record, controllers: [], scope: null });
         await client.query(
           `UPDATE character_command_executions
               SET status = 'completed', result_json = $1::jsonb, expires_at = $2
@@ -1224,7 +1636,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         );
 
         const record = toCharacterRecord(updatedRow);
-        const resultJson = input.buildResult({ record });
+        const resultJson = input.buildResult({ record, controllers: [], scope: null });
         await client.query(
           `UPDATE character_command_executions
               SET status = 'completed', result_json = $1::jsonb, expires_at = $2
@@ -1302,4 +1714,40 @@ function toMigrationPreviewRecord(row: MigrationPreviewRow): MigrationPreviewRec
 function requireRow<T>(row: T | undefined, where: string): T {
   if (row === undefined) throw new Error(`${where} returned no row`);
   return row;
+}
+
+/** I6 Task 5: campaign lock for character write transactions (campaign → character order). */
+async function lockCampaignForWrite(
+  client: PoolClient,
+  campaignId: string,
+): Promise<{ id: string; status: string } | null> {
+  const result = await client.query<{ id: string; status: string }>(
+    `SELECT id, status FROM campaigns WHERE id = $1 FOR UPDATE`,
+    [campaignId],
+  );
+  return result.rows[0] ?? null;
+}
+
+async function loadTxMembership(
+  client: PoolClient,
+  campaignId: string,
+  userId: string,
+): Promise<{ role: string; status: string; generation: number } | null> {
+  const result = await client.query<{ role: string; status: string; generation: number }>(
+    `SELECT role, status, generation FROM campaign_members WHERE campaign_id = $1 AND user_id = $2`,
+    [campaignId, userId],
+  );
+  return result.rows[0] ?? null;
+}
+
+async function loadTxControllers(client: PoolClient, characterId: string): Promise<UserId[]> {
+  const result = await client.query<{ user_id: string }>(
+    `SELECT user_id FROM character_controllers WHERE character_id = $1 ORDER BY user_id`,
+    [characterId],
+  );
+  return result.rows.map((row) => row.user_id);
+}
+
+function isTxManager(role: string): boolean {
+  return role === "owner" || role === "co_gm";
 }

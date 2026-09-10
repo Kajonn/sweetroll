@@ -897,6 +897,59 @@ describe("character HTTP routes", () => {
     }
   });
 
+  it("serves attached campaign views through the ownership-union DTO", async () => {
+    const campaignId = randomUUID();
+    const controllerId = randomUUID();
+    const attached = characterView({
+      ownerId: null,
+      campaignId,
+      controllers: [controllerId],
+      placementGeneration: 2,
+      returnOwnerId: controllerId,
+    });
+    const app = await build(makeCharacters({ open: async () => ({ ok: true, value: attached }) }));
+    const response = await app.inject({
+      method: "get",
+      url: `/characters/${attached.characterId}`,
+      headers: cookie,
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as { character: Record<string, unknown>; requestId: string };
+    expect(body.character).toMatchObject({
+      characterId: attached.characterId,
+      ownerId: null,
+      campaignId,
+      controllers: [controllerId],
+      placementGeneration: 2,
+      returnOwnerId: controllerId,
+    });
+  });
+
+  it("maps result_unavailable to 409 without a payload", async () => {
+    const app = await build(
+      makeCharacters({
+        apply: async () => ({
+          ok: false,
+          error: {
+            code: "result_unavailable",
+            message: "The saved result is no longer available under the current policy. Retry with a new idempotency key.",
+          },
+        }),
+      }),
+    );
+    const response = await app.inject({
+      method: "post",
+      url: `/characters/${randomUUID()}/fields/ability/set`,
+      headers: cookie,
+      payload: { value: 12, expectedRevision: 1, idempotencyKey: "key-1" },
+    });
+    expect(response.statusCode).toBe(409);
+    const body = response.json() as { error: CharacterError; requestId: string };
+    expect(body.error.code).toBe("result_unavailable");
+    expect(body).not.toHaveProperty("value");
+    expect(body.requestId).toBeTypeOf("string");
+  });
+
   it("returns 409 with the reconciliation payload for conflicts", async () => {
     const conflict: CharacterError = {
       code: "conflict",

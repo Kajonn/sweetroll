@@ -24,6 +24,9 @@ const STATUS_BY_CODE: Record<CharacterError["code"], number> = {
   invalid_value: 422,
   internal: 500,
   temporarily_unavailable: 503,
+  // I6 Task 5: committed-but-undisclosable results are a non-sensitive
+  // conflict, never a retry of the same key.
+  result_unavailable: 409,
 };
 
 const badRequest = (message: string): CharacterError => ({ code: "bad_request", message });
@@ -161,7 +164,15 @@ const ProjectionDto = Type.Object({
 
 const CharacterViewDto = Type.Object({
   characterId: Type.String({ format: UUID_FORMAT }),
-  ownerId: Type.String({ format: UUID_FORMAT }),
+  // I6 Task 5 ownership union: standalone views populate ownerId with NULL
+  // campaign fields; attached views carry campaign custody (NULL ownerId,
+  // campaignId/controllers/generation/return owner) instead of inventing an
+  // owner user.
+  ownerId: Type.Union([Type.String({ format: UUID_FORMAT }), Type.Null()]),
+  campaignId: Type.Union([Type.String({ format: UUID_FORMAT }), Type.Null()]),
+  controllers: Type.Array(Type.String({ format: UUID_FORMAT })),
+  placementGeneration: Type.Integer({ minimum: 1 }),
+  returnOwnerId: Type.Union([Type.String({ format: UUID_FORMAT }), Type.Null()]),
   name: Type.String(),
   systemVersionId: Type.String({ format: UUID_FORMAT }),
   entityDefinitionId: Type.String(),

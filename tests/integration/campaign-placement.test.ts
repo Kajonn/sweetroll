@@ -1002,7 +1002,7 @@ describeWithDatabase("campaign character placement and atomic return (Task 4)", 
     expect(freshWrite.ok).toBe(true);
   });
 
-  it("denies every standalone path on attached sheets without leaking scope", async () => {
+  it("composes campaign capabilities into standalone paths on attached sheets (Task 5)", async () => {
     const campaignId = await createCampaign();
     await seedMember(campaignId, h.users.player.actorId);
     const sheet = await createStandalone("player");
@@ -1010,43 +1010,56 @@ describeWithDatabase("campaign character placement and atomic return (Task 4)", 
     const player = ctxFor(h.users.player);
     const gm = ctxFor(h.users.gm);
 
-    expect(await h.characters.open(player, sheet.characterId)).toEqual({
-      ok: false,
-      error: expect.objectContaining({ code: "not_found" }),
+    // I6 Task 5: the return-owner controller and the campaign GM read the
+    // attached sheet through the same entry points, with campaign custody
+    // instead of an invented owner.
+    for (const ctx of [player, gm]) {
+      const opened = await h.characters.open(ctx, sheet.characterId);
+      expect(opened.ok).toBe(true);
+      if (!opened.ok) return;
+      expect(opened.value).toMatchObject({
+        ownerId: null,
+        campaignId,
+        controllers: [h.users.player.actorId],
+        returnOwnerId: h.users.player.actorId,
+      });
+    }
+    const edited = await h.characters.apply(player, {
+      kind: "setField",
+      characterId: sheet.characterId,
+      fieldId: "ability",
+      value: 10,
+      expectedRevision: 2,
+      idempotencyKey: randomUUID(),
     });
-    expect(await h.characters.open(gm, sheet.characterId)).toEqual({
-      ok: false,
-      error: expect.objectContaining({ code: "not_found" }),
-    });
-    expect(
-      await h.characters.apply(player, {
-        kind: "setField",
-        characterId: sheet.characterId,
-        fieldId: "ability",
-        value: 10,
-        expectedRevision: 2,
-        idempotencyKey: randomUUID(),
-      }),
-    ).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+    expect(edited.ok).toBe(true);
+    // Transfer/duplicate out of the campaign stay denied for both roles.
     expect(
       await h.characters.manage(player, {
         kind: "transferOwnership",
         characterId: sheet.characterId,
         toUserId: h.users.other.actorId,
-        expectedRevision: 2,
+        expectedRevision: 3,
         idempotencyKey: randomUUID(),
       }),
     ).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
     expect(
       await h.characters.duplicate(player, { characterId: sheet.characterId, idempotencyKey: randomUUID() }),
     ).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
-    expect(await h.characters.exportCharacter(gm, { characterId: sheet.characterId })).toEqual({
-      ok: false,
-      error: expect.objectContaining({ code: "not_found" }),
+    // Exports project the current sheet only; activity hides pre-adoption
+    // personal history while attached.
+    const exported = await h.characters.exportCharacter(gm, { characterId: sheet.characterId });
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+    expect(exported.value.migrationLineage).toEqual([]);
+    const activity = await h.characters.listActivity(player, {
+      characterId: sheet.characterId,
+      limit: 10,
+      cursor: null,
     });
-    expect(
-      await h.characters.listActivity(player, { characterId: sheet.characterId, limit: 10, cursor: null }),
-    ).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+    expect(activity.ok).toBe(true);
+    if (!activity.ok) return;
+    expect(activity.value.events.map((event) => event.kind)).toContain("character_adopted");
     expect(
       await h.characters.previewMigration(player, { characterId: sheet.characterId, targetVersionId: h.versionId }),
     ).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });

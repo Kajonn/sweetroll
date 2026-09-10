@@ -114,6 +114,8 @@ const DDL = `
     payload_json       jsonb NOT NULL,
     roll_id            uuid REFERENCES character_rolls(id) ON DELETE RESTRICT,
     request_id         text NOT NULL,
+    -- I6 Task 5 history scope (standalone-only suite: no campaigns table, so no FK here).
+    scope_campaign_id  uuid,
     occurred_at        timestamptz NOT NULL DEFAULT now()
   );
   CREATE INDEX character_activity_events_page_idx

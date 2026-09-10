@@ -18,12 +18,16 @@ import type {
 
 import {
   createCharacterPersistenceRepository,
+  type AttachedAuthorization,
+  type CampaignMembershipSnapshot,
   type CharacterPersistenceRepository,
   type CharacterRecord,
   type ManagementMutation,
+  type StoredResultScope,
 } from "./persistence.js";
+import { isActiveMember, isGameMaster, type MembershipRecord } from "../campaigns/policy.js";
 import { claimExecution } from "./idempotency.js";
-import { buildCharacterExportDocument } from "./export.js";
+import { buildAttachedCharacterExportDocument, buildCharacterExportDocument } from "./export.js";
 import { buildCandidateValues, collectEditableFields, denyAttachedMigrationScope } from "./migration.js";
 
 export type { RequestContext } from "../systems/authoring.js";
@@ -84,7 +88,14 @@ export type CharacterErrorCode =
   | "command_in_progress"
   | "invalid_value"
   | "internal"
-  | "temporarily_unavailable";
+  | "temporarily_unavailable"
+  /**
+   * I6 Task 5: the mutation already committed, but its saved result can no
+   * longer be disclosed under the current policy/placement generation (e.g.
+   * a replay after removal and rejoin). Stale state is never replayed and
+   * the command is never re-executed; retry with a new idempotency key.
+   */
+  | "result_unavailable";
 
 export type CharacterError = {
   code: CharacterErrorCode;
@@ -424,6 +435,10 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     mismatch: (): CharacterError => ({ code: "idempotency_mismatch", message: MISMATCH_MESSAGE }),
     replayExpired: (): CharacterError => ({ code: "conflict", message: REPLAY_EXPIRED_MESSAGE }),
     inProgress: (): CharacterError => ({ code: "command_in_progress", message: IN_PROGRESS_MESSAGE }),
+    resultUnavailable: (): CharacterError => ({
+      code: "result_unavailable",
+      message: "The saved result is no longer available under the current policy. Retry with a new idempotency key.",
+    }),
     archived: (): CharacterError => ({ code: "conflict", message: ARCHIVED_MESSAGE }),
     conflict: (
       latestRevision: number,
@@ -522,6 +537,16 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     };
   }
 
+  /**
+   * I6 Task 5: stamps the in-transaction controller list onto an attached
+   * view before it is sealed into a receipt. Standalone commits pass an
+   * empty list, leaving the view unchanged.
+   */
+  function withControllers(view: CharacterView, controllers: UserId[]): CharacterView {
+    if (controllers.length === 0) return view;
+    return { ...view, controllers: [...controllers].sort() };
+  }
+
   function deserializeView(stored: unknown): CharacterView {
     const raw = stored as Omit<CharacterView, "archivedAt" | "createdAt" | "updatedAt"> & {
       archivedAt: string | null;
@@ -537,11 +562,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
   }
 
   type StoredCommandOutcome =
-    | { ok: true; value: { character: unknown; roll: NormalizedRoll | null } }
+    | { ok: true; value: { scope: StoredResultScope; character: unknown; roll: NormalizedRoll | null } }
     | { ok: false; error: CharacterError };
 
   type StoredDuplicateOutcome =
-    | { ok: true; value: { character: unknown } }
+    | { ok: true; value: { scope: StoredResultScope; character: unknown } }
     | { ok: false; error: CharacterError };
 
   function serializeCommandError(error: CharacterError): StoredCommandOutcome {
@@ -598,6 +623,117 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     if (scope.campaignId !== null) return { ok: false, error: denied() };
     if (scope.ownerId !== ctx.actorId) return { ok: false, error: denied() };
     return null;
+  }
+
+  // I6 Task 5: saved results carry their original placement/policy scope
+  // inside the receipt envelope (NULL = standalone). Replays reauthorize
+  // the CURRENT scope before touching stored bytes: a current right to the
+  // returned standalone character never discloses campaign-era receipts,
+  // and a campaign receipt never serves a departed actor or a stale
+  // policy/placement generation.
+  function peekStoredScope(resultJson: unknown): StoredResultScope {
+    if (typeof resultJson !== "object" || resultJson === null) return null;
+    const outcome = resultJson as { ok?: unknown; value?: { scope?: StoredResultScope } };
+    if (outcome.ok !== true) return null;
+    return outcome.value?.scope ?? null;
+  }
+
+  function toMembershipRecord(snapshot: CampaignMembershipSnapshot): MembershipRecord {
+    return {
+      campaignId: snapshot.campaignId,
+      userId: snapshot.userId,
+      role: snapshot.role,
+      status: snapshot.status,
+      generation: snapshot.generation,
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    };
+  }
+
+  /**
+   * Campaign read capability for one attached character (NULL unless the
+   * actor is an active GM over every attached sheet, or an active
+   * controller of this sheet). Reads the characters table only through
+   * loadCharacterScope first at call sites that must work without campaign
+   * tables; this snapshot itself needs the campaign schema.
+   */
+  async function loadAttachedSnapshot(
+    ctx: RequestContext,
+    characterId: CharacterId,
+  ): Promise<{ auth: AttachedAuthorization; manager: boolean } | null> {
+    const auth = await repo.loadCampaignAuthorization(characterId, ctx.actorId);
+    if (auth === null || auth.record.campaignId === null || auth.campaign === null) return null;
+    if (auth.membership === null) return null;
+    const membership = toMembershipRecord(auth.membership);
+    if (!isActiveMember(membership)) return null;
+    const manager = isGameMaster(membership);
+    if (!manager && !auth.controllers.includes(ctx.actorId)) return null;
+    return { auth, manager };
+  }
+
+  async function authorizeStoredCampaignOutcome(
+    ctx: RequestContext,
+    characterId: CharacterId,
+    scope: NonNullable<StoredResultScope>,
+    denied: () => CharacterError,
+  ): Promise<CharacterResult<never> | null> {
+    const snapshot = await loadAttachedSnapshot(ctx, characterId);
+    if (snapshot === null) return { ok: false, error: denied() };
+    // The sheet moved on (returned, or attached elsewhere): the stored
+    // campaign bytes stay undisclosed even to a currently capable actor.
+    if (snapshot.auth.record.campaignId !== scope.campaignId) {
+      return { ok: false, error: denied() };
+    }
+    const membership = snapshot.auth.membership;
+    if (
+      membership === null
+      || membership.generation !== scope.membershipGeneration
+      || snapshot.auth.record.placementGeneration !== scope.placementGeneration
+    ) {
+      // Still authorized, but the policy/placement generation moved (e.g.
+      // removal and rejoin): committed stays committed, the stale result is
+      // not replayed, and nothing re-executes.
+      return { ok: false, error: errors.resultUnavailable() };
+    }
+    return null;
+  }
+
+  async function authorizeStoredOutcome(
+    ctx: RequestContext,
+    characterId: CharacterId,
+    resultJson: unknown,
+    denied: () => CharacterError,
+  ): Promise<CharacterResult<never> | null> {
+    const scope = peekStoredScope(resultJson);
+    if (scope === null) return denyStoredOutcomeUnlessStandaloneOwned(ctx, characterId, denied);
+    return authorizeStoredCampaignOutcome(ctx, characterId, scope, denied);
+  }
+
+  /**
+   * Reauthorization before conflict details (I6 Task 5): a membership
+   * revoked between the pre-transaction snapshot and the conflict must not
+   * receive field-level change summaries or activity cursors.
+   */
+  async function recheckWriteAccess(
+    ctx: RequestContext,
+    characterId: CharacterId,
+    campaignId: string | null,
+  ): Promise<boolean> {
+    if (campaignId === null) {
+      return (await repo.openOwnedCharacter(characterId, ctx.actorId)) !== null;
+    }
+    return (await loadAttachedSnapshot(ctx, characterId)) !== null;
+  }
+
+  function campaignArchivedError(revision: number): CharacterError {
+    return {
+      code: "conflict",
+      message: "The campaign is archived. Authorized reads and exports remain available; sheet edits are rejected until the campaign recovers.",
+      latestRevision: revision,
+      changedDefinitionIds: [],
+      activityCursor: null,
+      cacheDisposition: "retain",
+    };
   }
 
   function replayStoredOutcome(resultJson: unknown): CharacterResult<CharacterCommandResult> {
@@ -854,10 +990,22 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
         if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
         if (claimed.status === "replay") {
+          // I6 Task 5: stored ok outcomes reauthorize the duplicate copy's
+          // current scope (an adopted copy denies); stored error outcomes
+          // reauthorize the source instead, since they carry no sheet.
           const stored = claimed.resultJson as StoredDuplicateOutcome;
           if (stored.ok) {
             const duplicateId = (stored.value.character as { characterId: CharacterId }).characterId;
-            const denial = await denyReplayUnlessOwner(ctx, duplicateId, () => errors.notFoundPurge());
+            const denial = await authorizeStoredOutcome(ctx, duplicateId, claimed.resultJson, () =>
+              errors.notFoundPurge(),
+            );
+            if (denial !== null) return denial;
+          } else {
+            const denial = await denyStoredOutcomeUnlessStandaloneOwned(
+              ctx,
+              duplicateInput.characterId,
+              () => errors.notFoundPurge(),
+            );
             if (denial !== null) return denial;
           }
           return replayDuplicateOutcome(claimed.resultJson);
@@ -912,6 +1060,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const copiedState = structuredClone(source.state);
         const outcome = await repo.duplicateCharacterTx({
           executionId,
+          source: { characterId: duplicateInput.characterId, actorId: ctx.actorId },
           duplicate: {
             characterId: duplicateId,
             ownerId: ctx.actorId,
@@ -932,7 +1081,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             requestId: ctx.requestId,
           },
           resultExpiresAt: replayExpiresAt,
-          buildResult: ({ record }) => {
+          buildResult: ({ record, controllers, scope }) => {
             const view = toView(
               record,
               {
@@ -949,25 +1098,48 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
                 replayed: false,
               },
             );
-            return { ok: true, value: { character: serializeView(view) } };
+            return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)) } };
           },
         });
 
         if (outcome.kind === "already_completed") {
           // The duplicate copy may have been adopted since the claim: recheck
           // placement scope before disclosing the stored sheet. Stored error
-          // outcomes carry no sheet and replay unchanged.
+          // outcomes reauthorize the source instead, since they carry no sheet.
           const stored = outcome.resultJson as StoredDuplicateOutcome;
           if (stored.ok) {
             const duplicateId = (stored.value.character as { characterId: CharacterId }).characterId;
-            const placementDenial = await denyStoredOutcomeUnlessStandaloneOwned(
-              ctx,
-              duplicateId,
-              () => errors.notFoundPurge(),
+            const placementDenial = await authorizeStoredOutcome(ctx, duplicateId, outcome.resultJson, () =>
+              errors.notFoundPurge(),
             );
             if (placementDenial !== null) return placementDenial;
+          } else {
+            const sourceDenial = await denyStoredOutcomeUnlessStandaloneOwned(
+              ctx,
+              duplicateInput.characterId,
+              () => errors.notFoundPurge(),
+            );
+            if (sourceDenial !== null) return sourceDenial;
           }
           return replayDuplicateOutcome(outcome.resultJson);
+        }
+        if (outcome.kind === "not_found") {
+          const error = errors.notFoundPurge();
+          await repo.finalizeExecutionError({
+            executionId,
+            resultJson: serializeDuplicateError(error),
+            expiresAt: replayExpiresAt,
+          });
+          return { ok: false, error };
+        }
+        if (outcome.kind === "archived") {
+          const error = errors.archived();
+          await repo.finalizeExecutionError({
+            executionId,
+            resultJson: serializeDuplicateError(error),
+            expiresAt: replayExpiresAt,
+          });
+          return { ok: false, error };
         }
         const stored = outcome.resultJson as StoredDuplicateOutcome;
         if (!stored.ok) return { ok: false, error: stored.error };
@@ -980,18 +1152,54 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     async open(ctx, characterId) {
       try {
         const record = await repo.openOwnedCharacter(characterId, ctx.actorId);
-        if (record === null) return { ok: false, error: errors.not_found() };
+        if (record !== null) {
+          const resolved = await input.runtime.resolve({
+            versionId: record.systemVersionId,
+            entityId: record.entityDefinitionId,
+            state: record.state,
+            intent: { kind: "observe" },
+          });
+          if (!resolved.ok) return { ok: false, error: mapRuntimeError(resolved.error) };
 
+          const view = toView(
+            record,
+            {
+              derivedValues: resolved.value.derivedValues,
+              validations: resolved.value.validations,
+              projection: resolved.value.projection,
+              packageChecksum: resolved.value.packageChecksum,
+              changedDefinitionIds: [],
+            },
+            {
+              baseRevision: record.revision,
+              commandExecutionId: newExecutionId(),
+              replayExpiresAt: new Date(now().getTime() + REPLAY_TTL_MS).toISOString(),
+              replayed: false,
+            },
+          );
+          return { ok: true, value: view };
+        }
+
+        // I6 Task 5 campaign read: active GMs see every attached sheet,
+        // active players only sheets they control. The scope lookup stays on
+        // the characters table so standalone-only deployments never touch
+        // campaign tables here.
+        const scope = await repo.loadCharacterScope(characterId);
+        if (scope === null || scope.campaignId === null) return { ok: false, error: errors.not_found() };
+        const attached = await loadAttachedSnapshot(ctx, characterId);
+        if (attached === null) return { ok: false, error: errors.not_found() };
+
+        const attachedRecord = attached.auth.record;
         const resolved = await input.runtime.resolve({
-          versionId: record.systemVersionId,
-          entityId: record.entityDefinitionId,
-          state: record.state,
+          versionId: attachedRecord.systemVersionId,
+          entityId: attachedRecord.entityDefinitionId,
+          state: attachedRecord.state,
           intent: { kind: "observe" },
         });
         if (!resolved.ok) return { ok: false, error: mapRuntimeError(resolved.error) };
 
         const view = toView(
-          record,
+          attachedRecord,
           {
             derivedValues: resolved.value.derivedValues,
             validations: resolved.value.validations,
@@ -1000,11 +1208,12 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             changedDefinitionIds: [],
           },
           {
-            baseRevision: record.revision,
+            baseRevision: attachedRecord.revision,
             commandExecutionId: newExecutionId(),
             replayExpiresAt: new Date(now().getTime() + REPLAY_TTL_MS).toISOString(),
             replayed: false,
           },
+          { controllers: attached.auth.controllers },
         );
         return { ok: true, value: view };
       } catch {
@@ -1048,7 +1257,9 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
         if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
         if (claimed.status === "replay") {
-          const denial = await denyReplayUnlessOwner(ctx, command.characterId, () => errors.not_found());
+          const denial = await authorizeStoredOutcome(ctx, command.characterId, claimed.resultJson, () =>
+            errors.not_found(),
+          );
           if (denial !== null) return denial;
           return replayStoredOutcome(claimed.resultJson);
         }
@@ -1056,17 +1267,57 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const executionId = claimed.executionId;
         const replayExpiresAt = new Date(claimStartedAt.getTime() + REPLAY_TTL_MS);
 
+        // I6 Task 5: standalone owners keep the existing path; attached
+        // sheets compose campaign capabilities (active GM over every sheet,
+        // active players over controlled sheets) and commit through the
+        // campaign-locked transaction below.
+        let attachedCampaignId: string | null = null;
         const snapshot = await repo.openOwnedCharacter(command.characterId, ctx.actorId);
+        // I6 Task 5: the resolve source. Standalone commands read the owned
+        // snapshot; attached commands read the campaign-authorized record.
+        let attachedRecord: CharacterRecord | null = null;
         if (snapshot === null) {
-          const error = errors.not_found();
-          await repo.finalizeExecutionError({
-            executionId,
-            resultJson: serializeCommandError(error),
-            expiresAt: replayExpiresAt,
-          });
-          return { ok: false, error };
-        }
-        if (snapshot.lifecycle === "archived") {
+          const scope = await repo.loadCharacterScope(command.characterId);
+          if (scope === null || scope.campaignId === null) {
+            const error = errors.not_found();
+            await repo.finalizeExecutionError({
+              executionId,
+              resultJson: serializeCommandError(error),
+              expiresAt: replayExpiresAt,
+            });
+            return { ok: false, error };
+          }
+          const attached = await loadAttachedSnapshot(ctx, command.characterId);
+          if (attached === null) {
+            const error = errors.not_found();
+            await repo.finalizeExecutionError({
+              executionId,
+              resultJson: serializeCommandError(error),
+              expiresAt: replayExpiresAt,
+            });
+            return { ok: false, error };
+          }
+          if (attached.auth.campaign?.status !== "active") {
+            const error = campaignArchivedError(attached.auth.record.revision);
+            await repo.finalizeExecutionError({
+              executionId,
+              resultJson: serializeCommandError(error),
+              expiresAt: replayExpiresAt,
+            });
+            return { ok: false, error };
+          }
+          if (attached.auth.record.lifecycle === "archived") {
+            const error = errors.archived();
+            await repo.finalizeExecutionError({
+              executionId,
+              resultJson: serializeCommandError(error),
+              expiresAt: replayExpiresAt,
+            });
+            return { ok: false, error };
+          }
+          attachedCampaignId = scope.campaignId;
+          attachedRecord = attached.auth.record;
+        } else if (snapshot.lifecycle === "archived") {
           const error = errors.archived();
           await repo.finalizeExecutionError({
             executionId,
@@ -1088,10 +1339,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
                   executionId,
                 } as const);
 
+        const resolveSource: CharacterRecord = attachedRecord ?? snapshot!;
         const resolved = await input.runtime.resolve({
-          versionId: snapshot.systemVersionId,
-          entityId: snapshot.entityDefinitionId,
-          state: snapshot.state,
+          versionId: resolveSource.systemVersionId,
+          entityId: resolveSource.entityDefinitionId,
+          state: resolveSource.state,
           intent,
         });
         if (!resolved.ok) {
@@ -1129,7 +1381,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             requestId: ctx.requestId,
           },
           resultExpiresAt: replayExpiresAt,
-          buildResult: ({ record }) => {
+          ...(attachedCampaignId === null ? {} : { campaign: { campaignId: attachedCampaignId } }),
+          buildResult: ({ record, controllers, scope }) => {
             const view = toView(
               record,
               {
@@ -1146,15 +1399,13 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
                 replayed: false,
               },
             );
-            return { ok: true, value: { character: serializeView(view), roll } };
+            return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)), roll } };
           },
         });
 
         if (outcome.kind === "already_completed") {
-          const placementDenial = await denyStoredOutcomeUnlessStandaloneOwned(
-            ctx,
-            command.characterId,
-            () => errors.not_found(),
+          const placementDenial = await authorizeStoredOutcome(ctx, command.characterId, outcome.resultJson, () =>
+            errors.not_found(),
           );
           if (placementDenial !== null) return placementDenial;
           return replayStoredOutcome(outcome.resultJson);
@@ -1178,9 +1429,23 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           return { ok: false, error };
         }
         if (outcome.kind === "conflict") {
+          // I6 Task 5: reauthorize before disclosing conflict details. A
+          // membership revoked after the snapshot receives the generic
+          // denial, never field-level change summaries or cursors.
+          const stillAuthorized = await recheckWriteAccess(ctx, command.characterId, attachedCampaignId);
+          if (!stillAuthorized) {
+            const error = errors.not_found();
+            await repo.finalizeExecutionError({
+              executionId,
+              resultJson: serializeCommandError(error),
+              expiresAt: replayExpiresAt,
+            });
+            return { ok: false, error };
+          }
           const changedSinceBase = await repo.changedDefinitionIdsSinceRevision(
             command.characterId,
             command.expectedRevision,
+            { scopeCampaignId: attachedCampaignId },
           );
           const activityCursor =
             changedSinceBase.latestActivity === null ? null : encodeActivityCursor(changedSinceBase.latestActivity);
@@ -1240,7 +1505,9 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
         if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
         if (claimed.status === "replay") {
-          const denial = await denyReplayUnlessOwner(ctx, command.characterId, () => errors.notFoundPurge());
+          const denial = await authorizeStoredOutcome(ctx, command.characterId, claimed.resultJson, () =>
+            errors.notFoundPurge(),
+          );
           if (denial !== null) return denial;
           return replayStoredOutcome(claimed.resultJson);
         }
@@ -1248,23 +1515,73 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const executionId = claimed.executionId;
         const replayExpiresAt = new Date(claimStartedAt.getTime() + REPLAY_TTL_MS);
 
+        // I6 Task 5: standalone owners keep the existing path. Attached
+        // sheets compose campaign capabilities: transfer out of the campaign
+        // is denied, renames admit active controllers and GMs, and
+        // archive/recover are GM-only. All denials stay generic.
+        let attachedCampaignId: string | null = null;
+        let attachedRequireManager = false;
         const snapshot = await repo.openOwnedCharacter(command.characterId, ctx.actorId);
+        let resolveSource: CharacterRecord | null = snapshot;
         if (snapshot === null) {
-          const error = errors.notFoundPurge();
-          await repo.finalizeExecutionError({
-            executionId,
-            resultJson: serializeCommandError(error),
-            expiresAt: replayExpiresAt,
-          });
-          return { ok: false, error };
+          const scope = await repo.loadCharacterScope(command.characterId);
+          if (scope === null || scope.campaignId === null) {
+            const error = errors.notFoundPurge();
+            await repo.finalizeExecutionError({
+              executionId,
+              resultJson: serializeCommandError(error),
+              expiresAt: replayExpiresAt,
+            });
+            return { ok: false, error };
+          }
+          if (command.kind === "transferOwnership") {
+            const error = errors.notFoundPurge();
+            await repo.finalizeExecutionError({
+              executionId,
+              resultJson: serializeCommandError(error),
+              expiresAt: replayExpiresAt,
+            });
+            return { ok: false, error };
+          }
+          const attached = await loadAttachedSnapshot(ctx, command.characterId);
+          if (attached === null) {
+            const error = errors.notFoundPurge();
+            await repo.finalizeExecutionError({
+              executionId,
+              resultJson: serializeCommandError(error),
+              expiresAt: replayExpiresAt,
+            });
+            return { ok: false, error };
+          }
+          attachedRequireManager = command.kind === "archive" || command.kind === "recover";
+          if (attachedRequireManager && !attached.manager) {
+            const error = errors.notFoundPurge();
+            await repo.finalizeExecutionError({
+              executionId,
+              resultJson: serializeCommandError(error),
+              expiresAt: replayExpiresAt,
+            });
+            return { ok: false, error };
+          }
+          if (attached.auth.campaign?.status !== "active") {
+            const error = campaignArchivedError(attached.auth.record.revision);
+            await repo.finalizeExecutionError({
+              executionId,
+              resultJson: serializeCommandError(error),
+              expiresAt: replayExpiresAt,
+            });
+            return { ok: false, error };
+          }
+          attachedCampaignId = scope.campaignId;
+          resolveSource = attached.auth.record;
         }
 
         // Management commands never mutate character state, so it is safe to resolve the
         // projection from the pre-mutation snapshot (immutable pinned version/package).
         const resolved = await input.runtime.resolve({
-          versionId: snapshot.systemVersionId,
-          entityId: snapshot.entityDefinitionId,
-          state: snapshot.state,
+          versionId: resolveSource!.systemVersionId,
+          entityId: resolveSource!.entityDefinitionId,
+          state: resolveSource!.state,
           intent: { kind: "observe" },
         });
         if (!resolved.ok) {
@@ -1305,7 +1622,10 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             requestId: ctx.requestId,
           },
           resultExpiresAt: replayExpiresAt,
-          buildResult: ({ record }) => {
+          ...(attachedCampaignId === null
+            ? {}
+            : { campaign: { campaignId: attachedCampaignId, requireManager: attachedRequireManager } }),
+          buildResult: ({ record, controllers, scope }) => {
             const view = toView(
               record,
               {
@@ -1322,15 +1642,13 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
                 replayed: false,
               },
             );
-            return { ok: true, value: { character: serializeView(view), roll: null } };
+            return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)), roll: null } };
           },
         });
 
         if (outcome.kind === "already_completed") {
-          const placementDenial = await denyStoredOutcomeUnlessStandaloneOwned(
-            ctx,
-            command.characterId,
-            () => errors.notFoundPurge(),
+          const placementDenial = await authorizeStoredOutcome(ctx, command.characterId, outcome.resultJson, () =>
+            errors.notFoundPurge(),
           );
           if (placementDenial !== null) return placementDenial;
           return replayStoredOutcome(outcome.resultJson);
@@ -1354,9 +1672,22 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           return { ok: false, error };
         }
         if (outcome.kind === "conflict") {
+          // I6 Task 5: reauthorize before disclosing conflict details, as in
+          // apply above.
+          const stillAuthorized = await recheckWriteAccess(ctx, command.characterId, attachedCampaignId);
+          if (!stillAuthorized) {
+            const error = errors.notFoundPurge();
+            await repo.finalizeExecutionError({
+              executionId,
+              resultJson: serializeCommandError(error),
+              expiresAt: replayExpiresAt,
+            });
+            return { ok: false, error };
+          }
           const changedSinceBase = await repo.changedDefinitionIdsSinceRevision(
             command.characterId,
             command.expectedRevision,
+            { scopeCampaignId: attachedCampaignId },
           );
           const activityCursor =
             changedSinceBase.latestActivity === null ? null : encodeActivityCursor(changedSinceBase.latestActivity);
@@ -1392,9 +1723,28 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         }
 
         const character = await repo.openOwnedCharacter(listInput.characterId, ctx.actorId);
-        if (character === null) return { ok: false, error: errors.notFoundPurge() };
+        // I6 Task 5 history scoping: standalone reads see only unscoped
+        // (personal) events, so campaign history on a returned sheet stays
+        // inaccessible through personal reads. Attached reads admit active
+        // GMs and controllers but only their campaign's events, hiding
+        // pre-adoption personal history while attached. Payloads stay
+        // minimized (full audience filtering lands in Task 7).
+        let scopeCampaignId: string | null = null;
+        if (character === null) {
+          const scope = await repo.loadCharacterScope(listInput.characterId);
+          if (scope === null || scope.campaignId === null) {
+            return { ok: false, error: errors.notFoundPurge() };
+          }
+          const attached = await loadAttachedSnapshot(ctx, listInput.characterId);
+          if (attached === null) return { ok: false, error: errors.notFoundPurge() };
+          scopeCampaignId = scope.campaignId;
+        }
 
-        const rows = await repo.listActivityPage(listInput.characterId, { limit: limit + 1, cursor });
+        const rows = await repo.listActivityPage(
+          listInput.characterId,
+          { limit: limit + 1, cursor },
+          { scopeCampaignId },
+        );
         const page = rows.slice(0, limit);
         const nextCursor =
           rows.length > limit
@@ -1423,20 +1773,52 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     async exportCharacter(ctx, exportInput) {
       try {
         const record = await repo.openOwnedCharacter(exportInput.characterId, ctx.actorId);
-        if (record === null) return { ok: false, error: errors.notFoundPurge() };
+        if (record !== null) {
+          const resolved = await input.runtime.resolve({
+            versionId: record.systemVersionId,
+            entityId: record.entityDefinitionId,
+            state: record.state,
+            intent: { kind: "observe" },
+          });
+          if (!resolved.ok) return { ok: false, error: mapRuntimeError(resolved.error) };
 
+          const document = buildCharacterExportDocument(record, resolved.value.packageChecksum);
+
+          await repo.recordAudit({
+            characterId: record.characterId,
+            actorId: ctx.actorId,
+            kind: "character_exported",
+            summary: "Character exported",
+            requestId: ctx.requestId,
+          });
+
+          return { ok: true, value: document };
+        }
+
+        // I6 Task 5 campaign export: active GMs export every attached sheet,
+        // active players only controlled sheets. The projection carries the
+        // current sheet only (empty lineage, no owner/actor/history payload);
+        // archived campaigns still permit authorized exports.
+        const scope = await repo.loadCharacterScope(exportInput.characterId);
+        if (scope === null || scope.campaignId === null) {
+          return { ok: false, error: errors.notFoundPurge() };
+        }
+        const attached = await loadAttachedSnapshot(ctx, exportInput.characterId);
+        if (attached === null) return { ok: false, error: errors.notFoundPurge() };
+
+        const attachedRecord = attached.auth.record;
         const resolved = await input.runtime.resolve({
-          versionId: record.systemVersionId,
-          entityId: record.entityDefinitionId,
-          state: record.state,
+          versionId: attachedRecord.systemVersionId,
+          entityId: attachedRecord.entityDefinitionId,
+          state: attachedRecord.state,
           intent: { kind: "observe" },
         });
         if (!resolved.ok) return { ok: false, error: mapRuntimeError(resolved.error) };
 
-        const document = buildCharacterExportDocument(record, resolved.value.packageChecksum);
+        const document = buildAttachedCharacterExportDocument(attachedRecord, resolved.value.packageChecksum);
 
         await repo.recordAudit({
-          characterId: record.characterId,
+          characterId: attachedRecord.characterId,
           actorId: ctx.actorId,
           kind: "character_exported",
           summary: "Character exported",
@@ -1602,7 +1984,9 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
         if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
         if (claimed.status === "replay") {
-          const denial = await denyReplayUnlessOwner(ctx, commitInput.characterId, () => errors.not_found());
+          const denial = await authorizeStoredOutcome(ctx, commitInput.characterId, claimed.resultJson, () =>
+            errors.not_found(),
+          );
           if (denial !== null) return denial;
           return replayStoredOutcome(claimed.resultJson);
         }
@@ -1698,7 +2082,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             requestId: ctx.requestId,
           },
           resultExpiresAt: replayExpiresAt,
-          buildResult: ({ record }) => {
+          buildResult: ({ record, controllers, scope }) => {
             const view = toView(
               record,
               {
@@ -1715,15 +2099,13 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
                 replayed: false,
               },
             );
-            return { ok: true, value: { character: serializeView(view), roll: null } };
+            return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)), roll: null } };
           },
         });
 
         if (outcome.kind === "already_completed") {
-          const placementDenial = await denyStoredOutcomeUnlessStandaloneOwned(
-            ctx,
-            commitInput.characterId,
-            () => errors.not_found(),
+          const placementDenial = await authorizeStoredOutcome(ctx, commitInput.characterId, outcome.resultJson, () =>
+            errors.not_found(),
           );
           if (placementDenial !== null) return placementDenial;
           return replayStoredOutcome(outcome.resultJson);
@@ -1773,7 +2155,9 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
         if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
         if (claimed.status === "replay") {
-          const denial = await denyReplayUnlessOwner(ctx, rollbackInput.characterId, () => errors.notFoundPurge());
+          const denial = await authorizeStoredOutcome(ctx, rollbackInput.characterId, claimed.resultJson, () =>
+            errors.notFoundPurge(),
+          );
           if (denial !== null) return denial;
           return replayStoredOutcome(claimed.resultJson);
         }
@@ -1853,7 +2237,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             requestId: ctx.requestId,
           },
           resultExpiresAt: replayExpiresAt,
-          buildResult: ({ record }) => {
+          buildResult: ({ record, controllers, scope }) => {
             const view = toView(
               record,
               {
@@ -1870,15 +2254,13 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
                 replayed: false,
               },
             );
-            return { ok: true, value: { character: serializeView(view), roll: null } };
+            return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)), roll: null } };
           },
         });
 
         if (outcome.kind === "already_completed") {
-          const placementDenial = await denyStoredOutcomeUnlessStandaloneOwned(
-            ctx,
-            rollbackInput.characterId,
-            () => errors.notFoundPurge(),
+          const placementDenial = await authorizeStoredOutcome(ctx, rollbackInput.characterId, outcome.resultJson, () =>
+            errors.notFoundPurge(),
           );
           if (placementDenial !== null) return placementDenial;
           return replayStoredOutcome(outcome.resultJson);

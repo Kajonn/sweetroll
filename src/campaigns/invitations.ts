@@ -462,10 +462,13 @@ export function createInvitationCommands(input: CreateInvitationCommandsInput): 
   async function replayAdminMetadata(options: {
     ctx: RequestContext;
     inputHash: string;
-    receipt: { inputHash: string; resultJson: unknown } | null;
+    receipt: { inputHash: string; resultJson: unknown; expiresAt: Date } | null;
   }): Promise<CampaignResult<InvitationMetadata & { tokenUnavailable: true }>> {
     if (options.receipt === null) return { ok: false, error: errors.internal() };
     if (options.receipt.inputHash !== options.inputHash) return { ok: false, error: errors.mismatch() };
+    if (options.receipt.expiresAt.getTime() <= now().getTime()) {
+      return { ok: false, error: errors.result_unavailable() };
+    }
     const stored = options.receipt.resultJson as { campaignId?: string; invitationId?: string; value?: unknown };
     if (typeof stored.campaignId !== "string") return { ok: false, error: errors.internal() };
     const denial = await reauthorizeAdmin(options.ctx, stored.campaignId);
@@ -514,7 +517,7 @@ export function createInvitationCommands(input: CreateInvitationCommandsInput): 
 
         // Receipt-first: same-key replay returns metadata with
         // tokenUnavailable and never mints a second token.
-        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
         if (preExisting !== null) {
           return await replayAdminMetadata({ ctx, inputHash, receipt: preExisting });
         }
@@ -523,7 +526,7 @@ export function createInvitationCommands(input: CreateInvitationCommandsInput): 
           const campaign = await repo.lockCampaign(client, issueInput.campaignId);
           const membership =
             campaign === null ? null : await repo.loadMembership(client, issueInput.campaignId, ctx.actorId);
-          const raced = await repo.loadReceipt(client, receiptKey);
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
           if (raced !== null) {
             return { committed: false as const, receipt: raced };
           }
@@ -603,7 +606,7 @@ export function createInvitationCommands(input: CreateInvitationCommandsInput): 
           return { committed: true as const, value: { ...metadata, token } };
         }).catch(async (error) => {
           if (error instanceof ReceiptRace) {
-            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
             return { committed: false as const, receipt };
           }
           throw error;
@@ -815,7 +818,7 @@ export function createInvitationCommands(input: CreateInvitationCommandsInput): 
           if (campaign.accessRevision !== consumeInput.reviewedAccessRevision) {
             return {
               committed: false as const,
-              failure: errors.conflict(REREVIEW_MESSAGE, campaign.revision),
+              failure: errors.conflict(REREVIEW_MESSAGE, campaign.accessRevision),
             };
           }
           const existing = await repo.loadMembership(client, campaign.campaignId, ctx.actorId);
@@ -1002,7 +1005,7 @@ export function createInvitationCommands(input: CreateInvitationCommandsInput): 
           if (campaign.accessRevision !== consumeInput.reviewedAccessRevision) {
             return {
               committed: false as const,
-              failure: errors.conflict(REREVIEW_MESSAGE, campaign.revision),
+              failure: errors.conflict(REREVIEW_MESSAGE, campaign.accessRevision),
             };
           }
           // Decline consumes the token without creating membership.
@@ -1114,7 +1117,7 @@ export function createInvitationCommands(input: CreateInvitationCommandsInput): 
 
         // Lost-response recovery replays metadata only: another lost response
         // needs another explicit rotation, never a recovered token.
-        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
         if (preExisting !== null) {
           return await replayAdminMetadata({ ctx, inputHash, receipt: preExisting });
         }
@@ -1125,7 +1128,7 @@ export function createInvitationCommands(input: CreateInvitationCommandsInput): 
             campaign === null ? null : await repo.lockInvitation(client, rotateInput.invitationId);
           const membership =
             campaign === null ? null : await repo.loadMembership(client, rotateInput.campaignId, ctx.actorId);
-          const raced = await repo.loadReceipt(client, receiptKey);
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
           if (raced !== null) {
             return { committed: false as const, receipt: raced };
           }
@@ -1213,7 +1216,7 @@ export function createInvitationCommands(input: CreateInvitationCommandsInput): 
           return { committed: true as const, value: { ...metadata, token } };
         }).catch(async (error) => {
           if (error instanceof ReceiptRace) {
-            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
             return { committed: false as const, receipt };
           }
           throw error;
@@ -1249,10 +1252,13 @@ export function createInvitationCommands(input: CreateInvitationCommandsInput): 
         };
 
         const replayRevoke = async (
-          receipt: { inputHash: string; resultJson: unknown } | null,
+          receipt: { inputHash: string; resultJson: unknown; expiresAt: Date } | null,
         ): Promise<CampaignResult<InvitationMetadata>> => {
           if (receipt === null) return { ok: false, error: errors.internal() };
           if (receipt.inputHash !== inputHash) return { ok: false, error: errors.mismatch() };
+          if (receipt.expiresAt.getTime() <= now().getTime()) {
+            return { ok: false, error: errors.result_unavailable() };
+          }
           const stored = receipt.resultJson as { campaignId?: string; invitationId?: string; value?: unknown };
           if (typeof stored.campaignId !== "string") return { ok: false, error: errors.internal() };
           const denial = await reauthorizeAdmin(ctx, stored.campaignId);
@@ -1264,7 +1270,7 @@ export function createInvitationCommands(input: CreateInvitationCommandsInput): 
           return { ok: true, value: deserializeMetadata(stored.value) };
         };
 
-        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
         if (preExisting !== null) {
           return await replayRevoke(preExisting);
         }
@@ -1275,7 +1281,7 @@ export function createInvitationCommands(input: CreateInvitationCommandsInput): 
             campaign === null ? null : await repo.lockInvitation(client, revokeInput.invitationId);
           const membership =
             campaign === null ? null : await repo.loadMembership(client, revokeInput.campaignId, ctx.actorId);
-          const raced = await repo.loadReceipt(client, receiptKey);
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
           if (raced !== null) {
             return { committed: false as const, receipt: raced };
           }
@@ -1370,7 +1376,7 @@ export function createInvitationCommands(input: CreateInvitationCommandsInput): 
           return { committed: true as const, value: metadata };
         }).catch(async (error) => {
           if (error instanceof ReceiptRace) {
-            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
             return { committed: false as const, receipt };
           }
           throw error;

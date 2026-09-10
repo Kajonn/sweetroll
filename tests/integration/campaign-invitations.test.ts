@@ -452,9 +452,11 @@ describeWithDatabase("campaign single-use invitations and recovery (Task 6)", ()
     // Any later admin change bumps access: the old review is stale.
     await issuePlayerInvite(campaignId);
     const changed = await acceptAs(campaignId, invite.token, staleReview, "player");
+    // The cursor names the access revision the caller must re-review against.
+    const current = await revisions(campaignId);
     expect(changed).toEqual({
       ok: false,
-      error: expect.objectContaining({ code: "conflict" }),
+      error: expect.objectContaining({ code: "conflict", latestRevision: current.accessRevision }),
     });
 
     const fresh = await reviewAs(invite.token, "player");
@@ -859,6 +861,39 @@ describeWithDatabase("campaign single-use invitations and recovery (Task 6)", ()
     });
     // The committed membership stands regardless.
     expect(await memberRow(campaignId, h.users.player.actorId)).toMatchObject({ status: "active" });
+  });
+
+  it("expires admin receipts so stale issue replays become unavailable", async () => {
+    const campaignId = await createCampaign();
+    const key = randomUUID();
+    const { revision } = await revisions(campaignId);
+    const issued = await h.campaigns.issueInvitation(ctxFor(h.users.gm), {
+      campaignId,
+      intendedRole: "player",
+      expectedCampaignRevision: revision,
+      idempotencyKey: key,
+    });
+    expect(issued.ok).toBe(true);
+    if (!issued.ok) return;
+
+    await h.pool.query(
+      `UPDATE campaign_command_executions SET expires_at = now() - interval '1 hour'
+        WHERE actor_id = $1 AND command_kind = 'campaign_invitation_issue' AND idempotency_key = $2`,
+      [h.users.gm.actorId, key],
+    );
+    const replayed = await h.campaigns.issueInvitation(ctxFor(h.users.gm), {
+      campaignId,
+      intendedRole: "player",
+      expectedCampaignRevision: revision,
+      idempotencyKey: key,
+    });
+    // Same input hash, but the receipt lapsed: no stale metadata is returned.
+    expect(replayed).toEqual({
+      ok: false,
+      error: expect.objectContaining({ code: "result_unavailable" }),
+    });
+    // The expired replay mints nothing further.
+    expect(await invitationCount(campaignId)).toBe(1);
   });
 
   it("limits issue, review and consume attempts without logging tokens", async () => {

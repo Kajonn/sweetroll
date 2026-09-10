@@ -95,3 +95,34 @@
   here, but OpenAPI/client contract generation is Task 9's to document.
 - Pre-existing worktree modifications (`design_v2.md`, untracked plans doc)
   were left untouched; no design change was made, so no design-doc update.
+
+## Fix round 1/5 (2026-09-10)
+
+Two review findings fixed; nothing else touched (rate limiter, elevation
+behavior, newToken override, revision-bump coupling, grants, HTTP/contracts
+unchanged).
+
+- I1 (Important): admin replays ignored receipt TTL. `replayAdminMetadata`
+  (issue/rotate) and `replayRevoke` now take `loadReceiptWithExpiry` rows and
+  return the same documented `result_unavailable` on lapse as
+  accept/decline, checked before re-authorization or live-metadata reload.
+  All admin receipt loads (pre-check, in-transaction race, `ReceiptRace`
+  catch) moved from `loadReceipt` to `loadReceiptWithExpiry` in the
+  issue/rotate/revoke paths. The live-metadata reload on a valid receipt is
+  unchanged: a current receipt still reflects later rotation/revoke/consume
+  without token bytes; only an expired receipt is refused.
+- M1 (Minor): access-stale conflicts in accept/decline reported
+  `campaign.revision` in `latestRevision`. Both now report
+  `campaign.accessRevision` — the revision the caller must re-review
+  against. Invitation-stale and all other conflict cursors unchanged.
+- Tests (`tests/integration/campaign-invitations.test.ts`, 17 tests): new
+  "expires admin receipts so stale issue replays become unavailable" mirrors
+  the accept-expiry style (lapse the `campaign_invitation_issue` receipt via
+  SQL, same-key replay yields `result_unavailable` with no stale metadata
+  and mints no second row); the existing "requires re-review" test now
+  asserts `latestRevision` equals the current access revision.
+
+Verification (`TEST_DATABASE_URL=...@127.0.0.1:5433/sweetroll`,
+`--no-file-parallelism`): campaign-invitations **17/17**;
+membership+campaigns+migrations **29/29**; full vitest **50 files,
+521/521**; root `npm test` **28 files, 284/284**; `tsc --noEmit` clean.

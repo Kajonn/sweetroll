@@ -121,6 +121,19 @@ describeWithDatabase("campaign aggregate (Task 2)", () => {
     if (unknown.ok) return;
     expect(unknown.error.code).toBe("not_found");
 
+    // A draft-lifecycle version of an otherwise accessible system is rejected:
+    // only published versions satisfy the accessible-version predicate.
+    const draftVersionId = randomUUID();
+    await h.pool.query(
+      `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle)
+       VALUES ($1, $2, '9.9.9', $3, '{}'::jsonb, '', 'draft')`,
+      [draftVersionId, h.systemId, `draft-${randomUUID()}`],
+    );
+    const draft = await createCampaign({ versionId: draftVersionId });
+    expect(draft.ok).toBe(false);
+    if (draft.ok) return;
+    expect(draft.error.code).toBe("not_found");
+
     // other's private published version is not accessible to gm.
     const foreign = await createCampaign({ versionId: h.otherVersionId });
     expect(foreign.ok).toBe(false);
@@ -137,6 +150,18 @@ describeWithDatabase("campaign aggregate (Task 2)", () => {
     const replay = await createCampaign({ title: "Replayed", key });
     expect(replay).toEqual(first);
 
+    // The replay committed no spurious second row: exactly one campaign row
+    // and one receipt row exist for the key.
+    const rows = await h.pool.query("SELECT id FROM campaigns WHERE title = 'Replayed'");
+    expect(rows.rows).toHaveLength(1);
+    const receipts = await h.pool.query(
+      `SELECT COUNT(*)::int AS count
+          FROM campaign_command_executions
+         WHERE actor_id = $1 AND command_kind = 'campaign_create' AND idempotency_key = $2`,
+      [h.users.gm.actorId, key],
+    );
+    expect(receipts.rows[0].count).toBe(1);
+
     const mismatch = await h.campaigns.create(ctxFor(h.users.gm), {
       systemVersionId: h.versionId,
       title: "Changed",
@@ -146,6 +171,148 @@ describeWithDatabase("campaign aggregate (Task 2)", () => {
     expect(mismatch.ok).toBe(false);
     if (mismatch.ok) return;
     expect(mismatch.error.code).toBe("idempotency_mismatch");
+  });
+
+  it("replays update on the same key without double-applying", async () => {
+    const created = await createCampaign();
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const campaignId = created.value.campaignId;
+
+    const key = randomUUID();
+    const first = await h.campaigns.update(ctxFor(h.users.gm), {
+      campaignId,
+      title: "Applied once",
+      expectedCampaignRevision: 1,
+      idempotencyKey: key,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(first.value.revision).toBe(2);
+
+    const replay = await h.campaigns.update(ctxFor(h.users.gm), {
+      campaignId,
+      title: "Applied once",
+      expectedCampaignRevision: 1,
+      idempotencyKey: key,
+    });
+    expect(replay).toEqual(first);
+
+    // No second application: revision still 2 and a single audit record.
+    const opened = await h.campaigns.open(ctxFor(h.users.gm), { campaignId });
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    expect(opened.value.revision).toBe(2);
+    const audits = await h.pool.query(
+      `SELECT COUNT(*)::int AS count
+          FROM campaign_audit_records
+         WHERE campaign_id = $1 AND kind = 'campaign_updated'`,
+      [campaignId],
+    );
+    expect(audits.rows[0].count).toBe(1);
+  });
+
+  it("collapses management-role failures to not_found and keeps definite caller errors as bad_request", async () => {
+    const created = await createCampaign();
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const campaignId = created.value.campaignId;
+
+    // Seed active non-owner members directly: invitations arrive in Task 6.
+    await h.pool.query(
+      `INSERT INTO campaign_members (campaign_id, user_id, role)
+       VALUES ($1, $2, 'player'), ($1, $3, 'player')`,
+      [campaignId, h.users.player.actorId, h.users.other.actorId],
+    );
+
+    // Active player managing roles is a management-role failure: not_found.
+    const playerChange = await h.campaigns.changeRole(ctxFor(h.users.player), {
+      campaignId,
+      userId: h.users.player.actorId,
+      role: "player",
+      expectedCampaignRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(playerChange).toEqual({
+      ok: false,
+      error: expect.objectContaining({ code: "not_found" }),
+    });
+
+    // A player removing another active member is a definite caller error.
+    const playerRemovesOther = await h.campaigns.removeMember(ctxFor(h.users.player), {
+      campaignId,
+      userId: h.users.other.actorId,
+      expectedCampaignRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(playerRemovesOther.ok).toBe(false);
+    if (playerRemovesOther.ok) return;
+    expect(playerRemovesOther.error.code).toBe("bad_request");
+
+    // Owner promotes both to co_gm (revisions 1 -> 2 -> 3).
+    const promotePlayer = await h.campaigns.changeRole(ctxFor(h.users.gm), {
+      campaignId,
+      userId: h.users.player.actorId,
+      role: "co_gm",
+      expectedCampaignRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(promotePlayer.ok).toBe(true);
+    const promoteOther = await h.campaigns.changeRole(ctxFor(h.users.gm), {
+      campaignId,
+      userId: h.users.other.actorId,
+      role: "co_gm",
+      expectedCampaignRevision: 2,
+      idempotencyKey: randomUUID(),
+    });
+    expect(promoteOther.ok).toBe(true);
+
+    // A co_gm managing a peer co_gm collapses to not_found (both operations).
+    const peerDemote = await h.campaigns.changeRole(ctxFor(h.users.player), {
+      campaignId,
+      userId: h.users.other.actorId,
+      role: "player",
+      expectedCampaignRevision: 3,
+      idempotencyKey: randomUUID(),
+    });
+    expect(peerDemote).toEqual({
+      ok: false,
+      error: expect.objectContaining({ code: "not_found" }),
+    });
+    const peerRemove = await h.campaigns.removeMember(ctxFor(h.users.player), {
+      campaignId,
+      userId: h.users.other.actorId,
+      expectedCampaignRevision: 3,
+      idempotencyKey: randomUUID(),
+    });
+    expect(peerRemove).toEqual({
+      ok: false,
+      error: expect.objectContaining({ code: "not_found" }),
+    });
+
+    // Touching the owner stays a definite caller error (bad_request).
+    const touchOwner = await h.campaigns.changeRole(ctxFor(h.users.player), {
+      campaignId,
+      userId: h.users.gm.actorId,
+      role: "player",
+      expectedCampaignRevision: 3,
+      idempotencyKey: randomUUID(),
+    });
+    expect(touchOwner.ok).toBe(false);
+    if (touchOwner.ok) return;
+    expect(touchOwner.error.code).toBe("bad_request");
+
+    // Denied paths mutated nothing: revision still 3, other still co_gm.
+    const opened = await h.campaigns.open(ctxFor(h.users.gm), { campaignId });
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    expect(opened.value.revision).toBe(3);
+    const roster = await h.campaigns.listMembers(ctxFor(h.users.gm), { campaignId });
+    expect(roster.ok).toBe(true);
+    if (!roster.ok) return;
+    expect(
+      roster.value.members.find((member) => member.userId === h.users.other.actorId),
+    ).toMatchObject({ role: "co_gm", status: "active" });
   });
 
   it("updates metadata with revision checks and rejects oversize input before transactions", async () => {

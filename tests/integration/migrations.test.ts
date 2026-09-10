@@ -226,22 +226,43 @@ describeWithDatabase("runMigrations", () => {
 
     const indexes = await client.query<{ indexname: string }>(
       `SELECT indexname
-         FROM pg_indexes
+          FROM pg_indexes
         WHERE schemaname = $1
           AND tablename LIKE 'campaign%'
+          AND indexname NOT IN (
+            SELECT c.relname
+              FROM pg_constraint con
+              JOIN pg_class c ON c.oid = con.conindid
+             WHERE con.connamespace = $1::regnamespace
+               AND con.contype = 'u'
+          )
         ORDER BY indexname`,
       [schema],
     );
     expect(indexes.rows.map(({ indexname }) => indexname)).toEqual([
       "campaign_audit_records_page_idx",
       "campaign_audit_records_pkey",
-      "campaign_command_executions_actor_id_command_kind_idempoten_key",
       "campaign_command_executions_expiry_idx",
       "campaign_command_executions_pkey",
       "campaign_members_pkey",
       "campaign_members_user_idx",
       "campaigns_owner_page_idx",
       "campaigns_pkey",
+    ]);
+
+    // The actor-scoped idempotency receipt holds exactly one row per key via
+    // its UNIQUE constraint; assert the constraint rather than the
+    // auto-generated (truncated) backing index name.
+    const receiptUnique = await client.query<{ definition: string }>(
+      `SELECT pg_get_constraintdef(oid) AS definition
+          FROM pg_constraint
+        WHERE connamespace = $1::regnamespace
+          AND conrelid = 'campaign_command_executions'::regclass
+          AND contype = 'u'`,
+      [schema],
+    );
+    expect(receiptUnique.rows.map(({ definition }) => definition)).toEqual([
+      "UNIQUE (actor_id, command_kind, idempotency_key)",
     ]);
 
     const records = await client.query<{ filename: string }>(

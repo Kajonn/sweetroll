@@ -272,7 +272,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       let cursorClause = "";
       if (input.cursorCreatedAt !== null && input.cursorId !== null) {
         params.push(input.cursorCreatedAt, input.cursorId);
-        cursorClause = `AND (c.created_at < $2 OR (c.created_at = $2 AND c.id < $3))`;
+        cursorClause = `AND (c.created_at < $2::timestamptz OR (c.created_at = $2::timestamptz AND c.id < $3))`;
       }
       params.push(input.limit + 1);
       const result = await client.query<CampaignRow>(
@@ -297,7 +297,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       let cursorClause = "";
       if (input.cursorCreatedAt !== null && input.cursorUserId !== null) {
         params.push(input.cursorCreatedAt, input.cursorUserId);
-        cursorClause = `AND (created_at < $2 OR (created_at = $2 AND user_id < $3))`;
+        cursorClause = `AND (created_at < $2::timestamptz OR (created_at = $2::timestamptz AND user_id < $3))`;
       }
       params.push(input.limit + 1);
       const result = await client.query<MembershipRow>(

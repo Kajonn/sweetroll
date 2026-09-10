@@ -219,6 +219,9 @@ export const I3_SCHEMA_DDL = `
   );
 
   CREATE TABLE campaigns (
+    -- Test-fixture copy pinned to migrations/0012_campaigns.sql: keep the
+    -- campaign table/constraint/index definitions below identical to that
+    -- production migration. This DDL only seeds historical test schemas.
     id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id          uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     system_version_id uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,

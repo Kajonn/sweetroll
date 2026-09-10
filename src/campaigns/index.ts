@@ -172,6 +172,17 @@ const REMOVE_MEMBER_KIND = "campaign_remove_member";
 
 type ListCursor = { createdAt: string; id: string };
 
+/**
+ * Thrown inside a transaction when the idempotency receipt insert loses a
+ * concurrent race after the mutation already ran. Forcing a rollback keeps
+ * the spurious row from committing; the caller then replays the winner.
+ */
+class ReceiptRace extends Error {
+  constructor() {
+    super("idempotency receipt raced");
+  }
+}
+
 export function createCampaignsModule(input: CreateCampaignsModuleInput): Campaigns {
   const repo: CampaignPersistenceRepository = createCampaignPersistenceRepository(input.pool);
   const limits = input.limits;
@@ -390,10 +401,35 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
           title: createInput.title,
           description,
         });
-        const campaignId = newId();
-        const timestamp = now();
+        const receiptKey = {
+          actorId: ctx.actorId,
+          commandKind: CREATE_KIND,
+          idempotencyKey: createInput.idempotencyKey,
+        };
+
+        // Receipt-first: an exact replay returns the stored value without
+        // inserting a second campaign row.
+        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        if (preExisting !== null) {
+          return await resolveReplay<CampaignView>({
+            commandKind: CREATE_KIND,
+            idempotencyKey: createInput.idempotencyKey,
+            inputHash,
+            receipt: preExisting,
+            deserialize: deserializeView,
+            reauthorize: (id) => reauthorizeMember(ctx, id),
+          });
+        }
 
         const outcome = await withTransaction(async (client) => {
+          // Re-check inside the transaction: a concurrent identical request
+          // may have committed between the pre-check and our inserts.
+          const raced = await repo.loadReceipt(client, receiptKey);
+          if (raced !== null) {
+            return { committed: false as const, receipt: raced };
+          }
+          const campaignId = newId();
+          const timestamp = now();
           const record = await repo.insertCampaign(client, {
             campaignId,
             ownerId: ctx.actorId,
@@ -421,14 +457,17 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             expiresAt: new Date(timestamp.getTime() + RECEIPT_TTL_MS),
           });
           if (!inserted) {
-            const receipt = await repo.loadReceipt(client, {
-              actorId: ctx.actorId,
-              commandKind: CREATE_KIND,
-              idempotencyKey: createInput.idempotencyKey,
-            });
-            return { committed: false as const, receipt };
+            // Lost a concurrent race after mutating: roll back so the
+            // spurious row never commits, then replay the winner below.
+            throw new ReceiptRace();
           }
           return { committed: true as const, value };
+        }).catch(async (error) => {
+          if (error instanceof ReceiptRace) {
+            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            return { committed: false as const, receipt };
+          }
+          throw error;
         });
 
         if (outcome.committed) return { ok: true, value: outcome.value };
@@ -521,6 +560,25 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
           description: updateInput.description ?? null,
           expectedCampaignRevision: updateInput.expectedCampaignRevision,
         });
+        const receiptKey = {
+          actorId: ctx.actorId,
+          commandKind: UPDATE_KIND,
+          idempotencyKey: updateInput.idempotencyKey,
+        };
+
+        // Receipt-first: an exact replay returns the stored value without
+        // re-applying the mutation.
+        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        if (preExisting !== null) {
+          return await resolveReplay<CampaignView>({
+            commandKind: UPDATE_KIND,
+            idempotencyKey: updateInput.idempotencyKey,
+            inputHash,
+            receipt: preExisting,
+            deserialize: deserializeView,
+            reauthorize: (id) => reauthorizeMember(ctx, id),
+          });
+        }
 
         const outcome = await withTransaction(async (client) => {
           const campaign = await repo.lockCampaign(client, updateInput.campaignId);
@@ -528,6 +586,12 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             campaign === null
               ? null
               : await repo.loadMembership(client, updateInput.campaignId, ctx.actorId);
+          // Re-check before any mutation: a waiter behind the row lock must
+          // replay instead of re-applying or hitting a revision conflict.
+          const raced = await repo.loadReceipt(client, receiptKey);
+          if (raced !== null) {
+            return { committed: false as const, receipt: raced };
+          }
           if (campaign === null || !isActiveMember(membership)) {
             return { committed: false as const, failure: errors.not_found() as CampaignError };
           }
@@ -588,14 +652,17 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             expiresAt: new Date(now().getTime() + RECEIPT_TTL_MS),
           });
           if (!inserted) {
-            const receipt = await repo.loadReceipt(client, {
-              actorId: ctx.actorId,
-              commandKind: UPDATE_KIND,
-              idempotencyKey: updateInput.idempotencyKey,
-            });
-            return { committed: false as const, receipt };
+            // Lost a concurrent race after mutating: roll back so the second
+            // application never commits, then replay the winner below.
+            throw new ReceiptRace();
           }
           return { committed: true as const, value };
+        }).catch(async (error) => {
+          if (error instanceof ReceiptRace) {
+            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            return { committed: false as const, receipt };
+          }
+          throw error;
         });
 
         if ("failure" in outcome) return { ok: false, error: outcome.failure };
@@ -623,6 +690,25 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
           campaignId: archiveInput.campaignId,
           expectedCampaignRevision: archiveInput.expectedCampaignRevision,
         });
+        const receiptKey = {
+          actorId: ctx.actorId,
+          commandKind: ARCHIVE_KIND,
+          idempotencyKey: archiveInput.idempotencyKey,
+        };
+
+        // Receipt-first: an exact replay returns the stored value without
+        // re-applying the mutation.
+        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        if (preExisting !== null) {
+          return await resolveReplay<CampaignView>({
+            commandKind: ARCHIVE_KIND,
+            idempotencyKey: archiveInput.idempotencyKey,
+            inputHash,
+            receipt: preExisting,
+            deserialize: deserializeView,
+            reauthorize: (id) => reauthorizeMember(ctx, id),
+          });
+        }
 
         const outcome = await withTransaction(async (client) => {
           const campaign = await repo.lockCampaign(client, archiveInput.campaignId);
@@ -630,6 +716,12 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             campaign === null
               ? null
               : await repo.loadMembership(client, archiveInput.campaignId, ctx.actorId);
+          // Re-check before any mutation: a waiter behind the row lock must
+          // replay instead of re-applying or hitting a revision conflict.
+          const raced = await repo.loadReceipt(client, receiptKey);
+          if (raced !== null) {
+            return { committed: false as const, receipt: raced };
+          }
           if (campaign === null || !isActiveMember(membership)) {
             return { committed: false as const, failure: errors.not_found() as CampaignError };
           }
@@ -689,14 +781,17 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             expiresAt: new Date(now().getTime() + RECEIPT_TTL_MS),
           });
           if (!inserted) {
-            const receipt = await repo.loadReceipt(client, {
-              actorId: ctx.actorId,
-              commandKind: ARCHIVE_KIND,
-              idempotencyKey: archiveInput.idempotencyKey,
-            });
-            return { committed: false as const, receipt };
+            // Lost a concurrent race after mutating: roll back so the second
+            // application never commits, then replay the winner below.
+            throw new ReceiptRace();
           }
           return { committed: true as const, value };
+        }).catch(async (error) => {
+          if (error instanceof ReceiptRace) {
+            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            return { committed: false as const, receipt };
+          }
+          throw error;
         });
 
         if ("failure" in outcome) return { ok: false, error: outcome.failure };
@@ -724,6 +819,25 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
           campaignId: recoverInput.campaignId,
           expectedCampaignRevision: recoverInput.expectedCampaignRevision,
         });
+        const receiptKey = {
+          actorId: ctx.actorId,
+          commandKind: RECOVER_KIND,
+          idempotencyKey: recoverInput.idempotencyKey,
+        };
+
+        // Receipt-first: an exact replay returns the stored value without
+        // re-applying the mutation.
+        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        if (preExisting !== null) {
+          return await resolveReplay<CampaignView>({
+            commandKind: RECOVER_KIND,
+            idempotencyKey: recoverInput.idempotencyKey,
+            inputHash,
+            receipt: preExisting,
+            deserialize: deserializeView,
+            reauthorize: (id) => reauthorizeMember(ctx, id),
+          });
+        }
 
         const outcome = await withTransaction(async (client) => {
           const campaign = await repo.lockCampaign(client, recoverInput.campaignId);
@@ -731,6 +845,12 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             campaign === null
               ? null
               : await repo.loadMembership(client, recoverInput.campaignId, ctx.actorId);
+          // Re-check before any mutation: a waiter behind the row lock must
+          // replay instead of re-applying or hitting a revision conflict.
+          const raced = await repo.loadReceipt(client, receiptKey);
+          if (raced !== null) {
+            return { committed: false as const, receipt: raced };
+          }
           if (campaign === null || !isActiveMember(membership)) {
             return { committed: false as const, failure: errors.not_found() as CampaignError };
           }
@@ -790,14 +910,17 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             expiresAt: new Date(now().getTime() + RECEIPT_TTL_MS),
           });
           if (!inserted) {
-            const receipt = await repo.loadReceipt(client, {
-              actorId: ctx.actorId,
-              commandKind: RECOVER_KIND,
-              idempotencyKey: recoverInput.idempotencyKey,
-            });
-            return { committed: false as const, receipt };
+            // Lost a concurrent race after mutating: roll back so the second
+            // application never commits, then replay the winner below.
+            throw new ReceiptRace();
           }
           return { committed: true as const, value };
+        }).catch(async (error) => {
+          if (error instanceof ReceiptRace) {
+            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            return { committed: false as const, receipt };
+          }
+          throw error;
         });
 
         if ("failure" in outcome) return { ok: false, error: outcome.failure };
@@ -867,6 +990,25 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
           role: roleInput.role,
           expectedCampaignRevision: roleInput.expectedCampaignRevision,
         });
+        const receiptKey = {
+          actorId: ctx.actorId,
+          commandKind: CHANGE_ROLE_KIND,
+          idempotencyKey: roleInput.idempotencyKey,
+        };
+
+        // Receipt-first: an exact replay returns the stored value without
+        // re-applying the mutation.
+        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        if (preExisting !== null) {
+          return await resolveReplay<MemberView>({
+            commandKind: CHANGE_ROLE_KIND,
+            idempotencyKey: roleInput.idempotencyKey,
+            inputHash,
+            receipt: preExisting,
+            deserialize: deserializeMember,
+            reauthorize: (id) => reauthorizeMember(ctx, id),
+          });
+        }
 
         const outcome = await withTransaction(async (client) => {
           const campaign = await repo.lockCampaign(client, roleInput.campaignId);
@@ -874,6 +1016,12 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             campaign === null ? null : await repo.loadMembership(client, roleInput.campaignId, ctx.actorId);
           const target =
             campaign === null ? null : await repo.loadMembership(client, roleInput.campaignId, roleInput.userId);
+          // Re-check before any mutation: a waiter behind the row lock must
+          // replay instead of re-applying or hitting a revision conflict.
+          const raced = await repo.loadReceipt(client, receiptKey);
+          if (raced !== null) {
+            return { committed: false as const, receipt: raced };
+          }
           if (campaign === null || !isActiveMember(caller)) {
             return { committed: false as const, failure: errors.not_found() as CampaignError };
           }
@@ -944,14 +1092,17 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             expiresAt: new Date(now().getTime() + RECEIPT_TTL_MS),
           });
           if (!inserted) {
-            const receipt = await repo.loadReceipt(client, {
-              actorId: ctx.actorId,
-              commandKind: CHANGE_ROLE_KIND,
-              idempotencyKey: roleInput.idempotencyKey,
-            });
-            return { committed: false as const, receipt };
+            // Lost a concurrent race after mutating: roll back so the second
+            // application never commits, then replay the winner below.
+            throw new ReceiptRace();
           }
           return { committed: true as const, value };
+        }).catch(async (error) => {
+          if (error instanceof ReceiptRace) {
+            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            return { committed: false as const, receipt };
+          }
+          throw error;
         });
 
         if ("failure" in outcome) return { ok: false, error: outcome.failure };
@@ -980,6 +1131,28 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
           userId: removeInput.userId,
           expectedCampaignRevision: removeInput.expectedCampaignRevision,
         });
+        const receiptKey = {
+          actorId: ctx.actorId,
+          commandKind: REMOVE_MEMBER_KIND,
+          idempotencyKey: removeInput.idempotencyKey,
+        };
+        // Leave/removal replays a minimal own-command acknowledgement without
+        // requiring current membership: the caller may have departed already.
+        const replayRemoval = (
+          receipt: { inputHash: string; resultJson: unknown } | null,
+        ): CampaignResult<MemberView> => {
+          if (receipt === null) return { ok: false, error: errors.internal() };
+          if (receipt.inputHash !== inputHash) return { ok: false, error: errors.mismatch() };
+          const stored = receipt.resultJson as { value?: unknown };
+          return { ok: true, value: deserializeMember(stored.value) };
+        };
+
+        // Receipt-first: an exact replay returns the stored acknowledgement
+        // without re-applying the removal.
+        const preExisting = await repo.loadReceipt(input.pool, receiptKey);
+        if (preExisting !== null) {
+          return replayRemoval(preExisting);
+        }
 
         const outcome = await withTransaction(async (client) => {
           // Departure stays available while archived: no status gate here.
@@ -988,6 +1161,12 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             campaign === null ? null : await repo.loadMembership(client, removeInput.campaignId, ctx.actorId);
           const target =
             campaign === null ? null : await repo.loadMembership(client, removeInput.campaignId, removeInput.userId);
+          // Re-check before any mutation: a waiter behind the row lock must
+          // replay instead of re-applying or hitting a revision conflict.
+          const raced = await repo.loadReceipt(client, receiptKey);
+          if (raced !== null) {
+            return { committed: false as const, receipt: raced };
+          }
           if (campaign === null || !isActiveMember(caller)) {
             return { committed: false as const, failure: errors.not_found() as CampaignError };
           }
@@ -1052,26 +1231,22 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             expiresAt: new Date(now().getTime() + RECEIPT_TTL_MS),
           });
           if (!inserted) {
-            const receipt = await repo.loadReceipt(client, {
-              actorId: ctx.actorId,
-              commandKind: REMOVE_MEMBER_KIND,
-              idempotencyKey: removeInput.idempotencyKey,
-            });
-            return { committed: false as const, receipt };
+            // Lost a concurrent race after mutating: roll back so the second
+            // application never commits, then replay the winner below.
+            throw new ReceiptRace();
           }
           return { committed: true as const, value };
+        }).catch(async (error) => {
+          if (error instanceof ReceiptRace) {
+            const receipt = await repo.loadReceipt(input.pool, receiptKey);
+            return { committed: false as const, receipt };
+          }
+          throw error;
         });
 
         if ("failure" in outcome) return { ok: false, error: outcome.failure };
         if (outcome.committed) return { ok: true, value: outcome.value };
-        // Leave/removal replays a minimal own-command acknowledgement without
-        // requiring current membership: the caller may have departed already.
-        if (outcome.receipt?.inputHash !== inputHash) {
-          if (outcome.receipt == null) return { ok: false, error: errors.internal() };
-          return { ok: false, error: errors.mismatch() };
-        }
-        const stored = outcome.receipt.resultJson as { value?: unknown };
-        return { ok: true, value: deserializeMember(stored.value) };
+        return replayRemoval(outcome.receipt ?? null);
       } catch {
         return { ok: false, error: errors.internal() };
       }
@@ -1086,11 +1261,13 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
       case "not_member":
         return errs.not_found();
       case "not_manager":
-        return errs.bad_request("Only the campaign owner or a co-GM may perform this action.");
+      case "owner_only":
+        // Management-role failures collapse to not_found, consistent with
+        // update: a non-manager must not learn whether the target membership
+        // exists. Only definite caller errors stay bad_request below.
+        return errs.not_found();
       case "owner_immutable":
         return errs.bad_request("The campaign owner role cannot be changed or removed. Archive the campaign instead.");
-      case "owner_only":
-        return errs.bad_request("Only the campaign owner may manage co-GM roles.");
       case "self_only":
         return errs.bad_request("Players may only leave the campaign themselves.");
     }

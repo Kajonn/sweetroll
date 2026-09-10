@@ -388,6 +388,14 @@ export type CharacterActivityRow = {
   requestId: string;
   occurredAt: Date;
   cursorText: string;
+  /**
+   * I6 Task 8 fix: roll authorship/audience for per-reader existence
+   * redaction in the character-activity path (NULL when the event carries
+   * no roll). The read layer nulls `rollId` for readers outside the roll
+   * audience while keeping revision/state-change visibility.
+   */
+  rollActorId: string | null;
+  rollAudience: RollAudience | null;
 };
 
 /**
@@ -1065,6 +1073,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         // I6 Task 8: standalone commits accept only `owner_only`/omitted and
         // retain existing behavior. The module validates before claim; this
         // second layer holds even if that check ever widens.
+        // Deliberately `not_found` (not `bad_request`): persistence outcomes carry no validation variant, so this unreachable fail-closed denial collapses exactly like a foreign id.
         const standaloneRequested = input.rollAudience?.requested ?? null;
         if (standaloneRequested !== null && standaloneRequested !== "owner_only") {
           await client.query("ROLLBACK");
@@ -1280,13 +1289,16 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
     },
 
     async listActivityPage(characterId, page, scope) {
-      const rowShape = `id, character_revision, kind, payload_json, roll_id, request_id,
-             occurred_at, to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS occurred_at_cursor`;
       // I6 Task 5 history scoping: standalone reads see only unscoped
       // (personal) events, attached reads only their campaign's events.
       // Pre-adoption personal history stays hidden while attached and
       // returns after detachment; campaign history never relabels into the
-      // personal scope.
+      // personal scope. The LEFT JOIN carries the roll's authorship/audience
+      // so the read layer can redact `rollId` for out-of-audience sheet
+      // readers (fix round 1); dice/bindings never enter this projection.
+      const rowShape = `e.id, e.character_revision, e.kind, e.payload_json, e.roll_id, e.request_id,
+             e.occurred_at, to_char(e.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS occurred_at_cursor,
+             r.actor_id AS roll_actor_id, r.audience AS roll_audience`;
       type ActivityRowShape = {
         id: string;
         character_revision: number;
@@ -1296,28 +1308,31 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         request_id: string;
         occurred_at: Date;
         occurred_at_cursor: string;
+        roll_actor_id: string | null;
+        roll_audience: string | null;
       };
       const scopeValue = scope?.scopeCampaignId;
-      const filters: string[] = [`character_id = $1`];
+      const filters: string[] = [`e.character_id = $1`];
       const params: unknown[] = [characterId];
       if (page.cursor !== null) {
         params.push(page.cursor.occurredAtText, page.cursor.id);
-        filters.push(`(occurred_at, id) < ($2::timestamptz, $3)`);
+        filters.push(`(e.occurred_at, e.id) < ($2::timestamptz, $3)`);
       }
       if (scopeValue !== undefined) {
         if (scopeValue === null) {
-          filters.push(`scope_campaign_id IS NULL`);
+          filters.push(`e.scope_campaign_id IS NULL`);
         } else {
           params.push(scopeValue);
-          filters.push(`scope_campaign_id = $${params.length}`);
+          filters.push(`e.scope_campaign_id = $${params.length}`);
         }
       }
       params.push(page.limit);
       const rows = await pool.query<ActivityRowShape>(
         `SELECT ${rowShape}
-           FROM character_activity_events
+           FROM character_activity_events e
+           LEFT JOIN character_rolls r ON r.id = e.roll_id
           WHERE ${filters.join(" AND ")}
-          ORDER BY occurred_at DESC, id DESC
+          ORDER BY e.occurred_at DESC, e.id DESC
           LIMIT $${params.length}`,
         params,
       );
@@ -1330,6 +1345,8 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         requestId: row.request_id,
         occurredAt: row.occurred_at,
         cursorText: row.occurred_at_cursor,
+        rollActorId: row.roll_actor_id,
+        rollAudience: parseRollAudienceOrNull(row.roll_audience),
       }));
     },
 
@@ -1821,6 +1838,13 @@ async function lockCampaignForWrite(
 function parseRollAudienceDefault(value: string): RollAudience {
   if (value === "owner_only" || value === "gm_only" || value === "campaign") return value;
   throw new Error(`Unknown roll audience default: ${value}`);
+}
+
+/** I6 Task 8 fix: nullable audience from the activity LEFT JOIN; NULL means no roll. Fail closed (null) on unknown values. */
+function parseRollAudienceOrNull(value: string | null): RollAudience | null {
+  if (value === null) return null;
+  if (value === "owner_only" || value === "gm_only" || value === "campaign") return value;
+  return null;
 }
 
 async function loadTxMembership(

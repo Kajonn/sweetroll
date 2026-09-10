@@ -26,7 +26,7 @@ import {
   type RollAudience,
   type StoredResultScope,
 } from "./persistence.js";
-import { isActiveMember, isGameMaster, type MembershipRecord } from "../campaigns/policy.js";
+import { canReadRoll, isActiveMember, isGameMaster, type MembershipRecord } from "../campaigns/policy.js";
 import { claimExecution } from "./idempotency.js";
 import { buildAttachedCharacterExportDocument, buildCharacterExportDocument } from "./export.js";
 import { buildCandidateValues, collectEditableFields, denyAttachedMigrationScope } from "./migration.js";
@@ -1774,8 +1774,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         // inaccessible through personal reads. Attached reads admit active
         // GMs and controllers but only their campaign's events, hiding
         // pre-adoption personal history while attached. Payloads stay
-        // minimized (full audience filtering lands in Task 7).
+        // minimized; attached `rollId`s additionally honor the roll audience
+        // (Task 8 fix): out-of-audience readers keep the event with a nulled
+        // rollId, never the correlatable roll UUID.
         let scopeCampaignId: string | null = null;
+        let attachedMembership: MembershipRecord | null = null;
         if (character === null) {
           const scope = await repo.loadCharacterScope(listInput.characterId);
           if (scope === null || scope.campaignId === null) {
@@ -1784,6 +1787,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           const attached = await loadAttachedSnapshot(ctx, listInput.characterId);
           if (attached === null) return { ok: false, error: errors.notFoundPurge() };
           scopeCampaignId = scope.campaignId;
+          attachedMembership = toMembershipRecord(attached.auth.membership!);
         }
 
         const rows = await repo.listActivityPage(
@@ -1805,7 +1809,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
               characterRevision: row.characterRevision,
               kind: row.kind,
               payload: minimizeActivityPayload(row.kind, row.payloadJson),
-              rollId: row.rollId,
+              rollId: redactRollIdForReader(row, attachedMembership, scopeCampaignId),
               requestId: row.requestId,
               occurredAt: row.occurredAt,
             })),
@@ -2382,6 +2386,26 @@ function decodeActivityCursor(cursor: string | null): { occurredAtText: string; 
 // validation and never fall back to a wider audience.
 function isRollAudience(value: unknown): value is RollAudience {
   return value === "owner_only" || value === "gm_only" || value === "campaign";
+}
+
+// I6 Task 8 fix: character-activity roll-existence redaction. Standalone
+// reads (membership null) keep the roll id: only the owner can read them.
+// Attached reads apply the roll's audience policy; readers outside the
+// audience keep the event (revision/state-change visibility) with rollId
+// nulled, never the correlatable roll UUID. Fail closed on missing metadata.
+function redactRollIdForReader(
+  row: { rollId: string | null; rollActorId: string | null; rollAudience: RollAudience | null },
+  membership: MembershipRecord | null,
+  scopeCampaignId: string | null,
+): string | null {
+  if (row.rollId === null) return null;
+  if (membership === null || scopeCampaignId === null) return row.rollId;
+  if (row.rollActorId === null || row.rollAudience === null) return null;
+  const visible = canReadRoll({
+    roll: { campaignId: scopeCampaignId, actorId: row.rollActorId, audience: row.rollAudience },
+    membership,
+  });
+  return visible ? row.rollId : null;
 }
 
 // Activity pagination must never expose raw state values (or other stored input like action

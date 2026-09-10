@@ -314,6 +314,49 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
     expect(serialized).not.toContain("bindings");
   });
 
+  it("redacts private roll existence in character activity for out-of-audience sheet readers", async () => {
+    const s = await setup();
+    const first = await roll(h.users.player, s.sharedId, 1, { audience: "owner_only" });
+    expect(first.ok).toBe(true);
+    if (!first.ok) throw new Error(`private roll failed: ${JSON.stringify(first.error)}`);
+
+    async function characterRollIds(who: TestActor): Promise<{ rollIds: (string | null)[]; kinds: string[] }> {
+      const activity = await h.characters.listActivity(ctxFor(who), {
+        characterId: s.sharedId,
+        limit: 20,
+        cursor: null,
+      });
+      expect(activity.ok).toBe(true);
+      if (!activity.ok) throw new Error("character activity failed");
+      const actionEvents = activity.value.events.filter((event) => event.kind === "character_action_executed");
+      expect(actionEvents).toHaveLength(1);
+      return {
+        rollIds: actionEvents.map((event) => event.rollId),
+        kinds: activity.value.events.map((event) => event.kind),
+      };
+    }
+
+    // The rolling actor still sees the correlatable roll UUID.
+    const roller = await characterRollIds(h.users.player);
+    expect(roller.rollIds[0]).toBe(await rollIdOf(s.sharedId));
+    // Revision/state-change visibility is kept for every sheet reader.
+    expect(roller.kinds).toContain("character_action_executed");
+
+    // The other controller and both GMs keep sheet access and the event,
+    // but never the correlatable roll UUID.
+    for (const who of [secondController, h.users.gm, h.users.other] as const) {
+      const seen = await characterRollIds(who);
+      expect(seen.rollIds).toEqual([null]);
+      expect(seen.kinds).toContain("character_action_executed");
+    }
+
+    // Campaign activity behavior is unchanged: the private roll stays
+    // visible only to the roller there.
+    expect(await visibleRollSources(h.users.player, s.campaignId)).toHaveLength(1);
+    expect(await visibleRollSources(secondController, s.campaignId)).toEqual([]);
+    expect(await visibleRollSources(h.users.gm, s.campaignId)).toEqual([]);
+  });
+
   // ------------------------------------------------------------------
   // standalone vocabulary
   // ------------------------------------------------------------------

@@ -10,9 +10,7 @@ import { SystemPackageV1Schema } from "../src/systems/implementation/package/sch
 import { d20Export } from "../src/systems/implementation/package/fixtures/d20.js";
 import type { Characters } from "../src/characters/index.js";
 import type { Campaigns } from "../src/campaigns/index.js";
-import type { CampaignPlacement } from "../src/characters/campaignPlacement.js";
 import type { SystemRuntime } from "../src/systems/runtime.js";
-import type { Pool } from "pg";
 import type { Identity } from "../src/identity/index.js";
 import { buildCampaignsRoutes } from "../src/transport/http/campaigns.js";
 import { buildCharactersRoutes } from "../src/transport/http/characters.js";
@@ -73,9 +71,7 @@ async function emitOpenApi(): Promise<void> {
     buildCampaignsRoutes({
       campaigns: {} as Campaigns,
       characters: {} as Characters,
-      placement: {} as CampaignPlacement,
       runtime: {} as SystemRuntime,
-      pool: {} as Pool,
     }),
   );
   await app.ready();

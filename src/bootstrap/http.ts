@@ -95,10 +95,14 @@ const characters = createCharactersModule({
   listAuthorizedVersions: authoring.listAuthorizedVersions,
 });
 
-// I6 Task 9: one shared campaign policy/placement implementation. The same
-// instance backs the Campaigns module (departure return) and the campaign
-// HTTP placement paths; Characters resolves campaign authorization through
-// the same relational policy tables and predicates, never a second copy.
+// I6 Task 9 (fix): one shared campaign policy/placement implementation. The
+// same instance backs the Campaigns module — both departure return and the
+// module-owned placement transactions (create/assign/claim/adopt). The
+// campaign HTTP adapter receives { campaigns, characters, runtime } only:
+// transaction ownership and generation resolution live in the owning module,
+// and the post-commit reads reuse the Characters entry point. Characters
+// resolves campaign authorization through the same relational policy
+// tables and predicates, never a second copy.
 const placement = createCampaignPlacement({ pool, runtime });
 const campaigns = createCampaignsModule({
   pool,
@@ -127,7 +131,7 @@ void app.register(
 );
 void app.register(buildSystemsRoutes({ authoring }));
 void app.register(buildCharactersRoutes({ characters }));
-void app.register(buildCampaignsRoutes({ campaigns, characters, placement, runtime, pool }));
+void app.register(buildCampaignsRoutes({ campaigns, characters, runtime }));
 void app.register(
   buildDevSignInRoutes({
     identity,

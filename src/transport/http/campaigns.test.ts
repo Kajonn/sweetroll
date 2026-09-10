@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 
 import cookiePlugin from "@fastify/cookie";
 import Fastify from "fastify";
-import type { Pool } from "pg";
 import pino from "pino";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -20,10 +19,7 @@ import type {
 } from "../../campaigns/index.js";
 import type { Characters } from "../../characters/index.js";
 import type { CharacterView } from "../../characters/index.js";
-import type {
-  CampaignPlacement,
-  PlacedCharacterView,
-} from "../../characters/campaignPlacement.js";
+import type { PlacedCharacterView } from "../../characters/campaignPlacement.js";
 import type { SystemRuntime } from "../../systems/runtime.js";
 import type { AuthContext, Identity } from "../../identity/index.js";
 import { buildAuthHook } from "./auth-hook.js";
@@ -237,6 +233,10 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
       },
     }),
     listCharacters: async () => ({ ok: true, value: { characters: [], nextCursor: null } }),
+    createCampaignCharacter: async () => ({ ok: true, value: placedView() }),
+    assignCampaignControllers: async () => ({ ok: true, value: placedView() }),
+    claimCampaignCharacter: async () => ({ ok: true, value: placedView() }),
+    adoptCampaignCharacter: async () => ({ ok: true, value: placedView() }),
   };
   return { ...base, ...overrides };
 }
@@ -289,33 +289,6 @@ function fakeCharacterView(): CharacterView {
   } as unknown as CharacterView;
 }
 
-function makePool(generation: number | null = 1): { pool: Pool; queries: string[] } {
-  const queries: string[] = [];
-  const client = {
-    query: async (text: string) => {
-      queries.push(text);
-      if (text === "BEGIN" || text === "COMMIT" || text === "ROLLBACK") return { rows: [] };
-      if (text.includes("FROM campaign_members")) {
-        return generation === null ? { rows: [] } : { rows: [{ generation }] };
-      }
-      throw new Error(`unexpected query: ${text}`);
-    },
-    release: () => undefined,
-  };
-  return { pool: { connect: async () => client } as unknown as Pool, queries };
-}
-
-function makePlacement(overrides: Partial<CampaignPlacement> = {}): CampaignPlacement {
-  const base: CampaignPlacement = {
-    returnForMember: async () => ({ returned: [], releasedControllers: 0, releasedDesignations: 0 }),
-    createInCampaign: async () => ({ ok: true, value: placedView() }),
-    adopt: async () => ({ ok: true, value: placedView() }),
-    assign: async () => ({ ok: true, value: placedView() }),
-    claim: async () => ({ ok: true, value: placedView() }),
-  };
-  return { ...base, ...overrides };
-}
-
 function makeRuntime(): SystemRuntime {
   return {
     resolve: async () => ({
@@ -332,12 +305,9 @@ function makeRuntime(): SystemRuntime {
 async function build(input?: {
   campaigns?: Campaigns;
   characters?: Characters;
-  placement?: CampaignPlacement;
   runtime?: SystemRuntime;
-  pool?: Pool;
   anonymous?: boolean;
 }): Promise<ReturnType<typeof Fastify>> {
-  const { pool } = makePool();
   const app = Fastify({ genReqId: () => randomUUID(), loggerInstance: pino({ enabled: false }) });
   await app.register(cookiePlugin);
   await app.register(
@@ -354,9 +324,7 @@ async function build(input?: {
     buildCampaignsRoutes({
       campaigns: input?.campaigns ?? makeCampaigns(),
       characters: input?.characters ?? ({ open: async () => ({ ok: true, value: fakeCharacterView() }) } as unknown as Characters),
-      placement: input?.placement ?? makePlacement(),
       runtime: input?.runtime ?? makeRuntime(),
-      pool: input?.pool ?? pool,
     }),
   );
   await app.ready();
@@ -678,13 +646,13 @@ describe("campaign HTTP routes", () => {
     expect(okContent.statusCode).toBe(200);
   });
 
-  it("creates campaign characters Runtime-prepared on the pinned version with server-side generation", async () => {
+  it("creates campaign characters Runtime-prepared on the pinned version via one owning-module call", async () => {
     const campaignId = randomUUID();
     const pinnedVersionId = randomUUID();
     let resolveInput: unknown;
-    let placementInput: unknown;
-    const placed = placedView({ campaignId });
+    let createInput: unknown;
     const fullView = fakeCharacterView();
+    const placed = placedView({ campaignId, characterId: fullView.characterId });
     const runtime: SystemRuntime = {
       resolve: async (input: unknown) => {
         resolveInput = input;
@@ -694,18 +662,16 @@ describe("campaign HTTP routes", () => {
         };
       },
     } as unknown as SystemRuntime;
-    const { pool, queries } = makePool(4);
     const app = await build({
-      campaigns: makeCampaigns({ open: async () => ({ ok: true, value: campaignView({ campaignId, systemVersionId: pinnedVersionId }) }) }),
-      characters: { open: async () => ({ ok: true, value: fullView }) } as unknown as Characters,
-      placement: makePlacement({
-        createInCampaign: async (_client, _ctx, input) => {
-          placementInput = input;
+      campaigns: makeCampaigns({
+        open: async () => ({ ok: true, value: campaignView({ campaignId, systemVersionId: pinnedVersionId }) }),
+        createCampaignCharacter: async (_ctx, input) => {
+          createInput = input;
           return { ok: true, value: placed };
         },
       }),
+      characters: { open: async () => ({ ok: true, value: fullView }) } as unknown as Characters,
       runtime,
-      pool,
     });
     const response = await app.inject({
       method: "POST", url: `/campaigns/${campaignId}/characters`, headers: cookie,
@@ -718,70 +684,104 @@ describe("campaign HTTP routes", () => {
     expect(response.statusCode).toBe(201);
     expect(response.json().character).toMatchObject({ characterId: fullView.characterId });
     expect(resolveInput).toMatchObject({ versionId: pinnedVersionId, entityId: "character" });
-    expect(placementInput).toMatchObject({
-      campaignId, expectedCampaignRevision: 3, membershipGeneration: 4, idempotencyKey: "create-1", name: "New Hero",
+    // The adapter decodes the wire and passes Runtime prep through; the
+    // membership generation stays server-side (resolved in-transaction by
+    // the owning module, never a wire field).
+    expect(createInput).toMatchObject({
+      campaignId, expectedCampaignRevision: 3, idempotencyKey: "create-1", name: "New Hero",
     });
-    expect(queries).toEqual(["BEGIN", expect.stringContaining("campaign_members"), "COMMIT"]);
+    expect(createInput).not.toHaveProperty("membershipGeneration");
+    expect(createInput).toMatchObject({ prepared: { versionId: pinnedVersionId } });
   });
 
-  it("rolls placement transactions back on failure and denies nonmembers without touching placement", async () => {
+  it("maps placement failures without a post-commit read (no post-commit read on denial)", async () => {
     const campaignId = randomUUID();
     const characterId = randomUUID();
-    let placementCalls = 0;
-    const { pool, queries } = makePool(1);
+    let postCommitReads = 0;
+    const characters = {
+      open: async () => {
+        postCommitReads += 1;
+        return { ok: true, value: fakeCharacterView() };
+      },
+    } as unknown as Characters;
     const failing = await build({
-      placement: makePlacement({
-        claim: async () => {
-          placementCalls += 1;
-          return { ok: false, error: { code: "conflict", message: "designation missing" } };
-        },
+      campaigns: makeCampaigns({
+        claimCampaignCharacter: async () => ({ ok: false, error: { code: "conflict", message: "designation missing" } }),
       }),
-      pool,
+      characters,
     });
     const failed = await failing.inject({
       method: "POST", url: `/campaigns/${campaignId}/characters/${characterId}/claim`, headers: cookie,
       payload: { expectedCampaignRevision: 1, expectedCharacterRevision: 1, idempotencyKey: "claim-1" },
     });
     expect(failed.statusCode).toBe(409);
-    expect(placementCalls).toBe(1);
-    expect(queries[queries.length - 1]).toBe("ROLLBACK");
+    expect(failed.json().error.code).toBe("conflict");
+    expect(postCommitReads).toBe(0);
 
-    const outsiderPool = makePool(null);
-    let outsiderCalls = 0;
     const outsider = await build({
-      placement: makePlacement({
-        adopt: async () => {
-          outsiderCalls += 1;
-          return { ok: true, value: placedView() };
-        },
+      campaigns: makeCampaigns({
+        adoptCampaignCharacter: async () => ({ ok: false, error: { code: "not_found", message: "nope" } }),
       }),
-      pool: outsiderPool.pool,
+      characters,
     });
     const denied = await outsider.inject({
       method: "POST", url: `/campaigns/${campaignId}/characters/${characterId}/adopt`, headers: cookie,
       payload: { expectedCampaignRevision: 1, expectedCharacterRevision: 1, acknowledgedDisclosure: true, idempotencyKey: "adopt-1" },
     });
     expect(denied.statusCode).toBe(404);
-    expect(outsiderCalls).toBe(0);
+    expect(postCommitReads).toBe(0);
   });
 
-  it("maps assign/claim/adopt to placement with explicit revisions and full views", async () => {
+  it("maps post-commit read failures to result_unavailable without leaking (commit-then-revoke race)", async () => {
+    const campaignId = randomUUID();
+    const characterId = randomUUID();
+    // The placement already committed; the follow-up Characters read fails
+    // because the sheet was revoked or became undisclosable in between.
+    // Fault injection stands in for the race: the committed outcome stays
+    // committed and the wire carries a non-sensitive result_unavailable.
+    for (const openError of [
+      { code: "not_found", message: "The requested character does not exist." },
+      { code: "internal", message: "database exploded: TOP SECRET" },
+    ]) {
+      const app = await build({
+        campaigns: makeCampaigns({
+          assignCampaignControllers: async () => ({ ok: true, value: placedView({ characterId, campaignId }) }),
+        }),
+        characters: { open: async () => ({ ok: false, error: openError }) } as unknown as Characters,
+      });
+      const response = await app.inject({
+        method: "POST", url: `/campaigns/${campaignId}/characters/${characterId}/assign`, headers: cookie,
+        payload: {
+          controllerUserIds: [actorId],
+          expectedCampaignRevision: 2, expectedCharacterRevision: 5, idempotencyKey: "assign-race-1",
+        },
+      });
+      expect(response.statusCode, openError.code).toBe(409);
+      expect(response.statusCode, openError.code).not.toBe(500);
+      const body = response.json() as { error: { code: string; message: string } };
+      expect(body.error.code).toBe("result_unavailable");
+      expect(JSON.stringify(body)).not.toContain("TOP SECRET");
+      expect(body).not.toHaveProperty("character");
+    }
+  });
+
+  it("maps assign/claim/adopt to one owning-module call each with explicit revisions and full views", async () => {
     const campaignId = randomUUID();
     const characterId = randomUUID();
     const seen: Record<string, unknown> = {};
     const fullView = fakeCharacterView();
     const app = await build({
       characters: { open: async () => ({ ok: true, value: fullView }) } as unknown as Characters,
-      placement: makePlacement({
-        assign: async (_c, _x, input) => {
+      campaigns: makeCampaigns({
+        assignCampaignControllers: async (_ctx, input) => {
           seen.assign = input;
           return { ok: true, value: placedView({ characterId, campaignId }) };
         },
-        claim: async (_c, _x, input) => {
+        claimCampaignCharacter: async (_ctx, input) => {
           seen.claim = input;
           return { ok: true, value: placedView({ characterId, campaignId }) };
         },
-        adopt: async (_c, _x, input) => {
+        adoptCampaignCharacter: async (_ctx, input) => {
           seen.adopt = input;
           return { ok: true, value: placedView({ characterId, campaignId }) };
         },

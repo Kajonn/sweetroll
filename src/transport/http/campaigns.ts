@@ -1,6 +1,5 @@
 import { Type, type TSchema } from "@sinclair/typebox";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
-import type { Pool, PoolClient } from "pg";
 
 import type {
   CampaignError,
@@ -15,35 +14,21 @@ import type {
   MemberView,
 } from "../../campaigns/index.js";
 import type { Characters } from "../../characters/index.js";
-import {
-  prepareCampaignCharacter,
-  type CampaignPlacement,
-  type PlacedCharacterView,
-  type PlacementError,
-} from "../../characters/campaignPlacement.js";
+import { prepareCampaignCharacter } from "../../characters/campaignPlacement.js";
 import type { SystemRuntime } from "../../systems/runtime.js";
 import { CharacterViewDto, toCharacterViewDto } from "./characters.js";
 
 export type BuildCampaignsRoutesInput = {
   campaigns: Campaigns;
-  /** Full-sheet composer for placement responses (read outside the placement transaction). */
+  /** Full-sheet composer for post-commit placement reads (same projection as standalone reads). */
   characters: Characters;
-  /**
-   * I6 Task 9: the single shared placement implementation. Bootstrap and the
-   * test harness inject the same instance into `createCampaignsModule`
-   * (departure return) and here (placement HTTP); never two independent
-   * authorization copies.
-   */
-  placement: CampaignPlacement;
   /** Runtime for campaign-character preparation (outside any transaction). */
   runtime: SystemRuntime;
-  /** Transaction owner for placement operations (caller-owned client). */
-  pool: Pool;
 };
 
 type WireError = { code: string; message: string; latestRevision?: number | null };
 
-const STATUS_BY_CODE: Record<CampaignError["code"] | PlacementError["code"], number> = {
+const STATUS_BY_CODE: Record<CampaignError["code"], number> = {
   bad_request: 400,
   not_found: 404,
   conflict: 409,
@@ -57,8 +42,6 @@ const STATUS_BY_CODE: Record<CampaignError["code"] | PlacementError["code"], num
 };
 
 const badRequest = (message: string): CampaignError => ({ code: "bad_request", message });
-const notFound = (): CampaignError => ({ code: "not_found", message: "The requested campaign does not exist." });
-const internal = (): CampaignError => ({ code: "internal", message: "An internal error occurred." });
 
 // ---------------------------------------------------------------------------
 // OpenAPI / TypeBox schemas
@@ -966,7 +949,7 @@ function toFastifyResponses(response: Record<string, RouteResponse> | undefined)
 }
 
 export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => FastifyPluginCallback =
-  ({ campaigns, characters, placement, runtime, pool }) =>
+  ({ campaigns, characters, runtime }) =>
   async (app) => {
     app.addHook("onSend", async (request, reply) => {
       reply.header("x-request-id", request.id);
@@ -1085,59 +1068,15 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
     });
 
     /**
-     * Caller-owned placement transaction. The adapter owns BEGIN/COMMIT only;
-     * lock ordering (campaign first, then characters by ID) stays inside the
-     * placement operation, so Campaigns alone orders membership/placement
-     * transactions. Any non-ok outcome rolls back: failed attempts leave no
-     * pending idempotency rows behind.
-     */
-    const inPlacementTransaction = async <T>(
-      work: (client: PoolClient) => Promise<{ result: T; commit: boolean }>,
-    ): Promise<T> => {
-      const client = await pool.connect();
-      try {
-        await client.query("BEGIN");
-        try {
-          const outcome = await work(client);
-          if (outcome.commit) {
-            await client.query("COMMIT");
-          } else {
-            await client.query("ROLLBACK");
-          }
-          return outcome.result;
-        } catch (error) {
-          await client.query("ROLLBACK").catch(() => undefined);
-          throw error;
-        }
-      } finally {
-        client.release();
-      }
-    };
-
-    /**
-     * Resolves the caller's active membership generation inside the placement
-     * transaction. The generation is a server-side precondition (spec Section
-     * 6 names only campaign/character revisions on the wire); removed members
-     * and outsiders collapse to not_found without leaking campaign state.
-     */
-    const loadActiveMembershipGeneration = async (
-      client: PoolClient,
-      campaignId: string,
-      actorId: string,
-    ): Promise<number | null> => {
-      const result = await client.query<{ generation: number }>(
-        `SELECT generation FROM campaign_members
-          WHERE campaign_id = $1 AND user_id = $2 AND status = 'active'`,
-        [campaignId, actorId],
-      );
-      return result.rows[0]?.generation ?? null;
-    };
-
-    /**
      * Composes the full Characters view after a placement transaction
      * commits. Reads run outside the transaction through the owning
      * Characters entry point, so the response carries the same projection
      * shape as standalone reads under current campaign authorization.
+     *
+     * Spec Section 7: the placement already committed — committed stays
+     * committed. A post-commit read failure (the commit-then-revoke race,
+     * where the sheet is detached or undisclosable before this read) is a
+     * non-sensitive result_unavailable, never a 500 and never a leak.
      */
     const openPlacedCharacter = async (
       request: FastifyRequest,
@@ -1146,42 +1085,17 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
     ): Promise<unknown | null> => {
       const opened = await characters.open(ctxOf(request), characterId);
       if (!opened.ok) {
-        sendError(reply, internal(), request.id);
+        sendError(
+          reply,
+          {
+            code: "result_unavailable",
+            message: "The placement committed, but its result is no longer available.",
+          },
+          request.id,
+        );
         return null;
       }
       return toCharacterViewDto(opened.value);
-    };
-
-    const runPlacementMutation = async (
-      request: FastifyRequest,
-      reply: FastifyReply,
-      campaignId: string,
-      mutate: (
-        client: PoolClient,
-        ctx: { actorId: string; requestId: string },
-        membershipGeneration: number,
-      ) => Promise<{ ok: true; value: PlacedCharacterView } | { ok: false; error: WireError }>,
-    ): Promise<{ characterId: string } | null> => {
-      const ctx = ctxOf(request);
-      let outcome: { ok: true; value: PlacedCharacterView } | { ok: false; error: WireError };
-      try {
-        outcome = await inPlacementTransaction(async (client) => {
-          const generation = await loadActiveMembershipGeneration(client, campaignId, ctx.actorId);
-          if (generation === null) {
-            return { result: { ok: false as const, error: notFound() }, commit: false };
-          }
-          const result = await mutate(client, ctx, generation);
-          return { result, commit: result.ok };
-        });
-      } catch {
-        sendError(reply, internal(), request.id);
-        return null;
-      }
-      if (!outcome.ok) {
-        sendError(reply, outcome.error, request.id);
-        return null;
-      }
-      return { characterId: outcome.value.characterId };
     };
 
     type Handler = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown> | unknown;
@@ -1494,20 +1408,22 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         if (!prepared.ok) {
           return sendError(reply, prepared.error, request.id);
         }
-        const placed = await runPlacementMutation(request, reply, params.id, (client, mutationCtx, generation) =>
-          placement.createInCampaign(client, mutationCtx, {
-            campaignId: params.id,
-            expectedCampaignRevision: body.expectedCampaignRevision,
-            membershipGeneration: generation,
-            idempotencyKey: body.idempotencyKey,
-            name: body.name,
-            entityDefinitionId: body.entityDefinitionId,
-            prepared: prepared.value,
-            ...(body.controllerUserIds === undefined ? {} : { controllerUserIds: body.controllerUserIds }),
-          }),
-        );
-        if (placed === null) return null;
-        const character = await openPlacedCharacter(request, reply, placed.characterId);
+        // One owning-module call: the Campaigns method owns the placement
+        // transaction, resolves the server-side membership generation
+        // in-transaction, and invokes the shared placement. Runtime prep
+        // stays outside the transaction (Task 4 discipline); the module
+        // only rechecks and persists it.
+        const placed = await campaigns.createCampaignCharacter(ctx, {
+          campaignId: params.id,
+          expectedCampaignRevision: body.expectedCampaignRevision,
+          idempotencyKey: body.idempotencyKey,
+          name: body.name,
+          entityDefinitionId: body.entityDefinitionId,
+          prepared: prepared.value,
+          ...(body.controllerUserIds === undefined ? {} : { controllerUserIds: body.controllerUserIds }),
+        });
+        if (!placed.ok) return sendError(reply, placed.error, request.id);
+        const character = await openPlacedCharacter(request, reply, placed.value.characterId);
         if (character === null) return null;
         return reply.code(201).send({ character, requestId: request.id });
       },
@@ -1521,20 +1437,17 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
           expectedCharacterRevision: number;
           idempotencyKey: string;
         };
-        const placed = await runPlacementMutation(request, reply, params.id, (client, mutationCtx, generation) =>
-          placement.assign(client, mutationCtx, {
-            campaignId: params.id,
-            expectedCampaignRevision: body.expectedCampaignRevision,
-            membershipGeneration: generation,
-            characterId: params.characterId,
-            expectedCharacterRevision: body.expectedCharacterRevision,
-            controllerUserIds: body.controllerUserIds,
-            ...(body.designateClaimants === undefined ? {} : { designateClaimants: body.designateClaimants }),
-            idempotencyKey: body.idempotencyKey,
-          }),
-        );
-        if (placed === null) return null;
-        const character = await openPlacedCharacter(request, reply, placed.characterId);
+        const placed = await campaigns.assignCampaignControllers(ctxOf(request), {
+          campaignId: params.id,
+          expectedCampaignRevision: body.expectedCampaignRevision,
+          characterId: params.characterId,
+          expectedCharacterRevision: body.expectedCharacterRevision,
+          controllerUserIds: body.controllerUserIds,
+          ...(body.designateClaimants === undefined ? {} : { designateClaimants: body.designateClaimants }),
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!placed.ok) return sendError(reply, placed.error, request.id);
+        const character = await openPlacedCharacter(request, reply, placed.value.characterId);
         if (character === null) return null;
         return { character, requestId: request.id };
       },
@@ -1546,18 +1459,15 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
           expectedCharacterRevision: number;
           idempotencyKey: string;
         };
-        const placed = await runPlacementMutation(request, reply, params.id, (client, mutationCtx, generation) =>
-          placement.claim(client, mutationCtx, {
-            campaignId: params.id,
-            expectedCampaignRevision: body.expectedCampaignRevision,
-            membershipGeneration: generation,
-            characterId: params.characterId,
-            expectedCharacterRevision: body.expectedCharacterRevision,
-            idempotencyKey: body.idempotencyKey,
-          }),
-        );
-        if (placed === null) return null;
-        const character = await openPlacedCharacter(request, reply, placed.characterId);
+        const placed = await campaigns.claimCampaignCharacter(ctxOf(request), {
+          campaignId: params.id,
+          expectedCampaignRevision: body.expectedCampaignRevision,
+          characterId: params.characterId,
+          expectedCharacterRevision: body.expectedCharacterRevision,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!placed.ok) return sendError(reply, placed.error, request.id);
+        const character = await openPlacedCharacter(request, reply, placed.value.characterId);
         if (character === null) return null;
         return { character, requestId: request.id };
       },
@@ -1570,19 +1480,16 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
           acknowledgedDisclosure: boolean;
           idempotencyKey: string;
         };
-        const placed = await runPlacementMutation(request, reply, params.id, (client, mutationCtx, generation) =>
-          placement.adopt(client, mutationCtx, {
-            campaignId: params.id,
-            expectedCampaignRevision: body.expectedCampaignRevision,
-            membershipGeneration: generation,
-            characterId: params.characterId,
-            expectedCharacterRevision: body.expectedCharacterRevision,
-            acknowledgedDisclosure: body.acknowledgedDisclosure,
-            idempotencyKey: body.idempotencyKey,
-          }),
-        );
-        if (placed === null) return null;
-        const character = await openPlacedCharacter(request, reply, placed.characterId);
+        const placed = await campaigns.adoptCampaignCharacter(ctxOf(request), {
+          campaignId: params.id,
+          expectedCampaignRevision: body.expectedCampaignRevision,
+          characterId: params.characterId,
+          expectedCharacterRevision: body.expectedCharacterRevision,
+          acknowledgedDisclosure: body.acknowledgedDisclosure,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!placed.ok) return sendError(reply, placed.error, request.id);
+        const character = await openPlacedCharacter(request, reply, placed.value.characterId);
         if (character === null) return null;
         return { character, requestId: request.id };
       },

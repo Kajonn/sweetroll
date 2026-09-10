@@ -122,10 +122,12 @@ export async function buildI6Harness(input?: {
   await createI3Schema(databaseUrl, schema);
   const pool = createI3Pool(databaseUrl, schema);
 
-  // I6 Task 9: campaign HTTP registers pre-boot through extraRoutes
+  // I6 Task 9 (fix): campaign HTTP registers pre-boot through extraRoutes
   // (Fastify forbids register() after boot). The factory closes over pool
-  // and stashes the single shared placement/module pair used by both the
-  // Campaigns module and the placement HTTP paths.
+  // and stashes the single shared placement/module pair: the placement backs
+  // the Campaigns module (departure return + module-owned placement
+  // transactions) while the adapter receives { campaigns, characters,
+  // runtime } only.
   let placement!: CampaignPlacement;
   let campaigns!: Campaigns;
   const handle = await buildI3App({
@@ -138,7 +140,7 @@ export async function buildI6Harness(input?: {
         limits: DEFAULT_CAMPAIGN_LIMITS,
         charactersPlacement: placement,
       });
-      return buildCampaignsRoutes({ campaigns, characters, placement, runtime, pool });
+      return buildCampaignsRoutes({ campaigns, characters, runtime });
     },
   });
 

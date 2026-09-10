@@ -3,9 +3,7 @@ import Fastify from "fastify";
 
 import type { Characters } from "../../characters/index.js";
 import type { Campaigns } from "../../campaigns/index.js";
-import type { CampaignPlacement } from "../../characters/campaignPlacement.js";
 import type { SystemRuntime } from "../../systems/runtime.js";
-import type { Pool } from "pg";
 import type { Identity } from "../../identity/index.js";
 import { buildCampaignsRoutes } from "./campaigns.js";
 import { buildCharactersRoutes } from "./characters.js";
@@ -34,9 +32,7 @@ describe("buildOpenApiDocument", () => {
       buildCampaignsRoutes({
         campaigns: {} as Campaigns,
         characters: {} as Characters,
-        placement: {} as CampaignPlacement,
         runtime: {} as SystemRuntime,
-        pool: {} as Pool,
       }),
     );
     await app.ready();

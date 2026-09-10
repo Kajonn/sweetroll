@@ -5,7 +5,15 @@ import type { Pool, PoolClient } from "pg";
 import type { RequestContext } from "../systems/authoring.js";
 import { hashInput } from "../systems/implementation/authoring/assess.js";
 import type { CampaignLimits } from "../platform/config.js";
-import type { CampaignCharacterPlacement } from "../characters/campaignPlacement.js";
+import type {
+  AdoptCharacterInput,
+  AssignControllersInput,
+  CampaignPlacement,
+  ClaimCharacterInput,
+  CreateInCampaignInput,
+  PlacedCharacterView,
+  PlacementResult,
+} from "../characters/campaignPlacement.js";
 
 import {
   createCampaignPersistenceRepository,
@@ -214,6 +222,19 @@ export type RemoveMemberInput = {
   idempotencyKey: string;
 };
 
+/**
+ * I6 Task 9 fix: module-owned placement transactions. The transport adapter
+ * resolves authentication and wire decoding only; these inputs carry
+ * everything the owning module needs to resolve the caller's membership
+ * generation in-transaction and invoke the injected shared placement.
+ * `membershipGeneration` is server-side (resolved in-txn from the
+ * membership row), never a wire field.
+ */
+export type CreateCampaignCharacterInput = Omit<CreateInCampaignInput, "membershipGeneration">;
+export type AssignCampaignControllersInput = Omit<AssignControllersInput, "membershipGeneration">;
+export type ClaimCampaignCharacterInput = Omit<ClaimCharacterInput, "membershipGeneration">;
+export type AdoptCampaignCharacterInput = Omit<AdoptCharacterInput, "membershipGeneration">;
+
 export interface Campaigns {
   create(ctx: RequestContext, input: CreateCampaignInput): Promise<CampaignResult<CampaignView>>;
   open(ctx: RequestContext, input: OpenCampaignInput): Promise<CampaignResult<CampaignView>>;
@@ -228,6 +249,29 @@ export interface Campaigns {
   ): Promise<CampaignResult<ListCampaignCharactersResult>>;
   changeRole(ctx: RequestContext, input: ChangeRoleInput): Promise<CampaignResult<MemberView>>;
   removeMember(ctx: RequestContext, input: RemoveMemberInput): Promise<CampaignResult<MemberView>>;
+  /**
+   * I6 Task 9 fix: module-owned placement transactions. Each method owns its
+   * transaction (BEGIN/COMMIT/ROLLBACK), resolves the caller's active
+   * membership generation in-transaction, and invokes the injected shared
+   * placement — which keeps campaign-first lock ordering and generation
+   * rechecks. Transport never owns placement transactions or policy SQL.
+   */
+  createCampaignCharacter(
+    ctx: RequestContext,
+    input: CreateCampaignCharacterInput,
+  ): Promise<CampaignResult<PlacedCharacterView>>;
+  assignCampaignControllers(
+    ctx: RequestContext,
+    input: AssignCampaignControllersInput,
+  ): Promise<CampaignResult<PlacedCharacterView>>;
+  claimCampaignCharacter(
+    ctx: RequestContext,
+    input: ClaimCampaignCharacterInput,
+  ): Promise<CampaignResult<PlacedCharacterView>>;
+  adoptCampaignCharacter(
+    ctx: RequestContext,
+    input: AdoptCampaignCharacterInput,
+  ): Promise<CampaignResult<PlacedCharacterView>>;
   issueInvitation(
     ctx: RequestContext,
     input: IssueInvitationInput,
@@ -313,8 +357,14 @@ export type CreateCampaignsModuleInput = {
    * the adopted-character return through it by default, inside the same
    * transaction, so removal, controller/claim cleanup, detachment and receipt
    * stay all-or-nothing.
+   *
+   * I6 Task 9 fix: the same shared instance also backs the module-owned
+   * placement transactions (create/assign/claim/adopt), so transaction
+   * ownership, generation resolution and lock ordering live in the owning
+   * module — never in transport. Bootstrap and the test harness inject the
+   * single shared placement here.
    */
-  charactersPlacement: CampaignCharacterPlacement;
+  charactersPlacement: CampaignPlacement;
   now?: () => Date;
   newId?: () => string;
   /**
@@ -375,6 +425,19 @@ type ListCursor = { createdAt: string; id: string; scope: string };
 class ReceiptRace extends Error {
   constructor() {
     super("idempotency receipt raced");
+  }
+}
+
+/**
+ * Thrown inside a placement transaction to roll back a non-ok outcome
+ * (denial, conflict, idempotency mismatch) without surfacing it as an
+ * internal failure. The caller maps the carried error to the wire.
+ */
+class PlacementRollback extends Error {
+  readonly error: CampaignError;
+  constructor(error: CampaignError) {
+    super("placement outcome rolled back");
+    this.error = error;
   }
 }
 
@@ -633,6 +696,43 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
   // commands own audience validation, grant atomicity, source-filtered
   // reads and the bounded deterministic export projection.
   const content = createContentCommands({ pool: input.pool, repo, limits, now, newId });
+
+  /**
+   * I6 Task 9 fix: module-owned placement transaction. Resolves the caller's
+   * active membership generation in-transaction (removed members and
+   * outsiders collapse to not_found without leaking campaign state), then
+   * invokes the placement operation — which keeps campaign-first lock
+   * ordering and generation rechecks. Any non-ok placement outcome rolls
+   * back: failed attempts leave no pending idempotency rows behind.
+   */
+  async function runPlacementTransaction(
+    ctx: RequestContext,
+    campaignId: CampaignId,
+    mutate: (
+      client: PoolClient,
+      mutationCtx: RequestContext,
+      membershipGeneration: number,
+    ) => Promise<PlacementResult<PlacedCharacterView>>,
+  ): Promise<CampaignResult<PlacedCharacterView>> {
+    try {
+      return await withTransaction(async (client) => {
+        const membership = await repo.loadMembership(client, campaignId, ctx.actorId);
+        if (!isActiveMember(membership)) {
+          throw new PlacementRollback(errors.not_found());
+        }
+        const result = await mutate(client, ctx, membership.generation);
+        if (!result.ok) {
+          throw new PlacementRollback(result.error);
+        }
+        return { ok: true as const, value: result.value };
+      });
+    } catch (error) {
+      if (error instanceof PlacementRollback) {
+        return { ok: false, error: error.error };
+      }
+      return { ok: false, error: errors.internal() };
+    }
+  }
 
   return {
     issueInvitation: invitations.issueInvitation,
@@ -1636,6 +1736,42 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
       } catch {
         return { ok: false, error: errors.internal() };
       }
+    },
+
+    async createCampaignCharacter(ctx, characterInput) {
+      return await runPlacementTransaction(ctx, characterInput.campaignId, (client, mutationCtx, generation) =>
+        input.charactersPlacement.createInCampaign(client, mutationCtx, {
+          ...characterInput,
+          membershipGeneration: generation,
+        }),
+      );
+    },
+
+    async assignCampaignControllers(ctx, assignInput) {
+      return await runPlacementTransaction(ctx, assignInput.campaignId, (client, mutationCtx, generation) =>
+        input.charactersPlacement.assign(client, mutationCtx, {
+          ...assignInput,
+          membershipGeneration: generation,
+        }),
+      );
+    },
+
+    async claimCampaignCharacter(ctx, claimInput) {
+      return await runPlacementTransaction(ctx, claimInput.campaignId, (client, mutationCtx, generation) =>
+        input.charactersPlacement.claim(client, mutationCtx, {
+          ...claimInput,
+          membershipGeneration: generation,
+        }),
+      );
+    },
+
+    async adoptCampaignCharacter(ctx, adoptInput) {
+      return await runPlacementTransaction(ctx, adoptInput.campaignId, (client, mutationCtx, generation) =>
+        input.charactersPlacement.adopt(client, mutationCtx, {
+          ...adoptInput,
+          membershipGeneration: generation,
+        }),
+      );
     },
   };
 

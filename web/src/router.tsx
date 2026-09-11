@@ -3,10 +3,12 @@ import { createRootRoute, createRoute, createRouter, Outlet, useNavigate, usePar
 
 import { createApiClient, type ApiClient } from "./api/client.js";
 import { createCharactersApi, type CharactersApi } from "./characters/api.js";
+import { createCampaignsApi, type CampaignsApi } from "./campaigns/api.js";
+import { InvitationReviewView } from "./campaigns/InvitationReview.js";
 import { createCoordination } from "./characters/coordination.js";
 import type { BrowserChannel } from "./characters/identity.js";
 import type { IdentityGate } from "./characters/identity.js";
-import { takePostSigninPath } from "./characters/identity.js";
+import { storePostSigninPath, takePostSigninPath } from "./characters/identity.js";
 import { CharacterDetail, NewCharacterRoute, useSharedCharacterStore } from "./characters/CharacterRoute.js";
 import { CharacterLibrary } from "./player/CharacterLibrary.js";
 import { Account } from "./player/Account.js";
@@ -22,6 +24,10 @@ const apiClient: ApiClient = createApiClient({ baseUrl: "/api" });
 
 function useCharactersApi(): CharactersApi {
   return useMemo(() => createCharactersApi(createApiClient({ baseUrl: "/api" })), []);
+}
+
+function useCampaignsApi(): CampaignsApi {
+  return useMemo(() => createCampaignsApi(createApiClient({ baseUrl: "/api" })), []);
 }
 
 /** Re-render route views when the shared identity gate publishes a new snapshot. */
@@ -126,6 +132,14 @@ const characterDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/characters/$characterId",
   component: CharacterDetailRouteView,
+});
+const invitationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/invitations",
+  validateSearch: (search: Record<string, unknown>) => ({
+    token: typeof search.token === "string" ? search.token : undefined,
+  }),
+  component: InvitationsRouteView,
 });
 
 function SystemEditorRoute() {
@@ -345,6 +359,38 @@ export function creationViewKey(
   return `${actorId ?? "signed-out"}:${generation}:${systemVersionId ?? ""}`;
 }
 
+function InvitationsRouteView() {
+  const search = invitationsRoute.useSearch();
+  const identity = useIdentity();
+  useIdentityTick(identity);
+  const api = useCampaignsApi();
+  if (identity === null) {
+    return <p role="status">{t("character.loading")}</p>;
+  }
+  const actorId = identity.getActorId();
+  if (actorId === null) {
+    const tokenQuery = search.token !== undefined && search.token !== ""
+      ? `?token=${encodeURIComponent(search.token)}`
+      : "";
+    storePostSigninPath(`/invitations${tokenQuery}`);
+    return (
+      <section aria-labelledby="invitations-title">
+        <h1 id="invitations-title">{t("campaign.invitations.title")}</h1>
+        <p role="status">{t("character.detail.signIn")}</p>
+      </section>
+    );
+  }
+  const generation = identity.getGeneration?.() ?? 0;
+  return (
+    <InvitationReviewView
+      key={`${actorId}:${generation}`}
+      api={api}
+      actorId={actorId}
+      token={search.token ?? ""}
+    />
+  );
+}
+
 function CharacterDetailRouteView() {
   const params = useParams({ strict: false });
   const characterId = params["characterId"] ?? "";
@@ -394,7 +440,7 @@ function CharacterDetailRouteView() {
   );
 }
 
-const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute, welcomeRoute, activityRoute, accountRoute, signInCallbackRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute, invitationsRoute, welcomeRoute, activityRoute, accountRoute, signInCallbackRoute]);
 
 export function createAppRouter() { return createRouter({ routeTree }); }
 export const router = createAppRouter();

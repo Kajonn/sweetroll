@@ -568,7 +568,12 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       let cursorClause = "";
       if (input.cursorCreatedAt !== null && input.cursorId !== null) {
         params.push(input.cursorCreatedAt, input.cursorId);
-        cursorClause = `AND (c.created_at < $2::timestamptz OR (c.created_at = $2::timestamptz AND c.id < $3))`;
+        // Keyset anchor is (millisecond, id): cursors carry ISO-8601 strings
+        // at millisecond precision (JS Dates hold no microseconds), so the
+        // comparison truncates to match. Comparing raw microsecond
+        // timestamps against a truncated cursor would strand rows sharing
+        // the anchor's millisecond (skipped rows, short pages).
+        cursorClause = `AND ((date_trunc('milliseconds', c.created_at), c.id) < ($2::timestamptz, $3))`;
       }
       params.push(input.limit + 1);
       const result = await client.query<CampaignRow>(
@@ -577,7 +582,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
            JOIN campaign_members m ON m.campaign_id = c.id
           WHERE m.user_id = $1 AND m.status = 'active'
             ${cursorClause}
-          ORDER BY c.created_at DESC, c.id DESC
+          ORDER BY date_trunc('milliseconds', c.created_at) DESC, c.id DESC
           LIMIT $${params.length}`,
         params,
       );
@@ -593,7 +598,10 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       let cursorClause = "";
       if (input.cursorCreatedAt !== null && input.cursorUserId !== null) {
         params.push(input.cursorCreatedAt, input.cursorUserId);
-        cursorClause = `AND (created_at < $2::timestamptz OR (created_at = $2::timestamptz AND user_id < $3))`;
+        // Same millisecond-precision keyset anchor as listCampaignsPage:
+        // truncate to match the cursor so same-millisecond rows are neither
+        // skipped nor revisited (total order via the unique user_id).
+        cursorClause = `AND ((date_trunc('milliseconds', created_at), user_id) < ($2::timestamptz, $3))`;
       }
       params.push(input.limit + 1);
       const result = await client.query<MembershipRow>(
@@ -601,7 +609,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
            FROM campaign_members
           WHERE campaign_id = $1
             ${cursorClause}
-          ORDER BY created_at DESC, user_id DESC
+          ORDER BY date_trunc('milliseconds', created_at) DESC, user_id DESC
           LIMIT $${params.length}`,
         params,
       );
@@ -630,7 +638,8 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       let cursorClause = "";
       if (input.cursorCreatedAt !== null && input.cursorId !== null) {
         params.push(input.cursorCreatedAt, input.cursorId);
-        cursorClause = `AND (ch.created_at < $4::timestamptz OR (ch.created_at = $4::timestamptz AND ch.id < $5))`;
+        // Millisecond-precision keyset anchor (see listCampaignsPage).
+        cursorClause = `AND ((date_trunc('milliseconds', ch.created_at), ch.id) < ($4::timestamptz, $5))`;
       }
       params.push(input.limit + 1);
       const result = await client.query<{
@@ -658,7 +667,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
                WHERE cc.character_id = ch.id AND cc.user_id = $1
             ))
             ${cursorClause}
-          ORDER BY ch.created_at DESC, ch.id DESC
+          ORDER BY date_trunc('milliseconds', ch.created_at) DESC, ch.id DESC
           LIMIT $${params.length}`,
         params,
       );
@@ -905,7 +914,8 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       let cursorClause = "";
       if (input.cursorCreatedAt !== null && input.cursorId !== null) {
         params.push(input.cursorCreatedAt, input.cursorId);
-        cursorClause = `AND (created_at < $2::timestamptz OR (created_at = $2::timestamptz AND id < $3))`;
+        // Millisecond-precision keyset anchor (see listCampaignsPage).
+        cursorClause = `AND ((date_trunc('milliseconds', created_at), id) < ($2::timestamptz, $3))`;
       }
       params.push(input.limit + 1);
       const result = await client.query<InvitationRow>(
@@ -913,7 +923,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
            FROM campaign_invitations
           WHERE campaign_id = $1
             ${cursorClause}
-          ORDER BY created_at DESC, id DESC
+          ORDER BY date_trunc('milliseconds', created_at) DESC, id DESC
           LIMIT $${params.length}`,
         params,
       );
@@ -1142,7 +1152,8 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       let cursorClause = "";
       if (input.cursorCreatedAt !== null && input.cursorId !== null) {
         params.push(input.cursorCreatedAt, input.cursorId);
-        cursorClause = `AND (c.created_at < $4::timestamptz OR (c.created_at = $4::timestamptz AND c.id < $5))`;
+        // Millisecond-precision keyset anchor (see listCampaignsPage).
+        cursorClause = `AND ((date_trunc('milliseconds', c.created_at), c.id) < ($4::timestamptz, $5))`;
       }
       params.push(input.limit + 1);
       const result = await client.query<ContentRow>(
@@ -1150,7 +1161,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
            FROM campaign_content_items c
           WHERE c.campaign_id = $3 AND c.status = 'active' AND ${CONTENT_VISIBILITY_PREDICATE}
             ${cursorClause}
-          ORDER BY c.created_at DESC, c.id DESC
+          ORDER BY date_trunc('milliseconds', c.created_at) DESC, c.id DESC
           LIMIT $${params.length}`,
         params,
       );
@@ -1230,7 +1241,8 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       let cursorClause = "";
       if (input.cursorOccurredAt !== null && input.cursorId !== null) {
         params.push(input.cursorOccurredAt, input.cursorId);
-        cursorClause = `AND (e.occurred_at < $4::timestamptz OR (e.occurred_at = $4::timestamptz AND e.id < $5))`;
+        // Millisecond-precision keyset anchor (see listCampaignsPage).
+        cursorClause = `AND ((date_trunc('milliseconds', e.occurred_at), e.id) < ($4::timestamptz, $5))`;
       }
       params.push(input.limit + 1);
       const result = await client.query<ActivityEventRow>(
@@ -1242,7 +1254,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
             AND (c.id IS NULL OR (c.status = 'active' AND ${CONTENT_VISIBILITY_PREDICATE}))
             AND (r.id IS NULL OR ${ROLL_VISIBILITY_PREDICATE})
             ${cursorClause}
-          ORDER BY e.occurred_at DESC, e.id DESC
+          ORDER BY date_trunc('milliseconds', e.occurred_at) DESC, e.id DESC
           LIMIT $${params.length}`,
         params,
       );

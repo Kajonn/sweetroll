@@ -999,4 +999,47 @@ describeWithDatabase("campaign membership races and owner protection (Task 3)", 
       h.pool.connect = originalConnect as typeof h.pool.connect;
     }
   });
+
+  it("visits every roster row exactly once when a page boundary splits a same-millisecond cluster", async () => {
+    const created = await createCampaign();
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const campaignId = created.value.campaignId;
+
+    // Five members sharing one millisecond, microseconds apart: with limit=2
+    // every page boundary lands inside the cluster. A millisecond-precision
+    // cursor against microsecond-precision timestamps would strand the
+    // cluster mates after each boundary row.
+    const clustered: string[] = [];
+    for (let i = 0; i < 5; i += 1) {
+      const userId = randomUUID();
+      clustered.push(userId);
+      await h.pool.query(`INSERT INTO users (id, display_name) VALUES ($1, $2)`, [
+        userId,
+        `cluster-${i}`,
+      ]);
+      await h.pool.query(
+        `INSERT INTO campaign_members (campaign_id, user_id, role, status, generation, created_at)
+         VALUES ($1, $2, 'player', 'active', 1, '2026-01-01T00:00:00Z'::timestamptz + ($3 || ' microseconds')::interval)`,
+        [campaignId, userId, String(i * 137)],
+      );
+    }
+    const expected = [h.users.gm.actorId, ...clustered].sort();
+
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    for (let step = 0; step < 10; step += 1) {
+      const page = await h.campaigns.listMembers(ctxFor(h.users.gm), {
+        campaignId,
+        limit: 2,
+        cursor,
+      });
+      expect(page.ok).toBe(true);
+      if (!page.ok) return;
+      for (const member of page.value.members) seen.push(member.userId);
+      if (page.value.nextCursor === null) break;
+      cursor = page.value.nextCursor;
+    }
+    expect([...seen].sort()).toEqual(expected);
+  });
 });

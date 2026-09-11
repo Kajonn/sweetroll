@@ -3,6 +3,14 @@ import type { CampaignsApi, CampaignListQuery } from "./api.js";
 
 export const CAMPAIGN_LIST_PAGE_LIMIT = 25;
 
+export function campaignDetailKey(campaignId: string): string[] {
+  return ["campaigns", "detail", campaignId];
+}
+
+export function campaignCharactersKey(campaignId: string): string[] {
+  return ["campaigns", "characters", campaignId];
+}
+
 export function campaignListKey(actorId: string | null, generation: number) {
   return ["campaigns", "list", actorId, generation];
 }

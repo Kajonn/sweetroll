@@ -26,6 +26,11 @@ export type ClaimCharacterBody = {
   expectedCharacterRevision: number;
   idempotencyKey: string;
 };
+export type CreateCampaignCharacterBody = NonNullable<
+  operations["post_campaigns_id_characters"]["requestBody"]
+>["content"]["application/json"];
+export type CreateCampaignCharacterResponse =
+  operations["post_campaigns_id_characters"]["responses"]["201"]["content"]["application/json"];
 
 type ReviewBody = NonNullable<
   operations["post_invitations_review"]["requestBody"]
@@ -44,6 +49,7 @@ export type CampaignsApi = {
   leaveCampaign(campaignId: string, memberUserId: string, body: { expectedCampaignRevision: number; idempotencyKey: string }): Promise<unknown>;
   listCampaignCharacters(campaignId: string, input?: CampaignListQuery): Promise<CampaignCharacterListResponse>;
   claimCharacter(campaignId: string, characterId: string, body: ClaimCharacterBody): Promise<unknown>;
+  createCampaignCharacter(campaignId: string, body: CreateCampaignCharacterBody): Promise<CreateCampaignCharacterResponse>;
   listContent(campaignId: string, input?: ContentListQuery): Promise<CampaignContentListResponse>;
   openContent(contentId: string): Promise<CampaignContentResponse>;
   listActivity(campaignId: string, input?: ActivityListQuery): Promise<CampaignActivityResponse>;
@@ -77,6 +83,8 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
         }),
     claimCharacter: (campaignId, characterId, body) =>
       client.fetch("POST", `/campaigns/${campaignId}/characters/${characterId}/claim`, { body }),
+    createCampaignCharacter: (campaignId, body) =>
+      client.fetch<CreateCampaignCharacterResponse>("POST", `/campaigns/${campaignId}/characters`, { body }),
     listContent: (campaignId, input) =>
       input === undefined
         ? client.fetch<CampaignContentListResponse>("GET", `/campaigns/${campaignId}/content`)

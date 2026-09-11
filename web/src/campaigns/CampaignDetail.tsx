@@ -1,22 +1,15 @@
 // Campaign detail shell: openCampaign on mount, tabbed Characters /
 // Content / Activity bodies, and the self-leave flow. The Characters tab
-// body stays small and importable: Task 4 extracts it (enriched) into
-// CampaignCharacters.tsx.
+// body lives in CampaignCharacters.tsx (claiming, creation, indicators).
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { t } from "../i18n/index.js";
 import { Button, Dialog, EmptyState, PageHeader, Panel, Tabs } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
-import type { CampaignCharacterSummary, CampaignView } from "./types.js";
-
-export function campaignDetailKey(campaignId: string): string[] {
-  return ["campaigns", "detail", campaignId];
-}
-
-export function campaignCharactersKey(campaignId: string): string[] {
-  return ["campaigns", "characters", campaignId];
-}
+import { CampaignCharactersTab, type CampaignCharacterMetadataApi } from "./CampaignCharacters.js";
+import { campaignCharactersKey, campaignDetailKey } from "./campaignQueries.js";
+import type { CampaignView } from "./types.js";
 
 function isNotFound(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
@@ -30,51 +23,6 @@ function isConflict(error: unknown): boolean {
   return record.status === 409 || record.code === "conflict";
 }
 
-/** Minimal real characters list: fetch + rows + open links. */
-export function CampaignCharactersTab(props: { api: CampaignsApi; campaignId: string }) {
-  const characters = useQuery({
-    queryKey: campaignCharactersKey(props.campaignId),
-    queryFn: () => props.api.listCampaignCharacters(props.campaignId),
-  });
-
-  if (characters.status === "pending") {
-    return <p role="status">{t("campaign.detail.characters.loading")}</p>;
-  }
-
-  if (characters.status === "error") {
-    return (
-      <EmptyState
-        title={t("campaign.detail.characters.loadFailed")}
-        action={
-          <Button variant="primary" onClick={() => void characters.refetch()}>
-            {t("campaign.detail.retry")}
-          </Button>
-        }
-      />
-    );
-  }
-
-  const rows: CampaignCharacterSummary[] = characters.data.characters;
-  if (rows.length === 0) {
-    return (
-      <EmptyState
-        title={t("campaign.detail.characters.empty.title")}
-        description={t("campaign.detail.characters.empty.description")}
-      />
-    );
-  }
-
-  return (
-    <ul aria-label={t("campaign.detail.characters.listAriaLabel")}>
-      {rows.map((character) => (
-        <li key={character.characterId}>
-          <a href={`/characters/${character.characterId}`}>{character.name}</a>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 type LeavePhase = "idle" | "confirming" | "leaving" | "conflict" | "error";
 
 export function CampaignDetail(props: {
@@ -82,6 +30,8 @@ export function CampaignDetail(props: {
   campaignId: string;
   actorId: string;
   onLeft: () => void;
+  navigation?: { onOpenCharacter: (characterId: string) => void };
+  metadataApi?: CampaignCharacterMetadataApi;
 }) {
   const queryClient = useQueryClient();
   const detail = useQuery({
@@ -159,6 +109,13 @@ export function CampaignDetail(props: {
   }
 
   const campaign = detail.data.campaign;
+  // Sheet opens reuse the shared character renderer: the router supplies
+  // SPA navigation, and the plain-href fallback keeps deep links working.
+  const onOpenCharacter =
+    props.navigation?.onOpenCharacter ??
+    ((characterId: string) => {
+      window.location.href = `/characters/${characterId}`;
+    });
   return (
     <section aria-label={campaign.title}>
       <PageHeader
@@ -187,7 +144,17 @@ export function CampaignDetail(props: {
           {
             id: "characters",
             label: t("campaign.detail.tabs.characters"),
-            content: <CampaignCharactersTab api={props.api} campaignId={props.campaignId} />,
+            content: (
+              <CampaignCharactersTab
+                api={props.api}
+                campaignId={props.campaignId}
+                actorId={props.actorId}
+                campaignRevision={campaign.revision}
+                onOpenCharacter={onOpenCharacter}
+                onCampaignStale={() => void detail.refetch()}
+                metadataApi={props.metadataApi}
+              />
+            ),
           },
           {
             id: "content",

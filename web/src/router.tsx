@@ -444,6 +444,7 @@ function CampaignDetailRouteView() {
   const identity = useIdentity();
   useIdentityTick(identity);
   const api = useCampaignsApi();
+  const charactersApi = useCharactersApi();
   const navigate = useNavigate();
   if (identity === null) {
     return <p role="status">{t("character.loading")}</p>;
@@ -468,6 +469,12 @@ function CampaignDetailRouteView() {
       onLeft={() => {
         void navigate({ to: "/campaigns" });
       }}
+      navigation={{
+        onOpenCharacter: characterId => {
+          void navigate({ to: "/characters/$characterId", params: { characterId } });
+        },
+      }}
+      metadataApi={charactersApi}
     />
   );
 }

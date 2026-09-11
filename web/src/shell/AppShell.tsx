@@ -271,6 +271,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   router context and crashes. */}
               <a href="/" className={styles.navLink}>{t("shell.nav.home")}</a>
               <a href="/characters" className={styles.navLink}>{t("shell.nav.characters")}</a>
+              <a href="/campaigns" className={styles.navLink}>{t("shell.nav.campaigns")}</a>
               <a href="/characters/new" className={styles.navLink}>{t("shell.nav.newCharacter")}</a>
               <a href="/activity" className={styles.navLink}>{t("shell.nav.activity")}</a>
               <a href="/account" className={styles.navLink}>{t("shell.nav.account")}</a>
@@ -325,11 +326,12 @@ export function AppShell({ children }: { children: ReactNode }) {
               ) : (
                 children
               )}
-              {/* Phone bottom nav: Characters · Activity · Account. Plain
+              {/* Phone bottom nav: Characters · Campaigns · Activity · Account. Plain
                   anchors like the header nav (no router context required).
                   Hidden on desktop, where the header keeps serving. */}
               <nav aria-label={t("shell.bottomNav.label")} data-testid="player-bottom-nav" className={styles.bottomNav}>
                 <a href="/characters" className={styles.bottomNavLink}>{t("shell.nav.characters")}</a>
+                <a href="/campaigns" className={styles.bottomNavLink}>{t("shell.nav.campaigns")}</a>
                 <a href="/activity" className={styles.bottomNavLink}>{t("shell.nav.activity")}</a>
                 <a href="/account" className={styles.bottomNavLink}>{t("shell.nav.account")}</a>
               </nav>

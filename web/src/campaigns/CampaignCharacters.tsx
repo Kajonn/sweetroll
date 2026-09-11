@@ -180,7 +180,7 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
             const controlled = isControlled(character, props.actorId);
             const unavailable = unavailableIds[character.characterId] === true;
             const claimable =
-              character.lifecycle === "active" && !controlled && !unavailable;
+              character.lifecycle === "active" && !controlled && !unavailable && claimedIds[character.characterId] !== true;
             const indicator = controlled
               ? t("campaign.detail.characters.indicator.controlled")
               : claimable

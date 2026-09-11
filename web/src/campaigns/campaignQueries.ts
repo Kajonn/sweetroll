@@ -28,7 +28,7 @@ export function useCampaignList(
       return api.listCampaigns(query);
     },
     initialPageParam: null as string | null,
-    getNextPageParam: (last) => last.nextCursor ?? null,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
     enabled: options.enabled && options.online && actorId !== null,
     staleTime: 30_000,
   });

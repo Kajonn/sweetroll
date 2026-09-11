@@ -1,13 +1,15 @@
 // Campaign detail shell: openCampaign on mount, tabbed Characters /
 // Content / Activity bodies, and the self-leave flow. The Characters tab
 // body lives in CampaignCharacters.tsx (claiming, creation, indicators).
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { t } from "../i18n/index.js";
 import { Button, Dialog, EmptyState, PageHeader, Panel, Tabs } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
+import { CampaignActivityTab, campaignActivityKey } from "./CampaignActivity.js";
 import { CampaignCharactersTab, type CampaignCharacterMetadataApi } from "./CampaignCharacters.js";
+import { CampaignContentTab, campaignContentKey } from "./CampaignContent.js";
 import { campaignCharactersKey, campaignDetailKey } from "./campaignQueries.js";
 import type { CampaignView } from "./types.js";
 
@@ -40,6 +42,27 @@ export function CampaignDetail(props: {
   });
   const [leavePhase, setLeavePhase] = useState<LeavePhase>("idle");
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [accessChanged, setAccessChanged] = useState(false);
+
+  // Revocation purge: a not_found for a previously-readable campaign (or its
+  // content/activity feed) drops every query scoped to that campaign key and
+  // surfaces an "access changed" notice with a way back. The account list is
+  // invalidated (not purged) so it reloads without the revoked campaign. The
+  // sign-out path already purges via AppShell and is untouched here.
+  const handleAccessRevoked = useCallback((): void => {
+    queryClient.removeQueries({ queryKey: campaignDetailKey(props.campaignId) });
+    queryClient.removeQueries({ queryKey: campaignCharactersKey(props.campaignId) });
+    queryClient.removeQueries({ queryKey: campaignContentKey(props.campaignId) });
+    queryClient.removeQueries({ queryKey: campaignActivityKey(props.campaignId) });
+    void queryClient.invalidateQueries({ queryKey: ["campaigns", "list"] });
+    setAccessChanged(true);
+  }, [queryClient, props.campaignId]);
+
+  useEffect(() => {
+    if (detail.status === "error" && isNotFound(detail.error) && !accessChanged) {
+      handleAccessRevoked();
+    }
+  }, [detail.status, detail.error, accessChanged, handleAccessRevoked]);
 
   const attemptLeave = async (campaign: CampaignView): Promise<void> => {
     setLeavePhase("leaving");
@@ -76,6 +99,20 @@ export function CampaignDetail(props: {
       <section aria-label={t("campaign.detail.title")}>
         <PageHeader title={t("campaign.detail.title")} />
         <p role="status">{t("campaign.detail.loading")}</p>
+      </section>
+    );
+  }
+
+  if (accessChanged) {
+    return (
+      <section aria-label={t("campaign.detail.title")}>
+        <PageHeader title={t("campaign.detail.title")} />
+        <EmptyState
+          title={t("campaign.detail.unavailable.title")}
+          description={t("campaign.detail.unavailable.description")}
+          action={<a href="/campaigns">{t("campaign.detail.backToList")}</a>}
+        />
+        <p role="status">{t("campaign.detail.accessChanged.notice")}</p>
       </section>
     );
   }
@@ -160,9 +197,10 @@ export function CampaignDetail(props: {
             id: "content",
             label: t("campaign.detail.tabs.content"),
             content: (
-              <EmptyState
-                title={t("campaign.detail.content.empty.title")}
-                description={t("campaign.detail.content.empty.description")}
+              <CampaignContentTab
+                api={props.api}
+                campaignId={props.campaignId}
+                onAccessRevoked={handleAccessRevoked}
               />
             ),
           },
@@ -170,9 +208,10 @@ export function CampaignDetail(props: {
             id: "activity",
             label: t("campaign.detail.tabs.activity"),
             content: (
-              <EmptyState
-                title={t("campaign.detail.activity.empty.title")}
-                description={t("campaign.detail.activity.empty.description")}
+              <CampaignActivityTab
+                api={props.api}
+                campaignId={props.campaignId}
+                onAccessRevoked={handleAccessRevoked}
               />
             ),
           },

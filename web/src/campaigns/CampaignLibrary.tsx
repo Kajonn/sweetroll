@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { t } from "../i18n/index.js";
 import { Button, EmptyState, PageHeader, Panel } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
-import { useCampaignList } from "./campaignQueries.js";
+import { campaignListKey, useCampaignList } from "./campaignQueries.js";
 import type { CampaignSummary } from "./types.js";
 
 /**
@@ -106,6 +106,9 @@ export function CampaignLibrary(props: {
   }
 
   if (list.status === "error") {
+    // Retry refetches only this account-lifetime list key, never unrelated
+    // character/campaign queries.
+    const actorId: string = props.actorId;
     return (
       <section aria-label={t("campaign.library.title")}>
         <PageHeader title={t("campaign.library.title")} />
@@ -115,7 +118,9 @@ export function CampaignLibrary(props: {
             <Button
               variant="primary"
               onClick={() => {
-                void queryClient.invalidateQueries();
+                void queryClient.invalidateQueries({
+                  queryKey: campaignListKey(actorId, props.generation),
+                });
               }}
             >
               {t("campaign.library.retry")}

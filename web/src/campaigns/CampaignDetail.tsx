@@ -77,6 +77,8 @@ export function CampaignDetail(props: {
       });
       queryClient.removeQueries({ queryKey: campaignDetailKey(props.campaignId) });
       queryClient.removeQueries({ queryKey: campaignCharactersKey(props.campaignId) });
+      queryClient.removeQueries({ queryKey: campaignContentKey(props.campaignId) });
+      queryClient.removeQueries({ queryKey: campaignActivityKey(props.campaignId) });
       props.onLeft();
     } catch (cause) {
       if (isConflict(cause)) {

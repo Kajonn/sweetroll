@@ -1,6 +1,6 @@
 # GUI integration implementation plan
 
-**Status:** G0–G4 landed (I4a); G5 next. Only the mockup capture stays blocked (HTTP 401, re-verified 2026-09-09).
+**Status:** G0–G6 landed (I4a/I5); G7 player slice landed 2026-09-11. Only the mockup capture stays blocked (HTTP 401, re-verified 2026-09-09).
 **Design authority:** [design_v2.md](../../../design_v2.md), especially Sections 10 and 17.  
 **Visual reference:** [Tablefolk GUI mockup](https://tablefolk-ttrpg-mockups.humdrumrat.chatgpt.site).  
 **Original baseline:** `be3efc89b536f563c0f11f2f929171dd8129463b`.
@@ -160,7 +160,8 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 
 ## G7 — Reuse the foundation for campaigns and GM operation
 
-- [ ] In I6, style invitation review, campaign list, character claiming/creation, permitted text content, audience labels, and revoked-access states using the shared controls.
+- [x] In I6, style invitation review, campaign list, character claiming/creation, permitted text content, audience labels, and revoked-access states using the shared controls.
+  *Closed 2026-09-11 (G7 player slice, `a33947f`–`4c3d09b` on `main`): `CampaignsApi` seam + lifetime-scoped queries; `/invitations` review/accept/decline with token-body-only transport and no-echo unavailable states; `/campaigns` list + detail shell (Characters/Content/Activity tabs) + leave flow; claim/create with custody disclosure and controller indicators; audience marks for all four levels; scoped revocation purge. Exit e2e `campaignJourney` 1/1 + web unit 877/877; acceptance `docs/acceptance/gui-2026-09-11-g7-player.md`. Open follow-ups: 5 visual baselines need owner-approved regen (new Campaigns nav entries + known font drift, header-only); pure-player claim discovery needs a backend visibility change (I7); no phone-viewport/dark-mode campaign e2e yet.*
 - [ ] In I7, build campaign setup, content/notes, members, mobile session board, and a searchable NPC/monster list leading to a full-width sheet. Use existing character capabilities where appropriate and explicit campaign contracts for any new ownership/lifecycle behavior.
 - [ ] Keep Session, Content, Characters, Members, and Settings navigation consistent with Section 4. Use panels on larger screens and focused pages/sheets on phones.
 - [ ] Make sharing audience persistent and readable; preview-as-player calls the real policy implementation. Shared controls never decide authorization.

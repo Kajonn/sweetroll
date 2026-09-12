@@ -151,6 +151,10 @@ export function CampaignContentTab(props: {
     queryKey: [...listKey, "item", selectedId ?? "none"],
     queryFn: () => props.api.openContent(selectedId ?? ""),
     enabled: selectedId !== null && online && actorId !== null,
+    // Authorization revalidation must not wait out the shared 30s stale
+    // budget: reopening, focus, and reconnect always re-read the note, so a
+    // narrowed grant cannot survive behind a fresh cache entry.
+    staleTime: 0,
   });
 
   useEffect(() => {
@@ -163,8 +167,9 @@ export function CampaignContentTab(props: {
   useEffect(() => {
     if (selectedId !== null && detail.status === "error" && isNotFound(detail.error)) {
       // A single note narrowed or removed after the list rendered: hide its
-      // row from now on, show the generic unavailable state (never the
-      // server payload), and reload the list fresh.
+      // row from now on, drop its cached body (a retained entry would
+      // outlive the revocation), show the generic unavailable state (never
+      // the server payload), and reload the list fresh.
       const revokedId = selectedId;
       setRevokedIds((prev) => {
         if (prev.has(revokedId)) return prev;
@@ -172,11 +177,35 @@ export function CampaignContentTab(props: {
         next.add(revokedId);
         return next;
       });
+      queryClient.removeQueries({ queryKey: [...listKey, "item", revokedId] });
       setSelectedId(null);
       setUnavailable(true);
       void queryClient.invalidateQueries({ queryKey: listKey });
     }
   }, [selectedId, detail.status, detail.error, queryClient, listKey]);
+
+  useEffect(() => {
+    if (
+      selectedId !== null &&
+      list.status === "success" &&
+      !revokedIds.has(selectedId) &&
+      !list.data.content.some((item) => item.contentId === selectedId)
+    ) {
+      // The list reloaded without the open note (narrowed audience, hidden
+      // note) while its reader stayed mounted: route through the same
+      // revoked path as a 404 read rather than leaving the stale body up.
+      const revokedId = selectedId;
+      setRevokedIds((prev) => {
+        if (prev.has(revokedId)) return prev;
+        const next = new Set(prev);
+        next.add(revokedId);
+        return next;
+      });
+      queryClient.removeQueries({ queryKey: [...listKey, "item", revokedId] });
+      setSelectedId(null);
+      setUnavailable(true);
+    }
+  }, [selectedId, list, revokedIds, queryClient, listKey]);
 
   const reload = (): void => {
     void queryClient.invalidateQueries({ queryKey: listKey });

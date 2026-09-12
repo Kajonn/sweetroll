@@ -164,9 +164,14 @@ export function CampaignDetail(props: {
       queryClient.removeQueries({ queryKey: campaignDetailKey(props.campaignId) });
       queryClient.removeQueries({ queryKey: campaignCharactersKey(props.campaignId) });
       // Same literal-prefix rationale as handleAccessRevoked above: drop
-      // all actor/generation-scoped content keys on leave.
+      // all actor/generation-scoped content keys on leave, plus the session,
+      // member, and invitation families (an open reader or session board
+      // unmounts on leave, and nothing may survive for a later reader).
       queryClient.removeQueries({ queryKey: ["campaigns", "content", props.campaignId] });
       queryClient.removeQueries({ queryKey: campaignActivityKey(props.campaignId) });
+      queryClient.removeQueries({ queryKey: ["campaigns", "members", props.campaignId] });
+      queryClient.removeQueries({ queryKey: ["campaigns", "session", props.campaignId] });
+      queryClient.removeQueries({ queryKey: ["campaigns", "invitations", props.campaignId] });
       props.onLeft();
     } catch (cause) {
       if (isConflict(cause)) {

@@ -22,6 +22,7 @@ export type CampaignLibraryViewProps = {
   hasNextPage: boolean;
   onLoadMore: () => void;
   onEnterToken: () => void;
+  onCreateCampaign: () => void;
 };
 
 export function CampaignLibraryView(props: CampaignLibraryViewProps) {
@@ -31,17 +32,26 @@ export function CampaignLibraryView(props: CampaignLibraryViewProps) {
         title={t("campaign.library.title")}
         description={t("campaign.library.description")}
         actions={
-          // Plain anchor (no router context required); the router-owned
-          // onEnterToken keeps in-app navigation client-side.
-          <a
-            href="/invitations"
-            onClick={(event) => {
-              event.preventDefault();
-              props.onEnterToken();
-            }}
-          >
-            {t("campaign.library.join")}
-          </a>
+          <>
+            <a
+              href="/campaigns/new"
+              onClick={(event) => {
+                event.preventDefault();
+                props.onCreateCampaign();
+              }}
+            >
+              {t("campaign.library.new")}
+            </a>{" "}
+            <a
+              href="/invitations"
+              onClick={(event) => {
+                event.preventDefault();
+                props.onEnterToken();
+              }}
+            >
+              {t("campaign.library.join")}
+            </a>
+          </>
         }
       />
       {props.campaigns.length === 0 ? (
@@ -72,6 +82,7 @@ export function CampaignLibraryView(props: CampaignLibraryViewProps) {
 
 export type CampaignLibraryNavigation = {
   onEnterToken: () => void;
+  onCreateCampaign: () => void;
 };
 
 export function CampaignLibrary(props: {
@@ -140,6 +151,7 @@ export function CampaignLibrary(props: {
         void list.fetchNextPage();
       }}
       onEnterToken={props.navigation.onEnterToken}
+      onCreateCampaign={props.navigation.onCreateCampaign}
     />
   );
 }

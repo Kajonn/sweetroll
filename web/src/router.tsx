@@ -5,6 +5,7 @@ import { createApiClient, type ApiClient } from "./api/client.js";
 import { createCharactersApi, type CharactersApi } from "./characters/api.js";
 import { createCampaignsApi, type CampaignsApi } from "./campaigns/api.js";
 import { CampaignDetail } from "./campaigns/CampaignDetail.js";
+import { CampaignCreate, campaignCreateViewKey } from "./campaigns/CampaignCreate.js";
 import { CampaignLibrary, campaignLibraryViewKey } from "./campaigns/CampaignLibrary.js";
 import { InvitationReviewView } from "./campaigns/InvitationReview.js";
 import { createCoordination } from "./characters/coordination.js";
@@ -147,6 +148,11 @@ const campaignsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/campaigns",
   component: CampaignLibraryRouteView,
+});
+const campaignCreateRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/campaigns/new",
+  component: CampaignCreateRouteView,
 });
 const campaignDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -433,6 +439,45 @@ function CampaignLibraryRouteView() {
         onEnterToken: () => {
           void navigate({ to: "/invitations" });
         },
+        onCreateCampaign: () => {
+          void navigate({ to: "/campaigns/new" });
+        },
+      }}
+    />
+  );
+}
+
+function CampaignCreateRouteView() {
+  const identity = useIdentity();
+  useIdentityTick(identity);
+  const api = useCampaignsApi();
+  const charactersApi = useCharactersApi();
+  const navigate = useNavigate();
+  if (identity === null) {
+    return <p role="status">{t("character.loading")}</p>;
+  }
+  const actorId = identity.getActorId();
+  if (actorId === null) {
+    storePostSigninPath("/campaigns/new");
+    return (
+      <section aria-labelledby="campaigns-title">
+        <h1 id="campaigns-title">{t("campaign.create.title")}</h1>
+        <p role="status">{t("character.detail.signIn")}</p>
+      </section>
+    );
+  }
+  const generation = identity.getGeneration?.() ?? 0;
+  return (
+    <CampaignCreate
+      key={campaignCreateViewKey(actorId, generation)}
+      api={api}
+      versionsApi={charactersApi}
+      actorId={actorId}
+      online={identity.isOnline()}
+      navigation={{
+        onCreated: (campaignId) => {
+          void navigate({ to: "/campaigns/$campaignId", params: { campaignId } });
+        },
       }}
     />
   );
@@ -528,7 +573,7 @@ function CharacterDetailRouteView() {
   );
 }
 
-const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute, campaignsRoute, campaignDetailRoute, invitationsRoute, welcomeRoute, activityRoute, accountRoute, signInCallbackRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute, campaignsRoute, campaignCreateRoute, campaignDetailRoute, invitationsRoute, welcomeRoute, activityRoute, accountRoute, signInCallbackRoute]);
 
 export function createAppRouter() { return createRouter({ routeTree }); }
 export const router = createAppRouter();

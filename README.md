@@ -56,6 +56,12 @@ For targeted investigation with caller-managed resources, invoke Playwright
 directly (for example `npx playwright test tests/e2e/campaignJourney.spec.ts`)
 with `DATABASE_URL`, `CI=1`, and dedicated ports/databases.
 
+CI runs the same canonical entry point (`npm run test:e2e` in `web/`) with
+`E2E_DATABASE_ADMIN_URL` from its PostgreSQL service, so campaign/GM/player
+journeys execute alongside smoke, acceptance, character-sheet, and visual
+specs. On failure CI uploads `web/test-results/` as `browser-failure-evidence`
+(7-day retention); traces contain deterministic test data only.
+
 ## Container modes
 
 Build one image with `docker build -t sweetroll .`.

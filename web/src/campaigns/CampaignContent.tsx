@@ -7,9 +7,10 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { t } from "../i18n/index.js";
-import { Button, EmptyState, Panel } from "../ui/index.js";
+import { Button, Dialog, EmptyState, Panel } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
-import type { ContentSummary, ContentView } from "./types.js";
+import { ContentEditor } from "./ContentEditor.js";
+import type { CampaignMember, ContentSummary, ContentView } from "./types.js";
 
 export type ContentAudience = ContentSummary["audience"];
 
@@ -21,6 +22,12 @@ function isNotFound(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   const record = error as { code?: unknown; status?: unknown };
   return record.status === 404 || record.code === "not_found";
+}
+
+function isConflict(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const record = error as { code?: unknown; status?: unknown };
+  return record.status === 409 || record.code === "conflict";
 }
 
 /** Plain-language audience marking, persisted on every row and the reader. */
@@ -84,10 +91,26 @@ function CampaignContentReader(props: { content: ContentView; onBack: () => void
 }
 
 export function CampaignContentTab(props: {
-  api: Pick<CampaignsApi, "listContent" | "openContent">;
+  api: Pick<
+    CampaignsApi,
+    | "listContent"
+    | "openContent"
+    | "createContent"
+    | "updateContent"
+    | "deleteContent"
+    | "recoverContent"
+    | "replaceContentGrants"
+  >;
   campaignId: string;
   /** Campaign-level revocation: the list itself is not_found for a previously-readable campaign. */
   onAccessRevoked?: () => void;
+  campaignRevision?: number;
+  actorId?: string | null;
+  generation?: number;
+  online?: boolean;
+  isGm?: boolean;
+  members?: CampaignMember[];
+  onChanged?: () => void;
 }) {
   const queryClient = useQueryClient();
   const list = useQuery({
@@ -98,6 +121,16 @@ export function CampaignContentTab(props: {
   const [revokedIds, setRevokedIds] = useState<Set<string>>(() => new Set());
   const [unavailable, setUnavailable] = useState(false);
   const revocationNotified = useRef(false);
+  // GM authoring state. Per-item Edit/Delete fetch the full view via
+  // openContent first: list summaries carry no body, grants, or revision.
+  // Recover is offered inside the editor for deleted views it can still read.
+  const [editing, setEditing] = useState<ContentView | null>(null);
+  const [deleting, setDeleting] = useState<ContentView | null>(null);
+  const [viewPendingId, setViewPendingId] = useState<string | null>(null);
+  const [viewFailed, setViewFailed] = useState(false);
+  const [mutationPending, setMutationPending] = useState(false);
+  const [mutationConflict, setMutationConflict] = useState(false);
+  const [mutationFailed, setMutationFailed] = useState(false);
   const detail = useQuery({
     queryKey: [...campaignContentKey(props.campaignId), "item", selectedId ?? "none"],
     queryFn: () => props.api.openContent(selectedId ?? ""),
@@ -128,6 +161,52 @@ export function CampaignContentTab(props: {
       void queryClient.invalidateQueries({ queryKey: campaignContentKey(props.campaignId) });
     }
   }, [selectedId, detail.status, detail.error, queryClient, props.campaignId]);
+
+  const reload = (): void => {
+    void queryClient.invalidateQueries({ queryKey: campaignContentKey(props.campaignId) });
+    props.onChanged?.();
+  };
+
+  const fetchView = async (contentId: string, assign: (view: ContentView) => void): Promise<void> => {
+    if (viewPendingId !== null) return;
+    setViewPendingId(contentId);
+    setViewFailed(false);
+    try {
+      const res = await props.api.openContent(contentId);
+      assign(res.content);
+    } catch {
+      setViewFailed(true);
+    } finally {
+      setViewPendingId(null);
+    }
+  };
+
+  const attemptDeleteTarget = async (): Promise<void> => {
+    if (deleting === null || mutationPending) return;
+    setMutationPending(true);
+    setMutationFailed(false);
+    setMutationConflict(false);
+    // Caller-minted idempotency key, fresh on every attempt.
+    try {
+      await props.api.deleteContent(deleting.contentId, {
+        expectedContentRevision: deleting.revision,
+        idempotencyKey: crypto.randomUUID(),
+      });
+      setDeleting(null);
+      reload();
+    } catch (cause) {
+      if (isConflict(cause)) {
+        // 409 → re-read first, then offer a retry with a fresh key. Never "Merge".
+        setDeleting(null);
+        setMutationConflict(true);
+        reload();
+      } else {
+        setMutationFailed(true);
+      }
+    } finally {
+      setMutationPending(false);
+    }
+  };
 
   if (list.status === "pending") {
     return <p role="status">{t("campaign.detail.content.loading")}</p>;
@@ -186,6 +265,93 @@ export function CampaignContentTab(props: {
   }
 
   const items: ContentListItem[] = list.data.content;
+  if (props.isGm === true) {
+    const members = props.members ?? [];
+    const visible = items.filter((item) => !revokedIds.has(item.contentId));
+    return (
+      <div>
+        <ContentEditor
+          api={props.api}
+          campaignId={props.campaignId}
+          members={members}
+          onSaved={reload}
+          onDeleted={reload}
+        />
+        {editing !== null ? (
+          <ContentEditor
+            key={editing.contentId}
+            api={props.api}
+            campaignId={props.campaignId}
+            members={members}
+            initial={editing}
+            onSaved={() => {
+              setEditing(null);
+              reload();
+            }}
+            onDeleted={() => {
+              setEditing(null);
+              reload();
+            }}
+          />
+        ) : null}
+        {viewFailed ? <p role="alert">{t("campaign.detail.content.edit.error")}</p> : null}
+        {mutationConflict ? <p role="alert">{t("campaign.detail.content.edit.conflict")}</p> : null}
+        {mutationFailed ? <p role="alert">{t("campaign.detail.content.edit.error")}</p> : null}
+        {visible.length === 0 ? (
+          <EmptyState
+            title={t("campaign.detail.content.empty.title")}
+            description={t("campaign.detail.content.empty.description")}
+          />
+        ) : (
+          <ul aria-label={t("campaign.detail.content.listAriaLabel")}>
+            {visible.map((item) => (
+              <li key={item.contentId}>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setUnavailable(false);
+                    setSelectedId(item.contentId);
+                  }}
+                >
+                  {t("campaign.detail.content.open", { title: item.title })}
+                </Button>{" "}
+                <span>{audienceLabel(item.audience)}</span>{" "}
+                <Button
+                  variant="secondary"
+                  pending={viewPendingId === item.contentId}
+                  onClick={() => void fetchView(item.contentId, setEditing)}
+                >
+                  {t("campaign.detail.content.edit.editItem", { title: item.title })}
+                </Button>{" "}
+                <Button
+                  variant="secondary"
+                  pending={viewPendingId === item.contentId}
+                  onClick={() => void fetchView(item.contentId, setDeleting)}
+                >
+                  {t("campaign.detail.content.edit.delete", { title: item.title })}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <Dialog
+          open={deleting !== null}
+          onOpenChange={(open) => {
+            if (!open) setDeleting(null);
+          }}
+          title={t("campaign.detail.content.edit.delete.confirm.title")}
+          description={t("campaign.detail.content.edit.delete.confirm.description")}
+          actions={
+            <Button variant="danger" pending={mutationPending} onClick={() => void attemptDeleteTarget()}>
+              {t("campaign.detail.content.edit.delete.confirm.confirm")}
+            </Button>
+          }
+        >
+          <p>{deleting?.title ?? ""}</p>
+        </Dialog>
+      </div>
+    );
+  }
   return (
     <CampaignContentView
       items={items}

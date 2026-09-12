@@ -9,7 +9,7 @@ import { Button, Dialog, EmptyState, PageHeader, Panel, Tabs } from "../ui/index
 import type { CampaignsApi } from "./api.js";
 import { CampaignActivityTab, campaignActivityKey } from "./CampaignActivity.js";
 import { CampaignCharactersTab, type CampaignCharacterMetadataApi } from "./CampaignCharacters.js";
-import { CampaignContentTab, campaignContentKey } from "./CampaignContent.js";
+import { CampaignContentTab } from "./CampaignContent.js";
 import { CampaignMembersTab, ownRole } from "./CampaignMembers.js";
 import { CampaignSettingsView } from "./CampaignSettings.js";
 import { InvitationManager } from "./InvitationManager.js";
@@ -130,7 +130,12 @@ export function CampaignDetail(props: {
   const handleAccessRevoked = useCallback((): void => {
     queryClient.removeQueries({ queryKey: campaignDetailKey(props.campaignId) });
     queryClient.removeQueries({ queryKey: campaignCharactersKey(props.campaignId) });
-    queryClient.removeQueries({ queryKey: campaignContentKey(props.campaignId) });
+    // Literal 3-element prefix (not campaignContentKey(campaignId), which
+    // evaluates to ["campaigns","content",id,null,0]): TanStack prefix
+    // matching would otherwise miss every actor/generation-scoped content
+    // key (e.g. ["campaigns","content",id,actor,gen] and detail item keys
+    // [...listKey,"item",...]), leaving stale content after revocation.
+    queryClient.removeQueries({ queryKey: ["campaigns", "content", props.campaignId] });
     queryClient.removeQueries({ queryKey: campaignActivityKey(props.campaignId) });
     queryClient.removeQueries({ queryKey: ["campaigns", "members", props.campaignId] });
     queryClient.removeQueries({ queryKey: ["campaigns", "session", props.campaignId] });
@@ -158,7 +163,9 @@ export function CampaignDetail(props: {
       });
       queryClient.removeQueries({ queryKey: campaignDetailKey(props.campaignId) });
       queryClient.removeQueries({ queryKey: campaignCharactersKey(props.campaignId) });
-      queryClient.removeQueries({ queryKey: campaignContentKey(props.campaignId) });
+      // Same literal-prefix rationale as handleAccessRevoked above: drop
+      // all actor/generation-scoped content keys on leave.
+      queryClient.removeQueries({ queryKey: ["campaigns", "content", props.campaignId] });
       queryClient.removeQueries({ queryKey: campaignActivityKey(props.campaignId) });
       props.onLeft();
     } catch (cause) {

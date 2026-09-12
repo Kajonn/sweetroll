@@ -4,11 +4,25 @@ import type {
   CampaignCharacterListResponse,
   CampaignContentListResponse,
   CampaignContentResponse,
+  CampaignLifecycleBody,
   CampaignListResponse,
   CampaignViewResponse,
+  ChangeMemberRoleBody,
+  CreateCampaignBody,
+  CreateCampaignResponse,
+  ExportCampaignBody,
+  ExportCampaignResponse,
   InvitationAcceptBody,
   InvitationAcceptResponse,
+  InvitationListResponse,
   InvitationReviewResponse,
+  IssueInvitationBody,
+  IssueInvitationResponse,
+  RemoveMemberBody,
+  RevokeInvitationBody,
+  RotateInvitationBody,
+  UpdateCampaignBody,
+  MemberListResponse,
 } from "./types.js";
 import type { operations } from "../api/schema.js";
 
@@ -53,6 +67,18 @@ export type CampaignsApi = {
   listContent(campaignId: string, input?: ContentListQuery): Promise<CampaignContentListResponse>;
   openContent(contentId: string): Promise<CampaignContentResponse>;
   listActivity(campaignId: string, input?: ActivityListQuery): Promise<CampaignActivityResponse>;
+  createCampaign(body: CreateCampaignBody): Promise<CreateCampaignResponse>;
+  updateCampaign(campaignId: string, body: UpdateCampaignBody): Promise<CampaignViewResponse>;
+  archiveCampaign(campaignId: string, body: CampaignLifecycleBody): Promise<CampaignViewResponse>;
+  recoverCampaign(campaignId: string, body: CampaignLifecycleBody): Promise<CampaignViewResponse>;
+  exportCampaign(campaignId: string, body: ExportCampaignBody): Promise<ExportCampaignResponse>;
+  listMembers(campaignId: string, input?: CampaignListQuery): Promise<MemberListResponse>;
+  changeMemberRole(campaignId: string, memberUserId: string, body: ChangeMemberRoleBody): Promise<unknown>;
+  removeMember(campaignId: string, memberUserId: string, body: RemoveMemberBody): Promise<unknown>;
+  listInvitations(campaignId: string, input?: CampaignListQuery): Promise<InvitationListResponse>;
+  issueInvitation(campaignId: string, body: IssueInvitationBody): Promise<IssueInvitationResponse>;
+  rotateInvitation(campaignId: string, inviteId: string, body: RotateInvitationBody): Promise<IssueInvitationResponse>;
+  revokeInvitation(campaignId: string, inviteId: string, body: RevokeInvitationBody): Promise<unknown>;
 };
 
 export function createCampaignsApi(client: ApiClient): CampaignsApi {
@@ -99,5 +125,37 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
         : client.fetch<CampaignActivityResponse>("GET", `/campaigns/${campaignId}/activity`, {
           query: { cursor: input.cursor ?? undefined, limit: input.limit ?? undefined },
         }),
+    createCampaign: (body) =>
+      client.fetch<CreateCampaignResponse>("POST", "/campaigns", { body }),
+    updateCampaign: (campaignId, body) =>
+      client.fetch<CampaignViewResponse>("PATCH", `/campaigns/${campaignId}`, { body }),
+    archiveCampaign: (campaignId, body) =>
+      client.fetch<CampaignViewResponse>("POST", `/campaigns/${campaignId}/archive`, { body }),
+    recoverCampaign: (campaignId, body) =>
+      client.fetch<CampaignViewResponse>("POST", `/campaigns/${campaignId}/recover`, { body }),
+    exportCampaign: (campaignId, body) =>
+      client.fetch<ExportCampaignResponse>("POST", `/campaigns/${campaignId}/exports`, { body }),
+    listMembers: (campaignId, input) =>
+      input === undefined
+        ? client.fetch<MemberListResponse>("GET", `/campaigns/${campaignId}/members`)
+        : client.fetch<MemberListResponse>("GET", `/campaigns/${campaignId}/members`, {
+          query: { cursor: input.cursor ?? undefined, limit: input.limit ?? undefined },
+        }),
+    changeMemberRole: (campaignId, memberUserId, body) =>
+      client.fetch("PATCH", `/campaigns/${campaignId}/members/${memberUserId}`, { body }),
+    removeMember: (campaignId, memberUserId, body) =>
+      client.fetch("DELETE", `/campaigns/${campaignId}/members/${memberUserId}`, { body }),
+    listInvitations: (campaignId, input) =>
+      input === undefined
+        ? client.fetch<InvitationListResponse>("GET", `/campaigns/${campaignId}/invitations`)
+        : client.fetch<InvitationListResponse>("GET", `/campaigns/${campaignId}/invitations`, {
+          query: { cursor: input.cursor ?? undefined, limit: input.limit ?? undefined },
+        }),
+    issueInvitation: (campaignId, body) =>
+      client.fetch<IssueInvitationResponse>("POST", `/campaigns/${campaignId}/invitations`, { body }),
+    rotateInvitation: (campaignId, inviteId, body) =>
+      client.fetch<IssueInvitationResponse>("POST", `/campaigns/${campaignId}/invitations/${inviteId}/rotate`, { body }),
+    revokeInvitation: (campaignId, inviteId, body) =>
+      client.fetch("POST", `/campaigns/${campaignId}/invitations/${inviteId}/revoke`, { body }),
   };
 }

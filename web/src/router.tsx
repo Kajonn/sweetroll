@@ -511,6 +511,8 @@ function CampaignDetailRouteView() {
       api={api}
       campaignId={campaignId}
       actorId={actorId}
+      generation={generation}
+      online={identity.isOnline()}
       onLeft={() => {
         void navigate({ to: "/campaigns" });
       }}

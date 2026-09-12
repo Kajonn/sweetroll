@@ -10,7 +10,10 @@ import type { CampaignsApi } from "./api.js";
 import { CampaignActivityTab, campaignActivityKey } from "./CampaignActivity.js";
 import { CampaignCharactersTab, type CampaignCharacterMetadataApi } from "./CampaignCharacters.js";
 import { CampaignContentTab, campaignContentKey } from "./CampaignContent.js";
-import { campaignCharactersKey, campaignDetailKey } from "./campaignQueries.js";
+import { CampaignMembersTab, ownRole } from "./CampaignMembers.js";
+import { CampaignSettingsView } from "./CampaignSettings.js";
+import { InvitationManager } from "./InvitationManager.js";
+import { campaignCharactersKey, campaignDetailKey, useCampaignMembers } from "./campaignQueries.js";
 import type { CampaignView } from "./types.js";
 
 function isNotFound(error: unknown): boolean {
@@ -27,6 +30,52 @@ function isConflict(error: unknown): boolean {
 
 type LeavePhase = "idle" | "confirming" | "leaving" | "conflict" | "error";
 
+function MembersManageSection(props: {
+  api: CampaignsApi;
+  campaignId: string;
+  actorId: string;
+  campaign: CampaignView;
+  generation: number;
+  online: boolean;
+  onChanged: () => void;
+  onAccessRevoked: () => void;
+}) {
+  const roster = useCampaignMembers(props.api, props.campaignId, props.actorId, props.generation, {
+    enabled: true,
+    online: props.online,
+  });
+  const members = roster.data?.pages.flatMap((page) => page.members) ?? [];
+  const isGm = ownRole(members, props.actorId) === "owner" || ownRole(members, props.actorId) === "co_gm";
+  return (
+    <>
+      <CampaignMembersTab
+        api={props.api}
+        campaignId={props.campaignId}
+        actorId={props.actorId}
+        campaignRevision={props.campaign.revision}
+        generation={props.generation}
+        online={props.online}
+        onChanged={props.onChanged}
+        onAccessRevoked={props.onAccessRevoked}
+      />
+      {isGm ? (
+        <>
+          <CampaignSettingsView api={props.api} campaign={props.campaign} onChanged={props.onChanged} />
+          <InvitationManager
+            api={props.api}
+            campaignId={props.campaignId}
+            campaignRevision={props.campaign.revision}
+            actorId={props.actorId}
+            generation={props.generation}
+            online={props.online}
+            onChanged={props.onChanged}
+          />
+        </>
+      ) : null}
+    </>
+  );
+}
+
 export function CampaignDetail(props: {
   api: CampaignsApi;
   campaignId: string;
@@ -34,6 +83,8 @@ export function CampaignDetail(props: {
   onLeft: () => void;
   navigation?: { onOpenCharacter: (characterId: string) => void };
   metadataApi?: CampaignCharacterMetadataApi;
+  generation?: number;
+  online?: boolean;
 }) {
   const queryClient = useQueryClient();
   const detail = useQuery({
@@ -54,6 +105,8 @@ export function CampaignDetail(props: {
     queryClient.removeQueries({ queryKey: campaignCharactersKey(props.campaignId) });
     queryClient.removeQueries({ queryKey: campaignContentKey(props.campaignId) });
     queryClient.removeQueries({ queryKey: campaignActivityKey(props.campaignId) });
+    queryClient.removeQueries({ queryKey: ["campaigns", "members", props.campaignId] });
+    queryClient.removeQueries({ queryKey: ["campaigns", "invitations", props.campaignId] });
     void queryClient.invalidateQueries({ queryKey: ["campaigns", "list"] });
     setAccessChanged(true);
   }, [queryClient, props.campaignId]);
@@ -192,6 +245,22 @@ export function CampaignDetail(props: {
                 onOpenCharacter={onOpenCharacter}
                 onCampaignStale={() => void detail.refetch()}
                 metadataApi={props.metadataApi}
+              />
+            ),
+          },
+          {
+            id: "members",
+            label: t("campaign.detail.tabs.members"),
+            content: (
+              <MembersManageSection
+                api={props.api}
+                campaignId={props.campaignId}
+                actorId={props.actorId}
+                campaign={campaign}
+                generation={props.generation ?? 0}
+                online={props.online ?? true}
+                onChanged={() => void detail.refetch()}
+                onAccessRevoked={handleAccessRevoked}
               />
             ),
           },

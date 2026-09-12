@@ -657,6 +657,7 @@ export const defaultMessages: MessageTable = {
   "campaign.detail.unavailable.description": "It may have been archived or your membership removed.",
   "campaign.detail.tabsAriaLabel": "Campaign tabs",
   "campaign.detail.tabs.characters": "Characters",
+  "campaign.detail.tabs.members": "Members",
   "campaign.detail.tabs.content": "Content",
   "campaign.detail.tabs.activity": "Activity",
   "campaign.detail.characters.loading": "Loading characters…",

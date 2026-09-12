@@ -185,12 +185,14 @@ test("G7 exit: invitation accept, campaign list, claim, permitted content, activ
     await expect(page.getByText(`You now control ${characterName}.`)).toBeVisible({ timeout: STEP_TIMEOUT });
 
     // 6. Content tab: persistent audience marking, open the permitted note,
-    // read its body.
+    // read its body. Scope list and reader assertions separately: the
+    // Audience selects carry the same labels as hidden <option> elements.
     await page.getByRole("tab", { name: "Content" }).click({ timeout: STEP_TIMEOUT });
-    await expect(page.getByText("All players")).toBeVisible({ timeout: STEP_TIMEOUT });
-    await page.getByRole("button", { name: `Open ${noteTitle}` }).click({ timeout: STEP_TIMEOUT });
-    await expect(page.getByText(noteBody)).toBeVisible({ timeout: STEP_TIMEOUT });
-    await expect(page.getByText("All players")).toBeVisible();
+    const contentList = page.getByRole("list", { name: "Campaign content" });
+    await expect(contentList.getByText("All players", { exact: true })).toBeVisible({ timeout: STEP_TIMEOUT });
+    await contentList.getByRole("button", { name: `Open ${noteTitle}` }).click({ timeout: STEP_TIMEOUT });
+    await expect(page.getByText(noteBody, { exact: true })).toBeVisible({ timeout: STEP_TIMEOUT });
+    await expect(page.locator("p").filter({ hasText: /^All players$/ })).toBeVisible();
     await page.getByRole("button", { name: "Back to content" }).click({ timeout: STEP_TIMEOUT });
 
     // 7. Activity tab: GM seeding events render (kind + actor + timestamp,

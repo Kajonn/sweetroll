@@ -63,8 +63,11 @@ test.describe("visual: library", () => {
       await page.getByTestId("dev-signin").click();
       // The list can legitimately be empty (deterministic template-only DB),
       // which gives the <ul> zero height; assert it is attached rather than
-      // visible so the screenshot captures the empty-library state.
+      // visible so the screenshot captures the empty-library state. The
+      // isolated visual database must start fresh: fail on leftover journey
+      // fixtures instead of screenshotting a contaminated library.
       await expect(page.getByTestId("system-library")).toBeAttached();
+      await expect(page.getByTestId("system-library").locator("li")).toHaveCount(0);
       await expect(page.getByTestId("library-new-system")).toBeVisible();
       await expectNoPageHorizontalOverflow(page);
       // Mask the footer: StatusBar shows the per-mount random request-id

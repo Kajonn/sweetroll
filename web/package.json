@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/run-e2e.mjs",
     "test:offline": "playwright test --config playwright.offline.config.ts",
     "test:e2e:update": "playwright test --update-snapshots",
     "typecheck": "tsc -p tsconfig.json --noEmit"

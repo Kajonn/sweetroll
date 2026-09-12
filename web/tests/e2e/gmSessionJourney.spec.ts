@@ -26,12 +26,13 @@ import { publishOwnedClone, uid } from "../offline/test-auth.js";
  * SWEETROLL_TEST_AUTH escape hatch is needed here.
  *
  * The bump conflict is deterministic, not timing luck: after expanding the
- * character (sheet at revision R) a 2.5s route delay is installed on the
- * character GET, so the first bump's sheet refetch stays in flight; the
- * second bump still carries the stale expectedRevision R and the server
- * answers 409, which the board surfaces as its conflict notice. The retry
- * then waits for the delayed refetch (fresh revision) and succeeds with a
- * fresh idempotency key.
+ * character (sheet at revision R) a deferred route gate holds the character
+ * GET, while a second GM page advances the sheet through its UI; the first
+ * page's next bump still carries the stale expectedRevision R and the server
+ * answers 409. The board shows its refreshing state with disabled controls,
+ * releases the GET, renders the updated value, then surfaces the conflict
+ * notice. The explicit retry uses the fresh revision with a fresh
+ * idempotency key.
  */
 
 const D20_VERSION_ID = "a0000000-0000-5000-8000-000000000002";
@@ -220,7 +221,9 @@ async function runJourney(page: Page, browser: Browser, viewport: { width: numbe
     // recent activity shows the authoring events, and the character
     // directory lists the new hero.
     await page.getByRole("tab", { name: "Session" }).click({ timeout: STEP_TIMEOUT });
-    await expect(page.getByRole("heading", { name: "Session" })).toBeVisible({ timeout: STEP_TIMEOUT });
+    // Exact match: the campaign title heading ("G7 GM Session …") contains
+    // "Session" as a substring and would otherwise collide in strict mode.
+    await expect(page.getByRole("heading", { name: "Session", exact: true })).toBeVisible({ timeout: STEP_TIMEOUT });
     await expect(page.getByRole("heading", { name: "Latest content" })).toBeVisible({ timeout: STEP_TIMEOUT });
     await expect(page.getByText(noteTitle)).toBeVisible({ timeout: STEP_TIMEOUT });
     await expect(page.getByRole("heading", { name: "Recent activity" })).toBeVisible({ timeout: STEP_TIMEOUT });
@@ -237,45 +240,73 @@ async function runJourney(page: Page, browser: Browser, viewport: { width: numbe
     await expect(page.getByRole("button", { name: "Decrease Health" })).toBeVisible({ timeout: STEP_TIMEOUT });
     await expect(page.getByText("10 / 10")).toBeVisible({ timeout: STEP_TIMEOUT });
 
-    // 11. Bump Health through a conflict: delay the character GET so the
-    // first bump's sheet refetch stays in flight; the immediate second bump
-    // still carries the stale revision and the server answers 409, which
-    // the board surfaces without losing the row. Decreases, not increases:
-    // Health starts at its 10/10 bound and bumping up 422s server-side.
+    // 11. Bump Health through a genuine cross-page conflict: a second GM page
+    // advances the sheet through its UI, so the first page's next bump
+    // carries a stale revision and the server answers 409. The board gates
+    // mutation controls on refresh readiness with a deferred GET (no sleep).
+    // Decreases, not increases: Health starts at its 10/10 bound and bumping
+    // up 422s server-side.
+    let releaseRefresh!: () => void;
+    const refreshGate = new Promise<void>((resolve) => {
+      releaseRefresh = resolve;
+    });
     await page.route(`**/api/characters/${placedCharacterId}`, async (route) => {
       if (route.request().method() === "GET") {
-        await new Promise((resolve) => setTimeout(resolve, 2500));
+        await refreshGate;
       }
       await route.continue();
     });
     const bumpUrl = `/api/characters/${placedCharacterId}/resources/health/bump`;
-    const firstBump = page.waitForResponse(
-      (response) => response.url().includes(bumpUrl) && response.request().method() === "POST",
+    const peerContext = await browser.newContext({ baseURL: origin });
+    try {
+      const peerPage = await peerContext.newPage();
+      await peerPage.setViewportSize(viewport);
+      await signInViaPanel(peerPage, "code-test-a");
+      await peerPage.goto(campaignUrl);
+      await expect(peerPage.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
+      await peerPage.getByRole("tab", { name: "Session" }).click({ timeout: STEP_TIMEOUT });
+      await peerPage.getByRole("button", { name: `Open ${characterName}` }).click({ timeout: STEP_TIMEOUT });
+      await expect(peerPage.getByRole("button", { name: "Decrease Health" })).toBeVisible({ timeout: STEP_TIMEOUT });
+      await peerPage.getByRole("button", { name: "Decrease Health" }).click({ timeout: STEP_TIMEOUT });
+      await expect(peerPage.getByText("9 / 10")).toBeVisible({ timeout: STEP_TIMEOUT });
+      await peerPage.close();
+    } finally {
+      await peerContext.close();
+    }
+    const firstBumpRequest = page.waitForRequest(
+      (request) => request.url().includes(bumpUrl) && request.method() === "POST",
       { timeout: STEP_TIMEOUT },
     );
     await page.getByRole("button", { name: "Decrease Health" }).click({ timeout: STEP_TIMEOUT });
-    expect((await firstBump).status()).toBe(200);
-    await page.getByRole("button", { name: "Decrease Health" }).click({ timeout: STEP_TIMEOUT });
-    await expect(page.getByText("Health changed. Reloaded — retry the bump.")).toBeVisible({
-      timeout: STEP_TIMEOUT,
-    });
-    // Retry once the delayed refetch lands (fresh revision, fresh key):
-    // 10 → 9 (first bump) → 8 (retry).
-    await page.waitForResponse(
+    const firstBody = (await firstBumpRequest).postDataJSON() as Record<string, unknown>;
+    await expect(page.getByText("Refreshing character…")).toBeVisible({ timeout: STEP_TIMEOUT });
+    await expect(page.getByRole("button", { name: "Decrease Health" })).toBeDisabled();
+    await expect(page.getByText("Health changed. Reloaded — retry the bump.")).toHaveCount(0);
+    const refreshed = page.waitForResponse(
       (response) =>
         response.url().includes(`/api/characters/${placedCharacterId}`) &&
         response.request().method() === "GET" &&
         response.status() === 200,
       { timeout: STEP_TIMEOUT },
     );
+    releaseRefresh();
+    await refreshed;
+    await expect(page.getByText("9 / 10")).toBeVisible({ timeout: STEP_TIMEOUT });
+    await expect(page.getByText("Health changed. Reloaded — retry the bump.")).toBeVisible({
+      timeout: STEP_TIMEOUT,
+    });
+    await expect(page.getByRole("button", { name: "Decrease Health" })).toBeEnabled();
     await page.unroute(`**/api/characters/${placedCharacterId}`);
-    const retried = page.waitForResponse(
-      (response) =>
-        response.url().includes(bumpUrl) && response.request().method() === "POST" && response.status() === 200,
+    // Explicit retry with the fresh revision and a fresh key: 10 → 9 (peer
+    // page) → 8 (retry).
+    const retryRequest = page.waitForRequest(
+      (request) => request.url().includes(bumpUrl) && request.method() === "POST",
       { timeout: STEP_TIMEOUT },
     );
     await page.getByRole("button", { name: "Decrease Health" }).click({ timeout: STEP_TIMEOUT });
-    await retried;
+    const retryBody = (await retryRequest).postDataJSON() as Record<string, unknown>;
+    expect(retryBody.expectedRevision).not.toBe(firstBody.expectedRevision);
+    expect(retryBody.idempotencyKey).not.toBe(firstBody.idempotencyKey);
     await expect(page.getByText("8 / 10")).toBeVisible({ timeout: STEP_TIMEOUT });
 
     // 12. Roll Check with the default campaign audience. The board renders

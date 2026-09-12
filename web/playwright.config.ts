@@ -22,8 +22,17 @@ export default defineConfig({
   // concurrent tests have cloned. Run serially so each clone's lifecycle
   // (create -> snapshot -> delete) completes before the next test reads
   // the shared state.
+  //
+  // The canonical `npm run test:e2e` runner isolates journeys from visuals
+  // in separate databases via SWEETROLL_E2E_SUITE. Direct `npx playwright
+  // test` keeps caller-managed resources and the historical all-files
+  // behavior when the variable is unset.
   workers: 1,
   retries: 0,
+  testMatch:
+    process.env.SWEETROLL_E2E_SUITE === "visual" ? "**/visual.spec.ts" : "**/*.spec.ts",
+  testIgnore:
+    process.env.SWEETROLL_E2E_SUITE === "journeys" ? ["**/visual.spec.ts"] : [],
   snapshotPathTemplate: "{testDir}/../visual/__screenshots__/{testFilePath}/{arg}{ext}",
   use: { baseURL: `http://localhost:${webPort}`, trace: "retain-on-failure" },
   webServer: [

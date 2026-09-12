@@ -33,6 +33,29 @@ suites do not compete with the session-burst test's latency measurements. The
 load and concurrency tests still issue concurrent requests internally; their
 workloads, correctness assertions, and latency budgets remain unchanged.
 
+## Browser E2E (canonical)
+
+Run the full browser suite through the isolated runner from `web/`:
+
+1. `E2E_DATABASE_ADMIN_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run test:e2e`
+
+The admin URL is a test-service connection with CREATE DATABASE permission,
+not a database to reset. The runner creates one run-scoped journey database
+and one visual database, migrates through the existing Playwright webServer
+command, runs journeys (`SWEETROLL_E2E_SUITE=journeys`, every spec except
+`visual.spec.ts`) then visuals (`SWEETROLL_E2E_SUITE=visual`, only
+`visual.spec.ts`), and drops only the databases it created. Each phase writes
+to its own run-scoped directory under ignored `web/test-results/<runId>/`;
+failure traces survive database cleanup. Extra Playwright selection flags
+forward to both phases (for example `--repeat-each=5`), except a single
+`--output` path, which the runner rejects. Large repeat counts accumulate
+fixtures per database and may push catalog fixtures past the first page;
+use targeted direct runs with isolated resources for large repeats instead.
+
+For targeted investigation with caller-managed resources, invoke Playwright
+directly (for example `npx playwright test tests/e2e/campaignJourney.spec.ts`)
+with `DATABASE_URL`, `CI=1`, and dedicated ports/databases.
+
 ## Container modes
 
 Build one image with `docker build -t sweetroll .`.

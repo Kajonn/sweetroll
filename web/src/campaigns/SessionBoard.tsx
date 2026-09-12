@@ -59,11 +59,22 @@ function SessionBumpRow(props: {
   revision: number;
   element: ResourceElement;
   online: boolean;
-  onBumped: () => void;
+  commandPending: boolean;
+  refreshPending: boolean;
+  refreshFailed: boolean;
+  onCommandStart: () => void;
+  onCommandEnd: () => void;
+  onBumped: () => Promise<void>;
 }) {
-  const [pending, setPending] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [failed, setFailed] = useState(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const current = props.element.value.current;
   // Bump bounds come from the live value, not the element definition: the
   // server clamps to value.max (e.g. Health 10/10 with element.max 30), so
@@ -73,10 +84,12 @@ function SessionBumpRow(props: {
   const upperBound = Math.min(props.element.value.max, props.element.max);
 
   const attempt = async (direction: "up" | "down"): Promise<void> => {
-    if (pending) return;
-    setPending(true);
-    setConflict(false);
-    setFailed(false);
+    if (props.commandPending || props.refreshPending || props.refreshFailed) return;
+    props.onCommandStart();
+    if (mountedRef.current) {
+      setConflict(false);
+      setFailed(false);
+    }
     // Caller-minted idempotency key, fresh on every attempt.
     try {
       await props.charactersApi.bumpCharacterResource(props.characterId, props.element.resourceId, {
@@ -84,19 +97,33 @@ function SessionBumpRow(props: {
         expectedRevision: props.revision,
         idempotencyKey: crypto.randomUUID(),
       });
-      props.onBumped();
+      try {
+        await props.onBumped();
+      } catch {
+        // Known-success mutation with a failed refresh: the row reports the
+        // refresh failure instead of a mutation failure to replay.
+        return;
+      }
     } catch (cause) {
       if (isConflict(cause)) {
         // 409 → re-read first, then offer a retry with a fresh key. Never "Merge".
-        props.onBumped();
-        setConflict(true);
-      } else {
+        // The ready-to-retry notice appears only after the refresh lands.
+        try {
+          await props.onBumped();
+        } catch {
+          return;
+        }
+        if (mountedRef.current) setConflict(true);
+      } else if (mountedRef.current) {
         setFailed(true);
       }
     } finally {
-      setPending(false);
+      props.onCommandEnd();
     }
   };
+
+  const controlsDisabled =
+    !props.online || props.commandPending || props.refreshPending || props.refreshFailed;
 
   return (
     <div>
@@ -106,14 +133,14 @@ function SessionBumpRow(props: {
       </span>{" "}
       <Button
         variant="secondary"
-        disabled={!props.online || pending || current <= lowerBound}
+        disabled={controlsDisabled || current <= lowerBound}
         onClick={() => void attempt("down")}
       >
         {t("campaign.detail.session.bump.down", { label: props.element.label })}
       </Button>{" "}
       <Button
         variant="secondary"
-        disabled={!props.online || pending || current >= upperBound}
+        disabled={controlsDisabled || current >= upperBound}
         onClick={() => void attempt("up")}
       >
         {t("campaign.detail.session.bump.up", { label: props.element.label })}
@@ -132,14 +159,25 @@ function SessionRollRow(props: {
   revision: number;
   element: ActionElement;
   online: boolean;
+  commandPending: boolean;
+  refreshPending: boolean;
+  refreshFailed: boolean;
+  onCommandStart: () => void;
+  onCommandEnd: () => void;
   onOpenCharacter: (characterId: string) => void;
-  onRolled: () => void;
+  onRolled: () => Promise<void>;
 }) {
   const [audience, setAudience] = useState<RollAudience>("campaign");
-  const [pending, setPending] = useState(false);
   const [resultText, setResultText] = useState<string | null>(null);
   const [uncertain, setUncertain] = useState(false);
   const [failed, setFailed] = useState(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Actions with required inputs never execute from the board: the board
   // must not fabricate inputs, so it links to the sheet instead.
@@ -155,10 +193,12 @@ function SessionRollRow(props: {
   }
 
   const execute = async (): Promise<void> => {
-    if (pending) return;
-    setPending(true);
-    setFailed(false);
-    setUncertain(false);
+    if (props.commandPending || props.refreshPending || props.refreshFailed) return;
+    props.onCommandStart();
+    if (mountedRef.current) {
+      setFailed(false);
+      setUncertain(false);
+    }
     // Caller-minted idempotency key, fresh on every attempt.
     try {
       const response = await props.charactersApi.executeCharacterAction(
@@ -174,25 +214,39 @@ function SessionRollRow(props: {
       // unparseable success keeps the attempt and shows the generic
       // uncertain-outcome text (malformed_response discipline).
       const raw = (response.result as { roll?: unknown }).roll ?? response.result;
-      if (typeof raw === "string" || typeof raw === "number") {
-        setResultText(String(raw));
-      } else {
-        setUncertain(true);
+      if (mountedRef.current) {
+        if (typeof raw === "string" || typeof raw === "number") {
+          setResultText(String(raw));
+        } else {
+          setUncertain(true);
+        }
       }
-      props.onRolled();
+      try {
+        await props.onRolled();
+      } catch {
+        return;
+      }
     } catch (cause) {
       if (isConflict(cause)) {
         // 409 → re-read first; the outcome is uncertain, so keep the
-        // attempt and show the generic uncertain-outcome text.
-        props.onRolled();
-        setUncertain(true);
-      } else {
+        // attempt and show the generic uncertain-outcome text only after
+        // the refresh lands.
+        try {
+          await props.onRolled();
+        } catch {
+          return;
+        }
+        if (mountedRef.current) setUncertain(true);
+      } else if (mountedRef.current) {
         setFailed(true);
       }
     } finally {
-      setPending(false);
+      props.onCommandEnd();
     }
   };
+
+  const controlsDisabled =
+    !props.online || props.commandPending || props.refreshPending || props.refreshFailed;
 
   return (
     <div>
@@ -205,12 +259,12 @@ function SessionRollRow(props: {
           { value: "campaign", label: "campaign" },
         ]}
         value={audience}
-        disabled={!props.online}
+        disabled={controlsDisabled}
         onChange={(event) => setAudience(event.target.value as RollAudience)}
       />{" "}
       <Button
         variant="secondary"
-        disabled={!props.online || pending}
+        disabled={controlsDisabled}
         onClick={() => void execute()}
       >
         {t("campaign.detail.session.roll.execute", { label: props.element.label })}
@@ -232,6 +286,16 @@ function SessionCharacterRow(props: {
   onOpenCharacter: (characterId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [commandPending, setCommandPending] = useState(false);
+  const [refreshPending, setRefreshPending] = useState(false);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const sheet = useQuery({
     queryKey: [
       "campaigns",
@@ -246,15 +310,29 @@ function SessionCharacterRow(props: {
     enabled: expanded,
   });
 
-  const reloadSheet = (): void => {
-    void sheet.refetch();
+  // Row-local refresh contract; callers await it and handle read failures
+  // separately. Readiness clears only once the returned sheet revision is
+  // applied to rendered controls.
+  const reloadSheet = async (): Promise<void> => {
+    if (mountedRef.current) {
+      setRefreshPending(true);
+      setRefreshFailed(false);
+    }
+    try {
+      await sheet.refetch({ throwOnError: true });
+    } catch (cause) {
+      if (mountedRef.current) setRefreshFailed(true);
+      throw cause;
+    } finally {
+      if (mountedRef.current) setRefreshPending(false);
+    }
   };
 
   let detail: ReactNode = null;
   if (expanded) {
-    if (sheet.status === "pending") {
+    if (!sheet.data && sheet.status === "pending") {
       detail = <p role="status">{t("campaign.detail.session.loading")}</p>;
-    } else if (sheet.status === "error") {
+    } else if (!sheet.data) {
       detail = <p role="alert">{t("campaign.detail.session.loadFailed")}</p>;
     } else {
       const elements = sheetElements(sheet.data.character);
@@ -266,6 +344,15 @@ function SessionCharacterRow(props: {
       );
       detail = (
         <div>
+          {refreshPending ? <p role="status">{t("campaign.detail.session.refreshing")}</p> : null}
+          {refreshFailed ? (
+            <div>
+              <p role="alert">{t("campaign.detail.session.refreshFailed")}</p>{" "}
+              <Button variant="secondary" onClick={() => void reloadSheet()}>
+                {t("campaign.detail.session.refreshCharacter")}
+              </Button>
+            </div>
+          ) : null}
           {resources.map((element) => (
             <SessionBumpRow
               key={element.id}
@@ -274,6 +361,13 @@ function SessionCharacterRow(props: {
               revision={sheet.data.character.revision}
               element={element}
               online={props.online}
+              commandPending={commandPending}
+              refreshPending={refreshPending}
+              refreshFailed={refreshFailed}
+              onCommandStart={() => setCommandPending(true)}
+              onCommandEnd={() => {
+                if (mountedRef.current) setCommandPending(false);
+              }}
               onBumped={reloadSheet}
             />
           ))}
@@ -285,6 +379,13 @@ function SessionCharacterRow(props: {
               revision={sheet.data.character.revision}
               element={element}
               online={props.online}
+              commandPending={commandPending}
+              refreshPending={refreshPending}
+              refreshFailed={refreshFailed}
+              onCommandStart={() => setCommandPending(true)}
+              onCommandEnd={() => {
+                if (mountedRef.current) setCommandPending(false);
+              }}
               onOpenCharacter={props.onOpenCharacter}
               onRolled={reloadSheet}
             />

@@ -1,5 +1,5 @@
 // web/src/campaigns/SessionBoard.test.tsx
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -165,5 +165,111 @@ describe("SessionBoard", () => {
       audience: "campaign",
       expectedRevision: 7,
     })));
+  });
+
+  it("disables same-character controls until the refreshed revision lands", async () => {
+    const campaignsApi = {
+      listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),
+      listActivity: vi.fn().mockResolvedValue({ events: [], nextCursor: null, requestId: "r1" }),
+      listCampaignCharacters: vi.fn().mockResolvedValue({ characters: [
+        { characterId: "s1", campaignId: "c1", name: "Bram", entityDefinitionId: "hero", systemVersionId: "v1", revision: 7, lifecycle: "active", placementGeneration: 1, controllers: [], updatedAt: "2026-09-01T00:00:00Z" },
+      ], nextCursor: null, requestId: "r2" }),
+    };
+    let resolveRefresh!: (value: { character: ReturnType<typeof sheet>; requestId: string }) => void;
+    const refreshing = new Promise<{ character: ReturnType<typeof sheet>; requestId: string }>(
+      (resolve) => { resolveRefresh = resolve; },
+    );
+    const charactersApi = {
+      open: vi.fn()
+        .mockResolvedValueOnce({ character: sheet(), requestId: "initial" })
+        .mockReturnValueOnce(refreshing)
+        .mockResolvedValue({ character: sheet({ revision: 8 }), requestId: "later" }),
+      bumpCharacterResource: vi.fn().mockResolvedValue({ result: {}, requestId: "r4" }),
+    };
+    render(<SessionBoard campaignsApi={campaignsApi as never} charactersApi={charactersApi as never}
+      campaignId="c1" actorId="u1" generation={0} online onOpenCharacter={() => {}} onAccessRevoked={() => {}} />,
+      { wrapper: wrapper() });
+    fireEvent.click(await screen.findByRole("button", { name: /open bram/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /increase health/i }));
+    await waitFor(() => expect(charactersApi.open).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("button", { name: /increase health/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /roll strike/i })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /roll strike/i }));
+    expect(charactersApi.bumpCharacterResource).toHaveBeenCalledTimes(1);
+    const firstKey = (charactersApi.bumpCharacterResource as ReturnType<typeof vi.fn>).mock.calls[0]![2].idempotencyKey as string;
+    await act(async () => resolveRefresh({ character: sheet({ revision: 8 }), requestId: "fresh" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /increase health/i })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: /increase health/i }));
+    await waitFor(() => expect(charactersApi.bumpCharacterResource).toHaveBeenCalledTimes(2));
+    const secondCall = (charactersApi.bumpCharacterResource as ReturnType<typeof vi.fn>).mock.calls[1]![2];
+    expect(secondCall.expectedRevision).toBe(8);
+    expect(typeof secondCall.idempotencyKey).toBe("string");
+    expect(secondCall.idempotencyKey).not.toBe(firstKey);
+  });
+
+  it("holds the 409 retry notice until the refresh resolves", async () => {
+    const campaignsApi = {
+      listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),
+      listActivity: vi.fn().mockResolvedValue({ events: [], nextCursor: null, requestId: "r1" }),
+      listCampaignCharacters: vi.fn().mockResolvedValue({ characters: [
+        { characterId: "s1", campaignId: "c1", name: "Bram", entityDefinitionId: "hero", systemVersionId: "v1", revision: 7, lifecycle: "active", placementGeneration: 1, controllers: [], updatedAt: "2026-09-01T00:00:00Z" },
+      ], nextCursor: null, requestId: "r2" }),
+    };
+    let resolveRefresh!: (value: { character: ReturnType<typeof sheet>; requestId: string }) => void;
+    const refreshing = new Promise<{ character: ReturnType<typeof sheet>; requestId: string }>(
+      (resolve) => { resolveRefresh = resolve; },
+    );
+    const charactersApi = {
+      open: vi.fn()
+        .mockResolvedValueOnce({ character: sheet(), requestId: "initial" })
+        .mockReturnValueOnce(refreshing),
+      bumpCharacterResource: vi.fn().mockRejectedValueOnce({ status: 409 }),
+    };
+    render(<SessionBoard campaignsApi={campaignsApi as never} charactersApi={charactersApi as never}
+      campaignId="c1" actorId="u1" generation={0} online onOpenCharacter={() => {}} onAccessRevoked={() => {}} />,
+      { wrapper: wrapper() });
+    fireEvent.click(await screen.findByRole("button", { name: /open bram/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /increase health/i }));
+    await waitFor(() => expect(charactersApi.open).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("button", { name: /increase health/i })).toBeDisabled();
+    expect(screen.queryByText(/retry the bump/i)).toBeNull();
+    await act(async () => resolveRefresh({ character: sheet({ revision: 8 }), requestId: "fresh" }));
+    await waitFor(() => expect(screen.getByText(/retry the bump/i)).toBeVisible());
+    await waitFor(() => expect(screen.getByRole("button", { name: /increase health/i })).toBeEnabled());
+  });
+
+  it("reports refresh failure without a Reloaded notice and recovers through explicit Refresh", async () => {
+    const campaignsApi = {
+      listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),
+      listActivity: vi.fn().mockResolvedValue({ events: [], nextCursor: null, requestId: "r1" }),
+      listCampaignCharacters: vi.fn().mockResolvedValue({ characters: [
+        { characterId: "s1", campaignId: "c1", name: "Bram", entityDefinitionId: "hero", systemVersionId: "v1", revision: 7, lifecycle: "active", placementGeneration: 1, controllers: [], updatedAt: "2026-09-01T00:00:00Z" },
+      ], nextCursor: null, requestId: "r2" }),
+    };
+    let rejectRefresh!: (reason: unknown) => void;
+    const refreshing = new Promise<{ character: ReturnType<typeof sheet>; requestId: string }>(
+      (_resolve, reject) => { rejectRefresh = reject; },
+    );
+    const charactersApi = {
+      open: vi.fn()
+        .mockResolvedValueOnce({ character: sheet(), requestId: "initial" })
+        .mockReturnValueOnce(refreshing)
+        .mockResolvedValueOnce({ character: sheet({ revision: 8 }), requestId: "recovered" }),
+      bumpCharacterResource: vi.fn().mockResolvedValue({ result: {}, requestId: "r4" }),
+    };
+    const { unmount } = render(<SessionBoard campaignsApi={campaignsApi as never} charactersApi={charactersApi as never}
+      campaignId="c1" actorId="u1" generation={0} online onOpenCharacter={() => {}} onAccessRevoked={() => {}} />,
+      { wrapper: wrapper() });
+    fireEvent.click(await screen.findByRole("button", { name: /open bram/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /increase health/i }));
+    await waitFor(() => expect(charactersApi.open).toHaveBeenCalledTimes(2));
+    await act(async () => rejectRefresh(new Error("refresh failed")));
+    await waitFor(() => expect(screen.getByText(/refresh failed/i)).toBeVisible());
+    expect(screen.queryByText(/Reloaded/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /increase health/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /refresh character/i })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /refresh character/i }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /increase health/i })).toBeEnabled());
+    unmount();
   });
 });

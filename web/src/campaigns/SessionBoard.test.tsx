@@ -78,6 +78,72 @@ describe("SessionBoard", () => {
     expect(campaignsApi.listCampaignCharacters).toHaveBeenCalledTimes(1);
   });
 
+  it("disables Increase at the value bound even when the element max is higher", async () => {
+    const campaignsApi = {
+      listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),
+      listActivity: vi.fn().mockResolvedValue({ events: [], nextCursor: null, requestId: "r1" }),
+      listCampaignCharacters: vi.fn().mockResolvedValue({ characters: [
+        { characterId: "s1", campaignId: "c1", name: "Bram", entityDefinitionId: "hero", systemVersionId: "v1", revision: 7, lifecycle: "active", placementGeneration: 1, controllers: [], updatedAt: "2026-09-01T00:00:00Z" },
+      ], nextCursor: null, requestId: "r2" }),
+    };
+    // Health 10/10 against element bounds 0/30: the server clamps to the
+    // value max, so Increase must already be disabled.
+    const capped = sheet();
+    capped.projection.sheets[0]!.sections[0]!.elements = [
+      { kind: "resource", id: "e1", resourceId: "hp", label: "Health", value: { current: 10, max: 10 }, min: 0, max: 30, step: 1, resetTo: "max", validations: [] },
+    ];
+    const charactersApi = {
+      open: vi.fn().mockResolvedValue({ character: capped, requestId: "r3" }),
+      bumpCharacterResource: vi.fn().mockResolvedValue({ result: {}, requestId: "r4" }),
+    };
+    render(<SessionBoard campaignsApi={campaignsApi as never} charactersApi={charactersApi as never}
+      campaignId="c1" actorId="u1" generation={0} online onOpenCharacter={() => {}} onAccessRevoked={() => {}} />,
+      { wrapper: wrapper() });
+    fireEvent.click(await screen.findByRole("button", { name: /bram/i }));
+    expect(await screen.findByRole("button", { name: /increase health/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /decrease health/i })).not.toBeDisabled();
+    expect(charactersApi.bumpCharacterResource).not.toHaveBeenCalled();
+  });
+
+  it("disables the roll audience selector while offline", async () => {
+    const campaignsApi = {
+      listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),
+      listActivity: vi.fn().mockResolvedValue({ events: [], nextCursor: null, requestId: "r1" }),
+      listCampaignCharacters: vi.fn().mockResolvedValue({ characters: [
+        { characterId: "s1", campaignId: "c1", name: "Bram", entityDefinitionId: "hero", systemVersionId: "v1", revision: 7, lifecycle: "active", placementGeneration: 1, controllers: [], updatedAt: "2026-09-01T00:00:00Z" },
+      ], nextCursor: null, requestId: "r2" }),
+    };
+    const charactersApi = {
+      open: vi.fn().mockResolvedValue({ character: sheet(), requestId: "r3" }),
+    };
+    render(<SessionBoard campaignsApi={campaignsApi as never} charactersApi={charactersApi as never}
+      campaignId="c1" actorId="u1" generation={0} online={false} onOpenCharacter={() => {}} onAccessRevoked={() => {}} />,
+      { wrapper: wrapper() });
+    fireEvent.click(await screen.findByRole("button", { name: /bram/i }));
+    expect(await screen.findByLabelText(/roll audience/i)).toBeDisabled();
+    expect(screen.getByRole("button", { name: /roll strike/i })).toBeDisabled();
+  });
+
+  it("refetches every feed through the Refresh button", async () => {
+    const campaignsApi = {
+      listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),
+      listActivity: vi.fn().mockResolvedValue({ events: [], nextCursor: null, requestId: "r1" }),
+      listCampaignCharacters: vi.fn().mockResolvedValue({ characters: [
+        { characterId: "s1", campaignId: "c1", name: "Bram", entityDefinitionId: "hero", systemVersionId: "v1", revision: 7, lifecycle: "active", placementGeneration: 1, controllers: [], updatedAt: "2026-09-01T00:00:00Z" },
+      ], nextCursor: null, requestId: "r2" }),
+    };
+    const charactersApi = { open: vi.fn() };
+    render(<SessionBoard campaignsApi={campaignsApi as never} charactersApi={charactersApi as never}
+      campaignId="c1" actorId="u1" generation={0} online onOpenCharacter={() => {}} onAccessRevoked={() => {}} />,
+      { wrapper: wrapper() });
+    await screen.findByRole("button", { name: /bram/i });
+    expect(campaignsApi.listContent).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: /^refresh$/i }));
+    await vi.waitFor(() => expect(campaignsApi.listContent).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(campaignsApi.listActivity).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(campaignsApi.listCampaignCharacters).toHaveBeenCalledTimes(2));
+  });
+
   it("rolls with the selected audience and fresh key", async () => {
     const campaignsApi = {
       listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),

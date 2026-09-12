@@ -11,7 +11,7 @@ describe("ContentEditor", () => {
   it("creates a note with audience and fresh idempotency key", async () => {
     const api = { createContent: vi.fn().mockResolvedValue({ content: { contentId: "n1" }, requestId: "r" }) };
     const onSaved = vi.fn();
-    render(<ContentEditor api={api as never} campaignId="c1" members={members as never} onSaved={onSaved} onDeleted={() => {}} />);
+    render(<ContentEditor api={api as never} campaignId="c1" members={members as never} onSaved={onSaved} onDeleted={() => {}} onConflicted={() => {}} />);
     fireEvent.change(screen.getByLabelText(/title/i), { target: { value: "Briefing" } });
     fireEvent.change(screen.getByLabelText(/body/i), { target: { value: "Meet at dusk." } });
     fireEvent.click(screen.getByRole("button", { name: /save note/i }));
@@ -29,7 +29,7 @@ describe("ContentEditor", () => {
   it("replaces grants with the complete checked set", async () => {
     const api = { replaceContentGrants: vi.fn().mockResolvedValue({ content: {}, requestId: "r" }) };
     const initial = { contentId: "n1", campaignId: "c1", audience: "selected_players", title: "Plan", body: "Shh.", tags: [], revision: 3, grantedUserIds: [] };
-    render(<ContentEditor api={api as never} campaignId="c1" members={members as never} initial={initial as never} onSaved={() => {}} onDeleted={() => {}} />);
+    render(<ContentEditor api={api as never} campaignId="c1" members={members as never} initial={initial as never} onSaved={() => {}} onDeleted={() => {}} onConflicted={() => {}} />);
     fireEvent.click(screen.getByRole("checkbox", { name: /u2/i }));
     fireEvent.click(screen.getByRole("button", { name: /save note/i }));
     await vi.waitFor(() => expect(api.replaceContentGrants).toHaveBeenCalledWith("n1", expect.objectContaining({
@@ -42,7 +42,7 @@ describe("ContentEditor", () => {
     const api = { deleteContent: vi.fn().mockResolvedValue({ content: {}, requestId: "r" }) };
     const initial = { contentId: "n1", campaignId: "c1", audience: "all_players", title: "Plan", body: "Shh.", tags: [], revision: 3, grantedUserIds: [] };
     const onDeleted = vi.fn();
-    render(<ContentEditor api={api as never} campaignId="c1" members={members as never} initial={initial as never} onSaved={() => {}} onDeleted={onDeleted} />);
+    render(<ContentEditor api={api as never} campaignId="c1" members={members as never} initial={initial as never} onSaved={() => {}} onDeleted={onDeleted} onConflicted={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: /hide /i }));
     fireEvent.click(await screen.findByRole("button", { name: /confirm hiding/i }));
     await vi.waitFor(() => expect(api.deleteContent).toHaveBeenCalledWith("n1", expect.objectContaining({
@@ -61,7 +61,7 @@ describe("ContentEditor", () => {
     };
     const onSaved = vi.fn();
     const onDeleted = vi.fn();
-    render(<ContentEditor api={api as never} campaignId="c1" members={members as never} initial={initial as never} onSaved={onSaved} onDeleted={onDeleted} />);
+    render(<ContentEditor api={api as never} campaignId="c1" members={members as never} initial={initial as never} onSaved={onSaved} onDeleted={onDeleted} onConflicted={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: /hide /i }));
     fireEvent.click(await screen.findByRole("button", { name: /confirm hiding/i }));
     await vi.waitFor(() => expect(api.deleteContent).toHaveBeenCalled());
@@ -84,7 +84,7 @@ describe("ContentEditor", () => {
       recoverContent: vi.fn().mockResolvedValue({ content: {}, requestId: "r" }),
     };
     const onSaved = vi.fn();
-    render(<ContentEditor api={api as never} campaignId="c1" members={members as never} initial={initial as never} onSaved={onSaved} onDeleted={() => {}} />);
+    render(<ContentEditor api={api as never} campaignId="c1" members={members as never} initial={initial as never} onSaved={onSaved} onDeleted={() => {}} onConflicted={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: /hide /i }));
     fireEvent.click(await screen.findByRole("button", { name: /confirm hiding/i }));
     await vi.waitFor(() => expect(api.deleteContent).toHaveBeenCalled());
@@ -95,6 +95,57 @@ describe("ContentEditor", () => {
       expectedContentRevision: 4,
     })));
     expect(onSaved).toHaveBeenCalled();
+  });
+
+  it("clears the create form after a successful save", async () => {
+    const api = { createContent: vi.fn().mockResolvedValue({ content: { contentId: "n1" }, requestId: "r" }) };
+    render(<ContentEditor api={api as never} campaignId="c1" members={members as never} onSaved={() => {}} onDeleted={() => {}} onConflicted={() => {}} />);
+    fireEvent.change(screen.getByLabelText(/title/i), { target: { value: "Briefing" } });
+    fireEvent.change(screen.getByLabelText(/body/i), { target: { value: "Meet at dusk." } });
+    fireEvent.click(screen.getByRole("button", { name: /save note/i }));
+    await vi.waitFor(() => expect(api.createContent).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(screen.getByLabelText(/title/i)).toHaveValue(""));
+    expect(screen.getByLabelText(/body/i)).toHaveValue("");
+  });
+
+  it("disables Save and hides edit controls while the note is deleted", async () => {
+    const initial = { contentId: "n1", campaignId: "c1", audience: "all_players", title: "Plan", body: "Shh.", tags: [], revision: 3, grantedUserIds: [], status: "active" };
+    const deleted = { ...initial, revision: 4, status: "deleted" };
+    const api = {
+      deleteContent: vi.fn().mockResolvedValue({ content: deleted, requestId: "r" }),
+      updateContent: vi.fn(),
+    };
+    render(<ContentEditor api={api as never} campaignId="c1" members={members as never} initial={initial as never} onSaved={() => {}} onDeleted={() => {}} onConflicted={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /hide /i }));
+    fireEvent.click(await screen.findByRole("button", { name: /confirm hiding/i }));
+    await vi.waitFor(() => expect(api.deleteContent).toHaveBeenCalled());
+    // No updateContent may issue against the deleted revision: Save is
+    // disabled and the edit controls are out of reach.
+    expect(await screen.findByRole("button", { name: /save note/i })).toBeDisabled();
+    await vi.waitFor(() => expect(screen.queryByLabelText(/title/i)).toBeNull());
+    expect(api.updateContent).not.toHaveBeenCalled();
+  });
+
+  it("returns to the live view after Recover clears the deleted view", async () => {
+    const initial = { contentId: "n1", campaignId: "c1", audience: "all_players", title: "Plan", body: "Shh.", tags: [], revision: 3, grantedUserIds: [], status: "active" };
+    const deleted = { ...initial, revision: 4, status: "deleted" };
+    const api = {
+      deleteContent: vi.fn().mockResolvedValue({ content: deleted, requestId: "r" }),
+      recoverContent: vi.fn().mockResolvedValue({ content: {}, requestId: "r" }),
+      updateContent: vi.fn().mockResolvedValue({ content: { ...initial, revision: 5 }, requestId: "r" }),
+    };
+    render(<ContentEditor api={api as never} campaignId="c1" members={members as never} initial={initial as never} onSaved={() => {}} onDeleted={() => {}} onConflicted={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /hide /i }));
+    fireEvent.click(await screen.findByRole("button", { name: /confirm hiding/i }));
+    await vi.waitFor(() => expect(api.deleteContent).toHaveBeenCalled());
+    expect(await screen.findByRole("button", { name: /save note/i })).toBeDisabled();
+    fireEvent.click(await screen.findByRole("button", { name: /recover /i }));
+    fireEvent.click(await screen.findByRole("button", { name: /confirm recovery/i }));
+    await vi.waitFor(() => expect(api.recoverContent).toHaveBeenCalled());
+    // The stale deleted view is gone: editing is possible again.
+    expect(await screen.findByLabelText(/title/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: /save note/i })).not.toBeDisabled();
+    expect(screen.queryByRole("button", { name: /recover /i })).toBeNull();
   });
 
   it("keeps input and the conflict notice visible after a 409", async () => {

@@ -14,8 +14,15 @@ import type { CampaignMember, ContentSummary, ContentView } from "./types.js";
 
 export type ContentAudience = ContentSummary["audience"];
 
-export function campaignContentKey(campaignId: string): string[] {
-  return ["campaigns", "content", campaignId];
+export function campaignContentKey(
+  campaignId: string,
+  actorId?: string | null,
+  generation?: number,
+): (string | number | null)[] {
+  // Same ["campaigns", "content", campaignId] prefix family as before, so
+  // the revocation purges in CampaignDetail.handleAccessRevoked (which
+  // remove by that prefix) still match these scoped keys.
+  return ["campaigns", "content", campaignId, actorId ?? null, generation ?? 0];
 }
 
 function isNotFound(error: unknown): boolean {
@@ -113,9 +120,18 @@ export function CampaignContentTab(props: {
   onChanged?: () => void;
 }) {
   const queryClient = useQueryClient();
+  // Online + identity gating mirrors useCampaignMembers: no fetch while
+  // offline or before the actor is known. Authoring mutations below are
+  // likewise disabled while offline (same discipline as the board's
+  // bump/Execute buttons).
+  const online = props.online ?? true;
+  const actorId = props.actorId ?? null;
+  const generation = props.generation ?? 0;
+  const listKey = campaignContentKey(props.campaignId, actorId, generation);
   const list = useQuery({
-    queryKey: campaignContentKey(props.campaignId),
+    queryKey: listKey,
     queryFn: () => props.api.listContent(props.campaignId),
+    enabled: online && actorId !== null,
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [revokedIds, setRevokedIds] = useState<Set<string>>(() => new Set());
@@ -132,9 +148,9 @@ export function CampaignContentTab(props: {
   const [mutationConflict, setMutationConflict] = useState(false);
   const [mutationFailed, setMutationFailed] = useState(false);
   const detail = useQuery({
-    queryKey: [...campaignContentKey(props.campaignId), "item", selectedId ?? "none"],
+    queryKey: [...listKey, "item", selectedId ?? "none"],
     queryFn: () => props.api.openContent(selectedId ?? ""),
-    enabled: selectedId !== null,
+    enabled: selectedId !== null && online && actorId !== null,
   });
 
   useEffect(() => {
@@ -158,17 +174,17 @@ export function CampaignContentTab(props: {
       });
       setSelectedId(null);
       setUnavailable(true);
-      void queryClient.invalidateQueries({ queryKey: campaignContentKey(props.campaignId) });
+      void queryClient.invalidateQueries({ queryKey: listKey });
     }
-  }, [selectedId, detail.status, detail.error, queryClient, props.campaignId]);
+  }, [selectedId, detail.status, detail.error, queryClient, listKey]);
 
   const reload = (): void => {
-    void queryClient.invalidateQueries({ queryKey: campaignContentKey(props.campaignId) });
+    void queryClient.invalidateQueries({ queryKey: listKey });
     props.onChanged?.();
   };
 
   const fetchView = async (contentId: string, assign: (view: ContentView) => void): Promise<void> => {
-    if (viewPendingId !== null) return;
+    if (viewPendingId !== null || !online) return;
     setViewPendingId(contentId);
     setViewFailed(false);
     try {
@@ -181,8 +197,13 @@ export function CampaignContentTab(props: {
     }
   };
 
+  // List-level Hide intentionally diverges from the editor delete path:
+  // it invalidates and reloads the list without retaining a deleted view,
+  // so no in-session Recover is offered here (the editor path keeps its
+  // deleted view mounted with a working Recover button). The dialog closes
+  // and the row simply disappears on the next load.
   const attemptDeleteTarget = async (): Promise<void> => {
-    if (deleting === null || mutationPending) return;
+    if (deleting === null || mutationPending || !online) return;
     setMutationPending(true);
     setMutationFailed(false);
     setMutationConflict(false);
@@ -277,6 +298,7 @@ export function CampaignContentTab(props: {
           onSaved={reload}
           onDeleted={reload}
           onConflicted={reload}
+          online={online}
         />
         {editing !== null ? (
           <ContentEditor
@@ -295,6 +317,7 @@ export function CampaignContentTab(props: {
               reload();
             }}
             onConflicted={reload}
+            online={online}
           />
         ) : null}
         {viewFailed ? <p role="alert">{t("campaign.detail.content.edit.error")}</p> : null}
@@ -322,6 +345,7 @@ export function CampaignContentTab(props: {
                 <Button
                   variant="secondary"
                   pending={viewPendingId === item.contentId}
+                  disabled={!online}
                   onClick={() => void fetchView(item.contentId, setEditing)}
                 >
                   {t("campaign.detail.content.edit.editItem", { title: item.title })}
@@ -329,6 +353,7 @@ export function CampaignContentTab(props: {
                 <Button
                   variant="secondary"
                   pending={viewPendingId === item.contentId}
+                  disabled={!online}
                   onClick={() => void fetchView(item.contentId, setDeleting)}
                 >
                   {t("campaign.detail.content.edit.delete", { title: item.title })}
@@ -345,7 +370,12 @@ export function CampaignContentTab(props: {
           title={t("campaign.detail.content.edit.delete.confirm.title")}
           description={t("campaign.detail.content.edit.delete.confirm.description")}
           actions={
-            <Button variant="danger" pending={mutationPending} onClick={() => void attemptDeleteTarget()}>
+            <Button
+              variant="danger"
+              pending={mutationPending}
+              disabled={!online}
+              onClick={() => void attemptDeleteTarget()}
+            >
               {t("campaign.detail.content.edit.delete.confirm.confirm")}
             </Button>
           }

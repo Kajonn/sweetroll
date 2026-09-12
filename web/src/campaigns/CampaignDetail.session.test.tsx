@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -39,5 +39,36 @@ describe("CampaignDetail session tab", () => {
     render(<CampaignDetail api={api as never} campaignId="c1" actorId="u2" onLeft={() => {}} />, { wrapper: wrapper() });
     await screen.findByRole("tab", { name: /members/i });
     expect(screen.queryByRole("tab", { name: /session/i })).toBeNull();
+  });
+
+  it("renders the board when the character surface is supplied and an unavailable state otherwise", async () => {
+    const api = {
+      openCampaign: vi.fn().mockResolvedValue({ campaign, requestId: "r" }),
+      listMembers: vi.fn().mockResolvedValue({
+        members: [
+          { campaignId: "c1", userId: "u1", role: "owner", status: "active", generation: 1, createdAt: "2026-09-01T00:00:00Z", updatedAt: "2026-09-01T00:00:00Z" },
+        ],
+        nextCursor: null, requestId: "r2",
+      }),
+      listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r3" }),
+      listActivity: vi.fn().mockResolvedValue({ events: [], nextCursor: null, requestId: "r4" }),
+      listCampaignCharacters: vi.fn().mockResolvedValue({ characters: [], nextCursor: null, requestId: "r5" }),
+    };
+    const charactersApi = {
+      open: vi.fn(),
+      bumpCharacterResource: vi.fn(),
+      executeCharacterAction: vi.fn(),
+    };
+    const { unmount } = render(
+      <CampaignDetail api={api as never} campaignId="c1" actorId="u1" onLeft={() => {}} charactersApi={charactersApi as never} />,
+      { wrapper: wrapper() },
+    );
+    fireEvent.click(await screen.findByRole("tab", { name: /session/i }));
+    expect(await screen.findByRole("heading", { name: /latest content/i })).toBeVisible();
+    unmount();
+    // A metadata-only handle must never reach the board as a silent cast.
+    render(<CampaignDetail api={api as never} campaignId="c1" actorId="u1" onLeft={() => {}} metadataApi={{} as never} />, { wrapper: wrapper() });
+    fireEvent.click(await screen.findByRole("tab", { name: /session/i }));
+    expect(await screen.findByText(/session data could not be loaded/i)).toBeVisible();
   });
 });

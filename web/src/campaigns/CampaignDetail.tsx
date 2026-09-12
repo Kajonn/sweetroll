@@ -31,6 +31,22 @@ function isConflict(error: unknown): boolean {
 
 type LeavePhase = "idle" | "confirming" | "leaving" | "conflict" | "error";
 
+/**
+ * Runtime guard for the session board's character surface. The router
+ * supplies the real CharactersApi; anything else (a metadata-only handle
+ * or the campaigns api) must never reach SessionBoard as a silent cast —
+ * the tab renders the generic unavailable state instead.
+ */
+function hasSessionCharacterSurface(value: unknown): value is SessionBoardProps["charactersApi"] {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.open === "function" &&
+    typeof record.bumpCharacterResource === "function" &&
+    typeof record.executeCharacterAction === "function"
+  );
+}
+
 function MembersManageSection(props: {
   api: CampaignsApi;
   campaignId: string;
@@ -311,12 +327,10 @@ export function CampaignDetail(props: {
                 {
                   id: "session",
                   label: t("campaign.detail.tabs.session"),
-                  content: (
+                  content: hasSessionCharacterSurface(props.charactersApi) ? (
                     <SessionBoard
                       campaignsApi={props.api}
-                      charactersApi={
-                        (props.charactersApi ?? props.metadataApi ?? props.api) as SessionBoardProps["charactersApi"]
-                      }
+                      charactersApi={props.charactersApi}
                       campaignId={props.campaignId}
                       actorId={props.actorId}
                       generation={generation}
@@ -324,6 +338,8 @@ export function CampaignDetail(props: {
                       onOpenCharacter={onOpenCharacter}
                       onAccessRevoked={handleAccessRevoked}
                     />
+                  ) : (
+                    <EmptyState title={t("campaign.detail.session.loadFailed")} />
                   ),
                 },
               ]

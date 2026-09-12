@@ -66,13 +66,20 @@ export function ContentEditor(props: {
   onSaved: () => void;
   onDeleted: () => void;
   /** 409 reload signal: refresh the parent list without unmounting this editor. */
-  onConflicted?: () => void;
+  onConflicted: () => void;
+  /** Online gate (mirrors the bump/Execute convention): mutations disabled while offline. */
+  online?: boolean;
 }) {
   const initial = props.initial;
   // After a successful Hide the editor stays mounted on the deleted view
   // (refetched for its fresh revision) so Recover stays reachable in-session.
   const [deletedView, setDeletedView] = useState<ContentView | null>(null);
   const effective = deletedView ?? initial;
+  // While the effective view is deleted no updateContent may issue: the
+  // backend rejects writes against a deleted revision, so Save and the edit
+  // controls stay out of reach until Recover clears the deleted view.
+  const isDeleted = effective?.status === "deleted";
+  const online = props.online ?? true;
   const [title, setTitle] = useState(initial?.title ?? "");
   const [bodyText, setBodyText] = useState(initial?.body ?? "");
   const [tagsText, setTagsText] = useState((initial?.tags ?? []).join(", "));
@@ -96,7 +103,7 @@ export function ContentEditor(props: {
   };
 
   const attemptSave = async (): Promise<void> => {
-    if (pending !== null || title.trim() === "") return;
+    if (pending !== null || title.trim() === "" || isDeleted || !online) return;
     setPending("save");
     setFailed(false);
     setConflict(false);
@@ -114,6 +121,13 @@ export function ContentEditor(props: {
         if (tags.length > 0) body.tags = tags;
         if (audience === "selected_players" && checked.length > 0) body.grantedUserIds = [...checked];
         await props.api.createContent(props.campaignId, body);
+        // Clear the create form after a successful save so a second Save
+        // cannot accidentally persist a duplicate note.
+        setTitle("");
+        setBodyText("");
+        setTagsText("");
+        setAudience("gm_only");
+        setChecked([]);
       } else {
         // Content fields: send only what changed. Grants: atomic full-set
         // replacement of the complete checked set, never deltas.
@@ -164,7 +178,7 @@ export function ContentEditor(props: {
         // 409 → reload the parent list (without unmounting), then offer a
         // retry with a fresh key. Never "Merge".
         setConflict(true);
-        props.onConflicted?.();
+        props.onConflicted();
       } else {
         setFailed(true);
       }
@@ -174,7 +188,7 @@ export function ContentEditor(props: {
   };
 
   const attemptDelete = async (): Promise<void> => {
-    if (effective === undefined || pending !== null) return;
+    if (effective === undefined || pending !== null || !online) return;
     setPending("delete");
     setFailed(false);
     setConflict(false);
@@ -210,7 +224,7 @@ export function ContentEditor(props: {
         // retry with a fresh key. Never "Merge".
         setDeleteOpen(false);
         setConflict(true);
-        props.onConflicted?.();
+        props.onConflicted();
       } else {
         setFailed(true);
       }
@@ -220,7 +234,7 @@ export function ContentEditor(props: {
   };
 
   const attemptRecover = async (): Promise<void> => {
-    if (effective === undefined || pending !== null) return;
+    if (effective === undefined || pending !== null || !online) return;
     setPending("recover");
     setFailed(false);
     setConflict(false);
@@ -231,6 +245,9 @@ export function ContentEditor(props: {
         idempotencyKey: crypto.randomUUID(),
       });
       setRecoverOpen(false);
+      // The row is active again: drop the retained deleted view so the
+      // editor returns to the live revision instead of a stale deleted one.
+      setDeletedView(null);
       props.onSaved();
     } catch (cause) {
       if (isConflict(cause)) {
@@ -238,7 +255,7 @@ export function ContentEditor(props: {
         // retry with a fresh key. Never "Merge".
         setRecoverOpen(false);
         setConflict(true);
-        props.onConflicted?.();
+        props.onConflicted();
       } else {
         setFailed(true);
       }
@@ -250,35 +267,39 @@ export function ContentEditor(props: {
   return (
     <div>
       <Panel title={effective?.title ?? t("campaign.detail.content.edit.createTitle")}>
-        <FormField label={t("campaign.detail.content.edit.titleLabel")}>
-          <input type="text" value={title} onChange={(event) => setTitle(event.target.value)} />
-        </FormField>
-        <FormField label={t("campaign.detail.content.edit.bodyLabel")}>
-          <textarea value={bodyText} onChange={(event) => setBodyText(event.target.value)} />
-        </FormField>
-        <FormField label={t("campaign.detail.content.edit.tagsLabel")}>
-          <input type="text" value={tagsText} onChange={(event) => setTagsText(event.target.value)} />
-        </FormField>
-        <Select
-          label={t("campaign.detail.content.edit.audienceLabel")}
-          options={AUDIENCES.map((value) => ({ value, label: audienceLabel(value) }))}
-          value={audience}
-          onChange={(event) => setAudience(event.target.value as ContentAudience)}
-        />
-        {audience === "selected_players" ? (
-          <fieldset>
-            <legend>{t("campaign.detail.content.edit.grantsLabel")}</legend>
-            {roster.map((member) => (
-              <Checkbox
-                key={member.userId}
-                label={member.userId.slice(0, 8)}
-                hint={member.userId}
-                checked={checked.includes(member.userId)}
-                onChange={() => toggleGrant(member.userId)}
-              />
-            ))}
-          </fieldset>
-        ) : null}
+        {isDeleted ? null : (
+          <>
+            <FormField label={t("campaign.detail.content.edit.titleLabel")}>
+              <input type="text" value={title} onChange={(event) => setTitle(event.target.value)} />
+            </FormField>
+            <FormField label={t("campaign.detail.content.edit.bodyLabel")}>
+              <textarea value={bodyText} onChange={(event) => setBodyText(event.target.value)} />
+            </FormField>
+            <FormField label={t("campaign.detail.content.edit.tagsLabel")}>
+              <input type="text" value={tagsText} onChange={(event) => setTagsText(event.target.value)} />
+            </FormField>
+            <Select
+              label={t("campaign.detail.content.edit.audienceLabel")}
+              options={AUDIENCES.map((value) => ({ value, label: audienceLabel(value) }))}
+              value={audience}
+              onChange={(event) => setAudience(event.target.value as ContentAudience)}
+            />
+            {audience === "selected_players" ? (
+              <fieldset>
+                <legend>{t("campaign.detail.content.edit.grantsLabel")}</legend>
+                {roster.map((member) => (
+                  <Checkbox
+                    key={member.userId}
+                    label={member.userId.slice(0, 8)}
+                    hint={member.userId}
+                    checked={checked.includes(member.userId)}
+                    onChange={() => toggleGrant(member.userId)}
+                  />
+                ))}
+              </fieldset>
+            ) : null}
+          </>
+        )}
         {conflict ? <p role="alert">{t("campaign.detail.content.edit.conflict")}</p> : null}
         {failed ? <p role="alert">{t("campaign.detail.content.edit.error")}</p> : null}
         {saved ? <p role="status">{t("campaign.detail.content.edit.saved")}</p> : null}
@@ -286,18 +307,18 @@ export function ContentEditor(props: {
           variant="primary"
           pending={pending === "save"}
           pendingText={t("campaign.detail.content.edit.saving")}
-          disabled={title.trim() === ""}
+          disabled={title.trim() === "" || isDeleted === true || !online}
           onClick={() => void attemptSave()}
         >
           {t("campaign.detail.content.edit.save")}
         </Button>{" "}
         {effective !== undefined && effective.status !== "deleted" ? (
-          <Button variant="danger" onClick={() => setDeleteOpen(true)}>
+          <Button variant="danger" disabled={!online} onClick={() => setDeleteOpen(true)}>
             {t("campaign.detail.content.edit.delete", { title: effective.title })}
           </Button>
         ) : null}{" "}
         {effective !== undefined && effective.status === "deleted" ? (
-          <Button variant="secondary" onClick={() => setRecoverOpen(true)}>
+          <Button variant="secondary" disabled={!online} onClick={() => setRecoverOpen(true)}>
             {t("campaign.detail.content.edit.recover", { title: effective.title })}
           </Button>
         ) : null}
@@ -311,7 +332,12 @@ export function ContentEditor(props: {
           title={t("campaign.detail.content.edit.delete.confirm.title")}
           description={t("campaign.detail.content.edit.delete.confirm.description")}
           actions={
-            <Button variant="danger" pending={pending === "delete"} onClick={() => void attemptDelete()}>
+            <Button
+              variant="danger"
+              pending={pending === "delete"}
+              disabled={!online}
+              onClick={() => void attemptDelete()}
+            >
               {t("campaign.detail.content.edit.delete.confirm.confirm")}
             </Button>
           }
@@ -330,6 +356,7 @@ export function ContentEditor(props: {
             <Button
               variant="primary"
               pending={pending === "recover"}
+              disabled={!online}
               onClick={() => void attemptRecover()}
             >
               {t("campaign.detail.content.edit.recover.confirm.confirm")}

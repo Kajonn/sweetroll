@@ -65,6 +65,12 @@ function SessionBumpRow(props: {
   const [conflict, setConflict] = useState(false);
   const [failed, setFailed] = useState(false);
   const current = props.element.value.current;
+  // Bump bounds come from the live value, not the element definition: the
+  // server clamps to value.max (e.g. Health 10/10 with element.max 30), so
+  // the buttons must disable at the value bound or the up-bump 422s.
+  const lowerBound =
+    (props.element.value as { min?: number }).min ?? props.element.min;
+  const upperBound = Math.min(props.element.value.max, props.element.max);
 
   const attempt = async (direction: "up" | "down"): Promise<void> => {
     if (pending) return;
@@ -100,14 +106,14 @@ function SessionBumpRow(props: {
       </span>{" "}
       <Button
         variant="secondary"
-        disabled={!props.online || pending || current <= props.element.min}
+        disabled={!props.online || pending || current <= lowerBound}
         onClick={() => void attempt("down")}
       >
         {t("campaign.detail.session.bump.down", { label: props.element.label })}
       </Button>{" "}
       <Button
         variant="secondary"
-        disabled={!props.online || pending || current >= props.element.max}
+        disabled={!props.online || pending || current >= upperBound}
         onClick={() => void attempt("up")}
       >
         {t("campaign.detail.session.bump.up", { label: props.element.label })}
@@ -199,6 +205,7 @@ function SessionRollRow(props: {
           { value: "campaign", label: "campaign" },
         ]}
         value={audience}
+        disabled={!props.online}
         onChange={(event) => setAudience(event.target.value as RollAudience)}
       />{" "}
       <Button

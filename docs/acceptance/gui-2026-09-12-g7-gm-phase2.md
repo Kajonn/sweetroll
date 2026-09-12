@@ -19,7 +19,7 @@ viewport, same flow). Chromium headless:
    d20 clone published through the real System Builder API (clone → save
    draft unchanged → publish 1.0.0), because the seeded reference templates
    are link-access/unlisted (OD-01) and versionless enumeration never offers
-   them. Nothing else is provisioned over HTTP.
+    them; no other writes provisioned; read-only GETs for catalog/directory.
 2. GM `code-test-a` via the dev sign-in panel (code field filled) creates
    the campaign entirely through the UI: `/campaigns/new` → select the
    seeded clone version → title `G7 GM Session <uid>` → Create campaign →

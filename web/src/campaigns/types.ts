@@ -95,6 +95,8 @@ export type UpdateContentBody = NonNullable<
 export type DeleteContentBody = NonNullable<
   operations["delete_content_id"]["requestBody"]
 >["content"]["application/json"];
+export type DeleteContentResponse =
+  operations["delete_content_id"]["responses"]["200"]["content"]["application/json"];
 
 export type RecoverContentBody = NonNullable<
   operations["post_content_id_recover"]["requestBody"]

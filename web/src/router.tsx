@@ -522,6 +522,7 @@ function CampaignDetailRouteView() {
         },
       }}
       metadataApi={charactersApi}
+      charactersApi={charactersApi}
     />
   );
 }

@@ -13,6 +13,7 @@ import type {
   CreateContentBody,
   CreateContentResponse,
   DeleteContentBody,
+  DeleteContentResponse,
   ExportCampaignBody,
   ExportCampaignResponse,
   InvitationAcceptBody,
@@ -87,7 +88,7 @@ export type CampaignsApi = {
   revokeInvitation(campaignId: string, inviteId: string, body: RevokeInvitationBody): Promise<unknown>;
   createContent(campaignId: string, body: CreateContentBody): Promise<CreateContentResponse>;
   updateContent(contentId: string, body: UpdateContentBody): Promise<CampaignContentResponse>;
-  deleteContent(contentId: string, body: DeleteContentBody): Promise<unknown>;
+  deleteContent(contentId: string, body: DeleteContentBody): Promise<DeleteContentResponse>;
   recoverContent(contentId: string, body: RecoverContentBody): Promise<unknown>;
   replaceContentGrants(contentId: string, body: ReplaceGrantsBody): Promise<unknown>;
 };
@@ -173,7 +174,7 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
     updateContent: (contentId, body) =>
       client.fetch<CampaignContentResponse>("PATCH", `/content/${contentId}`, { body }),
     deleteContent: (contentId, body) =>
-      client.fetch("DELETE", `/content/${contentId}`, { body }),
+      client.fetch<DeleteContentResponse>("DELETE", `/content/${contentId}`, { body }),
     recoverContent: (contentId, body) =>
       client.fetch("POST", `/content/${contentId}/recover`, { body }),
     replaceContentGrants: (contentId, body) =>

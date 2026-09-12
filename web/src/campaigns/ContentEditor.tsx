@@ -34,6 +34,22 @@ function sameIdSet(left: string[], right: string[]): boolean {
   return left.every((id) => rightSet.has(id));
 }
 
+/**
+ * Narrow the delete receipt to its deleted view. Never assume the payload
+ * shape: anything unparseable (or a view for another row / status) yields
+ * null and the caller falls back to the re-read paths.
+ */
+function deletedViewFromReceipt(receipt: unknown, contentId: string): ContentView | null {
+  if (typeof receipt !== "object" || receipt === null) return null;
+  const content = (receipt as { content?: unknown }).content;
+  if (typeof content !== "object" || content === null) return null;
+  const view = content as Partial<ContentView>;
+  if (view.contentId !== contentId || view.status !== "deleted" || typeof view.revision !== "number") {
+    return null;
+  }
+  return view as ContentView;
+}
+
 export function ContentEditor(props: {
   api: Pick<
     CampaignsApi,
@@ -164,20 +180,28 @@ export function ContentEditor(props: {
     setConflict(false);
     // Caller-minted idempotency key, fresh on every attempt.
     try {
-      await props.api.deleteContent(effective.contentId, {
+      const receipt = await props.api.deleteContent(effective.contentId, {
         expectedContentRevision: effective.revision,
         idempotencyKey: crypto.randomUUID(),
       });
       setDeleteOpen(false);
-      // Stay mounted on the refetched deleted view so Recover remains
-      // reachable in-session; the parent list still reloads via onDeleted.
-      // The fallback covers a delete the GM cannot re-read (then Recover is
-      // best-effort against the last known revision).
-      try {
-        const res = await props.api.openContent(effective.contentId);
-        setDeletedView(res.content);
-      } catch {
-        setDeletedView({ ...effective, status: "deleted" });
+      // Stay mounted on the deleted view so Recover remains reachable
+      // in-session; the parent list still reloads via onDeleted. Prefer the
+      // delete receipt's view: it carries the fresh post-delete revision,
+      // while openContent 404s on deleted rows by contract (so the re-read
+      // below only ever succeeds for rows that were already recovered).
+      // The stale-revision fallback covers a receipt that cannot be parsed
+      // (then Recover is best-effort against the last known revision).
+      const receiptView = deletedViewFromReceipt(receipt, effective.contentId);
+      if (receiptView !== null) {
+        setDeletedView(receiptView);
+      } else {
+        try {
+          const res = await props.api.openContent(effective.contentId);
+          setDeletedView(res.content);
+        } catch {
+          setDeletedView({ ...effective, status: "deleted" });
+        }
       }
       props.onDeleted();
     } catch (cause) {

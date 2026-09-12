@@ -13,6 +13,7 @@ import { CampaignContentTab, campaignContentKey } from "./CampaignContent.js";
 import { CampaignMembersTab, ownRole } from "./CampaignMembers.js";
 import { CampaignSettingsView } from "./CampaignSettings.js";
 import { InvitationManager } from "./InvitationManager.js";
+import { SessionBoard, type SessionBoardProps } from "./SessionBoard.js";
 import { campaignCharactersKey, campaignDetailKey, useCampaignMembers } from "./campaignQueries.js";
 import type { CampaignView } from "./types.js";
 
@@ -37,15 +38,10 @@ function MembersManageSection(props: {
   campaign: CampaignView;
   generation: number;
   online: boolean;
+  isGm: boolean;
   onChanged: () => void;
   onAccessRevoked: () => void;
 }) {
-  const roster = useCampaignMembers(props.api, props.campaignId, props.actorId, props.generation, {
-    enabled: true,
-    online: props.online,
-  });
-  const members = roster.data?.pages.flatMap((page) => page.members) ?? [];
-  const isGm = ownRole(members, props.actorId) === "owner" || ownRole(members, props.actorId) === "co_gm";
   return (
     <>
       <CampaignMembersTab
@@ -58,7 +54,7 @@ function MembersManageSection(props: {
         onChanged={props.onChanged}
         onAccessRevoked={props.onAccessRevoked}
       />
-      {isGm ? (
+      {props.isGm ? (
         <>
           <CampaignSettingsView api={props.api} campaign={props.campaign} onChanged={props.onChanged} />
           <InvitationManager
@@ -83,6 +79,7 @@ export function CampaignDetail(props: {
   onLeft: () => void;
   navigation?: { onOpenCharacter: (characterId: string) => void };
   metadataApi?: CampaignCharacterMetadataApi;
+  charactersApi?: SessionBoardProps["charactersApi"];
   generation?: number;
   online?: boolean;
 }) {
@@ -95,6 +92,20 @@ export function CampaignDetail(props: {
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [accessChanged, setAccessChanged] = useState(false);
 
+  // Hoisted roster read: same params as the former inline section call, so
+  // the query key matches and the request stays deduped. Enabled only once
+  // the detail itself resolved (the section only ever mounted past that
+  // point, preserving the Phase 1 fetch shape).
+  const generation = props.generation ?? 0;
+  const online = props.online ?? true;
+  const roster = useCampaignMembers(props.api, props.campaignId, props.actorId, generation, {
+    enabled: detail.status === "success",
+    online,
+  });
+  const members = roster.data?.pages.flatMap((page) => page.members) ?? [];
+  const role = ownRole(members, props.actorId);
+  const isGm = role === "owner" || role === "co_gm";
+
   // Revocation purge: a not_found for a previously-readable campaign (or its
   // content/activity feed) drops every query scoped to that campaign key and
   // surfaces an "access changed" notice with a way back. The account list is
@@ -106,6 +117,7 @@ export function CampaignDetail(props: {
     queryClient.removeQueries({ queryKey: campaignContentKey(props.campaignId) });
     queryClient.removeQueries({ queryKey: campaignActivityKey(props.campaignId) });
     queryClient.removeQueries({ queryKey: ["campaigns", "members", props.campaignId] });
+    queryClient.removeQueries({ queryKey: ["campaigns", "session", props.campaignId] });
     queryClient.removeQueries({ queryKey: ["campaigns", "invitations", props.campaignId] });
     void queryClient.invalidateQueries({ queryKey: ["campaigns", "list"] });
     setAccessChanged(true);
@@ -257,8 +269,9 @@ export function CampaignDetail(props: {
                 campaignId={props.campaignId}
                 actorId={props.actorId}
                 campaign={campaign}
-                generation={props.generation ?? 0}
-                online={props.online ?? true}
+                generation={generation}
+                online={online}
+                isGm={isGm}
                 onChanged={() => void detail.refetch()}
                 onAccessRevoked={handleAccessRevoked}
               />
@@ -272,6 +285,13 @@ export function CampaignDetail(props: {
                 api={props.api}
                 campaignId={props.campaignId}
                 onAccessRevoked={handleAccessRevoked}
+                campaignRevision={campaign.revision}
+                actorId={props.actorId}
+                generation={generation}
+                online={online}
+                isGm={isGm}
+                members={members}
+                onChanged={() => void detail.refetch()}
               />
             ),
           },
@@ -286,6 +306,28 @@ export function CampaignDetail(props: {
               />
             ),
           },
+          ...(isGm
+            ? [
+                {
+                  id: "session",
+                  label: t("campaign.detail.tabs.session"),
+                  content: (
+                    <SessionBoard
+                      campaignsApi={props.api}
+                      charactersApi={
+                        (props.charactersApi ?? props.metadataApi ?? props.api) as SessionBoardProps["charactersApi"]
+                      }
+                      campaignId={props.campaignId}
+                      actorId={props.actorId}
+                      generation={generation}
+                      online={online}
+                      onOpenCharacter={onOpenCharacter}
+                      onAccessRevoked={handleAccessRevoked}
+                    />
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
       <Dialog

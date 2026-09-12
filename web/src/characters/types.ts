@@ -106,6 +106,17 @@ export type DuplicateCharacterBody = NonNullable<
   operations["post_characters_characterId_duplicate"]["requestBody"]
 >["content"]["application/json"];
 
+export type BumpCharacterResourceBody = NonNullable<
+  operations["post_characters_characterId_resources_resourceId_bump"]["requestBody"]
+>["content"]["application/json"];
+export type BumpCharacterResourceResponse =
+  operations["post_characters_characterId_resources_resourceId_bump"]["responses"]["200"]["content"]["application/json"];
+export type ExecuteCharacterActionBody = NonNullable<
+  operations["post_characters_characterId_actions_actionId"]["requestBody"]
+>["content"]["application/json"];
+export type ExecuteCharacterActionResponse =
+  operations["post_characters_characterId_actions_actionId"]["responses"]["200"]["content"]["application/json"];
+
 export type CommandResultResponse = operations["post_characters_characterId_fields_fieldId_set"]["responses"]["200"]["content"]["application/json"];
 export type CommandResult = CommandResultResponse["result"];
 

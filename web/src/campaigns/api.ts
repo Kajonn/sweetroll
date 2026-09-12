@@ -10,6 +10,9 @@ import type {
   ChangeMemberRoleBody,
   CreateCampaignBody,
   CreateCampaignResponse,
+  CreateContentBody,
+  CreateContentResponse,
+  DeleteContentBody,
   ExportCampaignBody,
   ExportCampaignResponse,
   InvitationAcceptBody,
@@ -18,10 +21,13 @@ import type {
   InvitationReviewResponse,
   IssueInvitationBody,
   IssueInvitationResponse,
+  RecoverContentBody,
   RemoveMemberBody,
+  ReplaceGrantsBody,
   RevokeInvitationBody,
   RotateInvitationBody,
   UpdateCampaignBody,
+  UpdateContentBody,
   MemberListResponse,
 } from "./types.js";
 import type { operations } from "../api/schema.js";
@@ -51,8 +57,8 @@ type ReviewBody = NonNullable<
 >["content"]["application/json"];
 type DeclineResponse =
   operations["post_invitations_decline"]["responses"]["200"]["content"]["application/json"];
-type ContentListQuery = { cursor?: string | null; limit?: number };
-type ActivityListQuery = { cursor?: string | null; limit?: number };
+export type ContentListQuery = { cursor?: string | null; limit?: number };
+export type ActivityListQuery = { cursor?: string | null; limit?: number };
 
 export type CampaignsApi = {
   listCampaigns(input?: CampaignListQuery): Promise<CampaignListResponse>;
@@ -79,6 +85,11 @@ export type CampaignsApi = {
   issueInvitation(campaignId: string, body: IssueInvitationBody): Promise<IssueInvitationResponse>;
   rotateInvitation(campaignId: string, inviteId: string, body: RotateInvitationBody): Promise<IssueInvitationResponse>;
   revokeInvitation(campaignId: string, inviteId: string, body: RevokeInvitationBody): Promise<unknown>;
+  createContent(campaignId: string, body: CreateContentBody): Promise<CreateContentResponse>;
+  updateContent(contentId: string, body: UpdateContentBody): Promise<CampaignContentResponse>;
+  deleteContent(contentId: string, body: DeleteContentBody): Promise<unknown>;
+  recoverContent(contentId: string, body: RecoverContentBody): Promise<unknown>;
+  replaceContentGrants(contentId: string, body: ReplaceGrantsBody): Promise<unknown>;
 };
 
 export function createCampaignsApi(client: ApiClient): CampaignsApi {
@@ -157,5 +168,15 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
       client.fetch<IssueInvitationResponse>("POST", `/campaigns/${campaignId}/invitations/${inviteId}/rotate`, { body }),
     revokeInvitation: (campaignId, inviteId, body) =>
       client.fetch("POST", `/campaigns/${campaignId}/invitations/${inviteId}/revoke`, { body }),
+    createContent: (campaignId, body) =>
+      client.fetch<CreateContentResponse>("POST", `/campaigns/${campaignId}/content`, { body }),
+    updateContent: (contentId, body) =>
+      client.fetch<CampaignContentResponse>("PATCH", `/content/${contentId}`, { body }),
+    deleteContent: (contentId, body) =>
+      client.fetch("DELETE", `/content/${contentId}`, { body }),
+    recoverContent: (contentId, body) =>
+      client.fetch("POST", `/content/${contentId}/recover`, { body }),
+    replaceContentGrants: (contentId, body) =>
+      client.fetch("POST", `/content/${contentId}/grants`, { body }),
   };
 }

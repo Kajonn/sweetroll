@@ -1,6 +1,8 @@
 import { ApiError, type ApiClient } from "../api/client.js";
 import type {
   ActivityResponse,
+  BumpCharacterResourceBody,
+  BumpCharacterResourceResponse,
   CharacterExport,
   CharacterList,
   CommandResultResponse,
@@ -8,6 +10,8 @@ import type {
   CreationVersions,
   DuplicateCharacterBody,
   DuplicateCharacterResponse,
+  ExecuteCharacterActionBody,
+  ExecuteCharacterActionResponse,
   FrozenRequest,
   MigrationPreviewBody,
   MigrationPreviewResponse,
@@ -32,6 +36,16 @@ export type CharactersApi = {
   listCreationVersions(input?: VersionCatalogQuery): Promise<CreationVersions>;
   listCharacters(input?: CharacterListQuery): Promise<CharacterList>;
   duplicateCharacter(characterId: string, body: DuplicateCharacterBody): Promise<DuplicateCharacterResponse>;
+  bumpCharacterResource(
+    characterId: string,
+    resourceId: string,
+    body: BumpCharacterResourceBody,
+  ): Promise<BumpCharacterResourceResponse>;
+  executeCharacterAction(
+    characterId: string,
+    actionId: string,
+    body: ExecuteCharacterActionBody,
+  ): Promise<ExecuteCharacterActionResponse>;
   activity(characterId: string, cursor: string | null): Promise<ActivityResponse>;
   send(request: FrozenRequest): Promise<CommandResultResponse>;
   export(characterId: string): Promise<CharacterExport>;
@@ -87,6 +101,14 @@ export function createCharactersApi(client: ApiClient): CharactersApi {
       client.fetch<DuplicateCharacterResponse>("POST", `/characters/${characterId}/duplicate`, {
         body,
       }),
+    // ONLINE-ONLY GM session-board wrappers: they call the same HTTP contracts
+    // as the character session queue but bypass the offline durable queue.
+    // The player sheet keeps using the session; these must never be used
+    // while offline (callers gate on `online`).
+    bumpCharacterResource: (characterId, resourceId, body) =>
+      client.fetch<BumpCharacterResourceResponse>("POST", `/characters/${characterId}/resources/${resourceId}/bump`, { body }),
+    executeCharacterAction: (characterId, actionId, body) =>
+      client.fetch<ExecuteCharacterActionResponse>("POST", `/characters/${characterId}/actions/${actionId}`, { body }),
     activity: (characterId, cursor) =>
       client.fetch<ActivityResponse>("GET", `/characters/${characterId}/activity`, {
         query: { cursor },

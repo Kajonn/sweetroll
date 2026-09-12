@@ -362,3 +362,25 @@ describe("createCharactersApi", () => {
     expect(internal.status).toBe(500);
   });
 });
+
+describe("createCharactersApi GM session-board wrappers", () => {
+  it("bumps a resource with direction, revision, and key", async () => {
+    const client = makeClient();
+    client.fetch.mockResolvedValueOnce({ result: {}, requestId: "r1" });
+    const api = createCharactersApi(client);
+    await api.bumpCharacterResource("s1", "hp", { direction: "down", expectedRevision: 4, idempotencyKey: "k1" });
+    expect(client.fetch).toHaveBeenCalledWith("POST", "/characters/s1/resources/hp/bump", {
+      body: { direction: "down", expectedRevision: 4, idempotencyKey: "k1" },
+    });
+  });
+
+  it("executes an action with audience, revision, and key", async () => {
+    const client = makeClient();
+    client.fetch.mockResolvedValueOnce({ result: {}, requestId: "r2" });
+    const api = createCharactersApi(client);
+    await api.executeCharacterAction("s1", "a1", { audience: "campaign", expectedRevision: 4, idempotencyKey: "k2" });
+    expect(client.fetch).toHaveBeenCalledWith("POST", "/characters/s1/actions/a1", {
+      body: { audience: "campaign", expectedRevision: 4, idempotencyKey: "k2" },
+    });
+  });
+});

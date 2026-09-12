@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/client.js";
 import type {
   ActivityResponse,
+  BumpCharacterResourceResponse,
   CharacterExport,
   CharacterList,
   CharacterView,
   CreationOptions,
   CreationVersions,
   DuplicateCharacterResponse,
+  ExecuteCharacterActionResponse,
   FrozenRequest,
   MigrationPreviewBody,
   MigrationPreviewResponse,
@@ -247,6 +249,12 @@ class FakeApi implements CharactersApi {
     throw new Error("unused");
   }
   duplicateCharacter(): Promise<DuplicateCharacterResponse> {
+    throw new Error("unused");
+  }
+  bumpCharacterResource(): Promise<BumpCharacterResourceResponse> {
+    throw new Error("unused");
+  }
+  executeCharacterAction(): Promise<ExecuteCharacterActionResponse> {
     throw new Error("unused");
   }
   activityScript: Array<ActivityResponse | { __error: Error }> = [];

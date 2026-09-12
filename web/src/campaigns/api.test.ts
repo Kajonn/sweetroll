@@ -49,3 +49,32 @@ describe("createCampaignsApi GM setup", () => {
     });
   });
 });
+
+describe("createCampaignsApi GM content", () => {
+  it("creates content with audience and idempotency key", async () => {
+    const fetch = vi.fn().mockResolvedValue({ content: { contentId: "n1" }, requestId: "r1" });
+    const api = createCampaignsApi({ fetch } as never);
+    await api.createContent("c1", { title: "Briefing", body: "Meet at dusk.", audience: "all_players", idempotencyKey: "k1" });
+    expect(fetch).toHaveBeenCalledWith("POST", "/campaigns/c1/content", {
+      body: { title: "Briefing", body: "Meet at dusk.", audience: "all_players", idempotencyKey: "k1" },
+    });
+  });
+
+  it("replaces grants atomically with revision + fresh key", async () => {
+    const fetch = vi.fn().mockResolvedValue({ content: { contentId: "n1" }, requestId: "r2" });
+    const api = createCampaignsApi({ fetch } as never);
+    await api.replaceContentGrants("n1", { grantedUserIds: ["u2"], expectedContentRevision: 3, idempotencyKey: "k2" });
+    expect(fetch).toHaveBeenCalledWith("POST", "/content/n1/grants", {
+      body: { grantedUserIds: ["u2"], expectedContentRevision: 3, idempotencyKey: "k2" },
+    });
+  });
+
+  it("deletes content with the revision body on the DELETE", async () => {
+    const fetch = vi.fn().mockResolvedValue({ content: { contentId: "n1" }, requestId: "r3" });
+    const api = createCampaignsApi({ fetch } as never);
+    await api.deleteContent("n1", { expectedContentRevision: 3, idempotencyKey: "k3" });
+    expect(fetch).toHaveBeenCalledWith("DELETE", "/content/n1", {
+      body: { expectedContentRevision: 3, idempotencyKey: "k3" },
+    });
+  });
+});

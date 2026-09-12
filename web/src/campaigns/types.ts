@@ -81,3 +81,25 @@ export type RotateInvitationBody = NonNullable<
 export type RevokeInvitationBody = NonNullable<
   operations["post_campaigns_id_invitations_inviteId_revoke"]["requestBody"]
 >["content"]["application/json"];
+
+export type CreateContentBody = NonNullable<
+  operations["post_campaigns_id_content"]["requestBody"]
+>["content"]["application/json"];
+export type CreateContentResponse =
+  operations["post_campaigns_id_content"]["responses"]["201"]["content"]["application/json"];
+
+export type UpdateContentBody = NonNullable<
+  operations["patch_content_id"]["requestBody"]
+>["content"]["application/json"];
+
+export type DeleteContentBody = NonNullable<
+  operations["delete_content_id"]["requestBody"]
+>["content"]["application/json"];
+
+export type RecoverContentBody = NonNullable<
+  operations["post_content_id_recover"]["requestBody"]
+>["content"]["application/json"];
+
+export type ReplaceGrantsBody = NonNullable<
+  operations["post_content_id_grants"]["requestBody"]
+>["content"]["application/json"];

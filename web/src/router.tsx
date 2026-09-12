@@ -462,7 +462,7 @@ function CampaignCreateRouteView() {
     return (
       <section aria-labelledby="campaigns-title">
         <h1 id="campaigns-title">{t("campaign.create.title")}</h1>
-        <p role="status">{t("character.detail.signIn")}</p>
+        <p role="status">{t("campaign.create.signIn")}</p>
       </section>
     );
   }

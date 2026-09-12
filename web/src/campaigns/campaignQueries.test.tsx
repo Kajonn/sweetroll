@@ -1,10 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { CampaignsApi } from "./api.js";
-import { CAMPAIGN_LIST_PAGE_LIMIT, campaignListKey, useCampaignList } from "./campaignQueries.js";
+import {
+  CAMPAIGN_LIST_PAGE_LIMIT,
+  campaignInvitationsKey,
+  campaignListKey,
+  campaignMembersKey,
+  useCampaignList,
+  useCampaignMembers,
+} from "./campaignQueries.js";
 
 function makeApi(): CampaignsApi & { listCampaigns: ReturnType<typeof vi.fn> } {
   return {
@@ -59,5 +66,39 @@ describe("useCampaignList", () => {
     await vi.waitFor(() => expect(api.listCampaigns).toHaveBeenCalledTimes(1));
     expect(api.listCampaigns).toHaveBeenCalledWith({ cursor: null, limit: CAMPAIGN_LIST_PAGE_LIMIT });
     await vi.waitFor(() => expect(result.current.status).toBe("success"));
+  });
+});
+
+describe("useCampaignMembers", () => {
+  it("scopes the key to campaign, actor, and generation", () => {
+    expect(campaignMembersKey("c1", "u1", 2)).toEqual(["campaigns", "members", "c1", "u1", 2]);
+    expect(campaignInvitationsKey("c1", "u1", 2)).toEqual(["campaigns", "invitations", "c1", "u1", 2]);
+  });
+
+  it("stays disabled while signed out or offline", () => {
+    const api = { listMembers: vi.fn() };
+    const signedOut = renderHook(
+      () => useCampaignMembers(api as never, "c1", null, 0, { enabled: true, online: true }),
+      { wrapper: wrapper() },
+    );
+    const offline = renderHook(
+      () => useCampaignMembers(api as never, "c1", "u1", 0, { enabled: true, online: false }),
+      { wrapper: wrapper() },
+    );
+    expect(signedOut.result.current.status).toBe("pending");
+    expect(offline.result.current.status).toBe("pending");
+    expect(api.listMembers).not.toHaveBeenCalled();
+  });
+
+  it("pages members with cursor + limit when enabled", async () => {
+    const api = {
+      listMembers: vi.fn().mockResolvedValue({ members: [], nextCursor: null, requestId: "r" }),
+    };
+    const { result } = renderHook(
+      () => useCampaignMembers(api as never, "c1", "u1", 0, { enabled: true, online: true }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(api.listMembers).toHaveBeenCalledWith("c1", { cursor: null, limit: 25 }));
+    await waitFor(() => expect(result.current.status).toBe("success"));
   });
 });

@@ -37,15 +37,26 @@ function sameIdSet(left: string[], right: string[]): boolean {
 export function ContentEditor(props: {
   api: Pick<
     CampaignsApi,
-    "createContent" | "updateContent" | "deleteContent" | "recoverContent" | "replaceContentGrants"
+    | "createContent"
+    | "updateContent"
+    | "deleteContent"
+    | "recoverContent"
+    | "replaceContentGrants"
+    | "openContent"
   >;
   campaignId: string;
   members: CampaignMember[];
   initial?: ContentView;
   onSaved: () => void;
   onDeleted: () => void;
+  /** 409 reload signal: refresh the parent list without unmounting this editor. */
+  onConflicted?: () => void;
 }) {
   const initial = props.initial;
+  // After a successful Hide the editor stays mounted on the deleted view
+  // (refetched for its fresh revision) so Recover stays reachable in-session.
+  const [deletedView, setDeletedView] = useState<ContentView | null>(null);
+  const effective = deletedView ?? initial;
   const [title, setTitle] = useState(initial?.title ?? "");
   const [bodyText, setBodyText] = useState(initial?.body ?? "");
   const [tagsText, setTagsText] = useState((initial?.tags ?? []).join(", "));
@@ -75,7 +86,7 @@ export function ContentEditor(props: {
     setConflict(false);
     setSaved(false);
     try {
-      if (initial === undefined) {
+      if (effective === undefined) {
         // Caller-minted idempotency key, fresh on every attempt.
         const body: CreateContentBody = {
           title: title.trim(),
@@ -90,40 +101,40 @@ export function ContentEditor(props: {
       } else {
         // Content fields: send only what changed. Grants: atomic full-set
         // replacement of the complete checked set, never deltas.
-        let revision = initial.revision;
+        let revision = effective.revision;
         const patch: UpdateContentBody = {
           expectedContentRevision: revision,
           idempotencyKey: crypto.randomUUID(),
         };
         let dirty = false;
         const trimmedTitle = title.trim();
-        if (trimmedTitle !== initial.title) {
+        if (trimmedTitle !== effective.title) {
           patch.title = trimmedTitle;
           dirty = true;
         }
-        if (bodyText !== initial.body) {
+        if (bodyText !== effective.body) {
           patch.body = bodyText;
           dirty = true;
         }
         const tags = parseTags(tagsText);
-        if (!sameTagList(tags, initial.tags)) {
+        if (!sameTagList(tags, effective.tags)) {
           patch.tags = tags;
           dirty = true;
         }
-        if (audience !== initial.audience) {
+        if (audience !== effective.audience) {
           patch.audience = audience;
           dirty = true;
         }
         if (dirty) {
-          const updated = await props.api.updateContent(initial.contentId, patch);
+          const updated = await props.api.updateContent(effective.contentId, patch);
           revision = updated.content.revision;
         }
         const grantsDirty =
           audience === "selected_players" &&
-          (audience !== initial.audience || !sameIdSet(checked, initial.grantedUserIds ?? []));
+          (audience !== effective.audience || !sameIdSet(checked, effective.grantedUserIds ?? []));
         if (grantsDirty) {
           // Caller-minted idempotency key, fresh on every attempt.
-          await props.api.replaceContentGrants(initial.contentId, {
+          await props.api.replaceContentGrants(effective.contentId, {
             grantedUserIds: [...checked],
             expectedContentRevision: revision,
             idempotencyKey: crypto.randomUUID(),
@@ -134,9 +145,10 @@ export function ContentEditor(props: {
       props.onSaved();
     } catch (cause) {
       if (isConflict(cause)) {
-        // 409 → re-read first, then offer a retry with a fresh key. Never "Merge".
+        // 409 → reload the parent list (without unmounting), then offer a
+        // retry with a fresh key. Never "Merge".
         setConflict(true);
-        props.onSaved();
+        props.onConflicted?.();
       } else {
         setFailed(true);
       }
@@ -146,24 +158,35 @@ export function ContentEditor(props: {
   };
 
   const attemptDelete = async (): Promise<void> => {
-    if (initial === undefined || pending !== null) return;
+    if (effective === undefined || pending !== null) return;
     setPending("delete");
     setFailed(false);
     setConflict(false);
     // Caller-minted idempotency key, fresh on every attempt.
     try {
-      await props.api.deleteContent(initial.contentId, {
-        expectedContentRevision: initial.revision,
+      await props.api.deleteContent(effective.contentId, {
+        expectedContentRevision: effective.revision,
         idempotencyKey: crypto.randomUUID(),
       });
       setDeleteOpen(false);
+      // Stay mounted on the refetched deleted view so Recover remains
+      // reachable in-session; the parent list still reloads via onDeleted.
+      // The fallback covers a delete the GM cannot re-read (then Recover is
+      // best-effort against the last known revision).
+      try {
+        const res = await props.api.openContent(effective.contentId);
+        setDeletedView(res.content);
+      } catch {
+        setDeletedView({ ...effective, status: "deleted" });
+      }
       props.onDeleted();
     } catch (cause) {
       if (isConflict(cause)) {
-        // 409 → re-read first, then offer a retry with a fresh key. Never "Merge".
+        // 409 → reload the parent list (without unmounting), then offer a
+        // retry with a fresh key. Never "Merge".
         setDeleteOpen(false);
         setConflict(true);
-        props.onDeleted();
+        props.onConflicted?.();
       } else {
         setFailed(true);
       }
@@ -173,24 +196,25 @@ export function ContentEditor(props: {
   };
 
   const attemptRecover = async (): Promise<void> => {
-    if (initial === undefined || pending !== null) return;
+    if (effective === undefined || pending !== null) return;
     setPending("recover");
     setFailed(false);
     setConflict(false);
     // Caller-minted idempotency key, fresh on every attempt.
     try {
-      await props.api.recoverContent(initial.contentId, {
-        expectedContentRevision: initial.revision,
+      await props.api.recoverContent(effective.contentId, {
+        expectedContentRevision: effective.revision,
         idempotencyKey: crypto.randomUUID(),
       });
       setRecoverOpen(false);
       props.onSaved();
     } catch (cause) {
       if (isConflict(cause)) {
-        // 409 → re-read first, then offer a retry with a fresh key. Never "Merge".
+        // 409 → reload the parent list (without unmounting), then offer a
+        // retry with a fresh key. Never "Merge".
         setRecoverOpen(false);
         setConflict(true);
-        props.onSaved();
+        props.onConflicted?.();
       } else {
         setFailed(true);
       }
@@ -201,7 +225,7 @@ export function ContentEditor(props: {
 
   return (
     <div>
-      <Panel title={initial?.title ?? t("campaign.detail.content.edit.createTitle")}>
+      <Panel title={effective?.title ?? t("campaign.detail.content.edit.createTitle")}>
         <FormField label={t("campaign.detail.content.edit.titleLabel")}>
           <input type="text" value={title} onChange={(event) => setTitle(event.target.value)} />
         </FormField>
@@ -243,18 +267,18 @@ export function ContentEditor(props: {
         >
           {t("campaign.detail.content.edit.save")}
         </Button>{" "}
-        {initial !== undefined && initial.status !== "deleted" ? (
+        {effective !== undefined && effective.status !== "deleted" ? (
           <Button variant="danger" onClick={() => setDeleteOpen(true)}>
-            {t("campaign.detail.content.edit.delete", { title: initial.title })}
+            {t("campaign.detail.content.edit.delete", { title: effective.title })}
           </Button>
         ) : null}{" "}
-        {initial !== undefined && initial.status === "deleted" ? (
+        {effective !== undefined && effective.status === "deleted" ? (
           <Button variant="secondary" onClick={() => setRecoverOpen(true)}>
-            {t("campaign.detail.content.edit.recover", { title: initial.title })}
+            {t("campaign.detail.content.edit.recover", { title: effective.title })}
           </Button>
         ) : null}
       </Panel>
-      {initial !== undefined ? (
+      {effective !== undefined ? (
         <Dialog
           open={deleteOpen}
           onOpenChange={(open) => {
@@ -268,10 +292,10 @@ export function ContentEditor(props: {
             </Button>
           }
         >
-          <p>{initial.title}</p>
+          <p>{effective.title}</p>
         </Dialog>
       ) : null}
-      {initial !== undefined ? (
+      {effective !== undefined ? (
         <Dialog
           open={recoverOpen}
           onOpenChange={(open) => {
@@ -288,7 +312,7 @@ export function ContentEditor(props: {
             </Button>
           }
         >
-          <p>{initial.title}</p>
+          <p>{effective.title}</p>
         </Dialog>
       ) : null}
     </div>

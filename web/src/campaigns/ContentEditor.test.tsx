@@ -50,4 +50,43 @@ describe("ContentEditor", () => {
     })));
     expect(onDeleted).toHaveBeenCalled();
   });
+
+  it("keeps a working Recover after a Hide in-session", async () => {
+    const initial = { contentId: "n1", campaignId: "c1", audience: "all_players", title: "Plan", body: "Shh.", tags: [], revision: 3, grantedUserIds: [], status: "active" };
+    const deleted = { ...initial, revision: 4, status: "deleted" };
+    const api = {
+      deleteContent: vi.fn().mockResolvedValue({ content: {}, requestId: "r" }),
+      openContent: vi.fn().mockResolvedValue({ content: deleted, requestId: "r" }),
+      recoverContent: vi.fn().mockResolvedValue({ content: {}, requestId: "r" }),
+    };
+    const onSaved = vi.fn();
+    const onDeleted = vi.fn();
+    render(<ContentEditor api={api as never} campaignId="c1" members={members as never} initial={initial as never} onSaved={onSaved} onDeleted={onDeleted} />);
+    fireEvent.click(screen.getByRole("button", { name: /hide /i }));
+    fireEvent.click(await screen.findByRole("button", { name: /confirm hiding/i }));
+    await vi.waitFor(() => expect(api.deleteContent).toHaveBeenCalled());
+    await vi.waitFor(() => expect(onDeleted).toHaveBeenCalled());
+    // The editor stays mounted: Recover is now offered for the deleted view.
+    fireEvent.click(await screen.findByRole("button", { name: /recover /i }));
+    fireEvent.click(await screen.findByRole("button", { name: /confirm recovery/i }));
+    await vi.waitFor(() => expect(api.recoverContent).toHaveBeenCalledWith("n1", expect.objectContaining({
+      expectedContentRevision: 4,
+    })));
+    expect(onSaved).toHaveBeenCalled();
+  });
+
+  it("keeps input and the conflict notice visible after a 409", async () => {
+    const api = { updateContent: vi.fn().mockRejectedValue({ status: 409 }) };
+    const initial = { contentId: "n1", campaignId: "c1", audience: "all_players", title: "Plan", body: "Shh.", tags: [], revision: 3, grantedUserIds: [] };
+    const onSaved = vi.fn();
+    const onConflicted = vi.fn();
+    render(<ContentEditor api={api as never} campaignId="c1" members={members as never} initial={initial as never} onSaved={onSaved} onDeleted={() => {}} onConflicted={onConflicted} />);
+    fireEvent.change(screen.getByLabelText(/title/i), { target: { value: "New title" } });
+    fireEvent.click(screen.getByRole("button", { name: /save note/i }));
+    await vi.waitFor(() => expect(api.updateContent).toHaveBeenCalled());
+    expect(await screen.findByRole("alert")).toHaveTextContent(/changed.*reload/i);
+    expect(onConflicted).toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/title/i)).toHaveValue("New title");
+  });
 });

@@ -276,6 +276,7 @@ export function CampaignContentTab(props: {
           members={members}
           onSaved={reload}
           onDeleted={reload}
+          onConflicted={reload}
         />
         {editing !== null ? (
           <ContentEditor
@@ -289,9 +290,11 @@ export function CampaignContentTab(props: {
               reload();
             }}
             onDeleted={() => {
-              setEditing(null);
+              // Keep the editor mounted: it now shows the deleted view with
+              // its working Recover button. The list still reloads.
               reload();
             }}
+            onConflicted={reload}
           />
         ) : null}
         {viewFailed ? <p role="alert">{t("campaign.detail.content.edit.error")}</p> : null}

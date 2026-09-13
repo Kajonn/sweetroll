@@ -7,7 +7,9 @@
 
 **Reconciled baseline:** `d6bfd32b7016a3bdaf7d0b0585b7f4861f34374f` (after PR #1 merge and creation-picker work).
 
-**Remediation execution (branch `fix/claim-recovery-integration`, from `b8d9a9b`):** R6 claim discovery (`GET /campaigns/{id}/claimable-characters`, four-field rows, player-role journey claiming through the discovered row) and R7 deleted-summary recovery (`status=deleted` management filter, GM Hidden view, reload→Hidden→recover journey) are ported onto the merged stabilization baseline, retaining its revision-readiness gating, isolated E2E runner, and revocation-purge protections. Per-commit evidence only; full canonical suite and acceptance reconciliation (remediation index Task 2) remain open. Accessibility/device/production gates untouched.
+**Remediation planning 2026-09-12:** GM Phase 1/2 and subsequent review fixes are present at `11aea84`. The [pre-upgrade remediation index](2026-09-12-remediation-index.md) records fresh full-suite results, confirmed failures, workflow gaps, approval-gated contract proposals, and remaining acceptance/release work. This is a planning cross-reference, not closure of the unchecked G7/G9 gates or approval of new discovery/recovery permissions; historical reconciliation notes below retain their original baseline.
+
+**Remediation execution (merged as `a5561d7`):** R6 claim discovery (`GET /campaigns/{id}/claimable-characters`, four-field rows, player-role journey claiming through the discovered row) and R7 deleted-summary recovery (`status=deleted` management filter, GM Hidden view, reload→Hidden→recover journey) are ported onto the merged stabilization baseline, retaining its revision-readiness gating, isolated E2E runner, and revocation-purge protections. Verified on the branch: root 307, integration 300, web 943, canonical E2E 32/32, offline 22/22, builds/typechecks/contracts/docker. Acceptance reconciliation (remediation index Task 2) remains open. Accessibility/device/production gates untouched.
 
 ## Goal and boundaries
 

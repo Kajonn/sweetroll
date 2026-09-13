@@ -9,6 +9,8 @@ import type {
   CampaignViewResponse,
   ChangeMemberRoleBody,
   ClaimableCharacterListResponse,
+  CommitUpgradeBody,
+  CommitUpgradeResponse,
   CreateCampaignBody,
   CreateCampaignResponse,
   CreateContentBody,
@@ -23,6 +25,8 @@ import type {
   InvitationReviewResponse,
   IssueInvitationBody,
   IssueInvitationResponse,
+  PreviewUpgradeBody,
+  PreviewUpgradeResponse,
   RecoverContentBody,
   RemoveMemberBody,
   ReplaceGrantsBody,
@@ -94,6 +98,8 @@ export type CampaignsApi = {
   deleteContent(contentId: string, body: DeleteContentBody): Promise<DeleteContentResponse>;
   recoverContent(contentId: string, body: RecoverContentBody): Promise<unknown>;
   replaceContentGrants(contentId: string, body: ReplaceGrantsBody): Promise<unknown>;
+  previewUpgrade(campaignId: string, body: PreviewUpgradeBody): Promise<PreviewUpgradeResponse>;
+  commitUpgrade(campaignId: string, body: CommitUpgradeBody): Promise<CommitUpgradeResponse>;
 };
 
 export function createCampaignsApi(client: ApiClient): CampaignsApi {
@@ -192,5 +198,9 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
       client.fetch("POST", `/content/${contentId}/recover`, { body }),
     replaceContentGrants: (contentId, body) =>
       client.fetch("POST", `/content/${contentId}/grants`, { body }),
+    previewUpgrade: (campaignId, body) =>
+      client.fetch<PreviewUpgradeResponse>("POST", `/campaigns/${campaignId}/upgrade-previews`, { body }),
+    commitUpgrade: (campaignId, body) =>
+      client.fetch<CommitUpgradeResponse>("POST", `/campaigns/${campaignId}/upgrade-commits`, { body }),
   };
 }

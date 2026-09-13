@@ -96,3 +96,40 @@ describe("createCampaignsApi GM content", () => {
     });
   });
 });
+
+describe("createCampaignsApi campaign upgrade", () => {
+  it("previews an upgrade with exactly target, mappings, and defaults", async () => {
+    const fetch = vi.fn().mockResolvedValue({ campaignId: "c1", characters: [], requestId: "r6" });
+    const api = createCampaignsApi({ fetch } as never);
+    await api.previewUpgrade("c1", {
+      targetVersionId: "v2",
+      mappings: { "def-a": "map-1" },
+      defaults: { "def-b": 7 },
+    });
+    expect(fetch).toHaveBeenCalledWith("POST", "/campaigns/c1/upgrade-previews", {
+      body: { targetVersionId: "v2", mappings: { "def-a": "map-1" }, defaults: { "def-b": 7 } },
+    });
+  });
+
+  it("commits an upgrade with exactly target, revision, idempotency key, mappings, and defaults", async () => {
+    const idempotencyKey = crypto.randomUUID();
+    const fetch = vi.fn().mockResolvedValue({ campaignId: "c1", migratedCharacterIds: [], requestId: "r7" });
+    const api = createCampaignsApi({ fetch } as never);
+    await api.commitUpgrade("c1", {
+      targetVersionId: "v2",
+      expectedCampaignRevision: 3,
+      idempotencyKey,
+      mappings: { "def-a": "map-1" },
+      defaults: { "def-b": 7 },
+    });
+    expect(fetch).toHaveBeenCalledWith("POST", "/campaigns/c1/upgrade-commits", {
+      body: {
+        targetVersionId: "v2",
+        expectedCampaignRevision: 3,
+        idempotencyKey,
+        mappings: { "def-a": "map-1" },
+        defaults: { "def-b": 7 },
+      },
+    });
+  });
+});

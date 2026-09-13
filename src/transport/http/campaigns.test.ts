@@ -251,6 +251,18 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
         characters: [],
       },
     }),
+    // I7 Phase 3 Task 2: commit route lands in Task 3; the stub keeps the
+    // seam total while no route calls it yet.
+    commitUpgrade: async () => ({
+      ok: true as const,
+      value: {
+        campaignId: randomUUID(),
+        campaignRevision: 2,
+        sourceVersionId: randomUUID(),
+        targetVersionId: randomUUID(),
+        migratedCharacterIds: [],
+      },
+    }),
   };
   return { ...base, ...overrides };
 }

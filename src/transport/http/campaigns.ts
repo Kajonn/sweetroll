@@ -37,6 +37,9 @@ const STATUS_BY_CODE: Record<CampaignError["code"], number> = {
   // non-sensitive conflict, never a retry of the same key.
   result_unavailable: 409,
   export_too_large: 413,
+  // I7 Phase 3: per-character mapping/default rejections from commitUpgrade
+  // surface as 422, mirroring the Characters invalid_value mapping.
+  invalid_value: 422,
   rate_limited: 429,
   internal: 500,
 };

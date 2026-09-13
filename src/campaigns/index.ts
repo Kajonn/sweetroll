@@ -83,6 +83,13 @@ export type CampaignErrorCode =
   | "result_unavailable"
   | "export_too_large"
   | "rate_limited"
+  // I7 Phase 3: per-character mapping/default failures inside commitUpgrade
+  // preserve the Characters taxonomy (invalid_value surfaces as HTTP 422,
+  // mirroring src/transport/http/characters.ts) instead of collapsing to
+  // bad_request, so callers can distinguish "campaign changed, retry" (409)
+  // from "fix the mappings/defaults" (422). Mapped in STATUS_BY_CODE
+  // alongside this change; Task 3 wires the routes that can return it.
+  | "invalid_value"
   | "internal";
 
 export type CampaignError = {
@@ -259,6 +266,28 @@ export type CampaignUpgradePreview = {
   characters: UpgradeCharacterPreview[];
 };
 
+/**
+ * I7 Phase 3: atomic campaign system-version upgrade commit. The client
+ * passes candidate shaping (mappings/defaults), the revision guard and a
+ * caller-minted idempotencyKey — never previewIds (they expire and would
+ * race). The server recomputes previews in-transaction per D3.
+ */
+export type CommitCampaignUpgrade = {
+  campaignId: string;
+  targetVersionId: string;
+  expectedCampaignRevision: number;
+  idempotencyKey: string;
+  mappings?: Record<string, string>;
+  defaults?: Record<string, unknown>;
+};
+export type CampaignUpgradeResult = {
+  campaignId: string;
+  campaignRevision: number;
+  sourceVersionId: string;
+  targetVersionId: string;
+  migratedCharacterIds: string[];
+};
+
 export type ChangeRoleInput = {
   campaignId: CampaignId;
   userId: UserId;
@@ -312,6 +341,18 @@ export interface Campaigns {
     ctx: RequestContext,
     input: PreviewCampaignUpgrade,
   ): Promise<CampaignResult<CampaignUpgradePreview>>;
+  /**
+   * I7 Phase 3: atomic upgrade commit (D3 ordering; single transaction;
+   * idempotent replay). Locks the campaign row first, recomputes
+   * per-character previews server-side in deterministic character-ID order,
+   * commits each attached migration, moves the pin, bumps the campaign
+   * revision and writes the campaign audit (before/after pin + per-character
+   * migration IDs, D4). Any per-character 409/422 aborts the whole commit.
+   */
+  commitUpgrade(
+    ctx: RequestContext,
+    input: CommitCampaignUpgrade,
+  ): Promise<CampaignResult<CampaignUpgradeResult>>;
   changeRole(ctx: RequestContext, input: ChangeRoleInput): Promise<CampaignResult<MemberView>>;
   removeMember(ctx: RequestContext, input: RemoveMemberInput): Promise<CampaignResult<MemberView>>;
   /**
@@ -487,6 +528,11 @@ const ARCHIVE_KIND = "campaign_archive";
 const RECOVER_KIND = "campaign_recover";
 const CHANGE_ROLE_KIND = "campaign_change_role";
 const REMOVE_MEMBER_KIND = "campaign_remove_member";
+// I7 Phase 3: idempotency scope for the atomic upgrade commit (Task 2).
+const UPGRADE_COMMIT_KIND = "campaign_upgrade_commit";
+// I7 Phase 3: campaign audit kind for committed upgrades (D4 rollback
+// proof: before/after pin + per-character migration IDs in the summary).
+const UPGRADE_COMMIT_AUDIT_KIND = "campaign_upgrade_committed";
 
 type ListCursor = { createdAt: string; id: string; scope: string };
 
@@ -515,6 +561,21 @@ class PlacementRollback extends Error {
 }
 
 /**
+ * I7 Phase 3: thrown inside the upgrade-commit transaction to roll back a
+ * per-character or campaign-level failure (denial, revision conflict,
+ * mapping/default rejection) without surfacing it as an internal failure
+ * and without committing partial work (not even transient preview rows).
+ * The caller maps the carried error to the wire.
+ */
+class UpgradeRollback extends Error {
+  readonly error: CampaignError;
+  constructor(error: CampaignError) {
+    super("upgrade commit rolled back");
+    this.error = error;
+  }
+}
+
+/**
  * I7 Phase 3: a character needs explicit mapping when its preview carries
  * dropped-source warnings. This mirrors the single warning taxonomy owned
  * by `buildCandidateValues` in `src/characters/migration.ts` (dropped
@@ -535,6 +596,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
 
   const errors = {
     bad_request: (message: string): CampaignError => ({ code: "bad_request", message }),
+    invalid_value: (message: string): CampaignError => ({ code: "invalid_value", message }),
     not_found: (message: string = NOT_FOUND_MESSAGE): CampaignError => ({ code: "not_found", message }),
     mismatch: (): CampaignError => ({ code: "idempotency_mismatch", message: MISMATCH_MESSAGE }),
     result_unavailable: (): CampaignError => ({
@@ -598,6 +660,17 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
       createdAt: new Date(raw.createdAt),
       updatedAt: new Date(raw.updatedAt),
     };
+  }
+
+  function serializeUpgradeResult(value: CampaignUpgradeResult): unknown {
+    // Plain JSON scalars only (no dates): spread defensively so later field
+    // additions cannot alias the stored envelope.
+    return { ...value, migratedCharacterIds: [...value.migratedCharacterIds] };
+  }
+
+  function deserializeUpgradeResult(stored: unknown): CampaignUpgradeResult {
+    const raw = stored as CampaignUpgradeResult;
+    return { ...raw, migratedCharacterIds: [...raw.migratedCharacterIds] };
   }
 
   function serializeMember(view: MemberView): unknown {
@@ -1676,6 +1749,252 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
         }
         if ("failure" in outcome) return { ok: false, error: outcome.failure };
         return { ok: true, value: outcome.value };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async commitUpgrade(ctx, commitInput) {
+      try {
+        const keyError = checkIdempotencyKey(commitInput.idempotencyKey);
+        if (keyError !== null) return { ok: false, error: keyError };
+        const revisionError = checkRevision(commitInput.expectedCampaignRevision);
+        if (revisionError !== null) return { ok: false, error: revisionError };
+        if (typeof commitInput.targetVersionId !== "string" || commitInput.targetVersionId.length === 0) {
+          return { ok: false, error: errors.bad_request("targetVersionId must be a non-empty string.") };
+        }
+        const attached = input.attachedMigration;
+        if (attached === undefined) {
+          return { ok: false, error: errors.internal() };
+        }
+        // Idempotency scopes the upgrade itself (campaign + target +
+        // candidate shaping), not the revision guard: a waiter behind the row
+        // lock replays the stored envelope with the post-commit revision
+        // instead of re-applying or hitting idempotency_mismatch.
+        const inputHash = hashInput({
+          campaignId: commitInput.campaignId,
+          targetVersionId: commitInput.targetVersionId,
+          mappings: commitInput.mappings ?? null,
+          defaults: commitInput.defaults ?? null,
+        });
+        const receiptKey = {
+          actorId: ctx.actorId,
+          commandKind: UPGRADE_COMMIT_KIND,
+          idempotencyKey: commitInput.idempotencyKey,
+        };
+
+        // Receipt-first: an exact replay returns the stored value without
+        // re-applying the mutation.
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
+        if (preExisting !== null) {
+          return await resolveReplay<CampaignUpgradeResult>({
+            commandKind: UPGRADE_COMMIT_KIND,
+            idempotencyKey: commitInput.idempotencyKey,
+            inputHash,
+            receipt: preExisting,
+            deserialize: deserializeUpgradeResult,
+            reauthorize: (id) => reauthorizeMember(ctx, id),
+          });
+        }
+
+        // Per-character attached failures become explicit campaign-level
+        // errors carrying the character ID. Conflicts (concurrent edits,
+        // consumed/expired previews) stay retryable 409s against the latest
+        // campaign revision; mapping/default rejections stay 422s naming the
+        // offending definition. Anything else is internal.
+        const mapAttachedError = (
+          characterId: string,
+          error: { code: string; message: string },
+          latestRevision: number,
+        ): CampaignError => {
+          if (error.code === "conflict") {
+            return errors.conflict(`Character ${characterId}: ${error.message}`, latestRevision);
+          }
+          if (error.code === "invalid_value" || error.code === "bad_request") {
+            return errors.invalid_value(`Character ${characterId}: ${error.message}`);
+          }
+          if (error.code === "not_found") {
+            return errors.conflict(
+              `Character ${characterId} is no longer attached to this campaign. Retry with the latest revision and a new idempotency key.`,
+              latestRevision,
+            );
+          }
+          return errors.internal();
+        };
+
+        const outcome = await withTransaction(async (client) => {
+          // D3 ordering: campaign row locked first, then the attached roster
+          // in deterministic character-ID order (the attached commit takes
+          // row locks in that same order).
+          const campaign = await repo.lockCampaign(client, commitInput.campaignId);
+          const membership =
+            campaign === null
+              ? null
+              : await repo.loadMembership(client, commitInput.campaignId, ctx.actorId);
+          // Re-check before any mutation: a waiter behind the row lock must
+          // replay instead of re-applying or hitting a revision conflict.
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
+          if (raced !== null) {
+            return { committed: false as const, receipt: raced };
+          }
+          if (campaign === null || !isActiveMember(membership) || !isGameMaster(membership)) {
+            throw new UpgradeRollback(errors.not_found());
+          }
+          if (campaign.status !== "active") {
+            throw new UpgradeRollback(
+              errors.conflict("Archived campaigns reject upgrades until recovered.", campaign.revision),
+            );
+          }
+          if (campaign.revision !== commitInput.expectedCampaignRevision) {
+            throw new UpgradeRollback(
+              errors.conflict(
+                "The campaign has a newer revision. Retry with the latest revision and a new idempotency key.",
+                campaign.revision,
+              ),
+            );
+          }
+          // Same target authorization as the preview: pin violation and
+          // cross-system targets are distinguishable rejections, while
+          // unpublished/inaccessible targets collapse to not_found.
+          const target = await repo.loadVersionForUpgrade(client, commitInput.targetVersionId);
+          if (target === null) {
+            throw new UpgradeRollback(errors.not_found());
+          }
+          if (target.versionId === campaign.systemVersionId) {
+            throw new UpgradeRollback(
+              errors.bad_request("The target version is already the campaign version."),
+            );
+          }
+          const source = await repo.loadVersionForUpgrade(client, campaign.systemVersionId);
+          if (source === null) {
+            throw new UpgradeRollback(errors.internal());
+          }
+          if (target.systemId !== source.systemId) {
+            throw new UpgradeRollback(
+              errors.bad_request("The target version does not belong to the same system as the campaign."),
+            );
+          }
+          const accessible = await repo.loadAccessibleVersionOnClient(client, ctx.actorId, target.versionId);
+          if (accessible === null) {
+            throw new UpgradeRollback(errors.not_found());
+          }
+          // Bounded by the existing maxAttachedCharacters cap (default 200);
+          // no pagination — the roster is already bounded when committable.
+          const rows = await repo.listAttachedCharactersForUpgrade(
+            client,
+            campaign.campaignId,
+            limits.maxAttachedCharacters,
+          );
+          // Any-active-GM custody: previews are recomputed here in-transaction
+          // and owned by the committer, so no preview-owner binding survives
+          // across calls — a co-GM may commit what another GM previewed.
+          const migrated: Array<{ characterId: string; migrationId: string }> = [];
+          for (const row of rows) {
+            const previewed = await attached.previewAttachedMigration(client, ctx, {
+              characterId: row.characterId,
+              targetVersionId: target.versionId,
+              // Conditional spread: PreviewCharacterMigration uses exact
+              // optional properties, so undefined must mean absent, never
+              // an explicit undefined value.
+              ...(commitInput.mappings === undefined ? {} : { mappings: commitInput.mappings }),
+              ...(commitInput.defaults === undefined ? {} : { defaults: commitInput.defaults }),
+            });
+            if (!previewed.ok) {
+              throw new UpgradeRollback(mapAttachedError(row.characterId, previewed.error, campaign.revision));
+            }
+            const committed = await attached.commitAttachedMigration(client, ctx, {
+              characterId: row.characterId,
+              previewId: previewed.value.previewId,
+              expectedRevision: previewed.value.sourceRevision,
+              idempotencyKey: commitInput.idempotencyKey,
+            });
+            if (!committed.ok) {
+              throw new UpgradeRollback(mapAttachedError(row.characterId, committed.error, campaign.revision));
+            }
+            // The attached commit stores the migration lineage with the
+            // migration ID as the reconciliation's command execution ID.
+            migrated.push({
+              characterId: row.characterId,
+              migrationId: committed.value.character.reconciliation.commandExecutionId,
+            });
+          }
+          const moved = await repo.moveCampaignPinForUpgrade(client, {
+            campaignId: campaign.campaignId,
+            targetVersionId: target.versionId,
+            expectedRevision: commitInput.expectedCampaignRevision,
+            now: now(),
+          });
+          if (moved === null) {
+            throw new UpgradeRollback(
+              errors.conflict(
+                "The campaign has a newer revision. Retry with the latest revision and a new idempotency key.",
+                campaign.revision,
+              ),
+            );
+          }
+          // D4 rollback proof: before/after pin plus per-character migration
+          // IDs. The audit table carries kind/summary text only, so the IDs
+          // ride in the summary (never a partial migratedCharacterIds: any
+          // per-character failure above rolls the whole transaction back).
+          const detail =
+            migrated.length === 0
+              ? "no attached characters"
+              : migrated.map((entry) => `${entry.characterId} (migration ${entry.migrationId})`).join(", ");
+          await repo.appendAudit(client, {
+            campaignId: campaign.campaignId,
+            actorId: ctx.actorId,
+            kind: UPGRADE_COMMIT_AUDIT_KIND,
+            summary: `Campaign upgrade committed: ${campaign.systemVersionId} -> ${target.versionId}; migrated ${detail}`,
+            requestId: ctx.requestId,
+          });
+          const value = {
+            campaignId: campaign.campaignId,
+            campaignRevision: moved.revision,
+            sourceVersionId: campaign.systemVersionId,
+            targetVersionId: target.versionId,
+            migratedCharacterIds: migrated.map((entry) => entry.characterId),
+          } satisfies CampaignUpgradeResult;
+          const stored = {
+            campaignId: campaign.campaignId,
+            value: serializeUpgradeResult(value),
+            idempotencyKey: commitInput.idempotencyKey,
+          };
+          const inserted = await repo.tryInsertReceipt(client, {
+            actorId: ctx.actorId,
+            commandKind: UPGRADE_COMMIT_KIND,
+            idempotencyKey: commitInput.idempotencyKey,
+            inputHash,
+            campaignId: campaign.campaignId,
+            resultJson: stored,
+            expiresAt: new Date(now().getTime() + RECEIPT_TTL_MS),
+          });
+          if (!inserted) {
+            // Lost a concurrent race after mutating: roll back so the second
+            // application never commits, then replay the winner below.
+            throw new ReceiptRace();
+          }
+          return { committed: true as const, value };
+        }).catch(async (error) => {
+          if (error instanceof UpgradeRollback) {
+            return { committed: false as const, failure: error.error };
+          }
+          if (error instanceof ReceiptRace) {
+            const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
+            return { committed: false as const, receipt };
+          }
+          throw error;
+        });
+
+        if ("failure" in outcome) return { ok: false, error: outcome.failure };
+        if (outcome.committed) return { ok: true, value: outcome.value };
+        return await resolveReplay<CampaignUpgradeResult>({
+          commandKind: UPGRADE_COMMIT_KIND,
+          idempotencyKey: commitInput.idempotencyKey,
+          inputHash,
+          receipt: outcome.receipt ?? null,
+          deserialize: deserializeUpgradeResult,
+          reauthorize: (id) => reauthorizeMember(ctx, id),
+        });
       } catch {
         return { ok: false, error: errors.internal() };
       }

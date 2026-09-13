@@ -567,6 +567,29 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       return row === undefined ? null : toCampaignRecord(row);
     },
 
+    /**
+     * I7 Phase 3: move the campaign system-version pin for an upgrade commit
+     * with the revision guard inline. Membership changes bump
+     * access_revision (roster visibility); the pin move does not touch it —
+     * only the optimistic-concurrency revision advances with the pin.
+     */
+    async moveCampaignPinForUpgrade(
+      client: PoolClient,
+      input: { campaignId: string; targetVersionId: string; expectedRevision: number; now: Date },
+    ): Promise<CampaignRecord | null> {
+      const result = await client.query<CampaignRow>(
+        `UPDATE campaigns
+            SET system_version_id = $2,
+                revision = revision + 1,
+                updated_at = $3
+          WHERE id = $1 AND revision = $4
+          RETURNING ${CAMPAIGN_COLUMNS}`,
+        [input.campaignId, input.targetVersionId, input.now.toISOString(), input.expectedRevision],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toCampaignRecord(row);
+    },
+
     async loadMembership(
       client: DbClient,
       campaignId: string,

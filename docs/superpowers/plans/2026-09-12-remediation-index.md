@@ -82,8 +82,14 @@ Local traces and diffs from verification are in `web/test-results-verify-e2e/` a
 
 ## Planning Completion Checklist
 
-- [ ] Owner approves or changes the R6/R7 proposals before their implementation.
+- [x] Owner approves or changes the R6/R7 proposals before their implementation.
+  (Approved 2026-09-12, recorded in the I6 backend spec reconciliation note
+  and `design_v2.md` §§5.3/4.1; implemented as `a5561d7`.)
 - [ ] Each executed task has a failing regression, passing targeted check, and preserved existing authorization/offline behavior.
-- [ ] R1-R9 are closed by evidence or explicitly remain blockers; R10 automated checks are recorded.
+- [x] R1-R9 are closed by evidence or explicitly remain blockers; R10 automated checks are recorded.
+  (Evidence: Task 2 in `docs/acceptance/gui-2026-09-12-remediation.md` at
+  `40c6142`, 2026-09-13. Single caveat: one unattributed first-run web-unit
+  failure before three consecutive 943/943 reruns — capture the suite name if
+  it recurs. R10–R18 manual/device/production gates remain visibly open.)
 - [ ] Production/deferred gates remain visibly open rather than being inferred from green deterministic tests.
 - [ ] A fresh full-suite run, with no approved-baseline changes hidden in it, is linked from the GUI checklist.

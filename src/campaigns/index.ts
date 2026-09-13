@@ -348,6 +348,8 @@ export interface Campaigns {
    * commits each attached migration, moves the pin, bumps the campaign
    * revision and writes the campaign audit (before/after pin + per-character
    * migration IDs, D4). Any per-character 409/422 aborts the whole commit.
+   * Commits whose sources would drop without explicit caller mappings fail
+   * with invalid_value naming the character and definitions (no silent drop).
    */
   commitUpgrade(
     ctx: RequestContext,
@@ -583,8 +585,12 @@ class UpgradeRollback extends Error {
  * constraint changes migrate automatically per design §6.7) — no second
  * taxonomy is invented here.
  */
+function upgradeDroppedSourceWarnings(warnings: string[]): string[] {
+  return warnings.filter((warning) => warning.includes("have no target and will be dropped"));
+}
+
 function upgradeRequiresMapping(warnings: string[]): boolean {
-  return warnings.some((warning) => warning.includes("have no target and will be dropped"));
+  return upgradeDroppedSourceWarnings(warnings).length > 0;
 }
 
 export function createCampaignsModule(input: CreateCampaignsModuleInput): Campaigns {
@@ -1901,6 +1907,22 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             });
             if (!previewed.ok) {
               throw new UpgradeRollback(mapAttachedError(row.characterId, previewed.error, campaign.revision));
+            }
+            // Fail closed on a missing required mapping: when source fields
+            // would be silently dropped, the commit requires explicit caller
+            // mappings (their presence proves the GM engaged with the
+            // preview warnings instead of clicking through a silent drop).
+            // The drop warnings name the definitions; the error names the
+            // character. Defaults cannot rescue dropped sources, so only
+            // mappings count here.
+            const mappingsProvided =
+              commitInput.mappings !== undefined && Object.keys(commitInput.mappings).length > 0;
+            if (!mappingsProvided && upgradeRequiresMapping(previewed.value.warnings)) {
+              throw new UpgradeRollback(
+                errors.invalid_value(
+                  `Character ${row.characterId} requires explicit mappings: ${upgradeDroppedSourceWarnings(previewed.value.warnings).join(" ")}`,
+                ),
+              );
             }
             const committed = await attached.commitAttachedMigration(client, ctx, {
               characterId: row.characterId,

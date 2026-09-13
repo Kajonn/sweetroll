@@ -259,6 +259,13 @@ describeWithDatabase("campaign upgrade commit (Phase 3 Task 2)", () => {
   let h: I6Harness;
   /** Newer published version of the GM's system (the upgrade target). */
   let v2: string;
+  /**
+   * Explicit mapping covering the renamed `ability` → `ability_score` drop.
+   * Commits with dropped sources require caller mappings (their presence
+   * proves GM engagement with the preview warnings); `proficient` was
+   * deleted in v2 with no valid target, so its drop stays preview-disclosed.
+   */
+  const COVERING_MAPPINGS = { ability: "ability_score" };
 
   beforeAll(async () => {
     h = await buildI6Harness();
@@ -373,6 +380,7 @@ describeWithDatabase("campaign upgrade commit (Phase 3 Task 2)", () => {
       targetVersionId: v2,
       expectedCampaignRevision: rev,
       idempotencyKey: randomUUID(),
+      mappings: COVERING_MAPPINGS,
     });
     expect(first.ok).toBe(true);
     if (!first.ok) throw new Error(`expected upgrade commit: ${JSON.stringify(first)}`);
@@ -494,6 +502,7 @@ describeWithDatabase("campaign upgrade commit (Phase 3 Task 2)", () => {
       targetVersionId: v2,
       expectedCampaignRevision: rev,
       idempotencyKey: key,
+      mappings: COVERING_MAPPINGS,
     });
     expect(first.ok).toBe(true);
     if (!first.ok) throw new Error("expected upgrade commit");
@@ -507,6 +516,7 @@ describeWithDatabase("campaign upgrade commit (Phase 3 Task 2)", () => {
       targetVersionId: v2,
       expectedCampaignRevision: first.value.campaignRevision,
       idempotencyKey: key,
+      mappings: COVERING_MAPPINGS,
     });
     expect(replay).toEqual(first);
     expect(await migrationCount()).toBe(migrationsAfterFirst);
@@ -553,6 +563,7 @@ describeWithDatabase("campaign upgrade commit (Phase 3 Task 2)", () => {
       targetVersionId: v2,
       expectedCampaignRevision: rev,
       idempotencyKey: randomUUID(),
+      mappings: COVERING_MAPPINGS,
     });
     expect(commit.ok).toBe(false);
     if (commit.ok) throw new Error("archived-character commit must fail");
@@ -568,6 +579,99 @@ describeWithDatabase("campaign upgrade commit (Phase 3 Task 2)", () => {
     expect(await migrationCount()).toBe(migrationsBefore);
     const previewsAfter = await h.pool.query(`SELECT COUNT(*)::int AS count FROM character_migration_previews`);
     expect(previewsAfter.rows[0].count).toBe(previewsBefore.rows[0].count);
+  });
+
+  it("absorbs a pre-commit character revision bump and still commits", async () => {
+    // D3 recomputes previews server-side inside the commit transaction, so a
+    // revision bump landing between the client's preview and the commit is
+    // absorbed, not failed: the in-transaction preview is built from the
+    // latest committed character state. This locks in that behavior.
+    const campaignId = await createCampaign();
+    const editedCharacterId = await addCharacter(campaignId, 1);
+    const rev = await campaignRevision(campaignId);
+
+    const preview = await h.campaigns.previewUpgrade(ctxFor(h.users.gm), {
+      campaignId,
+      targetVersionId: v2,
+    });
+    expect(preview.ok).toBe(true);
+
+    // A real command bumps the character revision after the preview.
+    const roster = await h.campaigns.listCharacters(ctxFor(h.users.gm), { campaignId });
+    expect(roster.ok).toBe(true);
+    if (!roster.ok) throw new Error("roster read failed");
+    const editedRevision = roster.value.characters.find((row) => row.characterId === editedCharacterId)?.revision;
+    expect(editedRevision).toEqual(expect.any(Number));
+    const renamed = await h.characters.manage(ctxFor(h.users.gm), {
+      kind: "rename",
+      characterId: editedCharacterId,
+      name: `Edited after preview ${randomUUID().slice(0, 8)}`,
+      expectedRevision: editedRevision!,
+      idempotencyKey: randomUUID(),
+    });
+    expect(renamed.ok).toBe(true);
+
+    const commit = await h.campaigns.commitUpgrade(ctxFor(h.users.gm), {
+      campaignId,
+      targetVersionId: v2,
+      expectedCampaignRevision: rev,
+      idempotencyKey: randomUUID(),
+      mappings: COVERING_MAPPINGS,
+    });
+    expect(commit.ok).toBe(true);
+    if (!commit.ok) throw new Error(`expected absorbing commit: ${JSON.stringify(commit)}`);
+    expect(commit.value).toMatchObject({
+      campaignId,
+      campaignRevision: rev + 1,
+      sourceVersionId: h.versionId,
+      targetVersionId: v2,
+      migratedCharacterIds: [editedCharacterId],
+    });
+    expect((await h.campaigns.open(ctxFor(h.users.gm), { campaignId })).value?.systemVersionId).toBe(v2);
+    expect(await characterVersion(editedCharacterId)).toBe(v2);
+  });
+
+  it("rejects a missing required mapping with an explicit error naming character and definition", async () => {
+    // The fixture drops `ability`/`proficient` with no mapping supplied: the
+    // commit must fail closed with invalid_value (no silent drop) instead of
+    // migrating. The expected definition name is read off the live preview
+    // warnings, not hardcoded to the fixture.
+    const campaignId = await createCampaign();
+    const characterId = await addCharacter(campaignId, 1);
+    const rev = await campaignRevision(campaignId);
+
+    const preview = await h.campaigns.previewUpgrade(ctxFor(h.users.gm), {
+      campaignId,
+      targetVersionId: v2,
+    });
+    expect(preview.ok).toBe(true);
+    if (!preview.ok) throw new Error("expected upgrade preview");
+    const dropWarning = preview.value.characters
+      .find((row) => row.characterId === characterId)?.warnings
+      .find((warning) => warning.includes("have no target and will be dropped"));
+    expect(dropWarning).toEqual(expect.any(String));
+    const definition = dropWarning!.match(/"([^"]+)"/)?.[1];
+    expect(definition).toEqual(expect.any(String));
+
+    const migrationsBefore = await migrationCount();
+    const commit = await h.campaigns.commitUpgrade(ctxFor(h.users.gm), {
+      campaignId,
+      targetVersionId: v2,
+      expectedCampaignRevision: rev,
+      idempotencyKey: randomUUID(),
+    });
+    expect(commit.ok).toBe(false);
+    if (commit.ok) throw new Error("mapping-less commit must fail");
+    expect(commit.error.code).toBe("invalid_value");
+    expect(commit.error.message).toContain(characterId);
+    expect(commit.error.message).toContain(definition!);
+
+    // Zero writes: the pin, the campaign revision and the migration lineage
+    // are all untouched.
+    expect((await h.campaigns.open(ctxFor(h.users.gm), { campaignId })).value?.systemVersionId).toBe(h.versionId);
+    expect(await characterVersion(characterId)).toBe(h.versionId);
+    expect(await campaignRevision(campaignId)).toBe(rev);
+    expect(await migrationCount()).toBe(migrationsBefore);
   });
 
   it("rejects unknown mapping fields with an explicit error naming character and definition", async () => {
@@ -667,12 +771,16 @@ describeWithDatabase("campaign upgrade commit (Phase 3 Task 2)", () => {
       targetVersionId: v2,
       expectedCampaignRevision: rev,
       idempotencyKey: randomUUID(),
+      mappings: COVERING_MAPPINGS,
     });
     expect(commit.ok).toBe(true);
     if (!commit.ok) throw new Error(`expected handoff commit: ${JSON.stringify(commit)}`);
     expect((await h.campaigns.open(ctxFor(h.users.gm), { campaignId })).value?.systemVersionId).toBe(v2);
 
     // And the reverse direction: the co-GM commits the next upgrade alone.
+    // v3 is the same document, but `level` has no sheet element so the
+    // projection reports it as dropped — the commit gate applies uniformly
+    // and the same-ID explicit mapping records the engagement.
     const v3 = await publishV2(h, h.systemId, "3.0.0");
     const revAfter = await campaignRevision(campaignId);
     const coGmCommit = await h.campaigns.commitUpgrade(ctxFor(h.users.other), {
@@ -680,6 +788,7 @@ describeWithDatabase("campaign upgrade commit (Phase 3 Task 2)", () => {
       targetVersionId: v3,
       expectedCampaignRevision: revAfter,
       idempotencyKey: randomUUID(),
+      mappings: { level: "level" },
     });
     expect(coGmCommit.ok).toBe(true);
     expect((await h.campaigns.open(ctxFor(h.users.other), { campaignId })).value?.systemVersionId).toBe(v3);

@@ -56,6 +56,8 @@ describe("buildOpenApiDocument", () => {
       "/campaigns/{id}/members",
       "/campaigns/{id}/members/{userId}",
       "/campaigns/{id}/recover",
+      "/campaigns/{id}/upgrade-commits",
+      "/campaigns/{id}/upgrade-previews",
       "/characters",
       "/characters/creation-options",
       "/characters/creation-versions",

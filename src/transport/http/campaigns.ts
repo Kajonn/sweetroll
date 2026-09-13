@@ -316,6 +316,34 @@ const ClaimableCharacterSummaryDto = Type.Object({
   lifecycle: Type.Union([Type.Literal("active"), Type.Literal("archived")]),
 });
 
+// I7 Phase 3: per-character upgrade preview rows carry only the six
+// UpgradeCharacterPreview fields — never candidateState, projections,
+// rolls, inventory, or grants.
+const UpgradeCharacterPreviewDto = Type.Object({
+  characterId: Type.String({ format: UUID_FORMAT }),
+  name: Type.String(),
+  sourceVersionId: Type.String({ format: UUID_FORMAT }),
+  warnings: Type.Array(Type.String()),
+  requiresMapping: Type.Boolean(),
+});
+
+const UpgradePreviewDto = Type.Object({
+  campaignId: Type.String({ format: UUID_FORMAT }),
+  campaignRevision: Type.Integer(),
+  sourceVersionId: Type.String({ format: UUID_FORMAT }),
+  targetVersionId: Type.String({ format: UUID_FORMAT }),
+  targetSemanticVersion: Type.String(),
+  characters: Type.Array(UpgradeCharacterPreviewDto),
+});
+
+const UpgradeCommitDto = Type.Object({
+  campaignId: Type.String({ format: UUID_FORMAT }),
+  campaignRevision: Type.Integer(),
+  sourceVersionId: Type.String({ format: UUID_FORMAT }),
+  targetVersionId: Type.String({ format: UUID_FORMAT }),
+  migratedCharacterIds: Type.Array(Type.String({ format: UUID_FORMAT })),
+});
+
 const CampaignErrorEnvelope = Type.Object({
   error: Type.Object({
     code: Type.String(),
@@ -487,6 +515,22 @@ const ReplaceGrantsBody = Type.Object({
 
 const ExportCampaignBody = Type.Object({
   idempotencyKey: Type.String({ minLength: 1 }),
+});
+
+// I7 Phase 3: upgrade preview takes no cursor — the module caps attached
+// characters at 200 (stated here, not paginated).
+const PreviewUpgradeBody = Type.Object({
+  targetVersionId: Type.String({ format: UUID_FORMAT }),
+  mappings: Type.Optional(Type.Object({}, { additionalProperties: true })),
+  defaults: Type.Optional(Type.Object({}, { additionalProperties: true })),
+});
+
+const CommitUpgradeBody = Type.Object({
+  targetVersionId: Type.String({ format: UUID_FORMAT }),
+  expectedCampaignRevision: Type.Integer({ minimum: 1 }),
+  idempotencyKey: Type.String({ format: UUID_FORMAT }),
+  mappings: Type.Optional(Type.Object({}, { additionalProperties: true })),
+  defaults: Type.Optional(Type.Object({}, { additionalProperties: true })),
 });
 
 const CampaignIdParams = Type.Object({ id: Type.String({ format: UUID_FORMAT }) });
@@ -969,6 +1013,34 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
       response: {
         "200": Type.Object({ export: CampaignExportDto, requestId: Type.String() }),
         ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/campaigns/:id/upgrade-previews",
+    operationId: "post_campaigns_id_upgrade_previews",
+    schema: {
+      params: CampaignIdParams,
+      body: PreviewUpgradeBody,
+      response: {
+        "200": Type.Object({ ...UpgradePreviewDto.properties, requestId: Type.String() }),
+        ...ErrorResponses,
+        "422": CampaignErrorEnvelope,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/campaigns/:id/upgrade-commits",
+    operationId: "post_campaigns_id_upgrade_commits",
+    schema: {
+      params: CampaignIdParams,
+      body: CommitUpgradeBody,
+      response: {
+        "200": Type.Object({ ...UpgradeCommitDto.properties, requestId: Type.String() }),
+        ...ErrorResponses,
+        "422": CampaignErrorEnvelope,
       },
     },
   },
@@ -1721,6 +1793,48 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { export: result.value, requestId: request.id };
+      },
+
+      post_campaigns_id_upgrade_previews: async (request, reply) => {
+        const params = request.params as { id: string };
+        const body = request.body as {
+          targetVersionId: string;
+          mappings?: Record<string, string>;
+          defaults?: Record<string, unknown>;
+        };
+        // I7 Phase 3: read-only upgrade preview over all attached
+        // characters (module-side 200 cap, no cursor). The response carries
+        // only the six UpgradeCharacterPreview fields per character — never
+        // candidateState, projections, rolls, inventory, or grants.
+        const result = await campaigns.previewUpgrade(ctxOf(request), {
+          campaignId: params.id,
+          targetVersionId: body.targetVersionId,
+          ...(body.mappings === undefined ? {} : { mappings: body.mappings }),
+          ...(body.defaults === undefined ? {} : { defaults: body.defaults }),
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { ...result.value, requestId: request.id };
+      },
+
+      post_campaigns_id_upgrade_commits: async (request, reply) => {
+        const params = request.params as { id: string };
+        const body = request.body as {
+          targetVersionId: string;
+          expectedCampaignRevision: number;
+          idempotencyKey: string;
+          mappings?: Record<string, string>;
+          defaults?: Record<string, unknown>;
+        };
+        const result = await campaigns.commitUpgrade(ctxOf(request), {
+          campaignId: params.id,
+          targetVersionId: body.targetVersionId,
+          expectedCampaignRevision: body.expectedCampaignRevision,
+          idempotencyKey: body.idempotencyKey,
+          ...(body.mappings === undefined ? {} : { mappings: body.mappings }),
+          ...(body.defaults === undefined ? {} : { defaults: body.defaults }),
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { ...result.value, requestId: request.id };
       },
     };
 

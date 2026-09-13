@@ -150,6 +150,23 @@ describe("CampaignSettingsView", () => {
     expect(screen.getByText(/you are offline\. reconnect to commit this upgrade\./i)).toBeVisible();
   });
 
+  it("disables the Upgrade entry when the versions handle is absent", () => {
+    const api = {};
+    render(
+      <CampaignSettingsView
+        api={api as never}
+        campaign={campaign as never}
+        actorId="u1"
+        generation={0}
+        online
+        isGm
+        onChanged={() => {}}
+      />,
+      { wrapper: wrapper() },
+    );
+    expect(screen.getByRole("button", { name: /upgrade campaign/i })).toBeDisabled();
+  });
+
   it("invalidates roster/content/campaign reads after the upgrade commits", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const invalidateSpy = vi.spyOn(client, "invalidateQueries");

@@ -305,6 +305,9 @@ function toMigrationCharacterRecord(row: MigrationCharacterRow): CharacterRecord
   if (row.lifecycle !== "active" && row.lifecycle !== "archived") {
     throw new Error(`Unknown character lifecycle: ${row.lifecycle}`);
   }
+  if (row.visibility !== "owner_only") {
+    throw new Error(`Unknown character visibility: ${row.visibility}`);
+  }
   return {
     characterId: row.id,
     ownerId: row.owner_id,
@@ -316,7 +319,7 @@ function toMigrationCharacterRecord(row: MigrationCharacterRow): CharacterRecord
     name: row.name,
     revision: row.revision,
     state: row.state_json as RuntimeStateV1,
-    visibility: "owner_only",
+    visibility: row.visibility as "owner_only",
     lifecycle: row.lifecycle as CharacterLifecycle,
     archivedAt: row.archived_at,
     createdAt: row.created_at,

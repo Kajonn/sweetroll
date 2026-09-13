@@ -239,7 +239,7 @@ export function CampaignSettingsView(props: {
       </Panel>
       {showUpgrade ? (
         <Panel title={t("campaign.detail.upgrade.title")}>
-          <Button variant="secondary" disabled={!online} onClick={() => setUpgradeOpen(true)}>
+          <Button variant="secondary" disabled={!online || props.versionsApi === undefined} onClick={() => setUpgradeOpen(true)}>
             {t("campaign.detail.upgrade.title")}
           </Button>
           {!online ? <p role="status">{t("campaign.detail.upgrade.commit.offline")}</p> : null}

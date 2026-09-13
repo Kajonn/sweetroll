@@ -29,7 +29,11 @@ import {
 import { canReadRoll, isActiveMember, isGameMaster, type MembershipRecord } from "../campaigns/policy.js";
 import { claimExecution } from "./idempotency.js";
 import { buildAttachedCharacterExportDocument, buildCharacterExportDocument } from "./export.js";
-import { buildCandidateValues, collectEditableFields, denyAttachedMigrationScope } from "./migration.js";
+import { buildMigrationCandidate, denyAttachedMigrationScope } from "./migration.js";
+import {
+  isFinalizableMigrationRuntimeError as isFinalizableRuntimeError,
+  mapMigrationRuntimeError as mapRuntimeError,
+} from "./migration.js";
 
 export type { RequestContext } from "../systems/authoring.js";
 export type { RollAudience } from "./persistence.js";
@@ -759,42 +763,6 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         roll: stored.value.roll,
       },
     };
-  }
-
-  function mapRuntimeError(error: { code: string; message: string; definitionId?: string }): CharacterError {
-    switch (error.code) {
-      case "not_found":
-        return errors.not_found("The published version or entity definition does not exist.");
-      case "bad_request":
-      case "invalid_state":
-      case "unsupported_field_value":
-      case "budget_exceeded":
-      case "invalid_package":
-        return errors.invalid_value(error.message);
-      default:
-        // Unrecognized/transient runtime codes (including the runtime's `internal`,
-        // which SystemRuntime uses for temporary I/O failures such as package-load
-        // errors) become temporarily_unavailable, not programmer-error internals.
-        return errors.temporarilyUnavailable();
-    }
-  }
-
-  // Only these runtime error codes are stable/deterministic for the same input and safe to
-  // permanently finalize on the idempotency key. An unmapped code (including the runtime's
-  // `internal` code, which SystemRuntime also uses for transient I/O failures such as package
-  // load errors) must NOT finalize — the execution stays pending/reclaimable so a retry after
-  // the lease expires gets a fresh attempt instead of a permanently baked-in error.
-  const STABLE_RUNTIME_ERROR_CODES = new Set([
-    "not_found",
-    "bad_request",
-    "invalid_state",
-    "unsupported_field_value",
-    "budget_exceeded",
-    "invalid_package",
-  ]);
-
-  function isFinalizableRuntimeError(code: string): boolean {
-    return STABLE_RUNTIME_ERROR_CODES.has(code);
   }
 
   return {
@@ -1894,75 +1862,42 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const previewOwnerId = character.ownerId;
         if (previewOwnerId === null) return { ok: false, error: errors.notFoundPurge() };
 
-        const authorized = await input.authorizeVersionUse(ctx, migrationInput.targetVersionId);
-        if (!authorized.ok) return { ok: false, error: errors.not_found() };
-
-        const sourceIdentity = await repo.loadVersionIdentity(character.systemVersionId);
-        if (sourceIdentity === null) return { ok: false, error: errors.not_found() };
-        if (sourceIdentity.systemId !== authorized.value.systemId) {
-          return {
-            ok: false,
-            error: errors.invalid_value(
-              "The target version does not belong to the same system as the character.",
-            ),
-          };
-        }
-
-        const sourceResolved = await input.runtime.resolve({
-          versionId: character.systemVersionId,
-          entityId: character.entityDefinitionId,
-          state: character.state,
-          intent: { kind: "observe" },
-        });
-        if (!sourceResolved.ok) return { ok: false, error: mapRuntimeError(sourceResolved.error) };
-
-        const targetSeed = await input.runtime.resolve({
-          versionId: authorized.value.versionId,
-          entityId: character.entityDefinitionId,
-          intent: { kind: "initialize" },
-        });
-        if (!targetSeed.ok) return { ok: false, error: mapRuntimeError(targetSeed.error) };
-
-        const sourceFields = collectEditableFields(
-          sourceResolved.value.projection,
-          Object.keys(character.state.values),
+        // Shared candidate build: the exact computation the attached seam
+        // runs (version authorization, same-system check, source/target
+        // resolution, candidate validation). Error shapes are identical to
+        // the replaced inline code (plain not_found, invalid_value).
+        const built = await buildMigrationCandidate(
+          {
+            runtime: input.runtime,
+            authorizeVersionUse: input.authorizeVersionUse,
+            loadVersionIdentity: (versionId) => repo.loadVersionIdentity(versionId),
+          },
+          ctx,
+          {
+            character,
+            targetVersionId: migrationInput.targetVersionId,
+            mappings: migrationInput.mappings,
+            defaults: migrationInput.defaults,
+          },
         );
-        const targetFields = collectEditableFields(
-          targetSeed.value.projection,
-          Object.keys(targetSeed.value.state.values),
-        );
-
-        const built = buildCandidateValues({
-          sourceState: character.state,
-          sourceFields,
-          targetFields,
-          mappings: migrationInput.mappings ?? {},
-          defaults: migrationInput.defaults ?? {},
-        });
-        if (!built.ok) return { ok: false, error: errors.invalid_value(built.error.message) };
-
-        const candidate = await input.runtime.resolve({
-          versionId: authorized.value.versionId,
-          entityId: character.entityDefinitionId,
-          intent: { kind: "initialize", values: built.values },
-        });
-        if (!candidate.ok) return { ok: false, error: mapRuntimeError(candidate.error) };
+        if (!built.ok) return { ok: false, error: built.error };
+        const candidate = built.value;
 
         const previewId = newId();
         const createdAt = now();
         const expiresAt = new Date(createdAt.getTime() + PREVIEW_TTL_MS);
         const previewChecksum = hashInput({
           characterId: character.characterId,
-          sourceRevision: character.revision,
-          sourceVersionId: character.systemVersionId,
-          sourceChecksum: sourceIdentity.checksum,
-          targetVersionId: authorized.value.versionId,
-          targetChecksum: authorized.value.checksum,
+          sourceRevision: candidate.sourceRevision,
+          sourceVersionId: candidate.sourceVersionId,
+          sourceChecksum: candidate.sourceChecksum,
+          targetVersionId: candidate.targetVersionId,
+          targetChecksum: candidate.targetChecksum,
           mappings: migrationInput.mappings ?? {},
           defaults: migrationInput.defaults ?? {},
-          candidateState: candidate.value.state,
-          candidateProjection: candidate.value.projection,
-          warnings: built.warnings,
+          candidateState: candidate.candidateState,
+          candidateProjection: candidate.candidateProjection,
+          warnings: candidate.warnings,
           owner: previewOwnerId,
           expiresAt: expiresAt.toISOString(),
         });
@@ -1971,15 +1906,15 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           previewId,
           characterId: character.characterId,
           ownerId: previewOwnerId,
-          sourceRevision: character.revision,
-          sourceVersionId: character.systemVersionId,
-          sourceChecksum: sourceIdentity.checksum,
-          targetVersionId: authorized.value.versionId,
-          targetChecksum: authorized.value.checksum,
+          sourceRevision: candidate.sourceRevision,
+          sourceVersionId: candidate.sourceVersionId,
+          sourceChecksum: candidate.sourceChecksum,
+          targetVersionId: candidate.targetVersionId,
+          targetChecksum: candidate.targetChecksum,
           mappingJson: { mappings: migrationInput.mappings ?? {}, defaults: migrationInput.defaults ?? {} },
-          candidateState: candidate.value.state,
-          candidateProjection: candidate.value.projection,
-          warnings: built.warnings,
+          candidateState: candidate.candidateState,
+          candidateProjection: candidate.candidateProjection,
+          warnings: candidate.warnings,
           previewChecksum,
           expiresAt,
           audit: {
@@ -1995,12 +1930,12 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           value: {
             previewId,
             characterId: character.characterId,
-            sourceRevision: character.revision,
-            sourceVersionId: character.systemVersionId,
-            targetVersionId: authorized.value.versionId,
-            candidateState: candidate.value.state,
-            candidateProjection: candidate.value.projection,
-            warnings: built.warnings,
+            sourceRevision: candidate.sourceRevision,
+            sourceVersionId: candidate.sourceVersionId,
+            targetVersionId: candidate.targetVersionId,
+            candidateState: candidate.candidateState,
+            candidateProjection: candidate.candidateProjection,
+            warnings: candidate.warnings,
             expiresAt: expiresAt.toISOString(),
           },
         };

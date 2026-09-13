@@ -98,6 +98,32 @@ export type AccessibleVersion = {
 };
 
 /**
+ * I7 Phase 3: version metadata for upgrade preview/commit. Unfiltered by
+ * access: the caller first establishes target usability under the
+ * known-version use predicate (owner or public/link, published version on
+ * an active system) and compares systems before authorizing.
+ */
+export type UpgradeVersionMetadata = {
+  versionId: string;
+  systemId: string;
+  semanticVersion: string;
+  lifecycle: string;
+  checksum: string;
+};
+
+/**
+ * I7 Phase 3: one attached character for upgrade preview/commit in
+ * deterministic character-ID order (the commit path locks rows in this
+ * order). GM view only: preview/commit are GM commands, so no per-row
+ * controller predicate applies here.
+ */
+export type UpgradeCharacterRecord = {
+  characterId: string;
+  name: string;
+  systemVersionId: string;
+};
+
+/**
  * I6 Task 9: one attached character for the campaign roster read. GMs see
  * every attached sheet; players see only sheets they control (enforced in
  * SQL by listAttachedCharactersPage, never paginate-then-filter).
@@ -1434,6 +1460,95 @@ export function createCampaignPersistenceRepository(pool: Pool) {
         grants.set(row.content_id, list);
       }
       return grants;
+    },
+
+    /**
+     * I7 Phase 3: unfiltered version metadata for one version ID (pin source
+     * or candidate target). Access is checked separately through
+     * loadAccessibleVersionOnClient so same-system/pin-violation rejections
+     * stay distinguishable from undiscoverable-version collapse.
+     */
+    async loadVersionForUpgrade(
+      client: DbClient,
+      versionId: string,
+    ): Promise<UpgradeVersionMetadata | null> {
+      const result = await client.query<{
+        id: string;
+        system_id: string;
+        semantic_version: string;
+        lifecycle: string;
+        checksum: string;
+      }>(
+        `SELECT id, system_id, semantic_version, lifecycle, checksum
+           FROM system_versions WHERE id = $1`,
+        [versionId],
+      );
+      const row = result.rows[0];
+      return row === undefined
+        ? null
+        : {
+            versionId: row.id,
+            systemId: row.system_id,
+            semanticVersion: row.semantic_version,
+            lifecycle: row.lifecycle,
+            checksum: row.checksum,
+          };
+    },
+
+    /**
+     * I7 Phase 3: client-threaded known-version use check (same owner or
+     * public/link predicate as loadAccessibleVersion, but running on the
+     * caller's snapshot client instead of a fresh pool connection).
+     */
+    async loadAccessibleVersionOnClient(
+      client: DbClient,
+      actorId: string,
+      versionId: string,
+    ): Promise<AccessibleVersion | null> {
+      const result = await client.query<{
+        system_id: string;
+        version_id: string;
+        checksum: string;
+      }>(
+        `SELECT s.id AS system_id, v.id AS version_id, v.checksum
+           FROM system_versions v
+           JOIN systems s ON s.id = v.system_id
+          WHERE v.id = $2
+            AND v.lifecycle = 'published'
+            AND s.lifecycle = 'active'
+            AND (s.owner_id = $1 OR s.access IN ('public', 'link'))`,
+        [actorId, versionId],
+      );
+      const row = result.rows[0];
+      return row === undefined
+        ? null
+        : { systemId: row.system_id, versionId: row.version_id, checksum: row.checksum };
+    },
+
+    /**
+     * I7 Phase 3: attached characters for upgrade preview in deterministic
+     * character-ID order, bounded by the caller's limit (the existing
+     * maxAttachedCharacters cap; no pagination — the roster is already
+     * bounded when it can be previewed at all).
+     */
+    async listAttachedCharactersForUpgrade(
+      client: DbClient,
+      campaignId: string,
+      limit: number,
+    ): Promise<UpgradeCharacterRecord[]> {
+      const result = await client.query<{ id: string; name: string; system_version_id: string }>(
+        `SELECT id, name, system_version_id
+           FROM characters
+          WHERE campaign_id = $1
+          ORDER BY id
+          LIMIT $2`,
+        [campaignId, limit],
+      );
+      return result.rows.map((row) => ({
+        characterId: row.id,
+        name: row.name,
+        systemVersionId: row.system_version_id,
+      }));
     },
   };
 }

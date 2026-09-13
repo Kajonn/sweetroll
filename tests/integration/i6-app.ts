@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 
 import { createCampaignsModule, type Campaigns } from "../../src/campaigns/index.js";
+import { createAttachedMigrationCommands } from "../../src/characters/migration.js";
 import {
   createCampaignPlacement,
   type CampaignPlacement,
@@ -135,7 +136,7 @@ export async function buildI6Harness(input?: {
   const handle = await buildI3App({
     pool,
     wrapRuntime: input?.wrapRuntime,
-    extraRoutes: ({ characters, runtime }) => {
+    extraRoutes: ({ authoring, characters, runtime }) => {
       const limits = input?.limits ?? DEFAULT_CAMPAIGN_LIMITS;
       placement = createCampaignPlacement({
         pool,
@@ -146,6 +147,11 @@ export async function buildI6Harness(input?: {
         pool,
         limits,
         charactersPlacement: placement,
+        // I7 Phase 3: same attached-migration seam as production bootstrap.
+        attachedMigration: createAttachedMigrationCommands({
+          runtime,
+          authorizeVersionUse: authoring.authorizeVersionUse,
+        }),
       });
       return buildCampaignsRoutes({ campaigns, characters, runtime });
     },

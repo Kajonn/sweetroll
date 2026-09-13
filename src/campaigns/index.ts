@@ -69,6 +69,7 @@ import {
   isActiveMember,
   isGameMaster,
 } from "./policy.js";
+import type { AttachedMigrationCommands } from "../characters/migration.js";
 
 export type { RequestContext };
 export type CampaignId = string;
@@ -230,6 +231,34 @@ export type ListClaimableCharactersResult = {
   nextCursor: string | null;
 };
 
+/**
+ * I7 Phase 3: read-only campaign system-version upgrade preview. The GM
+ * picks the target from the existing creation-versions catalog (exact
+ * version-ID fallback); the server re-authorizes the exact target under
+ * the known-version use predicate and reports per-character warnings.
+ */
+export type PreviewCampaignUpgrade = {
+  campaignId: string;
+  targetVersionId: string;
+  mappings?: Record<string, string>;
+  defaults?: Record<string, unknown>;
+};
+export type UpgradeCharacterPreview = {
+  characterId: string;
+  name: string;
+  sourceVersionId: string;
+  warnings: string[];
+  requiresMapping: boolean;
+};
+export type CampaignUpgradePreview = {
+  campaignId: string;
+  campaignRevision: number;
+  sourceVersionId: string;
+  targetVersionId: string;
+  targetSemanticVersion: string;
+  characters: UpgradeCharacterPreview[];
+};
+
 export type ChangeRoleInput = {
   campaignId: CampaignId;
   userId: UserId;
@@ -274,6 +303,15 @@ export interface Campaigns {
     ctx: RequestContext,
     input: ListClaimableCharactersInput,
   ): Promise<CampaignResult<ListClaimableCharactersResult>>;
+  /**
+   * I7 Phase 3: read-only upgrade preview. No row writes, no audit rows,
+   * no idempotency keys. The commit command (Task 2) consumes the same
+   * per-character candidate computation inside its transaction.
+   */
+  previewUpgrade(
+    ctx: RequestContext,
+    input: PreviewCampaignUpgrade,
+  ): Promise<CampaignResult<CampaignUpgradePreview>>;
   changeRole(ctx: RequestContext, input: ChangeRoleInput): Promise<CampaignResult<MemberView>>;
   removeMember(ctx: RequestContext, input: RemoveMemberInput): Promise<CampaignResult<MemberView>>;
   /**
@@ -392,6 +430,14 @@ export type CreateCampaignsModuleInput = {
    * single shared placement here.
    */
   charactersPlacement: CampaignPlacement;
+  /**
+   * I7 Phase 3: attached-migration seam (preview/commit internals bound to
+   * the Characters runtime by the bootstrap/harness). Optional so existing
+   * invitation/placement-only seams keep constructing the module without a
+   * runtime; previewUpgrade/commitUpgrade fail closed with `internal` when
+   * it is absent.
+   */
+  attachedMigration?: AttachedMigrationCommands;
   now?: () => Date;
   newId?: () => string;
   /**
@@ -466,6 +512,18 @@ class PlacementRollback extends Error {
     super("placement outcome rolled back");
     this.error = error;
   }
+}
+
+/**
+ * I7 Phase 3: a character needs explicit mapping when its preview carries
+ * dropped-source warnings. This mirrors the single warning taxonomy owned
+ * by `buildCandidateValues` in `src/characters/migration.ts` (dropped
+ * sources need explicit mapping; defaulted targets resolve automatically;
+ * constraint changes migrate automatically per design §6.7) — no second
+ * taxonomy is invented here.
+ */
+function upgradeRequiresMapping(warnings: string[]): boolean {
+  return warnings.some((warning) => warning.includes("have no target and will be dropped"));
 }
 
 export function createCampaignsModule(input: CreateCampaignsModuleInput): Campaigns {
@@ -1504,6 +1562,120 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
                 : null,
           },
         };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async previewUpgrade(ctx, previewInput) {
+      try {
+        if (typeof previewInput.targetVersionId !== "string" || previewInput.targetVersionId.length === 0) {
+          return { ok: false, error: errors.bad_request("targetVersionId must be a non-empty string.") };
+        }
+        const attached = input.attachedMigration;
+        if (attached === undefined) {
+          return { ok: false, error: errors.internal() };
+        }
+        // Single-client read-only snapshot: campaign identity, membership,
+        // version metadata and the attached roster share one snapshot and
+        // the command writes nothing (no preview/audit/idempotency rows).
+        const outcome = await withClient(async (client) => {
+          const campaign = await repo.openCampaign(client, previewInput.campaignId);
+          const membership =
+            campaign === null
+              ? null
+              : await repo.loadMembership(client, previewInput.campaignId, ctx.actorId);
+          // Archived-readable: any active GM may preview on any status;
+          // players, removed members, outsiders and unknown IDs collapse to
+          // not_found without leaking campaign state. Mutations stay behind
+          // canManageCampaign (which additionally requires active status).
+          if (campaign === null || !isActiveMember(membership) || !isGameMaster(membership)) {
+            return { authorized: false as const };
+          }
+          const target = await repo.loadVersionForUpgrade(client, previewInput.targetVersionId);
+          if (target === null) {
+            return { authorized: true as const, failure: errors.not_found() as CampaignError };
+          }
+          if (target.versionId === campaign.systemVersionId) {
+            return {
+              authorized: true as const,
+              failure: errors.bad_request("The target version is already the campaign version.") as CampaignError,
+            };
+          }
+          const source = await repo.loadVersionForUpgrade(client, campaign.systemVersionId);
+          if (source === null) {
+            return { authorized: true as const, failure: errors.internal() as CampaignError };
+          }
+          if (target.systemId !== source.systemId) {
+            return {
+              authorized: true as const,
+              failure: errors.bad_request(
+                "The target version does not belong to the same system as the campaign.",
+              ) as CampaignError,
+            };
+          }
+          // Known-version use predicate (same as character creation):
+          // unpublished targets, archived systems and versions the caller
+          // may not use collapse to not_found. Link-access systems stay
+          // usable by exact version ID here while remaining undiscoverable
+          // in the creation-versions catalog (OD-01 option A).
+          const accessible = await repo.loadAccessibleVersionOnClient(client, ctx.actorId, target.versionId);
+          if (accessible === null) {
+            return { authorized: true as const, failure: errors.not_found() as CampaignError };
+          }
+          // Bounded by the existing maxAttachedCharacters cap (default 200);
+          // no pagination — the roster is already bounded when previewable.
+          const rows = await repo.listAttachedCharactersForUpgrade(
+            client,
+            campaign.campaignId,
+            limits.maxAttachedCharacters,
+          );
+          const characters: UpgradeCharacterPreview[] = [];
+          for (const row of rows) {
+            const built = await attached.buildAttachedMigrationCandidate(client, ctx, {
+              characterId: row.characterId,
+              targetVersionId: target.versionId,
+              // Conditional spread: PreviewCharacterMigration uses exact
+              // optional properties, so undefined must mean absent, never
+              // an explicit undefined value.
+              ...(previewInput.mappings === undefined ? {} : { mappings: previewInput.mappings }),
+              ...(previewInput.defaults === undefined ? {} : { defaults: previewInput.defaults }),
+            });
+            if (!built.ok) {
+              // Caller-supplied mapping/default mistakes surface as
+              // bad_request; anything else (runtime, storage) is internal.
+              // Per-character not_found cannot happen inside this snapshot
+              // (the row came from it; the target was just authorized).
+              if (built.error.code === "invalid_value" || built.error.code === "bad_request") {
+                return { authorized: true as const, failure: errors.bad_request(built.error.message) as CampaignError };
+              }
+              return { authorized: true as const, failure: errors.internal() as CampaignError };
+            }
+            characters.push({
+              characterId: row.characterId,
+              name: row.name,
+              sourceVersionId: built.value.sourceVersionId,
+              warnings: built.value.warnings,
+              requiresMapping: upgradeRequiresMapping(built.value.warnings),
+            });
+          }
+          return {
+            authorized: true as const,
+            value: {
+              campaignId: campaign.campaignId,
+              campaignRevision: campaign.revision,
+              sourceVersionId: campaign.systemVersionId,
+              targetVersionId: target.versionId,
+              targetSemanticVersion: target.semanticVersion,
+              characters,
+            } satisfies CampaignUpgradePreview,
+          };
+        });
+        if (!outcome.authorized) {
+          return { ok: false, error: errors.not_found() };
+        }
+        if ("failure" in outcome) return { ok: false, error: outcome.failure };
+        return { ok: true, value: outcome.value };
       } catch {
         return { ok: false, error: errors.internal() };
       }

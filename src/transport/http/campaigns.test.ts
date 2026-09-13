@@ -238,6 +238,19 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
     assignCampaignControllers: async () => ({ ok: true, value: placedView() }),
     claimCampaignCharacter: async () => ({ ok: true, value: placedView() }),
     adoptCampaignCharacter: async () => ({ ok: true, value: placedView() }),
+    // I7 Phase 3: preview route lands in Task 3; the stub keeps the
+    // seam total while no route calls it yet.
+    previewUpgrade: async () => ({
+      ok: true as const,
+      value: {
+        campaignId: randomUUID(),
+        campaignRevision: 1,
+        sourceVersionId: randomUUID(),
+        targetVersionId: randomUUID(),
+        targetSemanticVersion: "2.0.0",
+        characters: [],
+      },
+    }),
   };
   return { ...base, ...overrides };
 }

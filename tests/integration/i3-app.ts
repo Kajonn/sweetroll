@@ -476,7 +476,11 @@ export type BuildI3AppInput = {
    * forbids register() after boot, so dependents (campaign HTTP) register
    * here, before ready(), instead of after buildI3App returns.
    */
-  extraRoutes?: (modules: { characters: Characters; runtime: SystemRuntime }) => FastifyPluginCallback | FastifyPluginCallback[];
+  extraRoutes?: (modules: {
+    authoring: SystemAuthoring;
+    characters: Characters;
+    runtime: SystemRuntime;
+  }) => FastifyPluginCallback | FastifyPluginCallback[];
 };
 
 export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
@@ -539,7 +543,7 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
   );
 
   if (input.extraRoutes !== undefined) {
-    const routes = input.extraRoutes({ characters, runtime });
+    const routes = input.extraRoutes({ authoring, characters, runtime });
     for (const plugin of Array.isArray(routes) ? routes : [routes]) {
       void app.register(plugin);
     }

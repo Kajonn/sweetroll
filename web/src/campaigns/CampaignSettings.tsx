@@ -2,11 +2,16 @@
 // confirmations, and export readiness. Mounted by the Members tab only when
 // the actor's own role is owner or co_gm (Task 7 owns that gate).
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
+import type { CharactersApi } from "../characters/api.js";
+import { flattenCatalogPages, useVersionCatalog } from "../characters/versionCatalog.js";
 import { t } from "../i18n/index.js";
 import { Button, Dialog, FormField, Panel } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
-import type { CampaignView } from "./types.js";
+import { campaignCharactersPrefix, campaignDetailKey } from "./campaignQueries.js";
+import type { CampaignView, CommitUpgradeResponse } from "./types.js";
+import { UpgradeDialog } from "./UpgradeDialog.js";
 
 function isConflict(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
@@ -28,8 +33,18 @@ function describeError(cause: unknown, fallback: string): string {
 }
 
 export function CampaignSettingsView(props: {
-  api: Pick<CampaignsApi, "updateCampaign" | "archiveCampaign" | "recoverCampaign" | "exportCampaign">;
+  api: Pick<
+    CampaignsApi,
+    "updateCampaign" | "archiveCampaign" | "recoverCampaign" | "exportCampaign" | "previewUpgrade" | "commitUpgrade"
+  >;
+  /** Creation-versions catalog handle; the upgrade dialog stays shut without it. */
+  versionsApi?: Pick<CharactersApi, "listCreationVersions"> | undefined;
   campaign: CampaignView;
+  actorId?: string | null;
+  generation?: number;
+  online?: boolean;
+  /** GM surfacing gate from the Settings tab's existing role (server stays authoritative). */
+  isGm?: boolean;
   onChanged?: () => void;
 }) {
   const [title, setTitle] = useState(props.campaign.title);
@@ -43,6 +58,38 @@ export function CampaignSettingsView(props: {
   const [exportPending, setExportPending] = useState(false);
   const [exportDone, setExportDone] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const online = props.online ?? true;
+  const actorId = props.actorId ?? null;
+  const generation = props.generation ?? 0;
+  const showUpgrade = props.isGm === true;
+
+  // Resolve the pin's owning system + semver from the creation-versions
+  // catalog so the dialog can list newer same-system targets. The query never
+  // fires without a catalog handle (enabled guard); a link-only pin outside
+  // the catalog resolves to "" and the dialog degrades to exact-ID-only mode.
+  const catalog = useVersionCatalog(
+    (props.versionsApi ?? { listCreationVersions: () => Promise.reject(new Error("missing")) }) as CharactersApi,
+    actorId,
+    generation,
+    { enabled: showUpgrade && props.versionsApi !== undefined, online },
+  );
+  const pinEntry = flattenCatalogPages(catalog.data).find(
+    (entry) => entry.versionId === props.campaign.systemVersionId,
+  );
+
+  const handleCommitted = (_result: CommitUpgradeResponse): void => {
+    // Task 4 invalidation set: every actor/generation-scoped read under this
+    // campaign reloads and the detail view re-reads the moved pin.
+    void queryClient.invalidateQueries({ queryKey: campaignCharactersPrefix(props.campaign.campaignId) });
+    void queryClient.invalidateQueries({ queryKey: ["campaigns", "content", props.campaign.campaignId] });
+    void queryClient.invalidateQueries({ queryKey: ["campaigns", "activity", props.campaign.campaignId] });
+    void queryClient.invalidateQueries({ queryKey: ["campaigns", "session", props.campaign.campaignId] });
+    void queryClient.invalidateQueries({ queryKey: campaignDetailKey(props.campaign.campaignId) });
+    props.onChanged?.();
+  };
 
   const attemptSave = async (): Promise<void> => {
     const trimmedTitle = title.trim();
@@ -190,6 +237,29 @@ export function CampaignSettingsView(props: {
         {exportDone ? <p role="status">{t("campaign.manage.settings.export.done")}</p> : null}
         {exportError !== null ? <p role="alert">{exportError}</p> : null}
       </Panel>
+      {showUpgrade ? (
+        <Panel title={t("campaign.detail.upgrade.title")}>
+          <Button variant="secondary" disabled={!online} onClick={() => setUpgradeOpen(true)}>
+            {t("campaign.detail.upgrade.title")}
+          </Button>
+          {!online ? <p role="status">{t("campaign.detail.upgrade.commit.offline")}</p> : null}
+        </Panel>
+      ) : null}
+      {upgradeOpen && props.versionsApi !== undefined ? (
+        <UpgradeDialog
+          api={props.api}
+          versionsApi={props.versionsApi}
+          campaignId={props.campaign.campaignId}
+          actorId={actorId}
+          generation={generation}
+          target={null}
+          systemId={pinEntry?.systemId ?? ""}
+          sourceSemanticVersion={pinEntry?.semanticVersion ?? ""}
+          online={online}
+          onClose={() => setUpgradeOpen(false)}
+          onCommitted={handleCommitted}
+        />
+      ) : null}
       <Dialog
         open={archivePhase !== "idle"}
         onOpenChange={(open) => {

@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { t } from "../i18n/index.js";
 import { Button, Dialog, EmptyState, PageHeader, Panel, Tabs } from "../ui/index.js";
+import type { CharactersApi } from "../characters/api.js";
 import type { CampaignsApi } from "./api.js";
 import { CampaignActivityTab, campaignActivityKey } from "./CampaignActivity.js";
 import { CampaignCharactersTab, type CampaignCharacterMetadataApi } from "./CampaignCharacters.js";
@@ -49,6 +50,7 @@ function hasSessionCharacterSurface(value: unknown): value is SessionBoardProps[
 
 function MembersManageSection(props: {
   api: CampaignsApi;
+  versionsApi?: Pick<CharactersApi, "listCreationVersions"> | undefined;
   campaignId: string;
   actorId: string;
   campaign: CampaignView;
@@ -72,7 +74,16 @@ function MembersManageSection(props: {
       />
       {props.isGm ? (
         <>
-          <CampaignSettingsView api={props.api} campaign={props.campaign} onChanged={props.onChanged} />
+          <CampaignSettingsView
+            api={props.api}
+            versionsApi={props.versionsApi}
+            campaign={props.campaign}
+            actorId={props.actorId}
+            generation={props.generation}
+            online={props.online}
+            isGm={props.isGm}
+            onChanged={props.onChanged}
+          />
           <InvitationManager
             api={props.api}
             campaignId={props.campaignId}
@@ -96,6 +107,8 @@ export function CampaignDetail(props: {
   navigation?: { onOpenCharacter: (characterId: string) => void };
   metadataApi?: CampaignCharacterMetadataApi;
   charactersApi?: SessionBoardProps["charactersApi"];
+  /** Creation-versions catalog handle threaded to the GM Upgrade section. */
+  versionsApi?: Pick<CharactersApi, "listCreationVersions">;
   generation?: number;
   online?: boolean;
 }) {
@@ -299,6 +312,7 @@ export function CampaignDetail(props: {
             content: (
               <MembersManageSection
                 api={props.api}
+                versionsApi={props.versionsApi}
                 campaignId={props.campaignId}
                 actorId={props.actorId}
                 campaign={campaign}

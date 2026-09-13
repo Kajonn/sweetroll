@@ -130,6 +130,23 @@ describeWithDatabase("campaign HTTP acceptance demonstration (Task 10)", () => {
       idempotencyKey: randomUUID(),
     }, 200);
 
+    // The player learns the ID/revision only through claim discovery, with
+    // exact four-field rows and no pre-claim sheet access.
+    const emptyBefore = await get("other", `/campaigns/${campaignId}/claimable-characters?limit=10`);
+    expect(emptyBefore.statusCode, emptyBefore.body).toBe(200);
+    expect(emptyBefore.json().characters).toEqual([]);
+    const discovered = await get("player", `/campaigns/${campaignId}/claimable-characters?limit=1`);
+    expect(discovered.statusCode, discovered.body).toBe(200);
+    expect(Object.keys(discovered.json().characters[0]).sort()).toEqual([
+      "characterId",
+      "lifecycle",
+      "name",
+      "revision",
+    ]);
+    expect(discovered.json().characters[0].characterId).toBe(partyId);
+    const preClaim = await get("player", `/characters/${partyId}`);
+    expect(preClaim.statusCode).toBe(404);
+
     rev = await campaignRevision(campaignId);
     const claimed = await post("player", `/campaigns/${campaignId}/characters/${partyId}/claim`, {
       expectedCampaignRevision: rev,

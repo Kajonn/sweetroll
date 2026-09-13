@@ -10,8 +10,12 @@ import type { CreationOptions } from "../characters/types.js";
 import { t } from "../i18n/index.js";
 import { Button, Dialog, EmptyState, FormField, Panel, Select } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
-import { campaignCharactersKey } from "./campaignQueries.js";
-import type { CampaignCharacterSummary } from "./types.js";
+import {
+  campaignCharactersKey,
+  campaignClaimableCharactersKey,
+  useClaimableCharacters,
+} from "./campaignQueries.js";
+import type { CampaignCharacterSummary, ClaimableCharacterSummary } from "./types.js";
 
 /** Minimal creation-options metadata loader (reuses the characters seam). */
 export type CampaignCharacterMetadataApi = {
@@ -50,6 +54,14 @@ export type CampaignCharactersViewProps = {
   actorId?: string | null | undefined;
   characters: CampaignCharacterSummary[];
   characterRevisionById?: Record<string, number>;
+  claimable: ClaimableCharacterSummary[];
+  claimableStatus: "pending" | "error" | "success";
+  claimableHasMore?: boolean;
+  onLoadMoreClaimable?: () => void;
+  onRetryClaimable?: () => void;
+  online?: boolean;
+  /** GMs may open every roster sheet; players only sheets they control. */
+  isGm?: boolean;
   onOpenCharacter: (characterId: string) => void;
   /** Reload the list (and campaign revision) after a mutation outcome. */
   onChanged?: () => void;
@@ -63,10 +75,11 @@ function isControlled(character: CampaignCharacterSummary, actorId: string | nul
 export function CampaignCharactersView(props: CampaignCharactersViewProps) {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
-  const [unavailableIds, setUnavailableIds] = useState<Record<string, boolean>>({});
+  const [evictedIds, setEvictedIds] = useState<Record<string, boolean>>({});
   const [conflictIds, setConflictIds] = useState<Record<string, boolean>>({});
   const [claimedIds, setClaimedIds] = useState<Record<string, boolean>>({});
   const [claimErrors, setClaimErrors] = useState<Record<string, string | null>>({});
+  const online = props.online ?? true;
 
   const [name, setName] = useState("");
   const [systemVersionId, setSystemVersionId] = useState("");
@@ -78,8 +91,8 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
   const [createConflict, setCreateConflict] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const attemptClaim = async (character: CampaignCharacterSummary): Promise<void> => {
-    if (claimingId !== null) return;
+  const attemptClaim = async (character: ClaimableCharacterSummary): Promise<void> => {
+    if (claimingId !== null || !online) return;
     setClaimingId(character.characterId);
     setClaimErrors((prev) => ({ ...prev, [character.characterId]: null }));
     // Caller-minted idempotency key, fresh on every attempt: a 409 re-reads
@@ -88,8 +101,7 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
     try {
       await props.api.claimCharacter(props.campaignId, character.characterId, {
         expectedCampaignRevision: props.campaignRevision,
-        expectedCharacterRevision:
-          props.characterRevisionById?.[character.characterId] ?? character.revision,
+        expectedCharacterRevision: character.revision,
         idempotencyKey,
       });
       setClaimedIds((prev) => ({ ...prev, [character.characterId]: true }));
@@ -103,9 +115,9 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
         setConfirmingId(null);
         props.onChanged?.();
       } else if (isNotFound(cause)) {
-        // 404 means the sheet is not designated for this actor: the row
-        // flips to view-only and the list is reloaded fresh.
-        setUnavailableIds((prev) => ({ ...prev, [character.characterId]: true }));
+        // 404 means the designation is gone: evict the discovery row
+        // without relabelling it view-only, then reload fresh.
+        setEvictedIds((prev) => ({ ...prev, [character.characterId]: true }));
         setConfirmingId(null);
         props.onChanged?.();
       } else {
@@ -165,10 +177,76 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
     }
   };
 
-  const confirming = props.characters.find((row) => row.characterId === confirmingId) ?? null;
+  const visibleClaimable = props.claimable.filter((row) => evictedIds[row.characterId] !== true);
+  const confirming = visibleClaimable.find((row) => row.characterId === confirmingId) ?? null;
+
+  const claimSection = (
+    <section aria-label={t("campaign.detail.characters.claimDiscovery.title")}>
+      <h3>{t("campaign.detail.characters.claimDiscovery.title")}</h3>
+      <p>{t("campaign.detail.characters.claimDiscovery.description")}</p>
+      {!online ? <p role="status">{t("campaign.detail.characters.claimDiscovery.offline")}</p> : null}
+      {props.claimableStatus === "pending" ? (
+        <p role="status">{t("campaign.detail.characters.claimDiscovery.loading")}</p>
+      ) : null}
+      {props.claimableStatus === "error" ? (
+        <EmptyState
+          title={t("campaign.detail.characters.claimDiscovery.loadFailed")}
+          action={
+            <Button variant="primary" onClick={() => props.onRetryClaimable?.()}>
+              {t("campaign.detail.retry")}
+            </Button>
+          }
+        />
+      ) : null}
+      {props.claimableStatus === "success" && visibleClaimable.length === 0 ? (
+        <p role="status">{t("campaign.detail.characters.claimDiscovery.empty")}</p>
+      ) : null}
+      {props.claimableStatus === "success" && visibleClaimable.length > 0 ? (
+        <ul aria-label={t("campaign.detail.characters.claimDiscovery.title")}>
+          {visibleClaimable.map((row) => (
+            <li key={row.characterId}>
+              <span>{row.name}</span> <span>{row.lifecycle}</span>{" "}
+              {row.lifecycle === "archived" ? (
+                <span>{t("campaign.detail.characters.claimDiscovery.archived", { name: row.name })}</span>
+              ) : claimedIds[row.characterId] === true ? (
+                <span role="status">{t("campaign.detail.characters.claim.claimed", { name: row.name })}</span>
+              ) : (
+                <Button
+                  variant="primary"
+                  disabled={!online || claimingId !== null}
+                  onClick={() => setConfirmingId(row.characterId)}
+                >
+                  {t("campaign.detail.characters.claim.button", { name: row.name })}
+                </Button>
+              )}
+              {conflictIds[row.characterId] === true ? (
+                <p role="alert">
+                  {t("campaign.detail.characters.claim.conflict", { name: row.name })}
+                  <Button
+                    variant="secondary"
+                    disabled={!online}
+                    onClick={() => setConfirmingId(row.characterId)}
+                  >
+                    {t("campaign.detail.characters.claim.conflict.retry", { name: row.name })}
+                  </Button>
+                </p>
+              ) : null}
+              {claimErrors[row.characterId] ? <p role="alert">{claimErrors[row.characterId]}</p> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {props.claimableHasMore === true ? (
+        <Button variant="secondary" disabled={!online} onClick={() => props.onLoadMoreClaimable?.()}>
+          {t("campaign.detail.characters.claimDiscovery.more")}
+        </Button>
+      ) : null}
+    </section>
+  );
 
   return (
     <div>
+      {claimSection}
       {props.characters.length === 0 ? (
         <EmptyState
           title={t("campaign.detail.characters.empty.title")}
@@ -178,44 +256,20 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
         <ul aria-label={t("campaign.detail.characters.listAriaLabel")}>
           {props.characters.map((character) => {
             const controlled = isControlled(character, props.actorId);
-            const unavailable = unavailableIds[character.characterId] === true;
-            const claimable =
-              character.lifecycle === "active" && !controlled && !unavailable && claimedIds[character.characterId] !== true;
+            const openable = controlled || props.isGm === true;
             const indicator = controlled
               ? t("campaign.detail.characters.indicator.controlled")
-              : claimable
-                ? t("campaign.detail.characters.indicator.claimable")
-                : t("campaign.detail.characters.indicator.viewOnly");
+              : t("campaign.detail.characters.indicator.viewOnly");
             return (
               <li key={character.characterId}>
                 <span>{character.name}</span>{" "}
                 <span>{t("campaign.detail.characters.controllers", { count: character.controllers.length })}</span>{" "}
                 <span>{character.lifecycle}</span>{" "}
                 <span>{indicator}</span>{" "}
-                <Button variant="secondary" onClick={() => props.onOpenCharacter(character.characterId)}>
-                  {t("campaign.detail.characters.open", { name: character.name })}
-                </Button>{" "}
-                {claimable ? (
-                  <Button variant="primary" onClick={() => setConfirmingId(character.characterId)}>
-                    {t("campaign.detail.characters.claim.button", { name: character.name })}
+                {openable ? (
+                  <Button variant="secondary" onClick={() => props.onOpenCharacter(character.characterId)}>
+                    {t("campaign.detail.characters.open", { name: character.name })}
                   </Button>
-                ) : null}
-                {claimedIds[character.characterId] === true ? (
-                  <p role="status">{t("campaign.detail.characters.claim.claimed", { name: character.name })}</p>
-                ) : null}
-                {unavailable ? (
-                  <p role="status">{t("campaign.detail.characters.claim.unavailable", { name: character.name })}</p>
-                ) : null}
-                {conflictIds[character.characterId] === true ? (
-                  <p role="alert">
-                    {t("campaign.detail.characters.claim.conflict", { name: character.name })}
-                    <Button variant="secondary" onClick={() => setConfirmingId(character.characterId)}>
-                      {t("campaign.detail.characters.claim.conflict.retry", { name: character.name })}
-                    </Button>
-                  </p>
-                ) : null}
-                {claimErrors[character.characterId] ? (
-                  <p role="alert">{claimErrors[character.characterId]}</p>
                 ) : null}
               </li>
             );
@@ -239,6 +293,7 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
               variant="primary"
               pending={claimingId === confirming.characterId}
               pendingText={t("campaign.detail.characters.claim.claiming")}
+              disabled={!online}
               onClick={() => void attemptClaim(confirming)}
             >
               {t("campaign.detail.characters.claim.confirm.confirm")}
@@ -247,7 +302,7 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
         }
       >
         <Panel title={confirming?.name ?? ""}>
-          <p>{t("campaign.detail.characters.controllers", { count: confirming?.controllers.length ?? 0 })}</p>
+          <p>{t("campaign.detail.characters.claimDiscovery.description")}</p>
         </Panel>
       </Dialog>
       <Panel title={t("campaign.detail.characters.create.title")}>
@@ -320,16 +375,29 @@ export function CampaignCharactersTab(props: {
   campaignId: string;
   actorId?: string | null;
   campaignRevision: number;
+  generation?: number;
+  online?: boolean;
+  isGm?: boolean;
   onOpenCharacter: (characterId: string) => void;
   /** Re-read the campaign so claim/create retries use a fresh revision. */
   onCampaignStale?: () => void;
   metadataApi?: CampaignCharacterMetadataApi | undefined;
 }) {
   const queryClient = useQueryClient();
+  const generation = props.generation ?? 0;
+  const online = props.online ?? true;
   const characters = useQuery({
-    queryKey: campaignCharactersKey(props.campaignId),
+    queryKey: campaignCharactersKey(props.campaignId, props.actorId ?? null, generation),
     queryFn: () => props.api.listCampaignCharacters(props.campaignId),
+    enabled: props.actorId !== null && props.actorId !== undefined,
   });
+  const claimable = useClaimableCharacters(
+    props.api,
+    props.campaignId,
+    props.actorId ?? null,
+    generation,
+    { enabled: props.actorId !== null && props.actorId !== undefined, online },
+  );
 
   if (characters.status === "pending") {
     return <p role="status">{t("campaign.detail.characters.loading")}</p>;
@@ -349,6 +417,17 @@ export function CampaignCharactersTab(props: {
   }
 
   const rows: CampaignCharacterSummary[] = characters.data.characters;
+  const claimRows: ClaimableCharacterSummary[] =
+    claimable.data?.pages.flatMap((page) => page.characters) ?? [];
+  const refresh = (): void => {
+    void queryClient.invalidateQueries({
+      queryKey: campaignCharactersKey(props.campaignId, props.actorId ?? null, generation),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: campaignClaimableCharactersKey(props.campaignId, props.actorId ?? null, generation),
+    });
+    props.onCampaignStale?.();
+  };
   return (
     <CampaignCharactersView
       api={props.api}
@@ -357,11 +436,15 @@ export function CampaignCharactersTab(props: {
       actorId={props.actorId}
       characters={rows}
       characterRevisionById={Object.fromEntries(rows.map((row) => [row.characterId, row.revision]))}
+      claimable={claimRows}
+      claimableStatus={claimable.status}
+      claimableHasMore={claimable.hasNextPage}
+      onLoadMoreClaimable={() => void claimable.fetchNextPage()}
+      onRetryClaimable={() => void claimable.refetch()}
+      online={online}
+      isGm={props.isGm ?? false}
       onOpenCharacter={props.onOpenCharacter}
-      onChanged={() => {
-        void queryClient.invalidateQueries({ queryKey: campaignCharactersKey(props.campaignId) });
-        props.onCampaignStale?.();
-      }}
+      onChanged={refresh}
       metadataApi={props.metadataApi}
     />
   );

@@ -4,7 +4,7 @@
 // Error paths never render server payloads or secrets: only the generic
 // unavailable strings below reach the page.
 import { useEffect, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { t } from "../i18n/index.js";
 import { Button, Dialog, EmptyState, Panel } from "../ui/index.js";
@@ -18,11 +18,12 @@ export function campaignContentKey(
   campaignId: string,
   actorId?: string | null,
   generation?: number,
+  status?: "active" | "deleted",
 ): (string | number | null)[] {
   // Same ["campaigns", "content", campaignId] prefix family as before, so
   // the revocation purges in CampaignDetail.handleAccessRevoked (which
   // remove by that prefix) still match these scoped keys.
-  return ["campaigns", "content", campaignId, actorId ?? null, generation ?? 0];
+  return ["campaigns", "content", campaignId, actorId ?? null, generation ?? 0, status ?? "active"];
 }
 
 function isNotFound(error: unknown): boolean {
@@ -127,12 +128,26 @@ export function CampaignContentTab(props: {
   const online = props.online ?? true;
   const actorId = props.actorId ?? null;
   const generation = props.generation ?? 0;
-  const listKey = campaignContentKey(props.campaignId, actorId, generation);
+  const isGm = props.isGm === true;
+  const listKey = campaignContentKey(props.campaignId, actorId, generation, "active");
   const list = useQuery({
     queryKey: listKey,
     queryFn: () => props.api.listContent(props.campaignId),
     enabled: online && actorId !== null,
   });
+  const deletedKey = campaignContentKey(props.campaignId, actorId, generation, "deleted");
+  const deleted = useInfiniteQuery({
+    queryKey: deletedKey,
+    queryFn: ({ pageParam }: { pageParam: string | null }) =>
+      props.api.listContent(props.campaignId, { cursor: pageParam, limit: 25, status: "deleted" }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    enabled: online && actorId !== null && isGm,
+  });
+  const [view, setView] = useState<"active" | "hidden">("active");
+  const [recoveringId, setRecoveringId] = useState<string | null>(null);
+  const [recoverError, setRecoverError] = useState<string | null>(null);
+  const [recoveredTitle, setRecoveredTitle] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [revokedIds, setRevokedIds] = useState<Set<string>>(() => new Set());
   const [unavailable, setUnavailable] = useState(false);
@@ -209,7 +224,35 @@ export function CampaignContentTab(props: {
 
   const reload = (): void => {
     void queryClient.invalidateQueries({ queryKey: listKey });
+    if (isGm) void queryClient.invalidateQueries({ queryKey: deletedKey });
     props.onChanged?.();
+  };
+
+  const attemptRecover = async (contentId: string, title: string, revision: number): Promise<void> => {
+    if (recoveringId !== null || !online) return;
+    setRecoveringId(contentId);
+    setRecoverError(null);
+    setRecoveredTitle(null);
+    try {
+      await props.api.recoverContent(contentId, {
+        expectedContentRevision: revision,
+        idempotencyKey: crypto.randomUUID(),
+      });
+      setRecoveredTitle(title);
+      reload();
+    } catch (cause) {
+      if (isConflict(cause)) {
+        setRecoverError(t("campaign.detail.content.hidden.conflict", { title }));
+        void queryClient.invalidateQueries({ queryKey: deletedKey });
+      } else if (isNotFound(cause)) {
+        setRecoverError(t("campaign.detail.content.hidden.unavailable", { title }));
+        void queryClient.invalidateQueries({ queryKey: deletedKey });
+      } else {
+        setRecoverError(t("campaign.detail.content.edit.error"));
+      }
+    } finally {
+      setRecoveringId(null);
+    }
   };
 
   const fetchView = async (contentId: string, assign: (view: ContentView) => void): Promise<void> => {
@@ -318,8 +361,69 @@ export function CampaignContentTab(props: {
   if (props.isGm === true) {
     const members = props.members ?? [];
     const visible = items.filter((item) => !revokedIds.has(item.contentId));
+    const hiddenRows = (deleted.data?.pages.flatMap((page) => page.content) ?? []).filter(
+      (row) => !revokedIds.has(row.contentId),
+    );
     return (
       <div>
+        <div role="group" aria-label={t("campaign.detail.content.listAriaLabel")}>
+          <Button variant={view === "active" ? "primary" : "secondary"} onClick={() => setView("active")}>
+            {t("campaign.detail.content.view.active")}
+          </Button>{" "}
+          <Button variant={view === "hidden" ? "primary" : "secondary"} onClick={() => setView("hidden")}>
+            {t("campaign.detail.content.view.hidden")}
+          </Button>
+        </div>
+        {view === "hidden" ? (
+          <section aria-label={t("campaign.detail.content.view.hidden")}>
+            <p>{t("campaign.detail.content.hidden.description")}</p>
+            {recoverError !== null ? <p role="alert">{recoverError}</p> : null}
+            {recoveredTitle !== null ? (
+              <p role="status">{t("campaign.detail.content.hidden.recovered", { title: recoveredTitle })}</p>
+            ) : null}
+            {deleted.status === "pending" ? (
+              <p role="status">{t("campaign.detail.content.loading")}</p>
+            ) : null}
+            {deleted.status === "error" ? (
+              <EmptyState
+                title={t("campaign.detail.content.loadFailed")}
+                action={
+                  <Button variant="primary" onClick={() => void deleted.refetch()}>
+                    {t("campaign.detail.retry")}
+                  </Button>
+                }
+              />
+            ) : null}
+            {deleted.status === "success" && hiddenRows.length === 0 ? (
+              <p role="status">{t("campaign.detail.content.hidden.empty")}</p>
+            ) : null}
+            {deleted.status === "success" && hiddenRows.length > 0 ? (
+              <ul aria-label={t("campaign.detail.content.view.hidden")}>
+                {hiddenRows.map((row) => (
+                  <li key={row.contentId}>
+                    <span>{row.title}</span> <span>{audienceLabel(row.audience)}</span>{" "}
+                    <span>{row.status}</span>{" "}
+                    <Button
+                      variant="primary"
+                      pending={recoveringId === row.contentId}
+                      disabled={!online || recoveringId !== null}
+                      onClick={() => void attemptRecover(row.contentId, row.title, row.revision)}
+                    >
+                      {t("campaign.detail.content.hidden.recover", { title: row.title })}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {deleted.hasNextPage === true ? (
+              <Button variant="secondary" disabled={!online} onClick={() => void deleted.fetchNextPage()}>
+                {t("campaign.detail.content.hidden.more")}
+              </Button>
+            ) : null}
+          </section>
+        ) : null}
+        {view === "active" ? (
+        <>
         <ContentEditor
           api={props.api}
           campaignId={props.campaignId}
@@ -411,6 +515,8 @@ export function CampaignContentTab(props: {
         >
           <p>{deleting?.title ?? ""}</p>
         </Dialog>
+        </>
+        ) : null}
       </div>
     );
   }

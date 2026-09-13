@@ -233,6 +233,7 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
       },
     }),
     listCharacters: async () => ({ ok: true, value: { characters: [], nextCursor: null } }),
+    listClaimableCharacters: async () => ({ ok: true, value: { characters: [], nextCursor: null } }),
     createCampaignCharacter: async () => ({ ok: true, value: placedView() }),
     assignCampaignControllers: async () => ({ ok: true, value: placedView() }),
     claimCampaignCharacter: async () => ({ ok: true, value: placedView() }),
@@ -824,6 +825,7 @@ describe("campaign HTTP routes", () => {
       tags: view.tags,
       revision: view.revision,
       accessRevision: view.accessRevision,
+      status: view.status,
       createdAt: view.createdAt,
       updatedAt: view.updatedAt,
     };
@@ -841,6 +843,31 @@ describe("campaign HTTP routes", () => {
     const listed = await app.inject({ method: "GET", url: `/campaigns/${view.campaignId}/content?limit=10`, headers: cookie });
     expect(listed.statusCode).toBe(200);
     expect(listed.json().nextCursor).toBe("cursor-1");
+    expect(listed.json().content[0].status).toBe("active");
+
+    let statusInput: unknown;
+    const statusApp = await build({
+      campaigns: makeCampaigns({
+        openContent: async () => ({ ok: true, value: view }),
+        listContent: async (_ctx, input) => {
+          statusInput = input;
+          return { ok: true, value: { content: [], nextCursor: null } };
+        },
+      }),
+    });
+    const deleted = await statusApp.inject({
+      method: "GET",
+      url: `/campaigns/${view.campaignId}/content?status=deleted`,
+      headers: cookie,
+    });
+    expect(deleted.statusCode).toBe(200);
+    expect(statusInput).toMatchObject({ status: "deleted" });
+    const invalid = await statusApp.inject({
+      method: "GET",
+      url: `/campaigns/${view.campaignId}/content?status=archived`,
+      headers: cookie,
+    });
+    expect(invalid.statusCode).toBe(400);
 
     const oversize = await build({
       campaigns: makeCampaigns({
@@ -881,5 +908,60 @@ describe("campaign HTTP routes", () => {
     const members = await app.inject({ method: "GET", url: `/campaigns/${id}/members`, headers: cookie });
     expect(members.statusCode).toBe(200);
     expect(members.json().members).toHaveLength(1);
+  });
+
+  it("lists claimable characters with exact four-field rows and maps auth/page errors", async () => {
+    let claimInput: unknown;
+    const claimRow = {
+      characterId: randomUUID(),
+      name: "Bram",
+      revision: 3,
+      lifecycle: "active" as const,
+    };
+    const app = await build({
+      campaigns: makeCampaigns({
+        listClaimableCharacters: async (_ctx, input) => {
+          claimInput = input;
+          return { ok: true, value: { characters: [claimRow], nextCursor: "claim-cursor" } };
+        },
+      }),
+    });
+    const id = randomUUID();
+    const listed = await app.inject({
+      method: "GET",
+      url: `/campaigns/${id}/claimable-characters?limit=1`,
+      headers: cookie,
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(Object.keys(listed.json().characters[0]).sort()).toEqual([
+      "characterId",
+      "lifecycle",
+      "name",
+      "revision",
+    ]);
+    expect(listed.json().nextCursor).toBe("claim-cursor");
+    expect(claimInput).toEqual({ campaignId: id, limit: 1, cursor: null });
+
+    const unauthenticated = await app.inject({ method: "GET", url: `/campaigns/${id}/claimable-characters` });
+    expect(unauthenticated.statusCode).toBe(401);
+
+    const denied = await build({
+      campaigns: makeCampaigns({
+        listClaimableCharacters: async () => ({ ok: false, error: { code: "not_found", message: "nope" } }),
+      }),
+    });
+    const missing = await denied.inject({
+      method: "GET",
+      url: `/campaigns/${id}/claimable-characters`,
+      headers: cookie,
+    });
+    expect(missing.statusCode).toBe(404);
+
+    const badLimit = await app.inject({
+      method: "GET",
+      url: `/campaigns/${id}/claimable-characters?limit=0`,
+      headers: cookie,
+    });
+    expect(badLimit.statusCode).toBe(400);
   });
 });

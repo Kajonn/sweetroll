@@ -207,6 +207,29 @@ export type ListCampaignCharactersResult = {
   nextCursor: string | null;
 };
 
+/**
+ * R6 claim discovery: the caller's outstanding designations only. Exactly
+ * four public fields; never controllers, state, projection, rolls, audit,
+ * inventory, placement metadata, or system/version details.
+ */
+export type ListClaimableCharactersInput = {
+  campaignId: CampaignId;
+  limit?: number;
+  cursor?: string | null;
+};
+
+export type ClaimableCharacterSummary = {
+  characterId: string;
+  name: string;
+  revision: number;
+  lifecycle: "active" | "archived";
+};
+
+export type ListClaimableCharactersResult = {
+  characters: ClaimableCharacterSummary[];
+  nextCursor: string | null;
+};
+
 export type ChangeRoleInput = {
   campaignId: CampaignId;
   userId: UserId;
@@ -247,6 +270,10 @@ export interface Campaigns {
     ctx: RequestContext,
     input: ListCampaignCharactersInput,
   ): Promise<CampaignResult<ListCampaignCharactersResult>>;
+  listClaimableCharacters(
+    ctx: RequestContext,
+    input: ListClaimableCharactersInput,
+  ): Promise<CampaignResult<ListClaimableCharactersResult>>;
   changeRole(ctx: RequestContext, input: ChangeRoleInput): Promise<CampaignResult<MemberView>>;
   removeMember(ctx: RequestContext, input: RemoveMemberInput): Promise<CampaignResult<MemberView>>;
   /**
@@ -1423,6 +1450,57 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             nextCursor:
               hasMore && last !== undefined
                 ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.characterId, scope: listInput.campaignId })
+                : null,
+          },
+        };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async listClaimableCharacters(ctx, listInput) {
+      try {
+        const checked = checkLimit(listInput.limit);
+        if ("error" in checked) return { ok: false, error: checked.error };
+        const scope = `${listInput.campaignId}:${ctx.actorId}:claimable-characters`;
+        const decoded = decodeCursor(listInput.cursor, scope);
+        if ("error" in decoded) return { ok: false, error: decoded.error };
+        const outcome = await withClient(async (client) => {
+          const campaign = await repo.openCampaign(client, listInput.campaignId);
+          const membership =
+            campaign === null
+              ? null
+              : await repo.loadMembership(client, listInput.campaignId, ctx.actorId);
+          if (campaign === null || !canReadCampaign(campaign, membership)) {
+            return { authorized: false as const };
+          }
+          const rows = await repo.listClaimableCharactersPage(client, {
+            campaignId: listInput.campaignId,
+            actorId: ctx.actorId,
+            limit: checked.limit,
+            cursorCreatedAt: decoded.cursor?.createdAt ?? null,
+            cursorId: decoded.cursor?.id ?? null,
+          });
+          return { authorized: true as const, rows };
+        });
+        if (!outcome.authorized) {
+          return { ok: false, error: errors.not_found() };
+        }
+        const hasMore = outcome.rows.length > checked.limit;
+        const page = hasMore ? outcome.rows.slice(0, checked.limit) : outcome.rows;
+        const last = page[page.length - 1];
+        return {
+          ok: true,
+          value: {
+            characters: page.map((record) => ({
+              characterId: record.characterId,
+              name: record.name,
+              revision: record.revision,
+              lifecycle: record.lifecycle,
+            })),
+            nextCursor:
+              hasMore && last !== undefined
+                ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.characterId, scope })
                 : null,
           },
         };

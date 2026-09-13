@@ -420,7 +420,7 @@ export function SessionBoard(props: SessionBoardProps) {
     refetchInterval,
   });
   const characters = useQuery({
-    queryKey: campaignCharactersKey(props.campaignId),
+    queryKey: campaignCharactersKey(props.campaignId, props.actorId, props.generation),
     queryFn: () => props.campaignsApi.listCampaignCharacters(props.campaignId),
     refetchInterval,
   });

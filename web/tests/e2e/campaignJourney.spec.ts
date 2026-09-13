@@ -21,12 +21,9 @@ import { publishOwnedClone, uid } from "../offline/test-auth.js";
  * The dev sign-in panel stays (dev server), so no SWEETROLL_TEST_AUTH escape
  * hatch is needed here.
  *
- * The invitee joins as co_gm (not player): the backend lists campaign
- * characters to GMs in full but to players only when controlled, so a
- * player-role invitee can never discover a GM-designated sheet in the list
- * UI and the UI claim step would have no row to act on. The co_gm invitee
- * exercises the identical player-app UI (no role branching in these tabs);
- * the player-role discovery gap is recorded as a finding.
+ * The invitee joins as player: claim discovery comes from the dedicated
+ * claimable-characters read (never the GM roster), and the UI claim step
+ * acts on the discovered row without pre-claim sheet access.
  */
 
 const D20_VERSION_ID = "a0000000-0000-5000-8000-000000000002";
@@ -124,7 +121,7 @@ test("G7 exit: invitation accept, campaign list, claim, permitted content, activ
     campaignRevision = (await getJson(gmContext.request, `/api/campaigns/${campaignId}`)).campaign
       .revision as number;
     const issued = await postJson(gmContext.request, `/api/campaigns/${campaignId}/invitations`, {
-      intendedRole: "co_gm",
+      intendedRole: "player",
       expectedCampaignRevision: campaignRevision,
       idempotencyKey: `g7-invitation-${stamp}`,
     });
@@ -176,13 +173,21 @@ test("G7 exit: invitation accept, campaign list, claim, permitted content, activ
     await expect(page).toHaveURL(`/campaigns/${campaignId}`);
     await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
 
-    // 5. Characters tab (default): the designated sheet is claimable; claim
-    // it through the confirm dialog with a caller-minted idempotency key.
-    await expect(page.getByText("Available to claim.")).toBeVisible({ timeout: STEP_TIMEOUT });
+    // 5. Characters tab (default): the designated sheet is discovered
+    // through the claimable-characters read; the player has no pre-claim
+    // sheet access and no roster Open button. Claim through the confirm
+    // dialog with a caller-minted idempotency key.
+    const preClaim = await page.request.get(`/api/characters/${placedCharacterId}`);
+    expect(preClaim.status()).toBe(404);
+    await expect(page.getByText("Available to claim")).toBeVisible({ timeout: STEP_TIMEOUT });
+    await expect(page.getByRole("button", { name: `Open ${characterName}` })).toHaveCount(0);
     await page.getByRole("button", { name: `Claim ${characterName}` }).click({ timeout: STEP_TIMEOUT });
     await expect(page.getByRole("dialog")).toBeVisible({ timeout: STEP_TIMEOUT });
     await page.getByRole("dialog").getByRole("button", { name: "Confirm claim" }).click({ timeout: STEP_TIMEOUT });
-    await expect(page.getByText(`You now control ${characterName}.`)).toBeVisible({ timeout: STEP_TIMEOUT });
+    // Success is the roster Open button: the discovery row leaves the
+    // claimable list once its designation is consumed, so its transient
+    // claimed text is not the stable signal.
+    await expect(page.getByRole("button", { name: `Open ${characterName}` })).toBeVisible({ timeout: STEP_TIMEOUT });
 
     // 6. Content tab: persistent audience marking, open the permitted note,
     // read its body. Scope list and reader assertions separately: the

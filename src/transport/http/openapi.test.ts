@@ -47,6 +47,7 @@ describe("buildOpenApiDocument", () => {
       "/campaigns/{id}/characters/{characterId}/adopt",
       "/campaigns/{id}/characters/{characterId}/assign",
       "/campaigns/{id}/characters/{characterId}/claim",
+      "/campaigns/{id}/claimable-characters",
       "/campaigns/{id}/content",
       "/campaigns/{id}/exports",
       "/campaigns/{id}/invitations",

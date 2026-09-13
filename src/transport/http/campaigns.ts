@@ -182,6 +182,14 @@ const ContentAudienceDto = Type.Union([
   Type.Literal("owner_only"),
 ]);
 
+const ContentStatusDto = Type.Union([Type.Literal("active"), Type.Literal("deleted")]);
+
+const ContentListQuery = Type.Object({
+  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+  cursor: Type.Optional(Type.String()),
+  status: Type.Optional(ContentStatusDto),
+});
+
 const ContentSummaryDto = Type.Object({
   contentId: Type.String({ format: UUID_FORMAT }),
   campaignId: Type.String({ format: UUID_FORMAT }),
@@ -191,6 +199,7 @@ const ContentSummaryDto = Type.Object({
   tags: Type.Array(Type.String()),
   revision: Type.Integer(),
   accessRevision: Type.Integer(),
+  status: ContentStatusDto,
   createdAt: Type.String({ format: DATE_TIME_FORMAT }),
   updatedAt: Type.String({ format: DATE_TIME_FORMAT }),
 });
@@ -295,6 +304,13 @@ const CampaignCharacterSummaryDto = Type.Object({
   placementGeneration: Type.Integer(),
   controllers: Type.Array(Type.String({ format: UUID_FORMAT })),
   updatedAt: Type.String({ format: DATE_TIME_FORMAT }),
+});
+
+const ClaimableCharacterSummaryDto = Type.Object({
+  characterId: Type.String({ format: UUID_FORMAT }),
+  name: Type.String(),
+  revision: Type.Integer(),
+  lifecycle: Type.Union([Type.Literal("active"), Type.Literal("archived")]),
 });
 
 const CampaignErrorEnvelope = Type.Object({
@@ -750,6 +766,26 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
     },
   },
   {
+    method: "get",
+    path: "/campaigns/:id/claimable-characters",
+    operationId: "get_campaigns_id_claimable_characters",
+    schema: {
+      params: CampaignIdParams,
+      querystring: PageQuery,
+      response: {
+        "200": Type.Object({
+          characters: Type.Array(ClaimableCharacterSummaryDto),
+          nextCursor: Type.Union([Type.String(), Type.Null()]),
+          requestId: Type.String(),
+        }),
+        "400": CampaignErrorEnvelope,
+        "401": UnauthorizedEnvelope,
+        "404": CampaignErrorEnvelope,
+        "500": CampaignErrorEnvelope,
+      },
+    },
+  },
+  {
     method: "post",
     path: "/campaigns/:id/characters",
     operationId: "post_campaigns_id_characters",
@@ -807,7 +843,7 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
     operationId: "get_campaigns_id_content",
     schema: {
       params: CampaignIdParams,
-      querystring: PageQuery,
+      querystring: ContentListQuery,
       response: {
         "200": Type.Object({
           content: Type.Array(ContentSummaryDto),
@@ -1383,6 +1419,23 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         };
       },
 
+      get_campaigns_id_claimable_characters: async (request, reply) => {
+        const params = request.params as { id: string };
+        const page = parsePageQuery(request, reply);
+        if (page === null) return null;
+        const result = await campaigns.listClaimableCharacters(ctxOf(request), {
+          campaignId: params.id,
+          limit: page.limit,
+          cursor: page.cursor,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return {
+          characters: result.value.characters,
+          nextCursor: result.value.nextCursor,
+          requestId: request.id,
+        };
+      },
+
       post_campaigns_id_characters: async (request, reply) => {
         const params = request.params as { id: string };
         const body = request.body as {
@@ -1496,12 +1549,23 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
 
       get_campaigns_id_content: async (request, reply) => {
         const params = request.params as { id: string };
-        const page = parsePageQuery(request, reply);
-        if (page === null) return null;
+        const query = request.query as { limit?: string | number; cursor?: string; status?: unknown } | undefined;
+        const rawLimit = query?.limit;
+        const limit = rawLimit === undefined ? 25 : Number(rawLimit);
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+          sendError(reply, badRequest("limit must be an integer from 1 through 100."), request.id);
+          return null;
+        }
+        const status = query?.status;
+        if (status !== undefined && status !== "active" && status !== "deleted") {
+          sendError(reply, badRequest("status must be active or deleted."), request.id);
+          return null;
+        }
         const result = await campaigns.listContent(ctxOf(request), {
           campaignId: params.id,
-          limit: page.limit,
-          cursor: page.cursor,
+          limit,
+          cursor: query?.cursor ?? null,
+          ...(status === undefined ? {} : { status }),
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return {

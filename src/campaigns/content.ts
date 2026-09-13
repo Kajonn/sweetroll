@@ -39,10 +39,13 @@ export type OpenContentInput = {
   contentId: ContentId;
 };
 
+export type ContentListStatus = "active" | "deleted";
+
 export type ListContentInput = {
   campaignId: string;
   limit?: number;
   cursor?: string | null;
+  status?: ContentListStatus;
 };
 
 export type UpdateContentInput = {
@@ -94,6 +97,7 @@ export type ContentSummary = {
   tags: string[];
   revision: number;
   accessRevision: number;
+  status: ContentListStatus;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -437,6 +441,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
       tags: [...record.tags],
       revision: record.revision,
       accessRevision: record.accessRevision,
+      status: record.status,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
     };
@@ -813,7 +818,12 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
       try {
         const checked = checkLimit(listInput.limit);
         if ("error" in checked) return { ok: false, error: checked.error };
-        const scope = `${listInput.campaignId}:${ctx.actorId}:content`;
+        const status: ContentListStatus =
+          listInput.status === undefined || listInput.status === "active" ? "active" : listInput.status;
+        if (listInput.status !== undefined && listInput.status !== "active" && listInput.status !== "deleted") {
+          return { ok: false, error: errors.bad_request("status must be active or deleted.") };
+        }
+        const scope = `${listInput.campaignId}:${ctx.actorId}:content:${status}`;
         const decoded = decodeCursor(listInput.cursor, scope, false);
         if ("error" in decoded) return { ok: false, error: decoded.error };
         const outcome = await withClient(async (client) => {
@@ -827,6 +837,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
             campaignId: listInput.campaignId,
             actorId: ctx.actorId,
             isGm: isGameMaster(membership),
+            status,
             limit: checked.limit,
             cursorCreatedAt: decoded.cursor?.at ?? null,
             cursorId: decoded.cursor?.id ?? null,

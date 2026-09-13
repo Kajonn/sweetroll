@@ -33,8 +33,16 @@ describe("audienceLabel", () => {
 });
 
 describe("campaignContentKey", () => {
-  it("scopes keys by actor and generation under the revocation prefix", () => {
-    expect(campaignContentKey("c1", "u1", 2)).toEqual(["campaigns", "content", "c1", "u1", 2]);
+  it("scopes keys by actor, generation, and status under the revocation prefix", () => {
+    expect(campaignContentKey("c1", "u1", 2)).toEqual(["campaigns", "content", "c1", "u1", 2, "active"]);
+    expect(campaignContentKey("c1", "u1", 2, "deleted")).toEqual([
+      "campaigns",
+      "content",
+      "c1",
+      "u1",
+      2,
+      "deleted",
+    ]);
     // The leading ["campaigns", "content", campaignId] prefix is unchanged,
     // so CampaignDetail.handleAccessRevoked purges still cover these keys.
     const [a, b, c] = campaignContentKey("c1", "u1", 2);
@@ -64,7 +72,16 @@ describe("CampaignContentTab list-level Hide", () => {
   it("deletes and reloads without retaining a deleted view for recovery", async () => {
     const view = { contentId: "n1", campaignId: "c1", audience: "all_players", title: "Plan", body: "Shh.", tags: [], revision: 3, grantedUserIds: [], status: "active" };
     const api = {
-      listContent: vi.fn().mockResolvedValue({ content: [{ contentId: "n1", title: "Plan", audience: "all_players" }], nextCursor: null, requestId: "r" }),
+      listContent: vi.fn().mockImplementation((campaignId: string, query?: { status?: string }) =>
+        Promise.resolve({
+          content:
+            query?.status === "deleted"
+              ? []
+              : [{ contentId: "n1", title: "Plan", audience: "all_players" }],
+          nextCursor: null,
+          requestId: "r",
+        }),
+      ),
       openContent: vi.fn().mockResolvedValue({ content: view, requestId: "r" }),
       deleteContent: vi.fn().mockResolvedValue({ content: {}, requestId: "r" }),
     };
@@ -78,12 +95,57 @@ describe("CampaignContentTab list-level Hide", () => {
     await vi.waitFor(() => expect(api.deleteContent).toHaveBeenCalledWith("n1", expect.objectContaining({
       expectedContentRevision: 3,
     })));
-    // The dialog closes and the list reloads; unlike the editor path, no
-    // deleted view is retained, so no Recover is offered here.
-    await vi.waitFor(() => expect(api.listContent).toHaveBeenCalledTimes(2));
+    // The dialog closes and both lists reload; the editor path keeps its
+    // retained deleted view, while durable recovery lives in Hidden.
+    await vi.waitFor(() => expect(api.listContent).toHaveBeenCalled());
     expect(screen.queryByRole("button", { name: /confirm hiding/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /recover /i })).toBeNull();
     expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("renders a deleted summary after remount with a fresh client and recovers by listed revision", async () => {
+    const deletedRow = {
+      contentId: "n9",
+      campaignId: "c1",
+      creatorId: "u1",
+      audience: "all_players",
+      title: "Buried plan",
+      tags: [],
+      revision: 5,
+      accessRevision: 4,
+      status: "deleted",
+    };
+    const api = {
+      listContent: vi.fn().mockImplementation((campaignId: string, query?: { status?: string }) =>
+        Promise.resolve({
+          content: query?.status === "deleted" ? [deletedRow] : [],
+          nextCursor: null,
+          requestId: "r",
+        }),
+      ),
+      openContent: vi.fn().mockRejectedValue({ code: "not_found", status: 404 }),
+      recoverContent: vi.fn().mockResolvedValue({ content: {}, requestId: "r2" }),
+    };
+    const first = render(
+      <CampaignContentTab api={api as never} campaignId="c1" actorId="u1" generation={0} online isGm members={[]} />,
+      { wrapper: wrapper() },
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /hidden/i }));
+    expect(await screen.findByText("Buried plan")).toBeVisible();
+    // Restoration never opens the deleted note: the reader stays 404.
+    expect(api.openContent).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /recover buried plan/i }));
+    await vi.waitFor(() => expect(api.recoverContent).toHaveBeenCalledWith(
+      "n9",
+      expect.objectContaining({ expectedContentRevision: 5 }),
+    ));
+    expect(typeof api.recoverContent.mock.calls[0]![1].idempotencyKey).toBe("string");
+    first.unmount();
+    render(
+      <CampaignContentTab api={api as never} campaignId="c1" actorId="u1" generation={0} online isGm members={[]} />,
+      { wrapper: wrapper() },
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /hidden/i }));
+    expect(await screen.findByText("Buried plan")).toBeVisible();
   });
 });
 
@@ -104,7 +166,7 @@ describe("CampaignContentTab revocation revalidation", () => {
     contentId: "n1", campaignId: "c1", audience: "all_players", title: "Plan",
     body: "Secret body.", tags: [], revision: 3, grantedUserIds: [], status: "active",
   };
-  const listKey = ["campaigns", "content", "c1", "u1", 0];
+  const listKey = ["campaigns", "content", "c1", "u1", 0, "active"];
   const itemKey = [...listKey, "item", "n1"];
 
   function playerApi() {

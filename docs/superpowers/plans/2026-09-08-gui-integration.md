@@ -7,6 +7,8 @@
 
 **Reconciled baseline:** `d6bfd32b7016a3bdaf7d0b0585b7f4861f34374f` (after PR #1 merge and creation-picker work).
 
+**Remediation execution (branch `fix/claim-recovery-integration`, from `b8d9a9b`):** R6 claim discovery (`GET /campaigns/{id}/claimable-characters`, four-field rows, player-role journey claiming through the discovered row) and R7 deleted-summary recovery (`status=deleted` management filter, GM Hidden view, reload→Hidden→recover journey) are ported onto the merged stabilization baseline, retaining its revision-readiness gating, isolated E2E runner, and revocation-purge protections. Per-commit evidence only; full canonical suite and acceptance reconciliation (remediation index Task 2) remain open. Accessibility/device/production gates untouched.
+
 ## Goal and boundaries
 
 Bring the mockup's visual hierarchy, calm surfaces, clear navigation, compact character controls, and mobile usability to the existing Sweetroll application. Implement this incrementally in `web/`: retain React, TanStack Router/Query, CSS modules, Radix primitives, Lucide icons, generated API types, and the existing character projection/session model. Keep Sweetroll branding; Tablefolk is a visual reference rather than a product rename.

@@ -1412,4 +1412,291 @@ describeWithDatabase("campaign character placement and atomic return (Task 4)", 
     );
     return rows.rows[0]?.id ?? null;
   }
+
+  it("discovers only the caller's outstanding designations with exact four-field rows", async () => {
+    const campaignId = await createCampaign();
+    await seedMember(campaignId, h.users.player.actorId);
+    await seedMember(campaignId, h.users.other.actorId);
+    const prepared = await prepareCampaignCharacter(h.runtime, {
+      systemVersionId: h.versionId,
+      entityDefinitionId: "character",
+    });
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    const created = await inPlacementTxn((client) =>
+      h.placement.createInCampaign(client, ctxFor(h.users.gm), {
+        campaignId,
+        expectedCampaignRevision: 1,
+        membershipGeneration: 1,
+        idempotencyKey: randomUUID(),
+        name: "Discoverable",
+        entityDefinitionId: "character",
+        prepared: prepared.value,
+      }),
+    );
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const characterId = created.value.characterId;
+
+    // Before designation, discovery is empty for both players.
+    for (const who of [h.users.player, h.users.other] as const) {
+      const empty = await h.campaigns.listClaimableCharacters(ctxFor(who), { campaignId, limit: 10 });
+      expect(empty.ok).toBe(true);
+      if (!empty.ok) return;
+      expect(empty.value.characters).toEqual([]);
+      expect(empty.value.nextCursor).toBeNull();
+    }
+
+    // Designate the player; revision advances to 2.
+    const designated = await inPlacementTxn((client) =>
+      h.placement.assign(client, ctxFor(h.users.gm), {
+        campaignId,
+        expectedCampaignRevision: 2,
+        membershipGeneration: 1,
+        characterId,
+        expectedCharacterRevision: 1,
+        controllerUserIds: [],
+        designateClaimants: [h.users.player.actorId],
+        idempotencyKey: randomUUID(),
+      }),
+    );
+    expect(designated.ok).toBe(true);
+    if (!designated.ok) return;
+
+    const discovered = await h.campaigns.listClaimableCharacters(ctxFor(h.users.player), {
+      campaignId,
+      limit: 1,
+    });
+    expect(discovered.ok).toBe(true);
+    if (!discovered.ok) return;
+    expect(discovered.value.characters).toHaveLength(1);
+    const row = discovered.value.characters[0]!;
+    expect(Object.keys(row).sort()).toEqual(["characterId", "lifecycle", "name", "revision"]);
+    expect(row).toMatchObject({ characterId, name: "Discoverable", lifecycle: "active" });
+    expect(typeof row.revision).toBe("number");
+
+    // The other designee sees nothing; pre-claim sheet access stays denied.
+    const otherView = await h.campaigns.listClaimableCharacters(ctxFor(h.users.other), {
+      campaignId,
+      limit: 10,
+    });
+    expect(otherView.ok).toBe(true);
+    if (!otherView.ok) return;
+    expect(otherView.value.characters).toEqual([]);
+    expect((await h.characters.open(ctxFor(h.users.player), characterId)).ok).toBe(false);
+
+    // Outsider and unknown campaign collapse to not_found.
+    expect(
+      await h.campaigns.listClaimableCharacters(ctxFor(h.users.outsider), { campaignId, limit: 10 }),
+    ).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+    expect(
+      await h.campaigns.listClaimableCharacters(ctxFor(h.users.player), {
+        campaignId: randomUUID(),
+        limit: 10,
+      }),
+    ).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+
+    // Claim consumes only the caller's designation; discovery empties after.
+    const revision = await campaignRevision(campaignId);
+    const claimed = await inPlacementTxn((client) =>
+      h.placement.claim(client, ctxFor(h.users.player), {
+        campaignId,
+        expectedCampaignRevision: revision,
+        membershipGeneration: 1,
+        characterId,
+        expectedCharacterRevision: 1,
+        idempotencyKey: randomUUID(),
+      }),
+    );
+    expect(claimed.ok).toBe(true);
+    const afterClaim = await h.campaigns.listClaimableCharacters(ctxFor(h.users.player), {
+      campaignId,
+      limit: 10,
+    });
+    expect(afterClaim.ok).toBe(true);
+    if (!afterClaim.ok) return;
+    expect(afterClaim.value.characters).toEqual([]);
+  });
+
+  it("hides discovery after removal, preserves shared designations, and surfaces archived rows", async () => {
+    const campaignId = await createCampaign();
+    await seedMember(campaignId, h.users.player.actorId);
+    await seedMember(campaignId, h.users.other.actorId);
+    const prepared = await prepareCampaignCharacter(h.runtime, {
+      systemVersionId: h.versionId,
+      entityDefinitionId: "character",
+    });
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    const created = await inPlacementTxn((client) =>
+      h.placement.createInCampaign(client, ctxFor(h.users.gm), {
+        campaignId,
+        expectedCampaignRevision: 1,
+        membershipGeneration: 1,
+        idempotencyKey: randomUUID(),
+        name: "Shared designation",
+        entityDefinitionId: "character",
+        prepared: prepared.value,
+      }),
+    );
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const characterId = created.value.characterId;
+    const designated = await inPlacementTxn((client) =>
+      h.placement.assign(client, ctxFor(h.users.gm), {
+        campaignId,
+        expectedCampaignRevision: 2,
+        membershipGeneration: 1,
+        characterId,
+        expectedCharacterRevision: 1,
+        controllerUserIds: [],
+        designateClaimants: [h.users.player.actorId, h.users.other.actorId],
+        idempotencyKey: randomUUID(),
+      }),
+    );
+    expect(designated.ok).toBe(true);
+
+    // Both designees discover the same character; neither can open it yet.
+    for (const who of [h.users.player, h.users.other] as const) {
+      const view = await h.campaigns.listClaimableCharacters(ctxFor(who), { campaignId, limit: 10 });
+      expect(view.ok).toBe(true);
+      if (!view.ok) return;
+      expect(view.value.characters.map((r) => r.characterId)).toContain(characterId);
+      expect((await h.characters.open(ctxFor(who), characterId)).ok).toBe(false);
+    }
+
+    // Archive the sheet directly: discovery still surfaces it with lifecycle
+    // for the unavailable explanation (UI offers no Claim action).
+    await h.pool.query(`UPDATE characters SET lifecycle = 'archived' WHERE id = $1`, [characterId]);
+    const archived = await h.campaigns.listClaimableCharacters(ctxFor(h.users.player), {
+      campaignId,
+      limit: 10,
+    });
+    expect(archived.ok).toBe(true);
+    if (!archived.ok) return;
+    expect(archived.value.characters.find((r) => r.characterId === characterId)).toMatchObject({
+      lifecycle: "archived",
+    });
+    await h.pool.query(`UPDATE characters SET lifecycle = 'active' WHERE id = $1`, [characterId]);
+
+    // Removal hides discovery and consumes the departing member's
+    // designation; the other designee's row survives.
+    const removed = await h.campaigns.removeMember(ctxFor(h.users.gm), {
+      campaignId,
+      userId: h.users.player.actorId,
+      expectedCampaignRevision: await campaignRevision(campaignId),
+      idempotencyKey: randomUUID(),
+    });
+    expect(removed.ok).toBe(true);
+    expect(
+      await h.campaigns.listClaimableCharacters(ctxFor(h.users.player), { campaignId, limit: 10 }),
+    ).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+    const survivor = await h.campaigns.listClaimableCharacters(ctxFor(h.users.other), {
+      campaignId,
+      limit: 10,
+    });
+    expect(survivor.ok).toBe(true);
+    if (!survivor.ok) return;
+    expect(survivor.value.characters.map((r) => r.characterId)).toContain(characterId);
+
+    // Rejoin reactivates membership but never reactivates the consumed
+    // designation: discovery stays empty until the GM designates again.
+    await h.pool.query(
+      `UPDATE campaign_members SET status = 'active', generation = generation + 1
+        WHERE campaign_id = $1 AND user_id = $2`,
+      [campaignId, h.users.player.actorId],
+    );
+    const rejoined = await h.campaigns.listClaimableCharacters(ctxFor(h.users.player), {
+      campaignId,
+      limit: 10,
+    });
+    expect(rejoined.ok).toBe(true);
+    if (!rejoined.ok) return;
+    expect(rejoined.value.characters).toEqual([]);
+  });
+
+  it("paginates claim discovery without leaking unauthorized rows and rejects cross-scope cursors", async () => {
+    const campaignId = await createCampaign();
+    await seedMember(campaignId, h.users.player.actorId);
+    await seedMember(campaignId, h.users.other.actorId);
+    const ids: string[] = [];
+    let revision = 1;
+    for (let i = 0; i < 3; i++) {
+      const prepared = await prepareCampaignCharacter(h.runtime, {
+        systemVersionId: h.versionId,
+        entityDefinitionId: "character",
+      });
+      expect(prepared.ok).toBe(true);
+      if (!prepared.ok) return;
+      const created = await inPlacementTxn((client) =>
+        h.placement.createInCampaign(client, ctxFor(h.users.gm), {
+          campaignId,
+          expectedCampaignRevision: revision,
+          membershipGeneration: 1,
+          idempotencyKey: randomUUID(),
+          name: `Claim page ${i}`,
+          entityDefinitionId: "character",
+          prepared: prepared.value,
+        }),
+      );
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+      ids.push(created.value.characterId);
+      revision += 1;
+      // Designate the player on even rows, the other player on odd rows so
+      // pages interleave unauthorized rows for the reader.
+      const designee = i % 2 === 0 ? h.users.player.actorId : h.users.other.actorId;
+      const assigned = await inPlacementTxn((client) =>
+        h.placement.assign(client, ctxFor(h.users.gm), {
+          campaignId,
+          expectedCampaignRevision: revision,
+          membershipGeneration: 1,
+          characterId: created.value.characterId,
+          expectedCharacterRevision: 1,
+          controllerUserIds: [],
+          designateClaimants: [designee],
+          idempotencyKey: randomUUID(),
+        }),
+      );
+      expect(assigned.ok).toBe(true);
+      revision += 1;
+    }
+
+    const first = await h.campaigns.listClaimableCharacters(ctxFor(h.users.player), {
+      campaignId,
+      limit: 1,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(first.value.characters).toHaveLength(1);
+    expect(first.value.nextCursor).not.toBeNull();
+    // Every returned row belongs to the caller; the odd row never appears.
+    for (const row of first.value.characters) {
+      expect(ids).toContain(row.characterId);
+    }
+    const second = await h.campaigns.listClaimableCharacters(ctxFor(h.users.player), {
+      campaignId,
+      limit: 10,
+      cursor: first.value.nextCursor,
+    });
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    const seen = new Set([...first.value.characters, ...second.value.characters].map((r) => r.characterId));
+    expect(seen.size).toBe(2);
+
+    // Cross-scope cursor (other campaign) is rejected without leaking counts.
+    const otherCampaign = await createCampaign();
+    const cross = await h.campaigns.listClaimableCharacters(ctxFor(h.users.player), {
+      campaignId: otherCampaign,
+      limit: 10,
+      cursor: first.value.nextCursor,
+    });
+    expect(cross).toEqual({ ok: false, error: expect.objectContaining({ code: "bad_request" }) });
+    expect(
+      await h.campaigns.listClaimableCharacters(ctxFor(h.users.player), {
+        campaignId,
+        limit: 0,
+      }),
+    ).toEqual({ ok: false, error: expect.objectContaining({ code: "bad_request" }) });
+  });
 });

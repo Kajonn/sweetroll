@@ -628,6 +628,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns/{id}/claimable-characters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaigns_id_claimable_characters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/campaigns/{id}/characters/{characterId}/assign": {
         parameters: {
             query?: never;
@@ -9874,6 +9890,100 @@ export interface operations {
             };
         };
     };
+    get_campaigns_id_claimable_characters: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        characters: {
+                            /** Format: uuid */
+                            characterId: string;
+                            name: string;
+                            revision: number;
+                            lifecycle: "active" | "archived";
+                        }[];
+                        nextCursor: string | null;
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     post_campaigns_id_characters_characterId_assign: {
         parameters: {
             query?: never;
@@ -10840,6 +10950,7 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string;
+                status?: "active" | "deleted";
             };
             header?: never;
             path: {
@@ -10867,6 +10978,7 @@ export interface operations {
                             tags: string[];
                             revision: number;
                             accessRevision: number;
+                            status: "active" | "deleted";
                             /** Format: date-time */
                             createdAt: string;
                             /** Format: date-time */

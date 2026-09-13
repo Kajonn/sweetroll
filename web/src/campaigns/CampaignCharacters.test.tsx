@@ -19,62 +19,103 @@ function sheet(overrides = {}) {
   };
 }
 
+function claimRow(overrides = {}) {
+  return {
+    characterId: "s1",
+    name: "Bram",
+    revision: 4,
+    lifecycle: "active",
+    ...overrides,
+  };
+}
+
+function viewProps(overrides = {}) {
+  return {
+    api: { claimCharacter: vi.fn(), createCampaignCharacter: vi.fn() },
+    campaignId: "c1",
+    campaignRevision: 2,
+    characters: [],
+    characterRevisionById: {},
+    claimable: [],
+    claimableStatus: "success" as const,
+    onOpenCharacter: () => {},
+    ...overrides,
+  };
+}
+
 describe("CampaignCharactersView", () => {
-  it("marks claimable sheets and claims with a fresh idempotency key", async () => {
-    const api = { claimCharacter: vi.fn().mockResolvedValue({ character: {}, requestId: "r" }) };
+  it("claims a designated row with a fresh idempotency key and no sheet preload", async () => {
+    const api = {
+      claimCharacter: vi.fn().mockResolvedValue({ character: {}, requestId: "r" }),
+      createCampaignCharacter: vi.fn(),
+      open: vi.fn(),
+    };
     const onChanged = vi.fn();
-    render(<CampaignCharactersView api={api as never} campaignId="c1" campaignRevision={2}
-      characters={[{ characterId: "s1", campaignId: "c1", name: "Bram", entityDefinitionId: "hero",
-        systemVersionId: "v1", revision: 4, lifecycle: "active", placementGeneration: 1,
-        controllers: [], updatedAt: "2026-09-01T00:00:00Z", claimable: true } as never]}
-      characterRevisionById={{ s1: 4 }} onOpenCharacter={() => {}} onChanged={onChanged} />);
-    expect(screen.getByText(/available to claim/i)).toBeVisible();
+    render(
+      <CampaignCharactersView
+        {...viewProps({ api, onChanged, claimable: [claimRow()] })}
+      />,
+    );
     const button = screen.getByRole("button", { name: /claim bram/i });
     button.click();
-    // Claim discloses campaign custody behind a confirm dialog; the first
-    // click only opens it.
     const confirm = await screen.findByRole("button", { name: /confirm claim/i });
     fireEvent.click(confirm);
     await vi.waitFor(() => expect(api.claimCharacter).toHaveBeenCalled());
     const body = (api.claimCharacter as ReturnType<typeof vi.fn>).mock.calls[0]![2];
     expect(body.expectedCampaignRevision).toBe(2);
+    expect(body.expectedCharacterRevision).toBe(4);
     expect(typeof body.idempotencyKey).toBe("string");
+    expect(api.open).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /open bram/i })).toBeNull();
   });
 
-  it("marks sheets the actor controls and offers no claim action", () => {
-    const api = { claimCharacter: vi.fn() };
-    render(<CampaignCharactersView api={api as never} campaignId="c1" campaignRevision={2}
-      actorId="u1" characters={[sheet({ controllers: ["u1"] })] as never}
-      characterRevisionById={{ s1: 4 }} onOpenCharacter={() => {}} />);
+  it("marks sheets the actor controls and offers open only for controlled rows", () => {
+    const api = { claimCharacter: vi.fn(), createCampaignCharacter: vi.fn() };
+    render(
+      <CampaignCharactersView
+        {...viewProps({
+          api,
+          actorId: "u1",
+          characters: [sheet({ controllers: ["u1"] }), sheet({ characterId: "s2", name: "Wren" })],
+        })}
+      />,
+    );
     expect(screen.getByText(/you control this character/i)).toBeVisible();
-    expect(screen.queryByRole("button", { name: /claim bram/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /open bram/i })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /open wren/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /claim wren/i })).toBeNull();
   });
 
-  it("flips a row to view-only and reloads when claim reports not designated (404)", async () => {
+  it("evicts the discovery row without relabelling view-only when claim reports 404", async () => {
     const api = {
-      claimCharacter: vi.fn().mockRejectedValue({ code: "not_found", status: 404, message: "not designated" }),
+      claimCharacter: vi.fn().mockRejectedValue({ code: "not_found", status: 404, message: "gone" }),
+      createCampaignCharacter: vi.fn(),
     };
     const onChanged = vi.fn();
-    render(<CampaignCharactersView api={api as never} campaignId="c1" campaignRevision={2}
-      characters={[sheet()] as never}
-      characterRevisionById={{ s1: 4 }} onOpenCharacter={() => {}} onChanged={onChanged} />);
+    render(
+      <CampaignCharactersView
+        {...viewProps({ api, onChanged, claimable: [claimRow()] })}
+      />,
+    );
     fireEvent.click(screen.getByRole("button", { name: /claim bram/i }));
     fireEvent.click(await screen.findByRole("button", { name: /confirm claim/i }));
-    expect(await screen.findByText(/not designated for you/i)).toBeVisible();
-    expect(screen.getByText(/view-only/i)).toBeVisible();
+    await vi.waitFor(() => expect(onChanged).toHaveBeenCalled());
     expect(screen.queryByRole("button", { name: /claim bram/i })).toBeNull();
-    expect(onChanged).toHaveBeenCalled();
+    expect(screen.queryByText(/view-only/i)).toBeNull();
   });
 
   it("reloads and retries with a fresh key after a claim conflict (409), never merging", async () => {
     const api = {
       claimCharacter: vi.fn().mockRejectedValueOnce({ code: "conflict", status: 409, message: "taken" })
         .mockResolvedValueOnce({ character: {}, requestId: "r2" }),
+      createCampaignCharacter: vi.fn(),
     };
     const onChanged = vi.fn();
-    render(<CampaignCharactersView api={api as never} campaignId="c1" campaignRevision={2}
-      characters={[sheet()] as never}
-      characterRevisionById={{ s1: 4 }} onOpenCharacter={() => {}} onChanged={onChanged} />);
+    render(
+      <CampaignCharactersView
+        {...viewProps({ api, onChanged, claimable: [claimRow()] })}
+      />,
+    );
     fireEvent.click(screen.getByRole("button", { name: /claim bram/i }));
     fireEvent.click(await screen.findByRole("button", { name: /confirm claim/i }));
     const retry = await screen.findByRole("button", { name: /retry claim/i });
@@ -90,12 +131,48 @@ describe("CampaignCharactersView", () => {
     expect(second.idempotencyKey).not.toBe(first.idempotencyKey);
   });
 
-  it("opens sheets through the shared renderer callback, never a second renderer", () => {
-    const api = { claimCharacter: vi.fn() };
+  it("shows archived designations as unavailable with no claim action", () => {
+    const api = { claimCharacter: vi.fn(), createCampaignCharacter: vi.fn() };
+    render(
+      <CampaignCharactersView
+        {...viewProps({ api, claimable: [claimRow({ lifecycle: "archived" })] })}
+      />,
+    );
+    expect(screen.getByText(/archived and cannot be claimed/i)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /claim bram/i })).toBeNull();
+  });
+
+  it("lets GMs open roster sheets they do not control", () => {
+    const api = { claimCharacter: vi.fn(), createCampaignCharacter: vi.fn() };
     const onOpenCharacter = vi.fn();
-    render(<CampaignCharactersView api={api as never} campaignId="c1" campaignRevision={2}
-      characters={[sheet()] as never}
-      characterRevisionById={{ s1: 4 }} onOpenCharacter={onOpenCharacter} />);
+    render(
+      <CampaignCharactersView
+        {...viewProps({
+          api,
+          actorId: "u1",
+          isGm: true,
+          characters: [sheet({ controllers: [] })],
+          onOpenCharacter,
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /open bram/i }));
+    expect(onOpenCharacter).toHaveBeenCalledWith("s1");
+  });
+
+  it("opens controlled sheets through the shared renderer callback, never a second renderer", () => {
+    const api = { claimCharacter: vi.fn(), createCampaignCharacter: vi.fn() };
+    const onOpenCharacter = vi.fn();
+    render(
+      <CampaignCharactersView
+        {...viewProps({
+          api,
+          actorId: "u1",
+          characters: [sheet({ controllers: ["u1"] })],
+          onOpenCharacter,
+        })}
+      />,
+    );
     fireEvent.click(screen.getByRole("button", { name: /open bram/i }));
     expect(onOpenCharacter).toHaveBeenCalledWith("s1");
   });
@@ -110,8 +187,11 @@ describe("CampaignCharactersView", () => {
     };
     const onChanged = vi.fn();
     const onOpenCharacter = vi.fn();
-    render(<CampaignCharactersView api={api as never} campaignId="c1" campaignRevision={2}
-      characters={[]} characterRevisionById={{}} onOpenCharacter={onOpenCharacter} onChanged={onChanged} />);
+    render(
+      <CampaignCharactersView
+        {...viewProps({ api, onChanged, onOpenCharacter })}
+      />,
+    );
     fireEvent.change(screen.getByLabelText(/character name/i), { target: { value: "Wren" } });
     fireEvent.change(screen.getByLabelText(/entity definition/i), { target: { value: "hero" } });
     fireEvent.click(screen.getByRole("button", { name: /new campaign character/i }));

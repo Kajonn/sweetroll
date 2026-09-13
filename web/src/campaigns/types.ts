@@ -22,6 +22,10 @@ export type CampaignCharacterListResponse =
   operations["get_campaigns_id_characters"]["responses"]["200"]["content"]["application/json"];
 export type CampaignCharacterSummary = CampaignCharacterListResponse["characters"][number];
 
+export type ClaimableCharacterListResponse =
+  operations["get_campaigns_id_claimable_characters"]["responses"]["200"]["content"]["application/json"];
+export type ClaimableCharacterSummary = ClaimableCharacterListResponse["characters"][number];
+
 export type CampaignContentListResponse =
   operations["get_campaigns_id_content"]["responses"]["200"]["content"]["application/json"];
 export type ContentSummary = CampaignContentListResponse["content"][number];

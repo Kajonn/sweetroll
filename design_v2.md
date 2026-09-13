@@ -511,11 +511,21 @@ Expose a versioned REST HTTP interface described by OpenAPI. Use resource-orient
 
 `GET /characters/creation-versions` enumerates only systems owned by the actor plus explicitly discoverable (`public`) systems (OD-01 option A, unlisted/link-only). Character creation and metadata lookup from a KNOWN version ID keep their existing authorization unchanged: permission to use a version (owner or `public`/`link` access, published version, active system) never implies permission to discover it, and link-access systems remain usable when the exact version ID is known. The `/characters/new` page opened without a version shows a "Choose a system version" picker from this endpoint; the manual system-version-ID box remains as fallback, and picking a version loads its creation metadata through the unchanged lookup path.
 
-At the reconciled baseline `d6bfd32`, the picker uses the inline `CharactersApi.listCreationVersions()` query in `CreateCharacter.tsx`. GUI work must reuse this path, preserve exact-version links, and add account-scoped cache handling before G4 acceptance. OD-01 discovery is resolved as unlisted/link-only: the endpoint no longer enumerates other owners' `link` systems. G6 must bound/paginate this list before expanding it into a library/catalog. See the GUI plan reconciliation for current implementation versus remaining work.
+The picker retains the inline `CharactersApi.listCreationVersions()` query in `CreateCharacter.tsx` and exact-version links. Reconciled 2026-09-12 from the GUI plan: G1 records account/generation-scoped cache handling and cleanup; G4 records OD-01 option A and generated picker types (`8d5f22a`, `8785c3b`); G6 Task 1 records bounded pagination/filtering, generated contracts and ordering/revocation tests (`557de16`). These are existing implementation records, not work to restart or fresh verification in this documentation handoff. Production-authentication and G9 gates remain open.
 
 ## 13.1 Idempotency
 
 Create, roll, action, invitation, migration, and export commands accept an idempotency key scoped to user and endpoint. The server stores the completed result for a bounded interval. This prevents duplicated damage, resource spending, rolls, and invitations after mobile or offline retries.
+
+## 13.2 Approved pre-upgrade remediation contracts (2026-09-12)
+
+The owner approved the recommended [pre-upgrade remediation](docs/superpowers/plans/2026-09-12-remediation-index.md), including the two narrow discovery contracts below. Approval is not implementation or acceptance evidence. Campaigns owns authorization and pagination; existing Characters sheet authorization, placement commands, content recovery, revision/idempotency rules and standalone offline behavior remain intact. Production authentication remains owner-deferred. Campaign upgrades and scenes/display are excluded from this remediation.
+
+- **Claim discovery:** `GET /campaigns/{id}/claimable-characters` maps to `Campaigns.listClaimableCharacters(ctx, { campaignId, limit?, cursor? })`, operation ID `get_campaigns_id_claimable_characters`. It returns `{ characters, nextCursor }` plus HTTP `requestId`; each row contains exactly `characterId`, `name`, `revision`, and `lifecycle: 'active' | 'archived'`. Require active membership and an outstanding designation for the current actor, excluding sheets that actor already controls. Match campaign/character scope on every predicate, filter before bounded pagination, use stable timestamp/ID ordering, bind cursors to actor/campaign/query family, and reauthorize each page and claim. No controller IDs, other designees, sheet state/projection, inventory, rolls, audit, placement metadata or system/version details are disclosed. Discovery grants no sheet read/export/activity/mutation access; the existing roster endpoint and GM/controller sheet permissions are unchanged. Claim consumes only the caller's designation and preserves other designations/controllers. Archived rows remain explanatory with no UI Claim action; the existing command's missing character-lifecycle check is a known discrepancy, not silently changed here.
+- **Deleted-summary recovery:** `GET /campaigns/{id}/content` gains optional `status=active|deleted`, normalized to `active`; `ContentSummary` gains required `status`, while the result envelope and operation ID remain unchanged. Active lists retain existing readership. Deleted lists require active membership and existing management authority: creator OR a GM who may read the note, not any former recipient. Another creator's owner-only note remains inaccessible to GMs. Return existing summaries with current `revision`/`accessRevision` and status, never deleted bodies or grant lists. Filter before bounded pagination and bind normalized status, actor, campaign and query family into cursors. Ordinary `GET /content/{id}` remains active-only and returns generic 404 for deleted content. The GM Active/Hidden view supports paginated recovery after reload/new browser sessions using the listed revision and existing `POST /content/{id}/recover`; Hide means soft-delete, not GM-only audience. No deleted preview, permanent delete, retention change or player-note management UI is added. Preserve player-creator server authority and retained-editor receipt recovery. Archived campaigns still deny recovery mutations even if summaries are readable.
+- **Privacy and lifecycle:** inaccessible resources retain generic 404 collapse and protected responses remain `Cache-Control: no-store`; no campaign payload service-worker persistence is added. Scope browser queries and in-flight results by actor/generation, distinguish claim and active/deleted list families, and purge them on sign-out, account switch, leave, revocation or visibility loss. Cancel/reject late responses so private data cannot repopulate a later lifetime. Revalidate authorization on reconnect; do not claim offline erasure of information already received. Successful mutations refresh relevant summaries/roster/campaign revisions before further commands; a definite 409 requires fresh reads and explicit fresh-key retry, never guessed revisions or automatic replay of a known success.
+
+Detailed contracts and required regression matrices are in the [I6 backend spec](docs/superpowers/specs/2026-09-09-i6-campaign-backend-design.md) Sections 3.5 and 4.1.1 and the claim/recovery plans. Their implementation, ordinary-player journey, durable recovery, cache/privacy and release gates remain unverified by this docs-only change.
 
 # 14. Security, privacy, and abuse prevention
 
@@ -697,13 +707,15 @@ Every increment must meet all applicable criteria before work begins on the next
 
 ## 17.6a I4a - GUI integration
 
-**Status:** Planned, added 2026-09-08; reconciled against `d6bfd32`. I1-I4 historical closure records remain unchanged. The basic creation picker is implemented and reused by G4/G6; this does not close I4a or I5.
+**Status (reconciled 2026-09-12):** I4a implementation landed per the [GUI integration plan](docs/superpowers/plans/2026-09-08-gui-integration.md) G0-G5 records: frontend CI and routed checks, G1 lifecycle repairs, G2 shared controls/themes, G3 responsive shell, G4 character journey (`8d5f22a`, `8785c3b`) and G5 creator journey. I1-I4 historical closure records remain unchanged. The G0 reference capture remains blocked by the recorded HTTP 401; provisional-theme contrast, real-device and other G9 acceptance requirements are not closed by this reconciliation.
 
-Resolve OD-01 discovery semantics for the new picker before G4 acceptance, and include picker cache lifetime in G1. Complete G0-G5 in the [GUI integration plan](docs/superpowers/plans/2026-09-08-gui-integration.md): establish reference/route inventory and frontend CI; repair creator save/conflict and application-wide account cleanup; add theme tokens/shared controls; fix the responsive shell; polish the real character journey; and simplify/restyle the creator. G1 lifecycle repairs and G2 controls both precede protected-route migration.
+OD-01 was resolved on 2026-09-09 as option A (unlisted/link-only), with the two-account owned/private/link/public matrix recorded under G4. G1 records picker cache-lifetime repairs. Preserve these implementations and their dependency/evidence history rather than restarting them; retain every unchecked GUI gate. G6 subsequently landed the I5 feature slice, but production sign-in and full I5 acceptance remain open.
 
 **Acceptance demonstration:** At phone/tablet/desktop widths and in light/dark, create and publish a simple system without writing expressions, create and use a character, roll, recover from offline/conflict states, and sign out without leaving private data visible. Preserve generated contracts, stable IDs, published versions, and the existing character session/renderer. Review real screenshots and targeted regression evidence before I5 begins.
 
 ## 17.7 I5 - Standalone Player app
+
+**Status (reconciled 2026-09-12):** G6 records the landed library, onboarding/activity/account/PWA shell, shared-control follow-up, account theme defaults and paginated catalog (`557de16`, `b1acf8a`, `a5b4f72`, `ceda932`, `112cb16`). The deterministic auth/return and concurrency checks (`ddc0929`) do not validate a real provider. Production sign-in remains owner-deferred, and full I5/device/release acceptance stays open.
 
 This increment intentionally contains no campaign, invitation, membership, shared-content, other-player, or GM concepts. It composes the completed Character Sheet rather than rebuilding it. Apply GUI plan G6 using I4a shared components, including account theme defaults, device overrides, and real production sign-in.
 
@@ -719,6 +731,8 @@ This increment intentionally contains no campaign, invitation, membership, share
 **Acceptance demonstration:** A new player signs in on a phone, selects a system, creates and plays multiple personal characters, finds a recent character, works through a connection loss, exports data, and securely clears local data on sign-out.
 
 ## 17.8 I6 - Campaign backend and Player integration
+
+**Status (reconciled 2026-09-12):** GUI plan G7 records the player slice landed on 2026-09-11 (`a33947f` through `4c3d09b`), not full I6 acceptance. Ordinary-player claim discovery remains R6, now contract-approved under Section 13.2 but not implemented/verified by this handoff. Historical co-GM journey evidence does not close that player workflow or the current R8 visibility/revocation proof.
 
 Apply GUI plan G7 to the player campaign routes using I4a components and the owning Module authorization contracts.
 
@@ -745,6 +759,8 @@ Apply GUI plan G7 to the player campaign routes using I4a components and the own
 **Acceptance demonstration:** Provision a campaign and invitation through the documented HTTP interface; on a phone, a player accepts the invitation, creates or claims a campaign character, uses the sheet, reads only permitted content, makes a campaign-visible roll, and loses HTTP and cached access after membership revocation.
 
 ## 17.9 I7 - GM app
+
+**Status (reconciled 2026-09-12):** The GUI plan's remediation cross-reference and index record GM Phase 1/2 and subsequent review fixes present at `11aea84`. Full I7 and unchecked G7/G9 gates remain open: pre-upgrade runtime/test, ordinary-player discovery, durable recovery and acceptance remediation comes next. Preview-as-player, true pinning, broader multi-device/acceptance work and the later upgrade/scenes increments are not closed by Phase 2 or by contract approval.
 
 The first GM app is a responsive web surface within the shared PWA. Native packaging and app-store distribution are not part of this increment. Apply GUI plan G7, including mobile NPC/monster list-to-sheet navigation. Image presentation and the restricted player display are delivered in I7b; I7 second-device acceptance uses permitted text content and authenticated GM views.
 
@@ -793,7 +809,7 @@ Complete GUI plan G8: define media/scene/display contracts and persistence; add 
 
 | **ID** | **Decision**   | **Question**                                                                      | **Working recommendation**                                        |
 |--------|----------------|-----------------------------------------------------------------------------------|-------------------------------------------------------------------|
-| OD-01  | Sharing model  | Which systems may be enumerated by the creation picker versus used from a known link?         | Private plus unlisted links; resolve picker enumeration before G4 acceptance.                    |
+| OD-01 (resolved 2026-09-09) | Sharing model | Which systems may be enumerated by the creation picker versus used from a known link? | Option A: enumerate owned plus explicitly discoverable (`public`) systems; other owners' `link` systems remain unlisted. Known-version owner/public/link use is unchanged. GUI plan G4 records the two-account matrix; see Section 13. |
 | OD-02 (resolved 2026-09-09) | GM visibility | Do campaign GMs always see full character state? | Yes for attached sheet state, disclosed; no I6 toggle. Owner-only notes and actor-private rolls have separate policies. See Section 17.8. |
 | OD-03 (deferred 2026-09-09) | Collaboration | Can several creators edit one system draft concurrently? | Named collaborators and multi-creator editing are deferred. Retain current creator ownership and revision-safe saves; campaign membership/co-GM roles confer no system-authoring permissions. Not a blocker for the I6 backend-only slice. |
 | OD-04  | Rules ceiling (resolved) | Grammar v0.1 covers d20, 2d6, keep-high/low, advantage helpers, and threshold-counted dynamic d6 pools. | Defer reroll, explode, push, custom faces, lookups, and effects. |
@@ -806,7 +822,7 @@ Complete GUI plan G8: define media/scene/display contracts and persistence; add 
 
 ## 18.2 Immediate next actions
 
-**Current next work (reconciled against `d6bfd32`):** execute I4a / GUI plan G0-G5 before I5 feature expansion. Reuse the completed picker, fix its account-cache lifetime under G1, and resolve OD-01 discovery before G4 acceptance. Preserve I1-I4 records as history, carry G6-G7 into I5-I7, and implement the explicit I7b scene/display scope afterward. The numbered foundation actions below retain their original increment context; they are not instructions to redo completed work.
+**Current next work (reconciled 2026-09-12 against the GUI plan and remediation baseline `11aea84`):** complete the owner-approved [pre-upgrade remediation](docs/superpowers/plans/2026-09-12-remediation-index.md): runtime/readiness and browser isolation fixes, narrow claim discovery, deleted-summary recovery, real-player visibility evidence and automated acceptance coverage. This handoff records contracts and status only; implementation and fresh full-suite evidence remain outstanding. Do not restart landed I4a/I5 work or reopen resolved OD-01. Production authentication remains deferred and a production gate; upgrades and scenes are excluded from remediation. The later feature sequence remains I7 Phase 3 upgrades, Phase 4 hardening, then I7b scenes/display, subject to applicable gates. Preserve I1-I4 historical records and every unchecked G7/G9 gate. The numbered foundation actions below retain their original increment context; they are not instructions to redo completed work.
 
 1. The I1 capability matrix selects license-neutral d20, 2d6 PbtA-style, and d6 counted-success families; its detailed matrix is in the system-package contract design.
 2. OD-04 is resolved by grammar v0.1 in the system-package contract design; implement that grammar after the package structural contracts.
@@ -817,7 +833,7 @@ Complete GUI plan G8: define media/scene/display contracts and persistence; add 
 7. Run five moderated creator tests during I2 and measure time to first published playable system.
 8. Create the ownership authorization table in I3, then extend it with campaign membership, audience, and GM-policy cases before I6 implementation.
 9. Keep the I5 Player app campaign-free; add all player campaign workflows together with their backend support in I6.
-10. Resolve OD-01 discovery before G4 picker acceptance. OD-02 is resolved; the owner-approved OD-03/OD-08 deferrals and I5 prerequisite exception permit the I6 backend-only slice (Sections 17.1 and 18.1), not full I6 acceptance or production deployment. Settle launch-template licensing before demonstrations requiring shipped licensed templates. Keep commercial features and a public catalog outside the critical path.
+10. Preserve the resolved OD-01 discovery/use distinction and its G4 matrix evidence. OD-02 is resolved; the owner-approved OD-03/OD-08 deferrals and I5 prerequisite exception permit the I6 backend-only slice (Sections 17.1 and 18.1), not full I6 acceptance or production deployment. Settle launch-template licensing before demonstrations requiring shipped licensed templates. Keep commercial features and a public catalog outside the critical path.
 
 ## Appendix A. System package outline
 

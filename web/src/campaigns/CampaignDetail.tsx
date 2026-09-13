@@ -14,7 +14,7 @@ import { CampaignMembersTab, ownRole } from "./CampaignMembers.js";
 import { CampaignSettingsView } from "./CampaignSettings.js";
 import { InvitationManager } from "./InvitationManager.js";
 import { SessionBoard, type SessionBoardProps } from "./SessionBoard.js";
-import { campaignCharactersKey, campaignDetailKey, useCampaignMembers } from "./campaignQueries.js";
+import { campaignCharactersPrefix, campaignDetailKey, useCampaignMembers } from "./campaignQueries.js";
 import type { CampaignView } from "./types.js";
 
 function isNotFound(error: unknown): boolean {
@@ -129,7 +129,8 @@ export function CampaignDetail(props: {
   // sign-out path already purges via AppShell and is untouched here.
   const handleAccessRevoked = useCallback((): void => {
     queryClient.removeQueries({ queryKey: campaignDetailKey(props.campaignId) });
-    queryClient.removeQueries({ queryKey: campaignCharactersKey(props.campaignId) });
+    queryClient.removeQueries({ queryKey: campaignCharactersPrefix(props.campaignId) });
+    queryClient.removeQueries({ queryKey: ["campaigns", "claimable-characters", props.campaignId] });
     // Literal 3-element prefix (not campaignContentKey(campaignId), which
     // evaluates to ["campaigns","content",id,null,0]): TanStack prefix
     // matching would otherwise miss every actor/generation-scoped content
@@ -162,7 +163,8 @@ export function CampaignDetail(props: {
         idempotencyKey,
       });
       queryClient.removeQueries({ queryKey: campaignDetailKey(props.campaignId) });
-      queryClient.removeQueries({ queryKey: campaignCharactersKey(props.campaignId) });
+      queryClient.removeQueries({ queryKey: campaignCharactersPrefix(props.campaignId) });
+      queryClient.removeQueries({ queryKey: ["campaigns", "claimable-characters", props.campaignId] });
       // Same literal-prefix rationale as handleAccessRevoked above: drop
       // all actor/generation-scoped content keys on leave, plus the session,
       // member, and invitation families (an open reader or session board
@@ -282,6 +284,9 @@ export function CampaignDetail(props: {
                 campaignId={props.campaignId}
                 actorId={props.actorId}
                 campaignRevision={campaign.revision}
+                generation={generation}
+                online={online}
+                isGm={isGm}
                 onOpenCharacter={onOpenCharacter}
                 onCampaignStale={() => void detail.refetch()}
                 metadataApi={props.metadataApi}

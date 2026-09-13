@@ -8,6 +8,7 @@ import type {
   CampaignListResponse,
   CampaignViewResponse,
   ChangeMemberRoleBody,
+  ClaimableCharacterListResponse,
   CreateCampaignBody,
   CreateCampaignResponse,
   CreateContentBody,
@@ -58,7 +59,8 @@ type ReviewBody = NonNullable<
 >["content"]["application/json"];
 type DeclineResponse =
   operations["post_invitations_decline"]["responses"]["200"]["content"]["application/json"];
-export type ContentListQuery = { cursor?: string | null; limit?: number };
+export type ContentListQuery = { cursor?: string | null; limit?: number; status?: "active" | "deleted" };
+export type ClaimableCharactersQuery = { cursor?: string | null; limit?: number };
 export type ActivityListQuery = { cursor?: string | null; limit?: number };
 
 export type CampaignsApi = {
@@ -69,6 +71,7 @@ export type CampaignsApi = {
   declineInvitation(body: DeclineInvitationBody): Promise<DeclineResponse>;
   leaveCampaign(campaignId: string, memberUserId: string, body: { expectedCampaignRevision: number; idempotencyKey: string }): Promise<unknown>;
   listCampaignCharacters(campaignId: string, input?: CampaignListQuery): Promise<CampaignCharacterListResponse>;
+  listClaimableCharacters(campaignId: string, input?: ClaimableCharactersQuery): Promise<ClaimableCharacterListResponse>;
   claimCharacter(campaignId: string, characterId: string, body: ClaimCharacterBody): Promise<unknown>;
   createCampaignCharacter(campaignId: string, body: CreateCampaignCharacterBody): Promise<CreateCampaignCharacterResponse>;
   listContent(campaignId: string, input?: ContentListQuery): Promise<CampaignContentListResponse>;
@@ -123,11 +126,21 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
       client.fetch("POST", `/campaigns/${campaignId}/characters/${characterId}/claim`, { body }),
     createCampaignCharacter: (campaignId, body) =>
       client.fetch<CreateCampaignCharacterResponse>("POST", `/campaigns/${campaignId}/characters`, { body }),
+    listClaimableCharacters: (campaignId, input) =>
+      input === undefined
+        ? client.fetch<ClaimableCharacterListResponse>("GET", `/campaigns/${campaignId}/claimable-characters`)
+        : client.fetch<ClaimableCharacterListResponse>("GET", `/campaigns/${campaignId}/claimable-characters`, {
+          query: { cursor: input.cursor ?? undefined, limit: input.limit ?? undefined },
+        }),
     listContent: (campaignId, input) =>
       input === undefined
         ? client.fetch<CampaignContentListResponse>("GET", `/campaigns/${campaignId}/content`)
         : client.fetch<CampaignContentListResponse>("GET", `/campaigns/${campaignId}/content`, {
-          query: { cursor: input.cursor ?? undefined, limit: input.limit ?? undefined },
+          query: {
+            cursor: input.cursor ?? undefined,
+            limit: input.limit ?? undefined,
+            status: input.status ?? undefined,
+          },
         }),
     openContent: (contentId) =>
       client.fetch<CampaignContentResponse>("GET", `/content/${contentId}`),

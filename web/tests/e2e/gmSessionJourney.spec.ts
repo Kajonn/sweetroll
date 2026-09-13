@@ -178,6 +178,24 @@ async function runJourney(page: Page, browser: Browser, viewport: { width: numbe
     await expect(page.getByRole("dialog")).toHaveCount(0, { timeout: STEP_TIMEOUT });
     await expect(contentList.getByText("Selected players")).toBeVisible({ timeout: STEP_TIMEOUT });
 
+    // 7b. Durable Hidden recovery: hide again, reload (no retained editor),
+    // find the note in the Hidden view, recover, and read it in Active.
+    await page.getByRole("button", { name: `Edit ${noteTitle}` }).click({ timeout: STEP_TIMEOUT });
+    await page.getByRole("button", { name: `Hide ${noteTitle}` }).first().click({ timeout: STEP_TIMEOUT });
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: STEP_TIMEOUT });
+    await page.getByRole("dialog").getByRole("button", { name: "Confirm hiding" }).click({ timeout: STEP_TIMEOUT });
+    await page.goto(campaignUrl);
+    await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
+    await page.getByRole("tab", { name: "Content" }).click({ timeout: STEP_TIMEOUT });
+    await page.getByRole("button", { name: "Hidden", exact: true }).click({ timeout: STEP_TIMEOUT });
+    await expect(page.getByText(noteTitle, { exact: true }).first()).toBeVisible({ timeout: STEP_TIMEOUT });
+    await page.getByRole("button", { name: `Recover ${noteTitle}` }).click({ timeout: STEP_TIMEOUT });
+    await expect(page.getByText(`${noteTitle} was recovered.`)).toBeVisible({ timeout: STEP_TIMEOUT });
+    await page.getByRole("button", { name: "Active", exact: true }).click({ timeout: STEP_TIMEOUT });
+    await expect(page.getByRole("list", { name: "Campaign content" }).getByText("Selected players")).toBeVisible({
+      timeout: STEP_TIMEOUT,
+    });
+
     // 8. Characters tab: create a campaign character through the UI. Fresh
     // detail load first so the revision-guarded create cannot 409 on the
     // content mutations above.

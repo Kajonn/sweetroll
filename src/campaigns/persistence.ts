@@ -116,6 +116,19 @@ export type AttachedCharacterRecord = {
   updatedAt: Date;
 };
 
+/**
+ * R6 claim discovery: one outstanding own designation for the requesting
+ * actor. Exactly four public fields; never controllers, state, projection,
+ * rolls, audit, inventory, placement metadata, or system/version details.
+ */
+export type ClaimableCharacterRecord = {
+  characterId: string;
+  name: string;
+  revision: number;
+  lifecycle: "active" | "archived";
+  createdAt: Date;
+};
+
 export type CampaignReceipt = {
   inputHash: string;
   campaignId: string | null;
@@ -691,6 +704,67 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       });
     },
 
+    /**
+     * R6 claim discovery page for `GET /campaigns/{id}/claimable-characters`.
+     * Authorization precedes pagination in SQL: the row must designate the
+     * requesting actor in this campaign, and the actor must not already
+     * control the sheet. Character, designation, and controller predicates
+     * all match the campaign ID. $1 is the actor ID, $2 the campaign ID.
+     */
+    async listClaimableCharactersPage(
+      client: DbClient,
+      input: {
+        campaignId: string;
+        actorId: string;
+        limit: number;
+        cursorCreatedAt: string | null;
+        cursorId: string | null;
+      },
+    ): Promise<ClaimableCharacterRecord[]> {
+      const params: unknown[] = [input.actorId, input.campaignId];
+      let cursorClause = "";
+      if (input.cursorCreatedAt !== null && input.cursorId !== null) {
+        params.push(input.cursorCreatedAt, input.cursorId);
+        cursorClause = `AND ((date_trunc('milliseconds', ch.created_at), ch.id) < ($3::timestamptz, $4))`;
+      }
+      params.push(input.limit + 1);
+      const result = await client.query<{
+        id: string;
+        name: string;
+        revision: number;
+        lifecycle: string;
+        created_at: Date;
+      }>(
+        `SELECT ch.id, ch.name, ch.revision, ch.lifecycle, ch.created_at
+           FROM characters ch
+          WHERE ch.campaign_id = $2
+            AND EXISTS (
+              SELECT 1 FROM character_claim_designations d
+               WHERE d.character_id = ch.id AND d.campaign_id = $2 AND d.user_id = $1
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM character_controllers cc
+               WHERE cc.character_id = ch.id AND cc.campaign_id = $2 AND cc.user_id = $1
+            )
+            ${cursorClause}
+          ORDER BY date_trunc('milliseconds', ch.created_at) DESC, ch.id DESC
+          LIMIT $${params.length}`,
+        params,
+      );
+      return result.rows.map((row) => {
+        if (row.lifecycle !== "active" && row.lifecycle !== "archived") {
+          throw new Error(`Unknown character lifecycle: ${row.lifecycle}`);
+        }
+        return {
+          characterId: row.id,
+          name: row.name,
+          revision: row.revision,
+          lifecycle: row.lifecycle,
+          createdAt: row.created_at,
+        };
+      });
+    },
+
     async appendAudit(
       client: PoolClient,
       input: { campaignId: string; actorId: string; kind: string; summary: string; requestId: string },
@@ -1143,6 +1217,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
         campaignId: string;
         actorId: string;
         isGm: boolean;
+        status: "active" | "deleted";
         limit: number;
         cursorCreatedAt: string | null;
         cursorId: string | null;
@@ -1156,10 +1231,17 @@ export function createCampaignPersistenceRepository(pool: Pool) {
         cursorClause = `AND ((date_trunc('milliseconds', c.created_at), c.id) < ($4::timestamptz, $5))`;
       }
       params.push(input.limit + 1);
+      // R7 deleted management view: the creator OR a GM who may read the
+      // note (gm_only/all_players/selected_players; never another creator's
+      // owner-only note). Prior readership alone never authorizes recovery.
+      const predicate =
+        input.status === "deleted"
+          ? `(c.creator_id = $1 OR ($2::boolean AND c.audience IN ('gm_only', 'all_players', 'selected_players')))`
+          : CONTENT_VISIBILITY_PREDICATE;
       const result = await client.query<ContentRow>(
         `SELECT ${CONTENT_COLUMNS.split(", ").map((column) => `c.${column}`).join(", ")}
            FROM campaign_content_items c
-          WHERE c.campaign_id = $3 AND c.status = 'active' AND ${CONTENT_VISIBILITY_PREDICATE}
+          WHERE c.campaign_id = $3 AND c.status = '${input.status}' AND ${predicate}
             ${cursorClause}
           ORDER BY date_trunc('milliseconds', c.created_at) DESC, c.id DESC
           LIMIT $${params.length}`,

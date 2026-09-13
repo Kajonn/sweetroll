@@ -6,6 +6,8 @@
 **Scope:** Campaign backend and existing Characters integration. No Player campaign UI, GM app, outbox, or email delivery.
 **Implementation plan:** [Task-level backend plan](../plans/2026-09-09-i6-campaign-backend.md). Prerequisite dispositions approved below; implementation has not started.
 
+**Reconciliation / owner approval (2026-09-12):** The opening status and implementation note describe the original backend planning baseline, not current delivery. The GUI plan G7 records the player slice landed 2026-09-11 and its remediation cross-reference records GM Phase 1/2 plus review fixes at `11aea84`; neither closes full I6/I7 acceptance. The user approved the recommended [pre-upgrade remediation](../plans/2026-09-12-remediation-index.md), specifically the narrow claim-discovery GET (Section 3.5) and management-only deleted-summary recovery (Section 4.1.1). This update records approved contracts only; application, generated contracts, tests and acceptance are unchanged. Production auth remains deferred; upgrades and scenes/display are excluded from remediation. No unverified gate is closed.
+
 ## 1. Decisions and boundaries
 
 - OD-02: active GMs/co-GMs see full attached character sheet state, disclosed before joining, claiming, and adopting. I6 ships this fixed policy, not a visibility toggle. It does not implicitly grant access to owner-only notes or actor-private rolls.
@@ -48,6 +50,7 @@ An adoption additionally records immutable `return_owner_id`, source campaign, a
 | Read/edit/bump/roll sheet | All attached sheets | Controlled sheets only | No attached access |
 | Create campaign character | Unclaimed or assigned to active players | Self-controlled character | No |
 | Replace controllers / designate claimant | Yes, with adoption return-owner invariant | No | No |
+| Discover outstanding own claim designations | Minimal summary only if designated and not already a controller | Same; no pre-claim sheet access | No |
 | Claim | Not needed for GM access | Only if explicitly designated by GM; adds that member once and consumes designation | No |
 | Adopt standalone | Cannot take another user's character | Own active, exact-version character; explicit disclosure acknowledgement | No |
 | Transfer / duplicate to personal library | Denied while attached | Denied while attached | No |
@@ -74,6 +77,29 @@ Adoption requires an active standalone character, current owner consent, active 
 
 Archived campaigns allow authorized reads/exports and departure, but no new joins, content/character edits, rolls, adoption or assignment. Archive/recover are revisioned owner/co-GM commands. Recovery does not restore removed memberships, grants, claims or invitations consumed/revoked earlier.
 
+### 3.5 Approved claim-discovery read (2026-09-12)
+
+Add only `GET /campaigns/{id}/claimable-characters`, operation ID `get_campaigns_id_claimable_characters`, owned by `Campaigns.listClaimableCharacters(ctx, input)`. Input is `{ campaignId: string, limit?: number, cursor?: string | null }`. The Module returns the existing `Result` envelope containing `{ characters: ClaimableCharacterSummary[], nextCursor: string | null }`; HTTP adds `requestId`. Each summary contains exactly:
+
+```ts
+type ClaimableCharacterSummary = {
+  characterId: string;
+  name: string;
+  revision: number;
+  lifecycle: "active" | "archived";
+};
+```
+
+Require current active campaign membership, an outstanding designation for the requesting actor and no current controller record for that actor. Match both character and campaign IDs in designation/controller predicates; overlapping designations yield no duplicate rows. Authorize before `LIMIT`, reuse established default/max page limits, order by an existing stable timestamp plus character ID, and bind cursors to actor, campaign and this query family. Reject invalid/cross-scope cursors and reauthorize every page. The client cannot select an authoritative actor/role. Inaccessible campaign/resource IDs retain generic 404 collapse; missing authentication remains 401.
+
+This is metadata discovery, not a broader roster or sheet permission. Do not change `GET /campaigns/{id}/characters` output/authorization or `Characters.loadAttachedSnapshot`. Exclude controller IDs, other designees, state, projection, inventory, rolls, audit, placement metadata and system/version details. A designated ordinary player still cannot open/export/read sheet activity/edit/bump/roll until controlling the sheet. Existing GM authority is unchanged, not conferred by this endpoint.
+
+The existing claim command remains authoritative: recheck active membership/designation and existing campaign/character revision and idempotency preconditions; add the caller once and consume only that caller's designation, preserving other designations/controllers. Preserve campaign-custody disclosure. Archived rows carry lifecycle for an unavailable explanation with no UI Claim action. The current command lacks a character-lifecycle check while the UI offers only active claims; record that discrepancy without adding a new command restriction in this repair. Archived-campaign mutation rules remain unchanged.
+
+The ordinary-player journey must obtain the row from this read, not a GM-only roster/ID workaround, and must not preload a sheet or show Open/controller counts. Refresh discovery, roster and campaign revisions after claim and before further commands; on definite 409 reread before explicit fresh-key retry, and on 404 evict the row without treating it as view-only. Query keys and in-flight results are actor/generation-scoped, with a distinct claim family and consistent actor-scoped roster keys; purge on leave, revocation, sign-out and account switch, and reject late results. Section 4.3's no-store/no service-worker campaign-payload caching rules apply.
+
+Required evidence remains open: actual-player discovery/claim; exact four-field response; denied pre-claim sheet routes; outsider/other designee/removed member; leave/rejoin; consumed designation and shared controllers; archived rows; scoped cursors and interleaved unauthorized pagination; account switching and late-response purge. See the [claim plan](../plans/2026-09-12-player-claim-discovery.md).
+
 ## 4. Content, rolls, activity and exports
 
 ### 4.1 Content policy
@@ -87,7 +113,21 @@ All campaign content access requires active membership, including creator access
 | `selected_players` | Active granted players and active owner/co-GMs |
 | `owner_only` | Active creating member only; no implicit GM override |
 
-Players create owner-only notes and edit/delete their own notes; sharing/audience/grant administration is GM-only and cannot operate on another actor's inaccessible owner-only note. GMs edit/delete content they can read. Grant replacement validates active memberships in the same campaign, is atomic with audience changes, and increments content revision and authorization generation. Removing a member destroys grants rather than reactivating them on rejoin. Soft deletion hides content from ordinary reads; authorized recovery uses the same visibility policy and expected revision. Text has bounded title/body/tag lengths and list sizes; no HTML execution, uploads, external ingestion, or custom rendering.
+Players create owner-only notes and edit/delete their own notes; sharing/audience/grant administration is GM-only and cannot operate on another actor's inaccessible owner-only note. GMs edit/delete content they can read. Grant replacement validates active memberships in the same campaign, is atomic with audience changes, and increments content revision and authorization generation. Removing a member destroys grants rather than reactivating them on rejoin. Soft deletion hides content from ordinary reads; recovery requires active membership and management authority (creator OR a GM who may read the content), plus expected revision. Prior readership alone never authorizes recovery. Text has bounded title/body/tag lengths and list sizes; no HTML execution, uploads, external ingestion, or custom rendering.
+
+### 4.1.1 Approved deleted-summary recovery (2026-09-12)
+
+Extend the existing `GET /campaigns/{id}/content` and `Campaigns.listContent` input with optional `status: 'active' | 'deleted'`, normalized to `active`. Add required `status` to `ContentSummary`; preserve `ListContentResult`, the existing operation ID and HTTP `requestId` convention. Use a content-specific query schema rather than changing the shared pagination schema. Default and explicit active requests retain existing readership and share one normalized cursor scope.
+
+Deleted lists require current active membership and the SQL equivalent of existing `canManageContent`: the creating member OR an active GM who may read the note. Do not substitute readership alone or a blanket GM bypass. A selected/all-player recipient who is neither creator nor authorized GM cannot discover or recover a deleted note; another creator's owner-only note remains hidden from GMs. Apply this policy before pagination, preserve bounded limits and deterministic ordering, and bind normalized status, actor, campaign and query family into cursors. Reauthorize every page; reject invalid or cross-scope/status cursors without leaking unauthorized counts.
+
+Return existing summary metadata, including fresh `revision` and `accessRevision`, plus status, never `body` or `grantedUserIds`. Ordinary `GET /content/{id}` stays active-only and returns generic 404 for a deleted note, even to its manager; no deleted-body/grant preview endpoint is added. Recover through the existing `POST /content/{id}/recover` using the listed `expectedContentRevision` and an idempotency key. Preserve DELETE receipts, retained-editor recovery and current retention. Archived campaigns still deny recovery mutations; readable summaries must not imply recovery is currently permitted. No permanent deletion or player-note management UI is added; player-creator server recovery authority remains intact.
+
+The GM view has paginated Active/Hidden lists; Hide explicitly means soft-delete, not setting audience to GM-only. Hidden rows show title/audience/status and recovery confirmation, not Open/Edit or deleted-body preview. Discovery must survive navigation, reload and a new authenticated browser context without a retained client object. Disable mutations offline, while refreshing, or when campaign lifecycle forbids them. After success refresh active/deleted lists and relevant activity/session reads. On definite 409, refresh the summary before explicit fresh-key retry, never guess `revision + 1`; on 404 evict the row and show generic unavailability.
+
+Separate list keys by normalized status/cursor and actor/generation while retaining the campaign content purge prefix and distinct detail-body keys. Purge both list modes and protected bodies on sign-out, account switch, leave, revocation or visibility loss, cancel/reject late results, and revalidate on reconnect. Preserve Section 4.3 privacy limits; this is not permission to persist campaign payloads in a service worker or a claim of offline erasure.
+
+Required evidence remains open: list Hide then recovery after reload/new context; creator/readable-GM versus recipient/owner-only denial; active-only direct reads; status defaults/validation and exact summary fields; scoped pagination with unauthorized rows; departure/rejoin; archived-campaign denial; stale and concurrent recovery; actor-lifetime cache purge and retained-editor/offline regressions. See the [recovery plan](../plans/2026-09-12-content-recovery.md).
 
 ### 4.2 Roll contract changes
 
@@ -159,7 +199,8 @@ Every row maps to owning Module methods with typed input/output, preconditions f
 | Members | `GET /campaigns/{id}/members`; `PATCH /campaigns/{id}/members/{userId}` for role; `DELETE /campaigns/{id}/members/{userId}` for removal/self-leave |
 | Invitations | `POST/GET /campaigns/{id}/invitations`; `POST /campaigns/{id}/invitations/{inviteId}/rotate`; `POST /campaigns/{id}/invitations/{inviteId}/revoke`; `POST /invitations/review`, `/invitations/accept`, `/invitations/decline` |
 | Placement | `GET/POST /campaigns/{id}/characters`; `POST /campaigns/{id}/characters/{characterId}/assign` (controllers and claimant designation); `/claim`; `/adopt` |
-| Content | `GET/POST /campaigns/{id}/content`; `GET/PATCH/DELETE /content/{id}`; `POST /content/{id}/grants`; `POST /content/{id}/recover` |
+| Claim discovery (approved remediation, implementation pending) | `GET /campaigns/{id}/claimable-characters`; minimal own-designation summaries only (Section 3.5) |
+| Content | `GET/POST /campaigns/{id}/content`; approved remediation adds GET `status=active\|deleted` (Section 4.1.1, implementation pending); `GET/PATCH/DELETE /content/{id}`; `POST /content/{id}/grants`; `POST /content/{id}/recover` |
 | Activity/export | `GET /campaigns/{id}/activity`; `POST /campaigns/{id}/exports` |
 | Existing Characters | Preserve routes, extend action audience and DTOs, enforce Sections 2-4 and 7 on every existing route |
 

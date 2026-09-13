@@ -77,4 +77,22 @@ describe("createCampaignsApi GM content", () => {
       body: { expectedContentRevision: 3, idempotencyKey: "k3" },
     });
   });
+
+  it("lists claimable characters with cursor + limit query params", async () => {
+    const fetch = vi.fn().mockResolvedValue({ characters: [], nextCursor: null, requestId: "r4" });
+    const api = createCampaignsApi({ fetch } as never);
+    await api.listClaimableCharacters("c1", { cursor: null, limit: 25 });
+    expect(fetch).toHaveBeenCalledWith("GET", "/campaigns/c1/claimable-characters", {
+      query: { cursor: undefined, limit: 25 },
+    });
+  });
+
+  it("lists deleted content summaries with the status query param", async () => {
+    const fetch = vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r5" });
+    const api = createCampaignsApi({ fetch } as never);
+    await api.listContent("c1", { status: "deleted", limit: 25 });
+    expect(fetch).toHaveBeenCalledWith("GET", "/campaigns/c1/content", {
+      query: { cursor: undefined, limit: 25, status: "deleted" },
+    });
+  });
 });

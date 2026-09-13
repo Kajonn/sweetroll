@@ -1,7 +1,8 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import type { CampaignsApi, CampaignListQuery } from "./api.js";
+import type { CampaignsApi, CampaignListQuery, ClaimableCharactersQuery } from "./api.js";
 
 export const CAMPAIGN_LIST_PAGE_LIMIT = 25;
+export const CLAIMABLE_CHARACTERS_PAGE_LIMIT = 25;
 
 export const CAMPAIGN_MEMBER_PAGE_LIMIT = 25;
 
@@ -9,7 +10,26 @@ export function campaignDetailKey(campaignId: string): string[] {
   return ["campaigns", "detail", campaignId];
 }
 
-export function campaignCharactersKey(campaignId: string): string[] {
+export function campaignCharactersKey(
+  campaignId: string,
+  actorId?: string | null,
+  generation?: number,
+): (string | number | null)[] {
+  if (actorId === undefined || generation === undefined) {
+    return ["campaigns", "characters", campaignId];
+  }
+  return ["campaigns", "characters", campaignId, actorId, generation];
+}
+
+export function campaignClaimableCharactersKey(
+  campaignId: string,
+  actorId: string | null,
+  generation: number,
+) {
+  return ["campaigns", "claimable-characters", campaignId, actorId, generation];
+}
+
+export function campaignCharactersPrefix(campaignId: string): string[] {
   return ["campaigns", "characters", campaignId];
 }
 
@@ -58,6 +78,26 @@ export function useCampaignMembers(
   return useInfiniteQuery({
     queryKey: campaignMembersKey(campaignId, actorId, generation),
     queryFn: ({ pageParam }: { pageParam: string | null }) => api.listMembers(campaignId, memberPageQuery(pageParam)),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    enabled: options.enabled && options.online && actorId !== null,
+    staleTime: 30_000,
+  });
+}
+
+export function useClaimableCharacters(
+  api: CampaignsApi,
+  campaignId: string,
+  actorId: string | null,
+  generation: number,
+  options: { enabled: boolean; online: boolean },
+) {
+  return useInfiniteQuery({
+    queryKey: campaignClaimableCharactersKey(campaignId, actorId, generation),
+    queryFn: ({ pageParam }: { pageParam: string | null }) => {
+      const query: ClaimableCharactersQuery = { cursor: pageParam, limit: CLAIMABLE_CHARACTERS_PAGE_LIMIT };
+      return api.listClaimableCharacters(campaignId, query);
+    },
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     enabled: options.enabled && options.online && actorId !== null,

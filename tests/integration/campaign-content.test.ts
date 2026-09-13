@@ -926,4 +926,189 @@ describeWithDatabase("campaign content, grants and source-scoped history (Task 7
     if (!recovered.ok) throw new Error("recover failed");
     expect([recovered.value.revision, recovered.value.accessRevision]).toEqual([6, 5]);
   });
+
+  it("exposes only recoverable deleted summaries with management policy", async () => {
+    const campaignId = await createCampaign();
+    await seedMember(campaignId, h.users.player.actorId);
+    await seedMember(campaignId, h.users.other.actorId);
+    const shared = await createNote(campaignId, "gm", { audience: "all_players", title: "shared note" });
+    const diary = await createNote(campaignId, "player", { title: "player diary", body: "secret" });
+    expect(diary.audience).toBe("owner_only");
+
+    for (const note of [shared, diary]) {
+      const hidden = await h.campaigns.deleteContent(ctxFor(note.creatorId === h.users.gm.actorId ? h.users.gm : h.users.player), {
+        contentId: note.contentId,
+        expectedContentRevision: note.revision,
+        idempotencyKey: randomUUID(),
+      });
+      expect(hidden.ok).toBe(true);
+    }
+
+    // Default list excludes hidden notes; active scope is explicit-equivalent.
+    for (const status of [undefined, "active"] as const) {
+      const listed = await h.campaigns.listContent(ctxFor(h.users.gm), {
+        campaignId,
+        limit: 10,
+        ...(status === undefined ? {} : { status }),
+      });
+      expect(listed.ok).toBe(true);
+      if (!listed.ok) return;
+      expect(listed.value.content.map((r) => r.contentId)).not.toContain(shared.contentId);
+      for (const row of listed.value.content) expect(row.status).toBe("active");
+    }
+
+    // Deleted list returns manageable summaries only: fresh revision, exact
+    // status, no body or grant preview.
+    const hidden = await h.campaigns.listContent(ctxFor(h.users.gm), {
+      campaignId,
+      status: "deleted",
+      limit: 1,
+    });
+    expect(hidden.ok).toBe(true);
+    if (!hidden.ok) throw new Error("expected management list");
+    expect(hidden.value.content[0]).toMatchObject({ contentId: shared.contentId, status: "deleted" });
+    expect(hidden.value.content[0]).not.toHaveProperty("body");
+    expect(hidden.value.content[0]).not.toHaveProperty("grantedUserIds");
+
+    // A selected/all-player recipient sees no deleted summary; another
+    // creator's owner-only note stays absent for a GM.
+    const recipient = await h.campaigns.listContent(ctxFor(h.users.other), {
+      campaignId,
+      status: "deleted",
+      limit: 10,
+    });
+    expect(recipient.ok).toBe(true);
+    if (!recipient.ok) return;
+    expect(recipient.value.content).toEqual([]);
+    const gmView = await h.campaigns.listContent(ctxFor(h.users.gm), {
+      campaignId,
+      status: "deleted",
+      limit: 10,
+    });
+    expect(gmView.ok).toBe(true);
+    if (!gmView.ok) return;
+    expect(gmView.value.content.map((r) => r.contentId)).toContain(shared.contentId);
+    expect(gmView.value.content.map((r) => r.contentId)).not.toContain(diary.contentId);
+
+    // Ordinary open stays active-only even for the manager.
+    expect(
+      await h.campaigns.openContent(ctxFor(h.users.gm), { contentId: shared.contentId }),
+    ).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+
+    // Recover through the listed revision; it returns to active and leaves
+    // the deleted list.
+    const row = gmView.value.content.find((r) => r.contentId === shared.contentId)!;
+    const recovered = await h.campaigns.recoverContent(ctxFor(h.users.gm), {
+      contentId: shared.contentId,
+      expectedContentRevision: row.revision,
+      idempotencyKey: randomUUID(),
+    });
+    expect(recovered.ok).toBe(true);
+    const active = await h.campaigns.listContent(ctxFor(h.users.other), { campaignId, limit: 10 });
+    expect(active.ok).toBe(true);
+    if (!active.ok) return;
+    expect(active.value.content.map((r) => r.contentId)).toContain(shared.contentId);
+    const deletedAfter = await h.campaigns.listContent(ctxFor(h.users.gm), {
+      campaignId,
+      status: "deleted",
+      limit: 10,
+    });
+    expect(deletedAfter.ok).toBe(true);
+    if (!deletedAfter.ok) return;
+    expect(deletedAfter.value.content.map((r) => r.contentId)).not.toContain(shared.contentId);
+  });
+
+  it("scopes deleted cursors and denies stale, concurrent, and archived recovery", async () => {
+    const campaignId = await createCampaign();
+    await seedMember(campaignId, h.users.player.actorId);
+    const first = await createNote(campaignId, "gm", { audience: "all_players", title: "hidden one" });
+    const second = await createNote(campaignId, "gm", { audience: "all_players", title: "hidden two" });
+    for (const note of [first, second]) {
+      const hidden = await h.campaigns.deleteContent(ctxFor(h.users.gm), {
+        contentId: note.contentId,
+        expectedContentRevision: note.revision,
+        idempotencyKey: randomUUID(),
+      });
+      expect(hidden.ok).toBe(true);
+    }
+
+    const pageOne = await h.campaigns.listContent(ctxFor(h.users.gm), {
+      campaignId,
+      status: "deleted",
+      limit: 1,
+    });
+    expect(pageOne.ok).toBe(true);
+    if (!pageOne.ok) return;
+    expect(pageOne.value.characters).toBeUndefined();
+    expect(pageOne.value.content).toHaveLength(1);
+    expect(pageOne.value.nextCursor).not.toBeNull();
+    const pageTwo = await h.campaigns.listContent(ctxFor(h.users.gm), {
+      campaignId,
+      status: "deleted",
+      limit: 10,
+      cursor: pageOne.value.nextCursor,
+    });
+    expect(pageTwo.ok).toBe(true);
+    if (!pageTwo.ok) return;
+    expect(pageTwo.value.content).toHaveLength(1);
+
+    // Active-scope cursor is rejected on the deleted query and vice versa.
+    const activePage = await h.campaigns.listContent(ctxFor(h.users.gm), { campaignId, limit: 1 });
+    expect(activePage.ok).toBe(true);
+    if (!activePage.ok || activePage.value.nextCursor === null) return;
+    expect(
+      await h.campaigns.listContent(ctxFor(h.users.gm), {
+        campaignId,
+        status: "deleted",
+        limit: 10,
+        cursor: activePage.value.nextCursor,
+      }),
+    ).toEqual({ ok: false, error: expect.objectContaining({ code: "bad_request" }) });
+    expect(
+      await h.campaigns.listContent(ctxFor(h.users.gm), { campaignId, limit: 0, status: "deleted" }),
+    ).toEqual({ ok: false, error: expect.objectContaining({ code: "bad_request" }) });
+
+    // Stale revision conflicts; concurrent recovery wins once.
+    const target = pageTwo.value.content[0]!;
+    expect(
+      await h.campaigns.recoverContent(ctxFor(h.users.gm), {
+        contentId: target.contentId,
+        expectedContentRevision: target.revision - 1,
+        idempotencyKey: randomUUID(),
+      }),
+    ).toEqual({ ok: false, error: expect.objectContaining({ code: "conflict" }) });
+    const winner = await h.campaigns.recoverContent(ctxFor(h.users.gm), {
+      contentId: target.contentId,
+      expectedContentRevision: target.revision,
+      idempotencyKey: randomUUID(),
+    });
+    expect(winner.ok).toBe(true);
+    expect(
+      await h.campaigns.recoverContent(ctxFor(h.users.gm), {
+        contentId: target.contentId,
+        expectedContentRevision: target.revision,
+        idempotencyKey: randomUUID(),
+      }),
+    ).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+
+    // Archived campaigns deny recovery mutations even when summaries read.
+    await h.pool.query(`UPDATE campaigns SET status = 'archived' WHERE id = $1`, [campaignId]);
+    const remaining = await h.campaigns.listContent(ctxFor(h.users.gm), {
+      campaignId,
+      status: "deleted",
+      limit: 10,
+    });
+    expect(remaining.ok).toBe(true);
+    if (!remaining.ok) return;
+    const leftover = remaining.value.content[0];
+    if (leftover !== undefined) {
+      expect(
+        await h.campaigns.recoverContent(ctxFor(h.users.gm), {
+          contentId: leftover.contentId,
+          expectedContentRevision: leftover.revision,
+          idempotencyKey: randomUUID(),
+        }),
+      ).toEqual({ ok: false, error: expect.objectContaining({ code: "conflict" }) });
+    }
+  });
 });

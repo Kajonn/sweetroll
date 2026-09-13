@@ -138,3 +138,54 @@ Node v24.11.1. Working tree clean except the pre-existing untracked
   CI env/commands locally.
 - `web/test-results-verify-*/` traces from earlier verification runs are still
   untracked in the working tree and are not committed inputs to this record.
+
+## Checkbox closure audit (2026-09-13, docs-only)
+
+### Fresh full-suite run is linked, with no hidden baseline changes
+
+- The run is linked from the GUI checklist: the remediation-execution note
+  points at Task 2 above.
+- No screenshot baselines changed anywhere in the remediation range: the last
+  baseline-image commit is `0680707` (owner-approved re-baseline, predates
+  remediation); the only visual-path commit since `11aea84` is `7d92b71`,
+  which edits spec files (`campaignJourney`, `gmSessionJourney`, `visual`
+  specs), not images. The reconciling run passed visuals 10/10 with no
+  snapshot update, so no baseline change is hidden in the green result.
+
+### Deferred gates are visibly open (not inferred from green runs)
+
+- GUI plan: G0 mockup capture still blocked on the 401; G6 production
+  sign-in still open (no real provider by owner decision); G7 I7 boxes, all
+  G8 boxes, and all G9 boxes unchecked.
+- Task 2 above names R10–R18 individually as still open.
+- `design_v2.md`: "Production-authentication and G9 gates remain open"
+  (§13 picker note); "Approval is not implementation or acceptance evidence"
+  and "Production authentication remains owner-deferred" (§13.2); the I6
+  owner-approved exception "does not close I5, authorize production
+  deployment, or satisfy full I6 acceptance".
+- Phase 2 acceptance keeps its Limitations section (no OIDC, no physical
+  devices, phone coverage is Chromium viewport only).
+- The I7 GM spec header now records Phase 1/2 landed with Phase 3/4 open
+  instead of the stale "pre-implementation".
+
+### Per-task regression evidence
+
+| Task | Failing regression on record | Passing check | Auth/offline preserved |
+| --- | --- | --- | --- |
+| Stabilization T1 (revision readiness) | GM retry failures observed at `11aea84` (index Fresh Evidence; repeated runs also exposed desktop width) | Readiness gating in tree; two-GM 409 proof in `gmSessionJourney`; 32/32 in Task 2 matrix | Existing authz matrices + offline 22/22 green |
+| Stabilization T2 (audience locator) | Strict-mode failure at `campaignJourney` 190/193, observed before the scoping fix | Journey green, activity/leave assertions executing | Same as above |
+| Stabilization T3 (fixture isolation) | Library 360/1280 failures from cross-journey contamination at `11aea84` | Isolated runner; canonical 32/32 twice-separated DBs | Same as above |
+| Stabilization T4 (full suite in CI) | Allowlist-vs-`--list` omission demonstrated in plan; runner unit test proves both suites run and combined exit is nonzero on either failure (`run-e2e.test.ts`) | Local run through the exact CI entry point, green | Same as above; no live deliberate-failure CI run on record (plan conditions it on CI authorization) |
+| Claim T1/T2 (R6) | Recorded 2026-09-13: isolated worktree at `48366fa` with the 10 R6/R7 implementation files reverted to `a5561d7^` (tests/contracts kept): 3 placement discovery tests red (`TypeError: listClaimableCharacters is not a function`; HTTP 404 `Route GET .../claimable-characters ... not found`), claimable transport-mapping test red, http-acceptance journey red at the claimable step, 5 claim-discovery view tests red (no Claim action in old component). 8 backend + 5 web failures, all R6-specific | Same files restored: backend 61/61, web 19/19; player-role claim journey inside fresh canonical 32/32 | Roster endpoint/authorization unchanged and green; revocation purges extended |
+| Recovery T1/T2 (R7) | Recorded 2026-09-13 in the same worktree: 2 deleted-summary tests red (empty deleted lists, missing `status`), status-key scoping test red, durable Hidden recovery-after-remount test red | Same files restored: green as above; Hidden recover journey inside fresh canonical 32/32 | `GET /content/{id}` active-only unchanged; editor receipt recovery retained |
+| Acceptance T1 (R8 visibility) | Recorded red-first: four component regressions failed before the fix for the intended reasons; leave-purge case red before the extension | `campaignVisibility` 3/3 + component suites, retained in Task 2 matrix | Existing prefix-purge regressions retained and extended |
+
+Notes on the red runs: the 53 other backend tests and 9 other web tests in
+those files passed against the reverted tree, showing the revert removed only
+the new behavior. Three R8 revocation tests also failed in the reverted web
+tree via a status-key mismatch artifact (current tests compute keys with the
+new status-aware `campaignContentKey` while the old component stores under
+the old key); they are collateral of the revert, not R7 red evidence, and are
+not counted above. The worktree was removed after the runs; the main tree was
+never mutated. Full red/green logs are not committed inputs (same standing as
+the `web/test-results-verify-*/` traces).

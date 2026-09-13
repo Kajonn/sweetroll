@@ -85,11 +85,27 @@ Local traces and diffs from verification are in `web/test-results-verify-e2e/` a
 - [x] Owner approves or changes the R6/R7 proposals before their implementation.
   (Approved 2026-09-12, recorded in the I6 backend spec reconciliation note
   and `design_v2.md` §§5.3/4.1; implemented as `a5561d7`.)
-- [ ] Each executed task has a failing regression, passing targeted check, and preserved existing authorization/offline behavior.
+- [x] Each executed task has a failing regression, passing targeted check, and preserved existing authorization/offline behavior.
+  (Audited 2026-09-13 in `docs/acceptance/gui-2026-09-12-remediation.md`,
+  checkbox-closure section: per-task table recorded. Stabilization T1–T4 have
+  observed red evidence (index Fresh Evidence + runner failure-propagation
+  unit test); acceptance T1 recorded red-first; R6/R7 red runs recorded
+  2026-09-13 in an isolated revert worktree (backend 8 red / web 10 red, all
+  new-behavior-specific; same files 61/61 + 19/19 green after restore; fresh
+  canonical 32/32). Existing authorization/offline behavior preserved per the
+  Task 2 matrix. Plan worker checkboxes remain unticked — they are proposal
+  tracking, not evidence.)
 - [x] R1-R9 are closed by evidence or explicitly remain blockers; R10 automated checks are recorded.
   (Evidence: Task 2 in `docs/acceptance/gui-2026-09-12-remediation.md` at
   `40c6142`, 2026-09-13. Single caveat: one unattributed first-run web-unit
   failure before three consecutive 943/943 reruns — capture the suite name if
   it recurs. R10–R18 manual/device/production gates remain visibly open.)
-- [ ] Production/deferred gates remain visibly open rather than being inferred from green deterministic tests.
-- [ ] A fresh full-suite run, with no approved-baseline changes hidden in it, is linked from the GUI checklist.
+- [x] Production/deferred gates remain visibly open rather than being inferred from green deterministic tests.
+  (Audited 2026-09-13, same section: GUI plan G0/G6/G7/G8/G9, Task 2 R10–R18
+  list, `design_v2.md` §§13/13.2/I6-exception, Phase 2 limitations, I7 spec
+  header — all state the gates open. No green run is cited for any of them.)
+- [x] A fresh full-suite run, with no approved-baseline changes hidden in it, is linked from the GUI checklist.
+  (Task 2 matrix at `40c6142`, linked from the GUI plan execution note.
+  Last baseline-image change is `0680707` owner-approved re-baseline;
+  `7d92b71` touched only spec files; reconciling visuals passed 10/10 with
+  no snapshot update.)

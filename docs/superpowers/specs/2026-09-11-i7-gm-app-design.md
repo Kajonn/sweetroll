@@ -1,6 +1,11 @@
 # I7 GM App Design
 
-Date: 2026-09-11. Status: approved spec, pre-implementation.
+Date: 2026-09-11. Status: approved spec; Phase 1 (setup/members) and Phase 2
+(content/session) landed with acceptance at
+`docs/acceptance/gui-2026-09-11-g7-gm-phase1.md` and
+`docs/acceptance/gui-2026-09-12-g7-gm-phase2.md`. Phase 3 (upgrade) and
+Phase 4 (hardening) remain open; full I7 acceptance is not claimed.
+Reconciliation status: `docs/acceptance/gui-2026-09-12-remediation.md`.
 Authority: `design_v2.md` §17.9 (tasks 1–10), §13 cursor/idempotency/revision
 rules; GUI plan `docs/superpowers/plans/2026-09-08-gui-integration.md` G7 GM
 boxes. Backend contract source: `src/transport/http/campaigns.ts:503-936`.

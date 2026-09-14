@@ -730,7 +730,11 @@ export function CreateCharacter({
               </>
             ) : null}
             {pickerVersions?.length === 0 ? (
-              <EmptyState title={t("character.create.pickVersion.empty")} />
+              <EmptyState
+                title={t("character.create.pickVersion.empty")}
+                description={t("character.create.pickVersion.emptyHint")}
+                action={<a href="/">{t("character.create.pickVersion.emptyAction")}</a>}
+              />
             ) : null}
             <ul>
               {(pickerVersions ?? []).map(v => (

@@ -723,6 +723,25 @@ describe("CreateCharacter", () => {
     }
   });
 
+  it("P1b empty picker guides the user to publish a system first", async () => {
+    const api = makeApi();
+    api.listCreationVersions.mockResolvedValue({ data: { versions: [] }, requestId: "req-empty" });
+    const store = await openStore();
+    try {
+      renderCreate(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
+      );
+      expect(
+        await screen.findByText("No system versions are available for character creation."),
+      ).toBeVisible();
+      expect(await screen.findByText(/publish a version first/i)).toBeVisible();
+      const libraryLink = await screen.findByRole("link", { name: /your systems/i });
+      expect(libraryLink).toHaveAttribute("href", "/");
+    } finally {
+      await store.close();
+    }
+  });
+
   it("P2 selecting a version fills the version box and loads its metadata", async () => {
     const user = userEvent.setup();
     const api = makeApi();

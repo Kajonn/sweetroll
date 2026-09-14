@@ -453,6 +453,8 @@ export const defaultMessages: MessageTable = {
   "character.create.pickVersion.loading": "Loading available versions…",
   "character.create.pickVersion.error": "Available versions could not be loaded. Enter a system version ID manually.",
   "character.create.pickVersion.empty": "No system versions are available for character creation.",
+  "character.create.pickVersion.emptyHint": "Only published system versions can be used. Create or open a system and publish a version first.",
+  "character.create.pickVersion.emptyAction": "Go to your systems",
   "character.create.pickVersion.retry": "Retry loading versions",
   "character.create.pickVersion.loadMore": "Load more versions",
   "character.create.pickVersion.manualTitle": "Or enter a system version ID manually",

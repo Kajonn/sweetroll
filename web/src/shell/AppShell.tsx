@@ -130,6 +130,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [auth, setAuth] = useState<AuthState>({ state: "loading" });
   const [identity, setIdentity] = useState<IdentityGate | null>(null);
+  // The first session check has not settled: the gate reads anonymous until
+  // GET /me resolves, so anonymous-gated content (sign-in panel, prompts,
+  // welcome) must wait for it. Otherwise every full-page navigation flashes
+  // the login screen for a frame before the session resolves.
+  const [booted, setBooted] = useState(false);
   const [storageUnavailable, setStorageUnavailable] = useState(false);
   // Expired sessions read as anonymous but render children so the Account
   // screen owns the re-auth entry (G6 Task 6) instead of the generic prompt.
@@ -160,7 +165,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       };
       const unsubscribe = gate.subscribe(update);
       cleanup = () => { unsubscribe(); gate.dispose(); void store?.close(); };
-      void gate.refresh();
+      void gate.refresh().then(() => { if (!disposed) setBooted(true); });
     }).catch(() => { if (!disposed) setAuth({ state: "anonymous" }); });
     return () => { disposed = true; cleanup(); };
   }, []);
@@ -257,7 +262,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
   const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
   const showFirstRunWelcome =
-    auth.state === "anonymous" && !sessionExpired && pathname !== "/welcome" && isPlayerPath(pathname) && !isOnboardingComplete(null);
+    auth.state === "anonymous" && booted && !sessionExpired && pathname !== "/welcome" && isPlayerPath(pathname) && !isOnboardingComplete(null);
+  // Pre-boot anonymous is transient: the gate reads anonymous until the first
+  // GET /me resolves. Keep rendering children (route skeletons/loading
+  // states, never private data without an actor) instead of flashing the
+  // sign-in panel for a frame on every full-page navigation.
+  const bootAnonymous = auth.state === "anonymous" && !booted;
   return (
     <IdentityContext.Provider value={identity}>
       <AuthProvider initial={auth}>
@@ -302,7 +312,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <ErrorBoundary>
             <main role="main" id="main-content" data-testid="app-content" className={styles.main}>
               {storageUnavailable && <p role="status">{t("shell.characterStorageUnavailable")}</p>}
-              {showFirstRunWelcome ? (
+              {auth.state === "loading" || auth.state === "authenticated" || bootAnonymous ? (
+                children
+              ) : showFirstRunWelcome ? (
                 // Anonymous first-run on player paths sees the welcome inline:
                 // /welcome itself is exempt below and renders the routed
                 // Onboarding, while returning visitors fall through to the

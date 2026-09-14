@@ -209,6 +209,29 @@ describe("AppShell", () => {
     }
   });
 
+  it("does not flash the sign-in panel before the initial session check settles", async () => {
+    vi.stubEnv("MODE", "development");
+    let resolveMe!: (response: Response) => void;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (new URL(url, window.location.origin).pathname === "/api/me") {
+        return new Promise<Response>((resolve) => { resolveMe = resolve; });
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderShell(<AppShell><span data-testid="child">x</span></AppShell>);
+    // Boot refresh pending: children (route skeletons) render, never the sign-in panel.
+    expect(screen.getByTestId("child")).toBeInTheDocument();
+    expect(screen.queryByTestId("dev-signin-panel")).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(
+      fetchMock.mock.calls.some(([url]) => new URL(String(url), window.location.origin).pathname === "/api/me"),
+    ).toBe(true));
+    expect(screen.queryByTestId("dev-signin-panel")).not.toBeInTheDocument();
+    // Session resolves anonymous: the panel appears only now.
+    resolveMe(new Response(JSON.stringify({ state: "anonymous" })));
+    expect(await screen.findByTestId("dev-signin-panel")).toBeInTheDocument();
+  });
+
   it("unmounts the system editor on sign-out with no system data or further fetches", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {

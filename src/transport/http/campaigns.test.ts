@@ -15,6 +15,7 @@ import type {
   InvitationIssueReplay,
   InvitationIssueSuccess,
   InvitationReview,
+  MediaFileView,
   MemberView,
 } from "../../campaigns/index.js";
 import type { Characters } from "../../characters/index.js";
@@ -173,6 +174,21 @@ function characterSummary(): CampaignCharacterSummary {
   };
 }
 
+function mediaFileView(overrides: Partial<MediaFileView> = {}): MediaFileView {
+  return {
+    fileId: randomUUID(),
+    campaignId: randomUUID(),
+    name: "cave",
+    mediaType: "image/png",
+    sizeBytes: 70,
+    width: 1,
+    height: 1,
+    checksum: "deadbeef",
+    revision: 1,
+    ...overrides,
+  };
+}
+
 function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
   const base: Campaigns = {
     create: async () => ({ ok: true, value: campaignView() }),
@@ -263,6 +279,10 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
         migratedCharacterIds: [],
       },
     }),
+    // I7b Task 1: image routes land in a later task; the stub keeps the
+    // seam total while no route calls them yet.
+    uploadImage: async () => ({ ok: true as const, value: mediaFileView() }),
+    deleteImage: async () => ({ ok: true as const, value: mediaFileView() }),
   };
   return { ...base, ...overrides };
 }

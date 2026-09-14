@@ -41,8 +41,7 @@ import {
 } from "./content.js";
 import {
   createInvitationCommands,
-  DEFAULT_INVITATION_RATE_LIMIT,
-  type ConsumeInvitationInput,
+  DEFAULT_INVITATION_RATE_LIMIT,  type ConsumeInvitationInput,
   type InvitationAcceptSuccess,
   type InvitationDeclineSuccess,
   type InvitationIssueReplay,
@@ -60,6 +59,12 @@ import {
   type RevokeInvitationInput,
   type RotateInvitationInput,
 } from "./invitations.js";
+import {
+  createMediaCommands,
+  type DeleteImageInput,
+  type MediaFileView,
+  type UploadImageInput,
+} from "./media.js";
 import {
   authorizeRemoval,
   authorizeRoleChange,
@@ -83,6 +88,12 @@ export type CampaignErrorCode =
   | "result_unavailable"
   | "export_too_large"
   | "rate_limited"
+  // I7b Task 1: campaign image upload validation. Oversized bytes are
+  // `too_large` (HTTP 413); magic-byte/sharp/dimension rejections are
+  // `unprocessable` (HTTP 422). Mapped in STATUS_BY_CODE alongside this
+  // change; no system-package contract is affected.
+  | "too_large"
+  | "unprocessable"
   // I7 Phase 3: per-character mapping/default failures inside commitUpgrade
   // preserve the Characters taxonomy (invalid_value surfaces as HTTP 422,
   // mirroring src/transport/http/characters.ts) instead of collapsing to
@@ -420,6 +431,13 @@ export interface Campaigns {
     ctx: RequestContext,
     input: ExportCampaignInput,
   ): Promise<CampaignResult<CampaignExportSnapshot>>;
+  /**
+   * I7b Task 1: validated private image storage. GM-only (canManageCampaign,
+   * else generic not_found); originals stay on local disk and are never
+   * served by a static route.
+   */
+  uploadImage(ctx: RequestContext, input: UploadImageInput): Promise<CampaignResult<MediaFileView>>;
+  deleteImage(ctx: RequestContext, input: DeleteImageInput): Promise<CampaignResult<MediaFileView>>;
 }
 
 export type {
@@ -430,6 +448,7 @@ export type {
   ContentView,
   CreateContentInput,
   DeleteContentInput,
+  DeleteImageInput,
   ExportCampaignInput,
   InvitationAcceptSuccess,
   InvitationDeclineSuccess,
@@ -448,6 +467,7 @@ export type {
   ListContentResult,
   ListInvitationsInput,
   ListInvitationsResult,
+  MediaFileView,
   OpenContentInput,
   RecoverContentInput,
   ReplaceGrantsInput,
@@ -455,6 +475,7 @@ export type {
   RevokeInvitationInput,
   RotateInvitationInput,
   UpdateContentInput,
+  UploadImageInput,
 };
 
 export type CreateCampaignsModuleInput = {
@@ -868,6 +889,11 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
   // reads and the bounded deterministic export projection.
   const content = createContentCommands({ pool: input.pool, repo, limits, now, newId });
 
+  // I7b Task 1: validated private image storage. Same shared dependencies;
+  // the commands own magic-byte/sharp validation, disk writes and the
+  // metadata rows Tasks 2-4 reference.
+  const media = createMediaCommands({ pool: input.pool, repo, now, newId });
+
   /**
    * I6 Task 9 fix: module-owned placement transaction. Resolves the caller's
    * active membership generation in-transaction (removed members and
@@ -922,6 +948,8 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     replaceGrants: content.replaceGrants,
     listActivity: content.listActivity,
     exportCampaign: content.exportCampaign,
+    uploadImage: media.uploadImage,
+    deleteImage: media.deleteImage,
     async create(ctx, createInput) {
       try {
         const keyError = checkIdempotencyKey(createInput.idempotencyKey);

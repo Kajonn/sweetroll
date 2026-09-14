@@ -17,3 +17,7 @@ services:
 
 volumes:
   sweetroll-postgres:
+  # I7b Task 1: validated image originals (`data/media/<storage_key>`).
+  # The app container mounts it at /app/data/media, e.g.
+  # `docker run -v sweetroll-media:/app/data/media sweetroll`.
+  sweetroll-media:

@@ -259,6 +259,30 @@ export const I3_SCHEMA_DDL = `
   );
   CREATE INDEX campaign_activity_events_page_idx
     ON campaign_activity_events (campaign_id, occurred_at DESC, id DESC);
+  CREATE TABLE media_files (
+    -- Test-fixture copy pinned to migrations/0018_campaign_media.sql: keep
+    -- the media file table/constraint/index definitions below identical to
+    -- that production migration. This DDL only seeds historical test schemas.
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    owner_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    name text NOT NULL,
+    media_type text NOT NULL,
+    size_bytes integer NOT NULL,
+    width integer NOT NULL,
+    height integer NOT NULL,
+    checksum text NOT NULL,
+    storage_key text NOT NULL UNIQUE,
+    revision integer NOT NULL DEFAULT 1,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CHECK (media_type IN ('image/png', 'image/jpeg', 'image/webp')),
+    CHECK (size_bytes > 0),
+    CHECK (width > 0),
+    CHECK (height > 0),
+    CHECK (revision > 0)
+  );
+  CREATE INDEX media_files_page_idx
+    ON media_files (campaign_id, created_at DESC, id DESC);
 
   CREATE TABLE characters (
     id                   uuid PRIMARY KEY,

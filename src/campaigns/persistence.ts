@@ -155,6 +155,26 @@ export type ClaimableCharacterRecord = {
   createdAt: Date;
 };
 
+/**
+ * I7b Task 1: one validated campaign image. Original bytes live on local
+ * disk at `data/media/<storage_key>` (never served by a static route);
+ * Postgres holds this metadata only. Rows cascade with the campaign.
+ */
+export type MediaFileRecord = {
+  fileId: string;
+  campaignId: string;
+  ownerId: string;
+  name: string;
+  mediaType: string;
+  sizeBytes: number;
+  width: number;
+  height: number;
+  checksum: string;
+  storageKey: string;
+  revision: number;
+  createdAt: Date;
+};
+
 export type CampaignReceipt = {
   inputHash: string;
   campaignId: string | null;
@@ -261,6 +281,21 @@ type RollExportRow = {
   occurred_at: Date;
 };
 
+type MediaFileRow = {
+  id: string;
+  campaign_id: string;
+  owner_id: string;
+  name: string;
+  media_type: string;
+  size_bytes: number;
+  width: number;
+  height: number;
+  checksum: string;
+  storage_key: string;
+  revision: number;
+  created_at: Date;
+};
+
 function toCampaignRecord(row: CampaignRow): CampaignRecord {
   if (row.status !== "active" && row.status !== "archived") {
     throw new Error(`Unknown campaign status: ${row.status}`);
@@ -311,6 +346,8 @@ const CAMPAIGN_COLUMNS =
 const MEMBERSHIP_COLUMNS = "campaign_id, user_id, role, status, generation, created_at, updated_at";
 const CONTENT_COLUMNS =
   "id, campaign_id, creator_id, audience, title, body, tags, revision, access_revision, status, deleted_at, created_at, updated_at";
+const MEDIA_COLUMNS =
+  "id, campaign_id, owner_id, name, media_type, size_bytes, width, height, checksum, storage_key, revision, created_at";
 const ACTIVITY_COLUMNS = "id, campaign_id, actor_id, kind, source_content_id, source_roll_id, request_id, occurred_at";
 
 function toContentRecord(row: ContentRow): ContentRecord {
@@ -382,6 +419,26 @@ function toRollExportRecord(row: RollExportRow): RollExportRecord {
     total: row.total,
     output: row.rendered_output,
     occurredAt: row.occurred_at,
+  };
+}
+
+function toMediaFileRecord(row: MediaFileRow): MediaFileRecord {
+  if (row.media_type !== "image/png" && row.media_type !== "image/jpeg" && row.media_type !== "image/webp") {
+    throw new Error(`Unknown media type: ${row.media_type}`);
+  }
+  return {
+    fileId: row.id,
+    campaignId: row.campaign_id,
+    ownerId: row.owner_id,
+    name: row.name,
+    mediaType: row.media_type,
+    sizeBytes: row.size_bytes,
+    width: row.width,
+    height: row.height,
+    checksum: row.checksum,
+    storageKey: row.storage_key,
+    revision: row.revision,
+    createdAt: row.created_at,
   };
 }
 
@@ -1572,6 +1629,85 @@ export function createCampaignPersistenceRepository(pool: Pool) {
         name: row.name,
         systemVersionId: row.system_version_id,
       }));
+    },
+
+    /**
+     * I7b Task 1: media file rows. The validated original bytes already sit
+     * on disk under `storageKey` (written before this insert); the row is
+     * the durability record Tasks 2-4 reference.
+     */
+    async insertMediaFile(
+      client: PoolClient,
+      input: {
+        fileId: string;
+        campaignId: string;
+        ownerId: string;
+        name: string;
+        mediaType: string;
+        sizeBytes: number;
+        width: number;
+        height: number;
+        checksum: string;
+        storageKey: string;
+      },
+    ): Promise<MediaFileRecord> {
+      const result = await client.query<MediaFileRow>(
+        `INSERT INTO media_files
+            (id, campaign_id, owner_id, name, media_type, size_bytes, width, height, checksum, storage_key)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING ${MEDIA_COLUMNS}`,
+        [
+          input.fileId,
+          input.campaignId,
+          input.ownerId,
+          input.name,
+          input.mediaType,
+          input.sizeBytes,
+          input.width,
+          input.height,
+          input.checksum,
+          input.storageKey,
+        ],
+      );
+      const row = result.rows[0];
+      if (row === undefined) throw new Error("insertMediaFile returned no row");
+      return toMediaFileRecord(row);
+    },
+
+    async loadMediaFile(client: DbClient, fileId: string): Promise<MediaFileRecord | null> {
+      const result = await client.query<MediaFileRow>(
+        `SELECT ${MEDIA_COLUMNS} FROM media_files WHERE id = $1`,
+        [fileId],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toMediaFileRecord(row);
+    },
+
+    async lockMediaFile(client: PoolClient, fileId: string): Promise<MediaFileRecord | null> {
+      const result = await client.query<MediaFileRow>(
+        `SELECT ${MEDIA_COLUMNS} FROM media_files WHERE id = $1 FOR UPDATE`,
+        [fileId],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toMediaFileRecord(row);
+    },
+
+    /**
+     * Revision-guarded hard delete: the caller unlinks the disk bytes after
+     * the row is gone. Returns the deleted row for the idempotency receipt.
+     */
+    async deleteMediaFile(
+      client: PoolClient,
+      input: { fileId: string; expectedRevision: number },
+    ): Promise<MediaFileRecord | null> {
+      const result = await client.query<MediaFileRow>(
+        `DELETE FROM media_files
+          WHERE id = $1 AND revision = $2
+          RETURNING ${MEDIA_COLUMNS}`,
+        [input.fileId, input.expectedRevision],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toMediaFileRecord(row);
     },
   };
 }

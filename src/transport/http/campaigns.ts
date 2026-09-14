@@ -37,6 +37,10 @@ const STATUS_BY_CODE: Record<CampaignError["code"], number> = {
   // non-sensitive conflict, never a retry of the same key.
   result_unavailable: 409,
   export_too_large: 413,
+  // I7b Task 1: oversized image bytes surface as 413; undecodable or
+  // over-dimension images surface as 422.
+  too_large: 413,
+  unprocessable: 422,
   // I7 Phase 3: per-character mapping/default rejections from commitUpgrade
   // surface as 422, mirroring the Characters invalid_value mapping.
   invalid_value: 422,

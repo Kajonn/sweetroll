@@ -42,18 +42,21 @@ describe("tokenizeExpression", () => {
     expect(r.tokens.map((t) => t.kind)).toEqual(["lparen", "number", "operator", "number", "rparen"]);
   });
 
-  it("rejects dice notation (not in v0 subset)", () => {
-    const r = tokenizeExpression("4d6");
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.diagnostics[0]!.code).toBe("invalid_syntax");
+  it("accepts the d20 check expression from the shipped fixture", () => {
+    const r = tokenizeExpression("d20 + fields.modifier + inputs.bonus");
+    expect(r.ok).toBe(true);
   });
 
-  it("rejects adv/dis sugar (not in v0 subset)", () => {
+  it("accepts dice notation per grammar v0.1", () => {
+    const r = tokenizeExpression("4d6");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.tokens).toEqual([{ kind: "dice", count: 4, sides: 6, start: 0 }]);
+  });
+
+  it("accepts adv/dis sugar per grammar v0.1", () => {
     const r = tokenizeExpression("adv");
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.diagnostics[0]!.code).toBe("invalid_syntax");
+    expect(r.ok).toBe(true);
   });
 
   it("tokenizes inputs-scope references", () => {

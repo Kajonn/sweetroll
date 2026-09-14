@@ -1,5 +1,8 @@
 export { compileExpression } from "./compile.js";
 export type { CompileResult, CompileExpressionOpts, CompiledExpressionBody } from "./compile.js";
+export { tokenize } from "./tokenizer.js";
+export type { Token, TokenizeResult } from "./tokenizer.js";
+export type { RulesDiagnostic } from "./diagnostic.js";
 export { evaluate } from "./evaluate.js";
 export type { Rng, RollResult, DieResult, RuntimeDiagnostic, EvalResult, EvaluationBindings } from "./evaluate.js";
 export { renderExpression } from "./render.js";

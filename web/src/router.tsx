@@ -18,6 +18,7 @@ import { CharacterLibrary } from "./player/CharacterLibrary.js";
 import { Account } from "./player/Account.js";
 import { Onboarding } from "./player/Onboarding.js";
 import { PersonalActivity } from "./player/PersonalActivity.js";
+import { DisplayView } from "./display/DisplayView.js";
 import { t } from "./i18n/index.js";
 import { DocumentEditor } from "./editor/DocumentEditor.js";
 import { CloneFromTemplate } from "./library/CloneFromTemplate.js";
@@ -88,7 +89,20 @@ export function useCharacterCoordination(
   return coordination;
 }
 
-const rootRoute = createRootRoute({ component: () => <AppShell><Outlet /></AppShell> });
+const rootRoute = createRootRoute({ component: RootRouteView });
+
+/**
+ * Restricted display shell: /display skips AppShell (header nav, sign-in
+ * gate, account chrome) so a shared tablet shows no GM chrome and works
+ * without a GM session. Every other route keeps the shell.
+ */
+function RootRouteView() {
+  const pathname = typeof window === "undefined" ? "/" : window.location.pathname;
+  if (pathname === "/display") {
+    return <Outlet />;
+  }
+  return <AppShell><Outlet /></AppShell>;
+}
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
@@ -168,6 +182,14 @@ const campaignSceneRoute = createRoute({
     sceneId: typeof search.sceneId === "string" ? search.sceneId : "",
   }),
   component: CampaignSceneRouteView,
+});
+const displayRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/display",
+  validateSearch: (search: Record<string, unknown>) => ({
+    sceneId: typeof search.sceneId === "string" ? search.sceneId : "",
+  }),
+  component: DisplayRouteView,
 });
 
 function SystemEditorRoute() {
@@ -578,6 +600,18 @@ function CampaignSceneRouteView() {
   );
 }
 
+/**
+ * Restricted display entry: code form → credential-scoped projection. There
+ * is deliberately no identity gate, no sign-in stash, and no campaign API
+ * use here — the shell must not retain or fetch GM state, and the entry
+ * purge inside DisplayView runs before the first projection fetch.
+ */
+function DisplayRouteView() {
+  const search = displayRoute.useSearch();
+  const api = useMemo(() => createCampaignsApi(createApiClient({ baseUrl: "/api" })), []);
+  return <DisplayView api={api} sceneId={search.sceneId} />;
+}
+
 function CharacterDetailRouteView() {
   const params = useParams({ strict: false });
   const characterId = params["characterId"] ?? "";
@@ -627,7 +661,7 @@ function CharacterDetailRouteView() {
   );
 }
 
-const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute, campaignsRoute, campaignCreateRoute, campaignDetailRoute, campaignSceneRoute, invitationsRoute, welcomeRoute, activityRoute, accountRoute, signInCallbackRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute, campaignsRoute, campaignCreateRoute, campaignDetailRoute, campaignSceneRoute, displayRoute, invitationsRoute, welcomeRoute, activityRoute, accountRoute, signInCallbackRoute]);
 
 export function createAppRouter() {
   const router = createRouter({ routeTree });

@@ -84,6 +84,10 @@ function makeAuthoring(overrides: Partial<SystemAuthoring> = {}): SystemAuthorin
       ok: true,
       value: { kind: "system", systemId: randomUUID(), lifecycle: "archived" },
     }),
+    changeSharing: async (_ctx, input) => ({
+      ok: true,
+      value: { systemId: input.systemId, access: input.access },
+    }),
     deleteSystem: async () => ({ ok: true, value: { systemId: randomUUID() } }),
   };
   return { ...base, ...overrides };
@@ -296,6 +300,47 @@ describe("systems HTTP routes", () => {
     expect(exported.statusCode).toBe(200);
     expect(exported.headers["content-type"]).toContain("application/vnd.sweetroll.system+json");
     expect(exported.json().package.integrity.checksum).toBe(d20Package.integrity.checksum);
+  });
+
+  it("maps PATCH /systems/:systemId access change to changeSharing", async () => {
+    const systemId = randomUUID();
+    let received: unknown;
+    const app = await build(
+      makeAuthoring({
+        changeSharing: async (_ctx, input) => {
+          received = input;
+          return { ok: true, value: { systemId: input.systemId, access: input.access } };
+        },
+      }),
+    );
+    apps.push(app);
+    const headers = { cookie: "session=t" };
+
+    const ok = await app.inject({
+      method: "PATCH",
+      url: `/systems/${systemId}`,
+      headers,
+      payload: { access: "link" },
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(received).toEqual({ systemId, access: "link" });
+    expect(ok.json().sharing).toEqual({ systemId, access: "link" });
+
+    const badAccess = await app.inject({
+      method: "PATCH",
+      url: `/systems/${randomUUID()}`,
+      headers,
+      payload: { access: "galaxy" },
+    });
+    expect(badAccess.statusCode).toBe(400);
+
+    const empty = await app.inject({
+      method: "PATCH",
+      url: `/systems/${randomUUID()}`,
+      headers,
+      payload: {},
+    });
+    expect(empty.statusCode).toBe(400);
   });
 
   it("requires and forwards breaking-change acknowledgement when publishing", async () => {

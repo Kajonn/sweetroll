@@ -219,6 +219,10 @@ export interface SystemPersistenceRepository {
     systemId: SystemId,
     lifecycle: "active" | "archived",
   ): Promise<SystemRecord | null>;
+  updateSystemAccess(
+    systemId: SystemId,
+    access: "private" | "link" | "public",
+  ): Promise<SystemRecord | null>;
   updateVersionLifecycle(
     versionId: VersionId,
     lifecycle: "published" | "deprecated",
@@ -453,6 +457,17 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
           WHERE id = $1
           RETURNING id, owner_id, name, access, lifecycle, created_at, updated_at`,
         [systemId, lifecycle],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toSystemRecord(row);
+    },
+
+    async updateSystemAccess(systemId, access) {
+      const result = await pool.query<SystemRow>(
+        `UPDATE systems SET access = $2, updated_at = now()
+          WHERE id = $1
+          RETURNING id, owner_id, name, access, lifecycle, created_at, updated_at`,
+        [systemId, access],
       );
       const row = result.rows[0];
       return row === undefined ? null : toSystemRecord(row);

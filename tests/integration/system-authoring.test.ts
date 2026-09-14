@@ -924,4 +924,36 @@ describeWithDatabase("SystemAuthoring", () => {
     expect((await pool.query("SELECT id FROM system_versions WHERE id = $1", [version.versionId])).rowCount).toBe(1);
     expect((await pool.query("SELECT id FROM systems WHERE id = $1", [system.systemId])).rowCount).toBe(1);
   });
+
+  it("changes system sharing access for the owner and collapses strangers to not_found", async () => {
+    const owner = await createUser("Ada");
+    const stranger = await createUser("Bob");
+    const created = await authoring.createDraft(ctx(owner), {
+      source: { kind: "blank", name: "Shared Quest" },
+      idempotencyKey: randomUUID(),
+    });
+    if (!created.ok) throw new Error("unexpected");
+    const systemId = created.value.system.systemId;
+    expect(created.value.system.access).toBe("private");
+
+    const shared = await authoring.changeSharing(ctx(owner), { systemId, access: "link" });
+    expect(shared).toEqual({ ok: true, value: { systemId, access: "link" } });
+
+    const opened = await authoring.open(ctx(owner), systemId);
+    if (!opened.ok) throw new Error("unexpected");
+    expect(opened.value.system.access).toBe("link");
+
+    const denied = await authoring.changeSharing(ctx(stranger), { systemId, access: "public" });
+    expect(denied).toEqual({
+      ok: false,
+      error: { code: "not_found", message: "The requested resource does not exist." },
+    });
+
+    const audit = await repo.listAudit(systemId);
+    expect(audit.some((r) => r.kind === "system_sharing_changed")).toBe(true);
+
+    const relisted = await authoring.open(ctx(owner), systemId);
+    if (!relisted.ok) throw new Error("unexpected");
+    expect(relisted.value.system.access).toBe("link");
+  });
 });

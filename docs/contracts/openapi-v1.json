@@ -1417,9 +1417,6 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "lifecycle"
-                ],
                 "properties": {
                   "lifecycle": {
                     "anyOf": [
@@ -1429,6 +1426,22 @@
                       },
                       {
                         "const": "archived",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "access": {
+                    "anyOf": [
+                      {
+                        "const": "private",
+                        "type": "string"
+                      },
+                      {
+                        "const": "link",
+                        "type": "string"
+                      },
+                      {
+                        "const": "public",
                         "type": "string"
                       }
                     ]
@@ -1456,7 +1469,6 @@
                 "schema": {
                   "type": "object",
                   "required": [
-                    "lifecycle",
                     "requestId"
                   ],
                   "properties": {
@@ -1489,6 +1501,22 @@
                           "type": "string"
                         },
                         "lifecycle": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "sharing": {
+                      "type": "object",
+                      "required": [
+                        "systemId",
+                        "access"
+                      ],
+                      "properties": {
+                        "systemId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "access": {
                           "type": "string"
                         }
                       }

@@ -169,6 +169,16 @@ export type LifecycleResult =
   | { kind: "system"; systemId: SystemId; lifecycle: string }
   | { kind: "version"; versionId: VersionId; systemId: SystemId; lifecycle: string };
 
+export type ChangeSharingInput = {
+  systemId: SystemId;
+  access: "private" | "link" | "public";
+};
+
+export type SharingResult = {
+  systemId: SystemId;
+  access: string;
+};
+
 export interface SystemAuthoring {
   createDraft(ctx: RequestContext, input: CreateDraftInput): Promise<Result<AuthoringWorkspace>>;
   open(ctx: RequestContext, systemId: SystemId): Promise<Result<AuthoringWorkspace>>;
@@ -193,6 +203,7 @@ export interface SystemAuthoring {
     input: ListVersionsInput,
   ): Promise<Result<ListVersionsResult>>;
   changeLifecycle(ctx: RequestContext, input: LifecycleChangeInput): Promise<Result<LifecycleResult>>;
+  changeSharing(ctx: RequestContext, input: ChangeSharingInput): Promise<Result<SharingResult>>;
   deleteSystem(ctx: RequestContext, systemId: SystemId): Promise<Result<{ systemId: SystemId }>>;
 }
 
@@ -695,6 +706,31 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
             systemId: updated.systemId,
             lifecycle: updated.lifecycle,
           },
+        };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async changeSharing(ctx, input) {
+      try {
+        if (input.access !== "private" && input.access !== "link" && input.access !== "public") {
+          return { ok: false, error: errors.bad_request("access must be private, link, or public.") };
+        }
+        const system = await authorizeOwner(input.systemId, ctx.actorId);
+        if (system === null) return { ok: false, error: errors.not_found() };
+        const updated = await repo.updateSystemAccess(input.systemId, input.access);
+        if (updated === null) return { ok: false, error: errors.not_found() };
+        await repo.appendAudit({
+          systemId: updated.systemId,
+          actorId: ctx.actorId,
+          kind: "system_sharing_changed",
+          summary: `System sharing changed to ${updated.access}`,
+          requestId: ctx.requestId,
+        });
+        return {
+          ok: true,
+          value: { systemId: updated.systemId, access: updated.access },
         };
       } catch {
         return { ok: false, error: errors.internal() };

@@ -1419,7 +1419,8 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    lifecycle: "active" | "archived";
+                    lifecycle?: "active" | "archived";
+                    access?: "private" | "link" | "public";
                 };
             };
         };
@@ -1430,13 +1431,18 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        lifecycle: {
+                        lifecycle?: {
                             kind: "system" | "version";
                             /** Format: uuid */
                             systemId: string;
                             /** Format: uuid */
                             versionId?: string;
                             lifecycle: string;
+                        };
+                        sharing?: {
+                            /** Format: uuid */
+                            systemId: string;
+                            access: string;
                         };
                         requestId: string;
                     };

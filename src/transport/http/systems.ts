@@ -144,7 +144,8 @@ const PublishBody = Type.Object({
 });
 
 const ChangeSystemLifecycleBody = Type.Object({
-  lifecycle: Type.Union([Type.Literal("active"), Type.Literal("archived")]),
+  lifecycle: Type.Optional(Type.Union([Type.Literal("active"), Type.Literal("archived")])),
+  access: Type.Optional(Type.Union([Type.Literal("private"), Type.Literal("link"), Type.Literal("public")])),
 });
 
 const DeprecateVersionBody = Type.Object({
@@ -179,6 +180,11 @@ const LifecycleResultDto = Type.Object({
   systemId: Type.String({ format: UUID_FORMAT }),
   versionId: Type.Optional(Type.String({ format: UUID_FORMAT })),
   lifecycle: Type.String(),
+});
+
+const SharingResultDto = Type.Object({
+  systemId: Type.String({ format: UUID_FORMAT }),
+  access: Type.String(),
 });
 
 const ErrorResponses = {
@@ -328,7 +334,11 @@ export const systemsRouteDefinitions: readonly SystemsRouteDefinition[] = [
       params: SystemIdParams,
       body: ChangeSystemLifecycleBody,
       response: {
-        "200": Type.Object({ lifecycle: LifecycleResultDto, requestId: Type.String() }),
+        "200": Type.Object({
+          lifecycle: Type.Optional(LifecycleResultDto),
+          sharing: Type.Optional(SharingResultDto),
+          requestId: Type.String(),
+        }),
         "400": ErrorEnvelope,
         "401": UnauthorizedEnvelope,
         "404": ErrorEnvelope,
@@ -578,17 +588,36 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
 
       patch_systems_systemId: async (request, reply) => {
         const params = request.params as { systemId: string };
-        const body = request.body as { lifecycle?: unknown } | undefined;
-        if (body === undefined || (body.lifecycle !== "active" && body.lifecycle !== "archived")) {
-          return sendError(reply, badRequest("lifecycle must be active or archived."), request.id);
+        const body = request.body as { lifecycle?: unknown; access?: unknown } | undefined;
+        const lifecycleValid =
+          body?.lifecycle === undefined || body.lifecycle === "active" || body.lifecycle === "archived";
+        const accessValid =
+          body?.access === undefined ||
+          body.access === "private" ||
+          body.access === "link" ||
+          body.access === "public";
+        if (body === undefined || !lifecycleValid || !accessValid || (body.lifecycle === undefined && body.access === undefined)) {
+          return sendError(reply, badRequest("Body must include lifecycle (active or archived) and/or access (private, link, or public)."), request.id);
         }
-        const result = await authoring.changeLifecycle(ctxOf(request), {
-          kind: "system",
-          systemId: params.systemId,
-          lifecycle: body.lifecycle,
-        });
-        if (!result.ok) return sendError(reply, result.error, request.id);
-        return { lifecycle: result.value, requestId: request.id };
+        const out: { lifecycle?: unknown; sharing?: unknown } = {};
+        if (body.lifecycle !== undefined) {
+          const result = await authoring.changeLifecycle(ctxOf(request), {
+            kind: "system",
+            systemId: params.systemId,
+            lifecycle: body.lifecycle as "active" | "archived",
+          });
+          if (!result.ok) return sendError(reply, result.error, request.id);
+          out.lifecycle = result.value;
+        }
+        if (body.access !== undefined) {
+          const result = await authoring.changeSharing(ctxOf(request), {
+            systemId: params.systemId,
+            access: body.access as "private" | "link" | "public",
+          });
+          if (!result.ok) return sendError(reply, result.error, request.id);
+          out.sharing = result.value;
+        }
+        return { ...out, requestId: request.id };
       },
 
       delete_systems_systemId: async (request, reply) => {

@@ -6,6 +6,7 @@ import { t } from "../i18n/index.js";
 import { Button } from "../ui/index.js";
 
 import { CreateDraftDialog } from "./CreateDraftDialog.js";
+import { SystemSharing } from "./SystemSharing.js";
 import styles from "./SystemLibrary.module.css";
 
 export function SystemLibrary({ client }: { client: ApiClient }) {
@@ -38,6 +39,7 @@ export function SystemLibrary({ client }: { client: ApiClient }) {
           <li key={s.systemId} data-testid={`system-row-${i}`} tabIndex={-1}>
             <a href={`/systems/${s.systemId}`}>{s.name}</a>
             <span>{s.lifecycle}</span>
+            <SystemSharing client={client} system={s} />
           </li>
         ))}
         {hasNextPage === true && <li><Button variant="secondary" onClick={() => fetchNextPage()}>{t("library.loadMore")}</Button></li>}

@@ -175,6 +175,23 @@ export type MediaFileRecord = {
   createdAt: Date;
 };
 
+/**
+ * I7b Task 2: one GM-composed fog/token scene. Fog ops and token records
+ * live as JSONB on the row; `backgroundFileId` pins a Task 1 media row by
+ * application-checked convention (no FK, so pinned-image deletes keep
+ * working). Rows cascade with the campaign. The `fog`/`tokens` payloads
+ * stay `unknown` here; `src/campaigns/scenes.ts` owns their shapes.
+ */
+export type SceneRecord = {
+  sceneId: string;
+  campaignId: string;
+  backgroundFileId: string;
+  revision: number;
+  fog: unknown;
+  tokens: unknown;
+  createdAt: Date;
+};
+
 export type CampaignReceipt = {
   inputHash: string;
   campaignId: string | null;
@@ -296,6 +313,16 @@ type MediaFileRow = {
   created_at: Date;
 };
 
+type SceneRow = {
+  id: string;
+  campaign_id: string;
+  background_file_id: string;
+  revision: number;
+  fog_jsonb: unknown;
+  tokens_jsonb: unknown;
+  created_at: Date;
+};
+
 function toCampaignRecord(row: CampaignRow): CampaignRecord {
   if (row.status !== "active" && row.status !== "archived") {
     throw new Error(`Unknown campaign status: ${row.status}`);
@@ -348,6 +375,8 @@ const CONTENT_COLUMNS =
   "id, campaign_id, creator_id, audience, title, body, tags, revision, access_revision, status, deleted_at, created_at, updated_at";
 const MEDIA_COLUMNS =
   "id, campaign_id, owner_id, name, media_type, size_bytes, width, height, checksum, storage_key, revision, created_at";
+const SCENE_COLUMNS =
+  "id, campaign_id, background_file_id, revision, fog_jsonb, tokens_jsonb, created_at";
 const ACTIVITY_COLUMNS = "id, campaign_id, actor_id, kind, source_content_id, source_roll_id, request_id, occurred_at";
 
 function toContentRecord(row: ContentRow): ContentRecord {
@@ -438,6 +467,18 @@ function toMediaFileRecord(row: MediaFileRow): MediaFileRecord {
     checksum: row.checksum,
     storageKey: row.storage_key,
     revision: row.revision,
+    createdAt: row.created_at,
+  };
+}
+
+function toSceneRecord(row: SceneRow): SceneRecord {
+  return {
+    sceneId: row.id,
+    campaignId: row.campaign_id,
+    backgroundFileId: row.background_file_id,
+    revision: row.revision,
+    fog: row.fog_jsonb,
+    tokens: row.tokens_jsonb,
     createdAt: row.created_at,
   };
 }
@@ -1708,6 +1749,106 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       );
       const row = result.rows[0];
       return row === undefined ? null : toMediaFileRecord(row);
+    },
+
+    /**
+     * I7b Task 2: scene rows. New scenes start fully fogged with zero
+     * tokens (`fog_jsonb`/`tokens_jsonb` default to `[]`); every mutation
+     * below bumps `revision` under the caller's optimistic guard.
+     */
+    async insertScene(
+      client: PoolClient,
+      input: { sceneId: string; campaignId: string; backgroundFileId: string },
+    ): Promise<SceneRecord> {
+      const result = await client.query<SceneRow>(
+        `INSERT INTO scenes (id, campaign_id, background_file_id)
+          VALUES ($1, $2, $3)
+          RETURNING ${SCENE_COLUMNS}`,
+        [input.sceneId, input.campaignId, input.backgroundFileId],
+      );
+      const row = result.rows[0];
+      if (row === undefined) throw new Error("insertScene returned no row");
+      return toSceneRecord(row);
+    },
+
+    async loadScene(client: DbClient, sceneId: string): Promise<SceneRecord | null> {
+      const result = await client.query<SceneRow>(`SELECT ${SCENE_COLUMNS} FROM scenes WHERE id = $1`, [
+        sceneId,
+      ]);
+      const row = result.rows[0];
+      return row === undefined ? null : toSceneRecord(row);
+    },
+
+    async lockScene(client: PoolClient, sceneId: string): Promise<SceneRecord | null> {
+      const result = await client.query<SceneRow>(
+        `SELECT ${SCENE_COLUMNS} FROM scenes WHERE id = $1 FOR UPDATE`,
+        [sceneId],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toSceneRecord(row);
+    },
+
+    /**
+     * Revision-guarded background swap. The caller checks the replacement
+     * file belongs to the same campaign before calling.
+     */
+    async updateSceneBackground(
+      client: PoolClient,
+      input: { sceneId: string; backgroundFileId: string; expectedRevision: number },
+    ): Promise<SceneRecord | null> {
+      const result = await client.query<SceneRow>(
+        `UPDATE scenes
+            SET background_file_id = $2,
+                revision = revision + 1
+          WHERE id = $1 AND revision = $3
+          RETURNING ${SCENE_COLUMNS}`,
+        [input.sceneId, input.backgroundFileId, input.expectedRevision],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toSceneRecord(row);
+    },
+
+    /**
+     * Revision-guarded fog append: one op per call, concatenated onto the
+     * stored array in SQL so the read-modify-write stays a single guarded
+     * statement. Concurrent strokes never merge — the loser conflicts.
+     */
+    async appendSceneFogOp(
+      client: PoolClient,
+      input: { sceneId: string; fogOp: unknown; expectedRevision: number },
+    ): Promise<SceneRecord | null> {
+      const result = await client.query<SceneRow>(
+        `UPDATE scenes
+            SET fog_jsonb = fog_jsonb || $2::jsonb,
+                revision = revision + 1
+          WHERE id = $1 AND revision = $3
+          RETURNING ${SCENE_COLUMNS}`,
+        [input.sceneId, JSON.stringify([input.fogOp]), input.expectedRevision],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toSceneRecord(row);
+    },
+
+    /**
+     * Revision-guarded token replacement: the caller computes the full new
+     * array from the locked row (place/move/remove) and swaps it here under
+     * the same guard, so a concurrent mutation conflicts instead of
+     * clobbering.
+     */
+    async updateSceneTokens(
+      client: PoolClient,
+      input: { sceneId: string; tokens: unknown; expectedRevision: number },
+    ): Promise<SceneRecord | null> {
+      const result = await client.query<SceneRow>(
+        `UPDATE scenes
+            SET tokens_jsonb = $2::jsonb,
+                revision = revision + 1
+          WHERE id = $1 AND revision = $3
+          RETURNING ${SCENE_COLUMNS}`,
+        [input.sceneId, JSON.stringify(input.tokens), input.expectedRevision],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toSceneRecord(row);
     },
   };
 }

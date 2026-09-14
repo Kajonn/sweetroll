@@ -283,6 +283,21 @@ export const I3_SCHEMA_DDL = `
   );
   CREATE INDEX media_files_page_idx
     ON media_files (campaign_id, created_at DESC, id DESC);
+  CREATE TABLE scenes (
+    -- Test-fixture copy pinned to migrations/0019_campaign_scenes.sql: keep
+    -- the scene table/constraint/index definitions below identical to that
+    -- production migration. This DDL only seeds historical test schemas.
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    background_file_id uuid NOT NULL,
+    revision integer NOT NULL DEFAULT 1,
+    fog_jsonb jsonb NOT NULL DEFAULT '[]'::jsonb,
+    tokens_jsonb jsonb NOT NULL DEFAULT '[]'::jsonb,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CHECK (revision > 0)
+  );
+  CREATE INDEX scenes_page_idx
+    ON scenes (campaign_id, created_at DESC, id DESC);
 
   CREATE TABLE characters (
     id                   uuid PRIMARY KEY,

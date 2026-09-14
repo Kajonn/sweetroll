@@ -17,6 +17,7 @@ import type {
   InvitationReview,
   MediaFileView,
   MemberView,
+  SceneView,
 } from "../../campaigns/index.js";
 import type { Characters } from "../../characters/index.js";
 import type { CharacterView } from "../../characters/index.js";
@@ -189,6 +190,18 @@ function mediaFileView(overrides: Partial<MediaFileView> = {}): MediaFileView {
   };
 }
 
+function sceneView(overrides: Partial<SceneView> = {}): SceneView {
+  return {
+    sceneId: randomUUID(),
+    campaignId: randomUUID(),
+    revision: 1,
+    backgroundFileId: randomUUID(),
+    fog: [],
+    tokens: [],
+    ...overrides,
+  };
+}
+
 function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
   const base: Campaigns = {
     create: async () => ({ ok: true, value: campaignView() }),
@@ -283,6 +296,14 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
     // seam total while no route calls them yet.
     uploadImage: async () => ({ ok: true as const, value: mediaFileView() }),
     deleteImage: async () => ({ ok: true as const, value: mediaFileView() }),
+    // I7b Task 2: scene routes land in a later task; the stub keeps the
+    // seam total while no route calls them yet.
+    createScene: async () => ({ ok: true as const, value: sceneView() }),
+    updateScene: async () => ({ ok: true as const, value: sceneView() }),
+    applyFogEdit: async () => ({ ok: true as const, value: sceneView() }),
+    placeToken: async () => ({ ok: true as const, value: sceneView() }),
+    moveToken: async () => ({ ok: true as const, value: sceneView() }),
+    removeToken: async () => ({ ok: true as const, value: sceneView() }),
   };
   return { ...base, ...overrides };
 }

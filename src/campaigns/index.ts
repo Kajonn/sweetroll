@@ -66,6 +66,18 @@ import {
   type UploadImageInput,
 } from "./media.js";
 import {
+  createSceneCommands,
+  type ApplyFogEditInput,
+  type CreateSceneInput,
+  type FogOp,
+  type MoveTokenInput,
+  type PlaceTokenInput,
+  type RemoveTokenInput,
+  type SceneView,
+  type TokenRecord,
+  type UpdateSceneInput,
+} from "./scenes.js";
+import {
   authorizeRemoval,
   authorizeRoleChange,
   canChangeLifecycle,
@@ -438,18 +450,34 @@ export interface Campaigns {
    */
   uploadImage(ctx: RequestContext, input: UploadImageInput): Promise<CampaignResult<MediaFileView>>;
   deleteImage(ctx: RequestContext, input: DeleteImageInput): Promise<CampaignResult<MediaFileView>>;
+  /**
+   * I7b Task 2: revision-guarded scene, fog and token commands. GM-only
+   * (canManageCampaign, else generic not_found); backgrounds and token
+   * images must belong to the scene's campaign. Stale
+   * `expectedSceneRevision` values conflict with `latestRevision` and write
+   * nothing; every mutation is idempotent on its key.
+   */
+  createScene(ctx: RequestContext, input: CreateSceneInput): Promise<CampaignResult<SceneView>>;
+  updateScene(ctx: RequestContext, input: UpdateSceneInput): Promise<CampaignResult<SceneView>>;
+  applyFogEdit(ctx: RequestContext, input: ApplyFogEditInput): Promise<CampaignResult<SceneView>>;
+  placeToken(ctx: RequestContext, input: PlaceTokenInput): Promise<CampaignResult<SceneView>>;
+  moveToken(ctx: RequestContext, input: MoveTokenInput): Promise<CampaignResult<SceneView>>;
+  removeToken(ctx: RequestContext, input: RemoveTokenInput): Promise<CampaignResult<SceneView>>;
 }
 
 export type {
   ActivityEventView,
+  ApplyFogEditInput,
   CampaignExportSnapshot,
   ConsumeInvitationInput,
   ContentSummary,
   ContentView,
   CreateContentInput,
+  CreateSceneInput,
   DeleteContentInput,
   DeleteImageInput,
   ExportCampaignInput,
+  FogOp,
   InvitationAcceptSuccess,
   InvitationDeclineSuccess,
   InvitationIssueReplay,
@@ -468,13 +496,19 @@ export type {
   ListInvitationsInput,
   ListInvitationsResult,
   MediaFileView,
+  MoveTokenInput,
   OpenContentInput,
+  PlaceTokenInput,
   RecoverContentInput,
+  RemoveTokenInput,
   ReplaceGrantsInput,
   ReviewInvitationInput,
   RevokeInvitationInput,
   RotateInvitationInput,
+  SceneView,
+  TokenRecord,
   UpdateContentInput,
+  UpdateSceneInput,
   UploadImageInput,
 };
 
@@ -894,6 +928,11 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
   // metadata rows Tasks 2-4 reference.
   const media = createMediaCommands({ pool: input.pool, repo, now, newId });
 
+  // I7b Task 2: revision-guarded scene/fog/token commands. Same shared
+  // dependencies; the commands own guard checks, same-campaign pin checks
+  // and the JSONB fog/token mutations Tasks 3-4 project and serve.
+  const scenes = createSceneCommands({ pool: input.pool, repo, now, newId });
+
   /**
    * I6 Task 9 fix: module-owned placement transaction. Resolves the caller's
    * active membership generation in-transaction (removed members and
@@ -950,6 +989,12 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     exportCampaign: content.exportCampaign,
     uploadImage: media.uploadImage,
     deleteImage: media.deleteImage,
+    createScene: scenes.createScene,
+    updateScene: scenes.updateScene,
+    applyFogEdit: scenes.applyFogEdit,
+    placeToken: scenes.placeToken,
+    moveToken: scenes.moveToken,
+    removeToken: scenes.removeToken,
     async create(ctx, createInput) {
       try {
         const keyError = checkIdempotencyKey(createInput.idempotencyKey);

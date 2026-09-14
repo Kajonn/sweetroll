@@ -1,6 +1,7 @@
 // GM token tray: owns the place form plus one move form per token.
-// Coordinates are numeric inputs with arrow nudge buttons (the keyboard
-// alternatives to dragging). Commits mint fresh idempotency keys; 409
+// The committing keyboard alternative to dragging is the numeric X/Y
+// inputs plus the Move button (nudge buttons only stage coordinates).
+// Commits mint fresh idempotency keys; 409
 // re-reads first and offers an explicit retry, never revision guessing.
 import { useState } from "react";
 

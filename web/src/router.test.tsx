@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
 
 import { createTestLocks, makeView } from "./characters/testing.js";
+import { POST_SIGNIN_STORAGE_KEY, takePostSigninPath } from "./characters/identity.js";
 import type { CharacterView, CommandResultResponse } from "./characters/types.js";
 import { openCharacterStore } from "./characters/store.js";
 import { createAppRouter, creationViewKey, useCharacterCoordination } from "./router.js";
@@ -151,6 +152,33 @@ describe("router", () => {
     expect(creationViewKey("actor-1", 3, "v-1")).not.toBe(creationViewKey("actor-1", 4, "v-1"));
     expect(creationViewKey("actor-1", 3, "v-1")).not.toBe(creationViewKey("actor-1", 3, "v-2"));
     expect(creationViewKey(null, 3, "v-1")).not.toBe(creationViewKey("actor-1", 3, "v-1"));
+  });
+
+  it("preserves the scene deep link with sceneId across the sign-in round-trip", async () => {
+    sessionStorage.removeItem(POST_SIGNIN_STORAGE_KEY);
+    const fetch_ = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input), window.location.origin);
+      if (url.pathname === "/api/me") {
+        return new Response(JSON.stringify({ state: "anonymous" }));
+      }
+      return new Promise<Response>(() => {});
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetch_ as unknown as typeof fetch;
+    try {
+      renderAt("/campaigns/c1/scenes?sceneId=s1");
+      await waitFor(
+        () => expect(screen.getByRole("heading", { name: "Scene" })).toBeInTheDocument(),
+        { timeout: 10000 },
+      );
+      // Store then restore: the anonymous scene route stashes the full deep
+      // link (including ?sceneId=) and the /cb leg consumes it once.
+      expect(takePostSigninPath()).toBe("/campaigns/c1/scenes?sceneId=s1");
+      expect(takePostSigninPath()).toBe("/characters");
+    } finally {
+      globalThis.fetch = originalFetch;
+      window.history.pushState({}, "", "/");
+    }
   });
 });
 

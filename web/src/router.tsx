@@ -555,7 +555,8 @@ function CampaignSceneRouteView() {
   }
   const actorId = identity.getActorId();
   if (actorId === null) {
-    storePostSigninPath(`/campaigns/${campaignId}/scenes`);
+    const sceneQuery = search.sceneId !== "" ? `?sceneId=${encodeURIComponent(search.sceneId)}` : "";
+    storePostSigninPath(`/campaigns/${campaignId}/scenes${sceneQuery}`);
     return (
       <section aria-labelledby="campaign-scene-title">
         <h1 id="campaign-scene-title">{t("campaign.detail.scenes.title")}</h1>

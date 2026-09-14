@@ -1871,8 +1871,59 @@ describe("campaign media/scene/display HTTP routes (I7b Task 4)", () => {
     expect(revoked.json()).toEqual({ display: { displayId: firstId }, requestId: expect.any(String) });
     expect(received).toEqual({ displayId: firstId });
 
+    // A credential owned elsewhere reads as 404 through this campaign's URL
+    // WITHOUT revoking: the namespace pre-check runs before any mutation.
+    let revokeCalls = 0;
+    const scoped = await build({
+      campaigns: makeCampaigns({
+        listDisplayCredentials: async (_ctx, input) => {
+          expect(input).toEqual({ campaignId });
+          return { ok: true as const, value: [] };
+        },
+        revokeDisplay: async () => {
+          revokeCalls += 1;
+          return { ok: true as const, value: { displayId: firstId } };
+        },
+      }),
+    });
+    const wrongCampaign = await scoped.inject({
+      method: "POST",
+      url: `/campaigns/${campaignId}/displays/${firstId}/revoke`,
+      headers: cookie,
+      payload: {},
+    });
+    expect(wrongCampaign.statusCode).toBe(404);
+    expect(wrongCampaign.json().error.code).toBe("not_found");
+    expect(wrongCampaign.json()).not.toHaveProperty("display");
+    expect(revokeCalls).toBe(0);
+
+    // The pre-check failure propagates the same way: an outsider of :id
+    // cannot reach the revoke call either.
+    let outsiderRevokeCalls = 0;
+    const unscoped = await build({
+      campaigns: makeCampaigns({
+        listDisplayCredentials: async () => ({ ok: false, error: { code: "not_found", message: "nope" } }),
+        revokeDisplay: async () => {
+          outsiderRevokeCalls += 1;
+          return { ok: true as const, value: { displayId: firstId } };
+        },
+      }),
+    });
+    const outsider = await unscoped.inject({
+      method: "POST",
+      url: `/campaigns/${campaignId}/displays/${firstId}/revoke`,
+      headers: cookie,
+      payload: {},
+    });
+    expect(outsider.statusCode).toBe(404);
+    expect(outsiderRevokeCalls).toBe(0);
+
     const denied = await build({
       campaigns: makeCampaigns({
+        listDisplayCredentials: async () => ({
+          ok: true as const,
+          value: [{ displayId: firstId, campaignId, revokedAt: null, createdAt: new Date(0) }],
+        }),
         revokeDisplay: async () => ({ ok: false, error: { code: "not_found", message: "nope" } }),
       }),
     });

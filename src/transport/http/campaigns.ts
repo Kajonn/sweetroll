@@ -2505,10 +2505,23 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
       },
 
       post_campaigns_id_displays_displayId_revoke: async (request, reply) => {
-        // The :id segment is namespacing only: the module authorizes against
-        // the credential's owning campaign and purges that campaign's cached
-        // derivatives (which regenerate lazily on the next projection).
-        const params = request.params as { displayId: string };
+        // The :id segment names the campaign: the credential must be listed
+        // under this campaign before anything is revoked, so a wrong-:id URL
+        // reads as not_found WITHOUT revoking (mirroring the image
+        // delete/original owner checks, but pre-mutation — a committed
+        // revoke cannot be un-revoked). The module then authorizes against
+        // the owning campaign and purges that campaign's cached derivatives
+        // (which regenerate lazily on the next projection).
+        const params = request.params as { id: string; displayId: string };
+        const scoped = await campaigns.listDisplayCredentials(ctxOf(request), { campaignId: params.id });
+        if (!scoped.ok) return sendError(reply, scoped.error, request.id);
+        if (!scoped.value.some((entry) => entry.displayId === params.displayId)) {
+          return sendError(
+            reply,
+            { code: "not_found", message: "The requested campaign does not exist." },
+            request.id,
+          );
+        }
         const result = await campaigns.revokeDisplay(ctxOf(request), { displayId: params.displayId });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { display: result.value, requestId: request.id };

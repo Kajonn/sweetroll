@@ -78,6 +78,17 @@ import {
   type UpdateSceneInput,
 } from "./scenes.js";
 import {
+  createDisplayCommands,
+  type DisplayProjection,
+  type GetDisplayProjectionInput,
+  type PairDisplayInput,
+  type PairDisplaySuccess,
+  type RedeemDisplayCodeInput,
+  type RedeemDisplayCodeSuccess,
+  type RevokeDisplayInput,
+  type RevokeDisplaySuccess,
+} from "./display.js";
+import {
   authorizeRemoval,
   authorizeRoleChange,
   canChangeLifecycle,
@@ -463,6 +474,20 @@ export interface Campaigns {
   placeToken(ctx: RequestContext, input: PlaceTokenInput): Promise<CampaignResult<SceneView>>;
   moveToken(ctx: RequestContext, input: MoveTokenInput): Promise<CampaignResult<SceneView>>;
   removeToken(ctx: RequestContext, input: RemoveTokenInput): Promise<CampaignResult<SceneView>>;
+  /**
+   * I7b Task 3: restricted display pairing + redacted projection. `pairDisplay`
+   * (GM only) mints a single-use 6-char code (5-min TTL, hash stored);
+   * `redeemDisplayCode` (unauthenticated, display-side) consumes the code for
+   * a revocable credential; `getDisplayProjection` (credential-scoped, no GM
+   * session) returns the visible-and-revealed projection with fog-concealed
+   * pixels removed server-side; `revokeDisplay` (GM only) kills the
+   * credential. Unknown/expired/used/revoked credentials collapse to generic
+   * `not_found`.
+   */
+  pairDisplay(ctx: RequestContext, input: PairDisplayInput): Promise<CampaignResult<PairDisplaySuccess>>;
+  redeemDisplayCode(input: RedeemDisplayCodeInput): Promise<CampaignResult<RedeemDisplayCodeSuccess>>;
+  getDisplayProjection(input: GetDisplayProjectionInput): Promise<CampaignResult<DisplayProjection>>;
+  revokeDisplay(ctx: RequestContext, input: RevokeDisplayInput): Promise<CampaignResult<RevokeDisplaySuccess>>;
 }
 
 export type {
@@ -476,8 +501,10 @@ export type {
   CreateSceneInput,
   DeleteContentInput,
   DeleteImageInput,
+  DisplayProjection,
   ExportCampaignInput,
   FogOp,
+  GetDisplayProjectionInput,
   InvitationAcceptSuccess,
   InvitationDeclineSuccess,
   InvitationIssueReplay,
@@ -498,11 +525,17 @@ export type {
   MediaFileView,
   MoveTokenInput,
   OpenContentInput,
+  PairDisplayInput,
+  PairDisplaySuccess,
   PlaceTokenInput,
   RecoverContentInput,
+  RedeemDisplayCodeInput,
+  RedeemDisplayCodeSuccess,
   RemoveTokenInput,
   ReplaceGrantsInput,
   ReviewInvitationInput,
+  RevokeDisplayInput,
+  RevokeDisplaySuccess,
   RevokeInvitationInput,
   RotateInvitationInput,
   SceneView,
@@ -933,6 +966,12 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
   // and the JSONB fog/token mutations Tasks 3-4 project and serve.
   const scenes = createSceneCommands({ pool: input.pool, repo, now, newId });
 
+  // I7b Task 3: display pairing + redacted projection. Same shared
+  // dependencies; the commands own code minting (hash-only storage),
+  // single-use redeem, credential validation and the sharp redaction
+  // composite Tasks 4-5 and 7 serve and poll.
+  const display = createDisplayCommands({ pool: input.pool, repo, now, newId });
+
   /**
    * I6 Task 9 fix: module-owned placement transaction. Resolves the caller's
    * active membership generation in-transaction (removed members and
@@ -995,6 +1034,10 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     placeToken: scenes.placeToken,
     moveToken: scenes.moveToken,
     removeToken: scenes.removeToken,
+    pairDisplay: display.pairDisplay,
+    redeemDisplayCode: display.redeemDisplayCode,
+    getDisplayProjection: display.getDisplayProjection,
+    revokeDisplay: display.revokeDisplay,
     async create(ctx, createInput) {
       try {
         const keyError = checkIdempotencyKey(createInput.idempotencyKey);

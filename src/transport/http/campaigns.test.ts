@@ -11,6 +11,7 @@ import type {
   Campaigns,
   CampaignView,
   ContentView,
+  DisplayProjection,
   InvitationAcceptSuccess,
   InvitationIssueReplay,
   InvitationIssueSuccess,
@@ -202,6 +203,18 @@ function sceneView(overrides: Partial<SceneView> = {}): SceneView {
   };
 }
 
+function displayProjection(overrides: Partial<DisplayProjection> = {}): DisplayProjection {
+  const sceneId = randomUUID();
+  const displayId = randomUUID();
+  return {
+    sceneId,
+    sceneRevision: 1,
+    imageUrl: `/displays/${displayId}/scenes/${sceneId}/image?rev=1`,
+    tokens: [],
+    ...overrides,
+  };
+}
+
 function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
   const base: Campaigns = {
     create: async () => ({ ok: true, value: campaignView() }),
@@ -304,6 +317,15 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
     placeToken: async () => ({ ok: true as const, value: sceneView() }),
     moveToken: async () => ({ ok: true as const, value: sceneView() }),
     removeToken: async () => ({ ok: true as const, value: sceneView() }),
+    // I7b Task 3: display routes land in a later task; the stub keeps the
+    // seam total while no route calls them yet.
+    pairDisplay: async () => ({ ok: true as const, value: { code: "ABC123" } }),
+    redeemDisplayCode: async () => ({
+      ok: true as const,
+      value: { displayId: randomUUID(), secret: "secret" },
+    }),
+    getDisplayProjection: async () => ({ ok: true as const, value: displayProjection() }),
+    revokeDisplay: async () => ({ ok: true as const, value: { displayId: randomUUID() } }),
   };
   return { ...base, ...overrides };
 }

@@ -298,6 +298,28 @@ export const I3_SCHEMA_DDL = `
   );
   CREATE INDEX scenes_page_idx
     ON scenes (campaign_id, created_at DESC, id DESC);
+  CREATE TABLE display_codes (
+    -- Test-fixture copy pinned to migrations/0020_display_credentials.sql:
+    -- keep the pairing-code table/constraint definitions below identical to
+    -- that production migration. This DDL only seeds historical test schemas.
+    code_hash text PRIMARY KEY,
+    campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    expires_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE TABLE display_credentials (
+    -- Test-fixture copy pinned to migrations/0020_display_credentials.sql:
+    -- keep the credential table/constraint/index definitions below identical
+    -- to that production migration. This DDL only seeds historical test
+    -- schemas.
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    secret_hash text NOT NULL UNIQUE,
+    revoked_at timestamptz NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX display_credentials_page_idx
+    ON display_credentials (campaign_id, created_at DESC, id DESC);
 
   CREATE TABLE characters (
     id                   uuid PRIMARY KEY,

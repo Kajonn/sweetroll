@@ -192,6 +192,31 @@ export type SceneRecord = {
   createdAt: Date;
 };
 
+/**
+ * I7b Task 3: one single-use display pairing code. Only the SHA-256 hash
+ * persists (plaintext is returned once at pair time); redeem deletes the row
+ * so unknown/expired/used codes collapse to a generic not_found.
+ */
+export type DisplayCodeRecord = {
+  codeHash: string;
+  campaignId: string;
+  expiresAt: Date;
+  createdAt: Date;
+};
+
+/**
+ * I7b Task 3: one revocable display credential scoped to a campaign. Only
+ * the secret hash persists; reads require `revokedAt` NULL (revoke stamps
+ * it). Rows cascade with the campaign.
+ */
+export type DisplayCredentialRecord = {
+  displayId: string;
+  campaignId: string;
+  secretHash: string;
+  revokedAt: Date | null;
+  createdAt: Date;
+};
+
 export type CampaignReceipt = {
   inputHash: string;
   campaignId: string | null;
@@ -323,6 +348,21 @@ type SceneRow = {
   created_at: Date;
 };
 
+type DisplayCodeRow = {
+  code_hash: string;
+  campaign_id: string;
+  expires_at: Date;
+  created_at: Date;
+};
+
+type DisplayCredentialRow = {
+  id: string;
+  campaign_id: string;
+  secret_hash: string;
+  revoked_at: Date | null;
+  created_at: Date;
+};
+
 function toCampaignRecord(row: CampaignRow): CampaignRecord {
   if (row.status !== "active" && row.status !== "archived") {
     throw new Error(`Unknown campaign status: ${row.status}`);
@@ -377,6 +417,8 @@ const MEDIA_COLUMNS =
   "id, campaign_id, owner_id, name, media_type, size_bytes, width, height, checksum, storage_key, revision, created_at";
 const SCENE_COLUMNS =
   "id, campaign_id, background_file_id, revision, fog_jsonb, tokens_jsonb, created_at";
+const DISPLAY_CODE_COLUMNS = "code_hash, campaign_id, expires_at, created_at";
+const DISPLAY_CREDENTIAL_COLUMNS = "id, campaign_id, secret_hash, revoked_at, created_at";
 const ACTIVITY_COLUMNS = "id, campaign_id, actor_id, kind, source_content_id, source_roll_id, request_id, occurred_at";
 
 function toContentRecord(row: ContentRow): ContentRecord {
@@ -479,6 +521,25 @@ function toSceneRecord(row: SceneRow): SceneRecord {
     revision: row.revision,
     fog: row.fog_jsonb,
     tokens: row.tokens_jsonb,
+    createdAt: row.created_at,
+  };
+}
+
+function toDisplayCodeRecord(row: DisplayCodeRow): DisplayCodeRecord {
+  return {
+    codeHash: row.code_hash,
+    campaignId: row.campaign_id,
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+  };
+}
+
+function toDisplayCredentialRecord(row: DisplayCredentialRow): DisplayCredentialRecord {
+  return {
+    displayId: row.id,
+    campaignId: row.campaign_id,
+    secretHash: row.secret_hash,
+    revokedAt: row.revoked_at,
     createdAt: row.created_at,
   };
 }
@@ -1849,6 +1910,103 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       );
       const row = result.rows[0];
       return row === undefined ? null : toSceneRecord(row);
+    },
+
+    /**
+     * I7b Task 3: single-use pairing code insert. A code_hash collision
+     * (astronomically unlikely at 6 chars, but UNIQUE-guarded) inserts
+     * nothing and returns null so the caller mints a fresh code; callers
+     * always run this inside the pair transaction.
+     */
+    async insertDisplayCode(
+      client: PoolClient,
+      input: { codeHash: string; campaignId: string; expiresAt: Date },
+    ): Promise<DisplayCodeRecord | null> {
+      const result = await client.query<DisplayCodeRow>(
+        `INSERT INTO display_codes (code_hash, campaign_id, expires_at)
+          VALUES ($1, $2, $3::timestamptz)
+          ON CONFLICT (code_hash) DO NOTHING
+          RETURNING ${DISPLAY_CODE_COLUMNS}`,
+        [input.codeHash, input.campaignId, input.expiresAt.toISOString()],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toDisplayCodeRecord(row);
+    },
+
+    async loadDisplayCodeByHash(
+      client: DbClient,
+      codeHash: string,
+    ): Promise<DisplayCodeRecord | null> {
+      const result = await client.query<DisplayCodeRow>(
+        `SELECT ${DISPLAY_CODE_COLUMNS} FROM display_codes WHERE code_hash = $1`,
+        [codeHash],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toDisplayCodeRecord(row);
+    },
+
+    async lockDisplayCodeByHash(
+      client: PoolClient,
+      codeHash: string,
+    ): Promise<DisplayCodeRecord | null> {
+      const result = await client.query<DisplayCodeRow>(
+        `SELECT ${DISPLAY_CODE_COLUMNS} FROM display_codes WHERE code_hash = $1 FOR UPDATE`,
+        [codeHash],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toDisplayCodeRecord(row);
+    },
+
+    /** Single-use consume: redeem deletes the row (used codes read as missing). */
+    async deleteDisplayCode(client: PoolClient, codeHash: string): Promise<void> {
+      await client.query(`DELETE FROM display_codes WHERE code_hash = $1`, [codeHash]);
+    },
+
+    async insertDisplayCredential(
+      client: PoolClient,
+      input: { displayId: string; campaignId: string; secretHash: string },
+    ): Promise<DisplayCredentialRecord> {
+      const result = await client.query<DisplayCredentialRow>(
+        `INSERT INTO display_credentials (id, campaign_id, secret_hash)
+          VALUES ($1, $2, $3)
+          RETURNING ${DISPLAY_CREDENTIAL_COLUMNS}`,
+        [input.displayId, input.campaignId, input.secretHash],
+      );
+      const row = result.rows[0];
+      if (row === undefined) throw new Error("insertDisplayCredential returned no row");
+      return toDisplayCredentialRecord(row);
+    },
+
+    async loadDisplayCredential(
+      client: DbClient,
+      displayId: string,
+    ): Promise<DisplayCredentialRecord | null> {
+      const result = await client.query<DisplayCredentialRow>(
+        `SELECT ${DISPLAY_CREDENTIAL_COLUMNS} FROM display_credentials WHERE id = $1`,
+        [displayId],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toDisplayCredentialRecord(row);
+    },
+
+    /**
+     * Soft revoke: stamps revoked_at only when still NULL. Returns the
+     * revoked row, or null when the credential is unknown or already
+     * revoked (both collapse to generic not_found at the command layer).
+     */
+    async revokeDisplayCredential(
+      client: PoolClient,
+      input: { displayId: string; now: Date },
+    ): Promise<DisplayCredentialRecord | null> {
+      const result = await client.query<DisplayCredentialRow>(
+        `UPDATE display_credentials
+            SET revoked_at = $2::timestamptz
+          WHERE id = $1 AND revoked_at IS NULL
+          RETURNING ${DISPLAY_CREDENTIAL_COLUMNS}`,
+        [input.displayId, input.now.toISOString()],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toDisplayCredentialRecord(row);
     },
   };
 }

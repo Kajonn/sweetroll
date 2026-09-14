@@ -5,6 +5,7 @@ import { createApiClient, type ApiClient } from "./api/client.js";
 import { createCharactersApi, type CharactersApi } from "./characters/api.js";
 import { createCampaignsApi, type CampaignsApi } from "./campaigns/api.js";
 import { CampaignDetail } from "./campaigns/CampaignDetail.js";
+import { CampaignSceneView } from "./campaigns/SceneViewport.js";
 import { CampaignCreate, campaignCreateViewKey } from "./campaigns/CampaignCreate.js";
 import { CampaignLibrary, campaignLibraryViewKey } from "./campaigns/CampaignLibrary.js";
 import { InvitationReviewView } from "./campaigns/InvitationReview.js";
@@ -159,6 +160,14 @@ const campaignDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/campaigns/$campaignId",
   component: CampaignDetailRouteView,
+});
+const campaignSceneRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/campaigns/$campaignId/scenes",
+  validateSearch: (search: Record<string, unknown>) => ({
+    sceneId: typeof search.sceneId === "string" ? search.sceneId : "",
+  }),
+  component: CampaignSceneRouteView,
 });
 
 function SystemEditorRoute() {
@@ -529,6 +538,45 @@ function CampaignDetailRouteView() {
   );
 }
 
+/**
+ * GM scene composition (viewport + fog toolbar + token tray). There is no
+ * client-side role fetch here: players and revoked readers get a
+ * server-driven 404 from openScene and the view renders unavailable.
+ */
+function CampaignSceneRouteView() {
+  const params = useParams({ strict: false });
+  const search = campaignSceneRoute.useSearch();
+  const campaignId = params["campaignId"] ?? "";
+  const identity = useIdentity();
+  useIdentityTick(identity);
+  const api = useCampaignsApi();
+  if (identity === null) {
+    return <p role="status">{t("character.loading")}</p>;
+  }
+  const actorId = identity.getActorId();
+  if (actorId === null) {
+    storePostSigninPath(`/campaigns/${campaignId}/scenes`);
+    return (
+      <section aria-labelledby="campaign-scene-title">
+        <h1 id="campaign-scene-title">{t("campaign.detail.scenes.title")}</h1>
+        <p role="status">{t("character.detail.signIn")}</p>
+      </section>
+    );
+  }
+  const generation = identity.getGeneration?.() ?? 0;
+  return (
+    <CampaignSceneView
+      key={`${actorId}:${generation}:${campaignId}:${search.sceneId}`}
+      api={api}
+      campaignId={campaignId}
+      sceneId={search.sceneId}
+      actorId={actorId}
+      generation={generation}
+      online={identity.isOnline()}
+    />
+  );
+}
+
 function CharacterDetailRouteView() {
   const params = useParams({ strict: false });
   const characterId = params["characterId"] ?? "";
@@ -578,7 +626,7 @@ function CharacterDetailRouteView() {
   );
 }
 
-const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute, campaignsRoute, campaignCreateRoute, campaignDetailRoute, invitationsRoute, welcomeRoute, activityRoute, accountRoute, signInCallbackRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute, campaignsRoute, campaignCreateRoute, campaignDetailRoute, campaignSceneRoute, invitationsRoute, welcomeRoute, activityRoute, accountRoute, signInCallbackRoute]);
 
 export function createAppRouter() {
   const router = createRouter({ routeTree });

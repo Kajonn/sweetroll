@@ -203,8 +203,7 @@ describe("CampaignSettingsView", () => {
     expect(onChanged).toHaveBeenCalled();
   });
 
-  it("degrades to exact-ID-only mode when the pin is outside the catalog", async () => {
-    const user = userEvent.setup();
+  it("degrades to exact-ID-only mode when the pin is outside the catalog", async () => {    const user = userEvent.setup();
     const linkOnlyVersionsApi = {
       listCreationVersions: vi.fn().mockResolvedValue({
         data: {
@@ -234,5 +233,77 @@ describe("CampaignSettingsView", () => {
     expect(await screen.findByLabelText(/exact version id/i)).toBeVisible();
     expect(await screen.findByText(/no newer versions of this system are available/i)).toBeVisible();
     expect(screen.queryByRole("button", { name: /d20/i })).toBeNull();
+  });
+});
+
+describe("CampaignSettingsView display pairing", () => {
+  function displayApi(overrides = {}) {
+    return {
+      pairDisplay: vi.fn().mockResolvedValue({ code: "ABC123", requestId: "r" }),
+      listDisplayCredentials: vi.fn().mockResolvedValue({
+        displays: [
+          { displayId: "d1", campaignId: "c1", revokedAt: null, createdAt: "2026-09-01T00:00:00Z" },
+        ],
+        requestId: "r2",
+      }),
+      revokeDisplay: vi.fn().mockResolvedValue({ display: { displayId: "d1" }, requestId: "r3" }),
+      ...overrides,
+    };
+  }
+
+  function renderDisplaySettings(api: unknown, extra = {}) {
+    return render(
+      <CampaignSettingsView
+        api={api as never}
+        campaign={campaign as never}
+        actorId="u1"
+        generation={0}
+        online
+        isGm
+        onChanged={() => {}}
+        {...extra}
+      />,
+      { wrapper: wrapper() },
+    );
+  }
+
+  it("shows the pair code once with credential list + revoke", async () => {
+    const user = userEvent.setup();
+    const api = displayApi();
+    const onChanged = vi.fn();
+    renderDisplaySettings(api, { onChanged });
+    expect(await screen.findByText(/display d1/i)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /pair display/i }));
+    expect(await screen.findByText("ABC123")).toBeVisible();
+    expect(api.pairDisplay).toHaveBeenCalledWith("c1");
+    await user.click(screen.getByRole("button", { name: /^done$/i }));
+    expect(screen.queryByText("ABC123")).toBeNull();
+    await user.click(screen.getByRole("button", { name: /revoke/i }));
+    await vi.waitFor(() => expect(api.revokeDisplay).toHaveBeenCalledWith("c1", "d1"));
+    expect(onChanged).toHaveBeenCalled();
+    expect(await screen.findByText(/display revoked/i)).toBeVisible();
+  });
+
+  it("hides the Display section from players", () => {
+    renderDisplaySettings(displayApi(), { isGm: false });
+    expect(screen.queryByRole("button", { name: /pair display/i })).toBeNull();
+    expect(screen.queryByText(/restricted display/i)).toBeNull();
+  });
+
+  it("disables pairing offline with explanatory text", () => {
+    render(
+      <CampaignSettingsView
+        api={displayApi() as never}
+        campaign={campaign as never}
+        actorId="u1"
+        generation={0}
+        online={false}
+        isGm
+        onChanged={() => {}}
+      />,
+      { wrapper: wrapper() },
+    );
+    expect(screen.getByRole("button", { name: /pair display/i })).toBeDisabled();
+    expect(screen.getByText(/you are offline\. reconnect to pair or revoke displays\./i)).toBeVisible();
   });
 });

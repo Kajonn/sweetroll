@@ -2,7 +2,7 @@
 // confirmations, and export readiness. Mounted by the Members tab only when
 // the actor's own role is owner or co_gm (Task 7 owns that gate).
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { CharactersApi } from "../characters/api.js";
 import { flattenCatalogPages, useVersionCatalog } from "../characters/versionCatalog.js";
@@ -32,10 +32,147 @@ function describeError(cause: unknown, fallback: string): string {
   return fallback;
 }
 
+/**
+ * GM-only restricted-display pairing: mint a single-use code (shown once),
+ * list credentials, and revoke. Mounted behind the existing `isGm` role
+ * prop; the server stays authoritative. Pair/revoke POSTs send an explicit
+ * `{}` body through the seam wrappers.
+ */
+function DisplayPairingSection(props: {
+  api: Pick<CampaignsApi, "pairDisplay" | "listDisplayCredentials" | "revokeDisplay">;
+  campaignId: string;
+  actorId: string | null;
+  generation: number;
+  online: boolean;
+  onChanged?: (() => void) | undefined;
+}) {
+  const [pairCode, setPairCode] = useState<string | null>(null);
+  const [pairPending, setPairPending] = useState(false);
+  const [pairFailed, setPairFailed] = useState(false);
+  const [revokePendingId, setRevokePendingId] = useState<string | null>(null);
+  const [revokeFailed, setRevokeFailed] = useState(false);
+  const [revoked, setRevoked] = useState(false);
+  const queryClient = useQueryClient();
+
+  const credentials = useQuery({
+    queryKey: ["campaigns", "display-credentials", props.campaignId, props.actorId, props.generation],
+    queryFn: () => props.api.listDisplayCredentials(props.campaignId),
+    enabled: props.online && props.actorId !== null,
+    staleTime: 30_000,
+  });
+
+  const pair = async (): Promise<void> => {
+    if (pairPending) return;
+    setPairPending(true);
+    setPairFailed(false);
+    setRevoked(false);
+    try {
+      const response = await props.api.pairDisplay(props.campaignId);
+      setPairCode(response.code);
+    } catch {
+      setPairFailed(true);
+    } finally {
+      setPairPending(false);
+    }
+  };
+
+  const revoke = async (displayId: string): Promise<void> => {
+    if (revokePendingId !== null) return;
+    setRevokePendingId(displayId);
+    setRevokeFailed(false);
+    setRevoked(false);
+    try {
+      await props.api.revokeDisplay(props.campaignId, displayId);
+      setRevoked(true);
+      void queryClient.invalidateQueries({ queryKey: ["campaigns", "display-credentials", props.campaignId] });
+      props.onChanged?.();
+    } catch {
+      setRevokeFailed(true);
+    } finally {
+      setRevokePendingId(null);
+    }
+  };
+
+  return (
+    <Panel title={t("campaign.detail.scenes.display.title")}>
+      <p>{t("campaign.detail.scenes.display.description")}</p>
+      <Button
+        variant="secondary"
+        pending={pairPending}
+        pendingText={t("campaign.detail.scenes.display.pairing")}
+        disabled={!props.online}
+        onClick={() => void pair()}
+      >
+        {t("campaign.detail.scenes.display.pair")}
+      </Button>
+      {!props.online ? <p role="status">{t("campaign.detail.scenes.display.offline")}</p> : null}
+      {pairFailed ? <p role="alert">{t("campaign.detail.scenes.display.pairFailed")}</p> : null}
+      {revoked ? <p role="status">{t("campaign.detail.scenes.display.revoked")}</p> : null}
+      {revokeFailed ? <p role="alert">{t("campaign.detail.scenes.display.revokeFailed")}</p> : null}
+      <Panel title={t("campaign.detail.scenes.display.credentialsTitle")}>
+        {credentials.status === "pending" ? (
+          <p role="status">{t("campaign.detail.scenes.display.credentialsLoading")}</p>
+        ) : credentials.status === "error" ? (
+          <p role="alert">{t("campaign.detail.scenes.display.credentialsFailed")}</p>
+        ) : credentials.data.displays.length === 0 ? (
+          <p role="status">{t("campaign.detail.scenes.display.credentialsEmpty")}</p>
+        ) : (
+          <ul>
+            {credentials.data.displays.map((display) => (
+              <li key={display.displayId}>
+                <span>
+                  {t("campaign.detail.scenes.display.credential", { id: display.displayId.slice(0, 8) })}
+                  {display.revokedAt !== null ? ` ${t("campaign.detail.scenes.display.revokedSuffix")}` : null}
+                </span>{" "}
+                {display.revokedAt === null ? (
+                  <Button
+                    variant="secondary"
+                    pending={revokePendingId === display.displayId}
+                    pendingText={t("campaign.detail.scenes.display.revoking")}
+                    disabled={!props.online}
+                    onClick={() => void revoke(display.displayId)}
+                  >
+                    {t("campaign.detail.scenes.display.revoke")}
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+      <Dialog
+        open={pairCode !== null}
+        onOpenChange={(open) => {
+          if (!open) setPairCode(null);
+        }}
+        title={t("campaign.detail.scenes.display.codeTitle")}
+        description={t("campaign.detail.scenes.display.codeHint")}
+        actions={
+          <Button variant="primary" onClick={() => setPairCode(null)}>
+            {t("campaign.detail.scenes.display.dismiss")}
+          </Button>
+        }
+      >
+        <p>
+          {t("campaign.detail.scenes.display.codeLabel")}: <strong>{pairCode}</strong>
+        </p>
+      </Dialog>
+    </Panel>
+  );
+}
+
 export function CampaignSettingsView(props: {
   api: Pick<
     CampaignsApi,
-    "updateCampaign" | "archiveCampaign" | "recoverCampaign" | "exportCampaign" | "previewUpgrade" | "commitUpgrade"
+    | "updateCampaign"
+    | "archiveCampaign"
+    | "recoverCampaign"
+    | "exportCampaign"
+    | "previewUpgrade"
+    | "commitUpgrade"
+    | "pairDisplay"
+    | "listDisplayCredentials"
+    | "revokeDisplay"
   >;
   /** Creation-versions catalog handle; the upgrade dialog stays shut without it. */
   versionsApi?: Pick<CharactersApi, "listCreationVersions"> | undefined;
@@ -244,6 +381,16 @@ export function CampaignSettingsView(props: {
           </Button>
           {!online ? <p role="status">{t("campaign.detail.upgrade.commit.offline")}</p> : null}
         </Panel>
+      ) : null}
+      {showUpgrade ? (
+        <DisplayPairingSection
+          api={props.api}
+          campaignId={props.campaign.campaignId}
+          actorId={actorId}
+          generation={generation}
+          online={online}
+          onChanged={props.onChanged}
+        />
       ) : null}
       {upgradeOpen && props.versionsApi !== undefined ? (
         <UpgradeDialog

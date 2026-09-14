@@ -22,6 +22,7 @@ import { DocumentEditor } from "./editor/DocumentEditor.js";
 import { CloneFromTemplate } from "./library/CloneFromTemplate.js";
 import { SystemLibrary } from "./library/SystemLibrary.js";
 import { AppShell, useIdentity } from "./shell/AppShell.js";
+import { registerAppRouter } from "./shell/appNavigation.js";
 
 const apiClient: ApiClient = createApiClient({ baseUrl: "/api" });
 
@@ -579,5 +580,9 @@ function CharacterDetailRouteView() {
 
 const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute, campaignsRoute, campaignCreateRoute, campaignDetailRoute, invitationsRoute, welcomeRoute, activityRoute, accountRoute, signInCallbackRoute]);
 
-export function createAppRouter() { return createRouter({ routeTree }); }
+export function createAppRouter() {
+  const router = createRouter({ routeTree });
+  registerAppRouter(router);
+  return router;
+}
 export const router = createAppRouter();

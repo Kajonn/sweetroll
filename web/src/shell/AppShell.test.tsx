@@ -1,5 +1,5 @@
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -12,9 +12,10 @@ import { registerLocale, resetLocale } from "../i18n/index.js";
 import { defaultMessages } from "../i18n/messages.js";
 import { queryClient } from "../queryClient.js";
 import { AppShell, useAuth } from "./AppShell.js";
+import { registerAppRouter, resetAppRouter } from "./appNavigation.js";
 import styles from "./AppShell.module.css";
 
-afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+afterEach(() => { resetAppRouter(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 /**
  * G6 Task 4: the shell ThemeSwitcher reads the cached account default
@@ -230,6 +231,15 @@ describe("AppShell", () => {
     // Session resolves anonymous: the panel appears only now.
     resolveMe(new Response(JSON.stringify({ state: "anonymous" })));
     expect(await screen.findByTestId("dev-signin-panel")).toBeInTheDocument();
+  });
+
+  it("client-navigates header links through the registered router", async () => {
+    const push = vi.fn();
+    registerAppRouter({ history: { push } });
+    renderShell(<AppShell><span data-testid="child">x</span></AppShell>);
+    const header = within(screen.getByRole("banner"));
+    await userEvent.setup().click(header.getByRole("link", { name: "Campaigns" }));
+    expect(push).toHaveBeenCalledWith("/campaigns");
   });
 
   it("unmounts the system editor on sign-out with no system data or further fetches", async () => {
@@ -493,7 +503,13 @@ describe("AppShell responsive shell (G3-1)", () => {
     expect(css).toMatch(/position\s*:\s*sticky/);
     // Sticky chrome must not cover focused controls or errors.
     expect(css).toMatch(/scroll-margin-top/);
-    expect(css).toMatch(/scroll-padding-top/);
+    // The document is the scroller, so the sticky-header scroll guards
+    // live on `html` in the global stylesheet (a scroll-padding box on
+    // the non-scrolling .main region is inert and, worse, makes Chrome
+    // latch wheel events instead of chaining them to the document).
+    const globalCss = readFileSync(join(process.cwd(), "src/styles/global.css"), "utf8");
+    expect(globalCss).toMatch(/scroll-padding-top/);
+    expect(css).not.toMatch(/overscroll-behavior/);
     // Views own their widths: content children participate with min-width 0.
     expect(css).toMatch(/min-width\s*:\s*0/);
   });

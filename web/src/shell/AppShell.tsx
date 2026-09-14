@@ -6,6 +6,7 @@ import { isOnboardingComplete, Onboarding } from "../player/Onboarding.js";
 import { getStoredPreference, normalizePreference, THEME_STORAGE_KEY, applyDeviceSelection, applyEffectiveTheme, subscribeMatchesDark, toDevicePreference, type ThemePreference } from "../theme/theme.js";
 import { usePreferences } from "../theme/accountTheme.js";
 import { Button } from "../ui/Button.js";
+import { AppLink } from "../ui/AppLink.js";
 import { Select } from "../ui/Select.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { DevSignInPanel } from "./DevSignInPanel.js";
@@ -276,15 +277,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           <header role="banner" data-testid="app-header" className={styles.header}>
             <span className={styles.brand}>Sweetroll</span>
             <nav aria-label={t("shell.nav.label")} className={styles.nav}>
-              {/* Intentional plain anchors: AppShell also renders outside a
-                  RouterProvider (standalone/tests), where TanStack Link has no
-                  router context and crashes. */}
-              <a href="/" className={styles.navLink}>{t("shell.nav.home")}</a>
-              <a href="/characters" className={styles.navLink}>{t("shell.nav.characters")}</a>
-              <a href="/campaigns" className={styles.navLink}>{t("shell.nav.campaigns")}</a>
-              <a href="/characters/new" className={styles.navLink}>{t("shell.nav.newCharacter")}</a>
-              <a href="/activity" className={styles.navLink}>{t("shell.nav.activity")}</a>
-              <a href="/account" className={styles.navLink}>{t("shell.nav.account")}</a>
+              {/* Intentional plain anchor: the skip link is a same-document
+                  fragment, always handled by the browser. */}
+              <AppLink href="/" className={styles.navLink}>{t("shell.nav.home")}</AppLink>
+              <AppLink href="/characters" className={styles.navLink}>{t("shell.nav.characters")}</AppLink>
+              <AppLink href="/campaigns" className={styles.navLink}>{t("shell.nav.campaigns")}</AppLink>
+              <AppLink href="/characters/new" className={styles.navLink}>{t("shell.nav.newCharacter")}</AppLink>
+              <AppLink href="/activity" className={styles.navLink}>{t("shell.nav.activity")}</AppLink>
+              <AppLink href="/account" className={styles.navLink}>{t("shell.nav.account")}</AppLink>
             </nav>
             <div className={styles.actions}>
             {auth.state === "authenticated" && (
@@ -338,14 +338,15 @@ export function AppShell({ children }: { children: ReactNode }) {
               ) : (
                 children
               )}
-              {/* Phone bottom nav: Characters · Campaigns · Activity · Account. Plain
-                  anchors like the header nav (no router context required).
-                  Hidden on desktop, where the header keeps serving. */}
+              {/* Phone bottom nav: Characters · Campaigns · Activity · Account.
+                  AppLink keeps deep-link hrefs and falls back to plain
+                  navigation without a registered router. Hidden on desktop,
+                  where the header keeps serving. */}
               <nav aria-label={t("shell.bottomNav.label")} data-testid="player-bottom-nav" className={styles.bottomNav}>
-                <a href="/characters" className={styles.bottomNavLink}>{t("shell.nav.characters")}</a>
-                <a href="/campaigns" className={styles.bottomNavLink}>{t("shell.nav.campaigns")}</a>
-                <a href="/activity" className={styles.bottomNavLink}>{t("shell.nav.activity")}</a>
-                <a href="/account" className={styles.bottomNavLink}>{t("shell.nav.account")}</a>
+                <AppLink href="/characters" className={styles.bottomNavLink}>{t("shell.nav.characters")}</AppLink>
+                <AppLink href="/campaigns" className={styles.bottomNavLink}>{t("shell.nav.campaigns")}</AppLink>
+                <AppLink href="/activity" className={styles.bottomNavLink}>{t("shell.nav.activity")}</AppLink>
+                <AppLink href="/account" className={styles.bottomNavLink}>{t("shell.nav.account")}</AppLink>
               </nav>
             </main>
           </ErrorBoundary>

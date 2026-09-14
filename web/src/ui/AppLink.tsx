@@ -19,6 +19,8 @@ export function AppLink({ href, onClick, children, ...rest }: AppLinkProps) {
     onClick?.(event);
     if (event.defaultPrevented) return;
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const anchor = event.currentTarget as HTMLAnchorElement;
+    if (anchor.target === "_blank" || anchor.hasAttribute("download")) return;
     if (!href.startsWith("/")) return;
     const router = getAppRouter();
     if (router === null) return;

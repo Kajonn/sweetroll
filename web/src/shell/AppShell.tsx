@@ -273,12 +273,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     <IdentityContext.Provider value={identity}>
       <AuthProvider initial={auth}>
         <div className={styles.shell}>
+          {/* Intentional plain anchor: the skip link is a same-document
+              fragment, always handled by the browser. */}
           <a href="#main-content" className={styles.skipLink}>{t("shell.skipToContent")}</a>
           <header role="banner" data-testid="app-header" className={styles.header}>
             <span className={styles.brand}>Sweetroll</span>
             <nav aria-label={t("shell.nav.label")} className={styles.nav}>
-              {/* Intentional plain anchor: the skip link is a same-document
-                  fragment, always handled by the browser. */}
               <AppLink href="/" className={styles.navLink}>{t("shell.nav.home")}</AppLink>
               <AppLink href="/characters" className={styles.navLink}>{t("shell.nav.characters")}</AppLink>
               <AppLink href="/campaigns" className={styles.navLink}>{t("shell.nav.campaigns")}</AppLink>

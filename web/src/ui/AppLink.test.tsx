@@ -48,4 +48,31 @@ describe("AppLink", () => {
     await user.click(screen.getByTestId("ext"));
     expect(push).not.toHaveBeenCalled();
   });
+
+  it("lets target=_blank links fall through to the browser", async () => {
+    const user = userEvent.setup();
+    const push = vi.fn();
+    registerAppRouter({ history: { push } });
+    render(<AppLink href="/campaigns" target="_blank" data-testid="blank">Campaigns</AppLink>);
+    await user.click(screen.getByTestId("blank"));
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("lets download links fall through to the browser", async () => {
+    const user = userEvent.setup();
+    const push = vi.fn();
+    registerAppRouter({ history: { push } });
+    render(<AppLink href="/export.pdf" download data-testid="dl">Export</AppLink>);
+    await user.click(screen.getByTestId("dl"));
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("does not intercept same-document hash links", async () => {
+    const user = userEvent.setup();
+    const push = vi.fn();
+    registerAppRouter({ history: { push } });
+    render(<AppLink href="#main-content" data-testid="hash">Skip</AppLink>);
+    await user.click(screen.getByTestId("hash"));
+    expect(push).not.toHaveBeenCalled();
+  });
 });

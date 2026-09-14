@@ -151,6 +151,15 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
+html {
+  /* The document is the scroller and the app header is sticky: keep
+     scroll-into-view targets (focused controls, validation errors,
+     status messages) clear of the sticky chrome. Values mirror the
+     shell's scroll-margin guards. */
+  scroll-padding-top: 72px;
+  scroll-padding-bottom: 56px;
+}
+
 button { font: inherit; cursor: pointer; }
 :focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 

@@ -89,21 +89,22 @@
 /* Single neutral content region. Views own their internal columns; the
    shell never imposes a column grid here (no 240px first-column
    assumption). Attribute/media-query driven only: no JS resize listeners,
-   so children are never remounted on viewport or theme changes. */
+   so children are never remounted on viewport or theme changes.
+   The document is the scroller (the shell is min-height, not fixed
+   height): .main must stay normal flow. A scrollable-overflow box with
+   chained-scroll containment here grows to fit its content (no internal
+   overflow) yet makes Chrome latch wheel events on it instead of
+   chaining them to the document, which kills mousewheel scrolling. */
 .main {
   flex: 1 1 auto;
   display: block;
   width: 100%;
   min-width: 0;
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
   padding-inline-start: max(16px, env(safe-area-inset-left));
   padding-inline-end: max(16px, env(safe-area-inset-right));
   padding-top: 16px;
   padding-bottom: max(24px, env(safe-area-inset-bottom));
-  scroll-padding-top: 72px;
-  scroll-padding-bottom: 56px;
 }
 
 .main > * {

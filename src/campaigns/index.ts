@@ -63,6 +63,8 @@ import {
   createMediaCommands,
   type DeleteImageInput,
   type MediaFileView,
+  type OpenImageInput,
+  type OpenImageSuccess,
   type UploadImageInput,
 } from "./media.js";
 import {
@@ -71,6 +73,7 @@ import {
   type CreateSceneInput,
   type FogOp,
   type MoveTokenInput,
+  type OpenSceneInput,
   type PlaceTokenInput,
   type RemoveTokenInput,
   type SceneView,
@@ -79,8 +82,13 @@ import {
 } from "./scenes.js";
 import {
   createDisplayCommands,
+  type DisplayCredentialMetadata,
+  type DisplayImageBytes,
   type DisplayProjection,
   type GetDisplayProjectionInput,
+  type GetDisplaySceneImageInput,
+  type GetDisplayTokenImageInput,
+  type ListDisplayCredentialsInput,
   type PairDisplayInput,
   type PairDisplaySuccess,
   type RedeemDisplayCodeInput,
@@ -462,6 +470,12 @@ export interface Campaigns {
   uploadImage(ctx: RequestContext, input: UploadImageInput): Promise<CampaignResult<MediaFileView>>;
   deleteImage(ctx: RequestContext, input: DeleteImageInput): Promise<CampaignResult<MediaFileView>>;
   /**
+   * I7b Task 4: GM-only original read backing
+   * `GET /campaigns/:id/images/:fileId/original`. Outsiders, players,
+   * missing rows and rows with missing bytes collapse to generic not_found.
+   */
+  openImage(ctx: RequestContext, input: OpenImageInput): Promise<CampaignResult<OpenImageSuccess>>;
+  /**
    * I7b Task 2: revision-guarded scene, fog and token commands. GM-only
    * (canManageCampaign, else generic not_found); backgrounds and token
    * images must belong to the scene's campaign. Stale
@@ -469,6 +483,11 @@ export interface Campaigns {
    * nothing; every mutation is idempotent on its key.
    */
   createScene(ctx: RequestContext, input: CreateSceneInput): Promise<CampaignResult<SceneView>>;
+  /**
+   * I7b Task 4: GM-only scene read backing `GET /scenes/:sceneId`.
+   * GM member of the owning campaign, else generic not_found.
+   */
+  openScene(ctx: RequestContext, input: OpenSceneInput): Promise<CampaignResult<SceneView>>;
   updateScene(ctx: RequestContext, input: UpdateSceneInput): Promise<CampaignResult<SceneView>>;
   applyFogEdit(ctx: RequestContext, input: ApplyFogEditInput): Promise<CampaignResult<SceneView>>;
   placeToken(ctx: RequestContext, input: PlaceTokenInput): Promise<CampaignResult<SceneView>>;
@@ -488,6 +507,17 @@ export interface Campaigns {
   redeemDisplayCode(input: RedeemDisplayCodeInput): Promise<CampaignResult<RedeemDisplayCodeSuccess>>;
   getDisplayProjection(input: GetDisplayProjectionInput): Promise<CampaignResult<DisplayProjection>>;
   revokeDisplay(ctx: RequestContext, input: RevokeDisplayInput): Promise<CampaignResult<RevokeDisplaySuccess>>;
+  /**
+   * I7b Task 4: GM Settings credential list (metadata without secrets) plus
+   * the display-credential binary image reads backing the projection's
+   * `imageUrl` shapes (`.../image?rev=N` and `.../tokens/:tokenId/image?rev=N`).
+   */
+  listDisplayCredentials(
+    ctx: RequestContext,
+    input: ListDisplayCredentialsInput,
+  ): Promise<CampaignResult<DisplayCredentialMetadata[]>>;
+  getDisplaySceneImage(input: GetDisplaySceneImageInput): Promise<CampaignResult<DisplayImageBytes>>;
+  getDisplayTokenImage(input: GetDisplayTokenImageInput): Promise<CampaignResult<DisplayImageBytes>>;
 }
 
 export type {
@@ -501,10 +531,14 @@ export type {
   CreateSceneInput,
   DeleteContentInput,
   DeleteImageInput,
+  DisplayCredentialMetadata,
+  DisplayImageBytes,
   DisplayProjection,
   ExportCampaignInput,
   FogOp,
   GetDisplayProjectionInput,
+  GetDisplaySceneImageInput,
+  GetDisplayTokenImageInput,
   InvitationAcceptSuccess,
   InvitationDeclineSuccess,
   InvitationIssueReplay,
@@ -520,11 +554,15 @@ export type {
   ListActivityResult,
   ListContentInput,
   ListContentResult,
+  ListDisplayCredentialsInput,
   ListInvitationsInput,
   ListInvitationsResult,
   MediaFileView,
   MoveTokenInput,
   OpenContentInput,
+  OpenImageInput,
+  OpenImageSuccess,
+  OpenSceneInput,
   PairDisplayInput,
   PairDisplaySuccess,
   PlaceTokenInput,
@@ -1028,7 +1066,9 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     exportCampaign: content.exportCampaign,
     uploadImage: media.uploadImage,
     deleteImage: media.deleteImage,
+    openImage: media.openImage,
     createScene: scenes.createScene,
+    openScene: scenes.openScene,
     updateScene: scenes.updateScene,
     applyFogEdit: scenes.applyFogEdit,
     placeToken: scenes.placeToken,
@@ -1038,6 +1078,9 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     redeemDisplayCode: display.redeemDisplayCode,
     getDisplayProjection: display.getDisplayProjection,
     revokeDisplay: display.revokeDisplay,
+    listDisplayCredentials: display.listDisplayCredentials,
+    getDisplaySceneImage: display.getDisplaySceneImage,
+    getDisplayTokenImage: display.getDisplayTokenImage,
     async create(ctx, createInput) {
       try {
         const keyError = checkIdempotencyKey(createInput.idempotencyKey);

@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,16 +28,52 @@ export type RedeemDisplayCodeSuccess = { displayId: string; secret: string };
 export type GetDisplayProjectionInput = { displayId: string; secret: string; sceneId: string };
 export type RevokeDisplayInput = { displayId: string };
 export type RevokeDisplaySuccess = { displayId: string };
+export type ListDisplayCredentialsInput = { campaignId: string };
+/**
+ * I7b Task 4: GM Settings credential metadata. Carries no secret material
+ * (no secret, no hash) — the plaintext secret exists only in the single
+ * redeem response.
+ */
+export type DisplayCredentialMetadata = {
+  displayId: string;
+  campaignId: string;
+  revokedAt: Date | null;
+  createdAt: Date;
+};
+export type GetDisplaySceneImageInput = {
+  displayId: string;
+  secret: string;
+  sceneId: string;
+  rev: number;
+};
+export type GetDisplayTokenImageInput = {
+  displayId: string;
+  secret: string;
+  sceneId: string;
+  tokenId: string;
+};
+/** I7b Task 4: image bytes for the display-credential binary routes. */
+export type DisplayImageBytes = {
+  contentType: string;
+  bytes: Buffer;
+  revision: number;
+};
 
 /** Pairing codes live 5 minutes; redeem is single-use (the row is deleted). */
 const PAIRING_CODE_TTL_MS = 5 * 60 * 1000;
+// Uppercase alphanumeric code alphabet. Note: this alphabet is NOT
+// unambiguous — 0/O and 1/I remain confusable. Codes are machine-copied
+// (typed once from the GM screen into the display), never hand-transcribed
+// from dictation, so readability outranks disambiguation here.
 const CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const CODE_LENGTH = 6;
 const MAX_MINT_ATTEMPTS = 8;
 
 const NOT_FOUND_MESSAGE = "The requested display resource does not exist.";
 
-/** 6-char pairing code over an unambiguous alphabet (no lowercase lookalikes). */
+/** 6-char pairing code over an uppercase alphanumeric alphabet. Codes are
+ * machine-copied from the GM screen, never hand-transcribed (0/O and 1/I
+ * stay confusable by design, see CODE_ALPHABET). */
 export function generateDisplayCode(): string {
   const bytes = randomBytes(CODE_LENGTH);
   let code = "";
@@ -82,6 +118,12 @@ export interface DisplayCommands {
   redeemDisplayCode(input: RedeemDisplayCodeInput): Promise<CampaignResult<RedeemDisplayCodeSuccess>>;
   getDisplayProjection(input: GetDisplayProjectionInput): Promise<CampaignResult<DisplayProjection>>;
   revokeDisplay(ctx: RequestContext, input: RevokeDisplayInput): Promise<CampaignResult<RevokeDisplaySuccess>>;
+  listDisplayCredentials(
+    ctx: RequestContext,
+    input: ListDisplayCredentialsInput,
+  ): Promise<CampaignResult<DisplayCredentialMetadata[]>>;
+  getDisplaySceneImage(input: GetDisplaySceneImageInput): Promise<CampaignResult<DisplayImageBytes>>;
+  getDisplayTokenImage(input: GetDisplayTokenImageInput): Promise<CampaignResult<DisplayImageBytes>>;
 }
 
 export function createDisplayCommands(input: CreateDisplayCommandsInput): DisplayCommands {
@@ -142,6 +184,123 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
     const left = Buffer.from(presentedHash, "utf8");
     const right = Buffer.from(storedHash, "utf8");
     return left.length === right.length && timingSafeEqual(left, right);
+  }
+
+  /**
+   * I7b Task 4: shared display-credential + scene resolution for the
+   * projection and both binary image reads. Every failure — missing fields,
+   * unknown/revoked credential, secret mismatch, unknown scene, scene from
+   * another campaign — collapses to null (the caller maps it to generic
+   * not_found without distinguishing cases).
+   */
+  async function resolveDisplayScene(
+    projectionInput: GetDisplayProjectionInput,
+  ): Promise<
+    | {
+        credential: { displayId: string; campaignId: string };
+        scene: {
+          sceneId: string;
+          campaignId: string;
+          revision: number;
+          backgroundFileId: string;
+          fog: unknown;
+          tokens: unknown;
+        };
+      }
+    | null
+  > {
+    if (
+      !checkPresent(projectionInput.displayId) ||
+      !checkPresent(projectionInput.secret) ||
+      !checkPresent(projectionInput.sceneId)
+    ) {
+      return null;
+    }
+    const credential = await repo.loadDisplayCredential(input.pool, projectionInput.displayId);
+    if (
+      credential === null ||
+      credential.revokedAt !== null ||
+      !secretMatches(projectionInput.secret, credential.secretHash)
+    ) {
+      return null;
+    }
+    const scene = await repo.loadScene(input.pool, projectionInput.sceneId);
+    if (scene === null || scene.campaignId !== credential.campaignId) {
+      return null;
+    }
+    return {
+      credential: { displayId: credential.displayId, campaignId: credential.campaignId },
+      scene,
+    };
+  }
+
+  /**
+   * I7b Task 4: cache-miss composite shared by the projection and the scene
+   * image route. Bytes are deterministic in (background, fog), so a
+   * concurrent second composite writes identical content.
+   */
+  async function ensureDerivative(
+    sceneId: string,
+    revision: number,
+    backgroundBytes: Buffer,
+    fog: FogOp[],
+  ): Promise<string> {
+    const derivativePath = displayDerivativePath(sceneId, revision);
+    try {
+      await readFile(derivativePath);
+    } catch {
+      await mkdir(dirname(derivativePath), { recursive: true });
+      const derivative = await compositeDerivative(backgroundBytes, fog);
+      await writeFile(derivativePath, derivative, { mode: 0o600 });
+    }
+    return derivativePath;
+  }
+
+  async function readBackgroundBytes(storageKey: string): Promise<Buffer | null> {
+    try {
+      return await readFile(join(resolveMediaRoot(), storageKey));
+    } catch {
+      // Row present but bytes missing from disk: fail closed.
+      return null;
+    }
+  }
+
+  /**
+   * I7b Task 4: revoke-time purge of cached derivative files for the
+   * campaign's scenes. Derivatives regenerate lazily on the next projection
+   * (see the regeneration test in tests/integration/campaign-scenes.test.ts).
+   * Best-effort: a purge failure never fails the revoke itself.
+   */
+  async function purgeCampaignDerivatives(campaignId: string): Promise<void> {
+    try {
+      const sceneIds = await repo.listSceneIdsByCampaign(input.pool, campaignId);
+      const prefixes = new Set(sceneIds.map((sceneId) => `${sceneId}-rev`));
+      if (prefixes.size === 0) return;
+      let names: string[];
+      try {
+        names = await readdir(resolveDisplayRoot());
+      } catch {
+        return;
+      }
+      for (const name of names) {
+        if (!name.endsWith(".png")) continue;
+        let owned = false;
+        for (const prefix of prefixes) {
+          if (name.startsWith(prefix)) {
+            owned = true;
+            break;
+          }
+        }
+        if (!owned) continue;
+        try {
+          await unlink(join(resolveDisplayRoot(), name));
+        } catch {
+          // Converged already (concurrent revoke) — keep purging the rest.
+        }
+      }
+    } catch {
+      // Purge is hygiene, not correctness: the revoke already committed.
+    }
   }
 
   function isFogOp(value: unknown): value is FogOp {
@@ -335,52 +494,25 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
 
     async getDisplayProjection(projectionInput) {
       try {
-        if (
-          !checkPresent(projectionInput.displayId) ||
-          !checkPresent(projectionInput.secret) ||
-          !checkPresent(projectionInput.sceneId)
-        ) {
+        const resolved = await resolveDisplayScene(projectionInput);
+        if (resolved === null) {
           return { ok: false, error: errors.not_found() };
         }
-        const credential = await repo.loadDisplayCredential(input.pool, projectionInput.displayId);
-        if (
-          credential === null ||
-          credential.revokedAt !== null ||
-          !secretMatches(projectionInput.secret, credential.secretHash)
-        ) {
-          return { ok: false, error: errors.not_found() };
-        }
-        const scene = await repo.loadScene(input.pool, projectionInput.sceneId);
-        if (scene === null || scene.campaignId !== credential.campaignId) {
-          return { ok: false, error: errors.not_found() };
-        }
+        const { credential, scene } = resolved;
         const background = await repo.loadMediaFile(input.pool, scene.backgroundFileId);
         if (background === null || background.campaignId !== scene.campaignId) {
           // Orphaned background pin (image deleted while pinned, no FK):
           // fail closed — a scene without its background has no projection.
           return { ok: false, error: errors.not_found() };
         }
-        let backgroundBytes: Buffer;
-        try {
-          backgroundBytes = await readFile(join(resolveMediaRoot(), background.storageKey));
-        } catch {
-          // Row present but bytes missing from disk: same fail-closed collapse.
+        const backgroundBytes = await readBackgroundBytes(background.storageKey);
+        if (backgroundBytes === null) {
           return { ok: false, error: errors.not_found() };
         }
         const fog = parseStoredFog(scene.fog);
         const tokens = parseStoredTokens(scene.tokens);
 
-        const derivativePath = displayDerivativePath(scene.sceneId, scene.revision);
-        try {
-          await readFile(derivativePath);
-        } catch {
-          // Cache miss: composite the redacted derivative once per revision.
-          // Bytes are deterministic in (background, fog), so a concurrent
-          // second composite writes identical content.
-          await mkdir(dirname(derivativePath), { recursive: true });
-          const derivative = await compositeDerivative(backgroundBytes, fog);
-          await writeFile(derivativePath, derivative, { mode: 0o600 });
-        }
+        await ensureDerivative(scene.sceneId, scene.revision, backgroundBytes, fog);
 
         return {
           ok: true,
@@ -433,7 +565,118 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
         });
         // Already revoked (or raced): the credential is unusable either way.
         if (revoked === null) return { ok: false, error: errors.not_found() };
+        // I7b Task 4: revoke purges the campaign's cached derivatives (they
+        // regenerate lazily on the next projection). Best-effort and outside
+        // the transaction: the revoke already committed.
+        await purgeCampaignDerivatives(revoked.campaignId);
         return { ok: true, value: { displayId: revoked.displayId } };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async listDisplayCredentials(ctx, listInput) {
+      try {
+        if (!checkPresent(listInput.campaignId)) return { ok: false, error: errors.not_found() };
+        // Single-client read-only snapshot: campaign identity and caller
+        // membership share one snapshot; outsiders and players collapse to
+        // generic not_found. Metadata only — secret hashes never leave.
+        const outcome = await withClient(async (client) => {
+          const campaign = await repo.openCampaign(client, listInput.campaignId);
+          const membership =
+            campaign === null ? null : await repo.loadMembership(client, listInput.campaignId, ctx.actorId);
+          if (campaign === null || !canManageCampaign(campaign, membership)) return null;
+          return await repo.listDisplayCredentialsByCampaign(client, listInput.campaignId);
+        });
+        if (outcome === null) return { ok: false, error: errors.not_found() };
+        return {
+          ok: true,
+          value: outcome.map((record) => ({
+            displayId: record.displayId,
+            campaignId: record.campaignId,
+            revokedAt: record.revokedAt,
+            createdAt: record.createdAt,
+          })),
+        };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async getDisplaySceneImage(imageInput) {
+      try {
+        if (typeof imageInput.rev !== "number" || !Number.isInteger(imageInput.rev) || imageInput.rev < 1) {
+          return { ok: false, error: errors.not_found() };
+        }
+        const resolved = await resolveDisplayScene(imageInput);
+        if (resolved === null) {
+          return { ok: false, error: errors.not_found() };
+        }
+        const { scene } = resolved;
+        // The rev cache key must name the current revision: a stale rev
+        // names fog state that no longer holds, so it reads as missing and
+        // the display refetches the projection instead of showing old fog.
+        if (imageInput.rev !== scene.revision) {
+          return { ok: false, error: errors.not_found() };
+        }
+        const background = await repo.loadMediaFile(input.pool, scene.backgroundFileId);
+        if (background === null || background.campaignId !== scene.campaignId) {
+          return { ok: false, error: errors.not_found() };
+        }
+        const backgroundBytes = await readBackgroundBytes(background.storageKey);
+        if (backgroundBytes === null) {
+          return { ok: false, error: errors.not_found() };
+        }
+        const derivativePath = await ensureDerivative(
+          scene.sceneId,
+          scene.revision,
+          backgroundBytes,
+          parseStoredFog(scene.fog),
+        );
+        let bytes: Buffer;
+        try {
+          bytes = await readFile(derivativePath);
+        } catch {
+          return { ok: false, error: errors.not_found() };
+        }
+        return { ok: true, value: { contentType: "image/png", bytes, revision: scene.revision } };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async getDisplayTokenImage(tokenImageInput) {
+      try {
+        if (!checkPresent(tokenImageInput.tokenId)) return { ok: false, error: errors.not_found() };
+        const resolved = await resolveDisplayScene(tokenImageInput);
+        if (resolved === null) {
+          return { ok: false, error: errors.not_found() };
+        }
+        const { scene } = resolved;
+        const fog = parseStoredFog(scene.fog);
+        const token = parseStoredTokens(scene.tokens).find(
+          (candidate) => candidate.tokenId === tokenImageInput.tokenId,
+        );
+        // Only tokens the projection itself would list get image bytes:
+        // unknown, hidden, fog-covered or imageless tokens read as missing
+        // (never a GM original URL for a concealed token).
+        if (
+          token === undefined ||
+          !token.visible ||
+          !isPointRevealed(token.x, token.y, fog) ||
+          token.imageFileId === null
+        ) {
+          return { ok: false, error: errors.not_found() };
+        }
+        const image = await repo.loadMediaFile(input.pool, token.imageFileId);
+        if (image === null || image.campaignId !== scene.campaignId) {
+          return { ok: false, error: errors.not_found() };
+        }
+        const bytes = await readBackgroundBytes(image.storageKey);
+        if (bytes === null) {
+          return { ok: false, error: errors.not_found() };
+        }
+        return { ok: true, value: { contentType: image.mediaType, bytes, revision: scene.revision } };
       } catch {
         return { ok: false, error: errors.internal() };
       }

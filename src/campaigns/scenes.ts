@@ -26,6 +26,7 @@ export type SceneView = {
   fog: FogOp[];
   tokens: TokenRecord[];
 };
+export type OpenSceneInput = { sceneId: string };
 export type CreateSceneInput = { campaignId: string; backgroundFileId: string; idempotencyKey: string };
 export type UpdateSceneInput = {
   sceneId: string;
@@ -95,6 +96,7 @@ export type CreateSceneCommandsInput = {
 };
 
 export interface SceneCommands {
+  openScene(ctx: RequestContext, input: OpenSceneInput): Promise<CampaignResult<SceneView>>;
   createScene(ctx: RequestContext, input: CreateSceneInput): Promise<CampaignResult<SceneView>>;
   updateScene(ctx: RequestContext, input: UpdateSceneInput): Promise<CampaignResult<SceneView>>;
   applyFogEdit(ctx: RequestContext, input: ApplyFogEditInput): Promise<CampaignResult<SceneView>>;
@@ -418,6 +420,35 @@ export function createSceneCommands(input: CreateSceneCommandsInput): SceneComma
   }
 
   return {
+    async openScene(ctx, openInput) {
+      try {
+        if (typeof openInput.sceneId !== "string" || openInput.sceneId.length === 0) {
+          return { ok: false, error: errors.not_found() };
+        }
+        // Single-client read-only snapshot: the scene row, its campaign and
+        // the caller membership share one snapshot; outsiders and players
+        // collapse to generic not_found without learning the scene exists.
+        const outcome = await withClient(async (client) => {
+          const scene = await repo.loadScene(client, openInput.sceneId);
+          if (scene === null) return { scene: null, campaign: null, membership: null };
+          const campaign = await repo.openCampaign(client, scene.campaignId);
+          const membership =
+            campaign === null ? null : await repo.loadMembership(client, scene.campaignId, ctx.actorId);
+          return { scene, campaign, membership };
+        });
+        if (
+          outcome.scene === null ||
+          outcome.campaign === null ||
+          !canManageCampaign(outcome.campaign, outcome.membership)
+        ) {
+          return { ok: false, error: errors.not_found() };
+        }
+        return { ok: true, value: toView(outcome.scene) };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
     async createScene(ctx, createInput) {
       try {
         const keyError = checkIdempotencyKey(createInput.idempotencyKey);

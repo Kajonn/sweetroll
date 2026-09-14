@@ -1840,6 +1840,18 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       return row === undefined ? null : toSceneRecord(row);
     },
 
+    /**
+     * I7b Task 4: scene IDs owning a campaign, for revoke-time derivative
+     * purge. Read-only; runs on any client (inside or outside a txn).
+     */
+    async listSceneIdsByCampaign(client: DbClient, campaignId: string): Promise<string[]> {
+      const result = await client.query<{ id: string }>(
+        `SELECT id FROM scenes WHERE campaign_id = $1 ORDER BY created_at ASC, id ASC`,
+        [campaignId],
+      );
+      return result.rows.map((row) => row.id);
+    },
+
     async lockScene(client: PoolClient, sceneId: string): Promise<SceneRecord | null> {
       const result = await client.query<SceneRow>(
         `SELECT ${SCENE_COLUMNS} FROM scenes WHERE id = $1 FOR UPDATE`,
@@ -1933,18 +1945,6 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       return row === undefined ? null : toDisplayCodeRecord(row);
     },
 
-    async loadDisplayCodeByHash(
-      client: DbClient,
-      codeHash: string,
-    ): Promise<DisplayCodeRecord | null> {
-      const result = await client.query<DisplayCodeRow>(
-        `SELECT ${DISPLAY_CODE_COLUMNS} FROM display_codes WHERE code_hash = $1`,
-        [codeHash],
-      );
-      const row = result.rows[0];
-      return row === undefined ? null : toDisplayCodeRecord(row);
-    },
-
     async lockDisplayCodeByHash(
       client: PoolClient,
       codeHash: string,
@@ -1987,6 +1987,22 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       );
       const row = result.rows[0];
       return row === undefined ? null : toDisplayCredentialRecord(row);
+    },
+
+    /**
+     * I7b Task 4: every credential of a campaign (active and revoked) for
+     * the GM Settings list. Secret hashes stay server-side; the command
+     * layer projects metadata only.
+     */
+    async listDisplayCredentialsByCampaign(
+      client: DbClient,
+      campaignId: string,
+    ): Promise<DisplayCredentialRecord[]> {
+      const result = await client.query<DisplayCredentialRow>(
+        `SELECT ${DISPLAY_CREDENTIAL_COLUMNS} FROM display_credentials WHERE campaign_id = $1 ORDER BY created_at ASC, id ASC`,
+        [campaignId],
+      );
+      return result.rows.map(toDisplayCredentialRecord);
     },
 
     /**

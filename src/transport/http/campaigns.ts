@@ -552,6 +552,184 @@ const CampaignCharacterParams = Type.Object({
   characterId: Type.String({ format: UUID_FORMAT }),
 });
 
+// ---------------------------------------------------------------------------
+// I7b Task 4: media / scene / display DTOs and bodies
+// ---------------------------------------------------------------------------
+
+const ImageContentTypeDto = Type.Union([
+  Type.Literal("image/png"),
+  Type.Literal("image/jpeg"),
+  Type.Literal("image/webp"),
+]);
+
+const MediaFileViewDto = Type.Object({
+  fileId: Type.String({ format: UUID_FORMAT }),
+  campaignId: Type.String({ format: UUID_FORMAT }),
+  name: Type.String(),
+  mediaType: ImageContentTypeDto,
+  sizeBytes: Type.Integer(),
+  width: Type.Integer(),
+  height: Type.Integer(),
+  checksum: Type.String(),
+  revision: Type.Integer(),
+});
+
+const FogRunDto = Type.Object({
+  x: Type.Number({ minimum: 0, maximum: 1 }),
+  y: Type.Number({ minimum: 0, maximum: 1 }),
+  r: Type.Number({ exclusiveMinimum: 0 }),
+});
+
+const FogOpDto = Type.Object({
+  mode: Type.Union([Type.Literal("reveal"), Type.Literal("conceal")]),
+  runs: Type.Array(FogRunDto, { minItems: 1 }),
+});
+
+const TokenRecordDto = Type.Object({
+  tokenId: Type.String(),
+  label: Type.String(),
+  x: Type.Number({ minimum: 0, maximum: 1 }),
+  y: Type.Number({ minimum: 0, maximum: 1 }),
+  size: Type.Number({ exclusiveMinimum: 0, maximum: 1 }),
+  visible: Type.Boolean(),
+  imageFileId: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+});
+
+const SceneViewDto = Type.Object({
+  sceneId: Type.String({ format: UUID_FORMAT }),
+  campaignId: Type.String({ format: UUID_FORMAT }),
+  revision: Type.Integer(),
+  backgroundFileId: Type.String(),
+  fog: Type.Array(FogOpDto),
+  tokens: Type.Array(TokenRecordDto),
+});
+
+const DisplayProjectionTokenDto = Type.Object({
+  tokenId: Type.String(),
+  label: Type.String(),
+  x: Type.Number(),
+  y: Type.Number(),
+  size: Type.Number(),
+  imageUrl: Type.Union([Type.String(), Type.Null()]),
+});
+
+const DisplayProjectionDto = Type.Object({
+  sceneId: Type.String(),
+  sceneRevision: Type.Integer(),
+  imageUrl: Type.String(),
+  tokens: Type.Array(DisplayProjectionTokenDto),
+});
+
+const DisplayCredentialMetadataDto = Type.Object({
+  displayId: Type.String({ format: UUID_FORMAT }),
+  campaignId: Type.String({ format: UUID_FORMAT }),
+  revokedAt: Type.Union([Type.String({ format: DATE_TIME_FORMAT }), Type.Null()]),
+  createdAt: Type.String({ format: DATE_TIME_FORMAT }),
+});
+
+const DisplayCredentialDto = Type.Object({
+  displayId: Type.String({ format: UUID_FORMAT }),
+  secret: Type.String({ minLength: 1 }),
+});
+
+// Binary payloads travel as Buffers (Fastify skips response validation for
+// Buffer payloads); the schema documents the wire shape for the contracts.
+const BinaryBodyDto = Type.String({ format: "binary", description: "Raw image bytes." });
+
+const UploadImageBody = Type.Object({
+  name: Type.String({ minLength: 1, maxLength: 256 }),
+  contentType: ImageContentTypeDto,
+  dataBase64: Type.String({ minLength: 1 }),
+  idempotencyKey: Type.String({ format: UUID_FORMAT }),
+});
+
+const DeleteImageBody = Type.Object({
+  expectedRevision: Type.Integer({ minimum: 1 }),
+  idempotencyKey: Type.String({ format: UUID_FORMAT }),
+});
+
+const CreateSceneBody = Type.Object({
+  backgroundFileId: Type.String({ minLength: 1 }),
+  idempotencyKey: Type.String({ format: UUID_FORMAT }),
+});
+
+const UpdateSceneBody = Type.Object({
+  backgroundFileId: Type.String({ minLength: 1 }),
+  expectedSceneRevision: Type.Integer({ minimum: 1 }),
+  idempotencyKey: Type.String({ format: UUID_FORMAT }),
+});
+
+const FogEditBody = Type.Object({
+  expectedSceneRevision: Type.Integer({ minimum: 1 }),
+  op: FogOpDto,
+  idempotencyKey: Type.String({ format: UUID_FORMAT }),
+});
+
+const PlaceTokenBody = Type.Object({
+  expectedSceneRevision: Type.Integer({ minimum: 1 }),
+  label: Type.String({ minLength: 1, maxLength: 256 }),
+  x: Type.Number({ minimum: 0, maximum: 1 }),
+  y: Type.Number({ minimum: 0, maximum: 1 }),
+  size: Type.Number({ exclusiveMinimum: 0, maximum: 1 }),
+  visible: Type.Boolean(),
+  imageFileId: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+  idempotencyKey: Type.String({ format: UUID_FORMAT }),
+});
+
+const MoveTokenBody = Type.Object({
+  expectedSceneRevision: Type.Integer({ minimum: 1 }),
+  x: Type.Number({ minimum: 0, maximum: 1 }),
+  y: Type.Number({ minimum: 0, maximum: 1 }),
+  idempotencyKey: Type.String({ format: UUID_FORMAT }),
+});
+
+const RemoveTokenBody = Type.Object({
+  expectedSceneRevision: Type.Integer({ minimum: 1 }),
+  idempotencyKey: Type.String({ format: UUID_FORMAT }),
+});
+
+// Pair/revoke carry no caller input: every call mints (or kills) exactly
+// one credential, so there is nothing to make idempotent.
+const PairDisplayBody = Type.Object({});
+const RevokeDisplayBody = Type.Object({});
+
+// Display pairing codes travel in POST bodies only, never in URL parameters
+// (same posture as the invitation token bodies above).
+const RedeemDisplayBody = Type.Object({
+  code: Type.String({
+    minLength: 1,
+    description: "Single-use pairing code, delivered out of band. Never appears in URLs or logs.",
+  }),
+});
+
+// Revision cache key for the binary display image routes. Query strings
+// arrive as strings; Fastify coerces to Integer under the shared query
+// validation (same as the PageQuery limit), and the handler rechecks.
+const ImageRevQuery = Type.Object({ rev: Type.Integer({ minimum: 1 }) });
+
+const CampaignImageParams = Type.Object({
+  id: Type.String({ format: UUID_FORMAT }),
+  fileId: Type.String({ format: UUID_FORMAT }),
+});
+const SceneParams = Type.Object({ id: Type.String({ format: UUID_FORMAT }) });
+const SceneTokenParams = Type.Object({
+  id: Type.String({ format: UUID_FORMAT }),
+  tokenId: Type.String({ format: UUID_FORMAT }),
+});
+const DisplaySceneParams = Type.Object({
+  id: Type.String({ format: UUID_FORMAT }),
+  sceneId: Type.String({ format: UUID_FORMAT }),
+});
+const DisplayTokenParams = Type.Object({
+  id: Type.String({ format: UUID_FORMAT }),
+  sceneId: Type.String({ format: UUID_FORMAT }),
+  tokenId: Type.String({ format: UUID_FORMAT }),
+});
+const DisplayRevokeParams = Type.Object({
+  id: Type.String({ format: UUID_FORMAT }),
+  displayId: Type.String({ format: UUID_FORMAT }),
+});
+
 type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 export type RouteResponse = TSchema | { schema: TSchema; mediaType?: string };
 type RouteSchema = {
@@ -1048,6 +1226,243 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
       },
     },
   },
+  {
+    method: "post",
+    path: "/campaigns/:id/images",
+    operationId: "post_campaigns_id_images",
+    schema: {
+      params: CampaignIdParams,
+      body: UploadImageBody,
+      response: {
+        "200": Type.Object({ image: MediaFileViewDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "delete",
+    path: "/campaigns/:id/images/:fileId",
+    operationId: "delete_campaigns_id_images_fileId",
+    schema: {
+      params: CampaignImageParams,
+      body: DeleteImageBody,
+      response: {
+        "200": Type.Object({ image: MediaFileViewDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/campaigns/:id/images/:fileId/original",
+    operationId: "get_campaigns_id_images_fileId_original",
+    schema: {
+      params: CampaignImageParams,
+      response: {
+        "200": { schema: BinaryBodyDto, mediaType: "application/octet-stream" },
+        "401": UnauthorizedEnvelope,
+        "404": CampaignErrorEnvelope,
+        "500": CampaignErrorEnvelope,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/campaigns/:id/scenes",
+    operationId: "post_campaigns_id_scenes",
+    schema: {
+      params: CampaignIdParams,
+      body: CreateSceneBody,
+      response: {
+        "201": Type.Object({ scene: SceneViewDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/scenes/:id",
+    operationId: "get_scenes_id",
+    schema: {
+      params: SceneParams,
+      response: {
+        "200": Type.Object({ scene: SceneViewDto, requestId: Type.String() }),
+        "401": UnauthorizedEnvelope,
+        "404": CampaignErrorEnvelope,
+        "500": CampaignErrorEnvelope,
+      },
+    },
+  },
+  {
+    method: "patch",
+    path: "/scenes/:id",
+    operationId: "patch_scenes_id",
+    schema: {
+      params: SceneParams,
+      body: UpdateSceneBody,
+      response: {
+        "200": Type.Object({ scene: SceneViewDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/scenes/:id/fog-edits",
+    operationId: "post_scenes_id_fog_edits",
+    schema: {
+      params: SceneParams,
+      body: FogEditBody,
+      response: {
+        "200": Type.Object({ scene: SceneViewDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/scenes/:id/tokens",
+    operationId: "post_scenes_id_tokens",
+    schema: {
+      params: SceneParams,
+      body: PlaceTokenBody,
+      response: {
+        "200": Type.Object({ scene: SceneViewDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "patch",
+    path: "/scenes/:id/tokens/:tokenId",
+    operationId: "patch_scenes_id_tokens_tokenId",
+    schema: {
+      params: SceneTokenParams,
+      body: MoveTokenBody,
+      response: {
+        "200": Type.Object({ scene: SceneViewDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "delete",
+    path: "/scenes/:id/tokens/:tokenId",
+    operationId: "delete_scenes_id_tokens_tokenId",
+    schema: {
+      params: SceneTokenParams,
+      body: RemoveTokenBody,
+      response: {
+        "200": Type.Object({ scene: SceneViewDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/campaigns/:id/display-codes",
+    operationId: "post_campaigns_id_display_codes",
+    schema: {
+      params: CampaignIdParams,
+      body: PairDisplayBody,
+      response: {
+        "200": Type.Object({ code: Type.String(), requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/campaigns/:id/display-credentials",
+    operationId: "get_campaigns_id_display_credentials",
+    schema: {
+      params: CampaignIdParams,
+      response: {
+        "200": Type.Object({
+          displays: Type.Array(DisplayCredentialMetadataDto),
+          requestId: Type.String(),
+        }),
+        "401": UnauthorizedEnvelope,
+        "404": CampaignErrorEnvelope,
+        "500": CampaignErrorEnvelope,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/campaigns/:id/displays/:displayId/revoke",
+    operationId: "post_campaigns_id_displays_displayId_revoke",
+    schema: {
+      params: DisplayRevokeParams,
+      body: RevokeDisplayBody,
+      response: {
+        "200": Type.Object({
+          display: Type.Object({ displayId: Type.String({ format: UUID_FORMAT }) }),
+          requestId: Type.String(),
+        }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/displays/redeem",
+    operationId: "post_displays_redeem",
+    schema: {
+      body: RedeemDisplayBody,
+      response: {
+        "200": Type.Object({ display: DisplayCredentialDto, requestId: Type.String() }),
+        "400": CampaignErrorEnvelope,
+        "404": CampaignErrorEnvelope,
+        "429": CampaignErrorEnvelope,
+        "500": CampaignErrorEnvelope,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/displays/:id/scenes/:sceneId/projection",
+    operationId: "get_displays_id_scenes_sceneId_projection",
+    schema: {
+      params: DisplaySceneParams,
+      response: {
+        "200": Type.Object({ projection: DisplayProjectionDto, requestId: Type.String() }),
+        "400": CampaignErrorEnvelope,
+        "404": CampaignErrorEnvelope,
+        "500": CampaignErrorEnvelope,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/displays/:id/scenes/:sceneId/image",
+    operationId: "get_displays_id_scenes_sceneId_image",
+    schema: {
+      params: DisplaySceneParams,
+      querystring: ImageRevQuery,
+      response: {
+        "200": { schema: BinaryBodyDto, mediaType: "image/png" },
+        "400": CampaignErrorEnvelope,
+        "404": CampaignErrorEnvelope,
+        "500": CampaignErrorEnvelope,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/displays/:id/scenes/:sceneId/tokens/:tokenId/image",
+    operationId: "get_displays_id_scenes_sceneId_tokens_tokenId_image",
+    schema: {
+      params: DisplayTokenParams,
+      querystring: ImageRevQuery,
+      response: {
+        "200": { schema: BinaryBodyDto, mediaType: "application/octet-stream" },
+        "400": CampaignErrorEnvelope,
+        "404": CampaignErrorEnvelope,
+        "500": CampaignErrorEnvelope,
+      },
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1071,10 +1486,22 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
       // Spec 4.3: every protected campaign response is non-cacheable. A
       // plugin-scoped onSend covers reads, mutations and errors alike; no
       // shared HTTP cache or service-worker payload caching is introduced.
-      reply.header("cache-control", "no-store");
+      // Binary display routes set their own Cache-Control first
+      // (revision-keyed derivatives are privately cacheable), so the
+      // default applies only when the handler set none.
+      if (reply.getHeader("cache-control") === undefined) {
+        reply.header("cache-control", "no-store");
+      }
     });
 
     app.addHook("preHandler", async (request, reply) => {
+      // Display-credential routes carry no GM session: the pairing code
+      // travels in the redeem body and the credential secret in the
+      // x-display-secret header (never the URL query, except the rev cache
+      // key). Each handler collapses every credential failure to generic
+      // not_found without distinguishing cases.
+      const routeUrl = request.routeOptions?.url ?? "";
+      if (routeUrl.startsWith("/displays/")) return;
       if (request.auth.state !== "authenticated") {
         return reply.code(401).send({
           error: { code: "unauthorized", message: "Authentication is required." },
@@ -1095,7 +1522,10 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         return;
       }
       const status = err.statusCode ?? 500;
-      const code = status === 401 ? "unauthorized" : "internal";
+      // Oversized JSON bodies hit Fastify's body limit before any handler
+      // runs: surface them as too_large (matching oversized-image module
+      // errors) instead of a bare internal with a 413 status.
+      const code = status === 401 ? "unauthorized" : status === 413 ? "too_large" : "internal";
       void reply.code(status).send({
         error: {
           code,
@@ -1137,6 +1567,33 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         return null;
       }
       return { limit, cursor: query?.cursor ?? null };
+    };
+
+    /**
+     * Display credential secret for the credential-authed routes. Headers
+     * only — a `secret` URL query parameter is never read, so a logged or
+     * shared URL cannot carry the credential.
+     */
+    const displaySecretOf = (request: FastifyRequest): string => {
+      const header = request.headers["x-display-secret"];
+      if (typeof header === "string") return header;
+      if (Array.isArray(header)) return header[0] ?? "";
+      return "";
+    };
+
+    /**
+     * Revision cache key for the binary display scene image. The query
+     * schema coerces `rev` under the shared query validation; this recheck
+     * normalizes strings and guards handlers registered without the schema.
+     */
+    const parseImageRev = (request: FastifyRequest, reply: FastifyReply): number | null => {
+      const query = request.query as { rev?: string | number } | undefined;
+      const rev = typeof query?.rev === "number" ? query.rev : Number(query?.rev);
+      if (!Number.isInteger(rev) || rev < 1) {
+        sendError(reply, badRequest("rev must be a positive integer revision."), request.id);
+        return null;
+      }
+      return rev;
     };
 
     const toCampaignDto = (view: CampaignView): unknown => ({
@@ -1839,6 +2296,273 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { ...result.value, requestId: request.id };
+      },
+
+      post_campaigns_id_images: async (request, reply) => {
+        const params = request.params as { id: string };
+        const body = request.body as {
+          name: string;
+          contentType: "image/png" | "image/jpeg" | "image/webp";
+          dataBase64: string;
+          idempotencyKey: string;
+        };
+        const result = await campaigns.uploadImage(ctxOf(request), {
+          campaignId: params.id,
+          name: body.name,
+          contentType: body.contentType,
+          dataBase64: body.dataBase64,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        // The stored view carries metadata only: no storage_key, no bytes.
+        return { image: result.value, requestId: request.id };
+      },
+
+      delete_campaigns_id_images_fileId: async (request, reply) => {
+        const params = request.params as { id: string; fileId: string };
+        const body = request.body as { expectedRevision: number; idempotencyKey: string } | undefined;
+        if (body?.expectedRevision === undefined || body?.idempotencyKey === undefined) {
+          return sendError(
+            reply,
+            badRequest("expectedRevision and idempotencyKey are required in the request body."),
+            request.id,
+          );
+        }
+        const result = await campaigns.deleteImage(ctxOf(request), {
+          fileId: params.fileId,
+          expectedRevision: body.expectedRevision,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        // The :id segment names the campaign: a file owned elsewhere reads
+        // as not_found through this campaign's URL (the delete itself was
+        // already authorized against the owning campaign).
+        if (result.value.campaignId !== params.id) {
+          return sendError(
+            reply,
+            { code: "not_found", message: "The requested campaign does not exist." },
+            request.id,
+          );
+        }
+        return { image: result.value, requestId: request.id };
+      },
+
+      get_campaigns_id_images_fileId_original: async (request, reply) => {
+        const params = request.params as { id: string; fileId: string };
+        const result = await campaigns.openImage(ctxOf(request), { fileId: params.fileId });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        if (result.value.file.campaignId !== params.id) {
+          return sendError(
+            reply,
+            { code: "not_found", message: "The requested campaign does not exist." },
+            request.id,
+          );
+        }
+        reply.header("content-type", result.value.contentType);
+        reply.header("cache-control", "no-store");
+        return reply.send(result.value.bytes);
+      },
+
+      post_campaigns_id_scenes: async (request, reply) => {
+        const params = request.params as { id: string };
+        const body = request.body as { backgroundFileId: string; idempotencyKey: string };
+        const result = await campaigns.createScene(ctxOf(request), {
+          campaignId: params.id,
+          backgroundFileId: body.backgroundFileId,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return reply.code(201).send({ scene: result.value, requestId: request.id });
+      },
+
+      get_scenes_id: async (request, reply) => {
+        const params = request.params as { id: string };
+        const result = await campaigns.openScene(ctxOf(request), { sceneId: params.id });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { scene: result.value, requestId: request.id };
+      },
+
+      patch_scenes_id: async (request, reply) => {
+        const params = request.params as { id: string };
+        const body = request.body as {
+          backgroundFileId: string;
+          expectedSceneRevision: number;
+          idempotencyKey: string;
+        };
+        const result = await campaigns.updateScene(ctxOf(request), {
+          sceneId: params.id,
+          backgroundFileId: body.backgroundFileId,
+          expectedSceneRevision: body.expectedSceneRevision,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { scene: result.value, requestId: request.id };
+      },
+
+      post_scenes_id_fog_edits: async (request, reply) => {
+        const params = request.params as { id: string };
+        const body = request.body as {
+          expectedSceneRevision: number;
+          op: { mode: "reveal" | "conceal"; runs: Array<{ x: number; y: number; r: number }> };
+          idempotencyKey: string;
+        };
+        const result = await campaigns.applyFogEdit(ctxOf(request), {
+          sceneId: params.id,
+          expectedSceneRevision: body.expectedSceneRevision,
+          op: body.op,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { scene: result.value, requestId: request.id };
+      },
+
+      post_scenes_id_tokens: async (request, reply) => {
+        const params = request.params as { id: string };
+        const body = request.body as {
+          expectedSceneRevision: number;
+          label: string;
+          x: number;
+          y: number;
+          size: number;
+          visible: boolean;
+          imageFileId: string | null;
+          idempotencyKey: string;
+        };
+        const result = await campaigns.placeToken(ctxOf(request), {
+          sceneId: params.id,
+          expectedSceneRevision: body.expectedSceneRevision,
+          label: body.label,
+          x: body.x,
+          y: body.y,
+          size: body.size,
+          visible: body.visible,
+          imageFileId: body.imageFileId,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { scene: result.value, requestId: request.id };
+      },
+
+      patch_scenes_id_tokens_tokenId: async (request, reply) => {
+        const params = request.params as { id: string; tokenId: string };
+        const body = request.body as {
+          expectedSceneRevision: number;
+          x: number;
+          y: number;
+          idempotencyKey: string;
+        };
+        const result = await campaigns.moveToken(ctxOf(request), {
+          sceneId: params.id,
+          tokenId: params.tokenId,
+          expectedSceneRevision: body.expectedSceneRevision,
+          x: body.x,
+          y: body.y,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { scene: result.value, requestId: request.id };
+      },
+
+      delete_scenes_id_tokens_tokenId: async (request, reply) => {
+        const params = request.params as { id: string; tokenId: string };
+        const body = request.body as { expectedSceneRevision: number; idempotencyKey: string } | undefined;
+        if (body?.expectedSceneRevision === undefined || body?.idempotencyKey === undefined) {
+          return sendError(
+            reply,
+            badRequest("expectedSceneRevision and idempotencyKey are required in the request body."),
+            request.id,
+          );
+        }
+        const result = await campaigns.removeToken(ctxOf(request), {
+          sceneId: params.id,
+          tokenId: params.tokenId,
+          expectedSceneRevision: body.expectedSceneRevision,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { scene: result.value, requestId: request.id };
+      },
+
+      post_campaigns_id_display_codes: async (request, reply) => {
+        const params = request.params as { id: string };
+        const result = await campaigns.pairDisplay(ctxOf(request), { campaignId: params.id });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { code: result.value.code, requestId: request.id };
+      },
+
+      get_campaigns_id_display_credentials: async (request, reply) => {
+        const params = request.params as { id: string };
+        const result = await campaigns.listDisplayCredentials(ctxOf(request), { campaignId: params.id });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return {
+          displays: result.value.map((entry) => ({
+            ...entry,
+            revokedAt: entry.revokedAt === null ? null : entry.revokedAt.toISOString(),
+            createdAt: entry.createdAt.toISOString(),
+          })),
+          requestId: request.id,
+        };
+      },
+
+      post_campaigns_id_displays_displayId_revoke: async (request, reply) => {
+        // The :id segment is namespacing only: the module authorizes against
+        // the credential's owning campaign and purges that campaign's cached
+        // derivatives (which regenerate lazily on the next projection).
+        const params = request.params as { displayId: string };
+        const result = await campaigns.revokeDisplay(ctxOf(request), { displayId: params.displayId });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { display: result.value, requestId: request.id };
+      },
+
+      post_displays_redeem: async (request, reply) => {
+        const body = request.body as { code: string };
+        const result = await campaigns.redeemDisplayCode({ code: body.code });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { display: result.value, requestId: request.id };
+      },
+
+      get_displays_id_scenes_sceneId_projection: async (request, reply) => {
+        const params = request.params as { id: string; sceneId: string };
+        const result = await campaigns.getDisplayProjection({
+          displayId: params.id,
+          secret: displaySecretOf(request),
+          sceneId: params.sceneId,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { projection: result.value, requestId: request.id };
+      },
+
+      get_displays_id_scenes_sceneId_image: async (request, reply) => {
+        const params = request.params as { id: string; sceneId: string };
+        const rev = parseImageRev(request, reply);
+        if (rev === null) return null;
+        const result = await campaigns.getDisplaySceneImage({
+          displayId: params.id,
+          secret: displaySecretOf(request),
+          sceneId: params.sceneId,
+          rev,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("content-type", result.value.contentType);
+        reply.header("cache-control", "private, max-age=3600");
+        return reply.send(result.value.bytes);
+      },
+
+      get_displays_id_scenes_sceneId_tokens_tokenId_image: async (request, reply) => {
+        const params = request.params as { id: string; sceneId: string; tokenId: string };
+        // The rev query key is enforced by the route schema (required cache
+        // key); token bytes are immutable originals, so the handler serves
+        // the current bytes without matching rev to the scene revision.
+        const result = await campaigns.getDisplayTokenImage({
+          displayId: params.id,
+          secret: displaySecretOf(request),
+          sceneId: params.sceneId,
+          tokenId: params.tokenId,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("content-type", result.value.contentType);
+        reply.header("cache-control", "private, max-age=3600");
+        return reply.send(result.value.bytes);
       },
     };
 

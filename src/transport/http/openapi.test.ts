@@ -49,13 +49,20 @@ describe("buildOpenApiDocument", () => {
       "/campaigns/{id}/characters/{characterId}/claim",
       "/campaigns/{id}/claimable-characters",
       "/campaigns/{id}/content",
+      "/campaigns/{id}/display-codes",
+      "/campaigns/{id}/display-credentials",
+      "/campaigns/{id}/displays/{displayId}/revoke",
       "/campaigns/{id}/exports",
+      "/campaigns/{id}/images",
+      "/campaigns/{id}/images/{fileId}",
+      "/campaigns/{id}/images/{fileId}/original",
       "/campaigns/{id}/invitations",
       "/campaigns/{id}/invitations/{inviteId}/revoke",
       "/campaigns/{id}/invitations/{inviteId}/rotate",
       "/campaigns/{id}/members",
       "/campaigns/{id}/members/{userId}",
       "/campaigns/{id}/recover",
+      "/campaigns/{id}/scenes",
       "/campaigns/{id}/upgrade-commits",
       "/campaigns/{id}/upgrade-previews",
       "/characters",
@@ -75,11 +82,19 @@ describe("buildOpenApiDocument", () => {
       "/content/{id}",
       "/content/{id}/grants",
       "/content/{id}/recover",
+      "/displays/redeem",
+      "/displays/{id}/scenes/{sceneId}/image",
+      "/displays/{id}/scenes/{sceneId}/projection",
+      "/displays/{id}/scenes/{sceneId}/tokens/{tokenId}/image",
       "/invitations/accept",
       "/invitations/decline",
       "/invitations/review",
       "/me",
       "/me/preferences",
+      "/scenes/{id}",
+      "/scenes/{id}/fog-edits",
+      "/scenes/{id}/tokens",
+      "/scenes/{id}/tokens/{tokenId}",
       "/signout",
       "/system-versions/{versionId}",
       "/system-versions/{versionId}/export",
@@ -206,5 +221,55 @@ describe("buildOpenApiDocument", () => {
     const rotate = paths["/campaigns/{id}/invitations/{inviteId}/rotate"]?.post;
     const rotateText = JSON.stringify(rotate?.responses?.["200"]?.content?.["application/json"]?.schema);
     expect(rotateText).toContain("tokenUnavailable");
+  });
+
+  it("exposes the scene/display operations with credentials outside URLs", async () => {
+    const doc = buildOpenApiDocument(Fastify());
+    const paths = doc.paths ?? {};
+
+    // Task 5/7 seam operations pin these IDs and paths.
+    expect(paths["/campaigns/{id}/images"]?.post?.operationId).toBe("post_campaigns_id_images");
+    expect(paths["/campaigns/{id}/images/{fileId}"]?.delete?.operationId).toBe(
+      "delete_campaigns_id_images_fileId",
+    );
+    expect(paths["/campaigns/{id}/images/{fileId}/original"]?.get?.operationId).toBe(
+      "get_campaigns_id_images_fileId_original",
+    );
+    expect(paths["/campaigns/{id}/scenes"]?.post?.operationId).toBe("post_campaigns_id_scenes");
+    expect(paths["/scenes/{id}"]?.get?.operationId).toBe("get_scenes_id");
+    expect(paths["/scenes/{id}/fog-edits"]?.post?.operationId).toBe("post_scenes_id_fog_edits");
+    expect(paths["/scenes/{id}/tokens"]?.post?.operationId).toBe("post_scenes_id_tokens");
+    expect(paths["/campaigns/{id}/display-codes"]?.post?.operationId).toBe(
+      "post_campaigns_id_display_codes",
+    );
+    expect(paths["/campaigns/{id}/display-credentials"]?.get?.operationId).toBe(
+      "get_campaigns_id_display_credentials",
+    );
+    expect(paths["/displays/redeem"]?.post?.operationId).toBe("post_displays_redeem");
+    expect(paths["/displays/{id}/scenes/{sceneId}/projection"]?.get?.operationId).toBe(
+      "get_displays_id_scenes_sceneId_projection",
+    );
+    expect(paths["/displays/{id}/scenes/{sceneId}/image"]?.get?.operationId).toBe(
+      "get_displays_id_scenes_sceneId_image",
+    );
+
+    // Display credentials travel in the redeem body / a header — never in
+    // the URL query (the rev cache key is the only display query parameter).
+    for (const [path, methods] of Object.entries(paths)) {
+      for (const [method, operation] of Object.entries(methods)) {
+        for (const parameter of operation.parameters ?? []) {
+          expect(parameter.name, `${method} ${path}`).not.toBe("secret");
+          expect(parameter.name, `${method} ${path}`).not.toBe("code");
+        }
+      }
+    }
+    const imageParamNames = (
+      paths["/displays/{id}/scenes/{sceneId}/image"]?.get?.parameters ?? []
+    ).map((parameter) => parameter.name);
+    expect(imageParamNames).toContain("rev");
+    expect(imageParamNames).not.toContain("secret");
+    const redeemSchema = paths["/displays/redeem"]?.post?.requestBody?.content?.["application/json"]
+      ?.schema as { required?: string[] } | undefined;
+    expect(redeemSchema?.required).toContain("code");
   });
 });

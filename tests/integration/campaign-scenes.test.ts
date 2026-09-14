@@ -914,3 +914,298 @@ describeWithDatabase("display pairing + redacted projection (Task 3 display comm
     expect(missingBytes).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
   });
 });
+
+describeWithDatabase("Task 4 transport support reads (openScene, openImage, credentials, image bytes)", () => {
+  let h: I6Harness;
+  let mediaDir: string;
+  let displayDir: string;
+  let redPngBase64: string;
+
+  beforeAll(async () => {
+    mediaDir = await mkdtemp(join(tmpdir(), "sweetroll-task4-media-"));
+    displayDir = await mkdtemp(join(tmpdir(), "sweetroll-task4-deriv-"));
+    process.env.SWEETROLL_MEDIA_DIR = mediaDir;
+    process.env.SWEETROLL_DISPLAY_DIR = displayDir;
+    h = await buildI6Harness();
+    const bytes = await sharp({
+      create: { width: 64, height: 64, channels: 4, background: { r: 200, g: 30, b: 30, alpha: 1 } },
+    })
+      .png()
+      .toBuffer();
+    redPngBase64 = bytes.toString("base64");
+  });
+
+  afterAll(async () => {
+    await h.close();
+    delete process.env.SWEETROLL_MEDIA_DIR;
+    delete process.env.SWEETROLL_DISPLAY_DIR;
+    await rm(mediaDir, { recursive: true, force: true });
+    await rm(displayDir, { recursive: true, force: true });
+  });
+
+  async function createCampaign(): Promise<string> {
+    const created = await h.campaigns.create(ctxFor(h.users.gm), {
+      systemVersionId: h.versionId,
+      title: `Task4 ${randomUUID()}`,
+      description: "",
+      idempotencyKey: randomUUID(),
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) throw new Error("campaign create failed");
+    return created.value.campaignId;
+  }
+
+  async function seedMember(campaignId: string, userId: string): Promise<void> {
+    await h.pool.query(
+      `INSERT INTO campaign_members (campaign_id, user_id, role, status, generation)
+       VALUES ($1, $2, 'player', 'active', 1)`,
+      [campaignId, userId],
+    );
+  }
+
+  async function uploadBackground(campaignId: string): Promise<{ fileId: string; revision: number }> {
+    const uploaded = await h.campaigns.uploadImage(ctxFor(h.users.gm), {
+      campaignId,
+      name: "arena",
+      contentType: "image/png",
+      dataBase64: redPngBase64,
+      idempotencyKey: randomUUID(),
+    });
+    expect(uploaded.ok).toBe(true);
+    if (!uploaded.ok) throw new Error("background upload failed");
+    return { fileId: uploaded.value.fileId, revision: uploaded.value.revision };
+  }
+
+  async function createScene(
+    campaignId: string,
+    backgroundFileId: string,
+  ): Promise<{ sceneId: string; revision: number }> {
+    const created = await h.campaigns.createScene(ctxFor(h.users.gm), {
+      campaignId,
+      backgroundFileId,
+      idempotencyKey: randomUUID(),
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) throw new Error("scene create failed");
+    return { sceneId: created.value.sceneId, revision: created.value.revision };
+  }
+
+  async function pairAndRedeem(campaignId: string): Promise<{ displayId: string; secret: string }> {
+    const paired = await h.campaigns.pairDisplay(ctxFor(h.users.gm), { campaignId });
+    expect(paired.ok).toBe(true);
+    if (!paired.ok) throw new Error("pair failed");
+    const redeemed = await h.campaigns.redeemDisplayCode({ code: paired.value.code });
+    expect(redeemed.ok).toBe(true);
+    if (!redeemed.ok) throw new Error("redeem failed");
+    return redeemed.value;
+  }
+
+  async function derivativeNames(sceneId?: string): Promise<string[]> {
+    const names = (await readdir(displayDir)).filter((name) => name.endsWith(".png")).sort();
+    return sceneId === undefined ? names : names.filter((name) => name.startsWith(`${sceneId}-rev`));
+  }
+
+  it("openScene returns the full view to GMs and 404s players, outsiders and unknown scenes", async () => {
+    const campaignId = await createCampaign();
+    await seedMember(campaignId, h.users.player.actorId);
+    const { fileId } = await uploadBackground(campaignId);
+    const { sceneId } = await createScene(campaignId, fileId);
+
+    const opened = await h.campaigns.openScene(ctxFor(h.users.gm), { sceneId });
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) throw new Error("expected openScene");
+    expect(opened.value).toMatchObject({ sceneId, campaignId, revision: 1, backgroundFileId: fileId });
+
+    const player = await h.campaigns.openScene(ctxFor(h.users.player), { sceneId });
+    expect(player).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+    const outsider = await h.campaigns.openScene(ctxFor(h.users.outsider), { sceneId });
+    expect(outsider).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+    const unknown = await h.campaigns.openScene(ctxFor(h.users.gm), { sceneId: randomUUID() });
+    expect(unknown).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+  });
+
+  it("openImage returns the original bytes to GMs and 404s players and unknown files", async () => {
+    const campaignId = await createCampaign();
+    await seedMember(campaignId, h.users.player.actorId);
+    const { fileId } = await uploadBackground(campaignId);
+
+    const opened = await h.campaigns.openImage(ctxFor(h.users.gm), { fileId });
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) throw new Error("expected openImage");
+    expect(opened.value.file).toMatchObject({ fileId, campaignId, mediaType: "image/png" });
+    expect(opened.value.contentType).toBe("image/png");
+    expect(opened.value.bytes.equals(Buffer.from(redPngBase64, "base64"))).toBe(true);
+
+    const player = await h.campaigns.openImage(ctxFor(h.users.player), { fileId });
+    expect(player).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+    const unknown = await h.campaigns.openImage(ctxFor(h.users.gm), { fileId: randomUUID() });
+    expect(unknown).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+  });
+
+  it("listDisplayCredentials returns metadata without secrets and marks revokes", async () => {
+    const campaignId = await createCampaign();
+    await seedMember(campaignId, h.users.player.actorId);
+
+    const empty = await h.campaigns.listDisplayCredentials(ctxFor(h.users.gm), { campaignId });
+    expect(empty).toEqual({ ok: true, value: [] });
+
+    const first = await pairAndRedeem(campaignId);
+    const second = await pairAndRedeem(campaignId);
+
+    const listed = await h.campaigns.listDisplayCredentials(ctxFor(h.users.gm), { campaignId });
+    expect(listed.ok).toBe(true);
+    if (!listed.ok) throw new Error("expected list");
+    expect(listed.value).toHaveLength(2);
+    expect(listed.value.map((entry) => entry.displayId).sort()).toEqual(
+      [first.displayId, second.displayId].sort(),
+    );
+    for (const entry of listed.value) {
+      expect(entry.campaignId).toBe(campaignId);
+      expect(entry.revokedAt).toBeNull();
+      expect(entry.createdAt).toBeInstanceOf(Date);
+    }
+    // No secret material anywhere in the metadata envelope.
+    expect(JSON.stringify(listed.value)).not.toMatch(/secret/i);
+
+    const player = await h.campaigns.listDisplayCredentials(ctxFor(h.users.player), { campaignId });
+    expect(player).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+
+    const revoked = await h.campaigns.revokeDisplay(ctxFor(h.users.gm), { displayId: first.displayId });
+    expect(revoked.ok).toBe(true);
+    const relisted = await h.campaigns.listDisplayCredentials(ctxFor(h.users.gm), { campaignId });
+    expect(relisted.ok).toBe(true);
+    if (!relisted.ok) throw new Error("expected relist");
+    expect(relisted.value).toHaveLength(2);
+    const revokedEntry = relisted.value.find((entry) => entry.displayId === first.displayId);
+    expect(revokedEntry?.revokedAt).toBeInstanceOf(Date);
+    expect(JSON.stringify(relisted.value)).not.toMatch(/secret/i);
+  });
+
+  it("getDisplaySceneImage serves the cached derivative and rejects stale revs and bad secrets", async () => {
+    const campaignId = await createCampaign();
+    const { fileId } = await uploadBackground(campaignId);
+    const { sceneId, revision } = await createScene(campaignId, fileId);
+    const { displayId, secret } = await pairAndRedeem(campaignId);
+
+    const projection = await h.campaigns.getDisplayProjection({ displayId, secret, sceneId });
+    expect(projection.ok).toBe(true);
+    const derivative = await readFile(join(displayDir, `${sceneId}-rev${revision}.png`));
+
+    const image = await h.campaigns.getDisplaySceneImage({ displayId, secret, sceneId, rev: revision });
+    expect(image.ok).toBe(true);
+    if (!image.ok) throw new Error("expected scene image");
+    expect(image.value.contentType).toBe("image/png");
+    expect(image.value.revision).toBe(revision);
+    expect(image.value.bytes.equals(derivative)).toBe(true);
+
+    const stale = await h.campaigns.getDisplaySceneImage({ displayId, secret, sceneId, rev: revision + 1 });
+    expect(stale).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+    const badSecret = await h.campaigns.getDisplaySceneImage({
+      displayId,
+      secret: "wrong-secret",
+      sceneId,
+      rev: revision,
+    });
+    expect(badSecret).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+  });
+
+  it("getDisplayTokenImage serves original bytes only for visible, revealed, image-backed tokens", async () => {
+    const campaignId = await createCampaign();
+    const { fileId } = await uploadBackground(campaignId);
+    const portrait = await uploadBackground(campaignId);
+    const created = await createScene(campaignId, fileId);
+    let revision = created.revision;
+    const { sceneId } = created;
+
+    // Scenes start fully fogged: reveal the token's neighborhood first.
+    const revealed = await h.campaigns.applyFogEdit(ctxFor(h.users.gm), {
+      sceneId,
+      expectedSceneRevision: revision,
+      op: { mode: "reveal", runs: [{ x: 0.5, y: 0.5, r: 0.4 }] },
+      idempotencyKey: randomUUID(),
+    });
+    expect(revealed.ok).toBe(true);
+    if (!revealed.ok) throw new Error("expected fog reveal");
+    revision = revealed.value.revision;
+
+    const placed = await h.campaigns.placeToken(ctxFor(h.users.gm), {
+      sceneId,
+      expectedSceneRevision: revision,
+      label: "Hero",
+      x: 0.5,
+      y: 0.5,
+      size: 0.1,
+      visible: true,
+      imageFileId: portrait.fileId,
+      idempotencyKey: randomUUID(),
+    });
+    expect(placed.ok).toBe(true);
+    if (!placed.ok) throw new Error("expected place");
+    const tokenId = placed.value.tokens[0]?.tokenId;
+    expect(tokenId).toEqual(expect.any(String));
+    if (tokenId === undefined) throw new Error("expected token");
+
+    const hidden = await h.campaigns.placeToken(ctxFor(h.users.gm), {
+      sceneId,
+      expectedSceneRevision: placed.value.revision,
+      label: "Secret",
+      x: 0.1,
+      y: 0.1,
+      size: 0.1,
+      visible: false,
+      imageFileId: portrait.fileId,
+      idempotencyKey: randomUUID(),
+    });
+    expect(hidden.ok).toBe(true);
+    if (!hidden.ok) throw new Error("expected hidden place");
+    const hiddenId = hidden.value.tokens.find((token) => token.label === "Secret")?.tokenId;
+    if (hiddenId === undefined) throw new Error("expected hidden token");
+
+    const { displayId, secret } = await pairAndRedeem(campaignId);
+
+    const image = await h.campaigns.getDisplayTokenImage({ displayId, secret, sceneId, tokenId });
+    expect(image.ok).toBe(true);
+    if (!image.ok) throw new Error("expected token image");
+    expect(image.value.contentType).toBe("image/png");
+    expect(image.value.bytes.equals(Buffer.from(redPngBase64, "base64"))).toBe(true);
+
+    const concealed = await h.campaigns.getDisplayTokenImage({ displayId, secret, sceneId, tokenId: hiddenId });
+    expect(concealed).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+    const unknown = await h.campaigns.getDisplayTokenImage({
+      displayId,
+      secret,
+      sceneId,
+      tokenId: randomUUID(),
+    });
+    expect(unknown).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+  });
+
+  it("revoke purges cached derivatives and the next credential regenerates them lazily", async () => {
+    const campaignId = await createCampaign();
+    const { fileId } = await uploadBackground(campaignId);
+    const { sceneId } = await createScene(campaignId, fileId);
+    const { displayId, secret } = await pairAndRedeem(campaignId);
+
+    const projection = await h.campaigns.getDisplayProjection({ displayId, secret, sceneId });
+    expect(projection.ok).toBe(true);
+    expect(await derivativeNames(sceneId)).toHaveLength(1);
+
+    const revoked = await h.campaigns.revokeDisplay(ctxFor(h.users.gm), { displayId });
+    expect(revoked.ok).toBe(true);
+    // Revoke purged the campaign's cached derivatives (nothing else is
+    // asserted about other campaigns' files here).
+    expect(await derivativeNames(sceneId)).toHaveLength(0);
+
+    // A fresh credential regenerates the derivative lazily on next projection.
+    const next = await pairAndRedeem(campaignId);
+    const again = await h.campaigns.getDisplayProjection({
+      displayId: next.displayId,
+      secret: next.secret,
+      sceneId,
+    });
+    expect(again.ok).toBe(true);
+    if (!again.ok) throw new Error("expected regenerated projection");
+    expect(again.value.imageUrl).toBe(`/displays/${next.displayId}/scenes/${sceneId}/image?rev=1`);
+    expect(await derivativeNames(sceneId)).toHaveLength(1);
+  });
+});

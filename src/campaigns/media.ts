@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,6 +24,16 @@ export type DeleteImageInput = {
   fileId: string;
   expectedRevision: number;
   idempotencyKey: string;
+};
+
+export type OpenImageInput = {
+  fileId: string;
+};
+
+export type OpenImageSuccess = {
+  file: MediaFileView;
+  contentType: UploadImageInput["contentType"];
+  bytes: Buffer;
 };
 
 export type MediaFileView = {
@@ -74,6 +84,7 @@ export type CreateMediaCommandsInput = {
 export interface MediaCommands {
   uploadImage(ctx: RequestContext, input: UploadImageInput): Promise<CampaignResult<MediaFileView>>;
   deleteImage(ctx: RequestContext, input: DeleteImageInput): Promise<CampaignResult<MediaFileView>>;
+  openImage(ctx: RequestContext, input: OpenImageInput): Promise<CampaignResult<OpenImageSuccess>>;
 }
 
 /**
@@ -346,6 +357,50 @@ export function createMediaCommands(input: CreateMediaCommandsInput): MediaComma
   }
 
   return {
+    /**
+     * I7b Task 4: GM-only original read backing
+     * `GET /campaigns/:id/images/:fileId/original`. Current-policy GM check
+     * against the owning campaign; outsiders/players collapse to generic
+     * not_found, as do missing rows and rows whose bytes left the disk.
+     */
+    async openImage(ctx, openInput) {
+      try {
+        if (typeof openInput.fileId !== "string" || openInput.fileId.length === 0) {
+          return { ok: false, error: errors.not_found() };
+        }
+        const outcome = await withClient(async (client) => {
+          const file = await repo.loadMediaFile(client, openInput.fileId);
+          if (file === null) return { file: null, campaign: null, membership: null };
+          const campaign = await repo.openCampaign(client, file.campaignId);
+          const membership =
+            campaign === null ? null : await repo.loadMembership(client, file.campaignId, ctx.actorId);
+          return { file, campaign, membership };
+        });
+        if (
+          outcome.file === null ||
+          outcome.campaign === null ||
+          !canManageCampaign(outcome.campaign, outcome.membership)
+        ) {
+          return { ok: false, error: errors.not_found() };
+        }
+        let bytes: Buffer;
+        try {
+          bytes = await readFile(join(resolveMediaRoot(), outcome.file.storageKey));
+        } catch {
+          // Row present but bytes missing from disk: same fail-closed
+          // collapse as the display projection's orphaned-background read.
+          return { ok: false, error: errors.not_found() };
+        }
+        const mediaType = outcome.file.mediaType;
+        if (mediaType !== "image/png" && mediaType !== "image/jpeg" && mediaType !== "image/webp") {
+          return { ok: false, error: errors.internal() };
+        }
+        return { ok: true, value: { file: toView(outcome.file), contentType: mediaType, bytes } };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
     async uploadImage(ctx, uploadInput) {
       let writtenStorageKey: string | null = null;
       try {

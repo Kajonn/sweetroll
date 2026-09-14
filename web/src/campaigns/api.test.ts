@@ -133,3 +133,69 @@ describe("createCampaignsApi campaign upgrade", () => {
     });
   });
 });
+
+describe("createCampaignsApi scenes", () => {
+  it("uploads an image with exactly name, contentType, dataBase64, and idempotency key", async () => {
+    const fetch = vi.fn().mockResolvedValue({ image: { fileId: "f1" }, requestId: "r1" });
+    const api = createCampaignsApi({ fetch } as never);
+    await api.uploadImage("c1", {
+      name: "cave",
+      contentType: "image/png",
+      dataBase64: "iVBORw0KGgo=",
+      idempotencyKey: "k1",
+    });
+    expect(fetch).toHaveBeenCalledWith("POST", "/campaigns/c1/images", {
+      body: { name: "cave", contentType: "image/png", dataBase64: "iVBORw0KGgo=", idempotencyKey: "k1" },
+    });
+  });
+
+  it("applies a fog edit with exactly revision, op, and idempotency key", async () => {
+    const fetch = vi.fn().mockResolvedValue({ scene: { sceneId: "s1" }, requestId: "r2" });
+    const api = createCampaignsApi({ fetch } as never);
+    await api.applyFogEdit("s1", {
+      expectedSceneRevision: 2,
+      op: { mode: "reveal", runs: [{ x: 0.5, y: 0.5, r: 0.1 }] },
+      idempotencyKey: "k2",
+    });
+    expect(fetch).toHaveBeenCalledWith("POST", "/scenes/s1/fog-edits", {
+      body: {
+        expectedSceneRevision: 2,
+        op: { mode: "reveal", runs: [{ x: 0.5, y: 0.5, r: 0.1 }] },
+        idempotencyKey: "k2",
+      },
+    });
+  });
+});
+
+describe("createCampaignsApi display", () => {
+  it("pairs a display with an empty JSON body", async () => {
+    const fetch = vi.fn().mockResolvedValue({ code: "AB12CD", requestId: "r1" });
+    const api = createCampaignsApi({ fetch } as never);
+    await api.pairDisplay("c1");
+    expect(fetch).toHaveBeenCalledWith("POST", "/campaigns/c1/display-codes", { body: {} });
+  });
+
+  it("redeems a pairing code in the POST body only", async () => {
+    const fetch = vi.fn().mockResolvedValue({ display: { displayId: "d1", secret: "s3cr3t" }, requestId: "r2" });
+    const api = createCampaignsApi({ fetch } as never);
+    await api.redeemDisplay({ code: "AB12CD" });
+    expect(fetch).toHaveBeenCalledWith("POST", "/displays/redeem", { body: { code: "AB12CD" } });
+  });
+
+  it("revokes a display with an empty JSON body", async () => {
+    const fetch = vi.fn().mockResolvedValue({ display: { displayId: "d1" }, requestId: "r3" });
+    const api = createCampaignsApi({ fetch } as never);
+    await api.revokeDisplay("c1", "d1");
+    expect(fetch).toHaveBeenCalledWith("POST", "/campaigns/c1/displays/d1/revoke", { body: {} });
+  });
+
+  it("reads the projection with the secret in the header, never the URL", async () => {
+    const fetch = vi.fn().mockResolvedValue({ projection: { sceneId: "s1" }, requestId: "r4" });
+    const api = createCampaignsApi({ fetch } as never);
+    await api.getDisplayProjection("d1", "s1", "s3cr3t");
+    expect(fetch).toHaveBeenCalledWith("GET", "/displays/d1/scenes/s1/projection", {
+      headers: { "x-display-secret": "s3cr3t" },
+    });
+    expect(fetch.mock.calls[0]?.[1]).not.toContain("s3cr3t");
+  });
+});

@@ -1,5 +1,7 @@
 import type { ApiClient } from "../api/client.js";
 import type {
+  ApplyFogEditBody,
+  ApplyFogEditResponse,
   CampaignActivityResponse,
   CampaignCharacterListResponse,
   CampaignContentListResponse,
@@ -15,8 +17,14 @@ import type {
   CreateCampaignResponse,
   CreateContentBody,
   CreateContentResponse,
+  CreateSceneBody,
+  CreateSceneResponse,
   DeleteContentBody,
   DeleteContentResponse,
+  DeleteImageBody,
+  DeleteImageResponse,
+  DisplayCredentialsResponse,
+  DisplayProjectionResponse,
   ExportCampaignBody,
   ExportCampaignResponse,
   InvitationAcceptBody,
@@ -25,15 +33,30 @@ import type {
   InvitationReviewResponse,
   IssueInvitationBody,
   IssueInvitationResponse,
+  MoveTokenBody,
+  MoveTokenResponse,
+  PairDisplayResponse,
+  PlaceTokenBody,
+  PlaceTokenResponse,
   PreviewUpgradeBody,
   PreviewUpgradeResponse,
   RecoverContentBody,
+  RedeemDisplayBody,
+  RedeemDisplayResponse,
   RemoveMemberBody,
+  RemoveTokenBody,
+  RemoveTokenResponse,
   ReplaceGrantsBody,
+  RevokeDisplayResponse,
   RevokeInvitationBody,
   RotateInvitationBody,
+  SceneDetailResponse,
   UpdateCampaignBody,
   UpdateContentBody,
+  UpdateSceneBody,
+  UpdateSceneResponse,
+  UploadImageBody,
+  UploadImageResponse,
   MemberListResponse,
 } from "./types.js";
 import type { operations } from "../api/schema.js";
@@ -100,6 +123,20 @@ export type CampaignsApi = {
   replaceContentGrants(contentId: string, body: ReplaceGrantsBody): Promise<unknown>;
   previewUpgrade(campaignId: string, body: PreviewUpgradeBody): Promise<PreviewUpgradeResponse>;
   commitUpgrade(campaignId: string, body: CommitUpgradeBody): Promise<CommitUpgradeResponse>;
+  uploadImage(campaignId: string, body: UploadImageBody): Promise<UploadImageResponse>;
+  deleteImage(campaignId: string, fileId: string, body: DeleteImageBody): Promise<DeleteImageResponse>;
+  createScene(campaignId: string, body: CreateSceneBody): Promise<CreateSceneResponse>;
+  openScene(sceneId: string): Promise<SceneDetailResponse>;
+  updateScene(sceneId: string, body: UpdateSceneBody): Promise<UpdateSceneResponse>;
+  applyFogEdit(sceneId: string, body: ApplyFogEditBody): Promise<ApplyFogEditResponse>;
+  placeToken(sceneId: string, body: PlaceTokenBody): Promise<PlaceTokenResponse>;
+  moveToken(sceneId: string, tokenId: string, body: MoveTokenBody): Promise<MoveTokenResponse>;
+  removeToken(sceneId: string, tokenId: string, body: RemoveTokenBody): Promise<RemoveTokenResponse>;
+  pairDisplay(campaignId: string): Promise<PairDisplayResponse>;
+  listDisplayCredentials(campaignId: string): Promise<DisplayCredentialsResponse>;
+  revokeDisplay(campaignId: string, displayId: string): Promise<RevokeDisplayResponse>;
+  redeemDisplay(body: RedeemDisplayBody): Promise<RedeemDisplayResponse>;
+  getDisplayProjection(displayId: string, sceneId: string, secret: string): Promise<DisplayProjectionResponse>;
 };
 
 export function createCampaignsApi(client: ApiClient): CampaignsApi {
@@ -202,5 +239,35 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
       client.fetch<PreviewUpgradeResponse>("POST", `/campaigns/${campaignId}/upgrade-previews`, { body }),
     commitUpgrade: (campaignId, body) =>
       client.fetch<CommitUpgradeResponse>("POST", `/campaigns/${campaignId}/upgrade-commits`, { body }),
+    uploadImage: (campaignId, body) =>
+      client.fetch<UploadImageResponse>("POST", `/campaigns/${campaignId}/images`, { body }),
+    deleteImage: (campaignId, fileId, body) =>
+      client.fetch<DeleteImageResponse>("DELETE", `/campaigns/${campaignId}/images/${fileId}`, { body }),
+    createScene: (campaignId, body) =>
+      client.fetch<CreateSceneResponse>("POST", `/campaigns/${campaignId}/scenes`, { body }),
+    openScene: (sceneId) =>
+      client.fetch<SceneDetailResponse>("GET", `/scenes/${sceneId}`),
+    updateScene: (sceneId, body) =>
+      client.fetch<UpdateSceneResponse>("PATCH", `/scenes/${sceneId}`, { body }),
+    applyFogEdit: (sceneId, body) =>
+      client.fetch<ApplyFogEditResponse>("POST", `/scenes/${sceneId}/fog-edits`, { body }),
+    placeToken: (sceneId, body) =>
+      client.fetch<PlaceTokenResponse>("POST", `/scenes/${sceneId}/tokens`, { body }),
+    moveToken: (sceneId, tokenId, body) =>
+      client.fetch<MoveTokenResponse>("PATCH", `/scenes/${sceneId}/tokens/${tokenId}`, { body }),
+    removeToken: (sceneId, tokenId, body) =>
+      client.fetch<RemoveTokenResponse>("DELETE", `/scenes/${sceneId}/tokens/${tokenId}`, { body }),
+    pairDisplay: (campaignId) =>
+      client.fetch<PairDisplayResponse>("POST", `/campaigns/${campaignId}/display-codes`, { body: {} }),
+    listDisplayCredentials: (campaignId) =>
+      client.fetch<DisplayCredentialsResponse>("GET", `/campaigns/${campaignId}/display-credentials`),
+    revokeDisplay: (campaignId, displayId) =>
+      client.fetch<RevokeDisplayResponse>("POST", `/campaigns/${campaignId}/displays/${displayId}/revoke`, { body: {} }),
+    redeemDisplay: (body) =>
+      client.fetch<RedeemDisplayResponse>("POST", "/displays/redeem", { body }),
+    getDisplayProjection: (displayId, sceneId, secret) =>
+      client.fetch<DisplayProjectionResponse>("GET", `/displays/${displayId}/scenes/${sceneId}/projection`, {
+        headers: { "x-display-secret": secret },
+      }),
   };
 }

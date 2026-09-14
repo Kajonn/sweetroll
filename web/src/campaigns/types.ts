@@ -122,3 +122,82 @@ export type CommitUpgradeBody = NonNullable<
 >["content"]["application/json"];
 export type CommitUpgradeResponse =
   operations["post_campaigns_id_upgrade_commits"]["responses"]["200"]["content"]["application/json"];
+
+export type UploadImageBody = NonNullable<
+  operations["post_campaigns_id_images"]["requestBody"]
+>["content"]["application/json"];
+export type UploadImageResponse =
+  operations["post_campaigns_id_images"]["responses"]["200"]["content"]["application/json"];
+
+export type DeleteImageBody = NonNullable<
+  operations["delete_campaigns_id_images_fileId"]["requestBody"]
+>["content"]["application/json"];
+export type DeleteImageResponse =
+  operations["delete_campaigns_id_images_fileId"]["responses"]["200"]["content"]["application/json"];
+
+export type CreateSceneBody = NonNullable<
+  operations["post_campaigns_id_scenes"]["requestBody"]
+>["content"]["application/json"];
+export type CreateSceneResponse =
+  operations["post_campaigns_id_scenes"]["responses"]["201"]["content"]["application/json"];
+
+export type SceneDetailResponse =
+  operations["get_scenes_id"]["responses"]["200"]["content"]["application/json"];
+export type SceneView = SceneDetailResponse["scene"];
+
+export type UpdateSceneBody = NonNullable<
+  operations["patch_scenes_id"]["requestBody"]
+>["content"]["application/json"];
+export type UpdateSceneResponse =
+  operations["patch_scenes_id"]["responses"]["200"]["content"]["application/json"];
+
+export type ApplyFogEditBody = NonNullable<
+  operations["post_scenes_id_fog_edits"]["requestBody"]
+>["content"]["application/json"];
+export type ApplyFogEditResponse =
+  operations["post_scenes_id_fog_edits"]["responses"]["200"]["content"]["application/json"];
+
+export type PlaceTokenBody = NonNullable<
+  operations["post_scenes_id_tokens"]["requestBody"]
+>["content"]["application/json"];
+export type PlaceTokenResponse =
+  operations["post_scenes_id_tokens"]["responses"]["200"]["content"]["application/json"];
+
+export type MoveTokenBody = NonNullable<
+  operations["patch_scenes_id_tokens_tokenId"]["requestBody"]
+>["content"]["application/json"];
+export type MoveTokenResponse =
+  operations["patch_scenes_id_tokens_tokenId"]["responses"]["200"]["content"]["application/json"];
+
+export type RemoveTokenBody = NonNullable<
+  operations["delete_scenes_id_tokens_tokenId"]["requestBody"]
+>["content"]["application/json"];
+export type RemoveTokenResponse =
+  operations["delete_scenes_id_tokens_tokenId"]["responses"]["200"]["content"]["application/json"];
+
+export type PairDisplayBody = NonNullable<
+  operations["post_campaigns_id_display_codes"]["requestBody"]
+>["content"]["application/json"];
+export type PairDisplayResponse =
+  operations["post_campaigns_id_display_codes"]["responses"]["200"]["content"]["application/json"];
+
+export type DisplayCredentialsResponse =
+  operations["get_campaigns_id_display_credentials"]["responses"]["200"]["content"]["application/json"];
+export type DisplayCredentialSummary = DisplayCredentialsResponse["displays"][number];
+
+export type RevokeDisplayBody = NonNullable<
+  operations["post_campaigns_id_displays_displayId_revoke"]["requestBody"]
+>["content"]["application/json"];
+export type RevokeDisplayResponse =
+  operations["post_campaigns_id_displays_displayId_revoke"]["responses"]["200"]["content"]["application/json"];
+
+export type RedeemDisplayBody = NonNullable<
+  operations["post_displays_redeem"]["requestBody"]
+>["content"]["application/json"];
+export type RedeemDisplayResponse =
+  operations["post_displays_redeem"]["responses"]["200"]["content"]["application/json"];
+export type RedeemedDisplay = RedeemDisplayResponse["display"];
+
+export type DisplayProjectionResponse =
+  operations["get_displays_id_scenes_sceneId_projection"]["responses"]["200"]["content"]["application/json"];
+export type DisplayProjection = DisplayProjectionResponse["projection"];

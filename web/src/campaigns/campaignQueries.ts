@@ -1,6 +1,13 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CampaignsApi, CampaignListQuery, ClaimableCharactersQuery } from "./api.js";
-import type { CommitUpgradeBody } from "./types.js";
+import type {
+  ApplyFogEditBody,
+  CommitUpgradeBody,
+  MoveTokenBody,
+  PlaceTokenBody,
+  RemoveTokenBody,
+  UpdateSceneBody,
+} from "./types.js";
 
 export const CAMPAIGN_LIST_PAGE_LIMIT = 25;
 export const CLAIMABLE_CHARACTERS_PAGE_LIMIT = 25;
@@ -109,6 +116,138 @@ export function campaignMembersKey(campaignId: string, actorId: string | null, g
 
 export function campaignInvitationsKey(campaignId: string, actorId: string | null, generation: number) {
   return ["campaigns", "invitations", campaignId, actorId, generation];
+}
+
+export function sceneDetailKey(
+  campaignId: string,
+  sceneId: string,
+  actorId: string | null,
+  generation: number,
+) {
+  return ["campaigns", "scene", campaignId, sceneId, actorId, generation];
+}
+
+export function displayProjectionKey(displayId: string, sceneId: string, revision: number) {
+  return ["displays", "projection", displayId, sceneId, revision];
+}
+
+export function useScene(
+  api: CampaignsApi,
+  campaignId: string,
+  sceneId: string,
+  actorId: string | null,
+  generation: number,
+  options: { enabled: boolean; online: boolean },
+) {
+  return useQuery({
+    queryKey: sceneDetailKey(campaignId, sceneId, actorId, generation),
+    queryFn: () => api.openScene(sceneId),
+    enabled: options.enabled && options.online && actorId !== null,
+    staleTime: 30_000,
+  });
+}
+
+export function useDisplayProjection(
+  api: CampaignsApi,
+  displayId: string,
+  sceneId: string,
+  revision: number,
+  secret: string | null,
+  options: { enabled: boolean; online: boolean },
+) {
+  return useQuery({
+    queryKey: displayProjectionKey(displayId, sceneId, revision),
+    queryFn: () => {
+      if (secret === null) throw new Error("display credential missing");
+      return api.getDisplayProjection(displayId, sceneId, secret);
+    },
+    enabled: options.enabled && options.online && secret !== null,
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Shared scene-commit invalidation: the campaign-wide scene prefix (same
+ * literal-prefix style `useCommitUpgrade` uses, so every actor/generation
+ * scoped scene read under this campaign reloads) plus the display-scoped
+ * projection entries for exactly this scene. Projection keys are
+ * display-first, so the scene slice is matched with a predicate — no new
+ * purge prefix is introduced.
+ */
+function invalidateSceneReads(
+  queryClient: ReturnType<typeof useQueryClient>,
+  campaignId: string,
+  sceneId: string,
+) {
+  void queryClient.invalidateQueries({ queryKey: ["campaigns", "scene", campaignId] });
+  void queryClient.invalidateQueries({
+    queryKey: ["displays", "projection"],
+    predicate: (query) => query.queryKey.includes(sceneId),
+  });
+}
+
+export function useUpdateScene(api: CampaignsApi, campaignId: string, sceneId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdateSceneBody) => api.updateScene(sceneId, body),
+    onSuccess: () => {
+      invalidateSceneReads(queryClient, campaignId, sceneId);
+    },
+  });
+}
+
+export function useApplyFogEdit(api: CampaignsApi, campaignId: string, sceneId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ApplyFogEditBody) => api.applyFogEdit(sceneId, body),
+    onSuccess: () => {
+      invalidateSceneReads(queryClient, campaignId, sceneId);
+    },
+  });
+}
+
+export function usePlaceToken(api: CampaignsApi, campaignId: string, sceneId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: PlaceTokenBody) => api.placeToken(sceneId, body),
+    onSuccess: () => {
+      invalidateSceneReads(queryClient, campaignId, sceneId);
+    },
+  });
+}
+
+export function useMoveToken(api: CampaignsApi, campaignId: string, sceneId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { tokenId: string; body: MoveTokenBody }) =>
+      api.moveToken(sceneId, input.tokenId, input.body),
+    onSuccess: () => {
+      invalidateSceneReads(queryClient, campaignId, sceneId);
+    },
+  });
+}
+
+export function useRemoveToken(api: CampaignsApi, campaignId: string, sceneId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { tokenId: string; body: RemoveTokenBody }) =>
+      api.removeToken(sceneId, input.tokenId, input.body),
+    onSuccess: () => {
+      invalidateSceneReads(queryClient, campaignId, sceneId);
+    },
+  });
+}
+
+export function useRevokeDisplay(api: CampaignsApi, campaignId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (displayId: string) => api.revokeDisplay(campaignId, displayId),
+    onSuccess: (_data, displayId) => {
+      // Purge this credential's cached projections; the display blanks on
+      // its next poll. Scoped to the display — no campaign-wide purge.
+      void queryClient.invalidateQueries({ queryKey: ["displays", "projection", displayId] });
+    },
+  });
 }
 
 function memberPageQuery(pageParam: string | null): CampaignListQuery {

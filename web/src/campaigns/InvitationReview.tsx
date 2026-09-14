@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { t } from "../i18n/index.js";
+import { AppLink } from "../ui/AppLink.js";
 import { Button, EmptyState, FormField, PageHeader, Panel } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
 import type { InvitationReview } from "./types.js";
@@ -231,7 +232,7 @@ export function InvitationReviewView(props: { api: CampaignsApi; actorId: string
         <EmptyState
           title={t("campaign.invitations.accepted.title", { title: review.campaignTitle })}
           description={t("campaign.invitations.accepted.description")}
-          action={<a href={`/campaigns/${review.campaignId}`}>{t("campaign.invitations.accepted.open")}</a>}
+          action={<AppLink href={`/campaigns/${review.campaignId}`}>{t("campaign.invitations.accepted.open")}</AppLink>}
         />
       </section>
     );

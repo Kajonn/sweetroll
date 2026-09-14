@@ -1,4 +1,5 @@
 import { t } from "../i18n/index.js";
+import { AppLink } from "../ui/AppLink.js";
 import { Button, PageHeader } from "../ui/index.js";
 import styles from "./Onboarding.module.css";
 
@@ -44,12 +45,12 @@ export function Onboarding({ actorId, onDismiss }: OnboardingProps) {
     <div className={styles.welcome} data-testid="onboarding">
       <PageHeader title={t("player.welcome.title")} description={t("player.welcome.description")} />
       <p className={styles.actions}>
-        <a href="/characters/new" data-testid="welcome-create" className={styles.createLink}>
+        <AppLink href="/characters/new" data-testid="welcome-create" className={styles.createLink}>
           {t("player.welcome.create")}
-        </a>{" "}
-        <a href="/characters" data-testid="welcome-library" className={styles.libraryLink}>
+        </AppLink>{" "}
+        <AppLink href="/characters" data-testid="welcome-library" className={styles.libraryLink}>
           {t("player.welcome.library")}
-        </a>
+        </AppLink>
       </p>
       <Button type="button" variant="secondary" onClick={dismiss} data-testid="welcome-dismiss">
         {t("player.welcome.dismiss")}

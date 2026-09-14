@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { t } from "../i18n/index.js";
+import { AppLink } from "../ui/AppLink.js";
 import { Button, Dialog, EmptyState, PageHeader, Panel, Tabs } from "../ui/index.js";
 import type { CharactersApi } from "../characters/api.js";
 import type { CampaignsApi } from "./api.js";
@@ -220,7 +221,7 @@ export function CampaignDetail(props: {
         <EmptyState
           title={t("campaign.detail.unavailable.title")}
           description={t("campaign.detail.unavailable.description")}
-          action={<a href="/campaigns">{t("campaign.detail.backToList")}</a>}
+          action={<AppLink href="/campaigns">{t("campaign.detail.backToList")}</AppLink>}
         />
         <p role="status">{t("campaign.detail.accessChanged.notice")}</p>
       </section>
@@ -235,7 +236,7 @@ export function CampaignDetail(props: {
           <EmptyState
             title={t("campaign.detail.unavailable.title")}
             description={t("campaign.detail.unavailable.description")}
-            action={<a href="/campaigns">{t("campaign.detail.backToList")}</a>}
+            action={<AppLink href="/campaigns">{t("campaign.detail.backToList")}</AppLink>}
           />
         </section>
       );

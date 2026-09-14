@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../api/client.js";
+import { registerAppRouter, resetAppRouter } from "../shell/appNavigation.js";
 import type { CharactersApi } from "./api.js";
 import { openCharacterStore, type CharacterStore, type OnlineAttempt } from "./store.js";
 import { CreateCharacter } from "./CreateCharacter.js";
@@ -130,6 +131,7 @@ async function fillForm(user: ReturnType<typeof userEvent.setup>) {
 
 describe("CreateCharacter", () => {
   afterEach(() => {
+    resetAppRouter();
     vi.restoreAllMocks();
   });
 
@@ -737,6 +739,24 @@ describe("CreateCharacter", () => {
       expect(await screen.findByText(/publish a version first/i)).toBeVisible();
       const libraryLink = await screen.findByRole("link", { name: /your systems/i });
       expect(libraryLink).toHaveAttribute("href", "/");
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("client-navigates the empty-state action to the library", async () => {
+    const user = userEvent.setup();
+    const push = vi.fn();
+    registerAppRouter({ history: { push } });
+    const api = makeApi();
+    api.listCreationVersions.mockResolvedValue({ data: { versions: [] }, requestId: "req-empty" });
+    const store = await openStore();
+    try {
+      renderCreate(
+        <CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />,
+      );
+      await user.click(await screen.findByRole("link", { name: /your systems/i }));
+      expect(push).toHaveBeenCalledWith("/");
     } finally {
       await store.close();
     }

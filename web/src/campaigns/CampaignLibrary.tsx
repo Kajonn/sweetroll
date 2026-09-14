@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 
 import { t } from "../i18n/index.js";
+import { AppLink } from "../ui/AppLink.js";
 import { Button, EmptyState, PageHeader, Panel } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
 import { campaignListKey, useCampaignList } from "./campaignQueries.js";
@@ -58,14 +59,14 @@ export function CampaignLibraryView(props: CampaignLibraryViewProps) {
         <EmptyState
           title={t("campaign.library.empty.title")}
           description={t("campaign.library.empty.description")}
-          action={<a href="/invitations">{t("campaign.library.join")}</a>}
+          action={<AppLink href="/invitations">{t("campaign.library.join")}</AppLink>}
         />
       ) : (
         <Panel title={t("campaign.library.listHeading")}>
           <ul aria-label={t("campaign.library.listAriaLabel")}>
             {props.campaigns.map((campaign) => (
               <li key={campaign.campaignId}>
-                <a href={`/campaigns/${campaign.campaignId}`}>{campaign.title}</a>
+                <AppLink href={`/campaigns/${campaign.campaignId}`}>{campaign.title}</AppLink>
               </li>
             ))}
           </ul>

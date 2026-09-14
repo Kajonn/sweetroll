@@ -9,6 +9,7 @@ import { useExportVersion } from "../api/exportVersion.js";
 import { useListVersions } from "../api/listVersions.js";
 import type { VersionSummary } from "../api/server.js";
 import { t } from "../i18n/index.js";
+import { AppLink } from "../ui/AppLink.js";
 
 import styles from "./VersionHistory.module.css";
 
@@ -166,16 +167,13 @@ export function VersionHistory({ client, systemId }: { client: ApiClient; system
                         ? t("versionHistory.action.cloning")
                         : t("versionHistory.action.clone")}
                     </button>
-                    {/* Intentional plain anchor: VersionHistory also renders
-                        outside a RouterProvider (standalone/tests), where
-                        TanStack Link has no router context and crashes. */}
-                    <a
+                    <AppLink
                       className={styles.action}
                       href={`/characters/new?systemVersionId=${v.versionId}`}
                       data-testid={`version-history-create-character-${v.versionId}`}
                     >
                       {t("versionHistory.action.createCharacter")}
-                    </a>
+                    </AppLink>
                     <button
                       type="button"
                       className={isDeprecated ? styles.actionMuted : styles.actionDanger}

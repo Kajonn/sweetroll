@@ -3,9 +3,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createApiClient } from "../api/client.js";
+import { registerAppRouter, resetAppRouter } from "../shell/appNavigation.js";
 import buttonStyles from "../ui/Button.module.css";
 import { PublishDialog } from "./PublishDialog.js";
 
@@ -39,6 +40,10 @@ function renderDialog({
 }
 
 describe("PublishDialog", () => {
+  afterEach(() => {
+    resetAppRouter();
+  });
+
   it("renders semver input, release notes textarea, and confirm button", () => {
     renderDialog();
     expect(screen.getByTestId("publish-dialog-semver")).toBeInTheDocument();
@@ -282,5 +287,37 @@ describe("PublishDialog", () => {
     expect(screen.getByTestId("publish-dialog-success")).toHaveTextContent("v1");
     expect(screen.getByTestId("publish-dialog-success")).toHaveTextContent("deadbeef");
     expect(screen.getByTestId("publish-dialog-close")).toBeInTheDocument();
+  });
+
+  it("client-navigates the success-card create-character CTA", async () => {
+    const user = userEvent.setup();
+    const push = vi.fn();
+    registerAppRouter({ history: { push } });
+    const fetch_ = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/publish") && init?.method === "POST") {
+        return new Response(
+          JSON.stringify({
+            version: {
+              versionId: "v1",
+              systemId: "s1",
+              semanticVersion: "1.0.0",
+              checksum: "deadbeef",
+              package: {},
+              releaseNotes: "init",
+              lifecycle: "active",
+              createdAt: "2026-01-01T00:00:00Z",
+            },
+            requestId: "r",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response("{}", { status: 200 });
+    });
+    renderDialog({ fetch_ });
+    await user.click(screen.getByTestId("publish-dialog-submit"));
+    const cta = await screen.findByTestId("publish-dialog-create-character");
+    await user.click(cta);
+    expect(push).toHaveBeenCalledWith("/characters/new?systemVersionId=v1");
   });
 });

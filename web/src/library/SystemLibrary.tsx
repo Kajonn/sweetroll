@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ApiClient } from "../api/client.js";
 import { useSystemLibrary } from "../api/listSystems.js";
 import { t } from "../i18n/index.js";
+import { AppLink } from "../ui/AppLink.js";
 import { Button } from "../ui/index.js";
 
 import { CreateDraftDialog } from "./CreateDraftDialog.js";
@@ -37,7 +38,7 @@ export function SystemLibrary({ client }: { client: ApiClient }) {
       <ul ref={ref} className={styles.list} aria-label={t("library.listAriaLabel")} data-testid="system-library">
         {data?.pages.flatMap((p) => p.systems).map((s, i) => (
           <li key={s.systemId} data-testid={`system-row-${i}`} tabIndex={-1}>
-            <a href={`/systems/${s.systemId}`}>{s.name}</a>
+            <AppLink href={`/systems/${s.systemId}`}>{s.name}</AppLink>
             <span>{s.lifecycle}</span>
             <SystemSharing client={client} system={s} />
           </li>

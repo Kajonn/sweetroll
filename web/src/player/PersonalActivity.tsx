@@ -3,6 +3,7 @@ import { useQueries } from "@tanstack/react-query";
 import type { CharactersApi } from "../characters/api.js";
 import type { ActivityEvent, CharacterSummary } from "../characters/types.js";
 import { t } from "../i18n/index.js";
+import { AppLink } from "../ui/AppLink.js";
 import { EmptyState, PageHeader, Panel } from "../ui/index.js";
 import {
   flattenLibraryPages,
@@ -128,13 +129,13 @@ export function PersonalActivity({ api, identity }: PersonalActivityProps) {
                 className={styles.row}
                 data-testid={`activity-item-${event.id}`}
               >
-                <a
+                <AppLink
                   href={`/characters/${character.characterId}`}
                   className={styles.rowLink}
                   aria-label={t("player.library.open", { name: character.name })}
                 >
                   {character.name}
-                </a>{" "}
+                </AppLink>{" "}
                 <span>{event.kind}</span>{" "}
                 <span>{t("character.tools.activitySummary", { revision: event.characterRevision, time: event.occurredAt })}</span>{" "}
                 <time dateTime={event.occurredAt}>{event.occurredAt}</time>

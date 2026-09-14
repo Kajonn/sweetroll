@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { ApiError } from "../api/client.js";
 import { t } from "../i18n/index.js";
+import { AppLink } from "../ui/AppLink.js";
 import { Button } from "../ui/Button.js";
 import { EmptyState } from "../ui/EmptyState.js";
 import { FormField } from "../ui/FormField.js";
@@ -733,7 +734,7 @@ export function CreateCharacter({
               <EmptyState
                 title={t("character.create.pickVersion.empty")}
                 description={t("character.create.pickVersion.emptyHint")}
-                action={<a href="/">{t("character.create.pickVersion.emptyAction")}</a>}
+                action={<AppLink href="/">{t("character.create.pickVersion.emptyAction")}</AppLink>}
               />
             ) : null}
             <ul>
@@ -842,7 +843,7 @@ export function CreateCharacter({
               <ul>
                 {recoveryLinks.map(entry => (
                   <li key={entry.characterId}>
-                    <a href={`/characters/${entry.characterId}`}>{entry.name}</a>
+                    <AppLink href={`/characters/${entry.characterId}`}>{entry.name}</AppLink>
                   </li>
                 ))}
               </ul>

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApiClient, type ApiClient } from "../api/client.js";
+import { registerAppRouter, resetAppRouter } from "../shell/appNavigation.js";
 import { VersionHistory } from "./VersionHistory.js";
 
 type FakeResponse = {
@@ -66,7 +67,7 @@ const TWO_VERSIONS = {
 };
 
 describe("VersionHistory", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => { resetAppRouter(); vi.restoreAllMocks(); });
 
   beforeEach(() => {
     if (!("URL" in globalThis) || typeof URL.createObjectURL !== "function") {
@@ -172,5 +173,17 @@ describe("VersionHistory", () => {
     await screen.findByTestId("version-history-table");
     expect(screen.getByTestId("version-history-deprecate-v2")).toBeDisabled();
     expect(screen.getByTestId("version-history-deprecate-v1")).not.toBeDisabled();
+  });
+
+  it("client-navigates the create-character CTA", async () => {
+    const push = vi.fn();
+    registerAppRouter({ history: { push } });
+    const fetch_ = makeFetch([
+      { urlIncludes: "/systems/s1/versions", body: TWO_VERSIONS },
+    ]);
+    renderHistory(fetch_);
+    await screen.findByTestId("version-history-table");
+    await userEvent.click(screen.getByTestId("version-history-create-character-v1"));
+    expect(push).toHaveBeenCalledWith("/characters/new?systemVersionId=v1");
   });
 });

@@ -771,9 +771,23 @@ describe("SystemRuntime.describeVersion", () => {
       expect(described.value).toEqual({
         versionId: packageValue.versionId,
         packageChecksum: packageValue.integrity.checksum,
-        entities: [{ id: "character", label: "Character" }],
+        entities: [{ id: "character", label: "Character", kind: "playable" }],
       });
     }
+  });
+
+  it("preserves npc entity kinds from the package", async () => {
+    const document = validDocument();
+    document.entities.push({ id: "goblin", label: "Goblin", fields: [], kind: "npc" });
+    const packageValue = compileRuntimePackage(document);
+    const runtime = createRuntime(packageValue);
+    const described = await runtime.describeVersion({ versionId: packageValue.versionId });
+    expect(described.ok).toBe(true);
+    if (!described.ok) return;
+    expect(described.value.entities).toEqual([
+      { id: "character", label: "Character", kind: "playable" },
+      { id: "goblin", label: "Goblin", kind: "npc" },
+    ]);
   });
 
   it("shares the package loading and corruption checks with resolve", async () => {

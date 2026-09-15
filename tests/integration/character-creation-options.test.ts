@@ -160,7 +160,7 @@ describeWithDatabase("Character creation options", () => {
     expect(response.json().data.versionId).toBe(versionId);
     expect(response.json().data.packageChecksum).toBeTypeOf("string");
     expect(response.json().data.packageChecksum.length).toBeGreaterThan(0);
-    expect(response.json().data.entities).toEqual([{ id: "character", label: "Character" }]);
+    expect(response.json().data.entities).toEqual([{ id: "character", label: "Character", kind: "playable" }]);
     expect(await rowCounts(app)).toEqual(before);
   });
 
@@ -179,7 +179,7 @@ describeWithDatabase("Character creation options", () => {
       });
       const response = await creationOptions(app, ada, versionId);
       expect(response.statusCode, `${name}: ${response.body}`).toBe(200);
-      expect(response.json().data.entities, name).toEqual([{ id: "character", label: "Character" }]);
+      expect(response.json().data.entities, name).toEqual([{ id: "character", label: "Character", kind: "playable" }]);
     }
 
     const counts = await rowCounts(app);

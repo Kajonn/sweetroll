@@ -3193,6 +3193,7 @@ export interface operations {
                             entities: {
                                 id: string;
                                 label: string;
+                                kind: "playable" | "npc";
                             }[];
                         };
                         requestId: string;

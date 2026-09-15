@@ -185,7 +185,7 @@ export type CreateCharacter = {
 export type CharacterCreationOptions = {
   versionId: VersionId;
   packageChecksum: string;
-  entities: { id: DefinitionId; label: string }[];
+  entities: { id: DefinitionId; label: string; kind: "playable" | "npc" }[];
 };
 
 export type CreationOptionsInput = {

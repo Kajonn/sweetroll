@@ -209,6 +209,7 @@ const CharacterCreationOptionsDto = Type.Object({
     Type.Object({
       id: Type.String({ minLength: 1 }),
       label: Type.String({ minLength: 1 }),
+      kind: Type.Union([Type.Literal("playable"), Type.Literal("npc")]),
     }),
   ),
 });

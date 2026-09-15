@@ -207,7 +207,7 @@ export type RuntimeResult<T> =
 export type VersionDescription = {
   versionId: VersionId;
   packageChecksum: string;
-  entities: { id: DefinitionId; label: string }[];
+  entities: { id: DefinitionId; label: string; kind: "playable" | "npc" }[];
 };
 
 export interface SystemRuntime {
@@ -232,7 +232,11 @@ export function createSystemRuntime(input: {
         value: {
           versionId: loaded.value.versionId,
           packageChecksum: loaded.value.integrity.checksum,
-          entities: loaded.value.entities.map((entity) => ({ id: entity.id, label: entity.label })),
+          entities: loaded.value.entities.map((entity) => ({
+            id: entity.id,
+            label: entity.label,
+            kind: entity.kind ?? "playable",
+          })),
         },
       };
     },

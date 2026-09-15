@@ -6782,7 +6782,8 @@
                             "type": "object",
                             "required": [
                               "id",
-                              "label"
+                              "label",
+                              "kind"
                             ],
                             "properties": {
                               "id": {
@@ -6792,6 +6793,18 @@
                               "label": {
                                 "minLength": 1,
                                 "type": "string"
+                              },
+                              "kind": {
+                                "anyOf": [
+                                  {
+                                    "const": "playable",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "npc",
+                                    "type": "string"
+                                  }
+                                ]
                               }
                             }
                           }

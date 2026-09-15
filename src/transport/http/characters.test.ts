@@ -364,7 +364,7 @@ describe("character HTTP routes", () => {
             value: {
               versionId,
               packageChecksum: d20Package.integrity.checksum,
-              entities: [{ id: "character", label: "Character" }],
+              entities: [{ id: "character", label: "Character", kind: "playable" }],
             },
           };
         },
@@ -380,7 +380,7 @@ describe("character HTTP routes", () => {
       data: {
         versionId,
         packageChecksum: d20Package.integrity.checksum,
-        entities: [{ id: "character", label: "Character" }],
+        entities: [{ id: "character", label: "Character", kind: "playable" }],
       },
       requestId: expect.any(String),
     });

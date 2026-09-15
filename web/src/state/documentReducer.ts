@@ -12,6 +12,7 @@ export type EntityFieldV1 = FieldWithId & Record<string, unknown>;
 export type EntityDefinitionV1 = {
   id: string;
   label: string;
+  kind?: "playable" | "npc";
   fields: EntityFieldV1[];
 };
 export type ReferenceDataV1 = { id: string; label: string; records: unknown[] };

@@ -214,4 +214,28 @@ describe("EntityList", () => {
     const css = readFileSync(resolve(process.cwd(), "src/editor/EntityList.module.css"), "utf8");
     expect(css).not.toMatch(/var\(--color-/);
   });
+
+  it("toggles an entity between playable and npc", async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderList([makeEntity("npc", "NPC")]);
+    await user.click(screen.getByTestId("entity-row-npc-select"));
+    await user.selectOptions(screen.getByTestId("entity-kind-picker-npc"), "npc");
+    {
+      const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1]?.[0];
+      expect(lastCall?.find((e: { id: string }) => e.id === "npc")).toMatchObject({ kind: "npc" });
+    }
+    await user.selectOptions(screen.getByTestId("entity-kind-picker-npc"), "playable");
+    {
+      const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1]?.[0];
+      expect(lastCall?.find((e: { id: string }) => e.id === "npc")).toMatchObject({ kind: "playable" });
+    }
+  });
+
+  it("defaults a newly added entity picker to playable", async () => {
+    const user = userEvent.setup();
+    renderList([]);
+    await user.click(screen.getByTestId("entity-list-add"));
+    const picker = screen.getByTestId(/^entity-kind-picker-/) as HTMLSelectElement;
+    expect(picker.value).toBe("playable");
+  });
 });

@@ -678,6 +678,7 @@ function EntitiesTab({
   const entityList: EntityListEntity[] = entities.map((entity) => ({
     id: entity.id,
     label: entity.label,
+    ...(entity.kind !== undefined ? { kind: entity.kind } : null),
     fields: entity.fields as unknown as EntityListEntity["fields"],
   }));
   return (

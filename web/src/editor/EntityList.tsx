@@ -15,6 +15,7 @@ import styles from "./EntityList.module.css";
 export type EntityListEntity = {
   id: string;
   label: string;
+  kind?: "playable" | "npc";
   fields: FieldV1[];
 };
 
@@ -309,6 +310,19 @@ function EntityDetail({
               maxLength={120}
               onChange={(e) => onChange({ label: e.target.value })}
               data-testid={`entity-label-input-${entity.id}`}
+            />
+          </FormField>
+          <FormField label={t("editor.entity.kind.label")}>
+            <Select
+              label={t("editor.entity.kind.label")}
+              id={`entity-kind-${entity.id}`}
+              value={entity.kind ?? "playable"}
+              onChange={(event) => onChange({ kind: event.target.value as "playable" | "npc" })}
+              data-testid={`entity-kind-picker-${entity.id}`}
+              options={[
+                { value: "playable", label: t("editor.entity.kind.playable") },
+                { value: "npc", label: t("editor.entity.kind.npc") },
+              ]}
             />
           </FormField>
         </div>

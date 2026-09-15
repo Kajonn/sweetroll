@@ -114,6 +114,18 @@ commands went through `docker compose exec` as documented above.
   (`0020_display_credentials.sql`) on both databases.
 - Cleanup: scratch database dropped, `/tmp/drill.dump` removed from the
   container, dev `sweetroll` confirmed intact afterwards.
+- Media-tarball drill (follow-up, same day): with `data/media` absent the
+  first drill only exercised the skip-with-warning branch, so the archive
+  path was proven with a scratch fixture — `data/media/.drill-fixture-i7task5-9f3k7q.bin`
+  (8 KiB random bytes; unique name, confirmed git-ignored via
+  `git check-ignore`: `.gitignore:14:data/media/*`). Re-ran
+  `scripts/backup.sh /tmp/opencode/drill-backup-media` → exit 0, ≈ 1 s,
+  manifest `media: present` with both checksums; `tar -tzf media.tar.gz`
+  listed `media/` + the fixture; extracted to a scratch dir and `cmp`
+  against the original → identical (sha256
+  `043c7bb1…07e9` both sides). Fixture, output dir, and extract dir all
+  deleted afterwards; `data/` removed, `git status` clean. No `backup.sh`
+  change needed — the archive path works as written.
 
 Small-volume caveat: the drilled database held migrations + seeds only
 (3 systems / 3 versions, all other tables empty), so the ≈ 1 s timings
@@ -143,7 +155,7 @@ Design §15 targets RPO ≤ 15 min and RTO ≤ 4 h.
 Originals/derivatives live under `data/media`
 (`SWEETROLL_MEDIA_DIR ?? <repo>/data/media`; compose volume
 `sweetroll-media` mounted at `/app/data/media` in app containers).
-`scripts/backup.sh` archives them as `media.tar.gz` when present. At drill
-time `data/media` did not exist in this checkout, so media coverage is
-procedural only and has not yet been exercised end-to-end — re-run the
-backup with media present before relying on it.
+`scripts/backup.sh` archives them as `media.tar.gz` when present. The
+archive path has been exercised end-to-end with a scratch fixture (see
+drill evidence above: tarball contents listed, extracted bytes `cmp`-identical
+to the original, fixture removed afterwards).

@@ -783,7 +783,7 @@ The first GM app is a responsive web surface within the shared PWA. Native packa
 
 ## 17.9a I7b - Simple scenes and restricted player display
 
-**Status:** Planned. Restores the owner-requested image, manual fog, token, and phone/tablet display scope; it does not introduce full VTT behavior.
+**Status:** Landed 2026-09-15 per GUI plan G8: media/scene/display contracts and persistence, authorized image storage with safe rendering, revision-controlled manual fog and token operations, revocable display pairing with server-filtered projections, touch/keyboard scene controls and the minimal display shell. Exit e2e `web/tests/e2e/sceneDisplayJourney.spec.ts` + acceptance `docs/acceptance/gui-2026-09-14-i7b-scenes.md`; the four findings from that record are closed on `main` (campaign-leave staleness, client-nav heading, offline bundle self-hit, document-editor-360 drift), each re-verified isolated. Production-auth and real-device gates stay open under G9.
 
 Complete GUI plan G8: define media/scene/display contracts and persistence; add safe authorized image storage and rendering; implement revision-controlled manual fog and token operations; implement revocable display pairing and server-filtered scene projections; then build touch/keyboard scene controls and the minimal display shell. Keep this within the modular application. Do not add a second rules engine or expose GM credentials on a shared tablet.
 

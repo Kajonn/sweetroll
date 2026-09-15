@@ -1,6 +1,6 @@
 # GUI integration implementation plan
 
-**Status:** G0–G6 landed (I4a/I5); G7 player slice landed 2026-09-11. Only the mockup capture stays blocked (HTTP 401, re-verified 2026-09-09).
+**Status:** G0–G6 landed (I4a/I5); G7 player slice landed 2026-09-11; G8 (I7b scenes/display) landed 2026-09-15. Only the mockup capture stays blocked (HTTP 401, re-verified 2026-09-09).
 **Design authority:** [design_v2.md](../../../design_v2.md), especially Sections 10 and 17.  
 **Visual reference:** [Tablefolk GUI mockup](https://tablefolk-ttrpg-mockups.humdrumrat.chatgpt.site).  
 **Original baseline:** `be3efc89b536f563c0f11f2f929171dd8129463b`.
@@ -177,14 +177,16 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 
 **New capability:** plan its contracts and persistence before implementing canvas controls. Keep it within the modular application and publish versioned HTTP contracts.
 
-- [ ] Introduce authorized image upload/storage with bounded file size/dimensions, validated decoding, safe rendering derivatives, ownership checks, and deletion. GM originals must not use public asset URLs. General document uploads remain outside this increment.
-- [ ] Persist a scene's background reference, revision, manual fog mask, and simple token records: image/label, normalized position, size, and visibility. Scene edits use revision checks and an explicit single-writer/conflict flow; do not silently merge concurrent brush operations.
-- [ ] Build SceneViewport, FogToolbar, TokenTray, and display-status controls. Support fit/pan/zoom, manually reveal/conceal parts of fog, undo the latest local operation, and drag or tap-to-place/move tokens. Provide keyboard/non-drag alternatives. No grid, movement measurement, initiative, vision, or automated token actions.
-- [ ] Define token visibility explicitly: GM-visible hidden tokens never reach players; tokens covered by fog are omitted or safely clipped by the server projection. Store coordinates in scene space so phone/tablet viewports agree.
-- [ ] Implement short-lived pairing and revocable credentials scoped to one campaign's display projection. Display clients cannot read GM notes, character sheets, member settings, originals, hidden tokens, or mutation endpoints, even if the device was previously used by a GM.
-- [ ] Before entering display mode, remove GM/account views and caches from that browser context. A CSS-hidden GM route is not a player display. Back navigation, reload, error screens, and reconnect must not reveal privileged data.
-- [ ] Send server-rendered redacted imagery (or equivalently safe tiles) containing only revealed pixels. A fog overlay over the full original image is insufficient. Scope media caching to authorization/revision; purge display state on revocation and blank it while permission is uncertain.
-- [ ] Synchronize authorized scene revisions to paired devices using the existing polling approach first. Show pending/applied/offline status on the GM device; present a safe blank/reconnecting state rather than stale privileged content. Do not broadcast secret payloads.
+*Landed 2026-09-15 per the [I7b plan](2026-09-14-i7b-scenes-display.md) Tasks 1–8 (`6ae140d`–`45613f6` plus review fixes through `8616b28`); exit e2e `sceneDisplayJourney` + acceptance `docs/acceptance/gui-2026-09-14-i7b-scenes.md`. The four findings from that record (campaign-leave staleness, client-nav heading, offline bundle self-hit, document-editor-360 drift) are closed on `main` (`f7e16ab`, `064412c`, `2e50025`, `9ff7830`), each re-verified isolated before close.*
+
+- [x] Introduce authorized image upload/storage with bounded file size/dimensions, validated decoding, safe rendering derivatives, ownership checks, and deletion. GM originals must not use public asset URLs. General document uploads remain outside this increment.
+- [x] Persist a scene's background reference, revision, manual fog mask, and simple token records: image/label, normalized position, size, and visibility. Scene edits use revision checks and an explicit single-writer/conflict flow; do not silently merge concurrent brush operations.
+- [x] Build SceneViewport, FogToolbar, TokenTray, and display-status controls. Support fit/pan/zoom, manually reveal/conceal parts of fog, undo the latest local operation, and drag or tap-to-place/move tokens. Provide keyboard/non-drag alternatives. No grid, movement measurement, initiative, vision, or automated token actions.
+- [x] Define token visibility explicitly: GM-visible hidden tokens never reach players; tokens covered by fog are omitted or safely clipped by the server projection. Store coordinates in scene space so phone/tablet viewports agree.
+- [x] Implement short-lived pairing and revocable credentials scoped to one campaign's display projection. Display clients cannot read GM notes, character sheets, member settings, originals, hidden tokens, or mutation endpoints, even if the device was previously used by a GM.
+- [x] Before entering display mode, remove GM/account views and caches from that browser context. A CSS-hidden GM route is not a player display. Back navigation, reload, error screens, and reconnect must not reveal privileged data.
+- [x] Send server-rendered redacted imagery (or equivalently safe tiles) containing only revealed pixels. A fog overlay over the full original image is insufficient. Scope media caching to authorization/revision; purge display state on revocation and blank it while permission is uncertain.
+- [x] Synchronize authorized scene revisions to paired devices using the existing polling approach first. Show pending/applied/offline status on the GM device; present a safe blank/reconnecting state rather than stale privileged content. Do not broadcast secret payloads.
 
 **Exit demonstration:** a GM uses monster sheets on a phone while an iPad displays an image; reveal and conceal fog, place and move a token, change scene, reconnect, and revoke the display. Inspect display network responses, storage, reload, and direct requests to prove GM originals and secrets are absent. Previously revealed information cannot be made unseen; conceal/revoke prevents subsequent access, not screenshots already taken. Repeat with a remote player viewing the same permitted scene.
 

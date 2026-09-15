@@ -14910,7 +14910,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/octet-stream": string;
+                    "image/png": string;
                 };
             };
             400: {

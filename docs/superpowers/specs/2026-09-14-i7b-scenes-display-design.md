@@ -78,6 +78,13 @@ on `/display` revalidates before rendering; uncertain permission renders blank, 
 privileged content. Cross-campaign credential use collapses to generic 404. Remote players use
 the same code path.
 
+As built, the display credential is a bearer secret held in `sessionStorage` and sent on display
+reads via the `x-display-secret` header (never in URLs, except the `rev` cache key). Rationale:
+header auth is CSRF-immune, tab-scoped storage clears with the session, and script access to the
+secret is XSS-equivalent to the existing GM session cookie — no new exposure class. An
+HttpOnly-cookie credential was considered and rejected: ambient cookie auth would reintroduce
+CSRF-able requests on the shared display context the entry purge is designed to isolate.
+
 ## Section 3 — GM scene UI
 
 - `SceneViewport`: fit/pan/zoom in normalized scene-space (phone/tablet agree); keyboard

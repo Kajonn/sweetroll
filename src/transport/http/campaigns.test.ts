@@ -1482,6 +1482,58 @@ describe("campaign media/scene/display HTTP routes (I7b Task 4)", () => {
     expect(mismatch.statusCode).toBe(404);
   });
 
+  it("refuses cross-campaign image deletes before any mutation", async () => {
+    const campaignId = randomUUID();
+    const fileId = randomUUID();
+    const idempotencyKey = randomUUID();
+    // A file owned elsewhere reads as 404 through this campaign's URL
+    // WITHOUT deleting: the openImage pre-check runs before any mutation.
+    let deleteCalls = 0;
+    const scoped = await build({
+      campaigns: makeCampaigns({
+        openImage: async () => ({
+          ok: true as const,
+          value: { file: mediaFileView({ fileId, campaignId: randomUUID() }), contentType: "image/png" as const, bytes: Buffer.from([9]) },
+        }),
+        deleteImage: async () => {
+          deleteCalls += 1;
+          return { ok: true as const, value: mediaFileView({ fileId, campaignId }) };
+        },
+      }),
+    });
+    const wrongCampaign = await scoped.inject({
+      method: "DELETE",
+      url: `/campaigns/${campaignId}/images/${fileId}`,
+      headers: cookie,
+      payload: { expectedRevision: 1, idempotencyKey },
+    });
+    expect(wrongCampaign.statusCode).toBe(404);
+    expect(wrongCampaign.json().error.code).toBe("not_found");
+    expect(wrongCampaign.json()).not.toHaveProperty("image");
+    expect(deleteCalls).toBe(0);
+
+    // The pre-check failure propagates the same way: an outsider of the
+    // owning campaign cannot reach the delete call either.
+    let outsiderDeleteCalls = 0;
+    const unscoped = await build({
+      campaigns: makeCampaigns({
+        openImage: async () => ({ ok: false, error: { code: "not_found", message: "nope" } }),
+        deleteImage: async () => {
+          outsiderDeleteCalls += 1;
+          return { ok: true as const, value: mediaFileView({ fileId, campaignId }) };
+        },
+      }),
+    });
+    const outsider = await unscoped.inject({
+      method: "DELETE",
+      url: `/campaigns/${campaignId}/images/${fileId}`,
+      headers: cookie,
+      payload: { expectedRevision: 1, idempotencyKey },
+    });
+    expect(outsider.statusCode).toBe(404);
+    expect(outsiderDeleteCalls).toBe(0);
+  });
+
   it("creates, reads and updates scenes under GM auth", async () => {
     const campaignId = randomUUID();
     const sceneId = randomUUID();

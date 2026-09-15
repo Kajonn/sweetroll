@@ -1456,7 +1456,7 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
       params: DisplayTokenParams,
       querystring: ImageRevQuery,
       response: {
-        "200": { schema: BinaryBodyDto, mediaType: "application/octet-stream" },
+        "200": { schema: BinaryBodyDto, mediaType: "image/png" },
         "400": CampaignErrorEnvelope,
         "404": CampaignErrorEnvelope,
         "500": CampaignErrorEnvelope,
@@ -2328,22 +2328,26 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
             request.id,
           );
         }
-        const result = await campaigns.deleteImage(ctxOf(request), {
-          fileId: params.fileId,
-          expectedRevision: body.expectedRevision,
-          idempotencyKey: body.idempotencyKey,
-        });
-        if (!result.ok) return sendError(reply, result.error, request.id);
-        // The :id segment names the campaign: a file owned elsewhere reads
-        // as not_found through this campaign's URL (the delete itself was
-        // already authorized against the owning campaign).
-        if (result.value.campaignId !== params.id) {
+        // The :id segment names the campaign: the file must open under this
+        // campaign before anything is deleted, so a wrong-:id URL reads as
+        // not_found WITHOUT deleting (mirroring the display-revoke
+        // pre-check — openImage is read-only and authorizes against the
+        // owning campaign, so outsiders collapse to not_found here too).
+        const scoped = await campaigns.openImage(ctxOf(request), { fileId: params.fileId });
+        if (!scoped.ok) return sendError(reply, scoped.error, request.id);
+        if (scoped.value.file.campaignId !== params.id) {
           return sendError(
             reply,
             { code: "not_found", message: "The requested campaign does not exist." },
             request.id,
           );
         }
+        const result = await campaigns.deleteImage(ctxOf(request), {
+          fileId: params.fileId,
+          expectedRevision: body.expectedRevision,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
         return { image: result.value, requestId: request.id };
       },
 

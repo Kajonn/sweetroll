@@ -50188,7 +50188,7 @@
         "responses": {
           "200": {
             "content": {
-              "application/octet-stream": {
+              "image/png": {
                 "schema": {
                   "format": "binary",
                   "description": "Raw image bytes.",

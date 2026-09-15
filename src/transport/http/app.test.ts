@@ -109,5 +109,8 @@ describe("HTTP platform endpoints", () => {
     expect(response.headers["content-type"]).toContain("text/plain");
     expect(response.body).toContain("sweetroll_http_requests_total");
     expect(response.body).toContain("sweetroll_http_request_duration_seconds");
+    expect(response.body).toContain('sweetroll_http_request_duration_seconds_bucket{');
+    expect(response.body).toMatch(/le="0\.3"/);
+    expect(response.body).toMatch(/le="0\.5"/);
   });
 });

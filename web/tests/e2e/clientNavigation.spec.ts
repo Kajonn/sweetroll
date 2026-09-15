@@ -16,7 +16,7 @@ test("client navigation: header hops keep the document alive", async ({ page }) 
   await page.evaluate(() => { (window as { __navAlive?: boolean }).__navAlive = true; });
   await page.locator('header nav a:has-text("Campaigns")').click();
   await expect(page).toHaveURL(/\/campaigns/, { timeout: 30_000 });
-  await expect(page.getByRole("heading", { name: "Campaigns" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as { __navAlive?: boolean }).__navAlive)).toBe(true);
   await page.locator('header nav a:has-text("Activity")').click();
   await expect(page).toHaveURL(/\/activity/, { timeout: 30_000 });

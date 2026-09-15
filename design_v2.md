@@ -764,6 +764,8 @@ Apply GUI plan G7 to the player campaign routes using I4a components and the own
 
 **Status (reconciled 2026-09-12):** The GUI plan's remediation cross-reference and index record GM Phase 1/2 and subsequent review fixes present at `11aea84`. Full I7 and unchecked G7/G9 gates remain open: pre-upgrade runtime/test, ordinary-player discovery, durable recovery and acceptance remediation comes next. Preview-as-player, true pinning, broader multi-device/acceptance work and the later upgrade/scenes increments are not closed by Phase 2 or by contract approval.
 
+**Hardening outcome (2026-09-15, task 10):** WCAG/keyboard axe spec (15/15), co-GM two-user conflict + independent-operation proof, session-burst p95 evidence within budget, SLO-aligned buckets + definitions, backup/restore drill (incl. media tarball), and an exercised incident runbook (incl. pool error-listener fix) are done with evidence in `docs/acceptance/i7-2026-09-15-hardening.md` (commits `4548793`–`d6f7255`). Full I7 stays open per that record's open-gaps list (preview-as-player, launch-template licensing, production auth, mockup capture, G9 device/playtest/deployment gates, RPO-scheduling/PITR gaps, example-only PromQL).
+
 The first GM app is a responsive web surface within the shared PWA. Native packaging and app-store distribution are not part of this increment. Apply GUI plan G7, including mobile NPC/monster list-to-sheet navigation. Image presentation and the restricted player display are delivered in I7b; I7 second-device acceptance uses permitted text content and authenticated GM views.
 
 **Tasks:**

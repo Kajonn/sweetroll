@@ -169,7 +169,8 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 - [ ] In I7, build campaign setup, content/notes, members, mobile session board, and a searchable NPC/monster list leading to a full-width sheet. Use existing character capabilities where appropriate and explicit campaign contracts for any new ownership/lifecycle behavior.
 - [ ] Keep Session, Content, Characters, Members, and Settings navigation consistent with Section 4. Use panels on larger screens and focused pages/sheets on phones.
 - [ ] Make sharing audience persistent and readable; preview-as-player calls the real policy implementation. Shared controls never decide authorization.
-- [ ] Verify two authenticated GM devices can operate independently without clobbering changes. This is distinct from handing a restricted display to players.
+- [x] Verify two authenticated GM devices can operate independently without clobbering changes. This is distinct from handing a restricted display to players.
+  *Proved 2026-09-15 (I7 hardening Task 2, `0a6c5d1`): two-context Chromium e2e — owner + co-GM shared-note stale commit surfaces explicit conflict UI (never "Merge"), fresh-key retry applies both effects with no clobber, and concurrent bumps on two different characters both apply with no conflict; acceptance `docs/acceptance/i7-2026-09-15-hardening.md`. Real-device operation stays G9.*
 
 **Exit:** I6/I7 demonstrations run through the real UI with permission, revocation, and conflict tests; no mock-only campaign screens count as completion.
 

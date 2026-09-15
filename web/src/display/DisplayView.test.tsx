@@ -175,6 +175,69 @@ describe("DisplayView", () => {
     expect(storage.getItem(DISPLAY_CREDENTIAL_STORAGE_KEY)).toBeNull();
   });
 
+  it("blanks the cached frame when revocation lands after a good frame", async () => {
+    const user = userEvent.setup();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const api = failingApi();
+    api.getDisplayProjection.mockResolvedValueOnce(projectionPayload());
+    // Revocation surfaces strictly as 404/not_found (backend Task 5
+    // contract: every credential failure collapses to generic not_found).
+    api.getDisplayProjection.mockRejectedValue({ code: "not_found", status: 404, message: "gone" });
+    const storage = memoryStorage(seedCredential());
+
+    const { container } = renderDisplay(
+      <DisplayView api={api as never} sceneId="s1" online pollMs={50} storage={storage} />,
+      qc,
+    );
+
+    expect(await screen.findByRole("img", { name: /display image/i })).toBeVisible();
+    // The poll (or revision-adopted refetch) picks up the revocation: the
+    // frozen frame must blank per §7.7, not linger behind a notice.
+    expect(await screen.findByText(/this display is unavailable/i)).toBeVisible();
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(container.querySelectorAll("a").length).toBe(0);
+
+    await user.click(screen.getByRole("button", { name: /enter a different code/i }));
+    expect(screen.getByLabelText(/display code/i)).toBeVisible();
+    expect(storage.getItem(DISPLAY_CREDENTIAL_STORAGE_KEY)).toBeNull();
+  });
+
+  it("keeps the cached frame across transient non-404 poll failures", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const api = failingApi();
+    api.getDisplayProjection.mockResolvedValueOnce(projectionPayload());
+    api.getDisplayProjection.mockRejectedValue({ status: 500, message: "boom" });
+
+    renderDisplay(
+      <DisplayView api={api as never} sceneId="s1" online pollMs={50} storage={memoryStorage(seedCredential())} />,
+      qc,
+    );
+
+    expect(await screen.findByRole("img", { name: /display image/i })).toBeVisible();
+    // Transient failure: the last good frame stays with a reconnecting
+    // notice — only revocation (404/not_found) blanks.
+    await waitFor(() => expect(screen.getByText(/reconnecting/i)).toBeVisible());
+    expect(screen.getByRole("img", { name: /display image/i })).toBeVisible();
+    expect(screen.queryByText(/this display is unavailable/i)).toBeNull();
+  });
+
+  it("blanks on the code-only revocation shape (no status attached)", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const api = failingApi();
+    // The HTTP contract always carries code "not_found" for revoked
+    // credentials; match it even when no numeric status is attached.
+    api.getDisplayProjection.mockRejectedValue({ code: "not_found", message: "gone" });
+
+    renderDisplay(
+      <DisplayView api={api as never} sceneId="s1" online storage={memoryStorage(seedCredential())} />,
+      qc,
+    );
+
+    expect(await screen.findByText(/this display is unavailable/i)).toBeVisible();
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(api.openCampaign).not.toHaveBeenCalled();
+  });
+
   it("shows reconnecting with retry when the projection poll fails", async () => {
     const user = userEvent.setup();
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

@@ -258,6 +258,32 @@ export function DisplayView(props: {
     );
   }
 
+  // A revoked credential must blank even when a good frame is cached
+  // (design §7.7): a post-frame 404 replaces the frozen frame with the
+  // blank state + disconnect affordance. Transient non-404 failures keep
+  // the last good frame with a reconnecting notice instead.
+  if (online && projection.status === "error" && isNotFound(projection.error)) {
+    return (
+      <section aria-label={t("display.title")}>
+        <h1>{t("display.title")}</h1>
+        <EmptyState
+          title={t("display.blank.title")}
+          description={t("display.blank.description")}
+          action={
+            <>
+              <Button variant="primary" onClick={() => void projection.refetch()}>
+                {t("display.retry")}
+              </Button>{" "}
+              <Button variant="secondary" onClick={disconnect}>
+                {t("display.disconnect")}
+              </Button>
+            </>
+          }
+        />
+      </section>
+    );
+  }
+
   return (
     <section aria-label={t("display.title")}>
       <h1>{t("display.title")}</h1>

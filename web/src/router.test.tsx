@@ -464,3 +464,40 @@ describe("G3 shell migration: back navigation", () => {
     }
   });
 });
+
+// I7b exit: the restricted /display route renders outside the GM shell —
+// code entry with no app-header, no banner, no nav — so a shared tablet
+// shows no GM chrome and needs no GM session.
+describe("I7b restricted display route", () => {
+  afterEach(() => {
+    window.history.pushState({}, "", "/");
+    window.sessionStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("renders /display with no app-header and no identity-gated chrome", async () => {
+    const fetch_ = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input), window.location.origin);
+      if (url.pathname === "/api/me") {
+        return new Response(JSON.stringify({ state: "anonymous" }));
+      }
+      return new Response(JSON.stringify({ systems: [], nextCursor: null, requestId: "r" }), { status: 200 });
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetch_ as unknown as typeof fetch;
+    try {
+      renderAt("/display?sceneId=s1");
+      expect(await screen.findByRole("heading", { name: /connect this display/i })).toBeVisible();
+      expect(screen.getByLabelText(/display code/i)).toBeVisible();
+      // No GM shell: no app-header, no banner landmark, no nav, no links.
+      expect(screen.queryByTestId("app-header")).toBeNull();
+      expect(screen.queryByRole("banner")).toBeNull();
+      expect(screen.queryByRole("navigation")).toBeNull();
+      expect(document.querySelectorAll("a").length).toBe(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+      window.history.pushState({}, "", "/");
+      window.sessionStorage.clear();
+    }
+  });
+});

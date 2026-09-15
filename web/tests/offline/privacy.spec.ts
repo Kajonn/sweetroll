@@ -470,7 +470,10 @@ test.describe("offline privacy and sign-out", () => {
     const nextOwner = await newSignedInContext(browser, TEST_USER_B.code);
     try {
       const setup = await owner.context.newPage();
-      const characterName = `Private ${Date.now().toString(36)}`;
+      // Distinctive marker: the scan matches cached bundle text, and the
+      // bundle contains the dictionary word "Private" (library.sharing.private),
+      // so the name must not contain it — otherwise build assets flag as leaks.
+      const characterName = `ZzPrivmark ${Date.now().toString(36)}`;
       const { characterId } = await createCharacter(setup.request, {
         systemVersionId: system.systemVersionId,
         name: characterName,
@@ -503,7 +506,7 @@ test.describe("offline privacy and sign-out", () => {
             try {
               const response = await cache.match(request);
               const text = await response?.text();
-              if (text && text.includes("Private")) hits.push(request.url);
+              if (text && text.includes("ZzPrivmark")) hits.push(request.url);
             } catch {
               /* ignore opaque entries */
             }
@@ -554,7 +557,7 @@ test.describe("offline privacy and sign-out", () => {
               request.onsuccess = () => resolve(request.result as unknown[]);
               request.onerror = () => reject(request.error);
             });
-            if (JSON.stringify(rows).includes("Private")) leaked.push(store);
+            if (JSON.stringify(rows).includes("ZzPrivmark")) leaked.push(store);
           }
           return { stores, leaked };
         } finally {

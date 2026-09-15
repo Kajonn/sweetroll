@@ -160,7 +160,7 @@ function makeCharacters(overrides: Partial<Characters> = {}): Characters {
       value: {
         versionId: randomUUID(),
         packageChecksum: d20Package.integrity.checksum,
-        entities: [{ id: "character", label: "Character" }],
+        entities: [{ id: "character", label: "Character", kind: "playable" }],
       },
     }),
     listCreationVersions: async () => ({ ok: true, value: { versions: [], nextCursor: null } }),

@@ -26,8 +26,22 @@ describe("SystemDocumentV1Schema", () => {
         entities: [{ ...validDocument().entities[0]!, id: "Bad-ID" }],
       },
     ],
+    [
+      "unknown entity kind",
+      {
+        ...validDocument(),
+        entities: [{ ...validDocument().entities[0]!, kind: "boss" }],
+      },
+    ],
   ])("rejects %s", (_name, value) => {
     expect(validate(value)).toBe(false);
+  });
+
+  it("accepts playable and npc entity kinds", () => {
+    for (const kind of ["playable", "npc"] as const) {
+      const value = { ...validDocument(), entities: [{ ...validDocument().entities[0]!, kind }] };
+      expect(validate(value)).toBe(true);
+    }
   });
 
   it("rejects an expression over the byte ceiling", () => {

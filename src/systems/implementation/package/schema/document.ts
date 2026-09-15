@@ -171,6 +171,7 @@ export const EntityDefinitionV1Schema = Type.Object(
   {
     id: DefinitionIdSchema,
     label: LabelSchema,
+    kind: Type.Optional(Type.Union([Type.Literal("playable"), Type.Literal("npc")])),
     fields: Type.Array(FieldV1Schema, { maxItems: PACKAGE_LIMITS.fields }),
   },
   { additionalProperties: false },

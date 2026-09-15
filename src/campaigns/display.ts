@@ -676,7 +676,10 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
         if (bytes === null) {
           return { ok: false, error: errors.not_found() };
         }
-        return { ok: true, value: { contentType: image.mediaType, bytes, revision: scene.revision } };
+        // Token images normalize to PNG (like the scene derivative), so the
+        // documented `image/png` holds for every admitted upload type.
+        const normalized = await sharp(bytes).png().toBuffer();
+        return { ok: true, value: { contentType: "image/png", bytes: normalized, revision: scene.revision } };
       } catch {
         return { ok: false, error: errors.internal() };
       }

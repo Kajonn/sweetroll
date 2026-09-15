@@ -1180,6 +1180,54 @@ describeWithDatabase("Task 4 transport support reads (openScene, openImage, cred
     expect(unknown).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
   });
 
+  it("getDisplayTokenImage normalizes non-PNG uploads to PNG bytes", async () => {
+    const campaignId = await createCampaign();
+    const { fileId } = await uploadBackground(campaignId);
+    const jpegBytes = await sharp(Buffer.from(ONE_BY_ONE_PNG_BASE64, "base64")).jpeg().toBuffer();
+    const uploaded = await h.campaigns.uploadImage(ctxFor(h.users.gm), {
+      campaignId,
+      name: "portrait",
+      contentType: "image/jpeg",
+      dataBase64: jpegBytes.toString("base64"),
+      idempotencyKey: randomUUID(),
+    });
+    expect(uploaded.ok).toBe(true);
+    if (!uploaded.ok) throw new Error("portrait upload failed");
+    const { sceneId } = await createScene(campaignId, fileId);
+
+    const revealed = await h.campaigns.applyFogEdit(ctxFor(h.users.gm), {
+      sceneId,
+      expectedSceneRevision: 1,
+      op: { mode: "reveal", runs: [{ x: 0.5, y: 0.5, r: 0.4 }] },
+      idempotencyKey: randomUUID(),
+    });
+    expect(revealed.ok).toBe(true);
+    if (!revealed.ok) throw new Error("expected fog reveal");
+
+    const placed = await h.campaigns.placeToken(ctxFor(h.users.gm), {
+      sceneId,
+      expectedSceneRevision: revealed.value.revision,
+      label: "Hero",
+      x: 0.5,
+      y: 0.5,
+      size: 0.1,
+      visible: true,
+      imageFileId: uploaded.value.fileId,
+      idempotencyKey: randomUUID(),
+    });
+    expect(placed.ok).toBe(true);
+    if (!placed.ok) throw new Error("expected place");
+    const tokenId = placed.value.tokens[0]?.tokenId;
+    if (tokenId === undefined) throw new Error("expected token");
+
+    const { displayId, secret } = await pairAndRedeem(campaignId);
+    const image = await h.campaigns.getDisplayTokenImage({ displayId, secret, sceneId, tokenId });
+    expect(image.ok).toBe(true);
+    if (!image.ok) throw new Error("expected token image");
+    expect(image.value.contentType).toBe("image/png");
+    expect(image.value.bytes.subarray(0, 4)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  });
+
   it("revoke purges cached derivatives and the next credential regenerates them lazily", async () => {
     const campaignId = await createCampaign();
     const { fileId } = await uploadBackground(campaignId);

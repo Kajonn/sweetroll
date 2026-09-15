@@ -69,7 +69,7 @@ auth+revision, purged on revocation. No service-worker persistence of campaign/d
 GM Campaign Settings → Display → `pairDisplay` shows a 6-character single-use code (5-min TTL).
 The display route `/display` holds no GM session: entering the code calls `redeemDisplayCode`,
 which first wipes campaign/GM query caches and in-flight results in that browser context, then
-issues a revocable HttpOnly display credential scoped to one campaign. The credential grants
+issues a revocable bearer display credential scoped to one campaign. The credential grants
 `getDisplayProjection` only — no GM notes, sheets, members, settings, originals, or mutations.
 
 GM Settings lists active display credentials with Revoke. Revocation kills the credential; the

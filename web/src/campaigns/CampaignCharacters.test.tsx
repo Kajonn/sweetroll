@@ -1,5 +1,5 @@
 // web/src/campaigns/CampaignCharacters.test.tsx
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CampaignCharactersView } from "./CampaignCharacters.js";
 
@@ -205,5 +205,59 @@ describe("CampaignCharactersView", () => {
     expect(typeof body.idempotencyKey).toBe("string");
     expect(onOpenCharacter).toHaveBeenCalledWith("s9");
     expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("lists npc-kind rows in the NPC section and keeps them out of the main list", () => {
+    render(
+      <CampaignCharactersView
+        {...viewProps({
+          isGm: true,
+          characters: [
+            sheet({ characterId: "s1", name: "Bram", entityDefinitionId: "hero" }),
+            sheet({ characterId: "s2", name: "Goblin", entityDefinitionId: "goblin" }),
+          ],
+          npcEntityIds: { goblin: true },
+          onOpenCharacter: () => {},
+        })}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: /monsters & npcs/i })).toBeVisible();
+    const npcSection = screen.getByRole("region", { name: /monsters & npcs/i });
+    expect(within(npcSection).getByRole("button", { name: /open goblin/i })).toBeVisible();
+    expect(within(npcSection).queryByRole("button", { name: /open bram/i })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /open goblin/i })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /open bram/i })).toHaveLength(1);
+  });
+
+  it("narrows the NPC section by name search and shows an empty state", () => {
+    render(
+      <CampaignCharactersView
+        {...viewProps({
+          isGm: true,
+          characters: [sheet({ characterId: "s2", name: "Goblin", entityDefinitionId: "goblin" })],
+          npcEntityIds: { goblin: true },
+          onOpenCharacter: () => {},
+        })}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(/search monsters & npcs/i), { target: { value: "zzz" } });
+    expect(screen.getByText(/no monsters or npcs match/i)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /open goblin/i })).toBeNull();
+    fireEvent.change(screen.getByLabelText(/search monsters & npcs/i), { target: { value: "gob" } });
+    expect(screen.getByRole("button", { name: /open goblin/i })).toBeVisible();
+  });
+
+  it("hides the NPC section when no kinds resolve and keeps every row in the main list", () => {
+    render(
+      <CampaignCharactersView
+        {...viewProps({
+          isGm: true,
+          characters: [sheet({ name: "Bram" })],
+          onOpenCharacter: () => {},
+        })}
+      />,
+    );
+    expect(screen.queryByRole("heading", { name: /monsters & npcs/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /open bram/i })).toBeVisible();
   });
 });

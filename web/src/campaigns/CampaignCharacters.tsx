@@ -66,10 +66,36 @@ export type CampaignCharactersViewProps = {
   /** Reload the list (and campaign revision) after a mutation outcome. */
   onChanged?: () => void;
   metadataApi?: CampaignCharacterMetadataApi | undefined;
+  /** Entity definition ids whose creation-options kind resolved to "npc". */
+  npcEntityIds?: Record<string, true> | undefined;
 };
 
 function isControlled(character: CampaignCharacterSummary, actorId: string | null | undefined): boolean {
   return actorId !== undefined && actorId !== null && character.controllers.includes(actorId);
+}
+
+function CharacterRow(props: {
+  character: CampaignCharacterSummary;
+  controlled: boolean;
+  openable: boolean;
+  onOpen: () => void;
+}) {
+  const indicator = props.controlled
+    ? t("campaign.detail.characters.indicator.controlled")
+    : t("campaign.detail.characters.indicator.viewOnly");
+  return (
+    <li>
+      <span>{props.character.name}</span>{" "}
+      <span>{t("campaign.detail.characters.controllers", { count: props.character.controllers.length })}</span>{" "}
+      <span>{props.character.lifecycle}</span>{" "}
+      <span>{indicator}</span>{" "}
+      {props.openable ? (
+        <Button variant="secondary" onClick={props.onOpen}>
+          {t("campaign.detail.characters.open", { name: props.character.name })}
+        </Button>
+      ) : null}
+    </li>
+  );
 }
 
 export function CampaignCharactersView(props: CampaignCharactersViewProps) {
@@ -90,6 +116,7 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
   const [createPending, setCreatePending] = useState(false);
   const [createConflict, setCreateConflict] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [npcSearch, setNpcSearch] = useState("");
 
   const attemptClaim = async (character: ClaimableCharacterSummary): Promise<void> => {
     if (claimingId !== null || !online) return;
@@ -180,6 +207,12 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
   const visibleClaimable = props.claimable.filter((row) => evictedIds[row.characterId] !== true);
   const confirming = visibleClaimable.find((row) => row.characterId === confirmingId) ?? null;
 
+  const npcRows = props.characters.filter((c) => props.npcEntityIds?.[c.entityDefinitionId] === true);
+  const mainRows = props.characters.filter((c) => props.npcEntityIds?.[c.entityDefinitionId] !== true);
+  const filteredNpcRows = npcRows.filter((c) =>
+    c.name.toLowerCase().includes(npcSearch.trim().toLowerCase()),
+  );
+
   const claimSection = (
     <section aria-label={t("campaign.detail.characters.claimDiscovery.title")}>
       <h3>{t("campaign.detail.characters.claimDiscovery.title")}</h3>
@@ -254,28 +287,45 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
         />
       ) : (
         <ul aria-label={t("campaign.detail.characters.listAriaLabel")}>
-          {props.characters.map((character) => {
-            const controlled = isControlled(character, props.actorId);
-            const openable = controlled || props.isGm === true;
-            const indicator = controlled
-              ? t("campaign.detail.characters.indicator.controlled")
-              : t("campaign.detail.characters.indicator.viewOnly");
-            return (
-              <li key={character.characterId}>
-                <span>{character.name}</span>{" "}
-                <span>{t("campaign.detail.characters.controllers", { count: character.controllers.length })}</span>{" "}
-                <span>{character.lifecycle}</span>{" "}
-                <span>{indicator}</span>{" "}
-                {openable ? (
-                  <Button variant="secondary" onClick={() => props.onOpenCharacter(character.characterId)}>
-                    {t("campaign.detail.characters.open", { name: character.name })}
-                  </Button>
-                ) : null}
-              </li>
-            );
-          })}
+          {mainRows.map((character) => (
+            <CharacterRow
+              key={character.characterId}
+              character={character}
+              controlled={isControlled(character, props.actorId)}
+              openable={isControlled(character, props.actorId) || props.isGm === true}
+              onOpen={() => props.onOpenCharacter(character.characterId)}
+            />
+          ))}
         </ul>
       )}
+      {npcRows.length > 0 ? (
+        <section aria-label={t("campaign.detail.characters.npc.title")}>
+          <h3>{t("campaign.detail.characters.npc.title")}</h3>
+          {!online ? <p role="status">{t("campaign.detail.characters.npc.offline")}</p> : null}
+          <FormField label={t("campaign.detail.characters.npc.search.label")}>
+            <input
+              type="search"
+              value={npcSearch}
+              onChange={(event) => setNpcSearch(event.target.value)}
+            />
+          </FormField>
+          {filteredNpcRows.length === 0 ? (
+            <p role="status">{t("campaign.detail.characters.npc.empty")}</p>
+          ) : (
+            <ul aria-label={t("campaign.detail.characters.npc.title")}>
+              {filteredNpcRows.map((character) => (
+                <CharacterRow
+                  key={character.characterId}
+                  character={character}
+                  controlled={isControlled(character, props.actorId)}
+                  openable={isControlled(character, props.actorId) || props.isGm === true}
+                  onOpen={() => props.onOpenCharacter(character.characterId)}
+                />
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
       <Dialog
         open={confirming !== null}
         onOpenChange={(open) => {
@@ -398,6 +448,30 @@ export function CampaignCharactersTab(props: {
     generation,
     { enabled: props.actorId !== null && props.actorId !== undefined, online },
   );
+  // Distinct system versions across the loaded rows (safe pre-guard preview;
+  // hooks must stay unconditional, so this reads optional data here while
+  // `rows` below uses the guarded payload).
+  const versionPreview: CampaignCharacterSummary[] = characters.data?.characters ?? [];
+  const versionIds = [...new Set(versionPreview.map((row) => row.systemVersionId))];
+  const entityKinds = useQuery({
+    queryKey: ["campaigns", "entity-kinds", props.campaignId, ...versionIds, generation],
+    queryFn: async () => {
+      const found = await Promise.all(
+        versionIds.map(async (versionId) => {
+          try {
+            const options = await props.metadataApi!.creationOptions(versionId);
+            return options.data.entities
+              .filter((entity) => (entity.kind ?? "playable") === "npc")
+              .map((entity) => entity.id);
+          } catch {
+            return [];
+          }
+        }),
+      );
+      return Object.fromEntries(found.flat().map((id) => [id, true])) as Record<string, true>;
+    },
+    enabled: props.metadataApi !== undefined && online && versionIds.length > 0,
+  });
 
   if (characters.status === "pending") {
     return <p role="status">{t("campaign.detail.characters.loading")}</p>;
@@ -446,6 +520,7 @@ export function CampaignCharactersTab(props: {
       onOpenCharacter={props.onOpenCharacter}
       onChanged={refresh}
       metadataApi={props.metadataApi}
+      npcEntityIds={entityKinds.data}
     />
   );
 }

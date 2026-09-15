@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 
 import { uid } from "../offline/test-auth.js";
@@ -278,6 +279,65 @@ test("NPC list: npc-kind rows filter into a searchable Monsters & NPCs section",
     await page.goto(campaignUrl);
     await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
     await expect(page.getByRole("heading", { name: "Monsters & NPCs" })).toBeVisible({ timeout: STEP_TIMEOUT });
+
+    // 7. Axe on the Characters tab at desktop width (1280): zero
+    // serious/critical violations (spec §4: axe-covered at 360 + 1280 px).
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(campaignUrl);
+    await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
+    await expect(page.getByRole("heading", { name: "Monsters & NPCs" })).toBeVisible({ timeout: STEP_TIMEOUT });
+    const desktopAxe = await new AxeBuilder({ page }).analyze();
+    expect(desktopAxe.violations.filter((v) => v.impact === "serious" || v.impact === "critical")).toEqual(
+      [],
+    );
+
+    // 8. Keyboard check: the search input takes focus and keyboard typing
+    // narrows the list.
+    const keyboardSearch = page.getByLabel(/search monsters & npcs/i);
+    await keyboardSearch.fill("");
+    await keyboardSearch.focus();
+    await expect(keyboardSearch).toBeFocused();
+    await page.keyboard.type("gob");
+    await expect(npcSection.getByRole("button", { name: `Open ${goblinName}`, exact: true })).toBeVisible({
+      timeout: STEP_TIMEOUT,
+    });
+    await page.keyboard.press("ControlOrMeta+A");
+    await page.keyboard.press("Backspace");
+    await expect(npcSection.getByRole("button", { name: `Open ${goblinName}`, exact: true })).toBeVisible({
+      timeout: STEP_TIMEOUT,
+    });
+
+    // 9. 360px-width pass: reload the detail narrow, assert no page
+    // horizontal overflow, the NPC section + search visible and usable
+    // (type in search, assert narrowing), and axe-clean at 360.
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto(campaignUrl);
+    await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
+    await expect(page.getByRole("heading", { name: "Monsters & NPCs" })).toBeVisible({ timeout: STEP_TIMEOUT });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(
+      true,
+    );
+    const narrowSection = page.getByRole("region", { name: "Monsters & NPCs" });
+    const narrowSearch = page.getByLabel(/search monsters & npcs/i);
+    await expect(narrowSearch).toBeVisible({ timeout: STEP_TIMEOUT });
+    await narrowSearch.fill("gob");
+    await expect(narrowSection.getByRole("button", { name: `Open ${goblinName}`, exact: true })).toBeVisible({
+      timeout: STEP_TIMEOUT,
+    });
+    await narrowSearch.fill("zzz");
+    await expect(page.getByText("No monsters or NPCs match.")).toBeVisible({ timeout: STEP_TIMEOUT });
+    await expect(narrowSection.getByRole("button", { name: `Open ${goblinName}`, exact: true })).toHaveCount(0);
+    await narrowSearch.fill("");
+    await expect(narrowSection.getByRole("button", { name: `Open ${goblinName}`, exact: true })).toBeVisible({
+      timeout: STEP_TIMEOUT,
+    });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(
+      true,
+    );
+    const narrowAxe = await new AxeBuilder({ page }).analyze();
+    expect(narrowAxe.violations.filter((v) => v.impact === "serious" || v.impact === "critical")).toEqual(
+      [],
+    );
   } finally {
     await gmContext.close();
   }

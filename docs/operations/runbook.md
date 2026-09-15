@@ -226,12 +226,20 @@ because they constrain the procedure:
    `error: database "sweetroll_hard_runbook_gone" does not exist`
    (FATAL 3D000) before `app.listen`. No endpoint to probe.
 2. `DROP DATABASE sweetroll_hard_runbook WITH (FORCE)` from under a
-   running backend kills the backend process instead of yielding 503:
-   the pool (`src/platform/database.ts`, no `pool.on("error")` handler)
-   crashes node on the terminated idle-client error, so the port closes
-   (`Failed to connect ... port 3115`, curl exit 7). DB-down manifests
-   as backend-down in that case — follow Drill 1, then the postgres
-   procedure in section (c).
+   running backend originally killed the backend process instead of
+   yielding 503: the pool (`src/platform/database.ts`, then with no
+   `pool.on("error")` handler) crashed node on the terminated idle-client
+   error, so the port closed (`Failed to connect ... port 3115`, curl
+   exit 7). FIXED 2026-09-15 (commit `fix(i7): survive abrupt DB loss via
+   pool error listener`): `createPool` now attaches a `pool.on("error")`
+   listener that logs (`postgres pool idle client error`, level 50, no
+   credentials in the record) and lets pg reap the dead client, so the
+   process survives and readiness reports 503. Re-exercised the same
+   FORCE-drop at 05:18:57Z: backend stayed alive and `/health/ready`
+   returned 503 `{"status":"unavailable"}` with exactly one
+   `postgres pool idle client error` line in the backend log. No retry or
+   backoff policy was added (out of scope) — pg dials fresh connections
+   on demand, so recovery after the database returns needs no restart.
 
 Exercised equivalent (05:15:25–05:15:32Z): backend on the live scratch DB
 in the worktree's own compose postgres, then the database frozen with
@@ -283,6 +291,39 @@ returning 200.
   `docs/operations/slo.md`), and no disk pressure was induced. Their
   detect/correlate steps reference real endpoints (`/metrics` buckets,
   `df` + log filters) but were not executed end-to-end.
-- The FORCE-drop crash in attempt 2 above (pool without an `error`
-  handler) is a robustness finding for a future task, not fixed here
-  (docs-only task, no product changes).
+
+### Fix verification (2026-09-15 ~05:18–05:19Z, same scratch pattern)
+
+Re-ran the abrupt-loss paths after the pool `error`-listener fix, backend
+on PORT=3115 against scratch DB `sweetroll_hard_runbook` in the worktree's
+own compose postgres (created + migrated, `ready HTTP 200` at start):
+
+```bash
+$ docker pause i7-hardening-postgres-1    # 2026-09-15T05:18:45Z
+$ time curl -s -w "\nready HTTP %{http_code}\n" http://localhost:3115/health/ready
+{"status":"unavailable"}
+ready HTTP 503
+real  0m0.262s
+# backend child process still alive (no crash)
+$ docker unpause i7-hardening-postgres-1  # 2026-09-15T05:18:49Z
+$ curl -s -w "\nready HTTP %{http_code}\n" http://localhost:3115/health/ready
+{"status":"ok"}
+ready HTTP 200
+$ docker exec i7-hardening-postgres-1 psql -U sweetroll -d postgres \
+    -c "DROP DATABASE sweetroll_hard_runbook WITH (FORCE);"  # 05:18:57Z
+DROP DATABASE
+$ curl -s -w "\nready HTTP %{http_code}\n" http://localhost:3115/health/ready
+{"status":"unavailable"}
+ready HTTP 503
+# backend child process still alive; backend log holds exactly one
+# {"level":50,...,"msg":"postgres pool idle client error"} line
+# (err: "terminating connection due to administrator command", no credentials)
+```
+
+Outcome: pause → 503 (not crash), unpause → 200, FORCE-drop → sustained
+503 with the process alive — the pre-fix crash is gone. Cleanup verified:
+scratch backend PIDs killed, port 3115 closed, no `sweetroll_hard_*` DBs
+left in either postgres, all containers healthy, dev servers on 3000/5173
+returning 200. Unit evidence: `npx vitest run
+src/platform/database.test.ts` 2 passed (red-first: the new idle-client
+test failed with `Error: boom` before the fix), `npm run typecheck` clean.

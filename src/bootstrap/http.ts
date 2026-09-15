@@ -25,7 +25,7 @@ import {
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel);
-const pool = createPool(config.databaseUrl);
+const pool = createPool(config.databaseUrl, logger);
 
 // Reference template fixtures are global rows (NULL owner, link) used by
 // CloneFromTemplate. They are inserted by migration 0008 and/or this seed call

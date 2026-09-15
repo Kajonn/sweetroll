@@ -168,4 +168,34 @@ describe("CampaignDetail session tab", () => {
     expect(client.getQueryData(invitationsKey)).toBeUndefined();
     expect(client.getQueryData(otherSessionKey)).toBeDefined();
   });
+
+  it("invalidates the campaign list on leave so the left campaign disappears", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    function LeaveWrapper({ children }: { children: ReactNode }) {
+      return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    }
+    const onLeft = vi.fn();
+    const api = {
+      openCampaign: vi.fn().mockResolvedValue({ campaign, requestId: "r" }),
+      listMembers: vi.fn().mockResolvedValue({
+        members: [
+          { campaignId: "c1", userId: "u1", role: "owner", status: "active", generation: 1, createdAt: "2026-09-01T00:00:00Z", updatedAt: "2026-09-01T00:00:00Z" },
+        ],
+        nextCursor: null, requestId: "r2",
+      }),
+      listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r3" }),
+      listActivity: vi.fn().mockResolvedValue({ events: [], nextCursor: null, requestId: "r4" }),
+      listCampaignCharacters: vi.fn().mockResolvedValue({ characters: [], nextCursor: null, requestId: "r5" }),
+      leaveCampaign: vi.fn().mockResolvedValue({ requestId: "r6" }),
+    };
+    render(<CampaignDetail api={api as never} campaignId="c1" actorId="u1" onLeft={onLeft} />, {
+      wrapper: LeaveWrapper,
+    });
+    await screen.findByText("North Watch");
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    fireEvent.click(screen.getByRole("button", { name: /^leave campaign$/i }));
+    fireEvent.click((await screen.findAllByRole("button", { name: /^leave campaign$/i })).at(-1)!);
+    await vi.waitFor(() => expect(onLeft).toHaveBeenCalled());
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["campaigns", "list"] });
+  });
 });

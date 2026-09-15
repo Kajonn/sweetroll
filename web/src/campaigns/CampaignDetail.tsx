@@ -188,6 +188,9 @@ export function CampaignDetail(props: {
       queryClient.removeQueries({ queryKey: ["campaigns", "members", props.campaignId] });
       queryClient.removeQueries({ queryKey: ["campaigns", "session", props.campaignId] });
       queryClient.removeQueries({ queryKey: ["campaigns", "invitations", props.campaignId] });
+      // Like the revocation path above: the account list is invalidated (not
+      // purged) so it reloads without the left campaign.
+      void queryClient.invalidateQueries({ queryKey: ["campaigns", "list"] });
       props.onLeft();
     } catch (cause) {
       if (isConflict(cause)) {

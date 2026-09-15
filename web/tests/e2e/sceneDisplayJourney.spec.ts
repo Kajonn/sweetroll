@@ -206,7 +206,7 @@ test("I7b exit: restricted scene display shows only revealed areas and visible t
     const displayContext = await browser.newContext({ baseURL: origin });
     const seenRequests: string[] = [];
     const seenResponses: { url: string; status: number }[] = [];
-    const projectionBodies: string[] = [];
+    const projectionTextReads: Promise<string>[] = [];
     try {
       const displayPage = await displayContext.newPage();
       displayPage.on("request", (request) => {
@@ -216,9 +216,7 @@ test("I7b exit: restricted scene display shows only revealed areas and visible t
         if (!response.url().startsWith(origin)) return;
         seenResponses.push({ url: response.url(), status: response.status() });
         if (response.url().includes("/projection")) {
-          void response.text().then((text) => {
-            projectionBodies.push(text);
-          });
+          projectionTextReads.push(response.text());
         }
       });
 
@@ -244,6 +242,10 @@ test("I7b exit: restricted scene display shows only revealed areas and visible t
       for (const path of gmPaths) {
         expect(seenRequests.filter((url) => url.includes(path)), `display fetched GM path ${path}`).toEqual([]);
       }
+      // Await the settled response texts before asserting: the handler
+      // above only queues the reads, so asserting on the array directly
+      // would race the body promises.
+      const projectionBodies = await Promise.all(projectionTextReads);
       expect(projectionBodies.length).toBeGreaterThan(0);
       for (const body of projectionBodies) {
         expect(body).not.toContain("Ghost");

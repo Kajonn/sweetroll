@@ -138,13 +138,16 @@ test("I7 exit: GM setup through UI, invitations, accept, promote, remove, unavai
     await expect(page).toHaveURL(`/campaigns/${campaignId}`);
     await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
 
-    // 4. Members tab as the owner: roster plus GM-gated management
-    // sections; the pinned version shows the seeded clone.
+    // 4. Members tab as the owner: roster plus GM-gated invitation
+    // management; settings live in the GM-only Settings tab.
     await page.getByRole("tab", { name: "Members" }).click({ timeout: STEP_TIMEOUT });
-    await expect(page.getByText("Campaign settings")).toBeVisible({ timeout: STEP_TIMEOUT });
     await expect(page.getByRole("heading", { name: "Invitations" })).toBeVisible({ timeout: STEP_TIMEOUT });
+    await expect(page.getByText("Campaign settings")).toHaveCount(0);
+    await page.getByRole("tab", { name: "Settings" }).click({ timeout: STEP_TIMEOUT });
+    await expect(page.getByText("Campaign settings")).toBeVisible({ timeout: STEP_TIMEOUT });
     await expect(page.getByText("Pinned system version")).toBeVisible({ timeout: STEP_TIMEOUT });
     await expect(page.getByText(ownedVersionId)).toBeVisible({ timeout: STEP_TIMEOUT });
+    await page.getByRole("tab", { name: "Members" }).click({ timeout: STEP_TIMEOUT });
 
     // 5. Issue a player invitation: token shown once, then gone.
     await page.getByRole("button", { name: "Issue invitation" }).click({ timeout: STEP_TIMEOUT });
@@ -190,6 +193,7 @@ test("I7 exit: GM setup through UI, invitations, accept, promote, remove, unavai
       await inviteePage.getByRole("tab", { name: "Members" }).click({ timeout: STEP_TIMEOUT });
       await expect(inviteePage.getByText(inviteeUserId!)).toBeVisible({ timeout: STEP_TIMEOUT });
       await expect(inviteePage.getByText("Campaign settings")).toHaveCount(0);
+      await expect(inviteePage.getByRole("tab", { name: "Settings" })).toHaveCount(0);
       await expect(inviteePage.getByRole("heading", { name: "Invitations" })).toHaveCount(0);
 
       // 10. GM promotes the member to co-GM behind the confirm dialog.

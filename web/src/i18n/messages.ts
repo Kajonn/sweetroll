@@ -677,6 +677,7 @@ export const defaultMessages: MessageTable = {
   "campaign.detail.tabs.content": "Content",
   "campaign.detail.tabs.activity": "Activity",
   "campaign.detail.tabs.session": "Session",
+  "campaign.detail.tabs.settings": "Settings",
   "campaign.detail.characters.loading": "Loading characters…",
   "campaign.detail.characters.loadFailed": "Characters could not be loaded.",
   "campaign.detail.characters.listAriaLabel": "Campaign characters",

@@ -11,7 +11,7 @@ import { uid } from "../offline/test-auth.js";
  * Covers the campaign/GM/display routes that had no axe/keyboard/overflow
  * browser coverage (library + character sheets already had it): the
  * /campaigns list, the campaign detail Characters / Content / Session /
- * Members tabs, the campaign settings display-pairing section, and the
+ * Members / Settings tabs, the campaign settings display-pairing section, and the
  * /display code-entry — each at 360 and 1280 px width in light mode, plus
  * one 360 px dark-mode pass. Per surface: no horizontal overflow, zero
  * serious/critical axe violations, and one primary control driven by
@@ -196,9 +196,9 @@ async function seedCharacterViaApi(page: Page, campaignId: string, name: string)
   return characterId;
 }
 
-/** Pair a display through the Members-tab settings UI; returns the code. */
+/** Pair a display through the Settings-tab settings UI; returns the code. */
 async function pairDisplayViaUi(page: Page, campaignTitle: string): Promise<string> {
-  await page.getByRole("tab", { name: "Members" }).click({ timeout: STEP_TIMEOUT });
+  await page.getByRole("tab", { name: "Settings" }).click({ timeout: STEP_TIMEOUT });
   await page.getByRole("button", { name: "Pair display", exact: true }).click({ timeout: STEP_TIMEOUT });
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Share this display code now")).toBeVisible({ timeout: STEP_TIMEOUT });
@@ -404,7 +404,7 @@ test.describe("campaign accessibility", () => {
       const { versionLabel, versionIndex } = await cloneD20ViaUi(page);
       await createCampaignViaUi(page, versionLabel, versionIndex, campaignTitle);
 
-      await page.getByRole("tab", { name: "Members" }).click({ timeout: STEP_TIMEOUT });
+      await page.getByRole("tab", { name: "Settings" }).click({ timeout: STEP_TIMEOUT });
       const pair = page.getByRole("button", { name: "Pair display", exact: true });
       await expect(pair).toBeVisible({ timeout: STEP_TIMEOUT });
 

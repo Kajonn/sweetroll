@@ -188,11 +188,11 @@ test("I7b exit: restricted scene display shows only revealed areas and visible t
     await expect(page.getByRole("img", { name: "Scene background" })).toBeVisible({ timeout: STEP_TIMEOUT });
     await placeToken(page, "Ghost", "0.75", "0.25", false);
 
-    // 3. GM pairs a display through Campaign settings (Members tab): the
+    // 3. GM pairs a display through Campaign settings (Settings tab): the
     // code dialog shows the single-use code once; Dismiss closes it.
     await page.goto(`/campaigns/${campaignId}`);
     await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
-    await page.getByRole("tab", { name: "Members" }).click({ timeout: STEP_TIMEOUT });
+    await page.getByRole("tab", { name: "Settings" }).click({ timeout: STEP_TIMEOUT });
     await page.getByRole("button", { name: "Pair display", exact: true }).click({ timeout: STEP_TIMEOUT });
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText("Share this display code now")).toBeVisible({ timeout: STEP_TIMEOUT });
@@ -317,7 +317,7 @@ test("I7b exit: restricted scene display shows only revealed areas and visible t
       // blanks on poll (no frozen frame) with a disconnect affordance.
       await page.goto(`/campaigns/${campaignId}`);
       await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
-      await page.getByRole("tab", { name: "Members" }).click({ timeout: STEP_TIMEOUT });
+      await page.getByRole("tab", { name: "Settings" }).click({ timeout: STEP_TIMEOUT });
       await page.getByRole("button", { name: "Revoke", exact: true }).click({ timeout: STEP_TIMEOUT });
       await expect(page.getByText("Display revoked.")).toBeVisible({ timeout: STEP_TIMEOUT });
 

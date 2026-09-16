@@ -16,7 +16,7 @@ import { uid } from "../offline/test-auth.js";
  * surfaces as a per-character preview warning without requiring explicit
  * mappings (every valued field is sheet-bound, so nothing is ever dropped).
  * Immediately after publishing, both campaigns still read the old pin.
- * Campaign A: Members tab → Campaign settings → Upgrade campaign → the new
+ * Campaign A: Settings tab → Campaign settings → Upgrade campaign → the new
  * version is discovered in the target list → preview shows the before/after
  * pin plus the per-character warning → a second GM context (co-GM) bumps the
  * campaign so the first commit goes stale (409) → the dialog reports the
@@ -331,7 +331,7 @@ test("G7 exit: publish newer version via creator UI, upgrade campaign A with sta
       });
       await gm2Page.close();
 
-      // 7. Campaign A: Members tab → Campaign settings → Upgrade campaign.
+      // 7. Campaign A: Settings tab → Campaign settings → Upgrade campaign.
       // The 2.0.0 target is discovered from the same creation-versions
       // catalog the dialog reads.
       const catalog = await getJson(gmContext.request, "/api/characters/creation-versions?limit=25");
@@ -344,7 +344,7 @@ test("G7 exit: publish newer version via creator UI, upgrade campaign A with sta
       await expect(page.getByRole("heading", { name: campaignTitleA })).toBeVisible({
         timeout: STEP_TIMEOUT,
       });
-      await page.getByRole("tab", { name: "Members" }).click({ timeout: STEP_TIMEOUT });
+      await page.getByRole("tab", { name: "Settings" }).click({ timeout: STEP_TIMEOUT });
       await expect(page.getByText("Campaign settings")).toBeVisible({ timeout: STEP_TIMEOUT });
       await page.getByRole("button", { name: "Upgrade campaign", exact: true }).click({
         timeout: STEP_TIMEOUT,

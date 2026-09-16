@@ -51,7 +51,6 @@ function hasSessionCharacterSurface(value: unknown): value is SessionBoardProps[
 
 function MembersManageSection(props: {
   api: CampaignsApi;
-  versionsApi?: Pick<CharactersApi, "listCreationVersions"> | undefined;
   campaignId: string;
   actorId: string;
   campaign: CampaignView;
@@ -74,27 +73,15 @@ function MembersManageSection(props: {
         onAccessRevoked={props.onAccessRevoked}
       />
       {props.isGm ? (
-        <>
-          <CampaignSettingsView
-            api={props.api}
-            versionsApi={props.versionsApi}
-            campaign={props.campaign}
-            actorId={props.actorId}
-            generation={props.generation}
-            online={props.online}
-            isGm={props.isGm}
-            onChanged={props.onChanged}
-          />
-          <InvitationManager
-            api={props.api}
-            campaignId={props.campaignId}
-            campaignRevision={props.campaign.revision}
-            actorId={props.actorId}
-            generation={props.generation}
-            online={props.online}
-            onChanged={props.onChanged}
-          />
-        </>
+        <InvitationManager
+          api={props.api}
+          campaignId={props.campaignId}
+          campaignRevision={props.campaign.revision}
+          actorId={props.actorId}
+          generation={props.generation}
+          online={props.online}
+          onChanged={props.onChanged}
+        />
       ) : null}
     </>
   );
@@ -316,7 +303,6 @@ export function CampaignDetail(props: {
             content: (
               <MembersManageSection
                 api={props.api}
-                versionsApi={props.versionsApi}
                 campaignId={props.campaignId}
                 actorId={props.actorId}
                 campaign={campaign}
@@ -375,6 +361,22 @@ export function CampaignDetail(props: {
                     />
                   ) : (
                     <EmptyState title={t("campaign.detail.session.loadFailed")} />
+                  ),
+                },
+                {
+                  id: "settings",
+                  label: t("campaign.detail.tabs.settings"),
+                  content: (
+                    <CampaignSettingsView
+                      api={props.api}
+                      versionsApi={props.versionsApi}
+                      campaign={campaign}
+                      actorId={props.actorId}
+                      generation={generation}
+                      online={online}
+                      isGm={isGm}
+                      onChanged={() => void detail.refetch()}
+                    />
                   ),
                 },
               ]

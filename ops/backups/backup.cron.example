@@ -1,0 +1,6 @@
+# Sweetroll scheduled backups — RPO <= 15 min requires <= 10 min cadence.
+# Install with `crontab -e` on the backup host (NOT in CI). Example-only until
+# a production host exists; the hardening drill used manual runs.
+# Every 10 minutes: timestamped backup + retention (keep newest 144 = 24h).
+SHELL=/bin/bash
+*/10 * * * * cd /opt/sweetroll && ./scripts/backup.sh "/var/backups/sweetroll/backup-$(date -u +\%Y\%m\%dT\%H\%M\%SZ)" >>/var/log/sweetroll-backup.log 2>&1 && ./scripts/backup-prune.sh /var/backups/sweetroll 144 >>/var/log/sweetroll-backup.log 2>&1

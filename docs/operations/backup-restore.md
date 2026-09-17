@@ -131,6 +131,59 @@ Small-volume caveat: the drilled database held migrations + seeds only
 (3 systems / 3 versions, all other tables empty), so the ≈ 1 s timings
 prove the procedure, not production-scale backup/restore throughput. Re-run
 the drill on a production-like volume before quoting RTO numbers externally.
+(This caveat is superseded by the 2026-09-17 volume drill numbers below.)
+
+## Scheduled backups and retention (2026-09-17)
+
+Schedule: `ops/backups/backup.cron.example` runs `scripts/backup.sh` with a
+UTC-timestamped output dir every 10 minutes on the backup host (installed via
+`crontab -e`, NOT in CI; example-only until a production host exists). RPO
+math: backup every 10 min ⇒ worst-case data loss ≤ 10 min < 15 min design
+§15 target, so the cadence satisfies RPO ≤ 15 min once installed.
+
+Retention: each cron run pipes into `scripts/backup-prune.sh
+/var/backups/sweetroll 144` — keep the newest 144 timestamped `backup-*`
+dirs (144 × 10 min = 24 h). The prune script refuses roots inside `<repo>/data`
+and only deletes dirs matching `backup-*[0-9]`; `--dry-run` prints `would
+remove …` without deleting (self-check: 3 fixture dirs with KEEP=2 printed
+`would remove …/backup-0001`, exit 0, nothing deleted).
+
+Production-volume re-drill (2026-09-17, worktree compose project
+`i7-hardening-remainder`, postgres:17-alpine): seeded 20 campaigns × 50
+characters = 1000 characters with `scripts/seed-volume-fixture.ts`
+(deterministic `vol-drill-` names) into scratch `sweetroll_drill_volume`
+(created via `docker compose exec`, migrated with `npm run migrate` first so
+the schema exists). Host port 5432 belongs to an unrelated postgres
+(main-repo `sweetroll-postgres-1`), so the stack ran with an out-of-repo
+compose override publishing `127.0.0.1:5439:5432`; all SQL went through
+`docker compose exec`, and the seeder's `TEST_DATABASE_URL` used
+`localhost:5439` (own container). The seeder guard refused a dev-`sweetroll`
+URL (exit 1) before the drill.
+
+- Backup: `scripts/backup.sh /tmp/opencode/drill-volume` (dev `sweetroll`
+  source, by construction) → exit 0, wall-clock 0.85 s, `sweetroll.dump`
+  101157 bytes, media skipped (`data/media` absent). Volume dump of the
+  drill DB with `backup.sh`'s identical `pg_dump -Fc` method
+  (`docker compose exec -T postgres pg_dump -U sweetroll -Fc
+  sweetroll_drill_volume`) → `sweetroll-volume.dump` 141996 bytes,
+  wall-clock 0.42 s.
+- Restore: `pg_restore --clean --if-exists` into
+  `sweetroll_drill_volume_restore` → exit 0, wall-clock 0.85 s.
+- Verification: `characters` 1000/1000, `campaigns` 20/20, `migrations_max`
+  identical (`0020_display_credentials.sql`) on source and restore.
+- Cleanup: both scratch databases dropped (no `sweetroll_drill_*` remain),
+  `/tmp/drill-volume.dump` removed from the container, host drill dir
+  removed, dev `sweetroll` confirmed intact afterwards (0 characters).
+
+Seeder deviations from the brief's verbatim SQL (actual schema):
+`campaigns` has no `settings_json` and requires `title` (used
+`vol-drill-<c>`); `characters` has `campaign_id` only under the attached
+ownership scope (`owner_id` NULL) plus required `system_version_id`,
+`entity_definition_id` (`'vol-drill'`), and `name`; `system_versions` PK is
+`id`, not `version_id`. Drill-DB setup likewise added one step the brief
+omitted: `CREATE DATABASE` yields an unmigrated DB, so the scratch DB was
+migrated with the repo's own `npm run migrate` entrypoint before seeding
+(scratch-only; dev migration state unchanged).
 
 ## RPO / RTO assessment (against design §15)
 

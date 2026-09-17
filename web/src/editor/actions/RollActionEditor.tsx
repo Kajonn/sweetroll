@@ -39,7 +39,11 @@ export type RollActionEditorProps = {
   /**
    * Guided (basics-first) mode for the dice tab: hides the grammar surfaces
    * (expression-id input + ExpressionEditor) and shows a dice-kind picker
-   * instead. The full expression source stays editable in Advanced.
+   * instead. Custom sources stay editable inline via the ExpressionEditor.
+   * Picking "custom" opens the inline editor on the current source without
+   * persisting anything, so a new roll action can grow a custom formula;
+   * picking a canned kind afterwards closes it and persists that kind.
+   * Canned sources stay editable in Advanced.
    */
   guided?: boolean | undefined;
   diceKind?: string | undefined;
@@ -123,6 +127,10 @@ export function RollActionEditor({
   onDiceKindChange,
 }: RollActionEditorProps) {
   const [tryItResult, setTryItResult] = useState<ReturnType<typeof evaluateRoll> | null>(null);
+  // Local custom-edit mode: picking "custom" reveals the inline formula
+  // editor on the current source without persisting anything. It clears
+  // when a canned kind is picked (which persists that kind instead).
+  const [customEditing, setCustomEditing] = useState(false);
 
   const inputTypes = useMemo<Record<string, ValueType>>(() => {
     const out: Record<string, ValueType> = {};
@@ -192,7 +200,14 @@ export function RollActionEditor({
               label={t("editor.action.roll.diceKind")}
               id={`dice-kind-${action.id}`}
               value={diceKind ?? "custom"}
-              onChange={(e) => onDiceKindChange?.(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value === "custom") {
+                  setCustomEditing(true);
+                  return;
+                }
+                setCustomEditing(false);
+                onDiceKindChange?.(e.target.value);
+              }}
               data-testid={`dice-kind-${action.id}`}
               disabled={disabled}
               title={t("editor.action.roll.diceKind.hint")}
@@ -217,7 +232,7 @@ export function RollActionEditor({
           </div>
         )}
       </div>
-      {guided === true ? null : (
+      {guided !== true || diceKind === "custom" || customEditing ? (
         <ExpressionEditor
           client={client}
           systemId={systemId}
@@ -225,7 +240,7 @@ export function RollActionEditor({
           onSourceChange={onExpressionSourceChange}
           disabled={disabled === true}
         />
-      )}
+      ) : null}
       <div className={styles.row}>
         <div className={styles.field}>
           <FormField label={t("editor.action.roll.outputTemplate")}>

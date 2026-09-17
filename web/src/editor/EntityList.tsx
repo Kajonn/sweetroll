@@ -7,6 +7,7 @@ import { Button, EmptyState, FormField, Select } from "../ui/index.js";
 
 import { BooleanFieldEditor } from "./fields/BooleanFieldEditor.js";
 import { ChoiceFieldEditor } from "./fields/ChoiceFieldEditor.js";
+import { ComputedFieldEditor } from "./fields/ComputedFieldEditor.js";
 import { ImageFieldEditor } from "./fields/ImageFieldEditor.js";
 import { ResourceFieldEditor } from "./fields/ResourceFieldEditor.js";
 import { ScalarFieldEditor } from "./fields/ScalarFieldEditor.js";
@@ -24,6 +25,13 @@ export type EntityListProps = {
   onChange: (next: EntityListEntity[]) => void;
   selectedEntityId: string | null;
   onSelectEntity: (id: string | null) => void;
+  /** Expression source by expression id (lives in document.expressions). When
+   * provided, computed fields render the formula editor; otherwise they
+   * render the preserved notice. */
+  expressionSourceFor?: ((expressionId: string) => string) | undefined;
+  expressionFallbackFor?: ((expressionId: string) => unknown) | undefined;
+  onExpressionSourceChange?: ((expressionId: string, next: string) => void) | undefined;
+  onExpressionFallbackChange?: ((expressionId: string, next: unknown) => void) | undefined;
 };
 
 function nextEntityId(existing: EntityListEntity[]): string {
@@ -136,9 +144,19 @@ export function defaultField(kind: FieldV1["kind"]): FieldV1 {
 function FieldEditorRouter({
   field,
   onChange,
+  siblings,
+  expressionSourceFor,
+  expressionFallbackFor,
+  onExpressionSourceChange,
+  onExpressionFallbackChange,
 }: {
   field: FieldV1;
   onChange: (next: FieldV1) => void;
+  siblings: ReadonlyArray<{ id: string; valueType: "number" | "text" | "boolean" }>;
+  expressionSourceFor?: ((expressionId: string) => string) | undefined;
+  expressionFallbackFor?: ((expressionId: string) => unknown) | undefined;
+  onExpressionSourceChange?: ((expressionId: string, next: string) => void) | undefined;
+  onExpressionFallbackChange?: ((expressionId: string, next: unknown) => void) | undefined;
 }) {
   switch (field.kind) {
     case "text":
@@ -155,18 +173,31 @@ function FieldEditorRouter({
     case "resource":
       return <ResourceFieldEditor field={field} onChange={onChange} />;
     case "computed":
+      if (expressionSourceFor === undefined) {
+        return (
+          <div className={styles.unsupported} data-testid={`field-unsupported-${field.id}`}>
+            <span data-testid={`field-unsupported-summary-${field.id}`}>
+              {field.label} ({t(`editor.fields.kind.${field.kind}`)})
+            </span>{" "}
+            <span>
+              {t("editor.entity.unsupportedPreserved", {
+                label: field.label,
+                kind: t(`editor.fields.kind.${field.kind}`),
+              })}
+            </span>
+          </div>
+        );
+      }
       return (
-        <div className={styles.unsupported} data-testid={`field-unsupported-${field.id}`}>
-          <span data-testid={`field-unsupported-summary-${field.id}`}>
-            {field.label} ({t(`editor.fields.kind.${field.kind}`)})
-          </span>{" "}
-          <span>
-            {t("editor.entity.unsupportedPreserved", {
-              label: field.label,
-              kind: t(`editor.fields.kind.${field.kind}`),
-            })}
-          </span>
-        </div>
+        <ComputedFieldEditor
+          field={field}
+          onChange={onChange}
+          expressionSource={expressionSourceFor(field.expressionId)}
+          onExpressionSourceChange={(next) => onExpressionSourceChange?.(field.expressionId, next)}
+          fallback={expressionFallbackFor?.(field.expressionId)}
+          onFallbackChange={(next) => onExpressionFallbackChange?.(field.expressionId, next)}
+          siblingFields={siblings.filter((s) => s.id !== field.id)}
+        />
       );
   }
 }
@@ -176,6 +207,10 @@ export function EntityList({
   onChange,
   selectedEntityId,
   onSelectEntity,
+  expressionSourceFor,
+  expressionFallbackFor,
+  onExpressionSourceChange,
+  onExpressionFallbackChange,
 }: EntityListProps) {
   const selected = entities.find((e) => e.id === selectedEntityId) ?? null;
   const replaceEntity = (id: string, patch: Partial<EntityListEntity>) => {
@@ -274,6 +309,10 @@ export function EntityList({
             onFieldChange={(field) => replaceField(selected.id, field)}
             onAddField={(kind) => addField(selected.id, kind)}
             onRemove={(id) => removeEntity(id)}
+            expressionSourceFor={expressionSourceFor}
+            expressionFallbackFor={expressionFallbackFor}
+            onExpressionSourceChange={onExpressionSourceChange}
+            onExpressionFallbackChange={onExpressionFallbackChange}
           />
         )}
       </section>
@@ -287,17 +326,48 @@ function EntityDetail({
   onFieldChange,
   onAddField,
   onRemove,
+  expressionSourceFor,
+  expressionFallbackFor,
+  onExpressionSourceChange,
+  onExpressionFallbackChange,
 }: {
   entity: EntityListEntity;
   onChange: (patch: Partial<EntityListEntity>) => void;
   onFieldChange: (field: FieldV1) => void;
   onAddField: (kind: FieldV1["kind"]) => void;
   onRemove: (id: string) => void;
+  expressionSourceFor?: ((expressionId: string) => string) | undefined;
+  expressionFallbackFor?: ((expressionId: string) => unknown) | undefined;
+  onExpressionSourceChange?: ((expressionId: string, next: string) => void) | undefined;
+  onExpressionFallbackChange?: ((expressionId: string, next: unknown) => void) | undefined;
 }) {
   // Guided kind picker for the add-field flow: defaults to text so the
   // simple path never asks for grammar, with number/choice/resource
   // reachable without leaving basics.
   const [fieldKind, setFieldKind] = useState<FieldV1["kind"]>("text");
+  // Sibling fields available for formula references (fields.<id>), typed
+  // for the expression environment.
+  type Sibling = { id: string; valueType: "number" | "text" | "boolean" };
+  const siblings: Sibling[] = [];
+  for (const f of entity.fields) {
+    switch (f.kind) {
+      case "integer":
+      case "decimal":
+      case "resource":
+        siblings.push({ id: f.id, valueType: "number" });
+        break;
+      case "boolean":
+        siblings.push({ id: f.id, valueType: "boolean" });
+        break;
+      case "text":
+      case "singleChoice":
+      case "multiChoice":
+        siblings.push({ id: f.id, valueType: "text" });
+        break;
+      default:
+        break;
+    }
+  }
   return (
     <div className={styles.detailInner}>
       <header className={styles.detailHeader}>
@@ -365,7 +435,15 @@ function EntityDetail({
               <div className={styles.fieldHeader}>
                 <span className={styles.fieldKind}>{t(`editor.fields.kind.${field.kind}`)}</span>
               </div>
-              <FieldEditorRouter field={field} onChange={onFieldChange} />
+              <FieldEditorRouter
+                field={field}
+                onChange={onFieldChange}
+                siblings={siblings}
+                expressionSourceFor={expressionSourceFor}
+                expressionFallbackFor={expressionFallbackFor}
+                onExpressionSourceChange={onExpressionSourceChange}
+                onExpressionFallbackChange={onExpressionFallbackChange}
+              />
             </div>
           ))}
         </div>

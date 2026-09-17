@@ -284,3 +284,75 @@ test("editing a published reference system preserves its advanced definitions", 
   expect(JSON.stringify(docAfter.validations)).toBe(before.validations);
   expect(docAfter.metadata.description).toContain(probeText);
 });
+
+test("editing a cloned reference computed field updates its expression end to end", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+
+  // Clone d20; find the entity holding the Defense computed field.
+  await signIn(page);
+  await page.getByTestId("clone-from-template-d20").click();
+  await expect(page).toHaveURL(/\/systems\/[0-9a-f-]+/);
+  const systemId = page.url().split("/").pop() ?? "";
+  createdSystemIds.push(systemId);
+  await expect(page.getByTestId("document-editor-header")).toBeVisible();
+
+  const openBefore = await (await page.request.get(`/api/systems/${systemId}`)).json();
+  const docBefore = openBefore.workspace.draft.document;
+  const defenseEntity = docBefore.entities.find((e: { fields: { id: string }[] }) =>
+    e.fields.some((f: { id: string }) => f.id === "defense"),
+  );
+  expect(defenseEntity).toBeDefined();
+  const entityId = defenseEntity.id as string;
+
+  // Attributes tab: the Defense formula editor shows the cloned source with
+  // a live sample preview (modifier defaults to 0, so 10 + 0).
+  await page.getByTestId("document-editor-tab-attributes").click();
+  await page.getByTestId(`entity-row-${entityId}-select`).click();
+  await expect(page.getByTestId("computed-field-defense")).toBeVisible();
+  await expect(page.getByTestId("computed-field-source-defense")).toHaveValue(
+    "10 + fields.modifier",
+  );
+  await expect(page.getByTestId("computed-field-preview-value-defense")).toHaveText("10");
+
+  // Change the formula, blur to commit, and expect the draft PUT to carry it.
+  const saved = waitForDraftPut(page, "12 + fields.modifier");
+  await page.getByTestId("computed-field-source-defense").fill("12 + fields.modifier");
+  await page.keyboard.press("Tab");
+  await saved;
+  await expect(page.getByTestId("computed-field-preview-value-defense")).toHaveText("12");
+
+  // The draft expression entry is updated; everything else is untouched.
+  const openAfter = await (await page.request.get(`/api/systems/${systemId}`)).json();
+  const docAfter = openAfter.workspace.draft.document;
+  const defenseExpr = docAfter.expressions.find((e: { id: string }) => e.id === "defense_expr");
+  expect(defenseExpr.source).toBe("12 + fields.modifier");
+  expect(docAfter.expressions).toHaveLength(docBefore.expressions.length);
+
+  // Advanced tab: the expression entry is named and points back at Defense.
+  await page.getByTestId("document-editor-tab-advanced").click();
+  await page.getByTestId("advanced-disclosure-toggle").click();
+  await expect(page.getByTestId("expression-entry-title-defense_expr")).toHaveText("defense_expr");
+  await expect(page.getByTestId("expression-used-by-defense_expr")).toContainText("Defense");
+
+  // Publish and prove the exported package carries the edited formula.
+  await page.getByTestId("document-editor-publish").click();
+  await expect(page.getByTestId("publish-dialog")).toBeVisible();
+  await page.getByTestId("publish-dialog-semver").fill("1.0.0");
+  await page.getByTestId("publish-dialog-release-notes").fill("Defense formula edit.");
+  await page.getByTestId("publish-dialog-submit").click();
+  await expect(page.getByTestId("publish-dialog-success")).toBeVisible();
+  await page.getByTestId("publish-dialog-close").click();
+  const versionsBody = await (await page.request.get(`/api/systems/${systemId}/versions`)).json();
+  const publishedVersionId = versionsBody.versions[0].versionId as string;
+  const exportRes = await page.request.get(`/api/system-versions/${publishedVersionId}/export`);
+  expect(exportRes.ok()).toBe(true);
+  const exportJson = await exportRes.json();
+  // Published packages carry compiled expressions (ast), not source text:
+  // the edited constant 12 must appear where 10 used to be.
+  const exported = exportJson.package.expressions.find((e: { id: string }) => e.id === "defense_expr");
+  const astJson = JSON.stringify(exported.ast);
+  expect(astJson).toContain('"value":12');
+  expect(astJson).not.toContain('"value":10');
+});

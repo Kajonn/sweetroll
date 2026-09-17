@@ -1,6 +1,9 @@
-import { useEffect, useState, type Dispatch } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch } from "react";
 
+import { evaluateExpression } from "../../ports/evaluateExpression.js";
+import type { ScalarValue, ValueType } from "../../ports/evaluateExpression.js";
 import { t } from "../../i18n/index.js";
+import { Button } from "../../ui/index.js";
 import {
   tokenizeExpression,
   type ExpressionDiagnostic,
@@ -41,6 +44,8 @@ export type ComputedFieldEditorProps = {
    */
   document?: SystemDocumentV1 | undefined;
   dispatch?: Dispatch<DocumentAction> | undefined;
+  /** Sibling fields available as `fields.<id>` references in the formula. */
+  siblingFields?: ReadonlyArray<{ id: string; valueType: "number" | "text" | "boolean" }> | undefined;
   referencedBy?: number | undefined;
   disabled?: boolean | undefined;
 };
@@ -54,6 +59,7 @@ export function ComputedFieldEditor({
   onFallbackChange,
   document,
   dispatch,
+  siblingFields,
   referencedBy,
   disabled,
 }: ComputedFieldEditorProps) {
@@ -66,9 +72,56 @@ export function ComputedFieldEditor({
     setDraftSource(expressionSource ?? "");
   }, [expressionSource]);
   const tokenizeResult = tokenizeExpression(draftSource);
+  const tokenizeOk = tokenizeResult.ok;
   const diagnostics: ReadonlyArray<ExpressionDiagnostic> = tokenizeResult.ok
     ? []
     : tokenizeResult.diagnostics;
+  const sourceRef = useRef<HTMLTextAreaElement | null>(null);
+  const insertField = (id: string) => {
+    const token = `fields.${id}`;
+    const el = sourceRef.current;
+    if (el === null) {
+      setDraftSource((d) => `${d}${token}`);
+      return;
+    }
+    const start = el.selectionStart ?? draftSource.length;
+    const end = el.selectionEnd ?? start;
+    const next = `${draftSource.slice(0, start)}${token}${draftSource.slice(end)}`;
+    setDraftSource(next);
+    const caret = start + token.length;
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    });
+  };
+  // Sample-value preview over the draft source: sibling fields contribute
+  // their types (bindings default to 0/""/false), evaluated client-side
+  // through the same compile+evaluate path as the sheet preview.
+  const preview = useMemo(() => {
+    if (field.kind !== "computed" || !tokenizeOk) return null;
+    const fields: Record<string, ValueType> = {};
+    const bindings: Record<string, ScalarValue> = {};
+    for (const s of siblingFields ?? []) {
+      fields[s.id] = s.valueType;
+      bindings[s.id] = s.valueType === "number" ? 0 : s.valueType === "boolean" ? false : "";
+    }
+    const resultType: ValueType = field.valueType;
+    const fb: ScalarValue =
+      resultType === "number"
+        ? (typeof fallback === "number" ? fallback : 0)
+        : resultType === "boolean"
+          ? fallback === true
+          : typeof fallback === "string"
+            ? fallback
+            : "";
+    return evaluateExpression({
+      source: draftSource,
+      env: { fields, inputs: {} },
+      resultType,
+      fallback: fb,
+      bindings,
+    });
+  }, [field, tokenizeOk, draftSource, siblingFields, fallback]);
 
   if (!isComputed(field)) {
     return (
@@ -146,6 +199,7 @@ export function ComputedFieldEditor({
           {t("editor.fields.computed.expression")}
           <textarea
             id={`computed-field-source-${field.id}`}
+            ref={sourceRef}
             value={draftSource}
             onChange={(e) => setDraftSource(e.target.value)}
             onBlur={commitSource}
@@ -158,6 +212,54 @@ export function ComputedFieldEditor({
             disabled={disabled}
           />
         </label>
+      </div>
+      <p
+        className={styles.placeholder}
+        data-testid={`computed-field-grammar-hint-${field.id}`}
+      >
+        {t("editor.fields.computed.grammarHint")}
+      </p>
+      {(siblingFields ?? []).length > 0 ? (
+        <div className={styles.row} data-testid={`computed-field-insert-${field.id}`}>
+          <span className={styles.field}>{t("editor.fields.computed.insertField")}</span>
+          {(siblingFields ?? []).map((s) => (
+            <Button
+              key={s.id}
+              variant="secondary"
+              onClick={() => insertField(s.id)}
+              data-testid={`computed-field-insert-${field.id}-${s.id}`}
+              disabled={disabled}
+            >
+              {s.id}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+      <div
+        className={styles.row}
+        data-testid={`computed-field-preview-${field.id}`}
+      >
+        <p className={styles.field}>
+          {t("editor.fields.computed.preview.title")}{" "}
+          {preview === null ? (
+            <span data-testid={`computed-field-preview-waiting-${field.id}`}>
+              {t("editor.fields.computed.preview.waiting")}
+            </span>
+          ) : preview.ok ? (
+            <span data-testid={`computed-field-preview-value-${field.id}`}>
+              {String(preview.value)}
+            </span>
+          ) : (
+            <span data-testid={`computed-field-preview-error-${field.id}`}>
+              {preview.diagnostics.length > 0
+                ? t("editor.fields.computed.diagnostic", {
+                    code: preview.diagnostics[0]!.code,
+                    message: preview.diagnostics[0]!.message,
+                  })
+                : t("editor.fields.computed.preview.error")}
+            </span>
+          )}
+        </p>
       </div>
       <div
         className={styles.row}

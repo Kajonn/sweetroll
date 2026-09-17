@@ -91,4 +91,53 @@ describe("ComputedFieldEditor", () => {
     expect(last?.kind).toBe("computed");
     if (last?.kind === "computed") expect(last.valueType).toBe("text");
   });
+
+  it("shows the grammar hint", () => {
+    renderEditor();
+    expect(screen.getByTestId("computed-field-grammar-hint-modifier")).toBeInTheDocument();
+  });
+
+  it("inserts a sibling field reference at the cursor", async () => {
+    const user = userEvent.setup();
+    renderEditor({
+      expressionSource: "10 + ",
+      siblingFields: [{ id: "modifier", valueType: "number" }],
+    });
+    const textarea = screen.getByTestId(
+      "computed-field-source-modifier",
+    ) as HTMLTextAreaElement;
+    textarea.focus();
+    textarea.setSelectionRange(5, 5);
+    await user.click(screen.getByTestId("computed-field-insert-modifier-modifier"));
+    expect(screen.getByTestId("computed-field-source-modifier")).toHaveValue(
+      "10 + fields.modifier",
+    );
+  });
+
+  it("previews the sample result for a valid formula", () => {
+    renderEditor({
+      expressionSource: "10 + fields.modifier",
+      siblingFields: [{ id: "modifier", valueType: "number" }],
+    });
+    expect(screen.getByTestId("computed-field-preview-value-modifier")).toHaveTextContent("10");
+  });
+
+  it("shows a preview error for an unknown field reference", () => {
+    renderEditor({
+      expressionSource: "10 + fields.nope",
+      siblingFields: [{ id: "modifier", valueType: "number" }],
+    });
+    expect(screen.getByTestId("computed-field-preview-error-modifier")).toBeInTheDocument();
+  });
+
+  it("waits for preview while the formula has syntax errors", async () => {
+    const user = userEvent.setup();
+    renderEditor({
+      expressionSource: "10 + ",
+      siblingFields: [{ id: "modifier", valueType: "number" }],
+    });
+    const textarea = screen.getByTestId("computed-field-source-modifier");
+    await user.type(textarea, "$");
+    expect(screen.getByTestId("computed-field-preview-waiting-modifier")).toBeInTheDocument();
+  });
 });

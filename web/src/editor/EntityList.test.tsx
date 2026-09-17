@@ -238,4 +238,44 @@ describe("EntityList", () => {
     const picker = screen.getByTestId(/^entity-kind-picker-/) as HTMLSelectElement;
     expect(picker.value).toBe("playable");
   });
+
+  it("renders the computed editor with its formula when expression callbacks are provided", () => {
+    renderList(
+      [
+        makeEntity("character", "Character", [
+          {
+            kind: "computed",
+            id: "defense",
+            label: "Defense",
+            valueType: "number",
+            expressionId: "defense_expr",
+          } as FieldV1,
+        ]),
+      ],
+      {
+        expressionSourceFor: (id: string) =>
+          id === "defense_expr" ? "10 + fields.modifier" : "",
+        onExpressionSourceChange: () => {},
+      },
+    );
+    expect(screen.getByTestId("computed-field-defense")).toBeInTheDocument();
+    expect(screen.getByTestId("computed-field-source-defense")).toHaveValue(
+      "10 + fields.modifier",
+    );
+  });
+
+  it("keeps the preserved notice for computed fields without expression callbacks", () => {
+    renderList([
+      makeEntity("character", "Character", [
+        {
+          kind: "computed",
+          id: "defense",
+          label: "Defense",
+          valueType: "number",
+          expressionId: "defense_expr",
+        } as FieldV1,
+      ]),
+    ]);
+    expect(screen.getByTestId("field-unsupported-defense")).toBeInTheDocument();
+  });
 });

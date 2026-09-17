@@ -14,6 +14,7 @@ import { ConflictBanner } from "./ConflictBanner.js";
 import { DiagnosticsDrawer } from "./DiagnosticsDrawer.js";
 import { EntityList, type EntityListEntity } from "./EntityList.js";
 import { ExpressionEditor } from "./expressions/ExpressionEditor.js";
+import { expressionUsages } from "./expressions/expressionUsage.js";
 import { MetadataEditor } from "./MetadataEditor.js";
 import { PreviewFrame } from "../preview/PreviewFrame.js";
 import { PreviewSheet } from "../preview/PreviewSheet.js";
@@ -582,6 +583,7 @@ export function DocumentEditorBody({
           />
         ) : active === "attributes" ? (
           <EntitiesTab
+            document={document}
             entities={document.entities}
             selectedEntityId={selectedEntityId}
             onSelectEntity={setSelectedEntityId}
@@ -665,11 +667,13 @@ function BasicsTab({
 }
 
 function EntitiesTab({
+  document,
   entities,
   selectedEntityId,
   onSelectEntity,
   dispatch,
 }: {
+  document: SystemDocumentV1;
   entities: EntityDefinitionV1[];
   selectedEntityId: string | null;
   onSelectEntity: (id: string | null) => void;
@@ -681,6 +685,11 @@ function EntitiesTab({
     ...(entity.kind !== undefined ? { kind: entity.kind } : null),
     fields: entity.fields as unknown as EntityListEntity["fields"],
   }));
+  const expressions = (document.expressions ?? []) as ReadonlyArray<{
+    id: string;
+    source: string;
+    fallback?: unknown;
+  }>;
   return (
     <section data-testid="attributes-tab" data-path="/attributes">
       <EntityList
@@ -692,6 +701,20 @@ function EntitiesTab({
             type: "setEntities",
             entities: next as unknown as EntityDefinitionV1[],
           });
+        }}
+        expressionSourceFor={(expressionId) =>
+          expressions.find((entry) => entry.id === expressionId)?.source ?? ""
+        }
+        expressionFallbackFor={(expressionId) =>
+          expressions.find((entry) => entry.id === expressionId)?.fallback
+        }
+        onExpressionSourceChange={(expressionId, next) => {
+          persistExpressionSource(document, dispatch, expressionId, next);
+        }}
+        onExpressionFallbackChange={(expressionId, next) => {
+          const current =
+            expressions.find((entry) => entry.id === expressionId)?.source ?? "";
+          commitComputedSource(document, dispatch, expressionId, current, next);
         }}
       />
     </section>
@@ -970,6 +993,7 @@ function DiceTab({
                   diceKind={diceKindFor(expressionSourceFor(action.expressionId))}
                   onDiceKindChange={hasExpression(action.expressionId)
                     ? (kind) => {
+                        if (kind === "custom") return;
                         persistExpressionSource(document, dispatch, action.expressionId, kind);
                       }
                     : undefined}
@@ -1287,6 +1311,38 @@ function AdvancedTab({
   );
 }
 
+function ExpressionEntryHeader({
+  document,
+  expressionId,
+}: {
+  document: SystemDocumentV1;
+  expressionId: string;
+}) {
+  const usages = expressionUsages(document, expressionId);
+  return (
+    <div data-testid={`expression-entry-${expressionId}`}>
+      <h3 className={styles.monoLabel} data-testid={`expression-entry-title-${expressionId}`}>
+        {expressionId}
+      </h3>
+      {usages.length === 0 ? (
+        <p data-testid={`expression-used-by-empty-${expressionId}`}>
+          {t("editor.advanced.expressions.usedByEmpty")}
+        </p>
+      ) : (
+        <ul data-testid={`expression-used-by-${expressionId}`}>
+          {usages.map((u, i) => (
+            <li key={`${u.kind}-${i}`} data-testid={`expression-used-by-${expressionId}-${i}`}>
+              {t("editor.advanced.expressions.usedBy")}: {u.label} (
+              {t(`editor.advanced.expressions.usedByKind.${u.kind}`)}
+              {u.detail !== "" ? ` · ${u.detail}` : ""})
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function ExpressionsSection({
   client,
   document,
@@ -1313,6 +1369,7 @@ function ExpressionsSection({
         <ul className={styles.expressionList}>
           {expressions.map((entry, idx) => (
             <li key={entry.id} data-path={`/expressions/${idx}`}>
+              <ExpressionEntryHeader document={document} expressionId={entry.id} />
               <ExpressionEditor
                 client={client}
                 systemId="s1"

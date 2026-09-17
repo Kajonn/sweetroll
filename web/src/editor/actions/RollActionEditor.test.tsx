@@ -51,6 +51,9 @@ type RenderOptions = {
   action?: RollActionV1;
   expressionSource?: string;
   onExpressionSourceChange?: (next: string) => void;
+  guided?: boolean;
+  diceKind?: string;
+  onDiceKindChange?: (next: string) => void;
 };
 
 function renderEditor(options: RenderOptions = {}) {
@@ -59,6 +62,9 @@ function renderEditor(options: RenderOptions = {}) {
     action: initialAction = defaultAction,
     expressionSource = "",
     onExpressionSourceChange,
+    guided,
+    diceKind,
+    onDiceKindChange,
   } = options;
   const client: ApiClient = createApiClient({ baseUrl: "http://x", fetch: fetch_ as typeof fetch });
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -77,6 +83,9 @@ function renderEditor(options: RenderOptions = {}) {
       expressionSource={expressionSource}
       onExpressionSourceChange={onExpressionSourceChange ?? vi.fn()}
       fieldTypes={{}}
+      guided={guided}
+      diceKind={diceKind}
+      onDiceKindChange={onDiceKindChange}
     />,
     { wrapper: makeWrapper(qc) },
   );
@@ -90,6 +99,9 @@ function renderEditor(options: RenderOptions = {}) {
         expressionSource={expressionSource}
         onExpressionSourceChange={onExpressionSourceChange ?? vi.fn()}
         fieldTypes={{}}
+        guided={guided}
+        diceKind={diceKind}
+        onDiceKindChange={onDiceKindChange}
       />,
     );
   };
@@ -255,5 +267,51 @@ describe("RollActionEditor", () => {
     expect(final.inputs[0]?.label).toBe("Modifier");
     expect(final.inputs[0]?.default).toBe(3);
     expect(final.inputs[0]?.required).toBe(true);
+  });
+
+  it("renders the expression editor in guided mode when the dice kind is custom", () => {
+    renderEditor({
+      guided: true,
+      diceKind: "custom",
+      expressionSource: "d20 + fields.modifier + inputs.bonus",
+    });
+    expect(screen.getByTestId("dice-kind-atk")).toBeInTheDocument();
+    expect(screen.getByTestId("expression-editor-source")).toHaveValue(
+      "d20 + fields.modifier + inputs.bonus",
+    );
+  });
+
+  it("hides the expression editor in guided mode for canned dice kinds", () => {
+    renderEditor({ guided: true, diceKind: "d20", expressionSource: "d20" });
+    expect(screen.getByTestId("dice-kind-atk")).toBeInTheDocument();
+    expect(screen.queryByTestId("expression-editor-source")).not.toBeInTheDocument();
+  });
+
+  it("selecting custom opens the expression editor without persisting a source", () => {
+    const onDiceKindChange = vi.fn();
+    renderEditor({
+      guided: true,
+      diceKind: "d20",
+      expressionSource: "d20",
+      onDiceKindChange,
+    });
+    fireEvent.change(screen.getByTestId("dice-kind-atk"), { target: { value: "custom" } });
+    expect(screen.getByTestId("expression-editor-source")).toHaveValue("d20");
+    expect(onDiceKindChange).not.toHaveBeenCalled();
+  });
+
+  it("selecting a canned kind after custom hides the editor and persists the kind", () => {
+    const onDiceKindChange = vi.fn();
+    renderEditor({
+      guided: true,
+      diceKind: "d20",
+      expressionSource: "d20",
+      onDiceKindChange,
+    });
+    fireEvent.change(screen.getByTestId("dice-kind-atk"), { target: { value: "custom" } });
+    expect(screen.getByTestId("expression-editor-source")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("dice-kind-atk"), { target: { value: "d6" } });
+    expect(onDiceKindChange).toHaveBeenCalledWith("d6");
+    expect(screen.queryByTestId("expression-editor-source")).not.toBeInTheDocument();
   });
 });

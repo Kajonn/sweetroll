@@ -4,6 +4,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCreateDraft } from "../api/createDraft.js";
 import type { ApiClient } from "../api/client.js";
 import { t } from "../i18n/index.js";
+import { randomUUID } from "../utils/uuid";
 
 type TemplateSpec = {
   templateKey: "d20" | "pbta2d6" | "d6SuccessPool";
@@ -39,7 +40,7 @@ export function CloneFromTemplate({ client }: { client: ApiClient }) {
     try {
       const out = await mutation.mutateAsync({
         source: { kind: "clone", versionId: tpl.versionId },
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
       });
       await navigate({ to: "/systems/$systemId", params: { systemId: out.system.systemId } });
     } catch {

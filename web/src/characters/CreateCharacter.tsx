@@ -13,6 +13,7 @@ import type { CharacterStore, OnlineAttempt } from "./store.js";
 import type { CreationOptions, CreationVersionEntry, FrozenRequest, ReviewExpiredAttemptInput } from "./types.js";
 import { flattenCatalogPages, useVersionCatalog } from "./versionCatalog.js";
 import styles from "./characters.module.css";
+import { randomUUID } from "../utils/uuid";
 
 export type CreateCharacterIdentity = {
   getActorId(): string | null;
@@ -102,7 +103,7 @@ function isReplayExpiredConflict(error: unknown): boolean {
  */
 export function CreateCharacter({
   api, store, identity, onCreated, initialSystemVersionId,
-  newId = () => crypto.randomUUID(), now = () => new Date().toISOString(),
+  newId = () => randomUUID(), now = () => new Date().toISOString(),
 }: CreateCharacterProps) {
   const [versionId, setVersionId] = useState(initialSystemVersionId ?? "");
   const [metadata, setMetadata] = useState<CreationOptions["data"] | null>(null);

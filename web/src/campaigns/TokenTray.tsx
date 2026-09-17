@@ -9,6 +9,7 @@ import { t } from "../i18n/index.js";
 import { Button, Checkbox, FormField, Panel } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
 import type { SceneView } from "./types.js";
+import { randomUUID } from "../utils/uuid";
 
 type Token = SceneView["tokens"][number];
 
@@ -73,7 +74,7 @@ function TokenMoveRow(props: {
     setConflict(false);
     setMoved(false);
     // Caller-minted idempotency key, fresh on every attempt.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       await props.api.moveToken(props.sceneId, props.token.tokenId, {
         expectedSceneRevision: props.sceneRevision,
@@ -190,7 +191,7 @@ export function TokenTrayView(props: {
     setConflict(false);
     setPlaced(false);
     // Caller-minted idempotency key, fresh on every attempt.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       await props.api.placeToken(props.sceneId, {
         expectedSceneRevision: props.sceneRevision,

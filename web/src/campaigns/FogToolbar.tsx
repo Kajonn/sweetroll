@@ -7,6 +7,7 @@ import { useState } from "react";
 import { t } from "../i18n/index.js";
 import { Button, FormField, Panel, Select } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
+import { randomUUID } from "../utils/uuid";
 
 type FogMode = "reveal" | "conceal";
 
@@ -65,7 +66,7 @@ export function FogToolbarView(props: {
     setConflict(false);
     setCommitted(false);
     // Caller-minted idempotency key, fresh on every attempt.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       await props.api.applyFogEdit(props.sceneId, {
         expectedSceneRevision: props.sceneRevision,

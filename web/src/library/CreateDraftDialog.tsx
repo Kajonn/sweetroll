@@ -8,6 +8,7 @@ import { t } from "../i18n/index.js";
 import { Button, FormField } from "../ui/index.js";
 
 import styles from "./CreateDraftDialog.module.css";
+import { randomUUID } from "../utils/uuid";
 
 type SourceKind = "blank" | "clone" | "import";
 
@@ -36,7 +37,7 @@ export function CreateDraftDialog({
         : kind === "clone"
           ? { kind: "clone", versionId }
           : { kind: "import", content };
-    const out = await mutation.mutateAsync({ source, idempotencyKey: crypto.randomUUID() });
+    const out = await mutation.mutateAsync({ source, idempotencyKey: randomUUID() });
     onOpenChange(false);
     await navigate({ to: "/systems/$systemId", params: { systemId: out.system.systemId } });
   };

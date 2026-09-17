@@ -12,6 +12,7 @@ import { Button, Checkbox, Dialog, EmptyState, FormField, Panel } from "../ui/in
 import type { CampaignsApi } from "./api.js";
 import { useUpgradePreview } from "./campaignQueries.js";
 import type { CommitUpgradeResponse } from "./types.js";
+import { randomUUID } from "../utils/uuid";
 
 export type UpgradeDialogProps = {
   api: Pick<CampaignsApi, "previewUpgrade" | "commitUpgrade">;
@@ -120,7 +121,7 @@ export function UpgradeDialog(props: UpgradeDialogProps) {
     // Caller-minted idempotency key, fresh on every attempt: a 409 refetches
     // the preview first and the retry mints a new key rather than reusing
     // this one or guessing revision + 1.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       const result = await props.api.commitUpgrade(props.campaignId, {
         targetVersionId: current.targetVersionId,

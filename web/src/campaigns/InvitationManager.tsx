@@ -11,6 +11,7 @@ import { Button, Dialog, EmptyState, FormField, Panel, Select } from "../ui/inde
 import type { CampaignsApi } from "./api.js";
 import { campaignInvitationsKey, useCampaignInvitations } from "./campaignQueries.js";
 import type { InvitationSummary } from "./types.js";
+import { randomUUID } from "../utils/uuid";
 
 function isConflict(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
@@ -84,7 +85,7 @@ export function InvitationManager(props: {
     setReplayInviteId(null);
     // Caller-minted idempotency key, fresh on every attempt: a 409 re-reads
     // first and the retry mints a new key rather than reusing this one.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     const trimmedExpires = expiresInput.trim();
     try {
       const response = await props.api.issueInvitation(props.campaignId, {
@@ -122,7 +123,7 @@ export function InvitationManager(props: {
     setError(null);
     setConflict(false);
     // Caller-minted idempotency key, fresh on every attempt.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       const response = await props.api.rotateInvitation(props.campaignId, invitation.invitationId, {
         expectedInvitationRevision: invitation.invitationRevision,
@@ -156,7 +157,7 @@ export function InvitationManager(props: {
     setError(null);
     setConflict(false);
     // Caller-minted idempotency key, fresh on every attempt.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       await props.api.revokeInvitation(props.campaignId, invitation.invitationId, {
         expectedInvitationRevision: invitation.invitationRevision,

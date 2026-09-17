@@ -12,6 +12,7 @@ import type { CampaignsApi } from "./api.js";
 import { campaignCharactersPrefix, campaignDetailKey } from "./campaignQueries.js";
 import type { CampaignView, CommitUpgradeResponse } from "./types.js";
 import { UpgradeDialog } from "./UpgradeDialog.js";
+import { randomUUID } from "../utils/uuid";
 
 function isConflict(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
@@ -236,7 +237,7 @@ export function CampaignSettingsView(props: {
     setSaveConflict(false);
     setSaved(false);
     // Caller-minted idempotency key, fresh on every attempt.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       await props.api.updateCampaign(props.campaign.campaignId, {
         title: trimmedTitle,
@@ -263,7 +264,7 @@ export function CampaignSettingsView(props: {
     if (archivePhase !== "confirming") return;
     setArchivePhase("working");
     // Caller-minted idempotency key, fresh on every attempt.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       await props.api.archiveCampaign(props.campaign.campaignId, {
         expectedCampaignRevision: props.campaign.revision,
@@ -287,7 +288,7 @@ export function CampaignSettingsView(props: {
     if (recoverPhase !== "confirming") return;
     setRecoverPhase("working");
     // Caller-minted idempotency key, fresh on every attempt.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       await props.api.recoverCampaign(props.campaign.campaignId, {
         expectedCampaignRevision: props.campaign.revision,
@@ -313,7 +314,7 @@ export function CampaignSettingsView(props: {
     setExportError(null);
     setExportDone(false);
     // Caller-minted idempotency key, fresh on every attempt.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       await props.api.exportCampaign(props.campaign.campaignId, { idempotencyKey });
       setExportDone(true);

@@ -12,6 +12,7 @@ import { t } from "../i18n/index.js";
 import { AppLink } from "../ui/AppLink.js";
 
 import styles from "./VersionHistory.module.css";
+import { randomUUID } from "../utils/uuid";
 
 function formatDate(iso: string): string {
   if (iso === "") return t("versionHistory.unknownDate");
@@ -58,7 +59,7 @@ export function VersionHistory({ client, systemId }: { client: ApiClient; system
     try {
       const out = await createDraft.mutateAsync({
         source: { kind: "clone", versionId: version.versionId },
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
       });
       location.assign(`/systems/${out.system.systemId}`);
     } catch {

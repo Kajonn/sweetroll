@@ -18,6 +18,7 @@ import { createApiClient } from "../api/client.js";
 import { createIdentityGate, type IdentityGate } from "../characters/identity.js";
 import { openCharacterStore } from "../characters/store.js";
 import { queryClient } from "../queryClient.js";
+import { randomUUID } from "../utils/uuid";
 
 export type AuthState =
   | { state: "loading" }
@@ -170,7 +171,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     }).catch(() => { if (!disposed) setAuth({ state: "anonymous" }); });
     return () => { disposed = true; cleanup(); };
   }, []);
-  const requestId = useMemo(() => (typeof crypto !== "undefined" ? crypto.randomUUID() : "req"), []);
+  const requestId = useMemo(() => (typeof crypto !== "undefined" ? randomUUID() : "req"), []);
   // Account-lifetime query hygiene: the shared client outlives sign-out and
   // account switches, so every lifetime change cancels in-flight queries
   // (late responses from the previous identity must not commit) and drops

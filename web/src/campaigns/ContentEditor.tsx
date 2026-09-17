@@ -8,6 +8,7 @@ import { Button, Checkbox, Dialog, FormField, Panel, Select } from "../ui/index.
 import type { CampaignsApi } from "./api.js";
 import { audienceLabel, type ContentAudience } from "./CampaignContent.js";
 import type { CampaignMember, ContentView, CreateContentBody, UpdateContentBody } from "./types.js";
+import { randomUUID } from "../utils/uuid";
 
 const AUDIENCES: ContentAudience[] = ["gm_only", "all_players", "selected_players", "owner_only"];
 
@@ -115,7 +116,7 @@ export function ContentEditor(props: {
           title: title.trim(),
           body: bodyText,
           audience,
-          idempotencyKey: crypto.randomUUID(),
+          idempotencyKey: randomUUID(),
         };
         const tags = parseTags(tagsText);
         if (tags.length > 0) body.tags = tags;
@@ -134,7 +135,7 @@ export function ContentEditor(props: {
         let revision = effective.revision;
         const patch: UpdateContentBody = {
           expectedContentRevision: revision,
-          idempotencyKey: crypto.randomUUID(),
+          idempotencyKey: randomUUID(),
         };
         let dirty = false;
         const trimmedTitle = title.trim();
@@ -167,7 +168,7 @@ export function ContentEditor(props: {
           await props.api.replaceContentGrants(effective.contentId, {
             grantedUserIds: [...checked],
             expectedContentRevision: revision,
-            idempotencyKey: crypto.randomUUID(),
+            idempotencyKey: randomUUID(),
           });
         }
       }
@@ -196,7 +197,7 @@ export function ContentEditor(props: {
     try {
       const receipt = await props.api.deleteContent(effective.contentId, {
         expectedContentRevision: effective.revision,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
       });
       setDeleteOpen(false);
       // Stay mounted on the deleted view so Recover remains reachable
@@ -242,7 +243,7 @@ export function ContentEditor(props: {
     try {
       await props.api.recoverContent(effective.contentId, {
         expectedContentRevision: effective.revision,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
       });
       setRecoverOpen(false);
       // The row is active again: drop the retained deleted view so the

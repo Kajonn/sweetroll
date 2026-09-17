@@ -1,3 +1,4 @@
+import { randomUUID } from "../utils/uuid";
 export type ApiErrorCode = string;
 
 export type ApiDiagnostic = { code: string; path: string; message: string };
@@ -100,7 +101,7 @@ export function createApiClient(input: CreateApiClientInput): ApiClient {
         }
       }
       const headers: Record<string, string> = { accept: "application/json", ...(init?.headers ?? {}) };
-      const requestId = crypto.randomUUID();
+      const requestId = randomUUID();
       headers["x-request-id"] = requestId;
       const controller = new AbortController();
       let timer: ReturnType<typeof setTimeout>;

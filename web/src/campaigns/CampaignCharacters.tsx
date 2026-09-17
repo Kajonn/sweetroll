@@ -16,6 +16,7 @@ import {
   useClaimableCharacters,
 } from "./campaignQueries.js";
 import type { CampaignCharacterSummary, ClaimableCharacterSummary } from "./types.js";
+import { randomUUID } from "../utils/uuid";
 
 /** Minimal creation-options metadata loader (reuses the characters seam). */
 export type CampaignCharacterMetadataApi = {
@@ -124,7 +125,7 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
     setClaimErrors((prev) => ({ ...prev, [character.characterId]: null }));
     // Caller-minted idempotency key, fresh on every attempt: a 409 re-reads
     // first and the retry mints a new key rather than reusing this one.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       await props.api.claimCharacter(props.campaignId, character.characterId, {
         expectedCampaignRevision: props.campaignRevision,
@@ -180,7 +181,7 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
     setCreateError(null);
     setCreateConflict(false);
     // Caller-minted idempotency key, fresh on every attempt.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       const response = await props.api.createCampaignCharacter(props.campaignId, {
         name: trimmedName,

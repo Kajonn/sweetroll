@@ -8,6 +8,7 @@ import { AppLink } from "../ui/AppLink.js";
 import { Button, EmptyState, FormField, PageHeader, Panel } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
 import type { InvitationReview } from "./types.js";
+import { randomUUID } from "../utils/uuid";
 
 export type InvitationPhase =
   | "entering"
@@ -103,7 +104,7 @@ export function InvitationReviewView(props: { api: CampaignsApi; actorId: string
     setError(null);
     // Caller-minted idempotency key, fresh on every attempt: a 409 re-reads
     // first and the retry mints a new key rather than reusing this one.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       if (kind === "accept") {
         await props.api.acceptInvitation({

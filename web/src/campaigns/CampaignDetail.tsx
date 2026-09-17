@@ -18,6 +18,7 @@ import { InvitationManager } from "./InvitationManager.js";
 import { SessionBoard, type SessionBoardProps } from "./SessionBoard.js";
 import { campaignCharactersPrefix, campaignDetailKey, useCampaignMembers } from "./campaignQueries.js";
 import type { CampaignView } from "./types.js";
+import { randomUUID } from "../utils/uuid";
 
 function isNotFound(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
@@ -157,7 +158,7 @@ export function CampaignDetail(props: {
     setLeaveError(null);
     // Caller-minted idempotency key, fresh on every attempt: a 409 re-reads
     // first and the retry mints a new key rather than reusing this one.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       await props.api.leaveCampaign(props.campaignId, props.actorId, {
         expectedCampaignRevision: campaign.revision,

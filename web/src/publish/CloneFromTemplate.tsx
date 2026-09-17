@@ -4,6 +4,7 @@ import { ApiError, type ApiClient } from "../api/client.js";
 import { useCreateDraft } from "../api/createDraft.js";
 import { useListTemplates, type Template } from "../api/listTemplates.js";
 import { t } from "../i18n/index.js";
+import { randomUUID } from "../utils/uuid";
 
 export function CloneFromTemplate({ client }: { client: ApiClient }) {
   const templates = useListTemplates(client);
@@ -17,7 +18,7 @@ export function CloneFromTemplate({ client }: { client: ApiClient }) {
     try {
       const out = await mutation.mutateAsync({
         source: { kind: "clone", versionId: tpl.versionId },
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
       });
       location.assign(`/systems/${out.system.systemId}`);
     } catch {

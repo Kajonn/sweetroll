@@ -17,6 +17,7 @@ import { campaignCharactersKey } from "./campaignQueries.js";
 import { audienceLabel } from "./CampaignContent.js";
 import { activityKindLabel } from "./CampaignActivity.js";
 import type { CampaignCharacterSummary } from "./types.js";
+import { randomUUID } from "../utils/uuid";
 
 export type SessionBoardProps = {
   campaignsApi: Pick<CampaignsApi, "listContent" | "listActivity" | "listCampaignCharacters">;
@@ -95,7 +96,7 @@ function SessionBumpRow(props: {
       await props.charactersApi.bumpCharacterResource(props.characterId, props.element.resourceId, {
         direction,
         expectedRevision: props.revision,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
       });
       try {
         await props.onBumped();
@@ -207,7 +208,7 @@ function SessionRollRow(props: {
         {
           audience,
           expectedRevision: props.revision,
-          idempotencyKey: crypto.randomUUID(),
+          idempotencyKey: randomUUID(),
         },
       );
       // Kind-agnostic result text: never assume the payload shape. An

@@ -12,6 +12,7 @@ import type { CampaignsApi } from "./api.js";
 import { campaignContentPreviewKey } from "./campaignQueries.js";
 import { ContentEditor } from "./ContentEditor.js";
 import type { CampaignMember, ContentSummary, ContentView, PreviewContentResponse } from "./types.js";
+import { randomUUID } from "../utils/uuid";
 
 export type ContentAudience = ContentSummary["audience"];
 
@@ -362,7 +363,7 @@ export function CampaignContentTab(props: {
     try {
       await props.api.recoverContent(contentId, {
         expectedContentRevision: revision,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
       });
       setRecoveredTitle(title);
       reload();
@@ -409,7 +410,7 @@ export function CampaignContentTab(props: {
     try {
       await props.api.deleteContent(deleting.contentId, {
         expectedContentRevision: deleting.revision,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
       });
       setDeleting(null);
       reload();

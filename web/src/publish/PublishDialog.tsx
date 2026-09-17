@@ -9,6 +9,7 @@ import { AppLink } from "../ui/AppLink.js";
 import { Button, Checkbox, FormField } from "../ui/index.js";
 
 import styles from "./PublishDialog.module.css";
+import { randomUUID } from "../utils/uuid";
 
 type BumpKind = "patch" | "minor" | "major";
 
@@ -89,7 +90,7 @@ export function PublishDialog({
       expectedRevision,
       semanticVersion: semver,
       releaseNotes,
-      idempotencyKey: crypto.randomUUID(),
+      idempotencyKey: randomUUID(),
       acknowledgeBreaking: allAcknowledged,
     };
     try {

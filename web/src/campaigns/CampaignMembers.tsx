@@ -11,6 +11,7 @@ import { Button, Dialog, EmptyState, Panel, Select } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
 import { campaignMembersKey, useCampaignMembers } from "./campaignQueries.js";
 import type { CampaignMember } from "./types.js";
+import { randomUUID } from "../utils/uuid";
 
 export function ownRole(members: CampaignMember[], actorId: string): "owner" | "co_gm" | "player" | null {
   const own = members.find((member) => member.userId === actorId);
@@ -91,7 +92,7 @@ export function CampaignMembersTab(props: {
     setConflict(false);
     // Caller-minted idempotency key, fresh on every attempt: a 409 re-reads
     // first and the retry mints a new key rather than reusing this one.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       await props.api.changeMemberRole(props.campaignId, member.userId, {
         role,
@@ -123,7 +124,7 @@ export function CampaignMembersTab(props: {
     setError(null);
     setConflict(false);
     // Caller-minted idempotency key, fresh on every attempt.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       await props.api.removeMember(props.campaignId, member.userId, {
         expectedCampaignRevision: props.campaignRevision,

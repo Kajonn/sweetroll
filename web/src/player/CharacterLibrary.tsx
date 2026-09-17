@@ -16,6 +16,7 @@ import {
   useCharacterLibrary,
 } from "./characterQueries.js";
 import styles from "./CharacterLibrary.module.css";
+import { randomUUID } from "../utils/uuid";
 
 export type CharacterLibraryIdentity = {
   getActorId(): string | null;
@@ -119,7 +120,7 @@ export function CharacterLibrary({ api, identity, navigation }: CharacterLibrary
     try {
       // The API seam never mints idempotency keys: the caller owns the key.
       const response = await api.duplicateCharacter(character.characterId, {
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
       });
       markOpened(response.character.characterId);
       await queryClient.invalidateQueries({ queryKey: characterLibraryKey(actorId, generation) });

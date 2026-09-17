@@ -11,6 +11,7 @@ import { openCharacterStore, type CharacterStore } from "./store.js";
 import { useCharacterSession } from "./useCharacterSession.js";
 import { useOfflineAvailability } from "../offline/useOfflineAvailability.js";
 import styles from "./characters.module.css";
+import { randomUUID } from "../utils/uuid";
 
 /**
  * SPA navigation callbacks for the character detail surface. The route
@@ -144,7 +145,7 @@ function CharacterDetailLoaded({
         identity,
         coordination,
         now: () => new Date().toISOString(),
-        newId: () => crypto.randomUUID(),
+        newId: () => randomUUID(),
       }),
     [actorId, characterId, api, store, identity, coordination],
   );

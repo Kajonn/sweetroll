@@ -6,6 +6,7 @@ import type { CharactersApi } from "../characters/api.js";
 import { t } from "../i18n/index.js";
 import { Button, EmptyState, FormField, PageHeader, Panel } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
+import { randomUUID } from "../utils/uuid";
 
 export function campaignCreateViewKey(actor: string | null, generation: number): string {
   return `${actor ?? "signed-out"}:${generation}`;
@@ -70,7 +71,7 @@ export function CampaignCreate(props: {
     setError(null);
     setConflict(false);
     // Caller-minted idempotency key, fresh on every attempt.
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = randomUUID();
     try {
       const response = await props.api.createCampaign({
         systemVersionId: versionId,

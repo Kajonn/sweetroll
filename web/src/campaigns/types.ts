@@ -110,6 +110,12 @@ export type ReplaceGrantsBody = NonNullable<
   operations["post_content_id_grants"]["requestBody"]
 >["content"]["application/json"];
 
+export type PreviewContentBody = NonNullable<
+  operations["post_campaigns_id_content_preview"]["requestBody"]
+>["content"]["application/json"];
+export type PreviewContentResponse =
+  operations["post_campaigns_id_content_preview"]["responses"]["200"]["content"]["application/json"];
+
 export type PreviewUpgradeBody = NonNullable<
   operations["post_campaigns_id_upgrade_previews"]["requestBody"]
 >["content"]["application/json"];

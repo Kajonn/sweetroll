@@ -114,6 +114,15 @@ export function campaignMembersKey(campaignId: string, actorId: string | null, g
   return ["campaigns", "members", campaignId, actorId, generation];
 }
 
+/**
+ * Preview-as-member cache family: ephemeral GM projection reads, keyed by
+ * the preview target. Preview data never enters the GM content cache keys;
+ * the Content tab purges this family on preview exit and on unmount.
+ */
+export function campaignContentPreviewKey(campaignId: string, targetUserId: string): string[] {
+  return ["campaigns", "preview", campaignId, targetUserId];
+}
+
 export function campaignInvitationsKey(campaignId: string, actorId: string | null, generation: number) {
   return ["campaigns", "invitations", campaignId, actorId, generation];
 }

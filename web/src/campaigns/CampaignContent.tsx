@@ -3,14 +3,15 @@
 // "unavailable" EmptyState + list invalidation; revoked ids never mount).
 // Error paths never render server payloads or secrets: only the generic
 // unavailable strings below reach the page.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { t } from "../i18n/index.js";
-import { Button, Dialog, EmptyState, Panel } from "../ui/index.js";
+import { Button, Dialog, EmptyState, Panel, Select } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
+import { campaignContentPreviewKey } from "./campaignQueries.js";
 import { ContentEditor } from "./ContentEditor.js";
-import type { CampaignMember, ContentSummary, ContentView } from "./types.js";
+import type { CampaignMember, ContentSummary, ContentView, PreviewContentResponse } from "./types.js";
 
 export type ContentAudience = ContentSummary["audience"];
 
@@ -53,6 +54,18 @@ export function audienceLabel(audience: ContentAudience): string {
 }
 
 export type ContentListItem = Pick<ContentSummary, "contentId" | "title" | "audience">;
+
+/** Narrow the preview union to its list rows (the item variant carries no cursor). */
+function previewListRows(response: PreviewContentResponse): ContentListItem[] {
+  if (!("nextCursor" in response)) return [];
+  return response.content;
+}
+
+/** Narrow the preview union to its reader item (the list variant carries a cursor). */
+function previewItemContent(response: PreviewContentResponse): ContentView | null {
+  if ("nextCursor" in response) return null;
+  return response.content;
+}
 
 export function CampaignContentView(props: {
   items: ContentListItem[];
@@ -98,6 +111,103 @@ function CampaignContentReader(props: { content: ContentView; onBack: () => void
   );
 }
 
+/**
+ * Read-only projection of one member's content view. Mounted only while a GM
+ * previews that target, so preview queries (under the preview cache family)
+ * exist solely inside preview mode; unmount purges the target's keys and no
+ * authoring control mounts here by construction.
+ */
+function CampaignContentPreview(props: {
+  api: Pick<CampaignsApi, "previewContent">;
+  campaignId: string;
+  targetUserId: string;
+  online: boolean;
+  actorId: string | null;
+  onExit: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const listKey = campaignContentPreviewKey(props.campaignId, props.targetUserId);
+  const list = useQuery({
+    queryKey: listKey,
+    queryFn: () => props.api.previewContent(props.campaignId, { targetUserId: props.targetUserId }),
+    enabled: props.online && props.actorId !== null && !failed,
+    staleTime: 0,
+  });
+  const detail = useQuery({
+    queryKey: [...listKey, "item", selectedId ?? "none"],
+    queryFn: () =>
+      props.api.previewContent(props.campaignId, {
+        targetUserId: props.targetUserId,
+        contentId: selectedId ?? "",
+      }),
+    enabled: props.online && props.actorId !== null && selectedId !== null && !failed,
+    staleTime: 0,
+  });
+
+  // The projection is ephemeral: unmount (exit or tab teardown) purges the
+  // target's keys so preview data never survives for a later reader. Deps
+  // are the stable scalars (listKey is rebuilt per render), so the cleanup
+  // runs only on unmount — never on re-render.
+  useEffect(() => {
+    return () => {
+      queryClient.removeQueries({
+        queryKey: campaignContentPreviewKey(props.campaignId, props.targetUserId),
+      });
+    };
+  }, [queryClient, props.campaignId, props.targetUserId]);
+
+  // Any preview fetch failure (e.g. the target removed mid-preview) surfaces
+  // an error state; the flag disables the queries first so the purge below
+  // cannot refetch-loop.
+  useEffect(() => {
+    if (!failed && (list.status === "error" || detail.status === "error")) {
+      setFailed(true);
+    }
+  }, [failed, list.status, detail.status]);
+
+  useEffect(() => {
+    if (failed) {
+      queryClient.removeQueries({
+        queryKey: campaignContentPreviewKey(props.campaignId, props.targetUserId),
+      });
+    }
+  }, [failed, queryClient, props.campaignId, props.targetUserId]);
+
+  let body: ReactNode = <p role="status">{t("campaign.detail.content.loading")}</p>;
+  if (failed || list.status === "error" || detail.status === "error") {
+    body = <EmptyState title={t("campaign.detail.content.preview.error")} />;
+  } else if (selectedId !== null) {
+    if (detail.status === "success") {
+      const item = previewItemContent(detail.data);
+      body =
+        item === null ? (
+          <EmptyState title={t("campaign.detail.content.preview.error")} />
+        ) : (
+          <CampaignContentReader content={item} onBack={() => setSelectedId(null)} />
+        );
+    }
+  } else if (list.status === "success") {
+    body = (
+      <CampaignContentView
+        items={previewListRows(list.data)}
+        revokedIds={new Set<string>()}
+        onOpenContent={(contentId) => setSelectedId(contentId)}
+      />
+    );
+  }
+  return (
+    <div>
+      <p role="status">{t("campaign.detail.content.preview.banner", { name: props.targetUserId })}</p>
+      <Button variant="secondary" onClick={props.onExit}>
+        {t("campaign.detail.content.preview.exit")}
+      </Button>
+      {body}
+    </div>
+  );
+}
+
 export function CampaignContentTab(props: {
   api: Pick<
     CampaignsApi,
@@ -108,6 +218,7 @@ export function CampaignContentTab(props: {
     | "deleteContent"
     | "recoverContent"
     | "replaceContentGrants"
+    | "previewContent"
   >;
   campaignId: string;
   /** Campaign-level revocation: the list itself is not_found for a previously-readable campaign. */
@@ -171,6 +282,21 @@ export function CampaignContentTab(props: {
     // narrowed grant cannot survive behind a fresh cache entry.
     staleTime: 0,
   });
+
+  // Preview-as-member (GM-only, ephemeral UI state — never a route). The
+  // picker offers active members regardless of role; the preview panel below
+  // renders list + reader from preview queries under the preview cache
+  // family, and every mutating control stays unmounted while previewing.
+  const [previewTargetId, setPreviewTargetId] = useState<string | null>(null);
+
+  const enterPreview = (targetUserId: string): void => {
+    setPreviewTargetId(targetUserId);
+  };
+
+  const exitPreview = (): void => {
+    // The preview panel's unmount cleanup purges the retired keys.
+    setPreviewTargetId(null);
+  };
 
   useEffect(() => {
     if (list.status === "error" && isNotFound(list.error) && !revocationNotified.current) {
@@ -359,13 +485,40 @@ export function CampaignContentTab(props: {
 
   const items: ContentListItem[] = list.data.content;
   if (props.isGm === true) {
+    if (previewTargetId !== null) {
+      return (
+        <CampaignContentPreview
+          api={props.api}
+          campaignId={props.campaignId}
+          targetUserId={previewTargetId}
+          online={online}
+          actorId={actorId}
+          onExit={exitPreview}
+        />
+      );
+    }
     const members = props.members ?? [];
+    // The roster carries userIds only: the picker offers every active member
+    // regardless of role and labels options by userId. Never invent names.
+    const previewRoster = members.filter((member) => member.status === "active");
     const visible = items.filter((item) => !revokedIds.has(item.contentId));
     const hiddenRows = (deleted.data?.pages.flatMap((page) => page.content) ?? []).filter(
       (row) => !revokedIds.has(row.contentId),
     );
     return (
       <div>
+        {previewRoster.length > 0 ? (
+          <Select
+            label={t("campaign.detail.content.preview.label")}
+            placeholder={t("campaign.detail.content.preview.placeholder")}
+            options={previewRoster.map((member) => ({ value: member.userId, label: member.userId }))}
+            value=""
+            required
+            onChange={(event) => {
+              if (event.target.value !== "") enterPreview(event.target.value);
+            }}
+          />
+        ) : null}
         <div role="group" aria-label={t("campaign.detail.content.listAriaLabel")}>
           <Button variant={view === "active" ? "primary" : "secondary"} onClick={() => setView("active")}>
             {t("campaign.detail.content.view.active")}

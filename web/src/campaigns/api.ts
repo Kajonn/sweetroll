@@ -38,6 +38,8 @@ import type {
   PairDisplayResponse,
   PlaceTokenBody,
   PlaceTokenResponse,
+  PreviewContentBody,
+  PreviewContentResponse,
   PreviewUpgradeBody,
   PreviewUpgradeResponse,
   RecoverContentBody,
@@ -121,6 +123,7 @@ export type CampaignsApi = {
   deleteContent(contentId: string, body: DeleteContentBody): Promise<DeleteContentResponse>;
   recoverContent(contentId: string, body: RecoverContentBody): Promise<unknown>;
   replaceContentGrants(contentId: string, body: ReplaceGrantsBody): Promise<unknown>;
+  previewContent(campaignId: string, body: PreviewContentBody): Promise<PreviewContentResponse>;
   previewUpgrade(campaignId: string, body: PreviewUpgradeBody): Promise<PreviewUpgradeResponse>;
   commitUpgrade(campaignId: string, body: CommitUpgradeBody): Promise<CommitUpgradeResponse>;
   uploadImage(campaignId: string, body: UploadImageBody): Promise<UploadImageResponse>;
@@ -235,6 +238,8 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
       client.fetch("POST", `/content/${contentId}/recover`, { body }),
     replaceContentGrants: (contentId, body) =>
       client.fetch("POST", `/content/${contentId}/grants`, { body }),
+    previewContent: (campaignId, body) =>
+      client.fetch<PreviewContentResponse>("POST", `/campaigns/${campaignId}/content-preview`, { body }),
     previewUpgrade: (campaignId, body) =>
       client.fetch<PreviewUpgradeResponse>("POST", `/campaigns/${campaignId}/upgrade-previews`, { body }),
     commitUpgrade: (campaignId, body) =>

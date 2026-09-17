@@ -17,7 +17,10 @@ RTO ≤ 4 h).
 | RPO ≤ 15 min | Backup/export pipeline (no dedicated series yet) | n/a — verified by restore drill, not PromQL |
 | RTO ≤ 4 h | `GET /health/ready` recovery probing (no dedicated series yet) | n/a — verified by recovery drill, not PromQL |
 
-## Alert-rule sketch (example-only, not deployed)
+## Deployable bundle (file-only, not deployed)
+
+Scrape: ops/prometheus/prometheus.yml
+Alerts: ops/prometheus/alerts.yml (locked by src/platform/alerts.test.ts)
 
 ```yaml
 # Example-only: not deployed (no production Prometheus/alertmanager).

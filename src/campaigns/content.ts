@@ -115,6 +115,31 @@ export type ListContentResult = {
   nextCursor: string | null;
 };
 
+/**
+ * Preview-as-player projection input. The caller (from `ctx`) must be an
+ * active GM; the target must be an active member of the same campaign. The
+ * projection evaluates the existing `canReadContent` policy with the
+ * target's membership — never a parallel policy.
+ */
+export type PreviewContentInput = {
+  campaignId: string;
+  targetUserId: string;
+  contentId?: ContentId;
+};
+
+export type PreviewContentList = {
+  kind: "list";
+  /** Every active row the target's real list returns, in real-list order. */
+  content: ContentSummary[];
+};
+
+export type PreviewContentItem = {
+  kind: "item";
+  content: ContentView;
+};
+
+export type PreviewContentResult = PreviewContentList | PreviewContentItem;
+
 export type ActivityEventView = {
   eventId: string;
   kind: ActivityEventKind;
@@ -241,6 +266,15 @@ export interface ContentCommands {
   createContent(ctx: RequestContext, input: CreateContentInput): Promise<CampaignResult<ContentView>>;
   openContent(ctx: RequestContext, input: OpenContentInput): Promise<CampaignResult<ContentView>>;
   listContent(ctx: RequestContext, input: ListContentInput): Promise<CampaignResult<ListContentResult>>;
+  /**
+   * Preview-as-player projection: GM-only read-only evaluation of the
+   * target member's content view. No rows written, no audit rows, no
+   * idempotency keys; mutations can never accept a preview identity.
+   */
+  previewContent(
+    ctx: RequestContext,
+    input: PreviewContentInput,
+  ): Promise<CampaignResult<PreviewContentResult>>;
   updateContent(ctx: RequestContext, input: UpdateContentInput): Promise<CampaignResult<ContentView>>;
   deleteContent(ctx: RequestContext, input: DeleteContentInput): Promise<CampaignResult<ContentView>>;
   recoverContent(ctx: RequestContext, input: RecoverContentInput): Promise<CampaignResult<ContentView>>;
@@ -260,6 +294,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
 
   const errors = {
     bad_request: (message: string): CampaignError => ({ code: "bad_request", message }),
+    forbidden: (message: string): CampaignError => ({ code: "forbidden", message }),
     not_found: (message: string = NOT_FOUND_MESSAGE): CampaignError => ({ code: "not_found", message }),
     campaign_not_found: (): CampaignError => ({
       code: "not_found",
@@ -858,6 +893,101 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
                 : null,
           },
         };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async previewContent(ctx, previewInput) {
+      try {
+        if (typeof previewInput.targetUserId !== "string" || previewInput.targetUserId.length === 0) {
+          return { ok: false, error: errors.bad_request("targetUserId must be a non-empty string.") };
+        }
+        if (
+          previewInput.contentId !== undefined &&
+          (typeof previewInput.contentId !== "string" || previewInput.contentId.length === 0)
+        ) {
+          return { ok: false, error: errors.bad_request("contentId must be a non-empty string.") };
+        }
+        // Single read-only snapshot: campaign identity plus caller and
+        // target memberships share one consistent view, and the transaction
+        // writes nothing (no preview/audit/idempotency rows).
+        const outcome = await withClient(async (client) => {
+          const campaign = await repo.openCampaign(client, previewInput.campaignId);
+          if (campaign === null) {
+            return { authorized: false as const, error: errors.campaign_not_found() as CampaignError };
+          }
+          const callerMembership = await repo.loadMembership(client, previewInput.campaignId, ctx.actorId);
+          // GM gate: only an active owner/co-GM may project another
+          // member's view. Authenticated non-GMs (members, removed members,
+          // outsiders) receive a distinct forbidden — never rows.
+          if (!isGameMaster(callerMembership)) {
+            return {
+              authorized: false as const,
+              error: errors.forbidden(
+                "Only game masters may preview content as another member.",
+              ) as CampaignError,
+            };
+          }
+          const targetMembership = await repo.loadMembership(
+            client,
+            previewInput.campaignId,
+            previewInput.targetUserId,
+          );
+          // Unknown, removed or never-joined targets collapse to not_found,
+          // exactly as if the member had no visible rows.
+          if (!isActiveMember(targetMembership)) {
+            return {
+              authorized: false as const,
+              error: errors.not_found(
+                "The preview target is not an active member of this campaign.",
+              ) as CampaignError,
+            };
+          }
+          if (previewInput.contentId === undefined) {
+            // The target's real list, unpaginated: the same page query with
+            // the target's identity and GM flag, drained server-side so the
+            // preview never truncates below the member's full visible set.
+            const targetIsGm = isGameMaster(targetMembership);
+            const content: ContentSummary[] = [];
+            let cursor: { at: string; id: string } | null = null;
+            for (;;) {
+              const rows = await repo.listContentPage(client, {
+                campaignId: previewInput.campaignId,
+                actorId: previewInput.targetUserId,
+                isGm: targetIsGm,
+                status: "active",
+                limit: limits.pageMax,
+                cursorCreatedAt: cursor?.at ?? null,
+                cursorId: cursor?.id ?? null,
+              });
+              const page = rows.length > limits.pageMax ? rows.slice(0, limits.pageMax) : rows;
+              for (const record of page) content.push(toSummary(record));
+              if (rows.length <= limits.pageMax) break;
+              const last = page[page.length - 1];
+              if (last === undefined) break;
+              cursor = { at: last.createdAt.toISOString(), id: last.contentId };
+            }
+            return { authorized: true as const, value: { kind: "list", content } as PreviewContentResult };
+          }
+          // The target's real reader: same campaign scoping, same active
+          // status, same canReadContent evaluation with the target's
+          // membership, same grants disclosure (GM-or-creator) as openContent.
+          const record = await repo.loadContent(client, previewInput.contentId);
+          if (record === null || record.campaignId !== previewInput.campaignId || record.status !== "active") {
+            return { authorized: true as const, failure: errors.not_found() as CampaignError };
+          }
+          const grants = new Set(await repo.loadContentGrantUserIds(client, record.contentId));
+          if (!canReadContent({ content: record, membership: targetMembership, grantedUserIds: grants })) {
+            return { authorized: true as const, failure: errors.not_found() as CampaignError };
+          }
+          const targetCtx = { ...ctx, actorId: previewInput.targetUserId };
+          const value = await viewForReader(client, targetCtx, record, targetMembership.role);
+          return { authorized: true as const, value: { kind: "item", content: value } as PreviewContentResult };
+        });
+        if (!outcome.authorized) return { ok: false, error: outcome.error };
+        if ("failure" in outcome) return { ok: false, error: outcome.failure };
+        return { ok: true, value: outcome.value };
       } catch {
         return { ok: false, error: errors.internal() };
       }

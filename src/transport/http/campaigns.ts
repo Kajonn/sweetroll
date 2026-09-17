@@ -33,6 +33,10 @@ const STATUS_BY_CODE: Record<CampaignError["code"], number> = {
   not_found: 404,
   conflict: 409,
   idempotency_mismatch: 409,
+  // Preview-as-player: the GM gate denies authenticated non-GM callers
+  // with forbidden (403). Unknown campaigns and non-member targets keep
+  // collapsing to not_found (404).
+  forbidden: 403,
   // I6 Task 5/7 convention: committed-but-undisclosable results are a
   // non-sensitive conflict, never a retry of the same key.
   result_unavailable: 409,
@@ -509,6 +513,26 @@ const UpdateContentBody = Type.Object({
 const ContentMutationBody = Type.Object({
   expectedContentRevision: Type.Integer({ minimum: 1 }),
   idempotencyKey: Type.String({ minLength: 1 }),
+});
+
+// Preview-as-player: GM-only projection of a member's content view. Without
+// contentId the member's full list projects (unpaginated server-side;
+// nextCursor is always null); with contentId the single reader item
+// projects, or the same 404 the real reader returns.
+const PreviewContentBody = Type.Object({
+  targetUserId: Type.String({ format: UUID_FORMAT }),
+  contentId: Type.Optional(Type.String({ format: UUID_FORMAT })),
+});
+
+const ContentPreviewListDto = Type.Object({
+  content: Type.Array(ContentSummaryDto),
+  nextCursor: Type.Null(),
+  requestId: Type.String(),
+});
+
+const ContentPreviewItemDto = Type.Object({
+  content: ContentViewDto,
+  requestId: Type.String(),
 });
 
 const ReplaceGrantsBody = Type.Object({
@@ -1096,6 +1120,20 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
       response: {
         "201": Type.Object({ content: ContentViewDto, requestId: Type.String() }),
         ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/campaigns/:id/content-preview",
+    operationId: "post_campaigns_id_content_preview",
+    schema: {
+      params: CampaignIdParams,
+      body: PreviewContentBody,
+      response: {
+        "200": Type.Union([ContentPreviewListDto, ContentPreviewItemDto]),
+        ...ErrorResponses,
+        "403": CampaignErrorEnvelope,
       },
     },
   },
@@ -2136,6 +2174,32 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return reply.code(201).send({ content: toContentDto(result.value), requestId: request.id });
+      },
+
+      post_campaigns_id_content_preview: async (request, reply) => {
+        const params = request.params as { id: string };
+        const body = request.body as { targetUserId: string; contentId?: string };
+        // GM-only read-only projection over the target member's policy view.
+        // No idempotency key, no mutation path: preview identity can never
+        // authorize a write.
+        const result = await campaigns.previewContent(ctxOf(request), {
+          campaignId: params.id,
+          targetUserId: body.targetUserId,
+          ...(body.contentId === undefined ? {} : { contentId: body.contentId }),
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        if (result.value.kind === "list") {
+          return {
+            content: result.value.content.map((summary) => ({
+              ...summary,
+              createdAt: summary.createdAt.toISOString(),
+              updatedAt: summary.updatedAt.toISOString(),
+            })),
+            nextCursor: null,
+            requestId: request.id,
+          };
+        }
+        return { content: toContentDto(result.value.content), requestId: request.id };
       },
 
       get_content_id: async (request, reply) => {

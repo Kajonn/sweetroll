@@ -49,6 +49,7 @@ describe("buildOpenApiDocument", () => {
       "/campaigns/{id}/characters/{characterId}/claim",
       "/campaigns/{id}/claimable-characters",
       "/campaigns/{id}/content",
+      "/campaigns/{id}/content-preview",
       "/campaigns/{id}/display-codes",
       "/campaigns/{id}/display-credentials",
       "/campaigns/{id}/displays/{displayId}/revoke",

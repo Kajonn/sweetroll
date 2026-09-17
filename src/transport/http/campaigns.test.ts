@@ -247,6 +247,9 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
     createContent: async () => ({ ok: true, value: contentView() }),
     openContent: async () => ({ ok: true, value: contentView() }),
     listContent: async () => ({ ok: true, value: { content: [], nextCursor: null } }),
+    // Preview-as-player: content preview projection lands in Task 1; the
+    // stub keeps the seam total while no route calls it yet.
+    previewContent: async () => ({ ok: true as const, value: { kind: "list" as const, content: [] } }),
     updateContent: async () => ({ ok: true, value: contentView() }),
     deleteContent: async () => ({ ok: true, value: contentView() }),
     recoverContent: async () => ({ ok: true, value: contentView() }),
@@ -477,6 +480,7 @@ describe("campaign HTTP routes", () => {
       { method: "post", url: `/campaigns/${id}/characters/${characterId}/adopt`, payload: { expectedCampaignRevision: 1, expectedCharacterRevision: 1, acknowledgedDisclosure: true, idempotencyKey: "k" } },
       { method: "get", url: `/campaigns/${id}/content` },
       { method: "post", url: `/campaigns/${id}/content`, payload: { title: "N", idempotencyKey: "k" } },
+      { method: "post", url: `/campaigns/${id}/content-preview`, payload: { targetUserId: userId } },
       { method: "get", url: `/content/${contentId}` },
       { method: "patch", url: `/content/${contentId}`, payload: { title: "N", ...contentBody } },
       { method: "delete", url: `/content/${contentId}`, payload: contentBody },
@@ -500,7 +504,7 @@ describe("campaign HTTP routes", () => {
       { method: "get", url: `/campaigns/${id}/display-credentials` },
       { method: "post", url: `/campaigns/${id}/displays/${id}/revoke`, payload: {} },
     ];
-    expect(routes).toHaveLength(45);
+    expect(routes).toHaveLength(46);
 
     for (const route of routes) {
       const response = await app.inject({
@@ -1302,6 +1306,152 @@ describe("campaign HTTP routes", () => {
     expect(rejected.json().error.code).toBe("invalid_value");
     expect(rejected.json().error.message).toContain(characterId);
     expect(rejected.json().error.message).toContain("old-field");
+  });
+
+  it("previews content as a member with the GM gate matrix", async () => {
+    const campaignId = randomUUID();
+    const targetUserId = randomUUID();
+    const view = contentView({ campaignId });
+    const summary = {
+      contentId: view.contentId,
+      campaignId: view.campaignId,
+      creatorId: view.creatorId,
+      audience: view.audience,
+      title: view.title,
+      tags: view.tags,
+      revision: view.revision,
+      accessRevision: view.accessRevision,
+      status: view.status,
+      createdAt: view.createdAt,
+      updatedAt: view.updatedAt,
+    };
+    let received: unknown;
+    const app = await build({
+      campaigns: makeCampaigns({
+        previewContent: async (_ctx, input) => {
+          received = input;
+          if (input.contentId !== undefined) {
+            return { ok: true as const, value: { kind: "item" as const, content: view } };
+          }
+          return { ok: true as const, value: { kind: "list" as const, content: [summary] } };
+        },
+      }),
+    });
+
+    // GM caller + active-member target: 200 with list rows in the member
+    // list shape (same fields the member's real list returns).
+    const listed = await app.inject({
+      method: "POST",
+      url: `/campaigns/${campaignId}/content-preview`,
+      headers: cookie,
+      payload: { targetUserId },
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(received).toEqual({ campaignId, targetUserId });
+    expect(listed.json().content).toHaveLength(1);
+    expect(listed.json().content[0]).toMatchObject({
+      contentId: summary.contentId,
+      title: summary.title,
+      status: "active",
+    });
+    expect(listed.json().nextCursor).toBeNull();
+    expect(listed.json().requestId).toBeTypeOf("string");
+    expect(listed.headers["cache-control"]).toBe("no-store");
+
+    // Single item: the projected reader view with its body.
+    const itemId = randomUUID();
+    const single = await app.inject({
+      method: "POST",
+      url: `/campaigns/${campaignId}/content-preview`,
+      headers: cookie,
+      payload: { targetUserId, contentId: itemId },
+    });
+    expect(single.statusCode).toBe(200);
+    expect(received).toEqual({ campaignId, targetUserId, contentId: itemId });
+    expect(single.json().content).toMatchObject({ contentId: view.contentId, body: view.body });
+    expect(single.json().requestId).toBeTypeOf("string");
+
+    // Signed-out: 401 via the existing auth hook.
+    const unauthenticated = await app.inject({
+      method: "POST",
+      url: `/campaigns/${campaignId}/content-preview`,
+      payload: { targetUserId },
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+    expect(unauthenticated.json().error.code).toBe("unauthorized");
+
+    // Member caller (caller is not a GM): 403.
+    const denied = await build({
+      campaigns: makeCampaigns({
+        previewContent: async () => ({
+          ok: false as const,
+          error: {
+            code: "forbidden" as const,
+            message: "Only game masters may preview content as another member.",
+          },
+        }),
+      }),
+    });
+    const forbiddenResponse = await denied.inject({
+      method: "POST",
+      url: `/campaigns/${campaignId}/content-preview`,
+      headers: cookie,
+      payload: { targetUserId },
+    });
+    expect(forbiddenResponse.statusCode).toBe(403);
+    expect(forbiddenResponse.json().error.code).toBe("forbidden");
+    expect(forbiddenResponse.json().requestId).toBeTypeOf("string");
+
+    // Non-member target, removed-member target and unknown campaign: 404.
+    const missing = await build({
+      campaigns: makeCampaigns({
+        previewContent: async () => ({
+          ok: false as const,
+          error: {
+            code: "not_found" as const,
+            message: "The preview target is not an active member of this campaign.",
+          },
+        }),
+      }),
+    });
+    for (const payload of [{ targetUserId }, { targetUserId, contentId: itemId }]) {
+      const notFound = await missing.inject({
+        method: "POST",
+        url: `/campaigns/${campaignId}/content-preview`,
+        headers: cookie,
+        payload,
+      });
+      expect(notFound.statusCode, JSON.stringify(payload)).toBe(404);
+      expect(notFound.json().error.code).toBe("not_found");
+    }
+
+    const unknown = await build({
+      campaigns: makeCampaigns({
+        previewContent: async () => ({
+          ok: false as const,
+          error: { code: "not_found" as const, message: "The requested campaign does not exist." },
+        }),
+      }),
+    });
+    const unknownCampaign = await unknown.inject({
+      method: "POST",
+      url: `/campaigns/${randomUUID()}/content-preview`,
+      headers: cookie,
+      payload: { targetUserId },
+    });
+    expect(unknownCampaign.statusCode).toBe(404);
+
+    // Malformed bodies: 400.
+    for (const payload of [{}, { targetUserId: "not-a-uuid" }, { targetUserId, contentId: "nope" }]) {
+      const invalid = await app.inject({
+        method: "POST",
+        url: `/campaigns/${campaignId}/content-preview`,
+        headers: cookie,
+        payload,
+      });
+      expect(invalid.statusCode, JSON.stringify(payload)).toBe(400);
+      expect(invalid.json().error.code).toBe("bad_request");
+    }
   });
 });
 

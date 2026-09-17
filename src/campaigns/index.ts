@@ -35,6 +35,8 @@ import {
   type ListContentInput,
   type ListContentResult,
   type OpenContentInput,
+  type PreviewContentInput,
+  type PreviewContentResult,
   type RecoverContentInput,
   type ReplaceGrantsInput,
   type UpdateContentInput,
@@ -119,6 +121,11 @@ export type CampaignErrorCode =
   | "result_unavailable"
   | "export_too_large"
   | "rate_limited"
+  // Preview-as-player: the GM gate on previewContent denies authenticated
+  // non-GM callers with `forbidden` (HTTP 403), mapped in STATUS_BY_CODE
+  // alongside this change. Unknown campaigns and non-member targets keep
+  // collapsing to generic not_found.
+  | "forbidden"
   // I7b Task 1: campaign image upload validation. Oversized bytes are
   // `too_large` (HTTP 413); magic-byte/sharp/dimension rejections are
   // `unprocessable` (HTTP 422). Mapped in STATUS_BY_CODE alongside this
@@ -453,6 +460,15 @@ export interface Campaigns {
   createContent(ctx: RequestContext, input: CreateContentInput): Promise<CampaignResult<ContentView>>;
   openContent(ctx: RequestContext, input: OpenContentInput): Promise<CampaignResult<ContentView>>;
   listContent(ctx: RequestContext, input: ListContentInput): Promise<CampaignResult<ListContentResult>>;
+  /**
+   * Preview-as-player projection over the real content policy. The caller
+   * must be an active GM (else `forbidden`); the target must be an active
+   * member (else `not_found`). Read-only: no idempotency keys, no audit.
+   */
+  previewContent(
+    ctx: RequestContext,
+    input: PreviewContentInput,
+  ): Promise<CampaignResult<PreviewContentResult>>;
   updateContent(ctx: RequestContext, input: UpdateContentInput): Promise<CampaignResult<ContentView>>;
   deleteContent(ctx: RequestContext, input: DeleteContentInput): Promise<CampaignResult<ContentView>>;
   recoverContent(ctx: RequestContext, input: RecoverContentInput): Promise<CampaignResult<ContentView>>;
@@ -566,6 +582,8 @@ export type {
   PairDisplayInput,
   PairDisplaySuccess,
   PlaceTokenInput,
+  PreviewContentInput,
+  PreviewContentResult,
   RecoverContentInput,
   RedeemDisplayCodeInput,
   RedeemDisplayCodeSuccess,
@@ -1058,6 +1076,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     createContent: content.createContent,
     openContent: content.openContent,
     listContent: content.listContent,
+    previewContent: content.previewContent,
     updateContent: content.updateContent,
     deleteContent: content.deleteContent,
     recoverContent: content.recoverContent,

@@ -1,0 +1,12 @@
+# Opt-in WAL archiving for point-in-time recovery drills.
+# Usage: docker compose -f compose.yaml -f compose.pitr.yaml up -d
+# Never applied to the dev database without owner approval; drills use scratch DBs.
+services:
+  postgres:
+    command: ["postgres", "-c", "archive_mode=on", "-c", "archive_command='test ! -f /var/lib/postgresql/wal_archive/%f && cp %p /var/lib/postgresql/wal_archive/%f'", "-c", "max_wal_senders=2", "-c", "wal_level=replica"]
+    volumes:
+      - sweetroll-postgres:/var/lib/postgresql/data
+      - sweetroll-wal:/var/lib/postgresql/wal_archive
+
+volumes:
+  sweetroll-wal:

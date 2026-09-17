@@ -17,6 +17,7 @@ RUN mkdir -p /app/data/media && chown node:node /app/data/media
 USER node
 COPY --chown=node:node --from=build /app/node_modules ./node_modules
 COPY --chown=node:node --from=build /app/dist ./dist
+COPY --chown=node:node web/dist ./web/dist
 COPY --chown=node:node package.json ./package.json
 COPY --chown=node:node migrations ./migrations
 VOLUME /app/data/media

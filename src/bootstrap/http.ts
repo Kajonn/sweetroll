@@ -134,6 +134,12 @@ const app = buildHttpApp({
   }),
 });
 
+const serveStatic = process.env.SWEETROLL_SERVE_STATIC === "1";
+void app.register((await import("../transport/http/static.js")).registerStaticServing, {
+  distDir: "web/dist",
+  enabled: serveStatic,
+});
+
 void app.register(
   buildIdentityRoutes({
     identity,

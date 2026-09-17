@@ -200,6 +200,8 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 
 ## G9 — Release and acceptance gates
 
+*Reconciled 2026-09-17 (hardening remainder, commits `3949820`–`484e282`): no G9 box closed by this plan — single-artifact serving is locally verified only (sign-in return + offline shell reopening unexercised), devices/playtests/mockup/production-auth stay open per `docs/acceptance/i7-2026-09-17-hardening-remainder.md` and `docs/acceptance/g9-2026-09-17-device-playtest.md`.*
+
 - [ ] Keep a view checklist in `docs/acceptance/gui-YYYY-MM-DD.md`: tested commit, commands, device/browser, theme, reference-system fixture, screenshots, manual findings, and remaining limitations. Record only checks actually run.
 - [ ] Verify each migrated route at phone/tablet/desktop widths, light/dark, 200% text enlargement, long translated labels, keyboard, and touch. Check real Android Chrome and iPad Safari interactions before release; emulation alone does not prove touch/keyboard behavior.
 - [ ] Use actual routed application screenshots with stable fixtures. Require human inspection before replacing baselines; do not hide functional errors to make screenshots pass.

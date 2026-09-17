@@ -33,9 +33,9 @@ const STATUS_BY_CODE: Record<CampaignError["code"], number> = {
   not_found: 404,
   conflict: 409,
   idempotency_mismatch: 409,
-  // Preview-as-player: the GM gate denies authenticated non-GM callers
-  // with forbidden (403). Unknown campaigns and non-member targets keep
-  // collapsing to not_found (404).
+  // Preview-as-player: the GM gate denies active-member non-GM callers
+  // with forbidden (403). Unknown campaigns, non-member callers and
+  // non-member targets keep collapsing to not_found (404).
   forbidden: 403,
   // I6 Task 5/7 convention: committed-but-undisclosable results are a
   // non-sensitive conflict, never a retry of the same key.

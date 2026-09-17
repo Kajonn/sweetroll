@@ -177,7 +177,7 @@ describeWithDatabase("campaign content preview projection (preview-as-player Tas
     expect(ungrantedItem.error.code).toBe("not_found");
   });
 
-  it("gates callers and targets (GM 200 / member 403 / unknown-target 404 / removed-target 404)", async () => {
+  it("gates callers and targets (member 403 / outsider+removed caller 404 / unknown-target 404 / removed-target 404)", async () => {
     const campaignId = await createCampaign();
     const playerId = h.users.player.actorId;
     const otherId = h.users.other.actorId;
@@ -195,14 +195,23 @@ describeWithDatabase("campaign content preview projection (preview-as-player Tas
     if (memberCall.ok) throw new Error("expected a member caller to be denied");
     expect(memberCall.error.code).toBe("forbidden");
 
-    // An outsider caller is denied the same way.
+    // An outsider caller collapses to the same not_found as an unknown
+    // campaign: no existence oracle.
     const outsiderCall = await h.campaigns.previewContent(ctxFor(h.users.outsider), {
       campaignId,
       targetUserId: playerId,
     });
     expect(outsiderCall.ok).toBe(false);
-    if (outsiderCall.ok) throw new Error("expected an outsider caller to be denied");
-    expect(outsiderCall.error.code).toBe("forbidden");
+    if (outsiderCall.ok) throw new Error("expected an outsider caller to miss");
+    expect(outsiderCall.error.code).toBe("not_found");
+    expect(outsiderCall.error.message).toBe("The requested campaign does not exist.");
+    const outsiderUnknown = await h.campaigns.previewContent(ctxFor(h.users.outsider), {
+      campaignId: randomUUID(),
+      targetUserId: playerId,
+    });
+    expect(outsiderUnknown.ok).toBe(false);
+    if (outsiderUnknown.ok) throw new Error("expected an unknown campaign to miss");
+    expect(JSON.stringify(outsiderUnknown.error)).toBe(JSON.stringify(outsiderCall.error));
 
     // A non-member target collapses to 404.
     const nonMemberTarget = await h.campaigns.previewContent(ctxFor(h.users.gm), {
@@ -232,6 +241,17 @@ describeWithDatabase("campaign content preview projection (preview-as-player Tas
     if (removedTarget.ok) throw new Error("expected a removed target to miss");
     expect(removedTarget.error.code).toBe("not_found");
 
+    // A removed-member caller collapses the same way: only active members
+    // ever reach the GM gate.
+    const removedCaller = await h.campaigns.previewContent(ctxFor(h.users.other), {
+      campaignId,
+      targetUserId: playerId,
+    });
+    expect(removedCaller.ok).toBe(false);
+    if (removedCaller.ok) throw new Error("expected a removed caller to miss");
+    expect(removedCaller.error.code).toBe("not_found");
+    expect(removedCaller.error.message).toBe("The requested campaign does not exist.");
+
     // Unknown campaigns 404.
     const unknown = await h.campaigns.previewContent(ctxFor(h.users.gm), {
       campaignId: randomUUID(),
@@ -242,7 +262,7 @@ describeWithDatabase("campaign content preview projection (preview-as-player Tas
     expect(unknown.error.code).toBe("not_found");
   });
 
-  it("serves the matrix over HTTP (GM 200 / member 403 / signed-out 401 / removed-target 404)", async () => {
+  it("serves the matrix over HTTP (GM 200 / member 403 / outsider 404 / signed-out 401 / removed-target 404)", async () => {
     const campaignId = await createCampaign();
     const playerId = h.users.player.actorId;
     const otherId = h.users.other.actorId;
@@ -277,6 +297,15 @@ describeWithDatabase("campaign content preview projection (preview-as-player Tas
     });
     expect(memberCall.statusCode).toBe(403);
     expect(memberCall.json().error.code).toBe("forbidden");
+    // Outsider caller: 404, indistinguishable from an unknown campaign.
+    const outsiderCall = await h.app.inject({
+      method: "POST",
+      url: `/campaigns/${campaignId}/content-preview`,
+      headers: cookie("outsider"),
+      payload: { targetUserId: playerId },
+    });
+    expect(outsiderCall.statusCode).toBe(404);
+    expect(outsiderCall.json().error.code).toBe("not_found");
     const signedOut = await h.app.inject({
       method: "POST",
       url: `/campaigns/${campaignId}/content-preview`,

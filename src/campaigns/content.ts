@@ -268,8 +268,10 @@ export interface ContentCommands {
   listContent(ctx: RequestContext, input: ListContentInput): Promise<CampaignResult<ListContentResult>>;
   /**
    * Preview-as-player projection: GM-only read-only evaluation of the
-   * target member's content view. No rows written, no audit rows, no
-   * idempotency keys; mutations can never accept a preview identity.
+   * target member's content view. Callers without an active membership
+   * collapse to not_found (no existence oracle); active non-GM members
+   * receive forbidden. No rows written, no audit rows, no idempotency keys;
+   * mutations can never accept a preview identity.
    */
   previewContent(
     ctx: RequestContext,
@@ -918,9 +920,17 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
             return { authorized: false as const, error: errors.campaign_not_found() as CampaignError };
           }
           const callerMembership = await repo.loadMembership(client, previewInput.campaignId, ctx.actorId);
+          // No existence oracle: callers without an active membership
+          // (outsiders, removed members) collapse to the same
+          // campaign_not_found as an unknown campaign, matching the
+          // neighboring content reads. Only active members reach the GM
+          // gate below, so forbidden is reserved for member callers.
+          if (!isActiveMember(callerMembership)) {
+            return { authorized: false as const, error: errors.campaign_not_found() as CampaignError };
+          }
           // GM gate: only an active owner/co-GM may project another
-          // member's view. Authenticated non-GMs (members, removed members,
-          // outsiders) receive a distinct forbidden — never rows.
+          // member's view. Active non-GM members receive a distinct
+          // forbidden — never rows.
           if (!isGameMaster(callerMembership)) {
             return {
               authorized: false as const,

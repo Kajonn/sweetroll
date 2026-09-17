@@ -1441,6 +1441,23 @@ describe("campaign HTTP routes", () => {
     });
     expect(unknownCampaign.statusCode).toBe(404);
 
+    // Outsider and removed-member callers collapse to the same not_found
+    // (the module returns campaign_not_found for both; proven in the parity
+    // test) — no existence oracle, while active members keep the 403 above.
+    for (const payload of [{ targetUserId }, { targetUserId, contentId: itemId }]) {
+      const collapsed = await unknown.inject({
+        method: "POST",
+        url: `/campaigns/${campaignId}/content-preview`,
+        headers: cookie,
+        payload,
+      });
+      expect(collapsed.statusCode, JSON.stringify(payload)).toBe(404);
+      expect(collapsed.json().error).toMatchObject({
+        code: "not_found",
+        message: "The requested campaign does not exist.",
+      });
+    }
+
     // Malformed bodies: 400.
     for (const payload of [{}, { targetUserId: "not-a-uuid" }, { targetUserId, contentId: "nope" }]) {
       const invalid = await app.inject({

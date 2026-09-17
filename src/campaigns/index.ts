@@ -121,10 +121,10 @@ export type CampaignErrorCode =
   | "result_unavailable"
   | "export_too_large"
   | "rate_limited"
-  // Preview-as-player: the GM gate on previewContent denies authenticated
+  // Preview-as-player: the GM gate on previewContent denies active-member
   // non-GM callers with `forbidden` (HTTP 403), mapped in STATUS_BY_CODE
-  // alongside this change. Unknown campaigns and non-member targets keep
-  // collapsing to generic not_found.
+  // alongside this change. Unknown campaigns, non-member callers and
+  // non-member targets keep collapsing to generic not_found.
   | "forbidden"
   // I7b Task 1: campaign image upload validation. Oversized bytes are
   // `too_large` (HTTP 413); magic-byte/sharp/dimension rejections are
@@ -462,8 +462,10 @@ export interface Campaigns {
   listContent(ctx: RequestContext, input: ListContentInput): Promise<CampaignResult<ListContentResult>>;
   /**
    * Preview-as-player projection over the real content policy. The caller
-   * must be an active GM (else `forbidden`); the target must be an active
-   * member (else `not_found`). Read-only: no idempotency keys, no audit.
+   * must be an active member (else `not_found`, same as an unknown
+   * campaign) and an active GM (active non-GMs get `forbidden`); the target
+   * must be an active member (else `not_found`). Read-only: no idempotency
+   * keys, no audit.
    */
   previewContent(
     ctx: RequestContext,

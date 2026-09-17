@@ -12,3 +12,5 @@ web/tests/e2e/evidence/
 web/tests/offline/evidence/
 # I7b Task 1: validated image originals are runtime bytes, never committed.
 data/media/*
+# I7b Task 4: redacted display derivatives are a lazily-regenerated cache, never committed.
+data/display/*

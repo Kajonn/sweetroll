@@ -153,7 +153,12 @@ describe("AppShell", () => {
     let account: string | null = "user-a";
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       const path = new URL(url, window.location.origin).pathname;
-      if (path === "/dev/signin") return new Response("{}");
+      if (path === "/dev/signin") {
+        // Establish the new session at sign-in, not before the previous
+        // asynchronous sign-out has had a chance to clear the old session.
+        account = "user-b";
+        return new Response("{}");
+      }
       if (path === "/api/signout") { account = null; return new Response(null, { status: 204 }); }
       if (path === "/api/me") {
         return new Response(JSON.stringify(
@@ -198,9 +203,11 @@ describe("AppShell", () => {
       await userEvent.setup().click(await screen.findByRole("button", { name: "Sign out" }, { timeout: 10_000 }));
       await screen.findByTestId("dev-signin", undefined, { timeout: 10_000 });
       await vi.waitFor(() => expect(qc.getQueryData(["account-label"])).toBeUndefined(), { timeout: 10_000 });
+      // Anonymous UI and an empty cache precede server revocation. This
+      // sequential account-switch journey waits for sign-out to finish.
+      await screen.findByText("Signed out.");
       // Sign in as a different account: the null→actor settle invalidates
       // (refetching under B) without resurrecting A's cache.
-      account = "user-b";
       await userEvent.setup().click(screen.getByTestId("dev-signin"));
       expect(await screen.findByText("Private B", undefined, { timeout: 10_000 })).toBeInTheDocument();
       expect(screen.queryByText("Private A")).not.toBeInTheDocument();

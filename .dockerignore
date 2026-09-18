@@ -3,5 +3,7 @@
 coverage
 dist
 node_modules
+web/dist
+web/node_modules
 # I7b Task 1: never bake local image originals into the image.
 data/media

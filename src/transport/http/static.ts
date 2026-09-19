@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyPluginAsync } from "fastify";
+import type { FastifyInstance, FastifyPluginAsync, FastifyPluginCallback } from "fastify";
 import fastifyStatic from "@fastify/static";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -20,3 +20,17 @@ export const registerStaticServing: FastifyPluginAsync<{
     reply.type("text/html").send(readFileSync(path.join(root, "index.html"), "utf8"));
   });
 };
+
+/** Mount browser API routes under /api only in the combined deployment.
+ * A normal plugin scope also prefixes routes supplied by fastify-plugin.
+ * Development keeps the existing unprefixed API used by the Vite proxy.
+ */
+export function registerApiRoutes(
+  app: FastifyInstance,
+  routes: ReadonlyArray<FastifyPluginCallback>,
+  serveStatic: boolean,
+): void {
+  void app.register(async (api) => {
+    for (const route of routes) void api.register(route);
+  }, { prefix: serveStatic ? "/api" : "" });
+}

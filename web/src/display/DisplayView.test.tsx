@@ -94,7 +94,7 @@ describe("DisplayView", () => {
     expect(api.redeemDisplay).toHaveBeenCalledWith({ code: "AB12CD" });
 
     const image = await screen.findByRole("img", { name: /display image/i });
-    expect(image).toHaveAttribute("src", "/displays/d1/scenes/s1/image?rev=3");
+    expect(image).toHaveAttribute("src", "/api/displays/d1/scenes/s1/image?rev=3");
     const alpha = await screen.findByText("Alpha");
     expect(alpha.style.left).toBe("25%");
     expect(alpha.style.top).toBe("50%");

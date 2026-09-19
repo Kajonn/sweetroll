@@ -872,3 +872,17 @@ The package format must be documented and versioned independently from individua
 | Campaign         | The collaboration scope containing members, characters, settings, and shared/secret content.    |
 | Audience         | The set of principals permitted to read an activity or content item.                            |
 | Reference system | An internal fixture used to verify that the generic platform supports real mechanics.           |
+
+
+## Railway deployment configuration (2026-09-19)
+
+The single-container hosting option uses the existing Dockerfile to serve the
+built frontend and HTTP backend together. With `SWEETROLL_SERVE_STATIC=1`,
+application API routes are mounted at `/api`, leaving browser deep links for the
+SPA. Backend-only development retains its unprefixed API and Vite proxy.
+Health, metrics, and explicitly enabled dev routes keep their existing paths.
+`railway.json` runs migrations before deployment, checks PostgreSQL readiness,
+and starts one app instance with a separately provisioned media volume and
+PostgreSQL service. See [setup instructions](docs/operations/railway.md).
+This configuration does not close the production-authentication, deployed
+acceptance, backup/restore, or physical-device gates.

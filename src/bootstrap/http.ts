@@ -134,23 +134,24 @@ const app = buildHttpApp({
   }),
 });
 
+const { registerStaticServing, registerApiRoutes } = await import("../transport/http/static.js");
 const serveStatic = process.env.SWEETROLL_SERVE_STATIC === "1";
-void app.register((await import("../transport/http/static.js")).registerStaticServing, {
+void app.register(registerStaticServing, {
   distDir: "web/dist",
   enabled: serveStatic,
 });
 
-void app.register(
+registerApiRoutes(app, [
   buildIdentityRoutes({
     identity,
     cookieName: config.sessionCookieName,
     secure: config.cookieSecure,
     allowedOrigins: config.allowedOrigins,
   }),
-);
-void app.register(buildSystemsRoutes({ authoring }));
-void app.register(buildCharactersRoutes({ characters }));
-void app.register(buildCampaignsRoutes({ campaigns, characters, runtime }));
+  buildSystemsRoutes({ authoring }),
+  buildCharactersRoutes({ characters }),
+  buildCampaignsRoutes({ campaigns, characters, runtime }),
+], serveStatic);
 void app.register(
   buildDevSignInRoutes({
     identity,

@@ -288,7 +288,7 @@ export function DisplayView(props: {
     <section aria-label={t("display.title")}>
       <h1>{t("display.title")}</h1>
       <div style={{ position: "relative" }}>
-        <img src={shown.imageUrl} alt={t("display.imageAlt")} style={{ display: "block", width: "100%" }} />
+        <img src={`/api${shown.imageUrl}`} alt={t("display.imageAlt")} style={{ display: "block", width: "100%" }} />
         <ul aria-label={t("display.tokensLabel")} style={{ listStyle: "none", margin: 0, padding: 0 }}>
           {shown.tokens.map((token) => (
             <li

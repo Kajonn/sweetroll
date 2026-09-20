@@ -30,4 +30,22 @@ describe("DevSignInPanel", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it("renders a single acceptance sign-in action without exposing a code field", () => {
+    render(<DevSignInPanel acceptance onSignedIn={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Sign in for acceptance testing" })).toBeInTheDocument();
+    expect(screen.queryByTestId("dev-signin-code")).not.toBeInTheDocument();
+  });
+
+  it("reports an acceptance sign-in failure", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => new Response("{}", { status: 401 })) as unknown as typeof fetch;
+    try {
+      render(<DevSignInPanel acceptance onSignedIn={vi.fn()} />);
+      await userEvent.setup().click(screen.getByTestId("dev-signin"));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Acceptance sign-in failed");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

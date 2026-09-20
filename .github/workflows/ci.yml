@@ -145,3 +145,20 @@ jobs:
       - run: psql postgres://sweetroll:sweetroll@localhost:5432/sweetroll -c "CREATE DATABASE sweetroll_offline;"
       - run: npm run web:build
       - run: npm --prefix web run test:offline
+
+  deploy:
+    name: Deploy production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [verify, web, web-e2e, web-offline]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: railway-production
+      cancel-in-progress: false
+    container: ghcr.io/railwayapp/cli:latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Railway
+        run: railway up --service sweetroll --environment production --detach

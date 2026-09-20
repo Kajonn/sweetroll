@@ -79,6 +79,36 @@
   gap: 8px;
 }
 
+.unplaced {
+  display: grid;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-panel);
+}
+
+.unplacedTitle,
+.unplacedHint {
+  margin: 0;
+}
+
+.unplacedTitle {
+  font-size: 13px;
+}
+
+.unplacedHint {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.unplacedActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .sectionsTitle {
   margin: 0;
   font-size: 13px;

@@ -22,7 +22,7 @@ import { generateSample } from "../preview/sampleData.js";
 import { PublishDialog } from "../publish/PublishDialog.js";
 import { VersionHistory } from "../publish/VersionHistory.js";
 import { ReferenceDataEditor, type ReferenceDataV1 } from "./referenceData/ReferenceDataEditor.js";
-import { SheetEditor } from "./sheet/SheetEditor.js";
+import { SheetEditor, type UnplacedDefinition } from "./sheet/SheetEditor.js";
 import type { SheetEditorV1 } from "./sheet/sheetTypes.js";
 import { useDraftSync } from "../state/draftSync.js";
 import {
@@ -801,6 +801,7 @@ function SheetsTab({
                 onChange={(next) => replaceSheet(idx, next)}
                 allocateSectionId={() => allocateSheetChildId("section")}
                 allocateElementId={() => allocateSheetChildId("element")}
+                unplacedDefinitions={unplacedDefinitionsForSheet(document, sheet)}
               />
               <Button
                 variant="secondary"
@@ -820,6 +821,37 @@ function SheetsTab({
 }
 
 type SheetEditorView = SheetEditorV1;
+
+export function unplacedDefinitionsForSheet(
+  document: SystemDocumentV1,
+  sheet: SheetEditorV1,
+): UnplacedDefinition[] {
+  const placed = new Set<string>();
+  for (const section of sheet.sections) {
+    for (const element of section.elements) {
+      if (element.kind === "field") placed.add(`field:${element.fieldId}`);
+      if (element.kind === "resource") placed.add(`resource:${element.resourceId}`);
+      if (element.kind === "action") placed.add(`action:${element.actionId}`);
+    }
+  }
+
+  const definitions: UnplacedDefinition[] = [];
+  const entity = document.entities.find((candidate) => candidate.id === sheet.targetEntityId);
+  for (const field of (entity?.fields ?? []) as unknown as Array<
+    EntityFieldV1 & { kind: string; label: string }
+  >) {
+    const kind = field.kind === "resource" ? "resource" : "field";
+    if (!placed.has(`${kind}:${field.id}`)) {
+      definitions.push({ kind, id: field.id, label: field.label });
+    }
+  }
+  for (const action of document.actions) {
+    if (!placed.has(`action:${action.id}`)) {
+      definitions.push({ kind: "action", id: action.id, label: action.label });
+    }
+  }
+  return definitions;
+}
 
 function nextSheetId(existing: ReadonlyArray<string>): string {
   for (let i = 1; i < 10_000; i++) {
@@ -988,7 +1020,7 @@ function DiceTab({
                   onExpressionSourceChange={(next) => {
                     persistExpressionSource(document, dispatch, action.expressionId, next);
                   }}
-                  fieldTypes={buildFieldTypeMap(document)}
+                  fieldTypes={buildFieldTypeMap(document, action.id)}
                   guided
                   diceKind={diceKindFor(expressionSourceFor(action.expressionId))}
                   onDiceKindChange={hasExpression(action.expressionId)
@@ -1023,8 +1055,11 @@ function DiceTab({
 }
 
 /** Guided dice-kind for a roll source: canned kind, else custom (Advanced edit). */
-function diceKindFor(source: string): string {
-  return (GUIDED_DICE_KINDS as ReadonlyArray<string>).includes(source) ? source : "custom";
+export function diceKindFor(source: string): string {
+  const base = /^(d(?:4|6|8|10|12|20))(?:\s*\+\s*fields\.[a-z][a-z0-9_]{0,63})?$/.exec(source)?.[1];
+  return base !== undefined && (GUIDED_DICE_KINDS as ReadonlyArray<string>).includes(base)
+    ? base
+    : "custom";
 }
 
 function nextExpressionId(existing: ReadonlyArray<string>): string {
@@ -1043,9 +1078,24 @@ function nextActionId(existing: ReadonlyArray<string>): string {
   return `action_${Date.now()}`;
 }
 
-function buildFieldTypeMap(document: SystemDocumentV1): Record<string, "number" | "text" | "boolean"> {
+function buildFieldTypeMap(
+  document: SystemDocumentV1,
+  actionId?: string,
+): Record<string, "number" | "text" | "boolean"> {
   const out: Record<string, "number" | "text" | "boolean"> = {};
-  for (const entity of document.entities) {
+  const typedSheets = document.sheets as unknown as SheetEditorV1[];
+  const owningSheet = actionId === undefined
+    ? undefined
+    : typedSheets.find((sheet) =>
+        sheet.sections.some((section) =>
+          section.elements.some((element) => element.kind === "action" && element.actionId === actionId),
+        ),
+      );
+  const fallbackEntity = document.entities.find((entity) => entity.kind !== "npc") ?? document.entities[0];
+  const entities = document.entities.filter((entity) =>
+    owningSheet === undefined ? entity.id === fallbackEntity?.id : entity.id === owningSheet.targetEntityId,
+  );
+  for (const entity of entities) {
     for (const field of entity.fields as unknown as EntityFieldV1[]) {
       const kind = (field as { kind?: string }).kind;
       if (kind === "integer" || kind === "decimal" || kind === "resource") {

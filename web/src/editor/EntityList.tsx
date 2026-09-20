@@ -217,10 +217,10 @@ export function EntityList({
     const next = entities.map((e) => (e.id === id ? { ...e, ...patch } : e));
     onChange(next);
   };
-  const replaceField = (entityId: string, field: FieldV1) => {
+  const replaceField = (entityId: string, originalFieldId: string, field: FieldV1) => {
     const next = entities.map((e) => {
       if (e.id !== entityId) return e;
-      const fields = e.fields.map((f) => (f.id === field.id ? field : f));
+      const fields = e.fields.map((f) => (f.id === originalFieldId ? field : f));
       return { ...e, fields };
     });
     onChange(next);
@@ -306,7 +306,9 @@ export function EntityList({
           <EntityDetail
             entity={selected}
             onChange={(patch) => replaceEntity(selected.id, patch)}
-            onFieldChange={(field) => replaceField(selected.id, field)}
+            onFieldChange={(originalFieldId, field) =>
+              replaceField(selected.id, originalFieldId, field)
+            }
             onAddField={(kind) => addField(selected.id, kind)}
             onRemove={(id) => removeEntity(id)}
             expressionSourceFor={expressionSourceFor}
@@ -333,7 +335,7 @@ function EntityDetail({
 }: {
   entity: EntityListEntity;
   onChange: (patch: Partial<EntityListEntity>) => void;
-  onFieldChange: (field: FieldV1) => void;
+  onFieldChange: (originalFieldId: string, field: FieldV1) => void;
   onAddField: (kind: FieldV1["kind"]) => void;
   onRemove: (id: string) => void;
   expressionSourceFor?: ((expressionId: string) => string) | undefined;
@@ -437,7 +439,7 @@ function EntityDetail({
               </div>
               <FieldEditorRouter
                 field={field}
-                onChange={onFieldChange}
+                onChange={(next) => onFieldChange(field.id, next)}
                 siblings={siblings}
                 expressionSourceFor={expressionSourceFor}
                 expressionFallbackFor={expressionFallbackFor}

@@ -21,9 +21,8 @@ RUN npm --prefix web run build
 FROM node:24-alpine
 ENV NODE_ENV=production
 WORKDIR /app
-# I7b Task 1: validated image originals live on local disk. The directory is
-# created writable for the runtime user and declared as a volume below so
-# container restarts never drop uploaded bytes.
+# Railway mounts persistent media storage at runtime. Keep the mount point in
+# the image so the service also starts cleanly when no volume is attached.
 RUN mkdir -p /app/data/media && chown node:node /app/data/media
 USER node
 COPY --chown=node:node --from=build /app/node_modules ./node_modules
@@ -31,6 +30,5 @@ COPY --chown=node:node --from=build /app/dist ./dist
 COPY --chown=node:node --from=web-build /app/web/dist ./web/dist
 COPY --chown=node:node package.json ./package.json
 COPY --chown=node:node migrations ./migrations
-VOLUME /app/data/media
 EXPOSE 3000
 CMD ["npm", "run", "start:http"]

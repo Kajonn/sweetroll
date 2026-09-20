@@ -53,6 +53,10 @@ export type RollActionEditorProps = {
 /** Canned dice sources offered by the guided dice-kind picker. */
 export const GUIDED_DICE_KINDS: ReadonlyArray<string> = ["d4", "d6", "d8", "d10", "d12", "d20"];
 
+function selectedFieldModifier(source: string): string {
+  return /^d(?:4|6|8|10|12|20)\s*\+\s*fields\.([a-z][a-z0-9_]{0,63})$/.exec(source)?.[1] ?? "";
+}
+
 function nextInputId(existing: ReadonlyArray<ActionInputV1>): DefinitionId {
   for (let i = 1; i < 10_000; i++) {
     const candidate = `input_${i}`;
@@ -177,6 +181,8 @@ export function RollActionEditor({
       : null;
 
   const showEmpty = tryItResult === null;
+  const numericFields = Object.entries(fieldTypes).filter(([, valueType]) => valueType === "number");
+  const currentFieldModifier = selectedFieldModifier(expressionSource);
 
   return (
     <section className={styles.layout} data-testid={`roll-action-${action.id}`} aria-label={action.label}>
@@ -195,28 +201,55 @@ export function RollActionEditor({
           </FormField>
         </div>
         {guided === true ? (
-          <div className={styles.field}>
-            <Select
-              label={t("editor.action.roll.diceKind")}
-              id={`dice-kind-${action.id}`}
-              value={diceKind ?? "custom"}
-              onChange={(e) => {
-                if (e.target.value === "custom") {
-                  setCustomEditing(true);
-                  return;
-                }
-                setCustomEditing(false);
-                onDiceKindChange?.(e.target.value);
-              }}
-              data-testid={`dice-kind-${action.id}`}
-              disabled={disabled}
-              title={t("editor.action.roll.diceKind.hint")}
-              options={[
-                ...GUIDED_DICE_KINDS.map((kind) => ({ value: kind, label: kind })),
-                { value: "custom", label: t("editor.action.roll.diceKind.custom") },
-              ]}
-            />
-          </div>
+          <>
+            <div className={styles.field}>
+              <Select
+                label={t("editor.action.roll.diceKind")}
+                id={`dice-kind-${action.id}`}
+                value={diceKind ?? "custom"}
+                onChange={(e) => {
+                  if (e.target.value === "custom") {
+                    setCustomEditing(true);
+                    return;
+                  }
+                  setCustomEditing(false);
+                  const modifier = currentFieldModifier === "" ? "" : ` + fields.${currentFieldModifier}`;
+                  if (modifier === "") onDiceKindChange?.(e.target.value);
+                  else onExpressionSourceChange(`${e.target.value}${modifier}`);
+                }}
+                data-testid={`dice-kind-${action.id}`}
+                disabled={disabled}
+                title={t("editor.action.roll.diceKind.hint")}
+                options={[
+                  ...GUIDED_DICE_KINDS.map((kind) => ({ value: kind, label: kind })),
+                  { value: "custom", label: t("editor.action.roll.diceKind.custom") },
+                ]}
+              />
+            </div>
+            {numericFields.length > 0 ? (
+              <div className={styles.field}>
+                <Select
+                  label={t("editor.action.roll.fieldModifier")}
+                  id={`roll-field-modifier-${action.id}`}
+                  value={currentFieldModifier}
+                  onChange={(event) => {
+                    const base = (diceKind ?? "d20") === "custom" ? "d20" : (diceKind ?? "d20");
+                    onExpressionSourceChange(
+                      event.target.value === ""
+                        ? base
+                        : `${base} + fields.${event.target.value}`,
+                    );
+                  }}
+                  data-testid={`roll-field-modifier-${action.id}`}
+                  disabled={disabled}
+                  options={[
+                    { value: "", label: t("editor.action.roll.fieldModifier.none") },
+                    ...numericFields.map(([id]) => ({ value: id, label: id })),
+                  ]}
+                />
+              </div>
+            ) : null}
+          </>
         ) : (
           <div className={styles.field}>
             <FormField label={t("editor.action.roll.expressionId")}>

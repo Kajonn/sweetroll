@@ -24,6 +24,21 @@ describe("DefinitionIdInput", () => {
     expect(screen.getByLabelText(/id/i)).toBeInTheDocument();
   });
 
+  it("uses a unique DOM id for each rendered input", () => {
+    render(
+      <>
+        <DefinitionIdInput value="first" onChange={() => {}} />
+        <DefinitionIdInput value="second" onChange={() => {}} />
+      </>,
+    );
+
+    const inputs = screen.getAllByTestId("definition-id-input");
+    expect(inputs[0]?.id).not.toBe(inputs[1]?.id);
+    const labels = screen.getAllByText("ID", { selector: "label" });
+    expect(labels[0]).toHaveAttribute("for", inputs[0]?.id);
+    expect(labels[1]).toHaveAttribute("for", inputs[1]?.id);
+  });
+
   it("does not show a footer when the id is not referenced elsewhere", () => {
     renderInput({ value: "name" });
     expect(screen.queryByTestId("definition-id-references")).not.toBeInTheDocument();

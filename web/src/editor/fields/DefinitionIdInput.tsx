@@ -1,5 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { t } from "../../i18n/index.js";
 import styles from "./DefinitionIdInput.module.css";
@@ -25,6 +25,7 @@ export function DefinitionIdInput({
 }: DefinitionIdInputProps) {
   const [draft, setDraft] = useState(value);
   const [pending, setPending] = useState<string | null>(null);
+  const generatedId = useId();
   const refs = referencedBy ?? 0;
 
   useEffect(() => {
@@ -58,7 +59,8 @@ export function DefinitionIdInput({
   };
 
   const valid = isValidDefinitionId(draft);
-  const inputId = "definition-id-input";
+  const inputId = `definition-id-input-${generatedId}`;
+  const referencesId = `definition-id-references-${generatedId}`;
 
   return (
     <div className={styles.field} data-testid="definition-id-input-wrapper">
@@ -77,9 +79,9 @@ export function DefinitionIdInput({
         autoCapitalize="off"
         autoCorrect="off"
         aria-invalid={!valid}
-        aria-describedby={refs > 0 ? "definition-id-references" : undefined}
+        aria-describedby={refs > 0 ? referencesId : undefined}
         disabled={disabled}
-        data-testid={inputId}
+        data-testid="definition-id-input"
       />
       {!valid && (
         <p className={styles.error} data-testid="definition-id-input-error">
@@ -87,7 +89,7 @@ export function DefinitionIdInput({
         </p>
       )}
       {refs > 0 && (
-        <p className={styles.references} data-testid="definition-id-references">
+        <p id={referencesId} className={styles.references} data-testid="definition-id-references">
           {t("editor.fields.id.referencedBy", { count: refs })}
         </p>
       )}

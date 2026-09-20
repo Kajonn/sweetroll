@@ -8,7 +8,13 @@ import { Button, EmptyState, FormField } from "../../ui/index.js";
 import { DefinitionIdInput } from "../fields/DefinitionIdInput.js";
 import { SectionEditor } from "./SectionEditor.js";
 import styles from "./SheetEditor.module.css";
-import type { SheetEditorV1, SheetSectionV1 } from "./sheetTypes.js";
+import type { SheetEditorV1, SheetElementV1, SheetSectionV1 } from "./sheetTypes.js";
+
+export type UnplacedDefinition = {
+  kind: "field" | "resource" | "action";
+  id: DefinitionId;
+  label: string;
+};
 
 export type SheetEditorProps = {
   sheet: SheetEditorV1;
@@ -19,13 +25,20 @@ export type SheetEditorProps = {
    */
   allocateSectionId?: (() => DefinitionId) | undefined;
   allocateElementId?: (() => DefinitionId) | undefined;
+  unplacedDefinitions?: ReadonlyArray<UnplacedDefinition> | undefined;
 };
 
 type Focus =
   | { kind: "section"; sectionIdx: number; elementIdx: number | null }
   | null;
 
-export function SheetEditor({ sheet, onChange, allocateSectionId, allocateElementId }: SheetEditorProps) {
+export function SheetEditor({
+  sheet,
+  onChange,
+  allocateSectionId,
+  allocateElementId,
+  unplacedDefinitions = [],
+}: SheetEditorProps) {
   const [focus, setFocus] = useState<Focus>(null);
 
   const replaceSheet = (patch: Partial<SheetEditorV1>) => {
@@ -108,6 +121,28 @@ export function SheetEditor({ sheet, onChange, allocateSectionId, allocateElemen
     });
   };
 
+  const placeDefinition = (definition: UnplacedDefinition) => {
+    const id = allocateElementId?.() ?? nextElementId(sheet);
+    const element: SheetElementV1 =
+      definition.kind === "field"
+        ? { kind: "field", id, fieldId: definition.id }
+        : definition.kind === "resource"
+          ? { kind: "resource", id, resourceId: definition.id }
+          : { kind: "action", id, actionId: definition.id };
+    if (sheet.sections.length === 0) {
+      const section: SheetSectionV1 = {
+        id: allocateSectionId?.() ?? nextSectionId([]),
+        label: defaultSectionLabel([]),
+        elements: [element],
+      };
+      replaceSheet({ sections: [section] });
+      return;
+    }
+    const first = sheet.sections[0];
+    if (first === undefined) return;
+    replaceSection(0, { ...first, elements: [...first.elements, element] });
+  };
+
   const sheetTotal = sheet.sections.length;
   const isSectionActive = (idx: number) =>
     focus?.kind === "section" && focus.sectionIdx === idx;
@@ -148,6 +183,26 @@ export function SheetEditor({ sheet, onChange, allocateSectionId, allocateElemen
           </div>
         </div>
       </header>
+      {unplacedDefinitions.length > 0 ? (
+        <aside className={styles.unplaced} data-testid="sheet-unplaced-definitions">
+          <div>
+            <h3 className={styles.unplacedTitle}>{t("editor.sheet.unplaced.title")}</h3>
+            <p className={styles.unplacedHint}>{t("editor.sheet.unplaced.hint")}</p>
+          </div>
+          <div className={styles.unplacedActions}>
+            {unplacedDefinitions.map((definition) => (
+              <Button
+                key={`${definition.kind}:${definition.id}`}
+                variant="secondary"
+                onClick={() => placeDefinition(definition)}
+                data-testid={`sheet-place-definition-${definition.id}`}
+              >
+                {t("editor.sheet.unplaced.place", { label: definition.label })}
+              </Button>
+            ))}
+          </div>
+        </aside>
+      ) : null}
       <div className={styles.sectionsHeader}>
         <h3 className={styles.sectionsTitle}>{t("editor.sheet.sections")}</h3>
         <Button
@@ -268,4 +323,13 @@ function defaultSectionLabel(sections: SheetSectionV1[]): string {
     if (!sections.some((s) => s.label === candidate)) return candidate;
   }
   return `${base} ${Date.now()}`;
+}
+
+function nextElementId(sheet: SheetEditorV1): DefinitionId {
+  const used = new Set(sheet.sections.flatMap((section) => section.elements.map((element) => element.id)));
+  for (let i = 1; i < 10_000; i++) {
+    const candidate = `element_${i}`;
+    if (!used.has(candidate)) return candidate;
+  }
+  return `element_${Date.now()}`;
 }

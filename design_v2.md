@@ -111,8 +111,8 @@ A GM may use **multiple devices in the same session simultaneously**, with each 
 ## 5.2 Create and publish a custom system
 
 1. Create a system draft from blank or by **cloning a template**; define name, description, language, and default dice notation.
-2. Define fields, resources, and actions with simple math/dice expressions.
-3. Arrange a single-column sheet into sections.
+2. Define fields, resources, and actions with guided controls for common dice plus an optional numeric attribute modifier; direct expression editing remains an advanced path.
+3. Arrange a single-column sheet into sections. The builder lists definitions not yet present on the target sheet and places each with one action, creating the first section when necessary; creators do not copy stable IDs for the basic path.
 4. Validate, preview with sample data (phone/desktop), and publish an immutable version. Share by direct link or invite.
 
 ## 5.3 Join and play
@@ -160,6 +160,8 @@ A sheet is a **single-column linear scroll** (predictable collapse to one column
 - A flat list of **action buttons** (rolls and simple stat bumps)
 
 **Removed from MVP:** tabs, multi-column grid layouts, drag-drop element palette, manual binding inspector, reusable fragments, conditional display, viewport authoring beyond preview. Keep only a simple section/order editor with move-up/down controls and keyboard authoring.
+
+The basic builder exposes an explicit “not on this character sheet” list for the sheet's target entity and global actions. Adding an item binds it to the first section (or creates that section when absent) using a generated document-wide element ID. Manual target-ID editing remains an advanced repair path, not the expected creation flow.
 
 ## 6.4 Rules and expression engine
 
@@ -646,8 +648,8 @@ Every increment must meet all applicable criteria before work begins on the next
 1. Establish the responsive React application shell, generated HTTP client, authenticated system library, accessible UI foundations, fault-containment view, and request/error correlation display.
 2. Build draft creation, metadata editing, autosave status, revision-conflict recovery, archive controls, and recoverable navigation between systems.
 3. Build editors for scalar, choice, resource, and computed fields with constraints, stable-ID handling, and immediate server-backed validation.
-4. Build the single-column sheet section/order editor with move controls and complete keyboard operation; do not add grid layout or drag-only behavior.
-5. Build simple math, dice action, validation-rule, and reference-data editors that expose only the grammar supported by I1.
+4. Build the single-column sheet section/order editor with move controls, complete keyboard operation, and one-action placement of definitions that are not yet on the sheet; do not add grid layout or drag-only behavior.
+5. Build simple math, dice action, validation-rule, and reference-data editors that expose only the grammar supported by I1. Common rolls use guided dice and numeric-attribute selectors so the basic journey does not require expression syntax.
 6. Build deterministic sample-data preview at phone and desktop widths using an immutable test snapshot rather than the mutable draft.
 7. Build validation reporting that links errors and accessibility warnings to the responsible editor and prevents invalid publication.
 8. Build publish confirmation, semantic version selection, release notes, version history, deprecation, package export, and clone-from-template workflows.

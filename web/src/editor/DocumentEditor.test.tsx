@@ -4,7 +4,12 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { createApiClient } from "../api/client.js";
-import { DocumentEditor } from "./DocumentEditor.js";
+import {
+  diceKindFor,
+  DocumentEditor,
+  unplacedDefinitionsForSheet,
+} from "./DocumentEditor.js";
+import { blankDocument } from "../state/documentReducer.js";
 
 type AssessmentLike = {
   ok: boolean;
@@ -77,6 +82,38 @@ function renderEditor(
 }
 
 describe("DocumentEditor", () => {
+  it("keeps a guided die selected when its expression has a field modifier", () => {
+    expect(diceKindFor("d20 + fields.strength")).toBe("d20");
+  });
+
+  it("lists only definitions that are not yet placed on the target sheet", () => {
+    const document = blankDocument();
+    document.entities = [{
+      id: "character",
+      label: "Character",
+      fields: [
+        { id: "strength", kind: "integer", label: "Strength" },
+        { id: "health", kind: "resource", label: "Health" },
+      ],
+    }];
+    document.actions = [{ id: "check", kind: "roll", label: "Check" }];
+    const sheet = {
+      id: "main",
+      label: "Main",
+      targetEntityId: "character",
+      sections: [{
+        id: "attributes",
+        label: "Attributes",
+        elements: [{ kind: "field" as const, id: "element_1", fieldId: "strength" }],
+      }],
+    };
+
+    expect(unplacedDefinitionsForSheet(document, sheet)).toEqual([
+      { kind: "resource", id: "health", label: "Health" },
+      { kind: "action", id: "check", label: "Check" },
+    ]);
+  });
+
   it("renders the tab nav and a header with system name", async () => {
     renderEditor();
 

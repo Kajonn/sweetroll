@@ -150,6 +150,25 @@ describe("SheetEditor", () => {
     expect(next?.sections[2]?.elements).toEqual([]);
   });
 
+  it("places an unplaced definition in the first section with one click", async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderSheet({
+      unplacedDefinitions: [
+        { kind: "field", id: "constitution", label: "Constitution" },
+      ],
+      allocateElementId: () => "element_9",
+    });
+
+    await user.click(screen.getByTestId("sheet-place-definition-constitution"));
+
+    const next = lastCallPayload(onChange);
+    expect(next?.sections[0]?.elements.at(-1)).toEqual({
+      kind: "field",
+      id: "element_9",
+      fieldId: "constitution",
+    });
+  });
+
   it("uses the provided section allocator when adding a section", async () => {
     const user = userEvent.setup();
     const { onChange } = renderSheet({ allocateSectionId: () => "custom_section" });

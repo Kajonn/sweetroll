@@ -54,6 +54,7 @@ type RenderOptions = {
   guided?: boolean;
   diceKind?: string;
   onDiceKindChange?: (next: string) => void;
+  fieldTypes?: Record<string, "number" | "text" | "boolean">;
 };
 
 function renderEditor(options: RenderOptions = {}) {
@@ -65,6 +66,7 @@ function renderEditor(options: RenderOptions = {}) {
     guided,
     diceKind,
     onDiceKindChange,
+    fieldTypes = {},
   } = options;
   const client: ApiClient = createApiClient({ baseUrl: "http://x", fetch: fetch_ as typeof fetch });
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -82,7 +84,7 @@ function renderEditor(options: RenderOptions = {}) {
       onChange={trackedOnChange}
       expressionSource={expressionSource}
       onExpressionSourceChange={onExpressionSourceChange ?? vi.fn()}
-      fieldTypes={{}}
+      fieldTypes={fieldTypes}
       guided={guided}
       diceKind={diceKind}
       onDiceKindChange={onDiceKindChange}
@@ -98,7 +100,7 @@ function renderEditor(options: RenderOptions = {}) {
         onChange={trackedOnChange}
         expressionSource={expressionSource}
         onExpressionSourceChange={onExpressionSourceChange ?? vi.fn()}
-        fieldTypes={{}}
+        fieldTypes={fieldTypes}
         guided={guided}
         diceKind={diceKind}
         onDiceKindChange={onDiceKindChange}
@@ -313,5 +315,22 @@ describe("RollActionEditor", () => {
     fireEvent.change(screen.getByTestId("dice-kind-atk"), { target: { value: "d6" } });
     expect(onDiceKindChange).toHaveBeenCalledWith("d6");
     expect(screen.queryByTestId("expression-editor-source")).not.toBeInTheDocument();
+  });
+
+  it("adds a numeric character field as a modifier without requiring expression syntax", () => {
+    const onExpressionSourceChange = vi.fn();
+    renderEditor({
+      guided: true,
+      diceKind: "d20",
+      expressionSource: "d20",
+      fieldTypes: { strength: "number", name: "text" },
+      onExpressionSourceChange,
+    });
+
+    fireEvent.change(screen.getByTestId("roll-field-modifier-atk"), {
+      target: { value: "strength" },
+    });
+
+    expect(onExpressionSourceChange).toHaveBeenCalledWith("d20 + fields.strength");
   });
 });

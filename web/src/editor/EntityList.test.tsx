@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -175,6 +175,31 @@ describe("EntityList", () => {
     const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1]?.[0];
     const character = lastCall?.find((e: { id: string }) => e.id === "character");
     expect(character?.fields[0]?.default).toBe("X");
+  });
+
+  it("persists a field ID rename instead of looking up the field by its new ID", () => {
+    const { onChange } = renderList([
+      makeEntity("character", "Character", [
+        {
+          kind: "integer",
+          id: "field_1",
+          label: "Dexterity",
+          default: 0,
+          required: false,
+          min: 0,
+          max: 20,
+          step: 1,
+        } as FieldV1,
+      ]),
+    ]);
+
+    fireEvent.change(screen.getByTestId("definition-id-input"), {
+      target: { value: "dexterity" },
+    });
+
+    const lastCall = onChange.mock.calls.at(-1)?.[0];
+    expect(lastCall?.[0]?.fields[0]?.id).toBe("dexterity");
+    expect(screen.getByTestId("scalar-field-dexterity")).toBeInTheDocument();
   });
 
   it("dispatches entity label changes through onChange", async () => {

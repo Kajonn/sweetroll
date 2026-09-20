@@ -67,3 +67,8 @@ specs. On failure CI uploads `web/test-results/` as `browser-failure-evidence`
 Build one image with `docker build -t sweetroll .`.
 The default command runs HTTP. Run migrations from the same image with
 `docker run --rm --env-file .env sweetroll npm run start:migrate`.
+
+## Railway deployment
+
+See [Railway setup](docs/operations/railway.md) for GitHub integration, PostgreSQL,
+media storage, environment variables, and the outstanding application-login gate.

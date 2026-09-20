@@ -35,6 +35,11 @@ const isDevMode = (): boolean => {
   return import.meta.env?.MODE === "development";
 };
 
+const isProductionBuild = (): boolean => {
+  if (typeof import.meta === "undefined") return false;
+  return import.meta.env?.PROD === true;
+};
+
 /** Player paths where anonymous first-run sees the welcome instead of the sign-in prompt. */
 function isPlayerPath(pathname: string): boolean {
   return (
@@ -145,6 +150,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [, setOnboardingTick] = useState(0);
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [installDismissed, setInstallDismissed] = useState<boolean>(() => isInstallDismissed());
+  const [acceptanceSignInAvailable, setAcceptanceSignInAvailable] = useState(false);
+  useEffect(() => {
+    if (!isProductionBuild()) return;
+    let disposed = false;
+    void fetch("/dev/signin/codes", { credentials: "same-origin" })
+      .then(async response => {
+        if (!response.ok) return false;
+        const body = await response.json() as { codes?: Array<{ code?: string }> };
+        return body.codes?.some(entry => entry.code === "code-dev") ?? false;
+      })
+      .catch(() => false)
+      .then(available => { if (!disposed) setAcceptanceSignInAvailable(available); });
+    return () => { disposed = true; };
+  }, []);
   useEffect(() => {
     let disposed = false;
     let cleanup = () => {};
@@ -331,6 +350,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                 children
               ) : auth.state === "anonymous" && isDevMode() ? (
                 <DevSignInPanel onSignedIn={markSignedIn} />
+              ) : auth.state === "anonymous" && acceptanceSignInAvailable ? (
+                <DevSignInPanel acceptance onSignedIn={markSignedIn} />
               ) : auth.state === "anonymous" ? (
                 // Production anonymous never keeps protected views mounted:
                 // sign-out unmounts routed children (editor, library) instead

@@ -4,9 +4,16 @@ import { t } from "../i18n/index.js";
 
 import styles from "./DevSignInPanel.module.css";
 
-export function DevSignInPanel({ onSignedIn }: { onSignedIn: () => void | Promise<void> }) {
+export function DevSignInPanel({
+  onSignedIn,
+  acceptance = false,
+}: {
+  onSignedIn: () => void | Promise<void>;
+  acceptance?: boolean;
+}) {
   const [code, setCode] = useState("code-dev");
   const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
   return (
     <form
       className={styles.panel}
@@ -15,6 +22,7 @@ export function DevSignInPanel({ onSignedIn }: { onSignedIn: () => void | Promis
       onSubmit={async (e) => {
         e.preventDefault();
         setPending(true);
+        setFailed(false);
         try {
           const res = await fetch("/dev/signin", {
             method: "POST",
@@ -23,21 +31,33 @@ export function DevSignInPanel({ onSignedIn }: { onSignedIn: () => void | Promis
             body: JSON.stringify({ code, redirectUri: window.location.origin + "/cb" }),
           });
           if (res.ok) await onSignedIn();
+          else setFailed(true);
+        } catch {
+          setFailed(true);
         } finally {
           setPending(false);
         }
       }}
     >
-      <label htmlFor="dev-signin-code">{t("shell.devSignIn.code")}</label>
-      <input
-        id="dev-signin-code"
-        value={code}
-        onChange={(e) => setCode(e.target.value)}
-        data-testid="dev-signin-code"
-      />
+      {acceptance ? (
+        <strong>{t("shell.acceptanceSignIn.title")}</strong>
+      ) : (
+        <>
+          <label htmlFor="dev-signin-code">{t("shell.devSignIn.code")}</label>
+          <input
+            id="dev-signin-code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            data-testid="dev-signin-code"
+          />
+        </>
+      )}
       <button type="submit" data-testid="dev-signin" disabled={pending}>
-        {t("shell.devSignIn.button")}
+        {pending
+          ? t("shell.acceptanceSignIn.pending")
+          : t(acceptance ? "shell.acceptanceSignIn.button" : "shell.devSignIn.button")}
       </button>
+      {failed ? <p role="alert">{t("shell.acceptanceSignIn.failed")}</p> : null}
     </form>
   );
 }

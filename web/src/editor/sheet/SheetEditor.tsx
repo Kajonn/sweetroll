@@ -40,6 +40,7 @@ export function SheetEditor({
   unplacedDefinitions = [],
 }: SheetEditorProps) {
   const [focus, setFocus] = useState<Focus>(null);
+  const [placementSectionId, setPlacementSectionId] = useState<DefinitionId | null>(null);
 
   const replaceSheet = (patch: Partial<SheetEditorV1>) => {
     onChange({ ...sheet, ...patch });
@@ -138,12 +139,16 @@ export function SheetEditor({
       replaceSheet({ sections: [section] });
       return;
     }
-    const first = sheet.sections[0];
-    if (first === undefined) return;
-    replaceSection(0, { ...first, elements: [...first.elements, element] });
+    const sectionIdx = Math.max(0, sheet.sections.findIndex((section) => section.id === placementSectionId));
+    const target = sheet.sections[sectionIdx];
+    if (target === undefined) return;
+    replaceSection(sectionIdx, { ...target, elements: [...target.elements, element] });
   };
 
   const sheetTotal = sheet.sections.length;
+  const selectedPlacementSectionId = sheet.sections.find((section) => section.id === placementSectionId)?.id
+    ?? sheet.sections[0]?.id
+    ?? "";
   const isSectionActive = (idx: number) =>
     focus?.kind === "section" && focus.sectionIdx === idx;
   const activeElementIdx = (idx: number) =>
@@ -189,6 +194,23 @@ export function SheetEditor({
             <h3 className={styles.unplacedTitle}>{t("editor.sheet.unplaced.title")}</h3>
             <p className={styles.unplacedHint}>{t("editor.sheet.unplaced.hint")}</p>
           </div>
+          {sheet.sections.length > 0 ? (
+            <div className={styles.placementTarget}>
+              <label htmlFor={`sheet-placement-section-${sheet.id}`}>
+                {t("editor.sheet.unplaced.section")}
+              </label>
+              <select
+                id={`sheet-placement-section-${sheet.id}`}
+                data-testid="sheet-placement-section"
+                value={selectedPlacementSectionId}
+                onChange={(event) => setPlacementSectionId(event.target.value)}
+              >
+                {sheet.sections.map((section) => (
+                  <option key={section.id} value={section.id}>{section.label}</option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <div className={styles.unplacedActions}>
             {unplacedDefinitions.map((definition) => (
               <Button

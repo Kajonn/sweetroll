@@ -4,8 +4,8 @@ import { Check } from "lucide-react";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import type { ApiClient } from "../api/client.js";
-import { useOpenSystem } from "../api/openSystem.js";
-import type { DocumentAssessment } from "../api/server.js";
+import { openSystemKey, useOpenSystem } from "../api/openSystem.js";
+import type { DocumentAssessment, PublishedVersion, SystemWorkspace } from "../api/server.js";
 import { t } from "../i18n/index.js";
 import type { ScalarValue, ValueType } from "../ports/evaluateExpression.js";
 import { ResourceBumpEditor, type ResourceBumpActionV1 } from "./actions/ResourceBumpEditor.js";
@@ -129,6 +129,7 @@ export function DocumentEditor({
     generation: generation ?? 0,
   });
   const [active, setActive] = useState<CreatorTabId>(() => readActiveTab());
+  const queryClient = useQueryClient();
 
   if (query.isPending) {
     return (
@@ -163,6 +164,14 @@ export function DocumentEditor({
       onActiveChange={setActive}
       initialDoc={initialDoc}
       assessment={ws.assessment}
+      onPublished={(version) => {
+        const key = openSystemKey(systemId, { actorId: actorId ?? null, generation: generation ?? 0 });
+        queryClient.setQueryData<SystemWorkspace>(key, current => current === undefined ? current : {
+          ...current,
+          versions: [{ versionId: version.versionId, systemId: version.systemId, semanticVersion: version.semanticVersion, checksum: version.checksum, releaseNotes: version.releaseNotes, lifecycle: version.lifecycle, createdAt: version.createdAt }, ...current.versions.filter(existing => existing.versionId !== version.versionId)],
+        });
+        void queryClient.invalidateQueries({ queryKey: key });
+      }}
       advancedDefaultOpen={readAdvancedDefaultOpen()}
     />
   );
@@ -190,6 +199,7 @@ export function DocumentEditorBody({
   onActiveChange,
   initialDoc,
   assessment,
+  onPublished,
   advancedDefaultOpen,
 }: {
   client: ApiClient;
@@ -198,6 +208,7 @@ export function DocumentEditorBody({
   onActiveChange: (next: CreatorTabId) => void;
   initialDoc: SystemDocumentV1;
   assessment: DocumentAssessment;
+  onPublished?: ((version: PublishedVersion) => void) | undefined;
   advancedDefaultOpen?: boolean | undefined;
 }) {
   const [document, dispatch] = useReducer(documentReducer, initialDoc);
@@ -591,6 +602,7 @@ export function DocumentEditorBody({
       </main>
       <PublishDialog
         client={client}
+        onPublished={onPublished}
         open={publishOpen}
         onOpenChange={setPublishOpen}
         systemId={ws.system.systemId}

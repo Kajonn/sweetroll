@@ -57,6 +57,7 @@ function makeApi(overrides: Partial<CharactersApi> = {}): CharactersApi {
     creationOptions: vi.fn(async () => {
       throw new Error("unused");
     }),
+    listCreationVersions: vi.fn(async () => ({ data: { versions: [], nextCursor: null }, requestId: "r" })),
     activity: vi.fn(async () => ({ events: [], nextCursor: null, requestId: "r" })),
     send: vi.fn(async () => {
       throw new Error("unused");
@@ -84,6 +85,27 @@ function makeApi(overrides: Partial<CharactersApi> = {}): CharactersApi {
 }
 
 describe("CharacterTools", () => {
+  it("offers published versions of the character's system and previews the selected version", async () => {
+    const user = userEvent.setup();
+    const target = "33333333-3333-4000-8000-000000000000";
+    const api = makeApi({
+      listCreationVersions: vi.fn(async () => ({ data: { versions: [
+        { versionId: "11111111-1111-4000-8000-000000000000", systemId: "22222222-2222-4000-8000-000000000000", systemName: "D20", semanticVersion: "1.0.0", createdAt: "2026-09-06T00:00:00Z" },
+        { versionId: target, systemId: "22222222-2222-4000-8000-000000000000", systemName: "D20", semanticVersion: "2.0.0", createdAt: "2026-09-06T00:00:00Z" },
+        { versionId: "other", systemId: "other", systemName: "Other", semanticVersion: "9.0.0", createdAt: "2026-09-06T00:00:00Z" },
+      ], nextCursor: null }, requestId: "r" })),
+      previewMigration: vi.fn(async () => migrationPreview()),
+    });
+    render(<CharacterTools characterId="char-1" api={api} session={makeSession(readySnapshot())} />);
+    await user.click(screen.getByRole("button", { name: /^migration$/i }));
+    const choice = screen.getByRole("combobox", { name: /target version/i });
+    await waitFor(() => expect(screen.getByRole("option", { name: /D20 · 2.0.0/ })).toBeInTheDocument());
+    expect(screen.queryByRole("option", { name: /D20 · 1.0.0/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Other/ })).not.toBeInTheDocument();
+    await user.selectOptions(choice, target);
+    await user.click(screen.getByRole("button", { name: /preview migration/i }));
+    expect(api.previewMigration).toHaveBeenCalledWith("char-1", { targetVersionId: target });
+  });
   let urls: string[];
   let originalCreate: typeof URL.createObjectURL | undefined;
   let originalRevoke: typeof URL.revokeObjectURL | undefined;
@@ -193,16 +215,16 @@ describe("CharacterTools", () => {
     const api = makeApi();
     render(<CharacterTools characterId="char-1" api={api} session={session} />);
     await user.click(screen.getByRole("button", { name: /activity/i }));
-    await waitFor(() => expect(screen.getByText(/field-set/)).toBeVisible());
+    await waitFor(() => expect(screen.getByText(/Field set/)).toBeVisible());
     await user.click(screen.getByRole("button", { name: /load more/i }));
-    await waitFor(() => expect(screen.getByText(/bump/)).toBeVisible());
+    await waitFor(() => expect(screen.getByText(/Bump/)).toBeVisible());
     expect(fetchActivityPage).toHaveBeenLastCalledWith("cursor-1");
     expect(api.activity).not.toHaveBeenCalled();
     // Close, go offline, reopen: the last fetched page shows marked stale.
     await user.click(screen.getByRole("button", { name: /^close$/i }));
     fetchActivityPage.mockImplementation(async () => ({ ...second, stale: true }));
     await user.click(screen.getByRole("button", { name: /activity/i }));
-    await waitFor(() => expect(screen.getByText(/bump/)).toBeVisible());
+    await waitFor(() => expect(screen.getByText(/Bump/)).toBeVisible());
     expect(screen.getAllByText(/stale/i).length).toBeGreaterThan(0);
   });
 
@@ -226,7 +248,8 @@ describe("CharacterTools", () => {
     const session = makeSession(readySnapshot());
     render(<CharacterTools characterId="char-1" api={api} session={session} now={() => "2026-09-06T00:00:00.000Z"} />);
     await user.click(screen.getByRole("button", { name: /migration/i }));
-    await user.type(screen.getByLabelText(/target version/i), "22222222-2222-4000-8000-000000000000");
+    await user.click(screen.getByText(/use a version from a direct link/i));
+    await user.type(screen.getByLabelText(/^version id$/i), "22222222-2222-4000-8000-000000000000");
     await user.click(screen.getByRole("button", { name: /preview migration/i }));
     await waitFor(() => expect(screen.getByText(/Type change on health/)).toBeVisible());
     expect(screen.getByText(/expired|re-preview/i)).toBeVisible();
@@ -329,7 +352,8 @@ describe("CharacterTools", () => {
     const api = makeApi({ previewMigration: vi.fn(async () => preview) });
     render(<CharacterTools characterId="char-1" api={api} session={makeSession(readySnapshot())} now={() => "2026-09-06T00:00:00.000Z"} />);
     await user.click(screen.getByRole("button", { name: /migration/i }));
-    await user.type(screen.getByLabelText(/target version/i), "22222222-2222-4000-8000-000000000000");
+    await user.click(screen.getByText(/use a version from a direct link/i));
+    await user.type(screen.getByLabelText(/^version id$/i), "22222222-2222-4000-8000-000000000000");
     await user.click(screen.getByRole("button", { name: /preview migration/i }));
     const region = await screen.findByLabelText(/migration preview/i);
     expect(within(region).getByText(/name/)).toBeVisible();
@@ -377,7 +401,8 @@ describe("CharacterTools", () => {
     const session = makeSession(readySnapshot());
     render(<CharacterTools characterId="char-1" api={api} session={session} now={() => "2026-09-06T00:00:00.000Z"} />);
     await user.click(screen.getByRole("button", { name: /migration/i }));
-    await user.type(screen.getByLabelText(/target version/i), "22222222-2222-4000-8000-000000000000");
+    await user.click(screen.getByText(/use a version from a direct link/i));
+    await user.type(screen.getByLabelText(/^version id$/i), "22222222-2222-4000-8000-000000000000");
     await user.click(screen.getByRole("button", { name: /preview migration/i }));
     await waitFor(() => expect(screen.getByRole("button", { name: /commit migration/i })).toBeDisabled());
     expect(screen.getByText(/older revision|re-preview/i)).toBeVisible();
@@ -403,13 +428,13 @@ describe("CharacterTools", () => {
     clickSpy.mockRestore();
   });
 
-  it("loads activity through the session cache and labels rows with kind, summary and time", async () => {
+  it("loads activity through the session cache and shows a readable action and local date", async () => {
     const user = userEvent.setup();
     const api = makeApi();
     const session = makeSession(readySnapshot());
     const fetchActivityPage = vi.fn(async (_cursor: string | null) => ({
       events: [
-        { id: "a1", characterRevision: 3, kind: "field-set", payload: {}, rollId: null, requestId: "r", occurredAt: "2026-09-06T00:00:00.000Z" },
+        { id: "a1", characterRevision: 3, kind: "character_field_set", payload: {}, rollId: null, requestId: "r", occurredAt: "2026-09-06T00:00:00.000Z" },
       ],
       nextCursor: null as string | null,
       stale: false,
@@ -420,9 +445,9 @@ describe("CharacterTools", () => {
     await user.click(screen.getByRole("button", { name: /activity/i }));
     await waitFor(() => expect(fetchActivityPage).toHaveBeenCalledWith(null));
     expect(api.activity).not.toHaveBeenCalled();
-    expect(screen.getByText(/field-set/)).toBeVisible();
-    expect(screen.getAllByText(/2026-09-06/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/revision 3/i)).toBeVisible();
+    expect(screen.getByText("Field updated")).toBeVisible();
+    expect(screen.getByText("Field updated").closest("li")?.querySelector("time")).toHaveAttribute("dateTime", "2026-09-06T00:00:00.000Z");
+    expect(screen.queryByText(/revision 3/i)).not.toBeInTheDocument();
   });
 
   it("reopens the last cached activity page marked stale while offline", async () => {
@@ -439,7 +464,7 @@ describe("CharacterTools", () => {
     (session.fetchActivityPage as unknown as ReturnType<typeof vi.fn>) = vi.fn(async () => cached);
     render(<CharacterTools characterId="char-1" api={makeApi()} session={session} />);
     await user.click(screen.getByRole("button", { name: /activity/i }));
-    await waitFor(() => expect(screen.getByText(/field-set/)).toBeVisible());
+    await waitFor(() => expect(screen.getByText(/Field set/)).toBeVisible());
     expect(screen.getByText(/stale/i)).toBeVisible();
   });
 
@@ -467,11 +492,11 @@ describe("CharacterTools", () => {
     (session.fetchActivityPage as unknown as typeof fetchActivityPage) = fetchActivityPage;
     render(<CharacterTools characterId="char-1" api={makeApi()} session={session} />);
     await user.click(screen.getByRole("button", { name: /activity/i }));
-    await waitFor(() => expect(screen.getByText(/field-set/)).toBeVisible());
+    await waitFor(() => expect(screen.getByText(/Field set/)).toBeVisible());
     await user.click(screen.getByRole("button", { name: /load more/i }));
     await waitFor(() => expect(fetchActivityPage).toHaveBeenCalledWith("cursor-1"));
-    expect(screen.getAllByText(/field-set/)).toHaveLength(1);
-    expect(screen.getByText(/bump/)).toBeVisible();
+    expect(screen.getAllByText(/Field set/)).toHaveLength(1);
+    expect(screen.getByText(/Bump/)).toBeVisible();
   });
 
   it("disables migration preview while offline, queued or blocked by an uncertain outcome", async () => {
@@ -551,7 +576,8 @@ describe("CharacterTools", () => {
     const session = makeSession(readySnapshot());
     render(<CharacterTools characterId="char-1" api={api} session={session} now={() => "2026-09-06T00:00:00.000Z"} />);
     await user.click(screen.getByRole("button", { name: /migration/i }));
-    await user.type(screen.getByLabelText(/target version/i), "22222222-2222-4000-8000-000000000000");
+    await user.click(screen.getByText(/use a version from a direct link/i));
+    await user.type(screen.getByLabelText(/^version id$/i), "22222222-2222-4000-8000-000000000000");
     await user.click(screen.getByRole("button", { name: /preview migration/i }));
     const commit = await screen.findByRole("button", { name: /commit migration/i });
     expect(commit).toBeDisabled();
@@ -570,9 +596,8 @@ describe("CharacterTools", () => {
     );
     render(<CharacterTools characterId="char-1" api={makeApi()} session={session} now={() => "2026-09-06T00:00:00.000Z"} />);
     await user.click(screen.getByRole("button", { name: /migration/i }));
-    expect(screen.getByText(/p-1/)).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /use last migration|use .*rollback/i }));
-    expect(screen.getByLabelText(/migration id/i)).toHaveValue("p-1");
+    expect(screen.getByText(/last migration can be rolled back/i)).toBeVisible();
+    expect(screen.queryByText(/p-1/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /roll back migration/i }));
     expect(session.rollbackMigration).toHaveBeenCalledWith("p-1");
   });

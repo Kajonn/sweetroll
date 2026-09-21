@@ -5,7 +5,7 @@ import { Button } from "../ui/Button.js";
 import type { CharactersApi } from "./api.js";
 import { captureOpener, focusFirst, restoreOpener, trapTabKey } from "./dialogTrap.js";
 import type { CharacterSession } from "./session.js";
-import type { ActivityEvent, MigrationPreview } from "./types.js";
+import type { ActivityEvent, CreationVersionEntry, MigrationPreview } from "./types.js";
 import styles from "./characters.module.css";
 
 export type CharacterToolsProps = {
@@ -165,11 +165,22 @@ function ConfirmDialog({ title, confirmLabel, onConfirm, onClose }: { title: str
 }
 
 function ActivityRow({ event }: { event: ActivityEvent }) {
+  const knownKinds = new Set([
+    "character_created", "character_duplicated", "character_field_set", "character_resource_bumped",
+    "character_action_executed", "character_renamed", "character_archived", "character_recovered",
+    "character_exported", "character_migration_previewed", "character_migration_committed",
+    "character_migration_rolled_back", "character_campaign_created", "character_adopted",
+    "character_controllers_assigned", "character_claimed", "character_ownership_transferred",
+  ]);
+  const label = knownKinds.has(event.kind)
+    ? t(`character.activity.${event.kind}`)
+    : event.kind.replace(/^character[_-]/, "").replace(/[_-]/g, " ").replace(/^./, letter => letter.toUpperCase());
+  const date = new Date(event.occurredAt);
+  const formattedDate = Number.isNaN(date.getTime()) ? event.occurredAt : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
   return (
     <li>
-      <span>{event.kind}</span>{" "}
-      <span>{t("character.tools.activitySummary", { revision: event.characterRevision, time: event.occurredAt })}</span>{" "}
-      <time dateTime={event.occurredAt}>{event.occurredAt}</time>
+      <span>{label}</span>{" · "}
+      <time dateTime={event.occurredAt}>{formattedDate}</time>
     </li>
   );
 }
@@ -360,6 +371,10 @@ function MigrationDialog({
   const readOnly = !snapshot.editing.owned;
   const manageBlocked = queued || uncertain || offline || readOnly;
   const [targetVersionId, setTargetVersionId] = useState("");
+  const [versions, setVersions] = useState<CreationVersionEntry[]>([]);
+  const [versionsCursor, setVersionsCursor] = useState<string | null>(null);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [versionsError, setVersionsError] = useState<string | null>(null);
   const [preview, setPreview] = useState<MigrationPreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [confirmedPreview, setConfirmedPreview] = useState(false);
@@ -371,6 +386,40 @@ function MigrationDialog({
   useEffect(() => {
     focusFirst(dialogRef.current);
   }, []);
+
+  const systemId = snapshot.confirmed?.projection.systemId;
+  const currentVersionId = snapshot.confirmed?.systemVersionId;
+  useEffect(() => {
+    if (!snapshot.connected || !systemId) return;
+    let cancelled = false;
+    setVersionsLoading(true);
+    void api.listCreationVersions({ systemId, limit: 20, cursor: null }).then(page => {
+      if (cancelled) return;
+      setVersions(page.data.versions.filter(version => version.systemId === systemId));
+      setVersionsCursor(page.data.nextCursor);
+      setVersionsError(null);
+    }).catch(() => {
+      if (!cancelled) setVersionsError(t("character.tools.migrationVersionsFailed"));
+    }).finally(() => {
+      if (!cancelled) setVersionsLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [api, systemId, snapshot.connected]);
+
+  const loadMoreVersions = async () => {
+    if (!systemId || !versionsCursor || versionsLoading) return;
+    setVersionsLoading(true);
+    try {
+      const page = await api.listCreationVersions({ systemId, limit: 20, cursor: versionsCursor });
+      setVersions(previous => [...previous, ...page.data.versions.filter(version => version.systemId === systemId && !previous.some(existing => existing.versionId === version.versionId))]);
+      setVersionsCursor(page.data.nextCursor);
+      setVersionsError(null);
+    } catch {
+      setVersionsError(t("character.tools.migrationVersionsFailed"));
+    } finally {
+      setVersionsLoading(false);
+    }
+  };
 
   const expired = preview !== null && Date.parse(preview.expiresAt) < Date.parse(now());
   const confirmedRevision = snapshot.confirmed?.reconciliation.revision;
@@ -424,12 +473,13 @@ function MigrationDialog({
   };
 
   const rollback = async () => {
-    if (migrationId.trim() === "" || manageBlocked) return;
+    const id = migrationId.trim() || lastMigrationId;
+    if (!id || manageBlocked) return;
     // Refresh and freeze before initiating the online-only operation.
     setBusy(true);
     setOpError(null);
     try {
-      await session.rollbackMigration(migrationId.trim());
+      await session.rollbackMigration(id);
       onClose();
     } catch (err) {
       setOpError(err instanceof Error && err.message ? err.message : t("character.tools.migrationRollbackFailed"));
@@ -454,8 +504,19 @@ function MigrationDialog({
       {previewError !== null ? <p role="alert">{previewError}</p> : null}
       {opError !== null ? <p role="alert">{opError}</p> : null}
       {previewBlockReason !== null ? <p>{previewBlockReason}</p> : null}
-      <label htmlFor="migration-target">{t("character.tools.migrationTargetVersion")}</label>
-      <input id="migration-target" className={styles.dialogField} value={targetVersionId} onChange={(event) => setTargetVersionId(event.target.value)} />
+      <label htmlFor="migration-version-choice">{t("character.tools.migrationTargetVersion")}</label>
+      <select id="migration-version-choice" className={styles.dialogField} value={versions.some(version => version.versionId === targetVersionId) ? targetVersionId : ""} onChange={(event) => { setTargetVersionId(event.target.value); setPreview(null); }}>
+        <option value="">{t("character.tools.migrationChooseVersion")}</option>
+        {versions.filter(version => version.versionId !== currentVersionId).map(version => <option key={version.versionId} value={version.versionId}>{version.systemName} · {version.semanticVersion}</option>)}
+      </select>
+      {versionsLoading ? <p role="status">{t("character.tools.migrationVersionsLoading")}</p> : null}
+      {versionsError ? <p role="alert">{versionsError}</p> : null}
+      {!versionsLoading && versionsCursor === null && versions.filter(version => version.versionId !== currentVersionId).length === 0 ? <p>{t("character.tools.migrationNoVersions")}</p> : null}
+      {versionsCursor !== null ? <Button type="button" variant="secondary" disabled={versionsLoading} onClick={() => void loadMoreVersions()}>{t("character.tools.migrationMoreVersions")}</Button> : null}
+      <details><summary>{t("character.tools.migrationManualVersion")}</summary>
+        <label htmlFor="migration-target">{t("character.tools.migrationVersionId")}</label>
+        <input id="migration-target" className={styles.dialogField} value={targetVersionId} onChange={(event) => { setTargetVersionId(event.target.value); setPreview(null); }} />
+      </details>
       <div className={styles.dialogActions}>
       <Button type="button" variant="primary" disabled={busy || targetVersionId.trim() === "" || manageBlocked} onClick={() => void loadPreview()}>
         {t("character.tools.migrationPreviewAction")}
@@ -505,18 +566,13 @@ function MigrationDialog({
           </div>
         </section>
       ) : null}
-      {lastMigrationId !== null ? (
-        <p>
-          {t("character.tools.migrationLastId", { id: lastMigrationId })}{" "}
-          <Button type="button" variant="secondary" onClick={() => setMigrationId(lastMigrationId)}>
-            {t("character.tools.migrationUseLast")}
-          </Button>
-        </p>
-      ) : null}
-      <label htmlFor="migration-id">{t("character.tools.migrationIdLabel")}</label>
-      <input id="migration-id" className={styles.dialogField} value={migrationId} onChange={(event) => setMigrationId(event.target.value)} />
+      {lastMigrationId !== null ? <p>{t("character.tools.migrationLastAvailable")}</p> : null}
+      <details><summary>{t("character.tools.migrationManualRollback")}</summary>
+        <label htmlFor="migration-id">{t("character.tools.migrationIdLabel")}</label>
+        <input id="migration-id" className={styles.dialogField} value={migrationId} onChange={(event) => setMigrationId(event.target.value)} />
+      </details>
       <div className={styles.dialogActions}>
-      <Button type="button" variant="primary" disabled={busy || migrationId.trim() === "" || manageBlocked} onClick={() => void rollback()}>
+      <Button type="button" variant="primary" disabled={busy || (migrationId.trim() === "" && lastMigrationId === null) || manageBlocked} onClick={() => void rollback()}>
         {t("character.tools.migrationRollback")}
       </Button>
       <Button type="button" variant="secondary" onClick={onClose}>

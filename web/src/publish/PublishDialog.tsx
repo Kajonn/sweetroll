@@ -65,6 +65,7 @@ export function PublishDialog({
   systemId,
   expectedRevision,
   readiness,
+  onPublished,
 }: {
   client: ApiClient;
   open: boolean;
@@ -72,6 +73,7 @@ export function PublishDialog({
   systemId: string;
   expectedRevision: number;
   readiness?: PublishDialogReadiness | undefined;
+  onPublished?: ((version: PublishedVersion) => void) | undefined;
 }) {
   const [semver, setSemver] = useState("0.1.0");
   const [releaseNotes, setReleaseNotes] = useState("");
@@ -95,6 +97,7 @@ export function PublishDialog({
     };
     try {
       const v = await mutation.mutateAsync(input);
+      onPublished?.(v);
       setPublished(v);
       setBreakingFindings(null);
       setAcknowledged(new Set());

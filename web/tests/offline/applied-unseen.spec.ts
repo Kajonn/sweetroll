@@ -184,7 +184,8 @@ test.describe("applied-but-unseen mutations", () => {
       // request: while the archive outcome is uncertain the dialog refuses
       // to preview at all (disabled control + explicit reason).
       await page.getByRole("button", { name: "Migration" }).click();
-      await page.getByLabel("Target version").fill(migrationTarget);
+      await page.getByText("Use a version from a direct link").click();
+      await page.getByLabel("Version ID").fill(migrationTarget);
       await expect(page.getByRole("button", { name: "Preview migration" })).toBeDisabled();
       const migrationDialogText = (await page.getByRole("dialog").last().textContent()) ?? "";
       expect(migrationDialogText).toMatch(/uncertain outcome|pending edits/i);

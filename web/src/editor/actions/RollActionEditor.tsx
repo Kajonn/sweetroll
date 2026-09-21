@@ -54,7 +54,14 @@ export type RollActionEditorProps = {
 export const GUIDED_DICE_KINDS: ReadonlyArray<string> = ["d4", "d6", "d8", "d10", "d12", "d20"];
 
 function selectedFieldModifier(source: string): string {
-  return /^d(?:4|6|8|10|12|20)\s*\+\s*fields\.([a-z][a-z0-9_]{0,63})$/.exec(source)?.[1] ?? "";
+  return /^d(?:4|6|8|10|12|20)\s*\+\s*fields\.([a-z][a-z0-9_]{0,63})(?:\s*\+\s*inputs\.[a-z][a-z0-9_]{0,63})*$/.exec(source)?.[1] ?? "";
+}
+
+function guidedInputTerms(source: string): string {
+  const terms = /^(?:d(?:4|6|8|10|12|20))(?:\s*\+\s*fields\.[a-z][a-z0-9_]{0,63})?((?:\s*\+\s*inputs\.[a-z][a-z0-9_]{0,63})*)$/.exec(source)?.[1] ?? "";
+  return [...terms.matchAll(/\+\s*inputs\.([a-z][a-z0-9_]{0,63})/g)]
+    .map((match) => ` + inputs.${match[1]}`)
+    .join("");
 }
 
 function nextInputId(existing: ReadonlyArray<ActionInputV1>): DefinitionId {
@@ -183,6 +190,7 @@ export function RollActionEditor({
   const showEmpty = tryItResult === null;
   const numericFields = Object.entries(fieldTypes).filter(([, valueType]) => valueType === "number");
   const currentFieldModifier = selectedFieldModifier(expressionSource);
+  const inputTerms = guidedInputTerms(expressionSource);
 
   return (
     <section className={styles.layout} data-testid={`roll-action-${action.id}`} aria-label={action.label}>
@@ -214,8 +222,8 @@ export function RollActionEditor({
                   }
                   setCustomEditing(false);
                   const modifier = currentFieldModifier === "" ? "" : ` + fields.${currentFieldModifier}`;
-                  if (modifier === "") onDiceKindChange?.(e.target.value);
-                  else onExpressionSourceChange(`${e.target.value}${modifier}`);
+                  if (modifier === "" && inputTerms === "") onDiceKindChange?.(e.target.value);
+                  else onExpressionSourceChange(`${e.target.value}${modifier}${inputTerms}`);
                 }}
                 data-testid={`dice-kind-${action.id}`}
                 disabled={disabled}
@@ -236,8 +244,8 @@ export function RollActionEditor({
                     const base = (diceKind ?? "d20") === "custom" ? "d20" : (diceKind ?? "d20");
                     onExpressionSourceChange(
                       event.target.value === ""
-                        ? base
-                        : `${base} + fields.${event.target.value}`,
+                        ? `${base}${inputTerms}`
+                        : `${base} + fields.${event.target.value}${inputTerms}`,
                     );
                   }}
                   data-testid={`roll-field-modifier-${action.id}`}

@@ -169,6 +169,27 @@ describe("SheetEditor", () => {
     });
   });
 
+  it("places a field or action in the selected section", async () => {
+    const user = userEvent.setup();
+    const { onChange, rerender } = renderSheet({
+      unplacedDefinitions: [
+        { kind: "field", id: "constitution", label: "Constitution" },
+        { kind: "action", id: "check", label: "Check" },
+      ],
+      allocateElementId: () => "element_9",
+    });
+
+    await user.selectOptions(screen.getByTestId("sheet-placement-section"), "combat");
+    await user.click(screen.getByTestId("sheet-place-definition-constitution"));
+    const next = lastCallPayload(onChange);
+    expect(next?.sections[0]?.elements).toEqual(makeSheet().sections[0]?.elements);
+    expect(next?.sections[1]?.elements.at(-1)).toEqual({ kind: "field", id: "element_9", fieldId: "constitution" });
+
+    rerender(<SheetEditor sheet={next!} onChange={onChange} unplacedDefinitions={[{ kind: "action", id: "check", label: "Check" }]} allocateElementId={() => "element_10"} />);
+    await user.click(screen.getByTestId("sheet-place-definition-check"));
+    expect(lastCallPayload(onChange)?.sections[1]?.elements.at(-1)).toEqual({ kind: "action", id: "element_10", actionId: "check" });
+  });
+
   it("uses the provided section allocator when adding a section", async () => {
     const user = userEvent.setup();
     const { onChange } = renderSheet({ allocateSectionId: () => "custom_section" });

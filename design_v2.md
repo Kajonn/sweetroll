@@ -161,7 +161,7 @@ A sheet is a **single-column linear scroll** (predictable collapse to one column
 
 **Removed from MVP:** tabs, multi-column grid layouts, drag-drop element palette, manual binding inspector, reusable fragments, conditional display, viewport authoring beyond preview. Keep only a simple section/order editor with move-up/down controls and keyboard authoring.
 
-The basic builder exposes an explicit “not on this character sheet” list for the sheet's target entity and global actions. Adding an item binds it to the first section (or creates that section when absent) using a generated document-wide element ID. Manual target-ID editing remains an advanced repair path, not the expected creation flow.
+The basic builder exposes an explicit “not on this character sheet” list for the sheet's target entity and global actions. The creator selects a target section for one-action placement (initially the first section); when none exists, placement creates the first section. Each placed item receives a generated document-wide element ID. Manual target-ID editing remains an advanced repair path, not the expected creation flow.
 
 ## 6.4 Rules and expression engine
 

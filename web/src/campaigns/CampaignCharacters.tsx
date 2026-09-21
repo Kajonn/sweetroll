@@ -52,6 +52,7 @@ export type CampaignCharactersViewProps = {
   api: Pick<CampaignsApi, "claimCharacter" | "createCampaignCharacter">;
   campaignId: string;
   campaignRevision: number;
+  pinnedVersionId?: string | undefined;
   actorId?: string | null | undefined;
   characters: CampaignCharacterSummary[];
   characterRevisionById?: Record<string, number>;
@@ -79,11 +80,14 @@ function CharacterRow(props: {
   character: CampaignCharacterSummary;
   controlled: boolean;
   openable: boolean;
+  isGm: boolean;
   onOpen: () => void;
 }) {
   const indicator = props.controlled
     ? t("campaign.detail.characters.indicator.controlled")
-    : t("campaign.detail.characters.indicator.viewOnly");
+    : props.isGm
+      ? t("campaign.detail.characters.indicator.gm")
+      : t("campaign.detail.characters.indicator.viewOnly");
   return (
     <li>
       <span>{props.character.name}</span>{" "}
@@ -118,6 +122,14 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
   const [createConflict, setCreateConflict] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [npcSearch, setNpcSearch] = useState("");
+  const pinnedOptions = useQuery({
+    queryKey: ["campaigns", "creation-options", props.campaignId, props.actorId, props.pinnedVersionId],
+    queryFn: () => props.metadataApi!.creationOptions(props.pinnedVersionId!),
+    enabled: props.metadataApi !== undefined && props.pinnedVersionId !== undefined && online,
+  });
+  const resolvedOptions = props.pinnedVersionId !== undefined
+    ? pinnedOptions.data?.data.entities ?? null
+    : entityOptions;
 
   const attemptClaim = async (character: ClaimableCharacterSummary): Promise<void> => {
     if (claimingId !== null || !online) return;
@@ -294,6 +306,7 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
               character={character}
               controlled={isControlled(character, props.actorId)}
               openable={isControlled(character, props.actorId) || props.isGm === true}
+              isGm={props.isGm === true}
               onOpen={() => props.onOpenCharacter(character.characterId)}
             />
           ))}
@@ -320,6 +333,7 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
                   character={character}
                   controlled={isControlled(character, props.actorId)}
                   openable={isControlled(character, props.actorId) || props.isGm === true}
+                  isGm={props.isGm === true}
                   onOpen={() => props.onOpenCharacter(character.characterId)}
                 />
               ))}
@@ -360,7 +374,7 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
         <FormField label={t("campaign.detail.characters.create.name.label")}>
           <input type="text" value={name} onChange={(event) => setName(event.target.value)} />
         </FormField>
-        {props.metadataApi !== undefined ? (
+        {props.metadataApi !== undefined && props.pinnedVersionId === undefined ? (
           <FormField
             label={t("campaign.detail.characters.create.version.label")}
             hint={t("campaign.detail.characters.create.version.hint")}
@@ -375,7 +389,7 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
             />
           </FormField>
         ) : null}
-        {props.metadataApi !== undefined ? (
+        {props.metadataApi !== undefined && props.pinnedVersionId === undefined ? (
           <Button
             variant="secondary"
             pending={loadingOptions}
@@ -386,15 +400,25 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
             {t("campaign.detail.characters.create.version.load")}
           </Button>
         ) : null}
-        {entityOptions !== null ? (
+        {props.pinnedVersionId !== undefined && pinnedOptions.status === "pending" ? (
+          <p role="status">{t("campaign.detail.characters.create.version.loading")}</p>
+        ) : null}
+        {props.pinnedVersionId !== undefined && pinnedOptions.status === "error" ? (
+          <p role="alert">{t("campaign.detail.characters.create.version.error")}{" "}
+            <Button variant="secondary" onClick={() => void pinnedOptions.refetch()}>
+              {t("campaign.detail.retry")}
+            </Button>
+          </p>
+        ) : null}
+        {resolvedOptions !== null ? (
           <Select
             label={t("campaign.detail.characters.create.entity.label")}
-            options={entityOptions.map((entity) => ({ value: entity.id, label: entity.label }))}
+            options={resolvedOptions.map((entity) => ({ value: entity.id, label: entity.label }))}
             placeholder={t("campaign.detail.characters.create.entity.label")}
             value={entityDefinitionId}
             onChange={(event) => setEntityDefinitionId(event.target.value)}
           />
-        ) : (
+        ) : props.pinnedVersionId === undefined ? (
           <FormField label={t("campaign.detail.characters.create.entity.label")}>
             <input
               type="text"
@@ -404,14 +428,16 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
               onChange={(event) => setEntityDefinitionId(event.target.value)}
             />
           </FormField>
-        )}
+        ) : null}
         {createConflict ? <p role="alert">{t("campaign.detail.characters.create.conflict")}</p> : null}
         {createError !== null ? <p role="alert">{createError}</p> : null}
         <Button
           variant="primary"
           pending={createPending}
           pendingText={t("campaign.detail.characters.create.creating")}
-          disabled={name.trim() === "" || entityDefinitionId.trim() === ""}
+          disabled={name.trim() === "" || entityDefinitionId.trim() === "" ||
+            (props.pinnedVersionId !== undefined &&
+              (resolvedOptions === null || !resolvedOptions.some((option) => option.id === entityDefinitionId)))}
           onClick={() => void submitCreate()}
         >
           {t("campaign.detail.characters.create.submit")}
@@ -426,6 +452,7 @@ export function CampaignCharactersTab(props: {
   campaignId: string;
   actorId?: string | null;
   campaignRevision: number;
+  pinnedVersionId?: string | undefined;
   generation?: number;
   online?: boolean;
   isGm?: boolean;
@@ -508,6 +535,7 @@ export function CampaignCharactersTab(props: {
       api={props.api}
       campaignId={props.campaignId}
       campaignRevision={props.campaignRevision}
+      pinnedVersionId={props.pinnedVersionId}
       actorId={props.actorId}
       characters={rows}
       characterRevisionById={Object.fromEntries(rows.map((row) => [row.characterId, row.revision]))}

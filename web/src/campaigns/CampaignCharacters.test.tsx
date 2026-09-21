@@ -1,7 +1,14 @@
 // web/src/campaigns/CampaignCharacters.test.tsx
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render as baseRender, screen, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { CampaignCharactersView } from "./CampaignCharacters.js";
+
+const render = (ui: ReactElement) => baseRender(ui, {
+  wrapper: ({ children }: { children: ReactNode }) =>
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{children}</QueryClientProvider>,
+});
 
 function sheet(overrides = {}) {
   return {
@@ -158,6 +165,20 @@ describe("CampaignCharactersView", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /open bram/i }));
     expect(onOpenCharacter).toHaveBeenCalledWith("s1");
+    expect(screen.getByText(/GM access/i)).toBeVisible();
+    expect(screen.queryByText(/view-only/i)).toBeNull();
+  });
+
+  it("loads the campaign's pinned version automatically and offers its entity choices", async () => {
+    const creationOptions = vi.fn().mockResolvedValue({ data: { entities: [
+      { id: "hero", label: "Hero", kind: "playable" },
+      { id: "npc", label: "Monster", kind: "npc" },
+    ] } });
+    render(<CampaignCharactersView {...viewProps({ metadataApi: { creationOptions }, pinnedVersionId: "v1" })} />);
+    expect(screen.queryByLabelText(/system version id/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /load entity options/i })).toBeNull();
+    expect(await screen.findByRole("option", { name: "Hero" })).toBeVisible();
+    expect(creationOptions).toHaveBeenCalledWith("v1");
   });
 
   it("opens controlled sheets through the shared renderer callback, never a second renderer", () => {

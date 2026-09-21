@@ -17,6 +17,22 @@ const versions = [
 ];
 
 describe("CampaignCreate", () => {
+  it("distinguishes versions with the same system name and number", async () => {
+    const api = { createCampaign: vi.fn().mockResolvedValue({ campaign: { campaignId: "c9" } }) };
+    const versionsApi = { listCreationVersions: vi.fn().mockResolvedValue({ data: { versions: [
+      { ...versions[0], versionId: "11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa" },
+      { ...versions[0], versionId: "22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb", createdAt: "2026-09-02T00:00:00Z" },
+    ], nextCursor: null } }) };
+    render(<CampaignCreate api={api as never} versionsApi={versionsApi as never} actorId="u1" online navigation={{ onCreated: () => {} }} />, { wrapper: wrapper() });
+    const choices = await screen.findAllByRole("button", { name: /d20 system 1\.0\.0/i });
+    expect(choices).toHaveLength(2);
+    expect(choices[0]).toHaveAccessibleName(/11111111/);
+    expect(choices[1]).toHaveAccessibleName(/22222222/);
+    fireEvent.click(choices[1]!);
+    fireEvent.change(screen.getByLabelText(/campaign title/i), { target: { value: "North Watch" } });
+    fireEvent.click(screen.getByRole("button", { name: /create campaign/i }));
+    await vi.waitFor(() => expect(api.createCampaign).toHaveBeenCalledWith(expect.objectContaining({ systemVersionId: "22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb" })));
+  });
   it("creates a campaign from the selected version with a fresh idempotency key", async () => {
     const api = { createCampaign: vi.fn().mockResolvedValue({ campaign: { campaignId: "c9" }, requestId: "r" }) };
     const versionsApi = { listCreationVersions: vi.fn().mockResolvedValue({ data: { versions, nextCursor: null }, requestId: "r" }) };

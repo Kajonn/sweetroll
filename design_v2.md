@@ -225,6 +225,8 @@ The character migration dialog lists discoverable published versions of the same
 
 The campaign workspace combines member management, content, characters, and an in-session activity feed. The **Session view** is a curated mobile surface: pinned content, recent rolls, quick character access, and reveal/hide controls.
 
+Campaign creation distinguishes versions with the same display name and semantic version by showing their publication date and a short version identifier. The campaign's pinned version supplies character creation choices automatically; players and GMs should not need to enter an internal version ID. A GM's roster access is labelled as GM access when they do not control a character. Campaign and Session activity show local dates and readable actor labels; the exact actor identifier remains available for identification. Sheet previews show a section title once when its first heading repeats that title.
+
 ## 7.2 GM session board
 
 A dedicated **GM Session board** lists all characters with their key resources at a glance (health, stress, ammo, etc.). The GM can one-tap a bump control on any resource without opening each sheet. Designed for the GM at a physical table, and works across the GM's multiple devices (Section 4.2).

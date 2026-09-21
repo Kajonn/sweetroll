@@ -33,6 +33,20 @@ const sheet = (overrides = {}) => ({
 });
 
 describe("SessionBoard", () => {
+  it("shows a readable actor and date in the session activity feed", async () => {
+    const campaignsApi = {
+      listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null }),
+      listActivity: vi.fn().mockResolvedValue({ events: [
+        { eventId: "e1", kind: "content_created", actorId: "u1", occurredAt: "2026-09-01T12:34:00Z" },
+      ], nextCursor: null }),
+      listCampaignCharacters: vi.fn().mockResolvedValue({ characters: [], nextCursor: null }),
+    };
+    render(<SessionBoard campaignsApi={campaignsApi as never} charactersApi={{} as never}
+      campaignId="c1" actorId="u1" generation={0} online onOpenCharacter={() => {}} onAccessRevoked={() => {}} />,
+    { wrapper: wrapper() });
+    expect(await screen.findByText("You")).toBeVisible();
+    expect(screen.queryByText("2026-09-01T12:34:00Z")).toBeNull();
+  });
   it("bumps a resource with revision + fresh key and reloads the sheet", async () => {
     const campaignsApi = {
       listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),

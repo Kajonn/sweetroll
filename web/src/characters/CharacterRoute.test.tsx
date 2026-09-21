@@ -82,6 +82,7 @@ function makeApi(view = completionView()): CharactersApi & { open: ReturnType<ty
   return {
     open: vi.fn(async () => makeOpenEnvelope(view)),
     creationOptions: vi.fn(),
+    listCreationVersions: vi.fn(async () => ({ data: { versions: [], nextCursor: null }, requestId: "r" })),
     activity: vi.fn(),
     send: vi.fn(),
     export: vi.fn(),
@@ -454,7 +455,7 @@ describe("CharacterRoute workflows", () => {
       await waitFor(() => expect(exportButton).toBeEnabled(), { timeout: 5000 });
       const activityButton = await screen.findByRole("button", { name: "Activity" });
       await user.click(activityButton);
-      expect(await screen.findByText("field-set")).toBeVisible();
+      expect(await screen.findByText("Field set")).toBeVisible();
       expect(api.activity).toHaveBeenCalledWith(CHARACTER_ID, null);
       await user.click(screen.getByRole("button", { name: "Close" }));
       await user.click(exportButton);
@@ -554,7 +555,8 @@ describe("CharacterRoute workflows", () => {
       const migrationButton = await screen.findByRole("button", { name: "Migration" });
       await waitFor(() => expect(screen.getByText("Saved")).toBeVisible(), { timeout: 5000 });
       await user.click(migrationButton);
-      await user.type(screen.getByLabelText("Target version"), "v-2");
+      await user.click(screen.getByText("Use a version from a direct link"));
+      await user.type(screen.getByLabelText("Version ID"), "v-2");
       const previewButton = screen.getByRole("button", { name: "Preview migration" });
       await waitFor(() => expect(previewButton).toBeEnabled(), { timeout: 5000 });
       await user.click(previewButton);
@@ -565,9 +567,7 @@ describe("CharacterRoute workflows", () => {
       expect(api.send.mock.calls[0]?.[0].path).toBe(`/characters/${CHARACTER_ID}/migrations/p-1/commit`);
       await waitFor(() => expect(screen.getByText("Saved")).toBeVisible(), { timeout: 5000 });
       await user.click(screen.getByRole("button", { name: "Migration" }));
-      expect(await screen.findByText(/p-1/)).toBeVisible();
-      await user.click(screen.getByRole("button", { name: /use last migration/i }));
-      expect(screen.getByLabelText("Migration ID")).toHaveValue("p-1");
+      expect(await screen.findByText(/last migration can be rolled back/i)).toBeVisible();
       await user.click(screen.getByRole("button", { name: "Roll back migration" }));
       await waitFor(() => expect(api.send).toHaveBeenCalledTimes(2));
       expect(api.send.mock.calls[1]?.[0].path).toBe(`/characters/${CHARACTER_ID}/migrations/p-1/rollback`);

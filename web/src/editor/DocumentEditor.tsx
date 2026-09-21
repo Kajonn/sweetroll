@@ -279,15 +279,8 @@ export function DocumentEditorBody({
   // Unsaved changes come from the G1 owner: true until this exact document
   // content matches the last server-confirmed save.
   const unsaved = !sync.isConfirmed(document);
-  // The header shows the working document's name while it diverges from the
-  // server document and falls back to the server system name when clean, so
-  // a dirty name is visible without waiting for the header itself to blur.
-  // When there is no server document yet, any non-empty working name is
-  // unconfirmed local content and is shown as-is.
-  const serverDocName =
-    ws.draft?.document !== undefined
-      ? ((ws.draft.document as SystemDocumentV1).metadata.name ?? "")
-      : null;
+  // The draft metadata is the editor's source of truth. The system record can
+  // lag behind it after saving; use that record only for an empty draft name.
   const workingName = document.metadata.name;
   // When the working name is empty, the heading falls back to display text
   // only: the document value stays "" so a deliberate clear is preserved and
@@ -295,15 +288,8 @@ export function DocumentEditorBody({
   // available.
   const fallbackName =
     ws.system.name !== "" ? ws.system.name : t("createDraft.name.placeholder");
-  const displayName =
-    workingName === ""
-      ? fallbackName
-      : serverDocName === null
-        ? workingName
-        : workingName === serverDocName
-          ? fallbackName
-          : workingName;
   const nameFocusedRef = useRef(false);
+  const displayName = workingName === "" && !nameFocusedRef.current ? fallbackName : workingName;
   // Clearing the contentEditable to "" dispatches "" but leaves the rendered
   // virtual text unchanged when the fallback was already showing (clean
   // state), so React bails out and the DOM node stays empty: repair it so the
@@ -374,11 +360,11 @@ export function DocumentEditorBody({
             if (text !== documentRef.current.metadata.name) {
               // System name is metadata; reroute through the document reducer.
               dispatch({ type: "setMetadata", patch: { name: text } });
-            } else if (text !== displayName) {
+            } else if (text !== (documentRef.current.metadata.name === "" ? fallbackName : displayName)) {
               // No edit (focus/blur without typing): restore the fallback
               // display so the settled heading is never empty for a11y.
               // Document value untouched.
-              e.currentTarget.textContent = displayName;
+              e.currentTarget.textContent = documentRef.current.metadata.name === "" ? fallbackName : displayName;
             }
           }}
         >
@@ -1056,7 +1042,7 @@ function DiceTab({
 
 /** Guided dice-kind for a roll source: canned kind, else custom (Advanced edit). */
 export function diceKindFor(source: string): string {
-  const base = /^(d(?:4|6|8|10|12|20))(?:\s*\+\s*fields\.[a-z][a-z0-9_]{0,63})?$/.exec(source)?.[1];
+  const base = /^(d(?:4|6|8|10|12|20))(?:\s*\+\s*fields\.[a-z][a-z0-9_]{0,63})?(?:\s*\+\s*inputs\.[a-z][a-z0-9_]{0,63})*$/.exec(source)?.[1];
   return base !== undefined && (GUIDED_DICE_KINDS as ReadonlyArray<string>).includes(base)
     ? base
     : "custom";

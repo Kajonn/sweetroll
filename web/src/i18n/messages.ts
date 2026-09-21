@@ -202,6 +202,7 @@ export const defaultMessages: MessageTable = {
   "editor.sheet.sections": "Sections",
   "editor.sheet.unplaced.title": "Not on this character sheet",
   "editor.sheet.unplaced.hint": "Add attributes and actions without copying their IDs.",
+  "editor.sheet.unplaced.section": "Place in section",
   "editor.sheet.unplaced.place": "Add {label}",
   "editor.sheet.removeConfirm.title": "Remove sheet?",
   "editor.sheet.removeConfirm.message": "Remove sheet \u201c{label}\u201d and all its sections?",

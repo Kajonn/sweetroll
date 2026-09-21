@@ -333,4 +333,52 @@ describe("RollActionEditor", () => {
 
     expect(onExpressionSourceChange).toHaveBeenCalledWith("d20 + fields.strength");
   });
+
+  it("preserves a declared bonus input when changing the guided attribute and die", () => {
+    const onExpressionSourceChange = vi.fn();
+    const action = {
+      ...defaultAction,
+      inputs: [{ id: "bonus", label: "Situational Bonus", valueType: "integer" as const, required: false, default: 0 }],
+    };
+    const view = renderEditor({
+      action,
+      guided: true,
+      diceKind: "d20",
+      expressionSource: "d20 + fields.modifier + inputs.bonus",
+      fieldTypes: { modifier: "number", strength: "number" },
+      onExpressionSourceChange,
+    });
+
+    fireEvent.change(screen.getByTestId("roll-field-modifier-atk"), { target: { value: "strength" } });
+    expect(onExpressionSourceChange).toHaveBeenCalledWith("d20 + fields.strength + inputs.bonus");
+
+    view.rerender(
+      <RollActionEditor
+        client={view.client}
+        systemId="s1"
+        action={action}
+        onChange={vi.fn()}
+        expressionSource="d20 + fields.strength + inputs.bonus"
+        onExpressionSourceChange={onExpressionSourceChange}
+        fieldTypes={{ modifier: "number", strength: "number" }}
+        guided
+        diceKind="d20"
+      />,
+    );
+    fireEvent.change(screen.getByTestId("dice-kind-atk"), { target: { value: "d6" } });
+    expect(onExpressionSourceChange).toHaveBeenCalledWith("d6 + fields.strength + inputs.bonus");
+  });
+
+  it("keeps an input bonus when removing the selected attribute", () => {
+    const onExpressionSourceChange = vi.fn();
+    renderEditor({
+      guided: true,
+      diceKind: "d20",
+      expressionSource: "d20 + fields.strength + inputs.bonus",
+      fieldTypes: { strength: "number" },
+      onExpressionSourceChange,
+    });
+    fireEvent.change(screen.getByTestId("roll-field-modifier-atk"), { target: { value: "" } });
+    expect(onExpressionSourceChange).toHaveBeenCalledWith("d20 + inputs.bonus");
+  });
 });

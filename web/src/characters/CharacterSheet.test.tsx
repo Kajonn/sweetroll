@@ -33,6 +33,14 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
 }
 
 describe("CharacterSheet", () => {
+  it("shows a section title once when its first element repeats the title", () => {
+    const current = snapshot();
+    const basics = current.confirmed!.projection.sheets[0]!.sections[0]!;
+    basics.elements.unshift({ kind: "heading", id: "repeated", text: "Basics", level: 2 });
+    render(<CharacterSheet snapshot={current} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    expect(screen.getAllByRole("heading", { name: "Basics" })).toHaveLength(1);
+    expect(screen.getByRole("heading", { name: "Who are you?" })).toBeVisible();
+  });
   it("renders every projected element in sequential sheets and uses unique labels for duplicate fields", () => {
     render(<CharacterSheet snapshot={snapshot()} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
 

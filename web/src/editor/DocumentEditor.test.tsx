@@ -84,6 +84,7 @@ function renderEditor(
 describe("DocumentEditor", () => {
   it("keeps a guided die selected when its expression has a field modifier", () => {
     expect(diceKindFor("d20 + fields.strength")).toBe("d20");
+    expect(diceKindFor("d20 + fields.strength + inputs.bonus")).toBe("d20");
   });
 
   it("lists only definitions that are not yet placed on the target sheet", () => {
@@ -560,9 +561,9 @@ describe("DocumentEditor", () => {
       </QueryClientProvider>,
     );
 
-    // Clean: the title falls back to the server system name.
+    // The draft metadata is the name shown by the editor, even after a save.
     const title = await screen.findByTestId("document-editor-name");
-    expect(title).toHaveTextContent("Test System");
+    expect(title).toHaveTextContent("Server Doc");
     // Quiesce the mount save and its echo before editing the title.
     await settleFetchActivity(() => ({ gets, puts }));
 
@@ -675,9 +676,9 @@ describe("DocumentEditor", () => {
       </QueryClientProvider>,
     );
 
-    // Clean: the title falls back to the server system name.
+    // The draft metadata is the name shown by the editor.
     const title = await screen.findByTestId("document-editor-name");
-    expect(title).toHaveTextContent("Test System");
+    expect(title).toHaveTextContent("Server Doc");
     // Quiesce the mount save and its echo before clearing the title.
     await settleFetchActivity(() => ({ gets, puts }));
 
@@ -785,7 +786,7 @@ describe("DocumentEditor", () => {
     );
 
     const title = await screen.findByTestId("document-editor-name");
-    expect(title).toHaveTextContent("Test System");
+    expect(title).toHaveTextContent("Server Doc");
     await settleFetchActivity(() => ({ gets, puts }));
 
     // Clear, then type "X" appended at the end with no select-all: the
@@ -803,10 +804,7 @@ describe("DocumentEditor", () => {
     expect(screen.getByTestId("metadata-name")).toHaveValue("X");
 
     // The debounced save sends "X" — never "Test SystemX" — and the saved
-    // value sticks in the working document. Once the save echo is adopted the
-    // header is clean again, so it shows the system name per the existing
-    // clean-state display rule (same as the clear test above); the saved name
-    // remains visible in the metadata input.
+    // value sticks in the working document and the heading after the save.
     await waitFor(() => expect(puts).toBeGreaterThan(putsBefore), { timeout: 10_000 });
     expect(putNames.at(-1)).toBe("X");
     expect(putNames).not.toContain("Test SystemX");
@@ -814,6 +812,6 @@ describe("DocumentEditor", () => {
     expect(putNames.at(-1)).toBe("X");
     expect(putNames).not.toContain("Test SystemX");
     expect(screen.getByTestId("metadata-name")).toHaveValue("X");
-    expect(title).toHaveTextContent("Test System");
+    expect(title).toHaveTextContent("X");
   }, 30_000);
 });

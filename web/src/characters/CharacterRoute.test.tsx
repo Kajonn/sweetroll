@@ -346,6 +346,7 @@ function makeWorkflowApi(handlers: {
   return {
     open: vi.fn(async () => makeOpenEnvelope(handlers.openView())),
     creationOptions: vi.fn(),
+    listCreationVersions: vi.fn(async () => ({ data: { versions: [], nextCursor: null }, requestId: "r" })),
     activity: vi.fn(async () => ({ events: [], nextCursor: null, requestId: "r" })),
     send,
     export: vi.fn(async () => {

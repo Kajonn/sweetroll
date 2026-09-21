@@ -217,6 +217,8 @@ Campaigns and standalone characters pin to an exact system version. A creator ca
 - Every migration produces a before/after snapshot and audit event; rollback is available for a bounded retention period.
 - MVP supports platform-generated field mappings and defaults. Creator-authored migration scripts are excluded.
 
+The character migration dialog lists discoverable published versions of the same system by system name and semantic version, excluding the currently pinned version. Because link-only versions are intentionally absent from discovery, a known version ID remains available through an advanced disclosure. Preview and explicit confirmation precede commit. The last successful migration can be rolled back directly; an advanced ID field remains for other eligible migrations. Character activity uses readable action names and local date/time formatting; server identifiers and revision numbers are not primary display text. A published system version updates the open editor's status immediately after publish succeeds.
+
 # 7. Campaign and play specification
 
 ## 7.1 Campaign workspace

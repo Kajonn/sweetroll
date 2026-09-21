@@ -82,6 +82,29 @@ function renderEditor(
 }
 
 describe("DocumentEditor", () => {
+  it("updates the visible published version as soon as publishing succeeds", async () => {
+    const user = userEvent.setup();
+    let published = false;
+    const fetch_ = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/publish") && init?.method === "POST") {
+        published = true;
+        return new Response(JSON.stringify({ version: { versionId: "v1", systemId: "s1", semanticVersion: "1.0.0", checksum: "sum", package: {}, releaseNotes: "first", lifecycle: "active", createdAt: "2026-09-06T00:00:00Z" }, requestId: "r" }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ workspace: {
+        system: { systemId: "s1", name: "Test", access: "private", lifecycle: "active", createdAt: "2026-09-06T00:00:00Z", updatedAt: "2026-09-06T00:00:00Z" },
+        draft: null, assessment: { ok: true, diagnostics: [] },
+        versions: published ? [{ versionId: "v1", systemId: "s1", semanticVersion: "1.0.0", checksum: "sum", releaseNotes: "first", lifecycle: "active", createdAt: "2026-09-06T00:00:00Z" }] : [],
+      }, requestId: "r" }), { status: 200 });
+    });
+    const client = createApiClient({ baseUrl: "http://x", fetch: fetch_ as typeof fetch });
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><DocumentEditor client={client} systemId="s1" /></QueryClientProvider>);
+    expect(await screen.findByText(/not published yet/i)).toBeVisible();
+    await user.click(screen.getByTestId("document-editor-publish"));
+    await user.click(screen.getByTestId("publish-dialog-submit"));
+    expect(await screen.findByTestId("publish-dialog-success")).toBeInTheDocument();
+    expect(screen.getByText(/latest published 1.0.0/i)).toBeVisible();
+  });
   it("keeps a guided die selected when its expression has a field modifier", () => {
     expect(diceKindFor("d20 + fields.strength")).toBe("d20");
     expect(diceKindFor("d20 + fields.strength + inputs.bonus")).toBe("d20");

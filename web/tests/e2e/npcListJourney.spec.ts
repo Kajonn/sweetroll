@@ -20,12 +20,12 @@ import { uid } from "../offline/test-auth.js";
  * Needs a live backend per web/playwright.config.ts (migrate + dev:http and
  * web:dev, with DATABASE_URL pointing at Postgres). No campaign DELETE
  * endpoint exists, so the campaign name is unique per run. Only the cloned
- * system is cleaned up (DELETE /api/systems/:systemId in afterEach, the
- * visual.spec.ts pattern).
+ * system is cleaned up for direct runs. Canonical runs discard their
+ * ephemeral shard database instead.
  */
 
 const D20_VERSION_ID = "a0000000-0000-5000-8000-000000000002";
-const STEP_TIMEOUT = 30_000;
+const STEP_TIMEOUT = 15_000;
 
 // Track systems cloned by this test so test.afterEach can delete them even
 // when an assertion fails before the in-test cleanup line runs.
@@ -33,7 +33,9 @@ const STEP_TIMEOUT = 30_000;
 // deletes are authorized.
 const createdSystemIds: string[] = [];
 test.afterEach(async ({ page }) => {
-  for (const id of createdSystemIds.splice(0)) {
+  const ids = createdSystemIds.splice(0);
+  if (process.env.SWEETROLL_E2E_EPHEMERAL_DB === "1") return;
+  for (const id of ids) {
     await page.request.delete(`/api/systems/${id}`).catch(() => {});
   }
 });
@@ -175,7 +177,7 @@ test("NPC list: npc-kind rows filter into a searchable Monsters & NPCs section",
   page: Page;
   browser: Browser;
 }) => {
-  test.setTimeout(420_000);
+  test.setTimeout(120_000);
   const stamp = uid();
   const campaignTitle = `NPC List ${stamp}`;
   const goblinName = `Goblin ${stamp}`;

@@ -5,7 +5,8 @@
 //
 // Required: E2E_DATABASE_ADMIN_URL (test-service connection with CREATE
 // DATABASE permission, not a database to reset). Children receive
-// DATABASE_URL, CI=1, and SWEETROLL_E2E_SUITE=journeys|visual.
+// DATABASE_URL, CI=1, SWEETROLL_E2E_EPHEMERAL_DB=1, and
+// SWEETROLL_E2E_SUITE=journeys|visual.
 //
 // Repeat counts (e.g. --repeat-each=5) forward to both suites. Do not pass a
 // single --output path: each phase writes to its own run-scoped directory
@@ -62,6 +63,34 @@ export function parseExtraArgs(argv) {
   return [...argv];
 }
 
+const ALL_SUITES = ["journeys", "visual"];
+
+export function parseRunnerArgs(argv) {
+  let selected = null;
+  const extraArgs = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--suite") {
+      if (selected !== null) throw new Error("Pass --suite only once.");
+      selected = argv[index + 1];
+      index += 1;
+      if (selected === undefined) throw new Error("--suite requires journeys or visual.");
+    } else if (arg.startsWith("--suite=")) {
+      if (selected !== null) throw new Error("Pass --suite only once.");
+      selected = arg.slice("--suite=".length);
+    } else {
+      extraArgs.push(arg);
+    }
+  }
+  if (selected !== null && !ALL_SUITES.includes(selected)) {
+    throw new Error("--suite must be journeys or visual.");
+  }
+  return {
+    suites: selected === null ? [...ALL_SUITES] : [selected],
+    extraArgs: parseExtraArgs(extraArgs),
+  };
+}
+
 function quoteIdent(name) {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
     throw new Error(`Unsafe database identifier: ${name}`);
@@ -74,7 +103,13 @@ function runPlaywright({ suite, databaseUrl, outputDir, extraArgs, spawnFn, env 
     const args = ["playwright", "test", ...extraArgs, "--output", outputDir];
     const child = spawnFn("npx", args, {
       cwd: WEB_DIR,
-      env: { ...env, DATABASE_URL: databaseUrl, CI: "1", SWEETROLL_E2E_SUITE: suite },
+      env: {
+        ...env,
+        DATABASE_URL: databaseUrl,
+        CI: "1",
+        SWEETROLL_E2E_EPHEMERAL_DB: "1",
+        SWEETROLL_E2E_SUITE: suite,
+      },
       stdio: "inherit",
     });
     let settled = false;
@@ -107,6 +142,7 @@ function runPlaywright({ suite, databaseUrl, outputDir, extraArgs, spawnFn, env 
 
 export async function runE2e({
   adminUrl = process.env.E2E_DATABASE_ADMIN_URL,
+  suites = ALL_SUITES,
   extraArgs = [],
   suffix = buildSuffix(),
   createClient,
@@ -114,6 +150,10 @@ export async function runE2e({
   env = process.env,
 } = {}) {
   const forwarded = parseExtraArgs(extraArgs);
+  if (!Array.isArray(suites) || suites.length === 0 ||
+      suites.some((suite) => !ALL_SUITES.includes(suite)) || new Set(suites).size !== suites.length) {
+    throw new Error("suites must contain unique journeys and/or visual entries.");
+  }
   if (!adminUrl) {
     throw new Error(
       "Missing E2E_DATABASE_ADMIN_URL: provide a test-service connection with CREATE DATABASE permission.",
@@ -141,7 +181,8 @@ export async function runE2e({
     } catch (err) {
       throw new Error("E2E setup failed: cannot connect with E2E_DATABASE_ADMIN_URL.");
     }
-    for (const dbName of [names.journeys, names.visual]) {
+    for (const suite of suites) {
+      const dbName = names[suite];
       try {
         await query(`CREATE DATABASE ${quoteIdent(dbName)}`);
       } catch (err) {
@@ -150,7 +191,7 @@ export async function runE2e({
       created.push(dbName);
     }
     let failed = false;
-    for (const suite of ["journeys", "visual"]) {
+    for (const suite of suites) {
       const code = await runPlaywright({
         suite,
         databaseUrl: withDatabase(adminUrl, names[suite]),
@@ -181,7 +222,8 @@ export async function runE2e({
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  runE2e({ extraArgs: process.argv.slice(2) }).then(
+  const parsed = parseRunnerArgs(process.argv.slice(2));
+  runE2e(parsed).then(
     () => {},
     (err) => {
       console.error(String(err?.message ?? err));

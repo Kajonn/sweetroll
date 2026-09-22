@@ -61,7 +61,25 @@ jobs:
         working-directory: web
 
   web-e2e:
+    name: web-e2e (${{ matrix.name }})
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: journeys-1-of-3
+            suite: journeys
+            shard: --shard=1/3
+          - name: journeys-2-of-3
+            suite: journeys
+            shard: --shard=2/3
+          - name: journeys-3-of-3
+            suite: journeys
+            shard: --shard=3/3
+          - name: visual
+            suite: visual
+            shard: ""
     services:
       postgres:
         image: postgres:17-alpine
@@ -96,12 +114,12 @@ jobs:
         working-directory: web
       - run: npx playwright install --with-deps chromium
         working-directory: web
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --suite=${{ matrix.suite }} ${{ matrix.shard }}
         working-directory: web
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: browser-failure-evidence
+          name: browser-failure-evidence-${{ matrix.name }}
           path: web/test-results/
           retention-days: 7
 

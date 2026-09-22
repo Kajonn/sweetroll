@@ -36,7 +36,7 @@ import { publishOwnedClone, uid } from "../offline/test-auth.js";
  */
 
 const D20_VERSION_ID = "a0000000-0000-5000-8000-000000000002";
-const STEP_TIMEOUT = 30_000;
+const STEP_TIMEOUT = 15_000;
 
 const VIEWPORTS = [
   { width: 360, height: 640 },
@@ -70,7 +70,7 @@ async function signInViaPanel(page: Page, code: string) {
 }
 
 async function runJourney(page: Page, browser: Browser, viewport: { width: number; height: number }) {
-  test.setTimeout(420_000);
+  test.setTimeout(120_000);
   await page.setViewportSize(viewport);
   const stamp = uid();
   const campaignTitle = `G7 GM Session ${stamp}`;

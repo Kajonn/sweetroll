@@ -26,7 +26,7 @@ import { publishOwnedClone, uid } from "../offline/test-auth.js";
  */
 
 const D20_VERSION_ID = "a0000000-0000-5000-8000-000000000002";
-const STEP_TIMEOUT = 30_000;
+const STEP_TIMEOUT = 15_000;
 // The display polls every 5s; follow/blank assertions allow several polls.
 const POLL_TIMEOUT = 60_000;
 
@@ -121,7 +121,7 @@ test("I7b exit: restricted scene display shows only revealed areas and visible t
   page: Page;
   browser: Browser;
 }) => {
-  test.setTimeout(420_000);
+  test.setTimeout(120_000);
   const stamp = uid();
   const campaignTitle = `I7b Scene Campaign ${stamp}`;
 

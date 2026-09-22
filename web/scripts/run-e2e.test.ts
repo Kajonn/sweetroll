@@ -6,6 +6,7 @@ import {
   adminDatabaseName,
   buildDatabaseNames,
   parseExtraArgs,
+  parseRunnerArgs,
   runE2e,
   sanitizeForLog,
   withDatabase,
@@ -65,6 +66,40 @@ describe("run-e2e orchestration", () => {
     expect(() => parseExtraArgs(["--output", "x"])).toThrow(/--output/);
     expect(() => parseExtraArgs(["--output=x"])).toThrow(/--output/);
     expect(parseExtraArgs(["--repeat-each=5"])).toEqual(["--repeat-each=5"]);
+  });
+
+  it("selects one suite while forwarding Playwright shard arguments", () => {
+    expect(parseRunnerArgs(["--suite=journeys", "--shard=2/3"])).toEqual({
+      suites: ["journeys"],
+      extraArgs: ["--shard=2/3"],
+    });
+    expect(parseRunnerArgs(["--suite", "visual"])).toEqual({
+      suites: ["visual"],
+      extraArgs: [],
+    });
+    expect(parseRunnerArgs([]).suites).toEqual(["journeys", "visual"]);
+    expect(() => parseRunnerArgs(["--suite=unknown"])).toThrow(/journeys|visual/);
+  });
+
+  it("creates, runs, and drops only the selected suite database", async () => {
+    const { client, queries } = stubClient();
+    const { calls, spawnFn } = stubSpawn([0]);
+    await runE2e({
+      adminUrl: ADMIN,
+      suites: ["journeys"],
+      extraArgs: ["--shard=1/3"],
+      suffix: "shard1",
+      createClient: () => client as never,
+      spawnFn: spawnFn as never,
+      env: {} as never,
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.args).toContain("--shard=1/3");
+    expect(calls[0]!.options.env.SWEETROLL_E2E_SUITE).toBe("journeys");
+    expect(calls[0]!.options.env.SWEETROLL_E2E_EPHEMERAL_DB).toBe("1");
+    expect(queries.filter((q) => q.startsWith("CREATE DATABASE"))).toHaveLength(1);
+    expect(queries.filter((q) => q.startsWith("DROP DATABASE"))).toHaveLength(1);
+    expect(queries.join("\n")).not.toContain("sweetroll_e2e_v_shard1");
   });
 
   it("runs journeys without visuals, then visuals only, with isolated outputs", async () => {

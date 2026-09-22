@@ -33,7 +33,7 @@ import { publishOwnedClone, uid } from "../offline/test-auth.js";
  */
 
 const D20_VERSION_ID = "a0000000-0000-5000-8000-000000000002";
-const STEP_TIMEOUT = 30_000;
+const STEP_TIMEOUT = 15_000;
 
 async function signInAs(request: APIRequestContext, code: string): Promise<string> {
   const response = await request.post("/dev/signin", {
@@ -104,7 +104,7 @@ test("I7 exit: co-GM shared-edit conflict and independent operation", async ({
   page: Page;
   browser: Browser;
 }) => {
-  test.setTimeout(420_000);
+  test.setTimeout(120_000);
   const stamp = uid();
   const campaignTitle = `G7 CoGM Conflict ${stamp}`;
   const noteTitle = `G7 CoGM Note ${stamp}`;

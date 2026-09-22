@@ -23,10 +23,11 @@ import { uid } from "../offline/test-auth.js";
  * create UI in this slice, so those rows go through real HTTP like the
  * scene-display journey does. Cloned systems are cleaned up in afterEach
  * (DELETE /api/systems/:id); campaigns/notes/scenes carry unique names per
- * run since those endpoints have no DELETE.
+ * run since those endpoints have no DELETE. Canonical runs discard their
+ * ephemeral shard database instead of issuing best-effort system deletes.
  */
 
-const STEP_TIMEOUT = 30_000;
+const STEP_TIMEOUT = 15_000;
 
 // 1x1 transparent PNG fixture (same bytes as the backend integration tests).
 const ONE_BY_ONE_PNG_BASE64 =
@@ -35,10 +36,12 @@ const ONE_BY_ONE_PNG_BASE64 =
 // Track systems cloned by these tests so test.afterEach can delete them
 // even when an assertion fails before the in-test cleanup line runs.
 // page.request shares the browser context's cookies (dev sign-in), so the
-// deletes are authorized. Keeps the shared DB deterministic across runs.
+// deletes are authorized for direct runs with a caller-managed database.
 const createdSystemIds: string[] = [];
 test.afterEach(async ({ page }) => {
-  for (const id of createdSystemIds.splice(0)) {
+  const ids = createdSystemIds.splice(0);
+  if (process.env.SWEETROLL_E2E_EPHEMERAL_DB === "1") return;
+  for (const id of ids) {
     await page.request.delete(`/api/systems/${id}`).catch(() => {});
   }
 });
@@ -223,7 +226,7 @@ async function expectAxeClean(page: Page) {
 }
 
 async function prepare(page: Page, width: number, dark = false) {
-  test.setTimeout(240_000);
+  test.setTimeout(120_000);
   await page.setViewportSize({ width, height: 800 });
   if (dark) {
     await page.emulateMedia({ colorScheme: "dark" });

@@ -1,12 +1,13 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect } from "@playwright/test";
 
-// Systems cloned by these tests are deleted in test.afterEach so a failing
-// assertion cannot leave residue in the shared DB (deterministic library
-// baselines). page.request shares the browser context's sign-in cookie.
+// Direct runs delete cloned systems; the canonical runner discards its whole
+// ephemeral database instead. page.request shares the sign-in cookie.
 const createdSystemIds: string[] = [];
 test.afterEach(async ({ page }) => {
-  for (const id of createdSystemIds.splice(0)) {
+  const ids = createdSystemIds.splice(0);
+  if (process.env.SWEETROLL_E2E_EPHEMERAL_DB === "1") return;
+  for (const id of ids) {
     await page.request.delete(`/api/systems/${id}`).catch(() => {});
   }
 });

@@ -52,15 +52,24 @@ forward to both phases (for example `--repeat-each=5`), except a single
 fixtures per database and may push catalog fixtures past the first page;
 use targeted direct runs with isolated resources for large repeats instead.
 
+Pass `--suite=journeys` or `--suite=visual` to run one phase. Playwright
+arguments remain available after that runner option, for example
+`npm run test:e2e -- --suite=journeys --shard=2/3`. Each invocation creates
+and drops only its selected suite database. Because that database is
+ephemeral, journey tests skip best-effort system deletion; direct Playwright
+runs against caller-managed databases retain their normal cleanup.
+
 For targeted investigation with caller-managed resources, invoke Playwright
 directly (for example `npx playwright test tests/e2e/campaignJourney.spec.ts`)
 with `DATABASE_URL`, `CI=1`, and dedicated ports/databases.
 
-CI runs the same canonical entry point (`npm run test:e2e` in `web/`) with
-`E2E_DATABASE_ADMIN_URL` from its PostgreSQL service, so campaign/GM/player
-journeys execute alongside smoke, acceptance, character-sheet, and visual
-specs. On failure CI uploads `web/test-results/` as `browser-failure-evidence`
-(7-day retention); traces contain deterministic test data only.
+CI runs three journey shards plus one visual matrix entry through the same
+canonical entry point. Every entry has its own PostgreSQL service and
+run-scoped database, so the full campaign/GM/player, smoke, acceptance,
+character-sheet, and visual coverage runs concurrently without shared state.
+Each entry has a ten-minute job limit. On failure CI uploads its own named
+`browser-failure-evidence-*` artifact (7-day retention); traces contain
+deterministic test data only.
 
 ## Container modes
 

@@ -14,10 +14,13 @@ import { test, expect, type Page } from "@playwright/test";
 // failing assertion cannot leave residue in the shared DB (deterministic
 // library baselines). page.request shares the browser context's sign-in
 // cookie. Created characters have no DELETE endpoint, matching
-// character-sheet.spec.ts precedent (unique names per run).
+// character-sheet.spec.ts precedent (unique names per run). Direct runs
+// clean up systems; canonical runs discard their ephemeral shard database.
 const createdSystemIds: string[] = [];
 test.afterEach(async ({ page }) => {
-  for (const id of createdSystemIds.splice(0)) {
+  const ids = createdSystemIds.splice(0);
+  if (process.env.SWEETROLL_E2E_EPHEMERAL_DB === "1") return;
+  for (const id of ids) {
     await page.request.delete(`/api/systems/${id}`).catch(() => {});
   }
 });
@@ -63,7 +66,7 @@ async function expectNoPageOverflow(page: Page) {
 test("G5 exit: blank → simple system without expression → order sheet → preview → save → reopen → publish → create character", async ({
   page,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(120_000);
 
   // 1. Create blank draft via library UI (name only), expect /systems/:id.
   await signIn(page);
@@ -288,7 +291,7 @@ test("editing a published reference system preserves its advanced definitions", 
 test("editing a cloned reference computed field updates its expression end to end", async ({
   page,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(120_000);
 
   // Clone d20; find the entity holding the Defense computed field.
   await signIn(page);

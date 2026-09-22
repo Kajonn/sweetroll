@@ -36,14 +36,15 @@ import { uid } from "../offline/test-auth.js";
  * own specs.
  */
 
-const STEP_TIMEOUT = 30_000;
+const STEP_TIMEOUT = 15_000;
 
-// Systems created by this test are deleted in test.afterEach so a failing
-// assertion cannot leave residue in the shared DB (deterministic library
-// baselines). page.request shares the browser context's sign-in cookie.
+// Direct runs delete created systems; the canonical runner discards its
+// ephemeral shard database. page.request shares the sign-in cookie.
 const createdSystemIds: string[] = [];
 test.afterEach(async ({ page }) => {
-  for (const id of createdSystemIds.splice(0)) {
+  const ids = createdSystemIds.splice(0);
+  if (process.env.SWEETROLL_E2E_EPHEMERAL_DB === "1") return;
+  for (const id of ids) {
     await page.request.delete(`/api/systems/${id}`).catch(() => {});
   }
 });
@@ -145,7 +146,7 @@ test("G7 exit: publish newer version via creator UI, upgrade campaign A with sta
   page: Page;
   browser: Browser;
 }) => {
-  test.setTimeout(420_000);
+  test.setTimeout(120_000);
   const stamp = uid();
   const campaignTitleA = `G7 Upgrade A ${stamp}`;
   const campaignTitleB = `G7 Upgrade B ${stamp}`;

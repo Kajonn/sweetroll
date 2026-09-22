@@ -586,6 +586,7 @@ Detailed contracts and required regression matrices are in the [I6 backend spec]
 - Offline-cache tests: sheet renders without network; queued writes sync without double-spend.
 - Accessibility tests in UI stories and end-to-end critical journeys, supplemented by manual screen-reader testing.
 - Responsive visual regression at 360 and 1280 px for platform UI primitives and reference systems.
+- Browser journeys run in isolated, ephemeral databases and may be sharded across CI jobs; the visual suite remains isolated from journeys. Ordinary UI waits fail within 15 seconds, complete journeys within two minutes, and the browser job within ten minutes so broken selectors cannot serialize into long CI stalls.
 - Load and soak tests shaped like session bursts: many resource updates, rolls, and views in a short window.
 
 ## 16.2 Reference systems

@@ -33,7 +33,7 @@ async function createCharacter(page: Page, name: string): Promise<string> {
 test("player library: list, search, recent, create, duplicate, archive, recover", async ({
   page,
 }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(120_000);
   await signIn(page);
   const name = `Library Hero ${Date.now().toString(36)}`;
   const characterId = await createCharacter(page, name);

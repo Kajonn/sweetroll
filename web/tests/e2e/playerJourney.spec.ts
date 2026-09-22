@@ -69,7 +69,7 @@ async function completeProficient(page: Page) {
 test("I5 exit: sign in on phone, select system, create+play two characters, find recent, survive offline, export, sign out clears data", async ({
   page,
 }) => {
-  test.setTimeout(420_000);
+  test.setTimeout(120_000);
   await page.setViewportSize({ width: 390, height: 844 });
   const stamp = Date.now().toString(36);
   const nameA = `Exit Hero A ${stamp}`;

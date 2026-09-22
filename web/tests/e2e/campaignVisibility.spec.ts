@@ -21,7 +21,7 @@ import { publishOwnedClone, uid } from "../offline/test-auth.js";
  */
 
 const D20_VERSION_ID = "a0000000-0000-5000-8000-000000000002";
-const STEP_TIMEOUT = 30_000;
+const STEP_TIMEOUT = 15_000;
 
 async function signInAs(request: APIRequestContext, code: string): Promise<string> {
   const response = await request.post("/dev/signin", {
@@ -64,7 +64,7 @@ test("campaign visibility: ordinary-player matrix, narrowing eviction, leave pur
   page: Page;
   browser: Browser;
 }) => {
-  test.setTimeout(420_000);
+  test.setTimeout(120_000);
   const stamp = uid();
   const campaignTitle = `Visibility ${stamp}`;
   const otherTitle = `Faraway ${stamp}`;

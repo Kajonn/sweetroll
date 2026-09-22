@@ -8,7 +8,7 @@ async function signIn(page: Page): Promise<void> {
 }
 
 test("client navigation: header hops keep the document alive", async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(120_000);
   await signIn(page);
   await page.goto("/characters");
   await expect(page.getByRole("heading", { name: "Your library" })).toBeVisible({ timeout: 30_000 });

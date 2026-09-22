@@ -348,6 +348,12 @@ test.describe("campaign accessibility", () => {
       await expect(page.getByRole("heading", { name: "Session", exact: true })).toBeVisible({
         timeout: STEP_TIMEOUT,
       });
+      // The character fixture is inserted through HTTP after the Characters tab
+      // has populated React Query's shared cache. Refresh explicitly instead of
+      // racing the Session board's 15-second polling interval.
+      await page.getByRole("button", { name: "Refresh", exact: true }).click({
+        timeout: STEP_TIMEOUT,
+      });
       await expect(page.getByRole("heading", { name: "Latest content" })).toBeVisible({
         timeout: STEP_TIMEOUT,
       });

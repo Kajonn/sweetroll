@@ -11,7 +11,7 @@ import { uid } from "../offline/test-auth.js";
  * `code-test-a` in an isolated context — the d20 template carries a single
  * entity, so the NPC entity is appended rather than patched — then creates a
  * campaign plus one NPC-kind and one playable-kind character entirely through
- * the UI (name + system version ID + Load entity options + entity + New
+ * the UI (name + automatically loaded entity options + New
  * campaign character, mirroring gmSessionJourney step 8). Asserts the
  * `Monsters & NPCs` section lists the NPC row only, the name search narrows
  * to an empty state and back, and opening the NPC row lands on the character
@@ -154,23 +154,13 @@ async function createCampaignCharacter(
   page: Page,
   campaignUrl: string,
   campaignTitle: string,
-  input: { name: string; versionId: string; entityId: string },
+  input: { name: string; entityId: string },
 ) {
   await page.goto(campaignUrl);
   await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
   await page.getByLabel("Character name").fill(input.name);
-  await page.getByLabel("System version ID").fill(input.versionId);
-  // Entity options load over HTTP: retry the loader a few times before
-  // giving up (same shape as gmSessionJourney step 8).
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await page.getByRole("button", { name: "Load entity options" }).click({ timeout: STEP_TIMEOUT });
-    try {
-      await expect(page.locator(`select option[value="${input.entityId}"]`)).toHaveCount(1, { timeout: 10_000 });
-      break;
-    } catch (err) {
-      if (attempt === 2) throw err;
-    }
-  }
+  await expect(page.getByLabel("System version ID")).toHaveCount(0);
+  await expect(page.locator(`select option[value="${input.entityId}"]`)).toHaveCount(1, { timeout: STEP_TIMEOUT });
   await page.getByLabel("Entity definition").selectOption(input.entityId, { timeout: STEP_TIMEOUT });
   await page.getByRole("button", { name: "New campaign character" }).click({ timeout: STEP_TIMEOUT });
   // Success opens the new sheet through the onOpenCharacter seam.
@@ -234,12 +224,10 @@ test("NPC list: npc-kind rows filter into a searchable Monsters & NPCs section",
     // asserts the sheet heading before returning.
     await createCampaignCharacter(page, campaignUrl, campaignTitle, {
       name: goblinName,
-      versionId: seed.versionId,
       entityId: seed.npcEntityId,
     });
     await createCampaignCharacter(page, campaignUrl, campaignTitle, {
       name: heroName,
-      versionId: seed.versionId,
       entityId: seed.playableEntityId,
     });
 

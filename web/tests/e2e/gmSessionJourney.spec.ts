@@ -202,20 +202,9 @@ async function runJourney(page: Page, browser: Browser, viewport: { width: numbe
     await page.goto(campaignUrl);
     await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
     await page.getByLabel("Character name").fill(characterName);
-    await page.getByLabel("System version ID").fill(ownedVersionId);
-    // Entity options load over HTTP: retry the loader a few times before
-    // giving up (the inline error text surfaces the cause on failure). The
-    // page also carries the theme <select>, so wait for the entity option
-    // itself rather than counting selects.
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await page.getByRole("button", { name: "Load entity options" }).click({ timeout: STEP_TIMEOUT });
-      try {
-        await expect(page.locator('select option[value="character"]')).toHaveCount(1, { timeout: 10_000 });
-        break;
-      } catch (err) {
-        if (attempt === 2) throw err;
-      }
-    }
+    // The campaign's pinned version loads the entity options automatically.
+    await expect(page.getByLabel("System version ID")).toHaveCount(0);
+    await expect(page.locator('select option[value="character"]')).toHaveCount(1, { timeout: STEP_TIMEOUT });
     await page.getByLabel("Entity definition").selectOption("character", { timeout: STEP_TIMEOUT });
     await page.getByRole("button", { name: "New campaign character" }).click({ timeout: STEP_TIMEOUT });
     // Success opens the new sheet through the onOpenCharacter seam; head

@@ -82,23 +82,14 @@ async function createCampaignCharacter(
   campaignTitle: string,
   campaignUrl: string,
   characterName: string,
-  ownedVersionId: string,
 ) {
   // Fresh detail load first so the revision-guarded create cannot 409 on
   // earlier mutations (gmSessionJourney step 8 discipline).
   await page.goto(campaignUrl);
   await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
   await page.getByLabel("Character name").fill(characterName);
-  await page.getByLabel("System version ID").fill(ownedVersionId);
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await page.getByRole("button", { name: "Load entity options" }).click({ timeout: STEP_TIMEOUT });
-    try {
-      await expect(page.locator('select option[value="character"]')).toHaveCount(1, { timeout: 10_000 });
-      break;
-    } catch (err) {
-      if (attempt === 2) throw err;
-    }
-  }
+  await expect(page.getByLabel("System version ID")).toHaveCount(0);
+  await expect(page.locator('select option[value="character"]')).toHaveCount(1, { timeout: STEP_TIMEOUT });
   await page.getByLabel("Entity definition").selectOption("character", { timeout: STEP_TIMEOUT });
   await page.getByRole("button", { name: "New campaign character" }).click({ timeout: STEP_TIMEOUT });
   // Success opens the new sheet through the onOpenCharacter seam.
@@ -290,8 +281,8 @@ test("I7 exit: co-GM shared-edit conflict and independent operation", async ({
       // 10. Independent operation: two campaign characters through the UI,
       // then owner and co-GM concurrently bump DIFFERENT characters'
       // Health. Both apply with no conflict on either side.
-      await createCampaignCharacter(page, campaignTitle, campaignUrl, heroA, ownedVersionId);
-      await createCampaignCharacter(page, campaignTitle, campaignUrl, heroB, ownedVersionId);
+      await createCampaignCharacter(page, campaignTitle, campaignUrl, heroA);
+      await createCampaignCharacter(page, campaignTitle, campaignUrl, heroB);
       await page.goto(campaignUrl);
       await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
       await page.getByRole("tab", { name: "Session" }).click({ timeout: STEP_TIMEOUT });

@@ -33,6 +33,8 @@ describe("PreviewSheet", () => {
 
     it("renders every section heading as a level-2 heading with the declared text", () => {
       renderD20();
+      expect(screen.getAllByRole("heading", { level: 2, name: "Basics" })).toHaveLength(1);
+      expect(screen.getAllByRole("heading", { level: 2, name: "Abilities" })).toHaveLength(1);
       expect(
         screen.getByRole("heading", { level: 2, name: "Basics" }),
       ).toBeInTheDocument();

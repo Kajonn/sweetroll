@@ -41,7 +41,22 @@ export type ActivityListItem = Pick<
   "eventId" | "kind" | "actorId" | "occurredAt"
 >;
 
-export function CampaignActivityView(props: { events: ActivityListItem[] }) {
+export function CampaignActivityLine(props: { event: ActivityListItem; actorId?: string | null | undefined }) {
+  const { event, actorId } = props;
+  const date = new Date(event.occurredAt);
+  const formatted = Number.isNaN(date.getTime()) ? event.occurredAt
+    : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  const actor = actorId === event.actorId
+    ? t("campaign.detail.activity.actor.you")
+    : t("campaign.detail.activity.actor.member", { id: event.actorId.slice(0, 8) });
+  return <>
+    <span>{activityKindLabel(event.kind)}</span>{" "}
+    <span title={event.actorId}>{actor}</span>{" "}
+    <time dateTime={event.occurredAt}>{formatted}</time>
+  </>;
+}
+
+export function CampaignActivityView(props: { events: ActivityListItem[]; actorId?: string | null | undefined }) {
   if (props.events.length === 0) {
     return (
       <EmptyState
@@ -54,8 +69,7 @@ export function CampaignActivityView(props: { events: ActivityListItem[] }) {
     <ul aria-label={t("campaign.detail.activity.listAriaLabel")}>
       {props.events.map((event) => (
         <li key={event.eventId}>
-          <span>{activityKindLabel(event.kind)}</span> <span>{event.actorId}</span>{" "}
-          <time dateTime={event.occurredAt}>{event.occurredAt}</time>
+          <CampaignActivityLine event={event} actorId={props.actorId} />
         </li>
       ))}
     </ul>
@@ -65,6 +79,7 @@ export function CampaignActivityView(props: { events: ActivityListItem[] }) {
 export function CampaignActivityTab(props: {
   api: Pick<CampaignsApi, "listActivity">;
   campaignId: string;
+  actorId?: string | null;
   /** Campaign-level revocation: the feed is not_found for a previously-readable campaign. */
   onAccessRevoked?: () => void;
 }) {
@@ -102,5 +117,5 @@ export function CampaignActivityTab(props: {
   }
 
   const events: ActivityListItem[] = feed.data.events;
-  return <CampaignActivityView events={events} />;
+  return <CampaignActivityView events={events} actorId={props.actorId} />;
 }

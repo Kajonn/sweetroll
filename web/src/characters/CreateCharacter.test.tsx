@@ -275,7 +275,7 @@ describe("CreateCharacter", () => {
       await waitFor(() => expect(api.send).toHaveBeenCalledTimes(2));
       const retriedCreate = api.send.mock.calls[1]![0] as { body: Record<string, unknown> };
       expect(firstCreate.body).toEqual(retriedCreate.body);
-      expect(onCreated).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
       expect(onCreated).toHaveBeenCalledWith("char-9");
       await waitFor(() => expect(store.readOnlineAttempts("actor-1")).resolves.toHaveLength(0));
     } finally {

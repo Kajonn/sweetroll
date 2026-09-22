@@ -123,7 +123,7 @@ export function CampaignCreate(props: {
                     aria-pressed={versionId === entry.versionId}
                     onClick={() => setVersionId(entry.versionId)}
                   >
-                    {`${entry.systemName} ${entry.semanticVersion}`}
+                    {`${entry.systemName} ${entry.semanticVersion} · ${new Date(entry.createdAt).toLocaleDateString()} · ${entry.versionId.slice(0, 8)}`}
                   </Button>
                 </li>
               ))}

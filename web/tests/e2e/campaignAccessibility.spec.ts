@@ -26,7 +26,6 @@ import { uid } from "../offline/test-auth.js";
  * run since those endpoints have no DELETE.
  */
 
-const D20_VERSION_ID = "a0000000-0000-5000-8000-000000000002";
 const STEP_TIMEOUT = 30_000;
 
 // 1x1 transparent PNG fixture (same bytes as the backend integration tests).
@@ -276,20 +275,21 @@ test.describe("campaign accessibility", () => {
       await expectNoPageHorizontalOverflow(page);
       await expectAxeClean(page);
 
-      // Keyboard flow: type the name + version, then load entity options
-      // with Enter and observe the character option.
+      // The campaign's pinned version loads entity choices automatically.
+      await expect(page.locator('select option[value="character"]')).toHaveCount(1, {
+        timeout: STEP_TIMEOUT,
+      });
+      await expect(page.getByLabel("System version ID")).toHaveCount(0);
+      // Keyboard flow: type the name and choose the entity without a loader.
       const nameInput = page.getByLabel("Character name");
       await nameInput.focus();
       await expect(nameInput).toBeFocused();
       await page.keyboard.type(heroName);
-      await page.getByLabel("System version ID").fill(D20_VERSION_ID);
-      const loadOptions = page.getByRole("button", { name: "Load entity options" });
-      await loadOptions.focus();
-      await expect(loadOptions).toBeFocused();
-      await page.keyboard.press("Enter");
-      await expect(page.locator('select option[value="character"]')).toHaveCount(1, {
-        timeout: STEP_TIMEOUT,
-      });
+      const entity = page.getByLabel("Entity definition");
+      await entity.focus();
+      await expect(entity).toBeFocused();
+      await entity.selectOption("character");
+      await expect(entity).toHaveValue("character");
     });
 
     test(`campaign content tab at ${width}px: axe, keyboard, no overflow`, async ({ page }) => {

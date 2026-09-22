@@ -132,6 +132,7 @@ export function CampaignDetail(props: {
   const handleAccessRevoked = useCallback((): void => {
     queryClient.removeQueries({ queryKey: campaignDetailKey(props.campaignId) });
     queryClient.removeQueries({ queryKey: campaignCharactersPrefix(props.campaignId) });
+    queryClient.removeQueries({ queryKey: ["campaigns", "creation-options", props.campaignId] });
     queryClient.removeQueries({ queryKey: ["campaigns", "claimable-characters", props.campaignId] });
     // Literal 3-element prefix (not campaignContentKey(campaignId), which
     // evaluates to ["campaigns","content",id,null,0]): TanStack prefix
@@ -166,6 +167,7 @@ export function CampaignDetail(props: {
       });
       queryClient.removeQueries({ queryKey: campaignDetailKey(props.campaignId) });
       queryClient.removeQueries({ queryKey: campaignCharactersPrefix(props.campaignId) });
+      queryClient.removeQueries({ queryKey: ["campaigns", "creation-options", props.campaignId] });
       queryClient.removeQueries({ queryKey: ["campaigns", "claimable-characters", props.campaignId] });
       // Same literal-prefix rationale as handleAccessRevoked above: drop
       // all actor/generation-scoped content keys on leave, plus the session,
@@ -289,6 +291,7 @@ export function CampaignDetail(props: {
                 campaignId={props.campaignId}
                 actorId={props.actorId}
                 campaignRevision={campaign.revision}
+                pinnedVersionId={campaign.systemVersionId}
                 generation={generation}
                 online={online}
                 isGm={isGm}
@@ -338,6 +341,7 @@ export function CampaignDetail(props: {
             label: t("campaign.detail.tabs.activity"),
             content: (
               <CampaignActivityTab
+                actorId={props.actorId}
                 api={props.api}
                 campaignId={props.campaignId}
                 onAccessRevoked={handleAccessRevoked}

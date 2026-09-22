@@ -15,7 +15,7 @@ import { Button, EmptyState, FormField, Select } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
 import { campaignCharactersKey } from "./campaignQueries.js";
 import { audienceLabel } from "./CampaignContent.js";
-import { activityKindLabel } from "./CampaignActivity.js";
+import { CampaignActivityLine } from "./CampaignActivity.js";
 import type { CampaignCharacterSummary } from "./types.js";
 import { randomUUID } from "../utils/uuid";
 
@@ -492,8 +492,7 @@ export function SessionBoard(props: SessionBoardProps) {
       <ul>
         {activity.data.events.map((event) => (
           <li key={event.eventId}>
-            <span>{activityKindLabel(event.kind)}</span> <span>{event.actorId}</span>{" "}
-            <time dateTime={event.occurredAt}>{event.occurredAt}</time>
+            <CampaignActivityLine event={event} actorId={props.actorId} />
           </li>
         ))}
       </ul>

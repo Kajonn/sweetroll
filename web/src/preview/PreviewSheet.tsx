@@ -399,7 +399,9 @@ function PreviewSection({
       aria-label={section.label}
     >
       <h2 className={styles.sectionHeading}>{section.label}</h2>
-      {section.elements.map((element) => (
+      {section.elements.filter((element, index) =>
+        !(index === 0 && element.kind === "heading" && element.text.trim() === section.label.trim()),
+      ).map((element) => (
         <PreviewElement
           key={element.id}
           element={element}

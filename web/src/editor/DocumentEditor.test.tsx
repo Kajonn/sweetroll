@@ -82,6 +82,47 @@ function renderEditor(
 }
 
 describe("DocumentEditor", () => {
+  it("publishes the confirmed autosave revision even when the open query still has an older revision", async () => {
+    const user = userEvent.setup();
+    const original = blankDocument();
+    original.metadata.name = "Original";
+    let saveRevision = 1;
+    let publishedRevision: number | null = null;
+    const workspace = (revision: number, document: typeof original) => ({
+      system: { systemId: "s1", name: "Original", access: "private", lifecycle: "active", createdAt: "2026-09-06T00:00:00Z", updatedAt: "2026-09-06T00:00:00Z" },
+      draft: { revision, document, sourceChecksum: "c", updatedBy: "u", updatedAt: "2026-09-06T00:00:00Z" },
+      versions: [], assessment: { ok: true, diagnostics: [] },
+    });
+    const fetch_ = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/draft") && init?.method === "PUT") {
+        saveRevision += 1;
+        const body = JSON.parse(String(init.body)) as { document: typeof original };
+        return new Response(JSON.stringify({ workspace: workspace(saveRevision, body.document), requestId: "r" }), { status: 200 });
+      }
+      if (url.endsWith("/publish") && init?.method === "POST") {
+        publishedRevision = (JSON.parse(String(init.body)) as { expectedRevision: number }).expectedRevision;
+        return new Response(JSON.stringify({ version: { versionId: "v1", systemId: "s1", semanticVersion: "0.1.0", checksum: "c", package: {}, releaseNotes: "", lifecycle: "active", createdAt: "2026-09-06T00:00:00Z" }, requestId: "r" }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ workspace: workspace(1, original), requestId: "r" }), { status: 200 });
+    });
+    const client = createApiClient({ baseUrl: "http://x", fetch: fetch_ as typeof fetch });
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><DocumentEditor client={client} systemId="s1" /></QueryClientProvider>);
+    await screen.findByTestId("metadata-name");
+    await user.clear(screen.getByTestId("metadata-name"));
+    await user.type(screen.getByTestId("metadata-name"), "Renamed");
+    await user.tab();
+    await settleFetchActivity(() => ({
+      gets: fetch_.mock.calls.filter(([, init]) => !init?.method || init.method === "GET").length,
+      puts: fetch_.mock.calls.filter(([, init]) => init?.method === "PUT").length,
+    }));
+    await waitFor(() => expect(screen.getByTestId("document-editor-publish")).toBeEnabled());
+    await user.click(screen.getByTestId("document-editor-publish"));
+    await user.click(await screen.findByTestId("publish-dialog-submit"));
+    await waitFor(() => expect(publishedRevision).toBe(saveRevision));
+    expect(publishedRevision).toBeGreaterThan(1);
+  });
+
   it("updates the visible published version as soon as publishing succeeds", async () => {
     const user = userEvent.setup();
     let published = false;
@@ -100,6 +141,7 @@ describe("DocumentEditor", () => {
     const client = createApiClient({ baseUrl: "http://x", fetch: fetch_ as typeof fetch });
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><DocumentEditor client={client} systemId="s1" /></QueryClientProvider>);
     expect(await screen.findByText(/not published yet/i)).toBeVisible();
+    await waitFor(() => expect(screen.getByTestId("document-editor-publish")).toBeEnabled());
     await user.click(screen.getByTestId("document-editor-publish"));
     await user.click(screen.getByTestId("publish-dialog-submit"));
     expect(await screen.findByTestId("publish-dialog-success")).toBeInTheDocument();
@@ -170,7 +212,8 @@ describe("DocumentEditor", () => {
   it("enables the publish button when the assessment has no diagnostics", async () => {
     renderEditor();
     const button = await screen.findByTestId("document-editor-publish");
-    expect(button).not.toBeDisabled();
+    expect(button).toBeDisabled();
+    await waitFor(() => expect(button).not.toBeDisabled());
     expect(button.getAttribute("aria-disabled")).toBeNull();
   });
 
@@ -231,6 +274,7 @@ describe("DocumentEditor", () => {
   it("opens the publish dialog when the publish button is clicked", async () => {
     const user = userEvent.setup();
     renderEditor();
+    await waitFor(() => expect(screen.getByTestId("document-editor-publish")).toBeEnabled());
     await user.click(await screen.findByTestId("document-editor-publish"));
     expect(screen.getByTestId("publish-dialog")).toBeInTheDocument();
   });

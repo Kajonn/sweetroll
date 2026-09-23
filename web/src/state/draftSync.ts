@@ -22,6 +22,8 @@ export type DraftSync = {
    * clobbering newer local edits with a stale echo.
    */
   isConfirmed: (document: unknown) => boolean;
+  /** Revision returned by the save that confirmed the current document. */
+  confirmedRevision: number | null;
   status: SyncStatus;
   banner: ConflictBanner | null;
   error: Error | null;
@@ -74,6 +76,7 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
   const mutation = useSaveDraft(input.client);
 
   const [status, setStatus] = useState<SyncStatus>("idle");
+  const [confirmedRevision, setConfirmedRevision] = useState<number | null>(null);
   const [banner, setBanner] = useState<ConflictBanner | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [offline, setOffline] = useState<boolean>(
@@ -148,7 +151,10 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
             // The save response is authoritative for the new revision, so a
             // stashed edit flushes against it without waiting for a refetch.
             const nextRevision = workspace?.draft?.revision;
-            if (typeof nextRevision === "number") knownRevisionRef.current = nextRevision;
+            if (typeof nextRevision === "number") {
+              knownRevisionRef.current = nextRevision;
+              setConfirmedRevision(nextRevision);
+            }
             lastSavedHashRef.current = hash;
             setStatus("saved");
             setBanner(null);
@@ -235,7 +241,7 @@ export function useDraftSync(input: UseDraftSyncInput): DraftSync {
   );
 
   return useMemo<DraftSync>(
-    () => ({ save, cancel, isConfirmed, status, banner, error, offline }),
-    [save, cancel, isConfirmed, status, banner, error, offline],
+    () => ({ save, cancel, isConfirmed, confirmedRevision, status, banner, error, offline }),
+    [save, cancel, isConfirmed, confirmedRevision, status, banner, error, offline],
   );
 }

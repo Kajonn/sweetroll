@@ -290,6 +290,8 @@ export function DocumentEditorBody({
   // Unsaved changes come from the G1 owner: true until this exact document
   // content matches the last server-confirmed save.
   const unsaved = !sync.isConfirmed(document);
+  const publishReady = !publishDisabled && !unsaved && sync.status === "saved" && !sync.offline;
+  const confirmedDraftRevision = sync.confirmedRevision ?? draftRevision;
   // The draft metadata is the editor's source of truth. The system record can
   // lag behind it after saving; use that record only for an empty draft name.
   const workingName = document.metadata.name;
@@ -464,12 +466,14 @@ export function DocumentEditorBody({
         <Button
           variant="primary"
           data-testid="document-editor-publish"
-          disabled={publishDisabled}
-          aria-disabled={publishDisabled ? "true" : undefined}
+          disabled={!publishReady}
+          aria-disabled={!publishReady ? "true" : undefined}
           onClick={() => setPublishOpen(true)}
           title={
             publishDisabled
               ? t("editor.publish.disabled.reason", { count: errorCount })
+              : !publishReady
+                ? t("editor.publish.waitForSave")
               : undefined
           }
         >
@@ -482,8 +486,8 @@ export function DocumentEditorBody({
         >
           <ul className={styles.readinessList}>
             <li className={styles.readinessItem}>
-              {draftRevision !== null
-                ? t("editor.readiness.draftRev", { revision: draftRevision })
+              {confirmedDraftRevision !== null
+                ? t("editor.readiness.draftRev", { revision: confirmedDraftRevision })
                 : t("editor.readiness.noDraft")}
             </li>
             <li className={styles.readinessItem}>
@@ -522,6 +526,8 @@ export function DocumentEditorBody({
           >
             {publishDisabled
               ? t("editor.publish.disabled.reason", { count: errorCount })
+              : !publishReady
+                ? t("editor.publish.waitForSave")
               : t("editor.readiness.ready")}
           </p>
         </section>
@@ -606,9 +612,9 @@ export function DocumentEditorBody({
         open={publishOpen}
         onOpenChange={setPublishOpen}
         systemId={ws.system.systemId}
-        expectedRevision={draftRevision ?? 0}
+        expectedRevision={confirmedDraftRevision ?? 0}
         readiness={{
-          draftRevision,
+          draftRevision: confirmedDraftRevision,
           diagnosticsCount: errorCount,
           latestPublished,
           unsaved,

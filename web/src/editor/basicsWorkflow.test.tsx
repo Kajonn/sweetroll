@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, test, vi } from "vitest";
@@ -114,10 +114,10 @@ describe("basics-first creator workflow (G5 task 2)", () => {
     await user.click(moveDown);
     expect(screen.getByTestId("section-row-section_1-position")).toHaveTextContent("2");
 
-    // Preview opens for the simple system and publish stays enabled.
+    // Preview opens for the simple system; publishing waits for autosave.
     await user.click(screen.getByTestId("document-editor-preview-toggle"));
     expect(screen.getByTestId("document-editor-preview")).toBeInTheDocument();
-    expect(screen.getByTestId("document-editor-publish")).not.toBeDisabled();
+    await waitFor(() => expect(screen.getByTestId("document-editor-publish")).not.toBeDisabled(), { timeout: 5000 });
   });
 
   test("advanced controls sit behind a labeled disclosure and never block basics", async () => {

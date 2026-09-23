@@ -684,6 +684,8 @@ function toAuditRecord(row: AuditRow): AuditRecord {
 }
 
 async function saveDraftImpl(pool: Pool, input: SaveDraftInput): Promise<DraftSaveResult> {
+  const candidateName = (input.document as { metadata?: { name?: unknown } } | null)?.metadata?.name;
+  const draftName = typeof candidateName === "string" && candidateName.trim() !== "" ? candidateName : null;
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -707,6 +709,10 @@ async function saveDraftImpl(pool: Pool, input: SaveDraftInput): Promise<DraftSa
         [input.systemId, JSON.stringify(input.document), input.sourceChecksum, input.updatedBy],
       );
       const draft = toDraftRecord(requireRow(inserted.rows[0], "saveDraft"));
+      if (draftName !== null) {
+        await client.query(`UPDATE systems SET name = $2, updated_at = now() WHERE id = $1`,
+          [input.systemId, draftName]);
+      }
       await client.query(
         `INSERT INTO system_audit_records (system_id, actor_id, kind, summary, request_id)
          VALUES ($1, $2, $3, $4, $5)`,
@@ -727,6 +733,10 @@ async function saveDraftImpl(pool: Pool, input: SaveDraftInput): Promise<DraftSa
       [input.systemId, JSON.stringify(input.document), input.sourceChecksum, input.updatedBy],
     );
     const draft = toDraftRecord(requireRow(updated.rows[0], "saveDraft"));
+    if (draftName !== null) {
+      await client.query(`UPDATE systems SET name = $2, updated_at = now() WHERE id = $1`,
+        [input.systemId, draftName]);
+    }
     await client.query(
       `INSERT INTO system_audit_records (system_id, actor_id, kind, summary, request_id)
        VALUES ($1, $2, $3, $4, $5)`,

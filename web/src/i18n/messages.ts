@@ -41,6 +41,7 @@ export const defaultMessages: MessageTable = {
   "createDraft.submit": "Create",
   "createDraft.submitting": "Creating…",
   "editor.publish.disabled.reason": "Publish disabled — {count} error diagnostics must be resolved.",
+  "editor.publish.waitForSave": "Waiting for the draft to finish saving before publishing.",
   "editor.publish.label": "Publish",
   "editor.loading": "Loading system…",
   "editor.error": "Failed to load system.",

@@ -218,6 +218,9 @@ function SessionRollRow(props: {
       if (mountedRef.current) {
         if (typeof raw === "string" || typeof raw === "number") {
           setResultText(String(raw));
+        } else if (raw !== null && typeof raw === "object" &&
+          typeof (raw as { total?: unknown }).total === "number") {
+          setResultText(String((raw as { total: number }).total));
         } else {
           setUncertain(true);
         }

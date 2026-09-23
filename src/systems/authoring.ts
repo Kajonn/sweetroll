@@ -435,7 +435,10 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           };
         }
         const versions = await repo.listVersions(input.systemId);
-        return { ok: true, value: toWorkspace(system, saved.draft, versions, assessed.assessment) };
+        const renamedSystem = assessed.document.metadata.name.trim() === ""
+          ? system
+          : { ...system, name: assessed.document.metadata.name };
+        return { ok: true, value: toWorkspace(renamedSystem, saved.draft, versions, assessed.assessment) };
       } catch {
         return { ok: false, error: errors.internal() };
       }

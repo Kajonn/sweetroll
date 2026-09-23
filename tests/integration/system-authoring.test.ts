@@ -346,6 +346,9 @@ describeWithDatabase("SystemAuthoring", () => {
     if (!saved.ok) throw new Error("unexpected");
     expect(saved.value.draft?.revision).toBe(2);
     expect(saved.value.assessment.ok).toBe(true);
+    expect(saved.value.system.name).toBe(d20Document.metadata.name);
+    const reopened = await authoring.open(ctx(owner), systemId);
+    expect(reopened.ok && reopened.value.system.name).toBe(d20Document.metadata.name);
 
     const stale = await authoring.saveDraft(ctx(owner), {
       systemId,

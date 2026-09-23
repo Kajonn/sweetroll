@@ -316,11 +316,8 @@ async function runJourney(page: Page, browser: Browser, viewport: { width: numbe
     expect(retryBody.idempotencyKey).not.toBe(firstBody.idempotencyKey);
     await expect(page.getByText("8 / 10")).toBeVisible({ timeout: STEP_TIMEOUT });
 
-    // 12. Roll Check with the default campaign audience. The board renders
-    // roll results kind-agnostically (never assuming the payload shape), so
-    // a structured roll object surfaces the generic uncertain-outcome
-    // notice rather than fabricated result text; the wire assertion pins
-    // the campaign audience on the executed request.
+    // 12. Roll Check with the default campaign audience. A confirmed
+    // structured result shows the server's total without an uncertainty notice.
     await expect(page.getByRole("button", { name: "Roll Check" })).toBeVisible({ timeout: STEP_TIMEOUT });
     const rollRequest = page.waitForRequest(
       (request) =>
@@ -328,9 +325,17 @@ async function runJourney(page: Page, browser: Browser, viewport: { width: numbe
         request.method() === "POST",
       { timeout: STEP_TIMEOUT },
     );
+    const rollResponse = page.waitForResponse(
+      (response) => response.url().includes(`/api/characters/${placedCharacterId}/actions/check`) &&
+        response.request().method() === "POST" && response.status() === 200,
+      { timeout: STEP_TIMEOUT },
+    );
     await page.getByRole("button", { name: "Roll Check" }).click({ timeout: STEP_TIMEOUT });
     expect((await rollRequest).postDataJSON()).toMatchObject({ audience: "campaign" });
-    await expect(page.getByText("The roll may have applied.")).toBeVisible({ timeout: STEP_TIMEOUT });
+    const body = await (await rollResponse).json() as { result: { roll: { total: number } } };
+    await expect(page.getByRole("button", { name: "Roll Check" }).locator("..").getByRole("status"))
+      .toHaveText(String(body.result.roll.total), { timeout: STEP_TIMEOUT });
+    await expect(page.getByText("The roll may have applied.")).toHaveCount(0);
   } finally {
     await gmContext.close();
   }

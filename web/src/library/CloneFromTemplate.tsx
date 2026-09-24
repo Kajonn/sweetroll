@@ -5,6 +5,7 @@ import { useCreateDraft } from "../api/createDraft.js";
 import type { ApiClient } from "../api/client.js";
 import { t } from "../i18n/index.js";
 import { randomUUID } from "../utils/uuid";
+import styles from "./CloneFromTemplate.module.css";
 
 type TemplateSpec = {
   templateKey: "d20" | "pbta2d6" | "d6SuccessPool";
@@ -52,14 +53,15 @@ export function CloneFromTemplate({ client }: { client: ApiClient }) {
   };
 
   return (
-    <section data-testid="clone-from-template" aria-label={t("library.cloneFromTemplate.label")}>
+    <section className={styles.section} data-testid="clone-from-template" aria-label={t("library.cloneFromTemplate.label")}>
       <h2>{t("library.cloneFromTemplate.label")}</h2>
-      <ul>
+      <ul className={styles.templates}>
         {TEMPLATES.map((tpl) => {
           const isPending = pending === tpl.versionId || mutation.isPending;
           return (
             <li key={tpl.templateKey}>
               <button
+                className={styles.template}
                 type="button"
                 data-testid={`clone-from-template-${tpl.templateKey}`}
                 disabled={isPending}

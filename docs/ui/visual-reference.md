@@ -1,9 +1,28 @@
 # Visual reference and route inventory (G0)
 
-**Status:** inventory only. No visual redesign is claimed by this document.
+**Status (2026-09-24):** original G0 inventory retained as dated history below; current implementation snapshot added here after merged PR #12. Source-mockup capture remains open.
 **Plan:** `docs/superpowers/plans/2026-09-08-gui-integration.md` G0.
 **Baseline:** `8302bd0` (worktree `docs/g0-reference-and-frontend-checks`).
 **Date checked:** 2026-09-08.
+
+## Current implementation snapshot (2026-09-24)
+
+Merged PR #12 (`a2510fb`, merge `29aa782`) gives the app a Tablefolk-inspired visual style. These values are from the **Sweetroll implementation**, not a claim that each exact value was approved from a source screenshot:
+
+| Role | Light | Dark |
+| --- | --- | --- |
+| Page / panel | `#f6f8f5` / `#ffffff` | `#112522` / `#19352f` |
+| Primary / muted text | `#183b37` / `#52655c` | `#edf5ec` / `#bfd1c6` |
+| Border / primary action | `#d9e2d8` / `#224b40` | `#34564b` / `#d9ee94` |
+| Focus | `#4f6f21` | light accent (`#d9ee94`) |
+
+The body uses the system UI font at 15px/1.55; controls and panels use 6–16px radii and tokenized shadows. `AppShell` now has a white sticky header on tablet/desktop, a horizontally scrollable header navigation on phones, and a narrow player bottom bar; feature views own their columns. The home route presents three starter systems as cards on a sage panel. Creator and character surfaces use the shared tokens. Light, Dark, and Follow device remain device/account display preferences; systems and sheets have no theme field or theme picker.
+
+The route inventory in Section 4 is the **2026-09-08 baseline**. Current `web/src/router.tsx` additionally routes the player library, onboarding, account, invitations, campaigns, campaign detail/scenes, and paired display. The historical sections below remain useful for understanding the migration but must not be read as today's UI structure.
+
+The ten checked-in files under `web/tests/visual/__screenshots__/visual.spec.ts/` are **Sweetroll application screenshots**, reviewed at 360 and 1280px for library, d20 editor, sheet preview, publish dialog, and conflict banner. PR #12 CI passed all web, offline, visual, journey, and verification jobs. This does not establish every view/theme/device combination in G9. No screenshot of the **source mockup** has been committed under `docs/ui/reference/`; earlier direct URL checks returned HTTP 401 (last recorded 2026-09-17), while an owner-backed mockup view was visually inspected for the refresh. G0 source archiving and G9 real-device/playtest/deployment checks remain open.
+
+The remainder of this file describes the original G0 baseline unless it explicitly states a later date.
 
 ## 1. Mockup availability
 
@@ -11,21 +30,19 @@ Visual reference target: Tablefolk GUI mockup
 (`https://tablefolk-ttrpg-mockups.humdrumrat.chatgpt.site`).
 
 - Direct fetch on 2026-09-08 returned **HTTP 401**. No authenticated
-  access is available from this workspace.
-- Therefore **no mockup screenshots are stored** under
-  `docs/ui/reference/`, and no spacing, typography, color roles,
-  navigation, hierarchy, or interaction states are recorded from the
-  mockup in this revision.
-- Per G0, unavailable reference views are recorded here explicitly
-  rather than inventing approved details. Do not implement Tablefolk
-  styling from memory. Revisit this file once authorized reference
-  captures exist.
+  access was available for that original baseline check.
+- Therefore, at that original baseline, **no mockup screenshots were stored**
+  under `docs/ui/reference/`, and no mockup spacing, typography, color roles,
+  navigation, hierarchy, or interaction states were recorded.
+- Per G0, unavailable reference views were recorded rather than inventing
+  approved details. PR #12 later implemented the visual refresh from an
+  inspected owner-backed reference; the exact source capture remains open.
 
-What this file records instead is the reviewable **current-app
-baseline** (tokens, shell, routes) so G1/G2 have a concrete starting
+What the original G0 sections record instead is the reviewable **then-current
+app baseline** (tokens, shell, routes) so G1/G2 had a concrete starting
 point without depending on the hosted prototype.
 
-## 2. Current token baseline (`web/src/styles/global.css`)
+## 2. Original token baseline (`web/src/styles/global.css`, 2026-09-08)
 
 Observed `:root` values at this baseline:
 
@@ -50,7 +67,7 @@ yet. Feature CSS modules consume these literals directly. G2 introduces
 semantic tokens and light/dark/Follow-device presets; this section is
 the before-image.
 
-## 3. Current shell baseline (`web/src/shell/AppShell.tsx`)
+## 3. Original shell baseline (`web/src/shell/AppShell.tsx`, 2026-09-08)
 
 - `AppShell` owns: banner header (`data-testid="app-header"` with
   "Sweetroll" wordmark, plain `<a href="/characters/new">` link,
@@ -70,7 +87,7 @@ the before-image.
   cleanup (cancel requests/timers, clear account-scoped queries, reject
   late responses) without changing this ownership.
 
-## 4. Route inventory (existing routes remain usable)
+## 4. Original route inventory (2026-09-08; existing routes remain usable)
 
 Source: `web/src/router.tsx` (`rootRoute` wraps `AppShell` + `Outlet`).
 
@@ -118,8 +135,8 @@ character state (G2 exit).
 
 ## 7. Reference screenshots
 
-`docs/ui/reference/` is intentionally empty in this revision (see
-Section 1). When authorized captures land, store representative views
+`docs/ui/reference/` was empty at the original baseline and remains without
+a checked-in source capture (see current snapshot above). When captures land, store representative views
 here with filename, source URL, capture date, and which details were
 unavailable — and update this file. Do not commit prototype data or
 simulated-service screens as production implementations.

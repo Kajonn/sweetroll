@@ -1,12 +1,12 @@
 .field {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   font-family: var(--font-body);
 }
 
 .label {
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-primary);
 }
 
@@ -38,7 +38,11 @@
   min-height: 44px;
   min-width: 44px;
   width: 100%;
+  transition: border-color 0.15s ease;
 }
+
+.input:not(:disabled):hover,
+.select:not(:disabled):hover { border-color: var(--text-muted); }
 
 .input:disabled,
 .select:disabled {

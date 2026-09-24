@@ -3,7 +3,8 @@
   color: var(--text-primary);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-dialog);
-  padding: 16px;
+  padding: 20px;
+  box-shadow: var(--shadow-panel);
   font-family: var(--font-body);
   display: grid;
   gap: 12px;
@@ -19,8 +20,8 @@
 
 .panelTitle {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.1rem;
+  font-weight: 700;
 }
 
 .panelActions {
@@ -47,8 +48,9 @@
 
 .pageTitle {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  font-weight: 750;
+  letter-spacing: -0.035em;
   color: var(--text-primary);
 }
 
@@ -69,12 +71,13 @@
   gap: 8px;
   justify-items: center;
   text-align: center;
-  padding: 32px 16px;
+  padding: 48px 24px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-dialog);
   background: var(--surface-panel);
   color: var(--text-primary);
   font-family: var(--font-body);
+  box-shadow: var(--shadow-panel);
 }
 
 .emptyTitle {

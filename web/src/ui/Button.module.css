@@ -14,7 +14,13 @@
   font-size: 1rem;
   line-height: 1.5;
   cursor: pointer;
+  font-weight: 600;
+  box-shadow: var(--shadow-control);
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
+
+.button:not(:disabled):hover { transform: translateY(-1px); box-shadow: var(--shadow-control-hover); }
+.button:not(:disabled):active { transform: translateY(0); }
 
 .buttonSecondary {
   background: var(--surface-panel);
@@ -63,7 +69,10 @@
   font-size: 1rem;
   line-height: 1;
   cursor: pointer;
+  transition: background-color 0.15s ease;
 }
+
+.iconButton:not(:disabled):hover { background: var(--surface-highlight); }
 
 .iconGlyph {
   display: inline-flex;

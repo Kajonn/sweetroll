@@ -1,19 +1,17 @@
 :root {
-  /* G2-structural primitives. Existing names/values are frozen; the semantic
-     alias layer below references them via var(). */
-  --color-bg: #fafafa;
+  /* Tablefolk-inspired Sweetroll palette. Component styles use semantic aliases. */
+  --color-bg: #f6f8f5;
   --color-surface: #ffffff;
-  --color-fg: #171717;
-  --color-fg-muted: #525252;
-  --color-border: #e5e5e5;
-  --color-accent: #4f46e5;
+  --color-fg: #183b37;
+  --color-fg-muted: #52655c;
+  --color-border: #d9e2d8;
+  --color-accent: #224b40;
   --color-accent-fg: #ffffff;
   --color-error: #dc2626;
   --color-warning: #d97706;
   --color-warning-fg: #92400e;
   --color-success: #059669;
-  /* Additional neutral primitives, valued from literals already in use in
-     feature styles so token migration stays pixel-identical. */
+  /* Feedback and overlay colors remain legible against the new surfaces. */
   --color-error-fg: #ffffff;
   --color-error-bg: rgba(220, 38, 38, 0.06);
   --color-warning-bg: #fffbeb;
@@ -23,15 +21,16 @@
   --color-success-fg: #166534;
   --color-success-bg: rgba(34, 197, 94, 0.12);
   --color-success-border: rgba(34, 197, 94, 0.4);
-  --color-overlay: rgba(23, 23, 23, 0.45);
-  --color-shadow: rgba(23, 23, 23, 0.2);
-  --color-wash: rgba(0, 0, 0, 0.05);
+  --color-overlay: rgba(17, 37, 34, 0.5);
+  --color-shadow: rgba(24, 59, 55, 0.15);
+  --color-wash: rgba(34, 75, 64, 0.07);
+  --color-highlight: #eaf2e9;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, sans-serif;
   --font-mono: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 
   /* Semantic alias layer. Feature styles consume these, never literals. */
   --surface-page: var(--color-bg);
@@ -39,6 +38,7 @@
   --surface-overlay: var(--color-surface);
   --surface-scrim: var(--color-overlay);
   --surface-hover: var(--color-wash);
+  --surface-highlight: var(--color-highlight);
   --text-primary: var(--color-fg);
   --text-muted: var(--color-fg-muted);
   --text-on-action: var(--color-accent-fg);
@@ -48,7 +48,7 @@
   --action-primary-fg: var(--color-accent-fg);
   --action-danger: var(--color-error);
   --action-danger-fg: var(--color-error-fg);
-  --focus-ring: 2px solid var(--color-accent);
+  --focus-ring: 2px solid #4f6f21;
   --status-error: var(--color-error);
   --status-error-bg: var(--color-error-bg);
   --status-warning: var(--color-warning);
@@ -65,9 +65,9 @@
   --font-heading: var(--font-sans);
   --font-code: var(--font-mono);
   --font-size-sm: 12px;
-  --font-size-md: 13px;
-  --font-size-base: 14px;
-  --font-size-lg: 16px;
+  --font-size-md: 14px;
+  --font-size-base: 15px;
+  --font-size-lg: 18px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -78,26 +78,27 @@
   --radius-dialog: var(--radius-lg);
   --radius-pill: 999px;
   --shadow-dialog: 0 12px 32px var(--color-shadow);
+  --shadow-panel: 0 3px 16px rgba(24, 59, 55, 0.045);
+  --shadow-control: 0 2px 5px var(--color-shadow);
+  --shadow-control-hover: 0 4px 12px var(--color-shadow);
   --layer-dialog-overlay: 1000;
   --layer-dialog-content: 1001;
 
   color-scheme: light;
 }
 
-/* Neutral dark token set: neutral placeholders pending mockup reference.
-   They keep the current neutral palette readable on dark surfaces and are
-   explicitly NOT Tablefolk styling (mockup unreachable, HTTP 401). Revisit
-   once a mockup reference is available. */
+/* The same visual language on dark surfaces. */
 [data-theme="dark"] {
-  --color-bg: #171717;
-  --color-surface: #262626;
-  --color-fg: #fafafa;
-  --color-fg-muted: #d4d4d4;
-  --color-border: #404040;
-  --color-accent: #818cf8;
-  --color-accent-fg: #171717;
+  --color-bg: #112522;
+  --color-surface: #19352f;
+  --color-fg: #edf5ec;
+  --color-fg-muted: #bfd1c6;
+  --color-border: #34564b;
+  --color-accent: #d9ee94;
+  --color-accent-fg: #112522;
+  --color-highlight: #26483a;
   --color-error: #f87171;
-  --color-error-fg: #171717;
+  --color-error-fg: #112522;
   --color-error-bg: rgba(248, 113, 113, 0.12);
   --color-warning: #fbbf24;
   --color-warning-fg: #fcd34d;
@@ -110,8 +111,9 @@
   --color-success-bg: rgba(52, 211, 153, 0.12);
   --color-success-border: rgba(52, 211, 153, 0.4);
   --color-overlay: rgba(0, 0, 0, 0.6);
-  --color-shadow: rgba(0, 0, 0, 0.5);
+  --color-shadow: rgba(0, 0, 0, 0.45);
   --color-wash: rgba(255, 255, 255, 0.08);
+  --focus-ring: 2px solid var(--color-accent);
 
   color-scheme: dark;
 }
@@ -144,8 +146,8 @@ html, body, #root {
   height: 100%;
   margin: 0;
   font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.55;
   color: var(--color-fg);
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
@@ -161,6 +163,8 @@ html {
 }
 
 button { font: inherit; cursor: pointer; }
+a { color: var(--action-primary); }
+a:hover { text-decoration-color: currentColor; }
 :focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 /* 44x44 CSS-pixel touch-target floor for button-ish controls. Compact

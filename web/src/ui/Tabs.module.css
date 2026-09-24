@@ -7,7 +7,7 @@
 
 .tabList {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   flex-wrap: wrap;
   border-bottom: 1px solid var(--border-default);
 }
@@ -29,6 +29,8 @@
 
 .tab:hover {
   color: var(--text-primary);
+  background: var(--surface-highlight);
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
 }
 
 .tab[aria-selected="true"] {

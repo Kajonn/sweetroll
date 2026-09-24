@@ -27,33 +27,48 @@
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 8px 12px;
+  gap: 8px 24px;
   flex-wrap: wrap;
   padding-top: env(safe-area-inset-top);
   padding-inline-start: max(16px, env(safe-area-inset-left));
   padding-inline-end: max(16px, env(safe-area-inset-right));
-  padding-bottom: 8px;
-  min-height: 48px;
+  padding-bottom: 12px;
+  min-height: 72px;
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg);
-  font-weight: 600;
+  background: var(--surface-panel);
+  box-shadow: 0 2px 12px var(--color-shadow);
 }
 
 .brand {
   white-space: nowrap;
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  color: var(--text-primary);
 }
 
 .nav {
   display: flex;
   align-items: center;
-  gap: 4px 12px;
+  gap: 4px;
   flex-wrap: wrap;
   min-width: 0;
 }
 
 .navLink {
   white-space: nowrap;
-  padding: 10px 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  color: var(--text-muted);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.navLink:hover,
+.navLink[aria-current="page"] {
+  background: var(--color-highlight);
+  color: var(--text-primary);
 }
 
 .actions {
@@ -67,6 +82,19 @@
 
 .signOutStatus {
   white-space: nowrap;
+}
+
+.actions > button:not(.helpButton) {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  padding: 8px 12px;
+}
+
+.actions > button:not(.helpButton):hover,
+.helpButton:hover {
+  background: var(--color-highlight);
 }
 
 .helpButton {
@@ -83,7 +111,7 @@
 }
 .helpButton:hover {
   color: var(--color-fg);
-  background: var(--color-bg);
+  background: var(--color-highlight);
 }
 
 /* Single neutral content region. Views own their internal columns; the
@@ -103,7 +131,7 @@
   min-height: 0;
   padding-inline-start: max(16px, env(safe-area-inset-left));
   padding-inline-end: max(16px, env(safe-area-inset-right));
-  padding-top: 16px;
+  padding-top: 24px;
   padding-bottom: max(24px, env(safe-area-inset-bottom));
 }
 
@@ -111,6 +139,14 @@
   min-width: 0;
   min-inline-size: 0;
   max-inline-size: 100%;
+}
+
+@media (min-width: 1200px) {
+  .main {
+    max-width: 1440px;
+    margin-inline: auto;
+    padding-inline: 32px;
+  }
 }
 
 /* The sticky header must not cover focused controls, validation
@@ -125,7 +161,7 @@
    software keyboard or viewport resize cannot trap primary actions
    behind an overlay. Styled here so StatusBar itself stays untouched. */
 .shell > footer {
-  background: var(--color-bg);
+  background: var(--surface-panel);
   padding-bottom: env(safe-area-inset-bottom);
   padding-inline-start: max(12px, env(safe-area-inset-left));
   padding-inline-end: max(12px, env(safe-area-inset-right));
@@ -152,12 +188,18 @@
 /* Phone: 320-599px. Single column, compact chrome, wrapping nav. */
 @media (max-width: 599px) {
   .header {
+    /* Player navigation already has a sticky bottom bar. Let the larger
+       header scroll away so focus targets are never hidden under it. */
+    position: relative;
     row-gap: 4px;
     font-size: 15px;
   }
   .nav {
     order: 3;
     flex-basis: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
   }
   .main {
     padding-top: 12px;
@@ -170,19 +212,29 @@
     z-index: 20;
     margin-top: 12px;
     border-top: 1px solid var(--border-default);
-    background: var(--surface-page);
+    background: var(--surface-panel);
+    box-shadow: 0 -3px 14px var(--color-shadow);
     padding-bottom: env(safe-area-inset-bottom);
   }
   .bottomNavLink {
     flex: 1 1 0;
+    min-width: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 44px;
-    padding: 10px 4px;
+    padding: 10px 2px;
     white-space: nowrap;
+    font-size: clamp(12px, 3.5vw, 14px);
     font-weight: 600;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-radius: var(--radius-control);
+  }
+  .bottomNavLink:hover,
+  .bottomNavLink[aria-current="page"] {
     color: var(--text-primary);
+    background: var(--color-highlight);
   }
 }
 
@@ -204,7 +256,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skipLink {
+  .skipLink,
+  .navLink {
     transition: none;
   }
 }

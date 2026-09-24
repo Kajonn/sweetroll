@@ -61,13 +61,13 @@ function resolveChain(name: string): string {
 }
 
 describe("token primitives", () => {
-  it("keeps every pre-existing primitive name and value", () => {
-    expect(computedVar("--color-bg")).toBe("#fafafa");
+  it("uses the Tablefolk-inspired Sweetroll primitives", () => {
+    expect(computedVar("--color-bg")).toBe("#f6f8f5");
     expect(computedVar("--color-surface")).toBe("#ffffff");
-    expect(computedVar("--color-fg")).toBe("#171717");
-    expect(computedVar("--color-fg-muted")).toBe("#525252");
-    expect(computedVar("--color-border")).toBe("#e5e5e5");
-    expect(computedVar("--color-accent")).toBe("#4f46e5");
+    expect(computedVar("--color-fg")).toBe("#183b37");
+    expect(computedVar("--color-fg-muted")).toBe("#52655c");
+    expect(computedVar("--color-border")).toBe("#d9e2d8");
+    expect(computedVar("--color-accent")).toBe("#224b40");
     expect(computedVar("--color-accent-fg")).toBe("#ffffff");
     expect(computedVar("--color-error")).toBe("#dc2626");
     expect(computedVar("--color-warning")).toBe("#d97706");
@@ -75,21 +75,21 @@ describe("token primitives", () => {
     expect(computedVar("--color-success")).toBe("#059669");
     expect(computedVar("--font-sans")).toContain("system-ui");
     expect(computedVar("--font-mono")).toContain("Menlo");
-    expect(computedVar("--radius-sm")).toBe("4px");
-    expect(computedVar("--radius-md")).toBe("6px");
-    expect(computedVar("--radius-lg")).toBe("8px");
-    expect(computedVar("--radius-xl")).toBe("12px");
+    expect(computedVar("--radius-sm")).toBe("6px");
+    expect(computedVar("--radius-md")).toBe("10px");
+    expect(computedVar("--radius-lg")).toBe("12px");
+    expect(computedVar("--radius-xl")).toBe("16px");
   });
 });
 
 describe("semantic aliases (light)", () => {
-  it("aliases resolve through primitives to the current values", () => {
-    expect(resolveChain("--surface-page")).toBe("#fafafa");
+  it("aliases resolve through the new light primitives", () => {
+    expect(resolveChain("--surface-page")).toBe("#f6f8f5");
     expect(resolveChain("--surface-panel")).toBe("#ffffff");
-    expect(resolveChain("--text-primary")).toBe("#171717");
-    expect(resolveChain("--text-muted")).toBe("#525252");
-    expect(resolveChain("--border-default")).toBe("#e5e5e5");
-    expect(resolveChain("--action-primary")).toBe("#4f46e5");
+    expect(resolveChain("--text-primary")).toBe("#183b37");
+    expect(resolveChain("--text-muted")).toBe("#52655c");
+    expect(resolveChain("--border-default")).toBe("#d9e2d8");
+    expect(resolveChain("--action-primary")).toBe("#224b40");
     expect(resolveChain("--action-primary-fg")).toBe("#ffffff");
     expect(resolveChain("--action-danger")).toBe("#dc2626");
     expect(resolveChain("--action-danger-fg")).toBe("#ffffff");
@@ -99,41 +99,41 @@ describe("semantic aliases (light)", () => {
     expect(resolveChain("--status-success")).toBe("#059669");
     expect(resolveChain("--font-body")).toContain("system-ui");
     expect(resolveChain("--font-code")).toContain("Menlo");
-    expect(resolveChain("--radius-control")).toBe("4px");
-    expect(resolveChain("--radius-panel")).toBe("6px");
-    expect(resolveChain("--radius-dialog")).toBe("8px");
+    expect(resolveChain("--radius-control")).toBe("6px");
+    expect(resolveChain("--radius-panel")).toBe("10px");
+    expect(resolveChain("--radius-dialog")).toBe("12px");
     expect(computedVar("--radius-pill")).toBe("999px");
     expect(computedVar("--layer-dialog-overlay")).toBe("1000");
     expect(computedVar("--layer-dialog-content")).toBe("1001");
   });
 
-  it("migrated badge/overlay/shadow literals resolve to the values they replaced", () => {
-    // VersionHistory badgeActive was color #166534 on rgba(34,197,94,…).
+  it("feedback and overlay roles resolve through shared primitives", () => {
+    // Success feedback retains its familiar legible color.
     expect(resolveChain("--status-success-fg")).toBe("#166534");
     expect(resolveChain("--status-success-bg")).toBe("rgba(34, 197, 94, 0.12)");
     expect(resolveChain("--status-success-border")).toBe("rgba(34, 197, 94, 0.4)");
     // Dialog overlays were rgba(23,23,23,0.45); dialog shadow the matching blur.
-    expect(resolveChain("--surface-scrim")).toBe("rgba(23, 23, 23, 0.45)");
+    expect(resolveChain("--surface-scrim")).toBe("rgba(17, 37, 34, 0.5)");
     expect(computedVar("--shadow-dialog")).toBe("0 12px 32px var(--color-shadow)");
-    expect(resolveChain("--surface-hover")).toBe("rgba(0, 0, 0, 0.05)");
-    expect(computedVar("--focus-ring")).toBe("2px solid var(--color-accent)");
+    expect(resolveChain("--surface-hover")).toBe("rgba(34, 75, 64, 0.07)");
+    expect(computedVar("--focus-ring")).toBe("2px solid #4f6f21");
   });
 });
 
 describe("dark preset", () => {
-  it("re-resolves aliases through overridden primitives, staying neutral", () => {
+  it("re-resolves aliases through the dark green palette", () => {
     document.documentElement.setAttribute("data-theme", "dark");
-    expect(resolveChain("--surface-page")).toBe("#171717");
-    expect(resolveChain("--surface-panel")).toBe("#262626");
-    expect(resolveChain("--text-primary")).toBe("#fafafa");
-    expect(resolveChain("--action-primary")).toBe("#818cf8");
+    expect(resolveChain("--surface-page")).toBe("#112522");
+    expect(resolveChain("--surface-panel")).toBe("#19352f");
+    expect(resolveChain("--text-primary")).toBe("#edf5ec");
+    expect(resolveChain("--action-primary")).toBe("#d9ee94");
+    expect(computedVar("--focus-ring")).toBe("2px solid var(--color-accent)");
     expect(resolveChain("--status-error")).toBe("#f87171");
     expect(resolveChain("--status-success")).toBe("#34d399");
   });
 
-  it("is documented as a neutral placeholder, not Tablefolk styling", () => {
-    expect(globalCss).toContain("pending mockup reference");
-    expect(globalCss).not.toContain("Tablefolk green");
+  it("documents the shared visual reference", () => {
+    expect(globalCss).toContain("Tablefolk-inspired Sweetroll palette");
   });
 });
 
@@ -168,7 +168,7 @@ describe("portal inheritance", () => {
     expect(document.body.contains(probe)).toBe(true);
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
     expect(computedVar("--surface-panel")).not.toBe("");
-    expect(resolveChain("--surface-panel")).toBe("#262626");
+    expect(resolveChain("--surface-panel")).toBe("#19352f");
     // Tokens must be scoped to :root/[data-theme], never to an app subtree
     // that portals escape.
     expect(globalCss).toMatch(/:root\s*\{[^}]*--surface-page/);

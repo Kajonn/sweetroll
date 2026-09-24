@@ -218,12 +218,14 @@
   }
   .bottomNavLink {
     flex: 1 1 0;
+    min-width: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 44px;
-    padding: 10px 4px;
+    padding: 10px 2px;
     white-space: nowrap;
+    font-size: clamp(12px, 3.5vw, 14px);
     font-weight: 600;
     color: var(--text-muted);
     text-decoration: none;

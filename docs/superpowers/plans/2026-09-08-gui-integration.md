@@ -1,6 +1,6 @@
 # GUI integration implementation plan
 
-**Status:** G0–G6 landed (I4a/I5); G7 player slice landed 2026-09-11; G8 (I7b scenes/display) landed 2026-09-15. Only the mockup capture stays blocked (HTTP 401, re-verified 2026-09-09).
+**Status (updated 2026-09-24):** Most G0–G6 implementation work, the G7 player/GM feature slices, G8 scenes/display, and the app-wide Tablefolk-inspired visual refresh have landed. Source mockup capture (G0), production sign-in (G6), and the unchecked G9 release gates remain open. Historical HTTP 401 checks (last recorded 2026-09-17) explain why the source capture is absent; they do not describe the current app palette.
 **Design authority:** [design_v2.md](../../../design_v2.md), especially Sections 10 and 17.  
 **Visual reference:** [Tablefolk GUI mockup](https://tablefolk-ttrpg-mockups.humdrumrat.chatgpt.site).  
 **Original baseline:** `be3efc89b536f563c0f11f2f929171dd8129463b`.
@@ -10,6 +10,8 @@
 **Remediation planning 2026-09-12:** GM Phase 1/2 and subsequent review fixes are present at `11aea84`. The [pre-upgrade remediation index](2026-09-12-remediation-index.md) records fresh full-suite results, confirmed failures, workflow gaps, approval-gated contract proposals, and remaining acceptance/release work. This is a planning cross-reference, not closure of the unchecked G7/G9 gates or approval of new discovery/recovery permissions; historical reconciliation notes below retain their original baseline.
 
 **Remediation execution (merged as `a5561d7`):** R6 claim discovery (`GET /campaigns/{id}/claimable-characters`, four-field rows, player-role journey claiming through the discovered row) and R7 deleted-summary recovery (`status=deleted` management filter, GM Hidden view, reload→Hidden→recover journey) are ported onto the merged stabilization baseline, retaining its revision-readiness gating, isolated E2E runner, and revocation-purge protections. Verified on the branch: root 307, integration 300, web 943, canonical E2E 32/32, offline 22/22, builds/typechecks/contracts/docker. Reconciled on `main` (`40c6142`, 2026-09-13, same matrix green — web unit 943/943 after one unattributed first-run failure): see Task 2 in `docs/acceptance/gui-2026-09-12-remediation.md`. R1–R9 are evidence-closed except the noted flake-capture gap; R10 automated checks recorded with manual sign-off still open. Accessibility/device/production gates untouched.
+
+**Visual refresh (merged PR #12, 2026-09-24):** `web/src/styles/global.css` now defines the sage/deep-green light palette and matching dark palette; shared shell, controls, starter-system cards, editor and character surfaces consume these tokens. The player bottom navigation was corrected for 360px width and the dark focus ring for contrast. Ten routed Playwright screenshots were visually inspected and updated at 360/1280 px. [CI on `a2510fb`](https://github.com/Kajonn/sweetroll/actions/runs/36055269301) passed `verify`, `web`, `web-offline`, `web-e2e (visual)`, and all three journey shards; deployment was skipped. This proves those automated views, not source-mockup archiving or the full G9 device/production/playtest matrix. Light/Dark/Follow device remain app display preferences; no system-specific theme picker or system theme data is implemented.
 
 ## Goal and boundaries
 
@@ -21,9 +23,9 @@ A simple creator remains the default: attributes and descriptions, GUI dice conf
 
 The owner's previously requested GM phone/tablet display, manual fog, and token placement are explicitly scheduled as I7b. They require backend authorization and media work as well as UI; they are not a CSS task. No tactical grid, initiative, movement rules, vision, automatic lighting, combat simulation, arbitrary CSS, or theme editor is introduced.
 
-## Reconciliation with the new commits
+## Historical reconciliation with PR #1 (superseded for current status)
 
-PR #1 and its CI scheduling fix are merged. The subsequent changes implement a character-creation version picker and add previously missing implementation-plan records. They do not implement the theme, shell redesign, complete I5 Player app, or GM/display milestones. Keep the delivery sequence below; reuse the new picker instead of rebuilding it.
+At this earlier baseline, PR #1 and its CI scheduling fix were merged. The then-subsequent changes implemented a character-creation version picker and added implementation-plan records; they did not yet implement the theme, shell redesign, complete I5 Player app, or GM/display milestones. Later status is recorded at the top of this plan. The historical dependency notes below explain why those changes were sequenced as they were.
 
 | Change at the reconciled baseline | Impact on this plan |
 | --- | --- |
@@ -41,7 +43,7 @@ PR #1 and its CI scheduling fix are merged. The subsequent changes implement a c
 3. **Picker completion (G4).** ~~The existing manual UUID fallback remains prominent, invalid UUID lookup can show an uncertain-outcome error for a definite 400 validation response, and the list has no bounded pagination.~~ *Closed 2026-09-09 (G4, `8d5f22a`):* picker is the primary entry with retry and a labeled manual fallback; 400/422 mapping was already definite-input-error (G1). Bounded server pagination still open — owned by G6 (library/catalog expansion).
 4. **Contract reuse (G4/G6).** ~~OpenAPI and `schema.d.ts` include the new operation, but `CreationVersionEntry`/`CreationVersions` in `web/src/characters/types.ts` are hand-written. Derive them from `operations["get_characters_creation_versions"]` during integration so UI and server contracts cannot drift.~~ *Closed for the picker 2026-09-09 (G4, `8d5f22a`).* G6 pagination work must update generated contracts likewise.
 
-These gaps are implementation work to perform under G1/G4/G6; this reconciliation changes documentation only. Existing editor/save, server revocation, production-authentication, frontend-CI, and deployment tasks remain open.
+These were implementation gaps at that baseline; the resolution notes above and the 2026-09-24 status at the top supersede this handoff. Production authentication and G9 deployment acceptance remain open.
 
 ## Delivery sequence
 
@@ -65,7 +67,7 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 **Existing files:** `.github/workflows/ci.yml`, `web/package.json`, `web/playwright.config.ts`, `web/playwright.offline.config.ts`, `web/tests/e2e/visual.spec.ts`, `docs/acceptance/`.
 
 - [ ] Capture representative mockup views and record spacing, typography, color roles, navigation, content hierarchy, and interaction states in `docs/ui/visual-reference.md`. Store selected reference screenshots under `docs/ui/reference/` so implementation does not depend solely on a hosted prototype. Record unavailable reference views explicitly rather than inventing approved details.
-  *Still blocked 2026-09-09:* mockup URL re-checked today, still HTTP 401. `docs/ui/reference/` stays empty (`.gitkeep`); no palette/typography/spacing values invented. This is the only G0 item that cannot close without the owner republishing the mockup.
+  *Historical access note:* direct URL checks returned HTTP 401 on 2026-09-09 and again in the 2026-09-17 acceptance record. During PR #12 the owner-backed mockup was visually inspected for the app refresh, but a source screenshot, dimensions, interaction states, and approved exact values were not committed under `docs/ui/reference/`. This box stays open. The current CSS values and **app** screenshots are documented in `docs/ui/visual-reference.md`.
 - [x] Map every view to an existing or proposed route and milestone (`docs/ui/visual-reference.md` §4 route inventory: `/`, `/systems/$systemId`, `/characters/new`, `/characters/$characterId` with owning components, milestones, and E2E coverage). Existing routes remain usable; URL changes still need a redirect and deep-link tests.
 - [x] Distinguish platform navigation from character content (`docs/ui/visual-reference.md` §5: shell-owned navigation vs projection-driven linear sheet; I5 `Characters/Activity/Account`, `Campaigns` only in I6; no prototype sheet tabs).
 - [x] Preserve the merged integration-file isolation fix (`6cd1c3a`): `npm run test:integration` uses `--no-file-parallelism`; request concurrency and latency budgets remain enforced.
@@ -73,7 +75,7 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 - [x] Representative routed browser tests and the production-offline suite run in CI with real database/server prerequisites (green run observed post-`ea9670f`). Deliberate-failure negative control verified per `docs/acceptance/gui-2026-09-08.md` (broken assertion fails the check; reverted after).
 - [x] Synthetic `page.setContent` visual checks replaced with real routed flows (`b5a2586`); all ten baselines regenerated from real layout and human-reviewed twice (8 approve / 2 reject with cause, then 10/10) per `docs/acceptance/gui-2026-09-09-g3-shell.md` and `task-12-report.md`.
 
-**Exit:** the reference and route inventory are reviewable, and green CI includes the frontend (observed green post-`ea9670f`). No claim of visual completion is based solely on screenshot similarity. The one exception is mockup capture, which stays blocked on the 401 above.
+**Exit:** the route inventory and CI are reviewable. PR #12 updated and inspected actual routed screenshots; this does not close the source-mockup capture or G9 gates. The older 401 evidence above remains dated access history.
 
 ## G1 — Repair the lifecycle before changing its presentation
 
@@ -95,7 +97,7 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 **Suggested new areas:** `web/src/ui/` and `web/src/theme/`; keep them within the current application.
 
 - [x] Semantic tokens defined and consumed (`web/src/ui/theme-tokens.test.tsx` chain-walks alias resolution; feature styles consume tokens). Structural proof only — jsdom never resolves `var()`.
-- [x] Light/dark presets shipped with Light, Dark, Follow-device; applied before first paint and to portaled dialogs/popovers (`main.test.tsx` startup wiring, `AppShell` switcher tests). Dark set is neutral placeholders — mockup values unavailable (401); contrast sign-off remains G9.
+- [x] Light/dark presets shipped with Light, Dark, Follow-device; applied before first paint and to portaled dialogs/popovers (`main.test.tsx` startup wiring, `AppShell` switcher tests). PR #12 replaced the neutral placeholder colors with the shared green visual language, updated the dark focus ring and tested token resolution. Full route/device contrast sign-off remains G9.
 - [x] Device preference persisted in I4a (`theme.test.ts` storage/init/cross-tab). Account default is I5 work; player-display preferences stay device-local.
 - [x] Flexibility proven by a third internal preset (accent/font/corners without touching feature components). No theme authoring product.
 - [x] Shared controls built on accessible primitives: Button, IconButton, FormField, NumberInput, Select, Checkbox, Panel, PageHeader, Dialog/Sheet, Menu, Tabs, EmptyState, SaveStatus (`controls.test.tsx`, `surfaces.test.tsx`; `Menu` deliberately keeps disclosure semantics — see task-g23 note in the G2 acceptance record).
@@ -202,6 +204,8 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 
 *Reconciled 2026-09-17 (hardening remainder, commits `3949820`–`484e282`): no G9 box closed by this plan — single-artifact serving is locally verified only (sign-in return + offline shell reopening unexercised), devices/playtests/mockup/production-auth stay open per `docs/acceptance/i7-2026-09-17-hardening-remainder.md` and `docs/acceptance/g9-2026-09-17-device-playtest.md`.*
 
+*Update 2026-09-24:* PR #12 provides human-reviewed routed library/editor/preview/dialog/conflict screenshots at 360/1280 px and green browser CI. It does not cover every migrated route, a real device, iPad Safari, deployed authentication return or offline reopening, or either playtest. Keep the G9 boxes below unchecked until each complete gate has its own evidence.
+
 - [ ] Keep a view checklist in `docs/acceptance/gui-YYYY-MM-DD.md`: tested commit, commands, device/browser, theme, reference-system fixture, screenshots, manual findings, and remaining limitations. Record only checks actually run.
 - [ ] Verify each migrated route at phone/tablet/desktop widths, light/dark, 200% text enlargement, long translated labels, keyboard, and touch. Check real Android Chrome and iPad Safari interactions before release; emulation alone does not prove touch/keyboard behavior.
 - [ ] Use actual routed application screenshots with stable fixtures. Require human inspection before replacing baselines; do not hide functional errors to make screenshots pass.
@@ -209,7 +213,7 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 - [ ] Ship the built frontend and API together, consistent with Section 11's deployable-artifact direction: static assets, SPA fallback excluding API routes, and production `/api` routing. Verify direct links, refresh, authentication return, CSS/fonts, and offline shell reopening without Vite dev/preview serving production.
 - [ ] Before public release, run one physical-table session and one remote session, with phone GM/player interaction and a separate tablet display. Close blocking usability, data-loss, and disclosure findings before declaring acceptance.
 
-## Reconciliation verification
+## Historical reconciliation verification (baseline `d6bfd32`)
 
 Reviewed source and tests through `d6bfd32`. The historical I4 acceptance and newly committed picker browser test/screenshot are retained as existing evidence, not claimed as a fresh browser or PostgreSQL execution in this review. Fresh targeted checks on that baseline:
 

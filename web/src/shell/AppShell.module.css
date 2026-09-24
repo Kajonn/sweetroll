@@ -188,12 +188,18 @@
 /* Phone: 320-599px. Single column, compact chrome, wrapping nav. */
 @media (max-width: 599px) {
   .header {
+    /* Player navigation already has a sticky bottom bar. Let the larger
+       header scroll away so focus targets are never hidden under it. */
+    position: relative;
     row-gap: 4px;
     font-size: 15px;
   }
   .nav {
     order: 3;
     flex-basis: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
   }
   .main {
     padding-top: 12px;

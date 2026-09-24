@@ -127,6 +127,7 @@ describe("dark preset", () => {
     expect(resolveChain("--surface-panel")).toBe("#19352f");
     expect(resolveChain("--text-primary")).toBe("#edf5ec");
     expect(resolveChain("--action-primary")).toBe("#d9ee94");
+    expect(computedVar("--focus-ring")).toBe("2px solid var(--color-accent)");
     expect(resolveChain("--status-error")).toBe("#f87171");
     expect(resolveChain("--status-success")).toBe("#34d399");
   });

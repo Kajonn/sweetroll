@@ -354,6 +354,43 @@ export type ResourceBumpActionV1 = Static<typeof ResourceBumpActionV1Schema>;
 export const ActionV1Schema = Type.Union([RollActionV1Schema, ResourceBumpActionV1Schema]);
 export type ActionV1 = Static<typeof ActionV1Schema>;
 
+// Dynamic sheet objects (templates, slots). Defined here — next to the field
+// and action schemas they embed — to keep the schema import graph acyclic
+// (dynamic.ts re-exports these as the canonical path; see Task 1 report).
+// A direct dynamic.ts <-> document.ts runtime import cycle throws
+// "Cannot access before initialization" under native Node ESM.
+export const TemplateKindSchema = Type.Union([
+  Type.Literal("item"),
+  Type.Literal("spell"),
+  Type.Literal("talent"),
+  Type.Literal("effect"),
+]);
+export type TemplateKind = Static<typeof TemplateKindSchema>;
+
+export const ObjectTemplateV1Schema = Type.Object(
+  {
+    id: DefinitionIdSchema,
+    label: LabelSchema,
+    kind: TemplateKindSchema,
+    description: Type.Optional(Type.String({ maxLength: LONG_TEXT_MAX_LENGTH })),
+    fields: Type.Array(FieldV1Schema, { maxItems: 64 }),
+    grantedActions: Type.Array(ActionV1Schema, { maxItems: 16 }),
+  },
+  { additionalProperties: false },
+);
+export type ObjectTemplateV1 = Static<typeof ObjectTemplateV1Schema>;
+
+export const SlotDefinitionV1Schema = Type.Object(
+  {
+    id: DefinitionIdSchema,
+    label: LabelSchema,
+    accepts: Type.Array(TemplateKindSchema, { minItems: 1, maxItems: 4 }),
+    maxEntries: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 })),
+  },
+  { additionalProperties: false },
+);
+export type SlotDefinitionV1 = Static<typeof SlotDefinitionV1Schema>;
+
 export const ValidationV1Schema = Type.Object(
   {
     id: DefinitionIdSchema,
@@ -393,6 +430,8 @@ export const SystemDocumentV1Schema = Type.Object(
     validations: Type.Array(ValidationV1Schema, {
       maxItems: PACKAGE_LIMITS.validations,
     }),
+    templates: Type.Optional(Type.Array(ObjectTemplateV1Schema, { maxItems: 128 })),
+    slots: Type.Optional(Type.Array(SlotDefinitionV1Schema, { maxItems: 64 })),
   },
   { additionalProperties: false },
 );

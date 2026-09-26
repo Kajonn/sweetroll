@@ -9,6 +9,7 @@ import {
   SystemMetadataV1Schema,
   ValidationV1Schema,
 } from "./document.js";
+import { ObjectTemplateV1Schema, SlotDefinitionV1Schema } from "./dynamic.js";
 import { CompiledExpressionV1Schema } from "./expression.js";
 
 const UUID_PATTERN = "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
@@ -51,6 +52,8 @@ export const SystemPackageV1Schema = Type.Object(
     }),
     actions: Type.Array(ActionV1Schema, { maxItems: PACKAGE_LIMITS.actions }),
     validations: Type.Array(ValidationV1Schema, { maxItems: PACKAGE_LIMITS.validations }),
+    templates: Type.Optional(Type.Array(ObjectTemplateV1Schema, { maxItems: 128 })),
+    slots: Type.Optional(Type.Array(SlotDefinitionV1Schema, { maxItems: 64 })),
     effectiveLimits: EffectivePackageLimitsV1Schema,
     integrity: Type.Object(
       {

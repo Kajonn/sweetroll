@@ -24,7 +24,7 @@ import { VersionHistory } from "../publish/VersionHistory.js";
 import { ReferenceDataEditor, type ReferenceDataV1 } from "./referenceData/ReferenceDataEditor.js";
 import { SheetEditor, type UnplacedDefinition } from "./sheet/SheetEditor.js";
 import type { SheetEditorV1 } from "./sheet/sheetTypes.js";
-import { readSlots, TEMPLATES_TAB_LABEL } from "./sheet/slotTypes.js";
+import { readSlots } from "./sheet/slotTypes.js";
 import { TemplatesTab } from "./TemplatesTab.js";
 import { useDraftSync } from "../state/draftSync.js";
 import {
@@ -558,7 +558,7 @@ export function DocumentEditorBody({
                 onActiveChange(tab);
               }}
             >
-              {tab === "templates" ? TEMPLATES_TAB_LABEL : t(`editor.tab.${tab}`)}
+              {t(`editor.tab.${tab}`)}
             </a>
           );
         })}

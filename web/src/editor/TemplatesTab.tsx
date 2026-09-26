@@ -48,23 +48,6 @@ const TEMPLATE_FIELD_KINDS: ReadonlyArray<FieldV1["kind"]> = [
   "resource",
 ];
 
-// Local labels for the new template/slot surfaces. These live here (rather
-// than the i18n table) so the Task 6 commit stays inside `web/src/editor/`;
-// move them into `web/src/i18n/messages.ts` as a follow-up.
-const STRINGS = {
-  templatesTitle: "Templates",
-  addTemplate: "Add template",
-  templatesEmpty: "No templates yet.",
-  slotsTitle: "Slots",
-  addSlot: "Add slot",
-  slotsEmpty: "No slots yet.",
-  templateDefaultLabel: "Template",
-  slotDefaultLabel: "Slot",
-  description: "Description",
-  accepts: "Accepts",
-  maxEntries: "Max entries",
-} as const;
-
 export type TemplatesTabProps = {
   client: ApiClient;
   document: SystemDocumentV1;
@@ -97,7 +80,7 @@ export function TemplatesTab({ client, document, dispatch }: TemplatesTabProps) 
     const id = nextScopedId(used, "template");
     const template: ObjectTemplateV1 = {
       id,
-      label: STRINGS.templateDefaultLabel,
+      label: t("editor.templates.defaultLabel"),
       kind: "item",
       fields: [],
       grantedActions: [],
@@ -118,7 +101,7 @@ export function TemplatesTab({ client, document, dispatch }: TemplatesTabProps) 
   const addSlot = () => {
     const used = collectUsedIds(document);
     const id = nextScopedId(used, "slot");
-    const slot: SlotDefinitionV1 = { id, label: STRINGS.slotDefaultLabel, accepts: ["item"] };
+    const slot: SlotDefinitionV1 = { id, label: t("editor.slots.defaultLabel"), accepts: ["item"] };
     dispatch({ type: "replace", document: withSlots(document, [...slots, slot]) });
   };
   const removeSlot = (id: string) => {
@@ -132,14 +115,14 @@ export function TemplatesTab({ client, document, dispatch }: TemplatesTabProps) 
     <section data-testid="templates-tab" data-path="/templates">
       <section data-testid="templates-section" data-path="/templates/list">
         <header className={styles.tabHeader}>
-          <h2 className={styles.tabTitle}>{STRINGS.templatesTitle}</h2>
+          <h2 className={styles.tabTitle}>{t("editor.templates.title")}</h2>
           <Button variant="secondary" onClick={addTemplate} data-testid="templates-add-button">
-            {STRINGS.addTemplate}
+            {t("editor.templates.add")}
           </Button>
         </header>
         {templates.length === 0 ? (
           <div data-testid="templates-tab-empty">
-            <EmptyState title={STRINGS.templatesEmpty} />
+            <EmptyState title={t("editor.templates.empty")} />
           </div>
         ) : (
           <ul className={styles.actionList}>
@@ -160,14 +143,14 @@ export function TemplatesTab({ client, document, dispatch }: TemplatesTabProps) 
       </section>
       <section data-testid="slots-section" data-path="/slots">
         <header className={styles.tabHeader}>
-          <h2 className={styles.tabTitle}>{STRINGS.slotsTitle}</h2>
+          <h2 className={styles.tabTitle}>{t("editor.slots.title")}</h2>
           <Button variant="secondary" onClick={addSlot} data-testid="slots-add-button">
-            {STRINGS.addSlot}
+            {t("editor.slots.add")}
           </Button>
         </header>
         {slots.length === 0 ? (
           <div data-testid="slots-tab-empty">
-            <EmptyState title={STRINGS.slotsEmpty} />
+            <EmptyState title={t("editor.slots.empty")} />
           </div>
         ) : (
           <ul className={styles.actionList}>
@@ -294,7 +277,7 @@ function TemplateDetail({
           value={template.kind}
           onChange={(e) => onChange({ kind: e.target.value as TemplateKind })}
           data-testid={`template-kind-${template.id}`}
-          options={TEMPLATE_KINDS.map((kind) => ({ value: kind, label: kind }))}
+          options={TEMPLATE_KINDS.map((kind) => ({ value: kind, label: t(`editor.templates.kind.${kind}`) }))}
         />
         <span data-testid={`template-id-${template.id}`}>
           {t("editor.entity.idLabel")} {template.id}
@@ -308,7 +291,7 @@ function TemplateDetail({
           {t("editor.sheet.removeConfirm.confirm")}
         </Button>
       </div>
-      <FormField label={STRINGS.description}>
+      <FormField label={t("editor.templates.description")}>
         <input
           id={`template-description-${template.id}`}
           type="text"
@@ -482,14 +465,14 @@ function withNominal(action: GrantedActionV1, nominal: boolean | undefined): Gra
   return (
     <div>
       <Checkbox
-        label="Nominal (display only, no roll resolution)"
+        label={t("editor.template.action.nominal")}
         checked={nominal}
         onChange={(e) => onChange(e.target.checked ? true : undefined)}
         data-testid={`template-action-nominal-${action.id}`}
       />
       {showTotalHint ? (
         <p data-testid={`template-action-nominal-hint-${action.id}`}>
-          Nominal actions do not resolve {"{total}"}; use static display text.
+          {t("editor.template.action.nominalHint", { total: "{total}" })}
         </p>
       ) : null}
     </div>
@@ -576,11 +559,11 @@ function SlotDetail({
         </Button>
       </div>
       <fieldset>
-        <legend>{STRINGS.accepts}</legend>
+        <legend>{t("editor.slots.accepts")}</legend>
         {TEMPLATE_KINDS.map((kind) => (
           <Checkbox
             key={kind}
-            label={kind}
+            label={t(`editor.templates.kind.${kind}`)}
             checked={slot.accepts.includes(kind)}
             onChange={() => toggleAccepts(kind)}
             data-testid={`slot-accepts-${slot.id}-${kind}`}
@@ -588,7 +571,7 @@ function SlotDetail({
         ))}
       </fieldset>
       <NumberInput
-        label={STRINGS.maxEntries}
+        label={t("editor.slots.maxEntries")}
         testId={`slot-max-entries-${slot.id}`}
         {...(slot.maxEntries === undefined ? {} : { value: slot.maxEntries })}
         min={1}

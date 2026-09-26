@@ -2,7 +2,6 @@ import { t } from "../../i18n/index.js";
 import type { DefinitionId } from "../../state/documentFieldTypes.js";
 import { FormField, Select } from "../../ui/index.js";
 import { DefinitionIdInput } from "../fields/DefinitionIdInput.js";
-import { SLOT_ELEMENT_LABEL } from "./slotTypes.js";
 import styles from "./SheetEditor.module.css";
 import type {
   ActionSheetElementV1,
@@ -41,7 +40,7 @@ export function ElementEditor({ element, onChange }: ElementEditorProps) {
             { value: "field", label: t("editor.element.kind.field") },
             { value: "resource", label: t("editor.element.kind.resource") },
             { value: "action", label: t("editor.element.kind.action") },
-            { value: "slot", label: SLOT_ELEMENT_LABEL },
+            { value: "slot", label: t("editor.element.kind.slot") },
           ]}
         />
       </div>
@@ -193,7 +192,7 @@ function SlotEditor({
   return (
     <div className={styles.elementRow2}>
       <div className={styles.elementField} data-testid={`element-binding-${element.id}`}>
-        {SLOT_ELEMENT_LABEL}
+        {t("editor.element.kind.slot")}
         <DefinitionIdInput
           value={element.slotId}
           onChange={(slotId) => onChange({ slotId })}

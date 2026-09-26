@@ -111,13 +111,3 @@ export function nextScopedId(used: Set<string>, prefix: string): string {
   }
   return `${prefix}_${Date.now()}`;
 }
-
-// Local labels for the new creator surfaces. These live here (rather than
-// the i18n table) so the Task 6 commit stays inside `web/src/editor/`; move
-// them into `web/src/i18n/messages.ts` as a follow-up.
-
-/** Tab label for the templates creator tab. */
-export const TEMPLATES_TAB_LABEL = "Templates";
-
-/** Element-kind label for slot placement elements. */
-export const SLOT_ELEMENT_LABEL = "Slot";

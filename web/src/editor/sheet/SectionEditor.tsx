@@ -12,7 +12,6 @@ import type {
   SheetElementV1,
   SheetSectionV1,
 } from "./sheetTypes.js";
-import { SLOT_ELEMENT_LABEL } from "./slotTypes.js";
 
 export type SectionEditorProps = {
   section: SheetSectionV1;
@@ -215,7 +214,7 @@ export function SectionEditor({
                       {idx + 1}
                     </span>
                     <span className={styles.kindBadge}>
-                      {element.kind === "slot" ? SLOT_ELEMENT_LABEL : t(`editor.element.kind.${element.kind}`)}
+                      {t(`editor.element.kind.${element.kind}`)}
                     </span>
                   </Button>
                   <Button
@@ -319,7 +318,7 @@ function AddElementButton({
       onClick={onClick}
       data-testid={`section-add-element-${kind}-${sectionId}`}
     >
-      {kind === "slot" ? SLOT_ELEMENT_LABEL : t(`editor.element.kind.${kind}`)}
+      {t(`editor.element.kind.${kind}`)}
     </Button>
   );
 }
@@ -417,7 +416,7 @@ function RemoveElementButton({
           </Dialog.Title>
           <p className={styles.dialogBody}>
             {t("editor.element.removeConfirm.message", {
-              kind: element.kind === "slot" ? SLOT_ELEMENT_LABEL : t(`editor.element.kind.${element.kind}`),
+              kind: t(`editor.element.kind.${element.kind}`),
             })}
           </p>
           <div className={styles.dialogActions}>

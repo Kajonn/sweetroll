@@ -103,6 +103,19 @@ export type CharacterSession = {
   setField(fieldId: string, value: unknown): Promise<void>;
   bumpResource(resourceId: string, direction: "up" | "down"): Promise<void>;
   executeAction(actionId: string, inputs?: Record<string, unknown>): Promise<void>;
+  /**
+   * Task 7: template-granted roll routed through the executeAction intent
+   * with its owning entry. Online-only, like entity actions.
+   */
+  executeGrantedAction(entryId: string, actionId: string, inputs?: Record<string, unknown>): Promise<void>;
+  /**
+   * Task 7: durable entry intents. Offline-capable like field sets and
+   * resource bumps: they queue durably and replay verbatim, so offline
+   * add/remove/edit sync on reconnect.
+   */
+  addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>): Promise<void>;
+  removeEntry(entryId: string): Promise<void>;
+  updateEntryValues(entryId: string, values: Record<string, unknown>): Promise<void>;
   resolveConflict(input: ResolveConflictInput): Promise<void>;
   archive(): Promise<void>;
   recover(): Promise<void>;
@@ -433,11 +446,36 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         firstAttemptAt,
       };
     }
+    if (entry.intent.kind === "addEntry") {
+      return {
+        method,
+        path: `/characters/${characterId}/entries`,
+        body: { entry: entry.intent.entry, expectedRevision, idempotencyKey: key },
+        firstAttemptAt,
+      };
+    }
+    if (entry.intent.kind === "removeEntry") {
+      return {
+        method: "DELETE",
+        path: `/characters/${characterId}/entries/${entry.intent.entryId}`,
+        body: { expectedRevision, idempotencyKey: key },
+        firstAttemptAt,
+      };
+    }
+    if (entry.intent.kind === "updateEntryValues") {
+      return {
+        method: "PATCH",
+        path: `/characters/${characterId}/entries/${entry.intent.entryId}`,
+        body: { values: entry.intent.values, expectedRevision, idempotencyKey: key },
+        firstAttemptAt,
+      };
+    }
     return {
       method,
       path: `/characters/${characterId}/actions/${entry.intent.actionId}`,
       body: {
         inputs: entry.intent.inputs ?? {},
+        ...(entry.intent.entryId === undefined ? {} : { entryId: entry.intent.entryId }),
         expectedRevision,
         idempotencyKey: key,
       },
@@ -1808,6 +1846,47 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           ...(inputs !== undefined ? { inputs } : {}),
         }),
       );
+    },
+    async executeGrantedAction(entryId: string, actionId: string, inputs?: Record<string, unknown>): Promise<void> {
+      assertMutationAllowed();
+      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (!isConnected()) {
+        throw structuredError(
+          "Actions require connectivity and cannot be initiated offline.",
+          "network-unavailable",
+        );
+      }
+      await persistEntry(
+        newEntry({
+          kind: "executeAction",
+          actionId,
+          entryId,
+          ...(inputs !== undefined ? { inputs } : {}),
+        }),
+      );
+    },
+    async addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>): Promise<void> {
+      assertMutationAllowed({ offlineIntent: true });
+      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      await persistEntry(newEntry({
+        kind: "addEntry",
+        entry: {
+          entryId: newId(),
+          slotId,
+          templateId,
+          values: values ?? {},
+        },
+      }));
+    },
+    async removeEntry(entryId: string): Promise<void> {
+      assertMutationAllowed({ offlineIntent: true });
+      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      await persistEntry(newEntry({ kind: "removeEntry", entryId }));
+    },
+    async updateEntryValues(entryId: string, values: Record<string, unknown>): Promise<void> {
+      assertMutationAllowed({ offlineIntent: true });
+      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      await persistEntry(newEntry({ kind: "updateEntryValues", entryId, values }));
     },
     async archive(): Promise<void> {
       await runOnlineOperation({ kind: "archive", operation: "archive" });

@@ -242,4 +242,38 @@ describe("CharacterSheet", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not save this change");
     expect(bonus).toHaveValue(3);
   });
+
+  it("renders slot elements through SlotListControl and skips synthetic granted actions", async () => {
+    const user = userEvent.setup();
+    const state = snapshot();
+    const moves = state.confirmed!.projection.sheets[1]!.sections[0]!;
+    moves.elements.push(
+      { kind: "slot", id: "inv-element", slotId: "inventory", label: "Inventory", accepts: ["item"], entries: [
+        { entryId: "aaaaaaaa-1111-4111-8111-111111111111", templateId: "longsword", label: "Longsword", values: { weapon_bonus: 1 } },
+      ] },
+      { kind: "action", id: "aaaaaaaa-1111-4111-8111-111111111111__longsword_attack", actionId: "longsword_attack", entryId: "aaaaaaaa-1111-4111-8111-111111111111", label: "Longsword Attack", actionKind: "roll", inputs: [], validations: [] },
+    );
+    const onExecuteGranted = vi.fn();
+    render(
+      <CharacterSheet
+        snapshot={state}
+        onSetField={vi.fn()}
+        onBump={vi.fn()}
+        onExecuteAction={vi.fn()}
+        onAddEntry={vi.fn()}
+        onRemoveEntry={vi.fn()}
+        onUpdateEntry={vi.fn()}
+        onExecuteGranted={onExecuteGranted}
+        templates={[{ id: "longsword", label: "Longsword", kind: "item", grantedActions: [
+          { id: "longsword_attack", label: "Longsword Attack", actionKind: "roll", inputs: [] },
+        ] }]}
+      />,
+    );
+    expect(screen.getByTestId("slot-list-inventory")).toBeVisible();
+    // The synthetic projection element is owned by the slot control: exactly
+    // one granted button exists, and it routes through onExecuteGranted.
+    expect(screen.getAllByRole("button", { name: "Longsword Attack" })).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Longsword Attack" }));
+    expect(onExecuteGranted).toHaveBeenCalledWith("aaaaaaaa-1111-4111-8111-111111111111", "longsword_attack", {});
+  });
 });

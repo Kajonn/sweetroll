@@ -1,6 +1,8 @@
 import { ApiError, type ApiClient } from "../api/client.js";
 import type {
   ActivityResponse,
+  AddCharacterEntryBody,
+  AddCharacterEntryResponse,
   BumpCharacterResourceBody,
   BumpCharacterResourceResponse,
   CharacterExport,
@@ -10,12 +12,17 @@ import type {
   CreationVersions,
   DuplicateCharacterBody,
   DuplicateCharacterResponse,
+  EntryTemplatesResponse,
   ExecuteCharacterActionBody,
   ExecuteCharacterActionResponse,
   FrozenRequest,
   MigrationPreviewBody,
   MigrationPreviewResponse,
   OpenCharacterResponse,
+  RemoveCharacterEntryBody,
+  RemoveCharacterEntryResponse,
+  UpdateCharacterEntryBody,
+  UpdateCharacterEntryResponse,
 } from "./types.js";
 
 export type VersionCatalogQuery = {
@@ -46,6 +53,18 @@ export type CharactersApi = {
     actionId: string,
     body: ExecuteCharacterActionBody,
   ): Promise<ExecuteCharacterActionResponse>;
+  addCharacterEntry(characterId: string, body: AddCharacterEntryBody): Promise<AddCharacterEntryResponse>;
+  removeCharacterEntry(
+    characterId: string,
+    entryId: string,
+    body: RemoveCharacterEntryBody,
+  ): Promise<RemoveCharacterEntryResponse>;
+  updateCharacterEntry(
+    characterId: string,
+    entryId: string,
+    body: UpdateCharacterEntryBody,
+  ): Promise<UpdateCharacterEntryResponse>;
+  listEntryTemplates(characterId: string): Promise<EntryTemplatesResponse>;
   activity(characterId: string, cursor: string | null): Promise<ActivityResponse>;
   send(request: FrozenRequest): Promise<CommandResultResponse>;
   export(characterId: string): Promise<CharacterExport>;
@@ -109,6 +128,17 @@ export function createCharactersApi(client: ApiClient): CharactersApi {
       client.fetch<BumpCharacterResourceResponse>("POST", `/characters/${characterId}/resources/${resourceId}/bump`, { body }),
     executeCharacterAction: (characterId, actionId, body) =>
       client.fetch<ExecuteCharacterActionResponse>("POST", `/characters/${characterId}/actions/${actionId}`, { body }),
+    // ONLINE-ONLY entry wrappers (same contract as the session queue; the
+    // player sheet uses the durable session intents below, these never run
+    // offline). listEntryTemplates backs the slot add-flow template picker.
+    addCharacterEntry: (characterId, body) =>
+      client.fetch<AddCharacterEntryResponse>("POST", `/characters/${characterId}/entries`, { body }),
+    removeCharacterEntry: (characterId, entryId, body) =>
+      client.fetch<RemoveCharacterEntryResponse>("DELETE", `/characters/${characterId}/entries/${entryId}`, { body }),
+    updateCharacterEntry: (characterId, entryId, body) =>
+      client.fetch<UpdateCharacterEntryResponse>("PATCH", `/characters/${characterId}/entries/${entryId}`, { body }),
+    listEntryTemplates: (characterId) =>
+      client.fetch<EntryTemplatesResponse>("GET", `/characters/${characterId}/templates`),
     activity: (characterId, cursor) =>
       client.fetch<ActivityResponse>("GET", `/characters/${characterId}/activity`, {
         query: { cursor },

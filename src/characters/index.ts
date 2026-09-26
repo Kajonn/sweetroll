@@ -3,8 +3,20 @@ import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 
 import type { RequestContext } from "../systems/authoring.js";
+import type {
+  CharacterEntryV1,
+  ObjectTemplateV1,
+  SlotDefinitionV1,
+  SystemPackageV1,
+  TemplateKind,
+} from "../systems/implementation/package/schema/index.js";
 import type { SystemAuthoring } from "../systems/authoring.js";
 import { hashInput } from "../systems/implementation/authoring/assess.js";
+import { validateEntryForSlot } from "../systems/implementation/runtime/entries.js";
+import {
+  createPostgresPublishedPackageLoader,
+  PublishedPackageCorruptError,
+} from "../systems/implementation/runtime/package-loader.js";
 import type {
   CharacterProjectionV1,
   DefinitionId,
@@ -19,6 +31,7 @@ import type {
 
 import {
   createCharacterPersistenceRepository,
+  type ApplyCommandOutcome,
   type AttachedAuthorization,
   type CampaignMembershipSnapshot,
   type CharacterPersistenceRepository,
@@ -49,6 +62,9 @@ const COMMAND_KIND: Record<CharacterCommand["kind"], string> = {
   setField: "character_set_field",
   bumpResource: "character_bump_resource",
   executeAction: "character_execute_action",
+  addEntry: "character_add_entry",
+  removeEntry: "character_remove_entry",
+  updateEntryValues: "character_update_entry_values",
 };
 const MANAGEMENT_COMMAND_KIND: Record<CharacterManagementCommand["kind"], string> = {
   rename: "character_rename",
@@ -275,7 +291,70 @@ export type CharacterActionCommand = {
 export type CharacterCommand =
   | CharacterFieldSetCommand
   | CharacterResourceBumpCommand
-  | CharacterActionCommand;
+  | CharacterActionCommand
+  | CharacterAddEntryCommand
+  | CharacterRemoveEntryCommand
+  | CharacterUpdateEntryValuesCommand;
+
+/**
+ * Task 7: player-managed dynamic entries (inventory, talents, spells,
+ * effects). Entry commands carry no audience: they mutate plain state
+ * values and never produce rolls (setField/bumpResource parity).
+ */
+export type CharacterEntryInput = {
+  entryId: string;
+  slotId: DefinitionId;
+  templateId: DefinitionId | null;
+  values: Record<string, unknown>;
+  quantity?: number;
+};
+
+export type CharacterAddEntryCommand = {
+  kind: "addEntry";
+  characterId: CharacterId;
+  entry: CharacterEntryInput;
+  expectedRevision: number;
+  idempotencyKey: string;
+};
+
+export type CharacterRemoveEntryCommand = {
+  kind: "removeEntry";
+  characterId: CharacterId;
+  entryId: string;
+  expectedRevision: number;
+  idempotencyKey: string;
+};
+
+export type CharacterUpdateEntryValuesCommand = {
+  kind: "updateEntryValues";
+  characterId: CharacterId;
+  entryId: string;
+  values: Record<string, unknown>;
+  expectedRevision: number;
+  idempotencyKey: string;
+};
+
+/**
+ * Task 7: template catalog for the sheet add flow. Only the metadata the
+ * picker and granted-action buttons need; entry values stay server-side.
+ */
+export type EntryTemplateSummary = {
+  id: DefinitionId;
+  label: string;
+  kind: TemplateKind;
+  grantedActions: Array<{
+    id: DefinitionId;
+    label: string;
+    actionKind: "roll" | "resourceBump";
+    inputs: Array<{
+      id: DefinitionId;
+      label: string;
+      valueType: "integer" | "decimal" | "boolean" | "text";
+      required: boolean;
+      default: RuntimeScalar;
+    }>;
+  }>;
+};
 
 export type CharacterRenameCommand = {
   kind: "rename";
@@ -416,6 +495,14 @@ export interface Characters {
   open(ctx: RequestContext, characterId: CharacterId): Promise<CharacterResult<CharacterView>>;
 
   apply(ctx: RequestContext, input: CharacterCommand): Promise<CharacterResult<CharacterCommandResult>>;
+  /**
+   * Task 7: template catalog for one character's sheet add flow, authorized
+   * exactly like `open` (standalone owner, attached campaign-authorized).
+   */
+  listEntryTemplates(
+    ctx: RequestContext,
+    input: { characterId: CharacterId },
+  ): Promise<CharacterResult<EntryTemplateSummary[]>>;
   manage(
     ctx: RequestContext,
     input: CharacterManagementCommand,
@@ -456,6 +543,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
   const now = input.now ?? (() => new Date());
   const newId = input.newId ?? (() => randomUUID());
   const newExecutionId = input.newExecutionId ?? (() => randomUUID());
+  // Task 7: entry validation needs the version's slots/templates. The
+  // runtime loads the same package internally during resolve; the module
+  // loads it directly here (precedent: the direct hashInput import above) so
+  // no SystemRuntime surface changes are required.
+  const loadPackage = createPostgresPublishedPackageLoader(input.pool);
 
   const errors = {
     bad_request: (message: string): CharacterError => ({ code: "bad_request", message }),
@@ -789,6 +881,324 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         nominal: stored.value.nominal ?? null,
       },
     };
+  }
+
+  // -------------------------------------------------------------------------
+  // Task 7: entry commands (addEntry/removeEntry/updateEntryValues)
+  // -------------------------------------------------------------------------
+
+  const ENTRY_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+  function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+
+  /**
+   * Shared applyCommandTx outcome handling for play commands. Extracted from
+   * apply() verbatim (I6 Task 5 scope discipline preserved); entry commands
+   * reuse it so conflict/not_found/archived/replay behave identically.
+   */
+  async function finishCommandTx(input: {
+    ctx: RequestContext;
+    outcome: ApplyCommandOutcome;
+    characterId: CharacterId;
+    expectedRevision: number;
+    attachedCampaignId: string | null;
+    executionId: string;
+    replayExpiresAt: Date;
+  }): Promise<CharacterResult<CharacterCommandResult>> {
+    const { ctx, outcome, characterId, expectedRevision, attachedCampaignId, executionId, replayExpiresAt } = input;
+    if (outcome.kind === "already_completed") {
+      const placementDenial = await authorizeStoredOutcome(ctx, characterId, outcome.resultJson, () =>
+        errors.not_found(),
+      );
+      if (placementDenial !== null) return placementDenial;
+      return replayStoredOutcome(outcome.resultJson);
+    }
+    if (outcome.kind === "not_found") {
+      const error = errors.not_found();
+      await repo.finalizeExecutionError({
+        executionId,
+        resultJson: serializeCommandError(error),
+        expiresAt: replayExpiresAt,
+      });
+      return { ok: false, error };
+    }
+    if (outcome.kind === "archived") {
+      const error = errors.archived();
+      await repo.finalizeExecutionError({
+        executionId,
+        resultJson: serializeCommandError(error),
+        expiresAt: replayExpiresAt,
+      });
+      return { ok: false, error };
+    }
+    if (outcome.kind === "conflict") {
+      // I6 Task 5: reauthorize before disclosing conflict details. A
+      // membership revoked after the snapshot receives the generic
+      // denial, never field-level change summaries or cursors.
+      const stillAuthorized = await recheckWriteAccess(ctx, characterId, attachedCampaignId);
+      if (!stillAuthorized) {
+        const error = errors.not_found();
+        await repo.finalizeExecutionError({
+          executionId,
+          resultJson: serializeCommandError(error),
+          expiresAt: replayExpiresAt,
+        });
+        return { ok: false, error };
+      }
+      const changedSinceBase = await repo.changedDefinitionIdsSinceRevision(
+        characterId,
+        expectedRevision,
+        { scopeCampaignId: attachedCampaignId },
+      );
+      const activityCursor =
+        changedSinceBase.latestActivity === null ? null : encodeActivityCursor(changedSinceBase.latestActivity);
+      const error = errors.conflict(outcome.latestRevision, changedSinceBase.changedDefinitionIds, activityCursor);
+      await repo.finalizeExecutionError({
+        executionId,
+        resultJson: serializeCommandError(error),
+        expiresAt: replayExpiresAt,
+      });
+      return { ok: false, error };
+    }
+
+    const stored = outcome.resultJson as StoredCommandOutcome;
+    if (!stored.ok) return { ok: false, error: stored.error };
+    const view = deserializeView(stored.value.character);
+    return { ok: true, value: { character: view, roll: stored.value.roll, nominal: stored.value.nominal ?? null } };
+  }
+
+  /**
+   * Loads the version package for entry validation. The runtime loads the
+   * same package during resolve; entry commands load it directly because
+   * validation (slots/templates) happens before any runtime intent runs.
+   */
+  async function loadEntryPackage(
+    versionId: string,
+    executionId: string,
+    replayExpiresAt: Date,
+  ): Promise<{ ok: true; value: SystemPackageV1 } | { ok: false; error: CharacterError }> {
+    try {
+      const loaded = await loadPackage(versionId);
+      if (loaded === null) return { ok: false, error: errors.internal() };
+      return { ok: true, value: loaded };
+    } catch (error) {
+      if (error instanceof PublishedPackageCorruptError) {
+        const mapped = mapRuntimeError({
+          code: "invalid_package",
+          message: "Published package runtime references are invalid.",
+        });
+        await repo.finalizeExecutionError({
+          executionId,
+          resultJson: serializeCommandError(mapped),
+          expiresAt: replayExpiresAt,
+        });
+        return { ok: false, error: mapped };
+      }
+      return { ok: false, error: errors.internal() };
+    }
+  }
+
+  /**
+   * Entry write path. Validation order (plan Task 7): idempotency claim and
+   * auth/scope happen in apply() before this runs; here: load package →
+   * validateEntryForSlot → mutate entries → resolve observe for the fresh
+   * projection → activity (entry_added/entry_removed/entry_updated) →
+   * applyCommandTx with the shared outcome handling.
+   *
+   * Deferred Task 4 decisions, decided here:
+   * - Map-key/entryId agreement: the map key is always derived from
+   *   entry.entryId on add; remove/update verify the stored entry agrees
+   *   with its key and reject otherwise.
+   * - Resource entry-value extra keys: lenient (entries.ts validates only
+   *   current/max; extras are preserved but never read).
+   * - Quantity: enforced on write (absent or integer >= 1, else
+   *   bad_request); updateEntryValues merges values only and never changes
+   *   quantity.
+   * - Templated adds fill absent values from template field defaults so a
+   *   bare template pick is immediately playable.
+   */
+  async function applyEntryCommand(
+    ctx: RequestContext,
+    command: CharacterAddEntryCommand | CharacterRemoveEntryCommand | CharacterUpdateEntryValuesCommand,
+    resolveSource: CharacterRecord,
+    attachedCampaignId: string | null,
+    executionId: string,
+    replayExpiresAt: Date,
+  ): Promise<CharacterResult<CharacterCommandResult>> {
+    const fail = async (error: CharacterError): Promise<CharacterResult<CharacterCommandResult>> => {
+      await repo.finalizeExecutionError({
+        executionId,
+        resultJson: serializeCommandError(error),
+        expiresAt: replayExpiresAt,
+      });
+      return { ok: false, error };
+    };
+
+    const packaged = await loadEntryPackage(resolveSource.systemVersionId, executionId, replayExpiresAt);
+    if (!packaged.ok) return packaged;
+    const slots: SlotDefinitionV1[] = packaged.value.slots ?? [];
+    const templates: ObjectTemplateV1[] = packaged.value.templates ?? [];
+    // RuntimeStateV1.entries is optional: legacy rows decode without it.
+    const storedEntries: Record<string, CharacterEntryV1> = resolveSource.state.entries ?? {};
+
+    let nextEntries: Record<string, CharacterEntryV1>;
+    let activityKind: "entry_added" | "entry_removed" | "entry_updated";
+    let activityFields: Record<string, unknown>;
+    let changedDefinitionIds: DefinitionId[];
+    let stateChanged: boolean;
+
+    if (command.kind === "addEntry") {
+      const entryInput = command.entry;
+      if (!isRecord(entryInput)) return fail(errors.bad_request("Entry must be an object."));
+      if (typeof entryInput.entryId !== "string" || !ENTRY_ID_PATTERN.test(entryInput.entryId)) {
+        return fail(errors.bad_request("Entry id must be a UUID."));
+      }
+      if (typeof entryInput.slotId !== "string" || entryInput.slotId.length === 0) {
+        return fail(errors.bad_request("Entry slot must be a non-empty string."));
+      }
+      if (
+        entryInput.templateId !== null
+        && (typeof entryInput.templateId !== "string" || entryInput.templateId.length === 0)
+      ) {
+        return fail(errors.bad_request("Entry template must be a definition id or null."));
+      }
+      if (!isRecord(entryInput.values)) return fail(errors.bad_request("Entry values must be an object."));
+      if (
+        entryInput.quantity !== undefined
+        && (!Number.isInteger(entryInput.quantity) || (entryInput.quantity as number) < 1)
+      ) {
+        return fail(errors.bad_request("Entry quantity must be an integer of at least 1."));
+      }
+      if (storedEntries[entryInput.entryId] !== undefined) {
+        return fail(errors.bad_request("Character entry already exists."));
+      }
+      const candidate: CharacterEntryV1 = {
+        entryId: entryInput.entryId,
+        slotId: entryInput.slotId,
+        templateId: entryInput.templateId,
+        values: { ...(entryInput.values as Record<string, unknown>) },
+        ...(entryInput.quantity === undefined ? {} : { quantity: entryInput.quantity as number }),
+      };
+      const siblingCount = Object.values(storedEntries).filter((entry) => entry.slotId === candidate.slotId).length;
+      const validation = validateEntryForSlot(candidate, slots, templates, siblingCount);
+      if (!validation.ok) return fail(errors.invalid_value(validation.message));
+      if (candidate.templateId !== null) {
+        const template = templates.find((candidateTemplate) => candidateTemplate.id === candidate.templateId);
+        if (template === undefined) return fail(errors.invalid_value("Entry template is unknown."));
+        for (const field of template.fields) {
+          if (Object.hasOwn(candidate.values, field.id)) continue;
+          // Computed/image template fields carry no player default and can
+          // never validate (see entries.ts), so they are left absent.
+          if (field.kind === "computed" || field.kind === "image") continue;
+          candidate.values[field.id] = structuredClone(field.default);
+        }
+      }
+      nextEntries = { ...storedEntries, [candidate.entryId]: candidate };
+      activityKind = "entry_added";
+      activityFields = { entryId: candidate.entryId, slotId: candidate.slotId, templateId: candidate.templateId };
+      changedDefinitionIds = [candidate.slotId];
+      stateChanged = true;
+    } else if (command.kind === "removeEntry") {
+      const stored = storedEntries[command.entryId];
+      if (stored === undefined) return fail(errors.bad_request("Character entry not found."));
+      if (stored.entryId !== command.entryId) {
+        return fail(errors.bad_request("Character entry reference is invalid."));
+      }
+      nextEntries = {};
+      for (const [key, value] of Object.entries(storedEntries)) {
+        if (key !== command.entryId) nextEntries[key] = value;
+      }
+      activityKind = "entry_removed";
+      activityFields = { entryId: stored.entryId, slotId: stored.slotId };
+      changedDefinitionIds = [stored.slotId];
+      stateChanged = true;
+    } else {
+      const stored = storedEntries[command.entryId];
+      if (stored === undefined) return fail(errors.bad_request("Character entry not found."));
+      if (stored.entryId !== command.entryId) {
+        return fail(errors.bad_request("Character entry reference is invalid."));
+      }
+      if (!isRecord(command.values)) return fail(errors.bad_request("Entry values must be an object."));
+      const merged = { ...stored.values, ...command.values };
+      const candidate: CharacterEntryV1 = { ...stored, values: merged };
+      const siblingCount = Object.values(storedEntries).filter(
+        (entry) => entry.slotId === stored.slotId && entry.entryId !== stored.entryId,
+      ).length;
+      const validation = validateEntryForSlot(candidate, slots, templates, siblingCount);
+      if (!validation.ok) return fail(errors.invalid_value(validation.message));
+      nextEntries = { ...storedEntries, [stored.entryId]: candidate };
+      activityKind = "entry_updated";
+      activityFields = { entryId: stored.entryId, slotId: stored.slotId, values: command.values };
+      changedDefinitionIds = [stored.slotId];
+      stateChanged = JSON.stringify(merged) !== JSON.stringify(stored.values);
+    }
+
+    const nextState: RuntimeStateV1 = { ...resolveSource.state, entries: nextEntries };
+    const resolved = await input.runtime.resolve({
+      versionId: resolveSource.systemVersionId,
+      entityId: resolveSource.entityDefinitionId,
+      state: nextState,
+      intent: { kind: "observe" },
+    });
+    if (!resolved.ok) {
+      const error = mapRuntimeError(resolved.error);
+      if (isFinalizableRuntimeError(resolved.error.code)) {
+        await repo.finalizeExecutionError({
+          executionId,
+          resultJson: serializeCommandError(error),
+          expiresAt: replayExpiresAt,
+        });
+      }
+      return { ok: false, error };
+    }
+
+    const outcome = await repo.applyCommandTx({
+      executionId,
+      characterId: command.characterId,
+      actorId: ctx.actorId,
+      expectedRevision: command.expectedRevision,
+      nextState: resolved.value.state,
+      stateChanged,
+      roll: null,
+      activity: {
+        kind: activityKind,
+        payloadJson: { ...activityFields, changedDefinitionIds },
+        requestId: ctx.requestId,
+      },
+      resultExpiresAt: replayExpiresAt,
+      ...(attachedCampaignId === null ? {} : { campaign: { campaignId: attachedCampaignId } }),
+      buildResult: ({ record, controllers, scope }) => {
+        const view = toView(
+          record,
+          {
+            derivedValues: resolved.value.derivedValues,
+            validations: resolved.value.validations,
+            projection: resolved.value.projection,
+            packageChecksum: resolved.value.packageChecksum,
+            changedDefinitionIds,
+          },
+          {
+            baseRevision: command.expectedRevision,
+            commandExecutionId: executionId,
+            replayExpiresAt: replayExpiresAt.toISOString(),
+            replayed: false,
+          },
+        );
+        return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)), roll: null, nominal: null } };
+      },
+    });
+
+    return finishCommandTx({
+      ctx,
+      outcome,
+      characterId: command.characterId,
+      expectedRevision: command.expectedRevision,
+      attachedCampaignId,
+      executionId,
+      replayExpiresAt,
+    });
   }
 
   return {
@@ -1244,11 +1654,17 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             ? { fieldId: command.fieldId, value: command.value }
             : command.kind === "bumpResource"
               ? { resourceId: command.resourceId, direction: command.direction }
-              : {
-                  actionId: command.actionId,
-                  inputs: command.inputs,
-                  ...(command.entryId !== undefined ? { entryId: command.entryId } : {}),
-                };
+              : command.kind === "executeAction"
+                ? {
+                    actionId: command.actionId,
+                    inputs: command.inputs,
+                    ...(command.entryId !== undefined ? { entryId: command.entryId } : {}),
+                  }
+                : command.kind === "addEntry"
+                  ? { entry: command.entry }
+                  : command.kind === "removeEntry"
+                    ? { entryId: command.entryId }
+                    : { entryId: command.entryId, values: command.values };
         // I6 Task 8: the requested audience (or its omission) is part of the
         // input hash. The effective default is NOT hashed: an omitted
         // audience replays from the recorded receipt even after the campaign
@@ -1365,6 +1781,19 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           }
         }
 
+        // Task 7: entry writes validate against the version package (slots,
+        // templates) instead of running a runtime mutation intent. Claim,
+        // auth/scope, campaign/archived gates above are shared with the
+        // sibling commands; outcome handling is shared via finishCommandTx.
+        if (
+          command.kind === "addEntry"
+          || command.kind === "removeEntry"
+          || command.kind === "updateEntryValues"
+        ) {
+          const resolveSource: CharacterRecord = attachedRecord ?? snapshot!;
+          return applyEntryCommand(ctx, command, resolveSource, attachedCampaignId, executionId, replayExpiresAt);
+        }
+
         const intent =
           command.kind === "setField"
             ? ({ kind: "set", fieldId: command.fieldId, value: command.value } as const)
@@ -1451,65 +1880,65 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           },
         });
 
-        if (outcome.kind === "already_completed") {
-          const placementDenial = await authorizeStoredOutcome(ctx, command.characterId, outcome.resultJson, () =>
-            errors.not_found(),
-          );
-          if (placementDenial !== null) return placementDenial;
-          return replayStoredOutcome(outcome.resultJson);
+        return finishCommandTx({
+          ctx,
+          outcome,
+          characterId: command.characterId,
+          expectedRevision: command.expectedRevision,
+          attachedCampaignId,
+          executionId,
+          replayExpiresAt,
+        });
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+    async listEntryTemplates(ctx, input): Promise<CharacterResult<EntryTemplateSummary[]>> {
+      try {
+        // Authorized exactly like open(): standalone owners read their own
+        // sheet; attached sheets compose the campaign capability. Reads stay
+        // available on archived sheets and archived campaigns.
+        const snapshot = await repo.openOwnedCharacter(input.characterId, ctx.actorId);
+        let record: CharacterRecord | null = snapshot;
+        if (record === null) {
+          const scope = await repo.loadCharacterScope(input.characterId);
+          if (scope === null || scope.campaignId === null) return { ok: false, error: errors.not_found() };
+          const attached = await loadAttachedSnapshot(ctx, input.characterId);
+          if (attached === null) return { ok: false, error: errors.not_found() };
+          record = attached.auth.record;
         }
-        if (outcome.kind === "not_found") {
-          const error = errors.not_found();
-          await repo.finalizeExecutionError({
-            executionId,
-            resultJson: serializeCommandError(error),
-            expiresAt: replayExpiresAt,
-          });
-          return { ok: false, error };
-        }
-        if (outcome.kind === "archived") {
-          const error = errors.archived();
-          await repo.finalizeExecutionError({
-            executionId,
-            resultJson: serializeCommandError(error),
-            expiresAt: replayExpiresAt,
-          });
-          return { ok: false, error };
-        }
-        if (outcome.kind === "conflict") {
-          // I6 Task 5: reauthorize before disclosing conflict details. A
-          // membership revoked after the snapshot receives the generic
-          // denial, never field-level change summaries or cursors.
-          const stillAuthorized = await recheckWriteAccess(ctx, command.characterId, attachedCampaignId);
-          if (!stillAuthorized) {
-            const error = errors.not_found();
-            await repo.finalizeExecutionError({
-              executionId,
-              resultJson: serializeCommandError(error),
-              expiresAt: replayExpiresAt,
-            });
-            return { ok: false, error };
+        let packageValue: SystemPackageV1;
+        try {
+          const loaded = await loadPackage(record.systemVersionId);
+          if (loaded === null) return { ok: false, error: errors.internal() };
+          packageValue = loaded;
+        } catch (error) {
+          // Read path: no execution was claimed, so nothing is finalized.
+          if (error instanceof PublishedPackageCorruptError) {
+            return {
+              ok: false,
+              error: mapRuntimeError({
+                code: "invalid_package",
+                message: "Published package runtime references are invalid.",
+              }),
+            };
           }
-          const changedSinceBase = await repo.changedDefinitionIdsSinceRevision(
-            command.characterId,
-            command.expectedRevision,
-            { scopeCampaignId: attachedCampaignId },
-          );
-          const activityCursor =
-            changedSinceBase.latestActivity === null ? null : encodeActivityCursor(changedSinceBase.latestActivity);
-          const error = errors.conflict(outcome.latestRevision, changedSinceBase.changedDefinitionIds, activityCursor);
-          await repo.finalizeExecutionError({
-            executionId,
-            resultJson: serializeCommandError(error),
-            expiresAt: replayExpiresAt,
-          });
-          return { ok: false, error };
+          return { ok: false, error: errors.internal() };
         }
-
-        const stored = outcome.resultJson as StoredCommandOutcome;
-        if (!stored.ok) return { ok: false, error: stored.error };
-        const view = deserializeView(stored.value.character);
-        return { ok: true, value: { character: view, roll: stored.value.roll, nominal: stored.value.nominal ?? null } };
+        return {
+          ok: true,
+          value: (packageValue.templates ?? []).map((template) => ({
+            id: template.id,
+            label: template.label,
+            kind: template.kind,
+            grantedActions: template.grantedActions.map((action) => ({
+              id: action.id,
+              label: action.label,
+              actionKind: action.kind,
+              inputs: action.kind === "roll" ? action.inputs.map((actionInput) => ({ ...actionInput })) : [],
+            })),
+          })),
+        };
       } catch {
         return { ok: false, error: errors.internal() };
       }

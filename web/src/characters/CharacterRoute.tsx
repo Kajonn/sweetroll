@@ -5,7 +5,7 @@ import type { CharactersApi } from "./api.js";
 import { CharacterSheet } from "./CharacterSheet.js";
 import { CharacterTools } from "./CharacterTools.js";
 import { ConflictReview } from "./ConflictReview.js";
-import { CreateCharacter, type CreateCharacterIdentity } from "./CreateCharacter.js";
+import type { SlotTemplate } from "./SlotListControl.js";import { CreateCharacter, type CreateCharacterIdentity } from "./CreateCharacter.js";
 import { createCharacterSession, type CoordinationPort, type IdentityPort } from "./session.js";
 import { openCharacterStore, type CharacterStore } from "./store.js";
 import { useCharacterSession } from "./useCharacterSession.js";
@@ -152,6 +152,46 @@ function CharacterDetailLoaded({
   const { session, snapshot } = useCharacterSession(createSession);
   const offline = useOfflineAvailability(snapshot.confirmed);
 
+  // Task 7: template catalog for slot pickers and granted-action buttons.
+  // Fetched only when the projected sheet actually contains a slot, so
+  // systems without slots behave exactly as before (no extra request).
+  // A failed fetch degrades to the custom-entry fallback; entries still
+  // list, remove, and sync.
+  const characterIdForTemplates = snapshot.confirmed?.characterId;
+  const hasSlots = snapshot.confirmed?.projection.sheets.some((sheet) =>
+    sheet.sections.some((section) => section.elements.some((element) => element.kind === "slot")),
+  ) ?? false;
+  const [templates, setTemplates] = useState<SlotTemplate[]>([]);
+  useEffect(() => {
+    if (!hasSlots || characterIdForTemplates === undefined) {
+      setTemplates([]);
+      return;
+    }
+    let cancelled = false;
+    void api.listEntryTemplates(characterIdForTemplates).then(
+      (response) => {
+        if (cancelled) return;
+        setTemplates(response.templates.map((template) => ({
+          id: template.id,
+          label: template.label,
+          kind: template.kind,
+          grantedActions: template.grantedActions.map((action) => ({
+            id: action.id,
+            label: action.label,
+            actionKind: action.actionKind,
+            inputs: action.inputs.map((input) => ({ ...input })),
+          })),
+        })));
+      },
+      () => {
+        if (!cancelled) setTemplates([]);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [api, hasSlots, characterIdForTemplates]);
+
   const focusedFor = useRef<string | null>(null);
   useEffect(() => {
     const fields = snapshot.confirmed?.projection.completionFields;
@@ -264,6 +304,11 @@ function CharacterDetailLoaded({
         onSetField={session.setField}
         onBump={session.bumpResource}
         onExecuteAction={session.executeAction}
+        onAddEntry={(slotId, templateId, values) => session.addEntry(slotId, templateId, values)}
+        onRemoveEntry={session.removeEntry}
+        onUpdateEntry={session.updateEntryValues}
+        onExecuteGranted={(entryId, actionId, inputs) => session.executeGrantedAction(entryId, actionId, inputs)}
+        templates={templates}
         offlineAvailable={offline.available}
       />
       {reviewOpen ? (

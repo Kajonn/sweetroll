@@ -6,16 +6,27 @@ import type { operations } from "../api/schema.js";
  * transport never mints or rewrites one.
  */
 export type FrozenRequest = {
-  method: "POST" | "PATCH";
+  method: "POST" | "PATCH" | "DELETE";
   path: string;
   body: Record<string, unknown> & { idempotencyKey: string };
   firstAttemptAt: string;
 };
 
+export type EntryInput = {
+  entryId: string;
+  slotId: string;
+  templateId: string | null;
+  values: Record<string, unknown>;
+  quantity?: number;
+};
+
 export type EditIntent =
   | { kind: "setField"; fieldId: string; value: unknown }
   | { kind: "bumpResource"; resourceId: string; direction: "up" | "down" }
-  | { kind: "executeAction"; actionId: string; inputs?: Record<string, unknown> };
+  | { kind: "executeAction"; actionId: string; inputs?: Record<string, unknown>; entryId?: string }
+  | { kind: "addEntry"; entry: EntryInput }
+  | { kind: "removeEntry"; entryId: string }
+  | { kind: "updateEntryValues"; entryId: string; values: Record<string, unknown> };
 export type QueueEntry = {
   id: string;
   actorId: string;
@@ -116,6 +127,25 @@ export type ExecuteCharacterActionBody = NonNullable<
 >["content"]["application/json"];
 export type ExecuteCharacterActionResponse =
   operations["post_characters_characterId_actions_actionId"]["responses"]["200"]["content"]["application/json"];
+
+export type AddCharacterEntryBody = NonNullable<
+  operations["post_characters_characterId_entries"]["requestBody"]
+>["content"]["application/json"];
+export type AddCharacterEntryResponse =
+  operations["post_characters_characterId_entries"]["responses"]["200"]["content"]["application/json"];
+export type RemoveCharacterEntryBody = NonNullable<
+  operations["delete_characters_characterId_entries_entryId"]["requestBody"]
+>["content"]["application/json"];
+export type RemoveCharacterEntryResponse =
+  operations["delete_characters_characterId_entries_entryId"]["responses"]["200"]["content"]["application/json"];
+export type UpdateCharacterEntryBody = NonNullable<
+  operations["patch_characters_characterId_entries_entryId"]["requestBody"]
+>["content"]["application/json"];
+export type UpdateCharacterEntryResponse =
+  operations["patch_characters_characterId_entries_entryId"]["responses"]["200"]["content"]["application/json"];
+export type EntryTemplatesResponse =
+  operations["get_characters_characterId_templates"]["responses"]["200"]["content"]["application/json"];
+export type EntryTemplate = EntryTemplatesResponse["templates"][number];
 
 export type CommandResultResponse = operations["post_characters_characterId_fields_fieldId_set"]["responses"]["200"]["content"]["application/json"];
 export type CommandResult = CommandResultResponse["result"];

@@ -48,6 +48,15 @@ const RuntimeValidationDto = Type.Object({
 const RuntimeStateDto = Type.Object({
   schemaVersion: Type.Literal("1.0"),
   values: Type.Object({}, { additionalProperties: true }),
+  // Task 7: entries ride the state over the wire (plain values, same as
+  // offline snapshots). Optional so pre-entry clients keep validating.
+  entries: Type.Optional(Type.Record(Type.String(), Type.Object({
+    entryId: Type.String(),
+    slotId: Type.String(),
+    templateId: Type.Union([Type.String(), Type.Null()]),
+    values: Type.Object({}, { additionalProperties: true }),
+    quantity: Type.Optional(Type.Integer({ minimum: 1 })),
+  }))),
 });
 const RecordDto = Type.Record(Type.String(), RuntimeScalarDto);
 
@@ -107,6 +116,18 @@ const ProjectionFieldDto = Type.Object({
     constraints: ProjectionFieldConstraintsDto,
     validations: Type.Array(RuntimeValidationDto),
   });
+const TemplateKindDto = Type.Union([
+  Type.Literal("item"),
+  Type.Literal("spell"),
+  Type.Literal("talent"),
+  Type.Literal("effect"),
+]);
+const ProjectionSlotEntryDto = Type.Object({
+  entryId: Type.String(),
+  templateId: Type.Union([Type.String(), Type.Null()]),
+  label: Type.String(),
+  values: Type.Object({}, { additionalProperties: true }),
+});
 const ProjectionElementDto = Type.Union([
   Type.Object({
     kind: Type.Literal("heading"),
@@ -135,6 +156,17 @@ const ProjectionElementDto = Type.Union([
     actionKind: Type.Union([Type.Literal("roll"), Type.Literal("resourceBump")]),
     inputs: Type.Array(ProjectionActionInputDto),
     validations: Type.Array(RuntimeValidationDto),
+    // Task 7: set on synthetic granted-action elements projected after
+    // their entry inside a slot. Absent = sheet-placed entity action.
+    entryId: Type.Optional(Type.String()),
+  }),
+  Type.Object({
+    kind: Type.Literal("slot"),
+    id: Type.String(),
+    slotId: Type.String(),
+    label: Type.String(),
+    accepts: Type.Array(TemplateKindDto),
+    entries: Type.Array(ProjectionSlotEntryDto),
   }),
 ]);
 const ProjectionDto = Type.Object({
@@ -375,6 +407,10 @@ const ExecuteActionParams = Type.Object({
   characterId: Type.String({ format: UUID_FORMAT }),
   actionId: Type.String({ minLength: 1 }),
 });
+const EntryIdParams = Type.Object({
+  characterId: Type.String({ format: UUID_FORMAT }),
+  entryId: Type.String({ minLength: 1 }),
+});
 const CommitMigrationParams = Type.Object({
   characterId: Type.String({ format: UUID_FORMAT }),
   previewId: Type.String({ minLength: 1 }),
@@ -400,8 +436,57 @@ const ExecuteActionBody = Type.Object({
   // validation (400) and never fall back to a wider audience. Standalone
   // sheets still accept only `owner_only`.
   audience: Type.Optional(RollAudienceDto),
+  // Task 7: template-granted actions execute against the named character
+  // entry (Task 5 command wiring). Absent = entity action (unchanged path).
+  entryId: Type.Optional(Type.String({ minLength: 1 })),
   expectedRevision: Type.Integer(),
   idempotencyKey: Type.String({ minLength: 1 }),
+});
+// Task 7: entry write bodies mirror the sibling command shapes
+// (expectedRevision + idempotencyKey discipline).
+const CharacterEntryBody = Type.Object({
+  entryId: Type.String({ format: UUID_FORMAT }),
+  slotId: Type.String({ minLength: 1 }),
+  templateId: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+  values: Type.Object({}, { additionalProperties: true }),
+  quantity: Type.Optional(Type.Integer({ minimum: 1 })),
+});
+const AddEntryBody = Type.Object({
+  entry: CharacterEntryBody,
+  expectedRevision: Type.Integer(),
+  idempotencyKey: Type.String({ minLength: 1 }),
+});
+const RemoveEntryBody = Type.Object({
+  expectedRevision: Type.Integer(),
+  idempotencyKey: Type.String({ minLength: 1 }),
+});
+const UpdateEntryBody = Type.Object({
+  values: Type.Object({}, { additionalProperties: true }),
+  expectedRevision: Type.Integer(),
+  idempotencyKey: Type.String({ minLength: 1 }),
+});
+const EntryGrantedActionInputDto = Type.Object({
+  id: Type.String(),
+  label: Type.String(),
+  valueType: Type.Union([
+    Type.Literal("integer"),
+    Type.Literal("decimal"),
+    Type.Literal("boolean"),
+    Type.Literal("text"),
+  ]),
+  required: Type.Boolean(),
+  default: RuntimeScalarDto,
+});
+const EntryTemplateDto = Type.Object({
+  id: Type.String(),
+  label: Type.String(),
+  kind: TemplateKindDto,
+  grantedActions: Type.Array(Type.Object({
+    id: Type.String(),
+    label: Type.String(),
+    actionKind: Type.Union([Type.Literal("roll"), Type.Literal("resourceBump")]),
+    inputs: Type.Array(EntryGrantedActionInputDto),
+  })),
 });
 const ManageCharacterBody = Type.Union([
   Type.Object({
@@ -572,6 +657,64 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
       response: {
         "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
         ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/characters/:characterId/entries",
+    operationId: "post_characters_characterId_entries",
+    schema: {
+      params: CharacterIdParams,
+      body: AddEntryBody,
+      response: {
+        "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "delete",
+    path: "/characters/:characterId/entries/:entryId",
+    operationId: "delete_characters_characterId_entries_entryId",
+    schema: {
+      params: EntryIdParams,
+      body: RemoveEntryBody,
+      response: {
+        "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "patch",
+    path: "/characters/:characterId/entries/:entryId",
+    operationId: "patch_characters_characterId_entries_entryId",
+    schema: {
+      params: EntryIdParams,
+      body: UpdateEntryBody,
+      response: {
+        "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/characters/:characterId/templates",
+    operationId: "get_characters_characterId_templates",
+    schema: {
+      params: CharacterIdParams,
+      response: {
+        "200": Type.Object({
+          templates: Type.Array(EntryTemplateDto),
+          requestId: Type.String(),
+        }),
+        "400": CharacterErrorEnvelope,
+        "401": UnauthorizedEnvelope,
+        "404": CharacterErrorEnvelope,
+        "500": CharacterErrorEnvelope,
+        "503": CharacterErrorEnvelope,
       },
     },
   },
@@ -930,6 +1073,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         const body = request.body as {
           inputs?: Record<string, unknown>;
           audience?: "owner_only" | "gm_only" | "campaign";
+          entryId?: string;
           expectedRevision: number;
           idempotencyKey: string;
         };
@@ -941,10 +1085,87 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
           expectedRevision: body.expectedRevision,
           idempotencyKey: body.idempotencyKey,
           ...(body.audience === undefined ? {} : { audience: body.audience }),
+          ...(body.entryId === undefined ? {} : { entryId: body.entryId }),
         };
         const result = await characters.apply(ctxOf(request), command);
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
+      post_characters_characterId_entries: async (request, reply) => {
+        const params = request.params as { characterId: string };
+        const body = request.body as {
+          entry: {
+            entryId: string;
+            slotId: string;
+            templateId: string | null;
+            values: Record<string, unknown>;
+            quantity?: number;
+          };
+          expectedRevision: number;
+          idempotencyKey: string;
+        };
+        const command: CharacterCommand = {
+          kind: "addEntry",
+          characterId: params.characterId,
+          entry: {
+            entryId: body.entry.entryId,
+            slotId: body.entry.slotId,
+            templateId: body.entry.templateId,
+            values: body.entry.values,
+            ...(body.entry.quantity === undefined ? {} : { quantity: body.entry.quantity }),
+          },
+          expectedRevision: body.expectedRevision,
+          idempotencyKey: body.idempotencyKey,
+        };
+        const result = await characters.apply(ctxOf(request), command);
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
+      delete_characters_characterId_entries_entryId: async (request, reply) => {
+        const params = request.params as { characterId: string; entryId: string };
+        const body = request.body as { expectedRevision: number; idempotencyKey: string };
+        const command: CharacterCommand = {
+          kind: "removeEntry",
+          characterId: params.characterId,
+          entryId: params.entryId,
+          expectedRevision: body.expectedRevision,
+          idempotencyKey: body.idempotencyKey,
+        };
+        const result = await characters.apply(ctxOf(request), command);
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
+      patch_characters_characterId_entries_entryId: async (request, reply) => {
+        const params = request.params as { characterId: string; entryId: string };
+        const body = request.body as {
+          values: Record<string, unknown>;
+          expectedRevision: number;
+          idempotencyKey: string;
+        };
+        const command: CharacterCommand = {
+          kind: "updateEntryValues",
+          characterId: params.characterId,
+          entryId: params.entryId,
+          values: body.values,
+          expectedRevision: body.expectedRevision,
+          idempotencyKey: body.idempotencyKey,
+        };
+        const result = await characters.apply(ctxOf(request), command);
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
+      get_characters_characterId_templates: async (request, reply) => {
+        const params = request.params as { characterId: string };
+        const result = await characters.listEntryTemplates(ctxOf(request), {
+          characterId: params.characterId,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "private");
+        return { templates: result.value, requestId: request.id };
       },
 
       patch_characters_characterId: async (request, reply) => {

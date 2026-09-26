@@ -138,6 +138,40 @@ function validateStructure(value: StructuralValue, prefix: string): PackageDiagn
     collectId(validation.id, `/validations/${validationIndex}/id`);
   });
 
+  // Dynamic sheet objects: templates/slots are Type.Optional, so legacy
+  // documents without the arrays validate exactly as before.
+  const templates = value.templates ?? [];
+  const slots = value.slots ?? [];
+  const slotIds = new Set<string>();
+
+  templates.forEach((template, templateIndex) => {
+    const templatePath = `/templates/${templateIndex}`;
+    collectId(template.id, `${templatePath}/id`);
+    template.fields.forEach((field, fieldIndex) => {
+      const fieldPath = `${templatePath}/fields/${fieldIndex}`;
+      collectId(field.id, `${fieldPath}/id`);
+      if (field.kind === "singleChoice" || field.kind === "multiChoice") {
+        field.options.forEach((option, optionIndex) => {
+          collectId(option.id, `${fieldPath}/options/${optionIndex}/id`);
+        });
+      }
+    });
+    (template.grantedActions ?? []).forEach((action, actionIndex) => {
+      const actionPath = `${templatePath}/grantedActions/${actionIndex}`;
+      collectId(action.id, `${actionPath}/id`);
+      if (action.kind === "roll") {
+        action.inputs.forEach((input, inputIndex) => {
+          collectId(input.id, `${actionPath}/inputs/${inputIndex}/id`);
+        });
+      }
+    });
+  });
+
+  slots.forEach((slot, slotIndex) => {
+    collectId(slot.id, `/slots/${slotIndex}/id`);
+    slotIds.add(slot.id);
+  });
+
   const missing = (exists: boolean, path: string): void => {
     if (!exists) {
       diagnostics.push({
@@ -171,6 +205,17 @@ function validateStructure(value: StructuralValue, prefix: string): PackageDiagn
           missing(resourceIds.has(element.resourceId), `${elementPath}/resourceId`);
         } else if (element.kind === "action") {
           missing(actionIds.has(element.actionId), `${elementPath}/actionId`);
+        } else {
+          // Forward-compatible slot branch: the `slot` sheet-element kind
+          // lands in Task 6. Unknown element kinds are ignored; a slot
+          // element must reference a defined slot.
+          const maybeSlot = element as { kind: string; slotId?: unknown };
+          if (maybeSlot.kind === "slot") {
+            missing(
+              typeof maybeSlot.slotId === "string" && slotIds.has(maybeSlot.slotId),
+              `${elementPath}/slotId`,
+            );
+          }
         }
       });
     });
@@ -192,11 +237,53 @@ function validateStructure(value: StructuralValue, prefix: string): PackageDiagn
     missing(definitionIds.has(validation.targetId), `/validations/${validationIndex}/targetId`);
   });
 
+  templates.forEach((template, templateIndex) => {
+    const templatePath = `/templates/${templateIndex}`;
+    const templateResourceIds = new Set<string>();
+    for (const field of template.fields) {
+      if (field.kind === "resource") templateResourceIds.add(field.id);
+    }
+    template.fields.forEach((field, fieldIndex) => {
+      if (field.kind === "computed") {
+        missing(
+          expressionIds.has(field.expressionId),
+          `${templatePath}/fields/${fieldIndex}/expressionId`,
+        );
+      }
+    });
+    (template.grantedActions ?? []).forEach((action, actionIndex) => {
+      const actionPath = `${templatePath}/grantedActions/${actionIndex}`;
+      if (action.kind === "roll") {
+        missing(expressionIds.has(action.expressionId), `${actionPath}/expressionId`);
+      } else {
+        missing(templateResourceIds.has(action.resourceId), `${actionPath}/resourceId`);
+      }
+    });
+  });
+
   return diagnostics;
 }
 
 function validateBudgets(value: StructuralValue, prefix: string): PackageDiagnostic[] {
   const diagnostics: PackageDiagnostic[] = [];
+  const templates = value.templates ?? [];
+  const slots = value.slots ?? [];
+
+  if (templates.length > PACKAGE_LIMITS.templates) {
+    diagnostics.push({
+      code: "limit_exceeded",
+      path: `${prefix}/templates`,
+      message: `Document contains more than ${PACKAGE_LIMITS.templates} templates.`,
+    });
+  }
+  if (slots.length > PACKAGE_LIMITS.slots) {
+    diagnostics.push({
+      code: "limit_exceeded",
+      path: `${prefix}/slots`,
+      message: `Document contains more than ${PACKAGE_LIMITS.slots} slots.`,
+    });
+  }
+
   let fieldCount = 0;
   for (const [entityIndex, entity] of value.entities.entries()) {
     fieldCount += entity.fields.length;
@@ -205,6 +292,40 @@ function validateBudgets(value: StructuralValue, prefix: string): PackageDiagnos
         code: "limit_exceeded",
         path: `${prefix}/entities/${entityIndex}/fields`,
         message: `Document contains more than ${PACKAGE_LIMITS.fields} fields.`,
+      });
+      break;
+    }
+  }
+
+  // Template fields share the global 512-field budget with entity fields.
+  // The guard on templateFieldTotal keeps entity-only overflows reporting
+  // exactly the pre-existing diagnostic.
+  let templateFieldTotal = 0;
+  for (const [templateIndex, template] of templates.entries()) {
+    templateFieldTotal += template.fields.length;
+    if (
+      templateFieldTotal > 0
+      && fieldCount + templateFieldTotal > PACKAGE_LIMITS.templateFields
+    ) {
+      diagnostics.push({
+        code: "limit_exceeded",
+        path: `${prefix}/templates/${templateIndex}/fields`,
+        message: `Document contains more than ${PACKAGE_LIMITS.templateFields} fields (entities and templates combined).`,
+      });
+      break;
+    }
+  }
+
+  // Template granted actions share the global 256-action budget with actions.
+  const actionCount = value.actions.length;
+  let grantedTotal = 0;
+  for (const [templateIndex, template] of templates.entries()) {
+    grantedTotal += (template.grantedActions ?? []).length;
+    if (grantedTotal > 0 && actionCount + grantedTotal > PACKAGE_LIMITS.grantedActions) {
+      diagnostics.push({
+        code: "limit_exceeded",
+        path: `${prefix}/templates/${templateIndex}/grantedActions`,
+        message: `Document contains more than ${PACKAGE_LIMITS.grantedActions} actions (entity and granted actions combined).`,
       });
       break;
     }

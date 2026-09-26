@@ -69,6 +69,12 @@ const seed = new Map([
   ["code-dev", { displayName: "Dev User", email: "dev@example.com", provider: "test", subject: "dev-1" }],
   ["code-test-a", { displayName: "Offline Test A", email: "offline-a@example.com", provider: "test", subject: "offline-test-a" }],
   ["code-test-b", { displayName: "Offline Test B", email: "offline-b@example.com", provider: "test", subject: "offline-test-b" }],
+  ["code-journey-gm", { displayName: "Journey GM", email: "journey-gm@example.com", provider: "test", subject: "journey-gm" }],
+  ["code-journey-p1", { displayName: "Journey Player One", email: "journey-p1@example.com", provider: "test", subject: "journey-p1" }],
+  ["code-journey-p2", { displayName: "Journey Player Two", email: "journey-p2@example.com", provider: "test", subject: "journey-p2" }],
+  ["code-journey-p3", { displayName: "Journey Player Three", email: "journey-p3@example.com", provider: "test", subject: "journey-p3" }],
+  ["code-journey-p4", { displayName: "Journey Player Four", email: "journey-p4@example.com", provider: "test", subject: "journey-p4" }],
+  ["code-journey-p5", { displayName: "Journey Player Five", email: "journey-p5@example.com", provider: "test", subject: "journey-p5" }],
 ]);
 
 const identity = createIdentityModule({

@@ -1,6 +1,6 @@
 import type { DefinitionId } from "../../state/documentFieldTypes.js";
 
-export type SheetElementKind = "heading" | "field" | "resource" | "action";
+export type SheetElementKind = "heading" | "field" | "resource" | "action" | "slot";
 
 export type HeadingSheetElementV1 = {
   kind: "heading";
@@ -27,11 +27,18 @@ export type ActionSheetElementV1 = {
   actionId: DefinitionId;
 };
 
+export type SlotSheetElementV1 = {
+  kind: "slot";
+  id: DefinitionId;
+  slotId: DefinitionId;
+};
+
 export type SheetElementV1 =
   | HeadingSheetElementV1
   | FieldSheetElementV1
   | ResourceSheetElementV1
-  | ActionSheetElementV1;
+  | ActionSheetElementV1
+  | SlotSheetElementV1;
 
 export type SheetSectionV1 = {
   id: DefinitionId;
@@ -68,4 +75,10 @@ export function isActionElement(
   element: SheetElementV1,
 ): element is ActionSheetElementV1 {
   return element.kind === "action";
+}
+
+export function isSlotElement(
+  element: SheetElementV1,
+): element is SlotSheetElementV1 {
+  return element.kind === "slot";
 }

@@ -24,6 +24,8 @@ import { VersionHistory } from "../publish/VersionHistory.js";
 import { ReferenceDataEditor, type ReferenceDataV1 } from "./referenceData/ReferenceDataEditor.js";
 import { SheetEditor, type UnplacedDefinition } from "./sheet/SheetEditor.js";
 import type { SheetEditorV1 } from "./sheet/sheetTypes.js";
+import { readSlots, TEMPLATES_TAB_LABEL } from "./sheet/slotTypes.js";
+import { TemplatesTab } from "./TemplatesTab.js";
 import { useDraftSync } from "../state/draftSync.js";
 import {
   blankDocument,
@@ -40,7 +42,7 @@ import { ValidationEditor } from "./validations/ValidationEditor.js";
 import styles from "./DocumentEditor.module.css";
 
 /** Basics-first creator tabs in workflow order. */
-export type CreatorTabId = "basics" | "attributes" | "dice" | "sections" | "advanced";
+export type CreatorTabId = "basics" | "attributes" | "dice" | "templates" | "sections" | "advanced";
 
 /**
  * Narrow-layout pane selection for the editor/preview switch (Task 4).
@@ -64,6 +66,7 @@ export const CREATOR_TABS: ReadonlyArray<CreatorTabId> = [
   "basics",
   "attributes",
   "dice",
+  "templates",
   "sections",
   "advanced",
 ];
@@ -555,7 +558,7 @@ export function DocumentEditorBody({
                 onActiveChange(tab);
               }}
             >
-              {t(`editor.tab.${tab}`)}
+              {tab === "templates" ? TEMPLATES_TAB_LABEL : t(`editor.tab.${tab}`)}
             </a>
           );
         })}
@@ -594,6 +597,8 @@ export function DocumentEditorBody({
           />
         ) : active === "dice" ? (
           <DiceTab client={client} document={document} dispatch={dispatch} />
+        ) : active === "templates" ? (
+          <TemplatesTab client={client} document={document} dispatch={dispatch} />
         ) : active === "sections" ? (
           <SheetsTab document={document} dispatch={dispatch} />
         ) : active === "advanced" ? (
@@ -836,6 +841,7 @@ export function unplacedDefinitionsForSheet(
       if (element.kind === "field") placed.add(`field:${element.fieldId}`);
       if (element.kind === "resource") placed.add(`resource:${element.resourceId}`);
       if (element.kind === "action") placed.add(`action:${element.actionId}`);
+      if (element.kind === "slot") placed.add(`slot:${element.slotId}`);
     }
   }
 
@@ -852,6 +858,11 @@ export function unplacedDefinitionsForSheet(
   for (const action of document.actions) {
     if (!placed.has(`action:${action.id}`)) {
       definitions.push({ kind: "action", id: action.id, label: action.label });
+    }
+  }
+  for (const slot of readSlots(document)) {
+    if (!placed.has(`slot:${slot.id}`)) {
+      definitions.push({ kind: "slot", id: slot.id, label: slot.label });
     }
   }
   return definitions;

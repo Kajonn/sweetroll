@@ -67,6 +67,22 @@ describe("TemplatesTab", () => {
     expect(screen.getByTestId(`dice-kind-${actionId}`)).toBeInTheDocument();
   });
 
+  it("keeps the granted-roll expression entry across the replace dispatch", async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await user.click(screen.getByTestId("templates-add-button"));
+    const templateId = readTemplates(latest ?? blankDocument())[0]?.id ?? "";
+    await user.click(screen.getByTestId(`template-add-roll-${templateId}`));
+    const doc = latest ?? blankDocument();
+    const expressionId = (
+      readTemplates(doc)[0]?.grantedActions[0] as { expressionId?: string } | undefined
+    )?.expressionId;
+    expect(expressionId).toBeTruthy();
+    // Regression net: the granted roll's expression must survive the
+    // `replace` dispatch (stale-snapshot `replace` used to drop it).
+    expect(doc.expressions.some((entry) => entry.id === expressionId)).toBe(true);
+  });
+
   it("adds a resource-bump granted action reusing ResourceBumpEditor", async () => {
     const user = userEvent.setup();
     renderTab();

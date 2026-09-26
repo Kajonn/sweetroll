@@ -218,16 +218,13 @@ function TemplateDetail({
   const addGrantedRoll = () => {
     const used = collectUsedIds(document);
     const expressionId = nextScopedId(used, "expr");
-    dispatch({
-      type: "addExpression",
-      expression: {
-        id: expressionId,
-        context: "roll",
-        resultType: "number",
-        source: "d20",
-        fallback: 0,
-      },
-    });
+    const expression = {
+      id: expressionId,
+      context: "roll",
+      resultType: "number",
+      source: "d20",
+      fallback: 0,
+    } as const;
     const action: GrantedRollActionV1 = {
       kind: "roll",
       id: nextScopedId(used, "action"),
@@ -236,7 +233,12 @@ function TemplateDetail({
       inputs: [],
       outputTemplate: "Result: {total}",
     };
+    // Dispatch `replace` first, then `addExpression`: `replace` returns its
+    // payload verbatim (see documentReducer's stale-snapshot warning), so
+    // dispatching it after `addExpression` would clobber the just-added
+    // expression entry and leave `expressionId` dangling.
     onChange({ grantedActions: [...template.grantedActions, action] });
+    dispatch({ type: "addExpression", expression: { ...expression } });
   };
   const addGrantedResourceBump = () => {
     const used = collectUsedIds(document);

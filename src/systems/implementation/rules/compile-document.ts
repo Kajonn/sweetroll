@@ -1,4 +1,4 @@
-import type { FieldV1, SystemDocumentV1, SystemPackageV1, ValueType } from "../package/schema/index.js";
+import type { ActionV1, FieldV1, SystemDocumentV1, SystemPackageV1, ValueType } from "../package/schema/index.js";
 import type { UnsignedSystemPackageV1 } from "../package/schema/index.js";
 import { signSystemPackage } from "../package/canonical.js";
 import { PACKAGE_LIMITS } from "../package/limits.js";
@@ -84,6 +84,23 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
       if (field.kind === "computed") addOwner(computedOwners, field.expressionId, entity.id);
     }
   }
+  // Dynamic sheet objects: template computed fields and granted roll actions
+  // reference the same global expression pool. Templates own their expressions
+  // exactly like entities — one expression id, one owner — so the shared-id
+  // rejection and env scoping below apply unchanged.
+  const templates = document.templates ?? [];
+  const templateEnvironments = new Map<string, ExpressionCompileEnv>();
+  for (const template of templates) {
+    const fields: Record<string, ValueType> = {};
+    for (const field of template.fields) {
+      const valueType = fieldToValueType(field);
+      if (valueType !== undefined) fields[field.id] = valueType;
+    }
+    templateEnvironments.set(template.id, { fields, inputs: {} });
+    for (const field of template.fields) {
+      if (field.kind === "computed") addOwner(computedOwners, field.expressionId, template.id);
+    }
+  }
   const validationOwners = new Map<string, Set<string>>();
   for (const validation of document.validations) {
     const owner = fieldOwners.get(validation.targetId)
@@ -98,23 +115,39 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     actions.push(action);
     rollActions.set(action.expressionId, actions);
   }
+  const templateRollActions = new Map<string, Array<{ templateId: string; action: Extract<ActionV1, { kind: "roll" }> }>>();
+  for (const template of templates) {
+    for (const action of template.grantedActions) {
+      if (action.kind !== "roll") continue;
+      const actions = templateRollActions.get(action.expressionId) ?? [];
+      actions.push({ templateId: template.id, action });
+      templateRollActions.set(action.expressionId, actions);
+    }
+  }
 
   const compiled: CompiledExpressionBody[] = [];
 
   for (const expr of document.expressions) {
+    const templateRolls = templateRollActions.get(expr.id) ?? [];
     const owners = expr.context === "computed"
       ? computedOwners.get(expr.id)
       : expr.context === "validation"
         ? validationOwners.get(expr.id)
-        : new Set(rollActions.get(expr.id)?.map((action) => actionTargets.get(action.id)).filter((owner) => owner !== undefined));
-    const actions = expr.context === "roll" ? rollActions.get(expr.id) ?? [] : [];
+        : new Set([
+          ...(rollActions.get(expr.id) ?? []).map((action) => actionTargets.get(action.id)).filter((owner) => owner !== undefined),
+          ...templateRolls.map((roll) => roll.templateId),
+        ]);
+    const actions = expr.context === "roll"
+      ? [...(rollActions.get(expr.id) ?? []), ...templateRolls.map((roll) => roll.action)]
+      : [];
     if ((owners?.size ?? 0) > 1 || actions.length > 1) {
       return scopeDiagnostic("invalid_expression", expr.id, "Expression cannot be shared across different owners.");
     }
     const owner = owners?.values().next().value as string | undefined;
     const entityEnv = owner === undefined ? undefined : entityEnvironments.get(owner);
+    const templateEnv = owner === undefined ? undefined : templateEnvironments.get(owner);
     const env: ExpressionCompileEnv = {
-      fields: entityEnv?.fields ?? {},
+      fields: entityEnv?.fields ?? templateEnv?.fields ?? {},
       inputs: {},
     };
     const action = actions[0];
@@ -158,6 +191,8 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     expressions: compiled.map((b, i) => ({ id: document.expressions[i]!.id, ...b })),
     actions: document.actions,
     validations: document.validations,
+    ...(document.templates !== undefined ? { templates: document.templates } : {}),
+    ...(document.slots !== undefined ? { slots: document.slots } : {}),
     effectiveLimits: {
       expressionBytes: PACKAGE_LIMITS.expressionBytes,
       expressionAstNodes: PACKAGE_LIMITS.expressionAstNodes,
@@ -185,27 +220,43 @@ function computedCycle(
     const computed = new Map(entity.fields
       .filter((field) => field.kind === "computed")
       .map((field) => [field.id, field]));
-    const visiting = new Set<string>();
-    const complete = new Set<string>();
-    const visit = (fieldId: string): string | undefined => {
-      if (complete.has(fieldId)) return undefined;
-      const field = computed.get(fieldId);
-      if (field === undefined) return undefined;
-      visiting.add(fieldId);
-      for (const dependency of compiledById.get(field.expressionId)?.dependencies ?? []) {
-        if (!computed.has(dependency)) continue;
-        if (visiting.has(dependency)) return field.expressionId;
-        const cycle = visit(dependency);
-        if (cycle !== undefined) return cycle;
-      }
-      visiting.delete(fieldId);
-      complete.add(fieldId);
-      return undefined;
-    };
-    for (const fieldId of computed.keys()) {
-      const cycle = visit(fieldId);
+    const cycle = cycleInComputedFields(computed, compiledById);
+    if (cycle !== undefined) return cycle;
+  }
+  for (const template of document.templates ?? []) {
+    const computed = new Map(template.fields
+      .filter((field) => field.kind === "computed")
+      .map((field) => [field.id, field]));
+    const cycle = cycleInComputedFields(computed, compiledById);
+    if (cycle !== undefined) return cycle;
+  }
+  return undefined;
+}
+
+function cycleInComputedFields(
+  computed: Map<string, { expressionId: string }>,
+  compiledById: Map<string, CompiledExpressionBody>,
+): string | undefined {
+  const visiting = new Set<string>();
+  const complete = new Set<string>();
+  const visit = (fieldId: string): string | undefined => {
+    if (complete.has(fieldId)) return undefined;
+    const field = computed.get(fieldId);
+    if (field === undefined) return undefined;
+    visiting.add(fieldId);
+    for (const dependency of compiledById.get(field.expressionId)?.dependencies ?? []) {
+      if (!computed.has(dependency)) continue;
+      if (visiting.has(dependency)) return field.expressionId;
+      const cycle = visit(dependency);
       if (cycle !== undefined) return cycle;
     }
+    visiting.delete(fieldId);
+    complete.add(fieldId);
+    return undefined;
+  };
+  for (const fieldId of computed.keys()) {
+    const cycle = visit(fieldId);
+    if (cycle !== undefined) return cycle;
   }
   return undefined;
 }

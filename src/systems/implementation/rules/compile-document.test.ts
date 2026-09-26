@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { d20Document, d20Package, d6SuccessPoolDocument, d6SuccessPoolPackage, pbta2d6Document, pbta2d6Package } from "../package/fixtures/index.js";
 import { validDocument } from "../package/schema/test-values.js";
 import type { SystemDocumentV1 } from "../package/schema/index.js";
+import { documentFromPackage } from "../authoring/assess.js";
 import { compileDocument } from "./compile-document.js";
 
 const opts = { systemId: "a0000000-0000-5000-8000-000000000001", versionId: "a0000000-0000-5000-8000-000000000002", semanticVersion: "1.0.0" };
@@ -275,7 +276,220 @@ describe("compileDocument", () => {
       }],
     });
   });
+
+  it("compiles a template roll expression against template fields and inputs", () => {
+    const document = templateDocument();
+
+    const result = compileDocument(document, opts);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const compiled = result.value.expressions.find((expression) => expression.id === "longsword_attack_expr");
+    expect(compiled).toMatchObject({
+      context: "roll",
+      resultType: "number",
+      inferredType: "number",
+      dependencies: ["bonus", "edge"],
+    });
+    expect(result.value.templates).toEqual(document.templates);
+    expect(result.value.slots).toEqual(document.slots);
+  });
+
+  it("rejects a granted-action expression referencing an unknown template field", () => {
+    const document = templateDocument();
+    document.expressions.find((expression) => expression.id === "longsword_attack_expr")!.source =
+      "d20 + fields.nope + inputs.edge";
+
+    const result = compileDocument(document, opts);
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [{
+        code: "missing_reference",
+        path: "longsword_attack_expr",
+        message: "unknown fields reference 'nope'",
+      }],
+    });
+  });
+
+  it("rejects one expression id shared by two templates", () => {
+    const document = templateDocument();
+    document.templates!.push({
+      id: "torch",
+      label: "Torch",
+      kind: "item",
+      fields: [{
+        kind: "integer",
+        id: "brand",
+        label: "Brand",
+        default: 0,
+        required: true,
+        min: 0,
+        max: 10,
+        step: 1,
+      }],
+      grantedActions: [{
+        kind: "roll",
+        id: "torch_attack",
+        label: "Torch Attack",
+        expressionId: "longsword_attack_expr",
+        inputs: [],
+        outputTemplate: "Result: {total}",
+      }],
+    });
+
+    const result = compileDocument(document, opts);
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [{
+        code: "invalid_expression",
+        path: "longsword_attack_expr",
+        message: "Expression cannot be shared across different owners.",
+      }],
+    });
+  });
+
+  it("rejects an expression shared between an entity action and a template action", () => {
+    const document = templateDocument();
+    document.templates![0]!.grantedActions = [{
+      kind: "roll",
+      id: "longsword_attack",
+      label: "Longsword Attack",
+      expressionId: "check_expr",
+      inputs: [],
+      outputTemplate: "Result: {total}",
+    }];
+
+    const result = compileDocument(document, opts);
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [{
+        code: "invalid_expression",
+        path: "check_expr",
+        message: "Expression cannot be shared across different owners.",
+      }],
+    });
+  });
+
+  it("rejects cyclic template computed dependencies", () => {
+    const document = templateDocument();
+    document.templates![0]!.fields.push(
+      {
+        kind: "computed",
+        id: "power",
+        label: "Power",
+        valueType: "number",
+        expressionId: "power_expr",
+      },
+      {
+        kind: "computed",
+        id: "might",
+        label: "Might",
+        valueType: "number",
+        expressionId: "might_expr",
+      },
+    );
+    document.expressions.push(
+      {
+        id: "power_expr",
+        context: "computed",
+        resultType: "number",
+        source: "fields.might + 1",
+        fallback: 0,
+      },
+      {
+        id: "might_expr",
+        context: "computed",
+        resultType: "number",
+        source: "fields.power + 1",
+        fallback: 0,
+      },
+    );
+
+    const result = compileDocument(document, opts);
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [{
+        code: "invalid_expression",
+        path: "might_expr",
+        message: "Computed field dependency cycle detected.",
+      }],
+    });
+  });
+
+  it("round-trips compiled templates through documentFromPackage", () => {
+    const document = templateDocument();
+
+    const result = compileDocument(document, opts);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const roundTripped = documentFromPackage(result.value);
+    expect(roundTripped.templates).toEqual(document.templates);
+    expect(roundTripped.slots).toEqual(document.slots);
+    expect(roundTripped.expressions.find((expression) => expression.id === "longsword_attack_expr")!.source)
+      .toBe("d20 + fields.bonus + inputs.edge");
+  });
+
+  it("omits templates and slots from packages compiled from legacy documents", () => {
+    const document = validDocument();
+    document.expressions = document.expressions.filter((expression) => expression.id !== "title_expr");
+    const result = compileDocument(document, opts);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.templates).toBeUndefined();
+    expect(result.value.slots).toBeUndefined();
+    expect(documentFromPackage(result.value).templates).toBeUndefined();
+    expect(documentFromPackage(result.value).slots).toBeUndefined();
+  });
 });
+
+function templateDocument(): SystemDocumentV1 {
+  const document = validDocument();
+  document.expressions = document.expressions.filter((expression) => expression.id !== "title_expr");
+  document.templates = [{
+    id: "longsword",
+    label: "Longsword",
+    kind: "item",
+    fields: [{
+      kind: "integer",
+      id: "bonus",
+      label: "Bonus",
+      default: 1,
+      required: true,
+      min: 0,
+      max: 10,
+      step: 1,
+    }],
+    grantedActions: [{
+      kind: "roll",
+      id: "longsword_attack",
+      label: "Longsword Attack",
+      expressionId: "longsword_attack_expr",
+      inputs: [{
+        id: "edge",
+        label: "Edge",
+        valueType: "integer",
+        required: false,
+        default: 0,
+      }],
+      outputTemplate: "Result: {total}",
+    }],
+  }];
+  document.slots = [{ id: "inventory", label: "Inventory", accepts: ["item"] }];
+  document.expressions.push({
+    id: "longsword_attack_expr",
+    context: "roll",
+    resultType: "number",
+    source: "d20 + fields.bonus + inputs.edge",
+    fallback: 0,
+  });
+  return document;
+}
 
 function twoEntityDocument(): SystemDocumentV1 {
   const document = validDocument();

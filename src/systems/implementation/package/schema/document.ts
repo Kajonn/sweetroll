@@ -244,11 +244,27 @@ export const ActionSheetElementV1Schema = Type.Object(
 );
 export type ActionSheetElementV1 = Static<typeof ActionSheetElementV1Schema>;
 
+// Slot placement element (Task 5 schema half; Task 6 owns the creator UI).
+// Binds a sheet position to a slot definition from `slots`; the runtime
+// projects the slot's entries (and their granted actions) at this position.
+// Additive union member: sheets without slot elements validate exactly as
+// before, and documents/packages carrying them now survive strict decode.
+export const SlotSheetElementV1Schema = Type.Object(
+  {
+    kind: Type.Literal("slot"),
+    id: DefinitionIdSchema,
+    slotId: DefinitionIdSchema,
+  },
+  { additionalProperties: false },
+);
+export type SlotSheetElementV1 = Static<typeof SlotSheetElementV1Schema>;
+
 export const SheetElementV1Schema = Type.Union([
   HeadingSheetElementV1Schema,
   FieldSheetElementV1Schema,
   ResourceSheetElementV1Schema,
   ActionSheetElementV1Schema,
+  SlotSheetElementV1Schema,
 ]);
 export type SheetElementV1 = Static<typeof SheetElementV1Schema>;
 
@@ -359,6 +375,37 @@ export type ActionV1 = Static<typeof ActionV1Schema>;
 // (dynamic.ts re-exports these as the canonical path; see Task 1 report).
 // A direct dynamic.ts <-> document.ts runtime import cycle throws
 // "Cannot access before initialization" under native Node ESM.
+//
+// Nominal-action ruling (Task 5): only template-granted actions may carry
+// `nominal`. Entity actions keep the exact ActionV1 shape above. A nominal
+// granted action records activity and returns its display text without
+// mechanical resolution or state changes; the runtime checks `nominal ===
+// true`. The flag is an optional boolean (absent = non-nominal) so creator
+// payloads that omit it validate exactly as before.
+export const GrantedRollActionV1Schema = Type.Object(
+  {
+    ...RollActionV1Schema.properties,
+    nominal: Type.Optional(Type.Boolean()),
+  },
+  { additionalProperties: false },
+);
+export type GrantedRollActionV1 = Static<typeof GrantedRollActionV1Schema>;
+
+export const GrantedResourceBumpActionV1Schema = Type.Object(
+  {
+    ...ResourceBumpActionV1Schema.properties,
+    nominal: Type.Optional(Type.Boolean()),
+  },
+  { additionalProperties: false },
+);
+export type GrantedResourceBumpActionV1 = Static<typeof GrantedResourceBumpActionV1Schema>;
+
+export const GrantedActionV1Schema = Type.Union([
+  GrantedRollActionV1Schema,
+  GrantedResourceBumpActionV1Schema,
+]);
+export type GrantedActionV1 = Static<typeof GrantedActionV1Schema>;
+
 export const TemplateKindSchema = Type.Union([
   Type.Literal("item"),
   Type.Literal("spell"),
@@ -374,7 +421,7 @@ export const ObjectTemplateV1Schema = Type.Object(
     kind: TemplateKindSchema,
     description: Type.Optional(Type.String({ maxLength: LONG_TEXT_MAX_LENGTH })),
     fields: Type.Array(FieldV1Schema, { maxItems: 64 }),
-    grantedActions: Type.Array(ActionV1Schema, { maxItems: 16 }),
+    grantedActions: Type.Array(GrantedActionV1Schema, { maxItems: 16 }),
   },
   { additionalProperties: false },
 );

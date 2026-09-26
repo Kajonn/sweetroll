@@ -11,11 +11,23 @@ import { DefinitionIdSchema } from "./common.js";
 // lives here: it only needs DefinitionIdSchema, so defining it here creates
 // no cycle.
 export {
+  GrantedActionV1Schema,
+  GrantedResourceBumpActionV1Schema,
+  GrantedRollActionV1Schema,
   ObjectTemplateV1Schema,
   SlotDefinitionV1Schema,
+  SlotSheetElementV1Schema,
   TemplateKindSchema,
 } from "./document.js";
-export type { ObjectTemplateV1, SlotDefinitionV1, TemplateKind } from "./document.js";
+export type {
+  GrantedActionV1,
+  GrantedResourceBumpActionV1,
+  GrantedRollActionV1,
+  ObjectTemplateV1,
+  SlotDefinitionV1,
+  SlotSheetElementV1,
+  TemplateKind,
+} from "./document.js";
 
 const UUID_PATTERN =
   "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";

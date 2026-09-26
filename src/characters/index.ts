@@ -8,6 +8,7 @@ import { hashInput } from "../systems/implementation/authoring/assess.js";
 import type {
   CharacterProjectionV1,
   DefinitionId,
+  NominalActionResult,
   NormalizedRoll,
   RuntimeScalar,
   RuntimeStateV1,
@@ -252,6 +253,14 @@ export type CharacterActionCommand = {
   expectedRevision: number;
   idempotencyKey: string;
   /**
+   * Task 5: template-granted actions execute against the named character
+   * entry (runtime resolves the template from the package and the entry
+   * from state). Absent = entity action (unchanged path). New entry
+   * add/remove/edit commands belong to Task 7; only execution wires
+   * through here.
+   */
+  entryId?: string;
+  /**
    * I6 Task 8: requested roll audience. Standalone actions accept only
    * `owner_only`/omitted. Attached actions accept the full vocabulary; when
    * omitted the campaign default applies. The requested value (or its
@@ -307,6 +316,14 @@ export type CharacterManagementCommand =
 export type CharacterCommandResult = {
   character: CharacterView;
   roll: NormalizedRoll | null;
+  /**
+   * Task 5: activity-only outcome of a nominal granted action (display
+   * text). Set by executeAction when the runtime returns one; omitted
+   * (read as null) by every other command. Persisted on the receipt so
+   * idempotent replays return it. Optional so pre-existing producers
+   * (management, migration) keep compiling unchanged.
+   */
+  nominal?: NominalActionResult | null;
 };
 
 export type ListCharacterActivity = {
@@ -578,7 +595,15 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
   }
 
   type StoredCommandOutcome =
-    | { ok: true; value: { scope: StoredResultScope; character: unknown; roll: NormalizedRoll | null } }
+    | {
+        ok: true;
+        value: {
+          scope: StoredResultScope;
+          character: unknown;
+          roll: NormalizedRoll | null;
+          nominal?: NominalActionResult | null;
+        };
+      }
     | { ok: false; error: CharacterError };
 
   type StoredDuplicateOutcome =
@@ -761,6 +786,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       value: {
         character: { ...view, reconciliation: { ...view.reconciliation, replayed: true } },
         roll: stored.value.roll,
+        nominal: stored.value.nominal ?? null,
       },
     };
   }
@@ -1218,7 +1244,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             ? { fieldId: command.fieldId, value: command.value }
             : command.kind === "bumpResource"
               ? { resourceId: command.resourceId, direction: command.direction }
-              : { actionId: command.actionId, inputs: command.inputs };
+              : {
+                  actionId: command.actionId,
+                  inputs: command.inputs,
+                  ...(command.entryId !== undefined ? { entryId: command.entryId } : {}),
+                };
         // I6 Task 8: the requested audience (or its omission) is part of the
         // input hash. The effective default is NOT hashed: an omitted
         // audience replays from the recorded receipt even after the campaign
@@ -1228,7 +1258,9 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           characterId: command.characterId,
           expectedRevision: command.expectedRevision,
           ...payload,
-          ...(command.kind === "executeAction" ? { audience: command.audience ?? null } : {}),
+          ...(command.kind === "executeAction"
+            ? { audience: command.audience ?? null, entryId: command.entryId ?? null }
+            : {}),
         });
 
         const claimStartedAt = now();
@@ -1343,6 +1375,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
                   actionId: command.actionId,
                   inputs: command.inputs,
                   executionId,
+                  ...(command.entryId !== undefined ? { entryId: command.entryId } : {}),
                 } as const);
 
         const resolveSource: CharacterRecord = attachedRecord ?? snapshot!;
@@ -1372,6 +1405,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
               : "character_action_executed";
         const changedDefinitionIds = resolved.value.changedDefinitionIds;
         const roll = resolved.value.roll;
+        const nominal = resolved.value.nominal;
 
         const outcome = await repo.applyCommandTx({
           executionId,
@@ -1413,7 +1447,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             // membership.
             const composedRoll =
               roll === null ? null : { ...roll, audience: rollAudience ?? ("owner_only" as const) };
-            return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)), roll: composedRoll } };
+            return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)), roll: composedRoll, nominal } };
           },
         });
 
@@ -1475,7 +1509,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const stored = outcome.resultJson as StoredCommandOutcome;
         if (!stored.ok) return { ok: false, error: stored.error };
         const view = deserializeView(stored.value.character);
-        return { ok: true, value: { character: view, roll: stored.value.roll } };
+        return { ok: true, value: { character: view, roll: stored.value.roll, nominal: stored.value.nominal ?? null } };
       } catch {
         return { ok: false, error: errors.internal() };
       }
@@ -1717,7 +1751,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const stored = outcome.resultJson as StoredCommandOutcome;
         if (!stored.ok) return { ok: false, error: stored.error };
         const view = deserializeView(stored.value.character);
-        return { ok: true, value: { character: view, roll: stored.value.roll } };
+        return { ok: true, value: { character: view, roll: stored.value.roll, nominal: stored.value.nominal ?? null } };
       } catch {
         return { ok: false, error: errors.internal() };
       }
@@ -2126,7 +2160,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const stored = outcome.resultJson as StoredCommandOutcome;
         if (!stored.ok) return { ok: false, error: stored.error };
         const view = deserializeView(stored.value.character);
-        return { ok: true, value: { character: view, roll: stored.value.roll } };
+        return { ok: true, value: { character: view, roll: stored.value.roll, nominal: stored.value.nominal ?? null } };
       } catch {
         return { ok: false, error: errors.internal() };
       }
@@ -2288,7 +2322,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const stored = outcome.resultJson as StoredCommandOutcome;
         if (!stored.ok) return { ok: false, error: stored.error };
         const view = deserializeView(stored.value.character);
-        return { ok: true, value: { character: view, roll: stored.value.roll } };
+        return { ok: true, value: { character: view, roll: stored.value.roll, nominal: stored.value.nominal ?? null } };
       } catch {
         return { ok: false, error: errors.internal() };
       }

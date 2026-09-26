@@ -723,6 +723,29 @@
                             "type": "string"
                           }
                         }
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "kind",
+                          "id",
+                          "slotId"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "slot",
+                            "type": "string"
+                          },
+                          "id": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "slotId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          }
+                        }
                       }
                     ]
                   }
@@ -1587,6 +1610,9 @@
                     "outputTemplate": {
                       "maxLength": 2000,
                       "type": "string"
+                    },
+                    "nominal": {
+                      "type": "boolean"
                     }
                   }
                 },
@@ -1650,6 +1676,9 @@
                           }
                         }
                       ]
+                    },
+                    "nominal": {
+                      "type": "boolean"
                     }
                   }
                 }

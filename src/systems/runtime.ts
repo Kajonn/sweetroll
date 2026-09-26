@@ -4,7 +4,7 @@ import { resolveObservedValues } from "./implementation/runtime/resolve.js";
 import { createDeterministicRng } from "./implementation/runtime/deterministic-rng.js";
 import { buildFieldBindings, decodeRuntimeState, initializeState } from "./implementation/runtime/state.js";
 import { evaluate } from "./implementation/rules/evaluate.js";
-import type { ActionInputV1, EntityDefinitionV1, SystemPackageV1 } from "./implementation/package/schema/index.js";
+import type { ActionInputV1, CharacterEntryV1, EntityDefinitionV1, SystemPackageV1 } from "./implementation/package/schema/index.js";
 
 export type VersionId = string;
 export type DefinitionId = string;
@@ -20,6 +20,9 @@ export type RuntimeStoredValue =
 export type RuntimeStateV1 = {
   schemaVersion: "1.0";
   values: Record<DefinitionId, RuntimeStoredValue>;
+  // Optional so legacy rows and hand-built states without entries keep
+  // decoding; decodeRuntimeState/initializeState always normalize to present.
+  entries?: Record<string, CharacterEntryV1>;
 };
 
 export type RuntimeIntent =

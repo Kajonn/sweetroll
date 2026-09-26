@@ -4,7 +4,7 @@ import type {
   RuntimeStateV1,
   RuntimeStoredValue,
 } from "../../runtime.js";
-import type { EntityDefinitionV1, FieldV1, ScalarValue } from "../package/schema/index.js";
+import type { CharacterEntryV1, EntityDefinitionV1, FieldV1, ScalarValue } from "../package/schema/index.js";
 
 export function initializeState(
   entity: EntityDefinitionV1,
@@ -33,7 +33,7 @@ export function initializeState(
     if (!decoded.ok) return decoded;
     stored[field.id] = decoded.value;
   }
-  return { ok: true, value: { schemaVersion: "1.0", values: stored } };
+  return { ok: true, value: { schemaVersion: "1.0", values: stored, entries: {} } };
 }
 
 export function decodeRuntimeState(
@@ -42,10 +42,26 @@ export function decodeRuntimeState(
 ): RuntimeResult<RuntimeStateV1> {
   if (
     !isRecord(input)
-    || Object.keys(input).length !== 2
+    || (Object.keys(input).length !== 2 && Object.keys(input).length !== 3)
     || input.schemaVersion !== "1.0"
     || !isRecord(input.values)
   ) {
+    return invalidState("State does not match runtime schema version 1.0.");
+  }
+  // Legacy rows predate entries: no `entries` key decodes to the default.
+  // New rows must carry a record of entry-shaped values.
+  let entries: Record<string, CharacterEntryV1> = {};
+  if (Object.hasOwn(input, "entries")) {
+    if (!isRecord(input.entries)) {
+      return invalidState("State does not match runtime schema version 1.0.");
+    }
+    for (const [entryId, entry] of Object.entries(input.entries)) {
+      if (!isEntryShape(entry)) {
+        return invalidState("State contains an invalid character entry.", entryId);
+      }
+      entries[entryId] = entry;
+    }
+  } else if (Object.keys(input).length !== 2) {
     return invalidState("State does not match runtime schema version 1.0.");
   }
 
@@ -68,7 +84,7 @@ export function decodeRuntimeState(
     if (!decoded.ok) return decoded;
     values[field.id] = decoded.value;
   }
-  return { ok: true, value: { schemaVersion: "1.0", values } };
+  return { ok: true, value: { schemaVersion: "1.0", values, entries } };
 }
 
 export function buildFieldBindings(
@@ -190,4 +206,12 @@ function invalidState(message: string, definitionId?: string): RuntimeResult<nev
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isEntryShape(value: unknown): value is CharacterEntryV1 {
+  return isRecord(value)
+    && typeof value.entryId === "string"
+    && typeof value.slotId === "string"
+    && (typeof value.templateId === "string" || value.templateId === null)
+    && isRecord(value.values);
 }

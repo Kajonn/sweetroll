@@ -62,6 +62,8 @@ describe("SlotListControl", () => {
     expect(screen.getByTestId(`slot-entry-${SWORD_ENTRY_ID}`)).toHaveTextContent("Longsword");
     expect(screen.getByTestId(`slot-entry-${SWORD_ENTRY_ID}`)).toHaveTextContent("weapon_bonus: 1");
     expect(screen.getByTestId(`slot-entry-${STONE_ENTRY_ID}`)).toHaveTextContent("Lucky Stone");
+    expect(screen.getByTestId(`slot-entry-${STONE_ENTRY_ID}`)).not.toHaveTextContent("name: Lucky Stone");
+    expect(screen.queryByTestId(`slot-entry-rename-${STONE_ENTRY_ID}`)).not.toBeInTheDocument();
 
     renderControl({ entries: [] });
     expect(screen.getByTestId("slot-empty-inventory")).toHaveTextContent("No entries yet.");
@@ -115,11 +117,13 @@ describe("SlotListControl", () => {
     const user = userEvent.setup();
     const handlers = renderControl();
 
+    await user.click(within(screen.getByTestId(`slot-entry-${STONE_ENTRY_ID}`)).getByRole("button", { name: "Rename" }));
     const rename = screen.getByTestId(`slot-entry-rename-${STONE_ENTRY_ID}`);
     await user.clear(within(rename).getByRole("textbox"));
     await user.type(within(rename).getByRole("textbox"), "Unlucky Stone");
     await user.click(within(rename).getByRole("button", { name: "Save name" }));
     expect(handlers.onUpdateEntry).toHaveBeenCalledWith(STONE_ENTRY_ID, { name: "Unlucky Stone" });
+    expect(screen.queryByTestId(`slot-entry-rename-${STONE_ENTRY_ID}`)).not.toBeInTheDocument();
   });
 
   it("disables entry controls while keeping the list readable", () => {

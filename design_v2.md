@@ -88,6 +88,8 @@ Roles are contextual capabilities, not account types. The same user can create a
 - Every visibility control states its audience in plain language and offers a preview-as-player check.
 - Provide undo for builder operations and recoverable deletion for user content where practical.
 
+In character sheet item slots, show the item name once and reveal rename editing on request. Keep Remove visually secondary in each row and require confirmation before deleting an item. After a granted nominal action is acknowledged by the server, show a clear action confirmation with its authored output when meaningful; do not display unresolved roll placeholders as a result.
+
 ## 4.2 Multi-device GM play
 
 A GM may use **multiple devices in the same session simultaneously**, with each device focused on a different task. Private control devices may share the GM account; a device handed to players uses restricted display access:

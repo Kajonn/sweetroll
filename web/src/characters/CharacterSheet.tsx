@@ -178,6 +178,10 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, 
           ? t("character.action.unavailable")
           : null;
   const stale = snapshot.tentative !== null;
+  const nominal = snapshot.lastNominal;
+  const nominalLabel = nominal === null
+    ? null
+    : templates?.flatMap((template) => template.grantedActions).find((action) => action.id === nominal.actionId)?.label ?? null;
   const showEstimateNote = resourceEstimateActive(snapshot);
   // Last-confirmed diagnostics: derived values, validations and bounds stay
   // exactly as the server projected them; only field/resource inputs carry
@@ -234,6 +238,7 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, 
     {diagnostics.length > 0 ? <section className={styles.diagnostics} aria-labelledby="character-diagnostics"><h2 id="character-diagnostics">{t("character.diagnostics.title")}</h2><ValidationList validations={diagnostics} /></section> : null}
     {projection.sheets.map(sheet => <section key={sheet.id} className={styles.sheetSection} aria-labelledby={`sheet-${sheet.id}`}><h2 id={`sheet-${sheet.id}`}>{sheet.label}</h2>{sheet.sections.map(section => <section key={section.id} className={styles.section} aria-labelledby={`section-${section.id}`}><h3 id={`section-${section.id}`}>{section.label}</h3>{section.elements.filter((element, index) => !(index === 0 && element.kind === "heading" && element.text.trim() === section.label.trim())).map(renderElement)}</section>)}</section>)}
     {projection.completionFields === undefined ? <p className={styles.completionUnavailable}>{t("character.completion.unavailable")}</p> : projection.completionFields.length > 0 ? <section className={styles.completion} aria-labelledby="character-completion"><h2 id="character-completion" tabIndex={-1}>{t("character.completion.title")}</h2>{projection.completionFields.map(field => <FieldControl key={field.id} field={field} tentativeValue={tentativeValue(snapshot, field.fieldId)} disabled={!editable} pending={pending} onCommit={onSetField} />)}</section> : null}
+    {nominal !== null ? <section className={styles.nominalResult} role="status" aria-live="polite"><strong>{nominalLabel === null ? t("character.nominal.recorded") : t("character.nominal.recordedNamed", { label: nominalLabel })}</strong>{nominal.output.includes("{total}") || nominal.output === nominalLabel ? null : <p>{nominal.output}</p>}</section> : null}
     {snapshot.lastRoll !== null ? <RollResult roll={snapshot.lastRoll} /> : null}
   </main>;
 }

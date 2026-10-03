@@ -33,7 +33,7 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
     ],
     editing: { owned: true },
     error: { kind: "conflict", message: "The character changed on the server. Review before re-sending." },
-    lastRoll: null,
+    lastRoll: null, lastNominal: null,
     lastMigration: null,
     pendingOnlineAttempts: [],
     connected: true,

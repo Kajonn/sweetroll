@@ -15,7 +15,7 @@ function snapshot(): CharacterSnapshot {
     entries: [],
     editing: { owned: true },
     error: null,
-    lastRoll: null,
+    lastRoll: null, lastNominal: null,
     lastMigration: null,
     pendingOnlineAttempts: [],
     connected: true,

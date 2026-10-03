@@ -10,7 +10,7 @@ import {
   documentReducer,
   type SystemDocumentV1,
 } from "../state/documentReducer.js";
-import { readSlots, readTemplates } from "./sheet/slotTypes.js";
+import { readSlots, readTemplates, withSlots, withTemplates } from "./sheet/slotTypes.js";
 import { TemplatesTab } from "./TemplatesTab.js";
 
 function stubFetch(): ReturnType<typeof vi.fn> {
@@ -57,6 +57,7 @@ describe("TemplatesTab", () => {
     const templateId = template?.id ?? "";
     expect(screen.getByTestId(`template-label-${templateId}`)).toBeInTheDocument();
     expect(screen.getByTestId(`template-kind-${templateId}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`template-kind-${templateId}`).querySelector('option[value="talent"]')).toHaveTextContent("ability");
 
     await user.click(screen.getByTestId(`template-add-roll-${templateId}`));
     const action = readTemplates(latest ?? blankDocument())[0]?.grantedActions[0];
@@ -81,6 +82,28 @@ describe("TemplatesTab", () => {
     // Regression net: the granted roll's expression must survive the
     // `replace` dispatch (stale-snapshot `replace` used to drop it).
     expect(doc.expressions.some((entry) => entry.id === expressionId)).toBe(true);
+  });
+
+  it("offers an eligible character attribute as the Longsword roll modifier", async () => {
+    const user = userEvent.setup();
+    const base = blankDocument();
+    base.entities = [{ id: "hero", label: "Hero", fields: [{
+      id: "might", kind: "integer", label: "Might", default: 2, required: true, min: 0, max: 20, step: 1,
+    }] }];
+    base.sheets = [{ id: "sheet", label: "Sheet", targetEntityId: "hero", sections: [{
+      id: "gear", label: "Gear", elements: [{ kind: "slot", id: "inventory_element", slotId: "inventory" }],
+    }] }];
+    base.expressions = [{ id: "hit_expr", context: "roll", resultType: "number", source: "d20", fallback: 0 }];
+    const withSlot = withSlots(base, [{ id: "inventory", label: "Inventory", accepts: ["item"] }]);
+    renderTab(withTemplates(withSlot, [{
+      id: "sword", label: "Longsword", kind: "item", fields: [],
+      grantedActions: [{ kind: "roll", id: "hit", label: "Hit", expressionId: "hit_expr", inputs: [], outputTemplate: "Hit: {total}" }],
+    }]));
+
+    const modifier = screen.getByTestId("roll-field-modifier-hit");
+    expect(modifier).toHaveTextContent("Might");
+    await user.selectOptions(modifier, "might");
+    expect(latest?.expressions[0]?.source).toBe("d20 + fields.might");
   });
 
   it("adds a resource-bump granted action reusing ResourceBumpEditor", async () => {

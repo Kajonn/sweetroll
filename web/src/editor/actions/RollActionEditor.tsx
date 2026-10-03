@@ -35,6 +35,7 @@ export type RollActionEditorProps = {
   expressionSource: string;
   onExpressionSourceChange: (next: string) => void;
   fieldTypes: Record<string, ValueType>;
+  fieldLabels?: Record<string, string> | undefined;
   disabled?: boolean | undefined;
   /**
    * Guided (basics-first) mode for the dice tab: hides the grammar surfaces
@@ -132,6 +133,7 @@ export function RollActionEditor({
   expressionSource,
   onExpressionSourceChange,
   fieldTypes,
+  fieldLabels,
   disabled,
   guided,
   diceKind,
@@ -252,7 +254,7 @@ export function RollActionEditor({
                   disabled={disabled}
                   options={[
                     { value: "", label: t("editor.action.roll.fieldModifier.none") },
-                    ...numericFields.map(([id]) => ({ value: id, label: id })),
+                    ...numericFields.map(([id]) => ({ value: id, label: fieldLabels?.[id] ?? id })),
                   ]}
                 />
               </div>

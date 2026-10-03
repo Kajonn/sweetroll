@@ -295,6 +295,44 @@ describe("compileDocument", () => {
     expect(result.value.slots).toEqual(document.slots);
   });
 
+  it("compiles separate Longsword hit and damage rolls using the carrying character's attribute", () => {
+    const document = templateDocument();
+    document.sheets[0]!.sections[0]!.elements.push({ kind: "slot", id: "inventory_element", slotId: "inventory" });
+    document.expressions.find((expression) => expression.id === "longsword_attack_expr")!.source =
+      "d20 + fields.modifier + fields.bonus";
+    document.templates![0]!.grantedActions.push({
+      kind: "roll", id: "longsword_damage", label: "Longsword Damage",
+      expressionId: "longsword_damage_expr", inputs: [], outputTemplate: "Damage: {total}",
+    });
+    document.expressions.push({
+      id: "longsword_damage_expr", context: "roll", resultType: "number",
+      source: "d8 + fields.modifier", fallback: 0,
+    });
+
+    const result = compileDocument(document, opts);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.expressions.find((expression) => expression.id === "longsword_attack_expr")?.dependencies)
+      .toEqual(["modifier", "bonus"]);
+    expect(result.value.expressions.find((expression) => expression.id === "longsword_damage_expr")?.dependencies)
+      .toEqual(["modifier"]);
+  });
+
+  it("rejects a character attribute when the item can be carried by an entity without it", () => {
+    const document = twoEntityDocument();
+    const template = templateDocument();
+    document.templates = template.templates!;
+    document.slots = template.slots!;
+    document.expressions.push(template.expressions.find((expression) => expression.id === "longsword_attack_expr")!);
+    document.expressions.at(-1)!.source = "d20 + fields.modifier";
+    document.sheets[0]!.sections[0]!.elements.push({ kind: "slot", id: "inventory_hero", slotId: "inventory" });
+    document.sheets[1]!.sections[0]!.elements.push({ kind: "slot", id: "inventory_foe", slotId: "inventory" });
+
+    expect(compileDocument(document, opts)).toMatchObject({
+      ok: false, diagnostics: [{ code: "missing_reference", path: "longsword_attack_expr" }],
+    });
+  });
+
   it("rejects a granted-action expression referencing an unknown template field", () => {
     const document = templateDocument();
     document.expressions.find((expression) => expression.id === "longsword_attack_expr")!.source =

@@ -34,6 +34,10 @@
 .slotEntry { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-top: 1px solid var(--border-default); min-width: 0; }
 .slotEntry:first-child { border-top: 0; padding-top: 0; }
 .slotEntryLabel { font-weight: 600; overflow-wrap: break-word; }
+.slotRemoveButton, .slotEditButton { align-self: flex-start; }
+.slotEditActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.nominalResult { padding: 12px 14px; border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-panel); }
+.nominalResult p { margin: 4px 0 0; overflow-wrap: break-word; }
 @media (max-width: 420px) { .sheet { padding: 8px; }.detail, .create { padding: 8px; }.resource { flex-wrap: wrap; }.resourceValue { flex-basis: 100%; order: 2; }.resource button { flex: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .sheet, .dialog, .toolGroup, .dialogActions { transition: none; }

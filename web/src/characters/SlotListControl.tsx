@@ -61,10 +61,11 @@ function describeCommandError(error: unknown): string {
   return t("character.command.failed", { message });
 }
 
-function scalarSummary(values: Record<string, unknown>): string | null {
+function scalarSummary(values: Record<string, unknown>, label: string): string | null {
   const parts: string[] = [];
   for (const [key, value] of Object.entries(values)) {
     if (value === null || value === undefined) continue;
+    if (key === "name" && value === label) continue;
     if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
       parts.push(`${key}: ${String(value)}`);
     }
@@ -143,7 +144,8 @@ function RemoveEntryButton({ entry, slotLabel, disabled, onRemove }: {
     <>
       <Button
         type="button"
-        variant="danger"
+        variant="secondary"
+        className={styles.slotRemoveButton}
         disabled={disabled}
         data-testid={`slot-entry-remove-${entry.entryId}`}
         onClick={() => {
@@ -190,18 +192,33 @@ function RenameEntryForm({ entry, disabled, onUpdate }: {
 }) {
   const current = typeof entry.values.name === "string" ? entry.values.name : "";
   const [draft, setDraft] = useState(current);
+  const [editing, setEditing] = useState(false);
+  const [pending, setPending] = useState(false);
   const [commandError, setCommandError] = useState("");
   useEffect(() => {
     setDraft(current);
   }, [current]);
+  if (!editing) {
+    return (
+      <Button type="button" variant="secondary" className={styles.slotEditButton}
+        disabled={disabled} onClick={() => setEditing(true)}>
+        {t("character.slot.rename")}
+      </Button>
+    );
+  }
   return (
     <form
       className={styles.field}
       data-testid={`slot-entry-rename-${entry.entryId}`}
       onSubmit={(event) => {
         event.preventDefault();
-        if (disabled || draft === current) return;
-        invokeCommand(() => onUpdate(entry.entryId, { name: draft }), (message) => setCommandError(message));
+        if (disabled || pending || draft === current) return;
+        setCommandError("");
+        setPending(true);
+        void Promise.resolve().then(() => onUpdate(entry.entryId, { name: draft })).then(
+          () => setEditing(false),
+          (error: unknown) => setCommandError(describeCommandError(error)),
+        ).finally(() => setPending(false));
       }}
     >
       <label>
@@ -209,11 +226,14 @@ function RenameEntryForm({ entry, disabled, onUpdate }: {
         <input
           type="text"
           value={draft}
-          disabled={disabled}
+          disabled={disabled || pending}
           onChange={(event) => setDraft(event.target.value)}
         />
       </label>
-      <Button type="submit" variant="secondary" disabled={disabled || draft === current}>{t("character.slot.saveName")}</Button>
+      <div className={styles.slotEditActions}>
+        <Button type="submit" variant="secondary" disabled={disabled || draft === current} pending={pending}>{t("character.slot.saveName")}</Button>
+        <Button type="button" variant="secondary" disabled={pending} onClick={() => { setDraft(current); setCommandError(""); setEditing(false); }}>{t("character.slot.cancel")}</Button>
+      </div>
       {commandError !== "" ? <p role="alert" className={styles.commandError}>{commandError}</p> : null}
     </form>
   );
@@ -339,11 +359,11 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
           <ul className={styles.slotList}>
             {entries.map((entry) => {
               const template = entry.templateId === null ? undefined : byId.get(entry.templateId);
-              const summary = scalarSummary(entry.values);
+              const summary = scalarSummary(entry.values, entry.label);
               return (
                 <li key={entry.entryId} data-testid={`slot-entry-${entry.entryId}`} className={styles.slotEntry}>
                   <span className={styles.slotEntryLabel}>{entry.label}</span>
-                  <span className={styles.meta}>{summary ?? t("character.slot.valuesEmpty")}</span>
+                  {summary !== null ? <span className={styles.meta}>{summary}</span> : null}
                   {template?.grantedActions.map((action) => (
                     <GrantedActionForm
                       key={action.id}

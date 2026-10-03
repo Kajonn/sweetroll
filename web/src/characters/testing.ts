@@ -89,6 +89,7 @@ export function makeEnvelope(view: CharacterView): CommandResultResponse {
     result: {
       character: view,
       roll: null,
+      nominal: null,
     },
     requestId: "req-1",
   };

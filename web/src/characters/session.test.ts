@@ -379,7 +379,7 @@ async function makeHarness(characterId = "char-1", initialOwner = true): Promise
 }
 
 function successEnvelope(c: CharacterView): SendStep {
-  return { envelope: { result: { character: c, roll: null }, requestId: "req-1" } };
+  return { envelope: { result: { character: c, roll: null, nominal: null }, requestId: "req-1" } };
 }
 
 function deferredEnvelope() {
@@ -2034,7 +2034,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       output: "hit",
       audience: "owner_only" as const,
     };
-    api.scriptSend(async () => ({ envelope: { result: { character: viewFor("char-1", 3), roll }, requestId: "req-1" } }));
+    api.scriptSend(async () => ({ envelope: { result: { character: viewFor("char-1", 3), roll, nominal: null }, requestId: "req-1" } }));
     await session.executeAction("ironclad", { difficulty: 10 });
     await session.whenIdle();
     expect(session.getSnapshot().lastRoll).toEqual(roll);
@@ -2050,6 +2050,22 @@ describe("CharacterSession uncertain online outcomes", () => {
     await session.rollbackMigration("m-9");
     expect(session.getSnapshot().lastMigration).toEqual({ operation: "rollback", migrationId: "m-9", revision: 5 });
     expect(session.getSnapshot().lastRoll).toEqual(roll);
+    session.dispose();
+    await store.close();
+  });
+
+  it("shows a nominal outcome only after the server acknowledges the granted action", async () => {
+    const { api, store, session } = await makeHarness();
+    await seedConfirmed(store, "char-1", viewFor("char-1", 3));
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    const nominal = { actionId: "raise_torch", entryId: "torch-1", output: "Torch raised." };
+    api.scriptSend(async () => ({ envelope: { result: { character: viewFor("char-1", 4), roll: null, nominal }, requestId: "req-nominal" } }));
+    expect(session.getSnapshot().lastNominal).toBeNull();
+    await session.executeGrantedAction(nominal.entryId, nominal.actionId);
+    await session.whenIdle();
+    expect(session.getSnapshot().lastNominal).toEqual(nominal);
+    expect(session.getSnapshot().lastRoll).toBeNull();
     session.dispose();
     await store.close();
   });

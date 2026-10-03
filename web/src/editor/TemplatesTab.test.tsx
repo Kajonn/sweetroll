@@ -57,6 +57,7 @@ describe("TemplatesTab", () => {
     const templateId = template?.id ?? "";
     expect(screen.getByTestId(`template-label-${templateId}`)).toBeInTheDocument();
     expect(screen.getByTestId(`template-kind-${templateId}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`template-kind-${templateId}`).querySelector('option[value="talent"]')).toHaveTextContent("ability");
 
     await user.click(screen.getByTestId(`template-add-roll-${templateId}`));
     const action = readTemplates(latest ?? blankDocument())[0]?.grantedActions[0];

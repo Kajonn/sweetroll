@@ -319,6 +319,7 @@ Use role-based permissions for coarse capabilities and resource-level policy che
 - Prominent action buttons and resource controls; numeric entry supports direct input and step controls.
 - Optimistic updates with visible pending/error state and automatic retry only when idempotent (offline-safe).
 - A roll result opens as a compact sheet showing dice, modifiers, total, and audience.
+- Roll expressions and field bindings use character attribute labels when available, retaining the field identifier for unresolved references. The creator presents the `talent` template kind as “ability” while preserving its stored kind value.
 
 ## 10.3 GM mobile session view
 

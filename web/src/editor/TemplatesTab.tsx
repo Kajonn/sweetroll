@@ -377,7 +377,8 @@ function TemplateDetail({
                 onExpressionSourceChange={(next) => {
                   commitExpressionSource(action.expressionId, next);
                 }}
-                fieldTypes={templateFieldTypeMap(template)}
+                fieldTypes={templateFieldTypeMap(template, document)}
+                fieldLabels={templateFieldLabels(template, document)}
                 guided
                 diceKind={guidedDiceKindFor(expressionSourceFor(action.expressionId))}
                 onDiceKindChange={
@@ -608,9 +609,10 @@ function guidedDiceKindFor(source: string): string {
 
 function templateFieldTypeMap(
   template: ObjectTemplateV1,
+  document: SystemDocumentV1,
 ): Record<string, "number" | "text" | "boolean"> {
   const out: Record<string, "number" | "text" | "boolean"> = {};
-  for (const field of template.fields) {
+  for (const field of [...eligibleCharacterFields(template, document), ...template.fields]) {
     if (field.kind === "integer" || field.kind === "decimal" || field.kind === "resource") {
       out[field.id] = "number";
     } else if (field.kind === "boolean") {
@@ -620,6 +622,23 @@ function templateFieldTypeMap(
     }
   }
   return out;
+}
+
+function templateFieldLabels(template: ObjectTemplateV1, document: SystemDocumentV1): Record<string, string> {
+  return Object.fromEntries([...eligibleCharacterFields(template, document), ...template.fields]
+    .map((field) => [field.id, field.label]));
+}
+
+function eligibleCharacterFields(template: ObjectTemplateV1, document: SystemDocumentV1): FieldV1[] {
+  const slots = new Set(readSlots(document).filter((slot) => slot.accepts.includes(template.kind)).map((slot) => slot.id));
+  const targets = document.sheets.filter((sheet) => (sheet.sections as Array<{ elements?: Array<{ kind: string; slotId?: string }> }>).some(
+    (section) => section.elements?.some((element) => element.kind === "slot" && slots.has(element.slotId ?? "")),
+  )).map((sheet) => sheet.targetEntityId);
+  const entities = [...new Set(targets)].map((id) => document.entities.find((entity) => entity.id === id));
+  if (entities.length === 0 || entities.some((entity) => entity === undefined)) return [];
+  return (entities[0]?.fields ?? []).filter((field) => entities.every((entity) =>
+    entity?.fields.some((candidate) => candidate.id === field.id && candidate.kind === field.kind),
+  )) as FieldV1[];
 }
 
 function templateResourceFields(

@@ -208,7 +208,9 @@ test.describe("visual: sheet preview", () => {
       // Pin the capture box while retaining the geometry checks above.
       if (width === 360) {
         await frame.evaluate((element) => {
-          element.style.minHeight = "610px";
+          element.style.boxSizing = "border-box";
+          element.style.height = "610px";
+          element.style.overflow = "hidden";
         });
       }
       try {
@@ -217,7 +219,9 @@ test.describe("visual: sheet preview", () => {
         });
       } finally {
         await frame.evaluate((element) => {
-          element.style.removeProperty("min-height");
+          element.style.removeProperty("box-sizing");
+          element.style.removeProperty("height");
+          element.style.removeProperty("overflow");
         });
         await header.evaluate((element) => {
           element.style.removeProperty("position");

@@ -203,26 +203,21 @@ test.describe("visual: sheet preview", () => {
       await header.evaluate((element) => {
         element.style.position = "static";
       });
-      // CI font rasterization can change the 360px frame's intrinsic height
-      // by one pixel and about 633 text-edge pixels between identical runs.
-      // Pin the capture box while retaining the geometry checks above.
-      if (width === 360) {
-        await frame.evaluate((element) => {
-          element.style.boxSizing = "border-box";
-          element.style.height = "610px";
-          element.style.overflow = "hidden";
-        });
-      }
+      // CI font rasterization shifts this frame between 609 and 610 CSS px.
+      // Capture a fixed 276x610 region; geometry is asserted independently above.
       try {
-        await expect(frame).toHaveScreenshot(`sheet-preview-${width}.png`, {
-          maxDiffPixels: width === 360 ? 700 : 0,
-        });
+        if (width === 360) {
+          await frame.scrollIntoViewIfNeeded();
+          const bounds = await frame.boundingBox();
+          expect(bounds).not.toBeNull();
+          await expect(page).toHaveScreenshot(`sheet-preview-${width}.png`, {
+            clip: { x: bounds!.x, y: bounds!.y, width: 276, height: 610 },
+            maxDiffPixels: 700,
+          });
+        } else {
+          await expect(frame).toHaveScreenshot(`sheet-preview-${width}.png`);
+        }
       } finally {
-        await frame.evaluate((element) => {
-          element.style.removeProperty("box-sizing");
-          element.style.removeProperty("height");
-          element.style.removeProperty("overflow");
-        });
         await header.evaluate((element) => {
           element.style.removeProperty("position");
         });

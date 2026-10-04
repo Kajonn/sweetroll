@@ -138,14 +138,15 @@ commands remain historical results from the initial feature commit.
   confirmation after server acknowledgement. Roll results show readable
   attribute labels. See `design_v2.md` sections 4.1 and 10.2 for the design
   decisions and the focused UI tests in PR #16 for regression coverage.
-- PR #16 at commit `a09d7205c229bf00093037465c881b807087ba01` passed
-  [CI run #71](https://github.com/Kajonn/sweetroll/actions/runs/37233284668):
+- PR #16 at commit `5a838c33cc63c0a0b2e8196795de6a5e82f933ff` passed
+  [CI run #75](https://github.com/Kajonn/sweetroll/actions/runs/37234535137):
   `verify`, `web`, `web-offline`, three journey shards, and `web-e2e (visual)`.
   The router test response fixture was completed with `nominal: null`, and the
   document editor's 360/1280 px snapshots were updated for the Templates tab.
-  The visual job initially had a one-pixel 360 px preview difference; its
-  retry passed without a code or baseline change. Production deployment was
-  skipped on this PR run.
+  Repeated CI runs exposed a one-pixel height variation in the 360 px sheet
+  preview. The visual test now captures a fixed 276×610 px region with a
+  limited text-edge pixel tolerance while retaining the explicit geometry
+  checks. Production deployment was skipped on this PR run.
 
 Remaining UI coverage: edit fields on a templated entry, a quantity control,
 and a browser journey clicking both Longsword rolls. The original limitations

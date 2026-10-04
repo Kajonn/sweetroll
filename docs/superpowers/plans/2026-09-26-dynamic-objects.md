@@ -6,8 +6,8 @@ checkboxes below preserve the task-by-task instructions and are not a reliable
 record of execution order or exact commands. The delivered behavior and
 verification are recorded in
 [`docs/acceptance/dynamic-objects-2026-09-26.md`](../../acceptance/dynamic-objects-2026-09-26.md),
-with final CI run [#71](https://github.com/Kajonn/sweetroll/actions/runs/37233284668)
-successful after a visual-job retry. This plan is complete for its original
+with verified CI run [#75](https://github.com/Kajonn/sweetroll/actions/runs/37234535137)
+successful after stabilizing the narrow preview snapshot. This plan is complete for its original
 step-1 scope; no remaining task in this file should be read as blocking PR #16.
 
 **Follow-up scope:** Provide a character-sheet editor for templated entry

@@ -28,7 +28,7 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
   };
   return {
     phase: "ready", confirmed: makeView({ characterId: "character", revision: 1, projection }), tentative: null,
-    entries: [], editing: { owned: true }, error: null, lastRoll: null, lastMigration: null, pendingOnlineAttempts: [], connected: true, ...overrides,
+    entries: [], editing: { owned: true }, error: null, lastRoll: null, lastNominal: null, lastMigration: null, pendingOnlineAttempts: [], connected: true, ...overrides,
   };
 }
 
@@ -85,6 +85,15 @@ describe("CharacterSheet", () => {
     expect(screen.getByText("Success")).toBeVisible();
     expect(screen.getByText("Owner only")).toBeVisible();
     expect(screen.queryByText("d20=14")).not.toBeInTheDocument();
+  });
+
+  it("confirms a nominal granted action without displaying its unused roll template", () => {
+    render(<CharacterSheet snapshot={snapshot({ lastNominal: { actionId: "raise_torch", entryId: "torch-1", output: "Result: {total}" } })}
+      templates={[{ id: "torch", label: "Torch", kind: "item", grantedActions: [{ id: "raise_torch", label: "Raise Torch", actionKind: "roll", inputs: [] }] }]}
+      onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    expect(screen.getByText("Raise Torch recorded").closest('[role="status"]')).toBeInTheDocument();
+    expect(screen.queryByText("Result: {total}")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Roll result" })).not.toBeInTheDocument();
   });
 
   it("shows roll dice and bindings only when details are requested", async () => {
@@ -206,7 +215,7 @@ describe("CharacterSheet", () => {
   });
 
   it("exposes no private detail once purged", () => {
-    render(<CharacterSheet snapshot={{ phase: "purged", confirmed: null, tentative: null, entries: [], editing: { owned: false }, error: { kind: "purged", message: "This character is no longer available." }, lastRoll: null, lastMigration: null, pendingOnlineAttempts: [], connected: false }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    render(<CharacterSheet snapshot={{ phase: "purged", confirmed: null, tentative: null, entries: [], editing: { owned: false }, error: { kind: "purged", message: "This character is no longer available." }, lastRoll: null, lastNominal: null, lastMigration: null, pendingOnlineAttempts: [], connected: false }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getByRole("status")).toHaveTextContent("This character is no longer available.");
     expect(screen.queryByText("Aria")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();

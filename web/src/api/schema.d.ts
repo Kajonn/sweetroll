@@ -4137,6 +4137,11 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
+                            } | null;
                         };
                         requestId: string;
                     };
@@ -4556,6 +4561,11 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
+                            } | null;
                         };
                         requestId: string;
                     };
@@ -4974,6 +4984,11 @@ export interface operations {
                                 total: number;
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
                             } | null;
                         };
                         requestId: string;
@@ -5397,6 +5412,11 @@ export interface operations {
                                 total: number;
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
                             } | null;
                         };
                         requestId: string;
@@ -5825,6 +5845,11 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
+                            } | null;
                         };
                         requestId: string;
                     };
@@ -6242,6 +6267,11 @@ export interface operations {
                                 total: number;
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
                             } | null;
                         };
                         requestId: string;
@@ -6663,6 +6693,11 @@ export interface operations {
                                 total: number;
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
                             } | null;
                         };
                         requestId: string;
@@ -7233,6 +7268,11 @@ export interface operations {
                                 total: number;
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
                             } | null;
                         };
                         requestId: string;
@@ -8723,6 +8763,11 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
+                            } | null;
                         };
                         requestId: string;
                     };
@@ -9139,6 +9184,11 @@ export interface operations {
                                 total: number;
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
                             } | null;
                         };
                         requestId: string;

@@ -86,6 +86,8 @@ export type CharacterSnapshot = {
   connected: boolean;
   /** The latest authoritative roll result received during this open session. */
   lastRoll: CommandResultResponse["result"]["roll"];
+  /** The latest confirmed nominal action, returned by the server after acknowledgment. */
+  lastNominal: CommandResultResponse["result"]["nominal"];
   /** The latest successful migration commit/rollback, kept for later UI use. */
   lastMigration: LastMigrationResult | null;
   /**
@@ -230,6 +232,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   let phase: SessionPhase = "loading";
   let error: BlockingError | null = null;
   let lastRoll: CommandResultResponse["result"]["roll"] = null;
+  let lastNominal: CommandResultResponse["result"]["nominal"] = null;
   let lastMigration: LastMigrationResult | null = null;
   let editing: { owned: boolean; owner: string | null } = { owned: coordination.isOwner(), owner: null };
   let disposed = false;
@@ -287,6 +290,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       error: visible && error ? { ...error } : null,
       connected: isConnected(),
       lastRoll: visible ? lastRoll : null,
+      lastNominal: visible ? lastNominal : null,
       lastMigration: visible ? lastMigration : null,
       pendingOnlineAttempts: visible ? pendingOnline.map((a) => ({ ...a, request: { ...a.request, body: { ...a.request.body } } })) : [],
     };
@@ -690,7 +694,10 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (!identityMatches()) return "blocked";
     coordination.invalidate?.();
     confirmed = character;
-    if (current.intent.kind === "executeAction") lastRoll = response.result.roll;
+    if (current.intent.kind === "executeAction") {
+      lastRoll = response.result.roll;
+      lastNominal = response.result.nominal;
+    }
     generation += 1;
     transientFailures = 0;
     entries = entries.filter((e) => e.id !== current.id).map((e) =>

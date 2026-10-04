@@ -9665,7 +9665,8 @@
                       "type": "object",
                       "required": [
                         "character",
-                        "roll"
+                        "roll",
+                        "nominal"
                       ],
                       "properties": {
                         "character": {
@@ -10920,6 +10921,32 @@
                                       "type": "string"
                                     }
                                   ]
+                                }
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "nominal": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "actionId",
+                                "entryId",
+                                "output"
+                              ],
+                              "properties": {
+                                "actionId": {
+                                  "type": "string"
+                                },
+                                "entryId": {
+                                  "type": "string"
+                                },
+                                "output": {
+                                  "type": "string"
                                 }
                               }
                             },
@@ -11697,7 +11724,8 @@
                       "type": "object",
                       "required": [
                         "character",
-                        "roll"
+                        "roll",
+                        "nominal"
                       ],
                       "properties": {
                         "character": {
@@ -12952,6 +12980,32 @@
                                       "type": "string"
                                     }
                                   ]
+                                }
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "nominal": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "actionId",
+                                "entryId",
+                                "output"
+                              ],
+                              "properties": {
+                                "actionId": {
+                                  "type": "string"
+                                },
+                                "entryId": {
+                                  "type": "string"
+                                },
+                                "output": {
+                                  "type": "string"
                                 }
                               }
                             },
@@ -13740,7 +13794,8 @@
                       "type": "object",
                       "required": [
                         "character",
-                        "roll"
+                        "roll",
+                        "nominal"
                       ],
                       "properties": {
                         "character": {
@@ -14995,6 +15050,32 @@
                                       "type": "string"
                                     }
                                   ]
+                                }
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "nominal": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "actionId",
+                                "entryId",
+                                "output"
+                              ],
+                              "properties": {
+                                "actionId": {
+                                  "type": "string"
+                                },
+                                "entryId": {
+                                  "type": "string"
+                                },
+                                "output": {
+                                  "type": "string"
                                 }
                               }
                             },
@@ -15795,7 +15876,8 @@
                       "type": "object",
                       "required": [
                         "character",
-                        "roll"
+                        "roll",
+                        "nominal"
                       ],
                       "properties": {
                         "character": {
@@ -17050,6 +17132,32 @@
                                       "type": "string"
                                     }
                                   ]
+                                }
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "nominal": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "actionId",
+                                "entryId",
+                                "output"
+                              ],
+                              "properties": {
+                                "actionId": {
+                                  "type": "string"
+                                },
+                                "entryId": {
+                                  "type": "string"
+                                },
+                                "output": {
+                                  "type": "string"
                                 }
                               }
                             },
@@ -17856,7 +17964,8 @@
                       "type": "object",
                       "required": [
                         "character",
-                        "roll"
+                        "roll",
+                        "nominal"
                       ],
                       "properties": {
                         "character": {
@@ -19111,6 +19220,32 @@
                                       "type": "string"
                                     }
                                   ]
+                                }
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "nominal": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "actionId",
+                                "entryId",
+                                "output"
+                              ],
+                              "properties": {
+                                "actionId": {
+                                  "type": "string"
+                                },
+                                "entryId": {
+                                  "type": "string"
+                                },
+                                "output": {
+                                  "type": "string"
                                 }
                               }
                             },
@@ -19886,7 +20021,8 @@
                       "type": "object",
                       "required": [
                         "character",
-                        "roll"
+                        "roll",
+                        "nominal"
                       ],
                       "properties": {
                         "character": {
@@ -21141,6 +21277,32 @@
                                       "type": "string"
                                     }
                                   ]
+                                }
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "nominal": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "actionId",
+                                "entryId",
+                                "output"
+                              ],
+                              "properties": {
+                                "actionId": {
+                                  "type": "string"
+                                },
+                                "entryId": {
+                                  "type": "string"
+                                },
+                                "output": {
+                                  "type": "string"
                                 }
                               }
                             },
@@ -21920,7 +22082,8 @@
                       "type": "object",
                       "required": [
                         "character",
-                        "roll"
+                        "roll",
+                        "nominal"
                       ],
                       "properties": {
                         "character": {
@@ -23175,6 +23338,32 @@
                                       "type": "string"
                                     }
                                   ]
+                                }
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "nominal": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "actionId",
+                                "entryId",
+                                "output"
+                              ],
+                              "properties": {
+                                "actionId": {
+                                  "type": "string"
+                                },
+                                "entryId": {
+                                  "type": "string"
+                                },
+                                "output": {
+                                  "type": "string"
                                 }
                               }
                             },
@@ -24588,7 +24777,8 @@
                       "type": "object",
                       "required": [
                         "character",
-                        "roll"
+                        "roll",
+                        "nominal"
                       ],
                       "properties": {
                         "character": {
@@ -25843,6 +26033,32 @@
                                       "type": "string"
                                     }
                                   ]
+                                }
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "nominal": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "actionId",
+                                "entryId",
+                                "output"
+                              ],
+                              "properties": {
+                                "actionId": {
+                                  "type": "string"
+                                },
+                                "entryId": {
+                                  "type": "string"
+                                },
+                                "output": {
+                                  "type": "string"
                                 }
                               }
                             },
@@ -31327,7 +31543,8 @@
                       "type": "object",
                       "required": [
                         "character",
-                        "roll"
+                        "roll",
+                        "nominal"
                       ],
                       "properties": {
                         "character": {
@@ -32582,6 +32799,32 @@
                                       "type": "string"
                                     }
                                   ]
+                                }
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "nominal": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "actionId",
+                                "entryId",
+                                "output"
+                              ],
+                              "properties": {
+                                "actionId": {
+                                  "type": "string"
+                                },
+                                "entryId": {
+                                  "type": "string"
+                                },
+                                "output": {
+                                  "type": "string"
                                 }
                               }
                             },
@@ -33353,7 +33596,8 @@
                       "type": "object",
                       "required": [
                         "character",
-                        "roll"
+                        "roll",
+                        "nominal"
                       ],
                       "properties": {
                         "character": {
@@ -34608,6 +34852,32 @@
                                       "type": "string"
                                     }
                                   ]
+                                }
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "nominal": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "actionId",
+                                "entryId",
+                                "output"
+                              ],
+                              "properties": {
+                                "actionId": {
+                                  "type": "string"
+                                },
+                                "entryId": {
+                                  "type": "string"
+                                },
+                                "output": {
+                                  "type": "string"
                                 }
                               }
                             },

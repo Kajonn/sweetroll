@@ -551,6 +551,8 @@ export const defaultMessages: MessageTable = {
   "character.slot.confirmAdd": "Add entry",
   "character.slot.rename": "Rename",
   "character.slot.saveName": "Save name",
+  "character.nominal.recorded": "Action recorded",
+  "character.nominal.recordedNamed": "{label} recorded",
   "character.review.addEntry": "Add {template} to {slot}",
   "character.review.removeEntry": "Remove entry {entry}",
   "character.review.updateEntry": "Update entry {entry}",

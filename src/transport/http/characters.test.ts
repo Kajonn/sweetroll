@@ -520,7 +520,7 @@ describe("character HTTP routes", () => {
       payload: { value: 14, expectedRevision: 2, idempotencyKey: "key-1" },
     });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ result: { character: expect.any(Object), roll: null }, requestId: expect.any(String) });
+    expect(response.json()).toEqual({ result: { character: expect.any(Object), roll: null, nominal: null }, requestId: expect.any(String) });
     expect(received).toEqual({
       kind: "setField",
       characterId: id,
@@ -588,6 +588,19 @@ describe("character HTTP routes", () => {
       expectedRevision: 1,
       idempotencyKey: "key-1",
     });
+  });
+
+  it("returns the authoritative nominal granted-action outcome", async () => {
+    const nominal = { actionId: "raise_torch", entryId: randomUUID(), output: "Torch raised." };
+    const app = await build(makeCharacters({
+      apply: async () => ({ ok: true, value: { ...commandResult(), nominal } }),
+    }));
+    const response = await app.inject({
+      method: "POST", url: `/characters/${randomUUID()}/actions/raise_torch`, headers: cookie,
+      payload: { entryId: nominal.entryId, expectedRevision: 1, idempotencyKey: "nominal-1" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().result).toMatchObject({ roll: null, nominal });
   });
 
   it("forwards the requested roll audience and serves campaign audiences", async () => {
@@ -850,7 +863,7 @@ describe("character HTTP routes", () => {
       payload: { command: "rename", name: "Renamed", expectedRevision: 1, idempotencyKey: "key-1" },
     });
     expect(rename.statusCode).toBe(200);
-    expect(rename.json()).toEqual({ result: { character: expect.any(Object), roll: null }, requestId: expect.any(String) });
+    expect(rename.json()).toEqual({ result: { character: expect.any(Object), roll: null, nominal: null }, requestId: expect.any(String) });
 
     const archive = await app.inject({
       method: "PATCH",

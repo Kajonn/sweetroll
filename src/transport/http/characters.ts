@@ -283,10 +283,16 @@ const RollDto = Type.Object({
   output: Type.String(),
   audience: RollAudienceDto,
 });
+const NominalActionResultDto = Type.Object({
+  actionId: Type.String(),
+  entryId: Type.String(),
+  output: Type.String(),
+});
 
 const CharacterCommandResultDto = Type.Object({
   character: CharacterViewDto,
   roll: Type.Union([RollDto, Type.Null()]),
+  nominal: Type.Union([NominalActionResultDto, Type.Null()]),
 });
 
 const ActivityEventDto = Type.Object({
@@ -945,6 +951,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
     const toCommandResultDto = (result: CharacterCommandResult): unknown => ({
       character: toCharacterDto(result.character),
       roll: result.roll,
+      nominal: result.nominal ?? null,
     });
 
     const toActivityEventDto = (event: CharacterActivityEvent): unknown => ({

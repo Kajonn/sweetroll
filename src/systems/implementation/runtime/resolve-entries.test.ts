@@ -161,6 +161,40 @@ async function initializedState(runtime: SystemRuntime, packageValue: SystemPack
 }
 
 describe("granted-action resolution", () => {
+  it("rolls Longsword to hit and then damage using the character's Strength", async () => {
+    const document = entryDocument();
+    document.sheets[0]!.sections[0]!.elements.push({ kind: "slot", id: "inventory_element", slotId: "inventory" });
+    document.expressions.find((expression) => expression.id === "longsword_attack_expr")!.source =
+      "d20 + fields.strength_mod + fields.weapon_bonus";
+    document.templates![0]!.grantedActions.push({
+      kind: "roll", id: "longsword_damage", label: "Longsword Damage",
+      expressionId: "longsword_damage_expr", inputs: [], outputTemplate: "Damage: {total}",
+    });
+    document.expressions.push({
+      id: "longsword_damage_expr", context: "roll", resultType: "number",
+      source: "d8 + fields.strength_mod", fallback: 0,
+    });
+    const pkg = compileEntryPackage(document);
+    const runtime = createRuntime(pkg);
+    const state = await initializedState(runtime, pkg);
+    state.values.strength_mod = 3;
+    state.entries = { ...state.entries, [SWORD_ENTRY_ID]: {
+      entryId: SWORD_ENTRY_ID, slotId: "inventory", templateId: "longsword", values: { weapon_bonus: 1 },
+    } };
+    for (const [actionId, sides, offset] of [["longsword_attack", 20, 4], ["longsword_damage", 8, 3]] as const) {
+      const result = await runtime.resolve({
+        versionId: pkg.versionId, entityId: "character", state,
+        intent: { kind: "action", actionId, entryId: SWORD_ENTRY_ID, inputs: {}, executionId: `exec-${actionId}` },
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) continue;
+      expect(result.value.roll?.dice[0]?.sides).toBe(sides);
+      expect(result.value.roll?.total).toBe((result.value.roll?.dice[0]?.value ?? 0) + offset);
+      expect(result.value.roll?.bindings).toContainEqual({ scope: "fields", definitionId: "strength_mod", value: 3 });
+      expect(result.value.state).toEqual(state);
+    }
+  });
+
   it("evaluates a granted roll with the entry value in scope", async () => {
     const packageValue = compileEntryPackage(entryDocument());
     const runtime = createRuntime(packageValue);

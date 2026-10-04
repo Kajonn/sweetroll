@@ -101,6 +101,25 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
       if (field.kind === "computed") addOwner(computedOwners, field.expressionId, template.id);
     }
   }
+  // A granted roll runs on the character carrying its entry. Only fields
+  // present on every entity that can display this template's slot are safe to
+  // reference; a template may be used by more than one sheet/entity.
+  const grantedEntityFields = new Map<string, Record<string, ValueType>>();
+  for (const template of templates) {
+    const eligibleSlots = new Set((document.slots ?? [])
+      .filter((slot) => slot.accepts.includes(template.kind)).map((slot) => slot.id));
+    const targets = new Set(document.sheets.filter((sheet) => sheet.sections.some((section) =>
+      section.elements.some((element) => element.kind === "slot" && eligibleSlots.has(element.slotId)),
+    )).map((sheet) => sheet.targetEntityId));
+    const environments = [...targets].map((id) => entityEnvironments.get(id)?.fields ?? {});
+    const common = { ...(environments[0] ?? {}) };
+    for (const fields of environments.slice(1)) {
+      for (const id of Object.keys(common)) {
+        if (common[id] !== fields[id]) delete common[id];
+      }
+    }
+    grantedEntityFields.set(template.id, common);
+  }
   const validationOwners = new Map<string, Set<string>>();
   for (const validation of document.validations) {
     const owner = fieldOwners.get(validation.targetId)
@@ -147,7 +166,9 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     const entityEnv = owner === undefined ? undefined : entityEnvironments.get(owner);
     const templateEnv = owner === undefined ? undefined : templateEnvironments.get(owner);
     const env: ExpressionCompileEnv = {
-      fields: entityEnv?.fields ?? templateEnv?.fields ?? {},
+      fields: templateRolls.length > 0
+        ? { ...grantedEntityFields.get(owner ?? ""), ...templateEnv?.fields }
+        : entityEnv?.fields ?? templateEnv?.fields ?? {},
       inputs: {},
     };
     const action = actions[0];

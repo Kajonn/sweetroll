@@ -200,7 +200,7 @@ export const defaultMessages: MessageTable = {
   "editor.templates.description": "Description",
   "editor.templates.kind.item": "item",
   "editor.templates.kind.spell": "spell",
-  "editor.templates.kind.talent": "talent",
+  "editor.templates.kind.talent": "ability",
   "editor.templates.kind.effect": "effect",
   "editor.slots.title": "Slots",
   "editor.slots.add": "Add slot",

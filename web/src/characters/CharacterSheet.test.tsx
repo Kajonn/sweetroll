@@ -104,6 +104,26 @@ describe("CharacterSheet", () => {
     expect(screen.getByText("inputs.bonus: 2")).toBeVisible();
   });
 
+  it("uses projected attribute names in roll expressions and binding details", async () => {
+    const user = userEvent.setup();
+    const base = snapshot();
+    const projection = base.confirmed!.projection;
+    const sheets = projection.sheets.map(sheet => ({ ...sheet, sections: sheet.sections.map(section => ({
+      ...section,
+      elements: [...section.elements, { kind: "field" as const, id: "might-control", fieldId: "might", label: "Might", fieldKind: "integer" as const, value: 3, editable: true, constraints: {}, validations: [] }],
+    })) }));
+    render(<CharacterSheet snapshot={{ ...base, confirmed: { ...base.confirmed!, projection: { ...projection, sheets } }, lastRoll: {
+      actionId: "hit", expression: "d20 + fields.might + fields.unknown", dice: [{ sides: 20, value: 12, kept: true }],
+      bindings: [{ scope: "fields", definitionId: "might", value: 3 }, { scope: "fields", definitionId: "unknown", value: 1 }],
+      total: 16, output: "Hit: 16", audience: "owner_only",
+    } }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+
+    expect(screen.getByText("d20 + Might + fields.unknown")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Show roll details" }));
+    expect(screen.getByText("Might: 3")).toBeVisible();
+    expect(screen.getByText("fields.unknown: 1")).toBeVisible();
+  });
+
   it("explains why actions are unavailable and preserves resource-bump actions", async () => {
     const user = userEvent.setup();
     const onExecuteAction = vi.fn();

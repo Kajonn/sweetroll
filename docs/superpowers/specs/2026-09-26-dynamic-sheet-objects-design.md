@@ -1,6 +1,6 @@
 # Dynamic sheet objects (inventory, talents, spells, effects) — design
 
-Date: 2026-09-26. Status: owner-approved design (chat), pre-implementation.
+Date: 2026-09-26. Status: implemented in `feat/dynamic-objects`; delivery review 2026-10-04.
 Authority: `design_v2.md` (system packages §11–13, character state, grammar v0.1, `OD-04`).
 
 ## Problem
@@ -32,7 +32,7 @@ the deferred lookups engine).
 
 ## Package format
 
-- `templates`: map alongside `entities`. Each template: `id`, `kind` (`item` |
+- `templates`: array alongside `entities`. Each template: `id`, `kind` (`item` |
   `spell` | `talent` | `effect`), a small field schema reusing existing field
   kinds only (integer, text, boolean, singleChoice, resource — no new field
   types in step 1), and `grantedActions` shaped exactly like entity actions.
@@ -58,19 +58,17 @@ the deferred lookups engine).
 
 ## Creator UI
 
-Template authoring behind the existing advanced disclosure (same pattern as
-expression editing): Templates tab by kind, fields + granted actions composed
-with entity-action controls. Slot placement in the sheet editor as ordinary
-section elements. No new interaction vocabulary, no freeform canvas.
+Template authoring uses a Templates tab by kind, fields, and granted actions;
+expression editing reuses the existing action controls. Slot placement uses ordinary
+section elements in the sheet editor. No new interaction vocabulary, no freeform canvas.
 
 ## Sheet UI (player)
 
 Slots render as compact lists: templated entries show name + key stats +
-inline granted-action buttons; custom entries show name + values with edit
-affordances. Add flow: template picker first, "custom entry" as labeled
-fallback (mirrors the G4 version-picker pattern). Quantity stepper where the
-template allows. Remove uses the standard destructive-confirm. Granted actions
-reuse existing roll/bump controls and sync text.
+inline granted-action buttons; custom entries show name + values and can be
+renamed. Add flow: template picker first, "custom entry" as labeled fallback
+(mirrors the G4 version-picker pattern). Remove uses the standard destructive
+confirmation. Granted actions reuse existing roll/bump controls and sync text.
 
 ## Validation, budgets, migration
 
@@ -100,3 +98,18 @@ New field kinds, lookups engine, full effects engine (stat modification,
 ongoing effects), entry-to-entry references, trading/gifting between
 characters, merchant/economy flows. `OD-04` stays deferred except granted
 roll/bump actions as specified here.
+
+## Delivery note (2026-10-04)
+
+The implemented creator labels the stored `talent` kind as **ability**. Item-granted
+rolls may reference an eligible attribute of the carrying character; separate
+Longsword hit and damage expressions are covered by compiler and runtime tests.
+The player UI shows a nominal action confirmation after server acknowledgement,
+keeps Remove secondary with confirmation, and reveals rename editing on request.
+The roll result uses readable attribute labels when available. The original
+implementation journey and later GUI evidence are recorded in
+[`docs/acceptance/dynamic-objects-2026-09-26.md`](../../acceptance/dynamic-objects-2026-09-26.md).
+
+Step-1 limitations: templated entry values still lack an edit form on the
+character sheet; a quantity stepper is not present. These are remaining
+product work, rather than acceptance claims for this delivery.

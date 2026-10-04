@@ -114,3 +114,39 @@ The journey spec is the e2e evidence; the whole e2e matrix was not re-run here.
 - Out-of-scope items from the design (new field kinds, lookups, effects
   engine, trading) appear nowhere in the journey, and OD-04 stays deferred
   except the granted roll/nominal actions proven here.
+
+## Follow-up delivery and verification (2026-10-04)
+
+This section supplements the original 2026-09-26 run above; its counts and
+commands remain historical results from the initial feature commit.
+
+- The creator offers `item`, `spell`, `effect`, and a user-facing **ability**
+  label for the stored `talent` kind. Slot acceptance can include the relevant
+  kinds. The later isolated Railway GUI journey added Dagger, Firebolt, and
+  Athletic Push to a Hero and used their granted actions; Firebolt showed
+  `d10 + Arcana` and `Arcana: 4`, and the creator displayed Athletic Push as
+  `ability` (PR #16 verification notes). This is GUI evidence for item, spell,
+  and ability use, separate from the original Playwright journey above.
+- Longsword can use a carrying character attribute for its hit expression and
+  has a separate damage expression/action. Compiler and runtime tests cover
+  both rolls (`src/systems/implementation/rules/compile-document.test.ts`,
+  `src/systems/implementation/runtime/resolve-entries.test.ts`). The original
+  browser journey exercised only `Longsword Attack`, so it is not evidence
+  that a player clicked both hit and damage in the GUI.
+- The UI follow-ups make item names appear once, place rename behind a control,
+  keep Remove secondary with a confirmation, and show nominal-action
+  confirmation after server acknowledgement. Roll results show readable
+  attribute labels. See `design_v2.md` sections 4.1 and 10.2 for the design
+  decisions and the focused UI tests in PR #16 for regression coverage.
+- PR #16 at commit `a09d7205c229bf00093037465c881b807087ba01` passed
+  [CI run #71](https://github.com/Kajonn/sweetroll/actions/runs/37233284668):
+  `verify`, `web`, `web-offline`, three journey shards, and `web-e2e (visual)`.
+  The router test response fixture was completed with `nominal: null`, and the
+  document editor's 360/1280 px snapshots were updated for the Templates tab.
+  The visual job initially had a one-pixel 360 px preview difference; its
+  retry passed without a code or baseline change. Production deployment was
+  skipped on this PR run.
+
+Remaining UI coverage: edit fields on a templated entry, a quantity control,
+and a browser journey clicking both Longsword rolls. The original limitations
+on real devices, human playtests, and cross-user sharing still apply.

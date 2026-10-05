@@ -18,7 +18,7 @@ export type CharacterSheetCallbacks = {
    */
   onAddEntry?(slotId: string, templateId: string | null, values: Record<string, unknown>): void | Promise<void>;
   onRemoveEntry?(entryId: string): void | Promise<void>;
-  onUpdateEntry?(entryId: string, values: Record<string, unknown>): void | Promise<void>;
+  onUpdateEntry?(entryId: string, values: Record<string, unknown>, quantity?: number): void | Promise<void>;
   onExecuteGranted?(entryId: string, actionId: string, inputs?: Record<string, unknown>): void | Promise<void>;
 };
 

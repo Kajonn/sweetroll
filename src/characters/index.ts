@@ -330,6 +330,7 @@ export type CharacterUpdateEntryValuesCommand = {
   characterId: CharacterId;
   entryId: string;
   values: Record<string, unknown>;
+  quantity?: number;
   expectedRevision: number;
   idempotencyKey: string;
 };
@@ -342,6 +343,7 @@ export type EntryTemplateSummary = {
   id: DefinitionId;
   label: string;
   kind: TemplateKind;
+  fields: ObjectTemplateV1["fields"];
   grantedActions: Array<{
     id: DefinitionId;
     label: string;
@@ -1013,9 +1015,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
    *   with its key and reject otherwise.
    * - Resource entry-value extra keys: lenient (entries.ts validates only
    *   current/max; extras are preserved but never read).
-   * - Quantity: enforced on write (absent or integer >= 1, else
-   *   bad_request); updateEntryValues merges values only and never changes
-   *   quantity.
+   * - Quantity: enforced on add and update (integer >= 1).
    * - Templated adds fill absent values from template field defaults so a
    *   bare template pick is immediately playable.
    */
@@ -1121,8 +1121,15 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         return fail(errors.bad_request("Character entry reference is invalid."));
       }
       if (!isRecord(command.values)) return fail(errors.bad_request("Entry values must be an object."));
+      if (command.quantity !== undefined && (!Number.isInteger(command.quantity) || command.quantity < 1)) {
+        return fail(errors.bad_request("Entry quantity must be an integer of at least 1."));
+      }
       const merged = { ...stored.values, ...command.values };
-      const candidate: CharacterEntryV1 = { ...stored, values: merged };
+      const candidate: CharacterEntryV1 = {
+        ...stored,
+        values: merged,
+        ...(command.quantity === undefined ? {} : { quantity: command.quantity }),
+      };
       const siblingCount = Object.values(storedEntries).filter(
         (entry) => entry.slotId === stored.slotId && entry.entryId !== stored.entryId,
       ).length;
@@ -1130,9 +1137,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       if (!validation.ok) return fail(errors.invalid_value(validation.message));
       nextEntries = { ...storedEntries, [stored.entryId]: candidate };
       activityKind = "entry_updated";
-      activityFields = { entryId: stored.entryId, slotId: stored.slotId, values: command.values };
+      activityFields = { entryId: stored.entryId, slotId: stored.slotId, values: command.values,
+        ...(command.quantity === undefined ? {} : { quantity: command.quantity }) };
       changedDefinitionIds = [stored.slotId];
-      stateChanged = JSON.stringify(merged) !== JSON.stringify(stored.values);
+      stateChanged = JSON.stringify(merged) !== JSON.stringify(stored.values)
+        || candidate.quantity !== stored.quantity;
     }
 
     const nextState: RuntimeStateV1 = { ...resolveSource.state, entries: nextEntries };
@@ -1931,6 +1940,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             id: template.id,
             label: template.label,
             kind: template.kind,
+            fields: template.fields.map((field) => structuredClone(field)),
             grantedActions: template.grantedActions.map((action) => ({
               id: action.id,
               label: action.label,

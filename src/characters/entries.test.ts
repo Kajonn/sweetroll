@@ -460,6 +460,27 @@ describeWithDatabase("Character entry commands", () => {
     expect(await activityKinds(characterId)).toEqual(["character_created", "entry_added", "entry_updated"]);
   });
 
+  it("updates item quantity with the entry revision and rejects invalid quantities", async () => {
+    const owner = await createUser("Ada");
+    const { versionId } = await publishEntryVersion(owner);
+    const characterId = await createEntryCharacter(owner, versionId);
+    const added = await characters.apply(ctx(owner), addEntryCommand(characterId, SWORD_ENTRY_ID, 1, randomUUID()));
+    expect(added.ok).toBe(true);
+    const invalid = await characters.apply(ctx(owner), {
+      kind: "updateEntryValues", characterId, entryId: SWORD_ENTRY_ID,
+      values: {}, quantity: 0, expectedRevision: 2, idempotencyKey: randomUUID(),
+    });
+    expect(invalid.ok).toBe(false);
+    const updated = await characters.apply(ctx(owner), {
+      kind: "updateEntryValues", characterId, entryId: SWORD_ENTRY_ID,
+      values: {}, quantity: 3, expectedRevision: 2, idempotencyKey: randomUUID(),
+    });
+    expect(updated.ok).toBe(true);
+    if (!updated.ok) throw new Error("quantity update failed");
+    expect(updated.value.character.state.entries?.[SWORD_ENTRY_ID]?.quantity).toBe(3);
+    expect(updated.value.character.reconciliation.revision).toBe(3);
+  });
+
   it("rejects entry commands with a stale expectedRevision", async () => {
     const owner = await createUser("Ada");
     const { versionId } = await publishEntryVersion(owner);

@@ -175,6 +175,7 @@ function CharacterDetailLoaded({
           id: template.id,
           label: template.label,
           kind: template.kind,
+          fields: template.fields.map((field) => ({ ...field })),
           grantedActions: template.grantedActions.map((action) => ({
             id: action.id,
             label: action.label,

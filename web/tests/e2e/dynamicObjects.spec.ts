@@ -126,6 +126,7 @@ test("dynamic objects: creator templates+slot -> player entries+granted roll -> 
   await page.getByTestId(`entity-field-kind-picker-${entityId}`).selectOption("text");
   await page.getByTestId(`entity-add-field-${entityId}`).click();
   await page.getByTestId("scalar-field-label-field").fill("Might");
+  const mightId = "field";
   await page.getByTestId("scalar-field-label-field_1").fill("Name");
   await waitForDraftPut(page, "Might");
 
@@ -151,6 +152,11 @@ test("dynamic objects: creator templates+slot -> player entries+granted roll -> 
   const swordId = await lastRowId(page, 'div[data-testid^="template-row-"]', "template-row-");
   expect(swordId).not.toBe(torchId);
   await page.getByTestId(`template-label-${swordId}`).fill("Longsword");
+  await page.getByTestId(`template-field-kind-picker-${swordId}`).selectOption("integer");
+  await page.getByTestId(`template-add-field-${swordId}`).click();
+  const bonusLabel = page.getByTestId(`template-fields-${swordId}`).locator('input[data-testid^="scalar-field-label-"]');
+  const bonusId = ((await bonusLabel.last().getAttribute("data-testid")) ?? "").replace("scalar-field-label-", "");
+  await bonusLabel.last().fill("Weapon bonus");
   await page.getByTestId(`template-add-roll-${swordId}`).click();
   const swordActionAttr = await page
     .getByTestId(`template-row-${swordId}`)
@@ -216,6 +222,17 @@ test("dynamic objects: creator templates+slot -> player entries+granted roll -> 
   await waitForDraftPut(page, slotId);
   await expectSaved(page);
 
+  // The bound slot exposes Hero's Might to both independent Longsword rolls.
+  await page.getByTestId("document-editor-tab-templates").click();
+  await page.getByTestId(`roll-field-modifier-${swordActionId}`).selectOption(mightId);
+  await page.getByTestId(`template-add-roll-${swordId}`).click();
+  const swordActions = page.getByTestId(`template-row-${swordId}`).locator('section[data-testid^="roll-action-"]');
+  const damageActionId = ((await swordActions.last().getAttribute("data-testid")) ?? "").replace("roll-action-", "");
+  await page.getByTestId(`roll-action-label-${damageActionId}`).fill("Longsword Damage");
+  await page.getByTestId(`dice-kind-${damageActionId}`).selectOption("d8");
+  await page.getByTestId(`roll-field-modifier-${damageActionId}`).selectOption(mightId);
+  await expectSaved(page);
+
   // Publish 1.0.0 and capture the version id from the post-publish CTA.
   await page.getByTestId("document-editor-publish").click();
   await expect(page.getByTestId("publish-dialog")).toBeVisible();
@@ -253,6 +270,19 @@ test("dynamic objects: creator templates+slot -> player entries+granted roll -> 
     await player.getByTestId(`slot-add-confirm-${slotId}`).click();
     await expectSheetSaved(player);
     await expect(player.getByRole("button", { name: "Longsword Attack" })).toBeVisible();
+    await expect(player.getByRole("button", { name: "Longsword Damage" })).toBeVisible();
+    const swordLi = player.locator('li[data-testid^="slot-entry-"]', {
+      has: player.getByRole("button", { name: "Longsword Attack" }),
+    });
+    const swordEntryId = ((await swordLi.getAttribute("data-testid")) ?? "").replace("slot-entry-", "");
+    expect(swordEntryId).toMatch(/.+/);
+    await player.getByTestId(`slot-entry-edit-${swordEntryId}`).click();
+    await player.getByTestId(`slot-entry-field-${swordEntryId}-${bonusId}`).fill("3");
+    await player.getByTestId(`slot-entry-quantity-${swordEntryId}`).fill("2");
+    await player.getByRole("button", { name: "Save values" }).click();
+    await expectSheetSaved(player);
+    await expect(swordLi).toContainText("×2");
+    await expect(swordLi).toContainText(`${bonusId}: 3`);
 
     // Add custom Lucky Stone: data-only, no granted actions.
     await player.getByTestId(`slot-add-${slotId}`).click();
@@ -269,25 +299,25 @@ test("dynamic objects: creator templates+slot -> player entries+granted roll -> 
     await player.getByRole("button", { name: "Longsword Attack" }).click();
     await expect(player.getByRole("heading", { name: "Roll result" })).toBeVisible({ timeout: 60_000 });
     await expect(player.getByText("Total", { exact: true })).toBeVisible();
+    await expect(player.getByText("d20 + Might")).toBeVisible();
+    await expectSheetSaved(player);
+    await player.getByRole("button", { name: "Longsword Damage" }).click();
+    await expect(player.getByText("d8 + Might")).toBeVisible({ timeout: 60_000 });
     await expectSheetSaved(player);
     const activityAfterRoll = await readActivity(player.request, characterId);
-    expect(activityAfterRoll.events.filter((e) => e.kind === "character_action_executed")).toHaveLength(1);
+    expect(activityAfterRoll.events.filter((e) => e.kind === "character_action_executed")).toHaveLength(2);
 
     // Remove longsword: the attack vanishes, prior activity stays intact.
-    const swordLi = player.locator('li[data-testid^="slot-entry-"]', {
-      has: player.getByRole("button", { name: "Longsword Attack" }),
-    });
-    const swordEntryId = ((await swordLi.getAttribute("data-testid")) ?? "").replace("slot-entry-", "");
-    expect(swordEntryId).toMatch(/.+/);
     await player.getByTestId(`slot-entry-remove-${swordEntryId}`).click();
     await player.getByTestId(`slot-entry-remove-confirm-${swordEntryId}`).click();
     await expectSheetSaved(player);
     await expect(player.getByRole("button", { name: "Longsword Attack" })).toHaveCount(0);
+    await expect(player.getByRole("button", { name: "Longsword Damage" })).toHaveCount(0);
     await expect(
       player.locator('li[data-testid^="slot-entry-"]', { hasText: "Lucky Stone" }),
     ).toBeVisible();
     const activityAfterRemove = await readActivity(player.request, characterId);
-    expect(activityAfterRemove.events.filter((e) => e.kind === "character_action_executed")).toHaveLength(1);
+    expect(activityAfterRemove.events.filter((e) => e.kind === "character_action_executed")).toHaveLength(2);
     expect(activityAfterRemove.events.filter((e) => e.kind === "entry_removed")).toHaveLength(1);
 
     // Offline leg: add torch while offline, reconnect, single replayed row.

@@ -117,7 +117,7 @@ export type CharacterSession = {
    */
   addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>): Promise<void>;
   removeEntry(entryId: string): Promise<void>;
-  updateEntryValues(entryId: string, values: Record<string, unknown>): Promise<void>;
+  updateEntryValues(entryId: string, values: Record<string, unknown>, quantity?: number): Promise<void>;
   resolveConflict(input: ResolveConflictInput): Promise<void>;
   archive(): Promise<void>;
   recover(): Promise<void>;
@@ -470,7 +470,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       return {
         method: "PATCH",
         path: `/characters/${characterId}/entries/${entry.intent.entryId}`,
-        body: { values: entry.intent.values, expectedRevision, idempotencyKey: key },
+        body: { values: entry.intent.values,
+          ...(entry.intent.quantity === undefined ? {} : { quantity: entry.intent.quantity }),
+          expectedRevision, idempotencyKey: key },
         firstAttemptAt,
       };
     }
@@ -1890,10 +1892,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({ kind: "removeEntry", entryId }));
     },
-    async updateEntryValues(entryId: string, values: Record<string, unknown>): Promise<void> {
+    async updateEntryValues(entryId: string, values: Record<string, unknown>, quantity?: number): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
       if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
-      await persistEntry(newEntry({ kind: "updateEntryValues", entryId, values }));
+      await persistEntry(newEntry({ kind: "updateEntryValues", entryId, values,
+        ...(quantity === undefined ? {} : { quantity }) }));
     },
     async archive(): Promise<void> {
       await runOnlineOperation({ kind: "archive", operation: "archive" });

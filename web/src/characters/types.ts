@@ -26,7 +26,7 @@ export type EditIntent =
   | { kind: "executeAction"; actionId: string; inputs?: Record<string, unknown>; entryId?: string }
   | { kind: "addEntry"; entry: EntryInput }
   | { kind: "removeEntry"; entryId: string }
-  | { kind: "updateEntryValues"; entryId: string; values: Record<string, unknown> };
+  | { kind: "updateEntryValues"; entryId: string; values: Record<string, unknown>; quantity?: number };
 export type QueueEntry = {
   id: string;
   actorId: string;

@@ -146,6 +146,7 @@ function projectSlot(
       templateId: entry.templateId,
       label: template?.label ?? customEntryLabel(entry.values),
       values: structuredClone(entry.values),
+      ...(entry.quantity === undefined ? {} : { quantity: entry.quantity }),
     };
   });
   const elements: CharacterProjectionElement[] = [{

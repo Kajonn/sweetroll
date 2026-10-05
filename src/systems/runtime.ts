@@ -196,6 +196,7 @@ export type CharacterProjectionSlotEntry = {
   templateId: DefinitionId | null;
   label: string;
   values: Record<string, unknown>;
+  quantity?: number;
 };
 
 export type CharacterProjectionSection = {

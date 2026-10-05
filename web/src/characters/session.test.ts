@@ -847,7 +847,7 @@ describe("CharacterSession", () => {
     // Entry writes queue durably offline and replay verbatim on reconnect.
     await session.addEntry("inventory", "longsword", {});
     await session.removeEntry("entry-9");
-    await session.updateEntryValues("entry-9", { name: "Stone" });
+    await session.updateEntryValues("entry-9", { name: "Stone" }, 2);
     await session.whenIdle();
     expect(session.getSnapshot().entries).toHaveLength(3);
     expect(session.getSnapshot().phase).toBe("offline");
@@ -867,6 +867,7 @@ describe("CharacterSession", () => {
       "PATCH /characters/char-1/entries/entry-9",
     ]);
     expect(api.sent[0]?.body).toMatchObject({ expectedRevision: 1 });
+    expect(api.sent[2]?.body).toMatchObject({ values: { name: "Stone" }, quantity: 2 });
     expect(session.getSnapshot().entries).toEqual([]);
 
     await session.executeGrantedAction("entry-1", "attack", { edge: 0 });

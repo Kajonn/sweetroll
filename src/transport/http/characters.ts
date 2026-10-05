@@ -1,5 +1,6 @@
 import { Type, type TSchema } from "@sinclair/typebox";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
+import { FieldV1Schema } from "../../systems/implementation/package/schema/document.js";
 
 import type {
   CharacterCommand,
@@ -127,6 +128,7 @@ const ProjectionSlotEntryDto = Type.Object({
   templateId: Type.Union([Type.String(), Type.Null()]),
   label: Type.String(),
   values: Type.Object({}, { additionalProperties: true }),
+  quantity: Type.Optional(Type.Integer({ minimum: 1 })),
 });
 const ProjectionElementDto = Type.Union([
   Type.Object({
@@ -468,6 +470,7 @@ const RemoveEntryBody = Type.Object({
 });
 const UpdateEntryBody = Type.Object({
   values: Type.Object({}, { additionalProperties: true }),
+  quantity: Type.Optional(Type.Integer({ minimum: 1 })),
   expectedRevision: Type.Integer(),
   idempotencyKey: Type.String({ minLength: 1 }),
 });
@@ -487,6 +490,7 @@ const EntryTemplateDto = Type.Object({
   id: Type.String(),
   label: Type.String(),
   kind: TemplateKindDto,
+  fields: Type.Array(FieldV1Schema),
   grantedActions: Type.Array(Type.Object({
     id: Type.String(),
     label: Type.String(),
@@ -1149,6 +1153,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         const params = request.params as { characterId: string; entryId: string };
         const body = request.body as {
           values: Record<string, unknown>;
+          quantity?: number;
           expectedRevision: number;
           idempotencyKey: string;
         };
@@ -1157,6 +1162,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
           characterId: params.characterId,
           entryId: params.entryId,
           values: body.values,
+          ...(body.quantity === undefined ? {} : { quantity: body.quantity }),
           expectedRevision: body.expectedRevision,
           idempotencyKey: body.idempotencyKey,
         };

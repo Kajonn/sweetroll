@@ -3064,6 +3064,7 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];
@@ -3749,6 +3750,7 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];
@@ -4089,6 +4091,7 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    quantity?: number;
                                                 }[];
                                             })[];
                                         }[];
@@ -4513,6 +4516,7 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    quantity?: number;
                                                 }[];
                                             })[];
                                         }[];
@@ -4937,6 +4941,7 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    quantity?: number;
                                                 }[];
                                             })[];
                                         }[];
@@ -5365,6 +5370,7 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    quantity?: number;
                                                 }[];
                                             })[];
                                         }[];
@@ -5797,6 +5803,7 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    quantity?: number;
                                                 }[];
                                             })[];
                                         }[];
@@ -6220,6 +6227,7 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    quantity?: number;
                                                 }[];
                                             })[];
                                         }[];
@@ -6455,6 +6463,7 @@ export interface operations {
                     values: {
                         [key: string]: unknown;
                     };
+                    quantity?: number;
                     expectedRevision: number;
                     idempotencyKey: string;
                 };
@@ -6646,6 +6655,7 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    quantity?: number;
                                                 }[];
                                             })[];
                                         }[];
@@ -6886,6 +6896,91 @@ export interface operations {
                             id: string;
                             label: string;
                             kind: "item" | "spell" | "talent" | "effect";
+                            fields: ({
+                                /** @constant */
+                                kind: "text";
+                                id: string;
+                                label: string;
+                                default: string;
+                                required: boolean;
+                                minLength: number;
+                                maxLength: number;
+                            } | {
+                                /** @constant */
+                                kind: "integer";
+                                id: string;
+                                label: string;
+                                default: number;
+                                required: boolean;
+                                min: number;
+                                max: number;
+                                step: number;
+                            } | {
+                                /** @constant */
+                                kind: "decimal";
+                                id: string;
+                                label: string;
+                                default: number;
+                                required: boolean;
+                                min: number;
+                                max: number;
+                                step: number;
+                            } | {
+                                /** @constant */
+                                kind: "boolean";
+                                id: string;
+                                label: string;
+                                default: boolean;
+                                required: boolean;
+                            } | {
+                                /** @constant */
+                                kind: "singleChoice";
+                                id: string;
+                                label: string;
+                                required: boolean;
+                                default: string | null;
+                                options: {
+                                    id: string;
+                                    label: string;
+                                }[];
+                            } | {
+                                /** @constant */
+                                kind: "multiChoice";
+                                id: string;
+                                label: string;
+                                required: boolean;
+                                default: string[];
+                                options: {
+                                    id: string;
+                                    label: string;
+                                }[];
+                            } | {
+                                /** @constant */
+                                kind: "resource";
+                                id: string;
+                                label: string;
+                                default: {
+                                    current: number;
+                                    max: number;
+                                };
+                                min: number;
+                                max: number;
+                                step: number;
+                                resetTo: "min" | "max";
+                            } | {
+                                /** @constant */
+                                kind: "computed";
+                                id: string;
+                                label: string;
+                                valueType: "number" | "text" | "boolean";
+                                expressionId: string;
+                            } | {
+                                /** @constant */
+                                kind: "image";
+                                id: string;
+                                label: string;
+                                required: boolean;
+                            })[];
                             grantedActions: {
                                 id: string;
                                 label: string;
@@ -7221,6 +7316,7 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    quantity?: number;
                                                 }[];
                                             })[];
                                         }[];
@@ -7641,6 +7737,7 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];
@@ -8328,6 +8425,7 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];
@@ -8715,6 +8813,7 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    quantity?: number;
                                                 }[];
                                             })[];
                                         }[];
@@ -9137,6 +9236,7 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    quantity?: number;
                                                 }[];
                                             })[];
                                         }[];
@@ -11894,6 +11994,7 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];
@@ -12336,6 +12437,7 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];
@@ -12682,6 +12784,7 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];
@@ -13030,6 +13133,7 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];

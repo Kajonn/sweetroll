@@ -12,6 +12,8 @@ const templates: SlotTemplate[] = [
     id: "longsword",
     label: "Longsword",
     kind: "item",
+    fields: [{ id: "weapon_bonus", label: "Weapon bonus", kind: "integer", default: 0,
+      required: true, min: 0, max: 10, step: 1 }],
     grantedActions: [
       { id: "longsword_attack", label: "Longsword Attack", actionKind: "roll", inputs: [] },
     ],
@@ -124,6 +126,20 @@ describe("SlotListControl", () => {
     await user.click(within(rename).getByRole("button", { name: "Save name" }));
     expect(handlers.onUpdateEntry).toHaveBeenCalledWith(STONE_ENTRY_ID, { name: "Unlucky Stone" });
     expect(screen.queryByTestId(`slot-entry-rename-${STONE_ENTRY_ID}`)).not.toBeInTheDocument();
+  });
+
+  it("edits a templated value and item quantity through the update callback", async () => {
+    const user = userEvent.setup();
+    const handlers = renderControl();
+    await user.click(screen.getByTestId(`slot-entry-edit-${SWORD_ENTRY_ID}`));
+    const bonus = screen.getByTestId(`slot-entry-field-${SWORD_ENTRY_ID}-weapon_bonus`);
+    await user.clear(bonus);
+    await user.type(bonus, "3");
+    const quantity = screen.getByTestId(`slot-entry-quantity-${SWORD_ENTRY_ID}`);
+    await user.clear(quantity);
+    await user.type(quantity, "2");
+    await user.click(screen.getByRole("button", { name: "Save values" }));
+    expect(handlers.onUpdateEntry).toHaveBeenCalledWith(SWORD_ENTRY_ID, { weapon_bonus: 3 }, 2);
   });
 
   it("disables entry controls while keeping the list readable", () => {

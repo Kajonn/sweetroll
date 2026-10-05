@@ -828,6 +828,7 @@ describe("character HTTP routes", () => {
       id: "longsword",
       label: "Longsword",
       kind: "item" as const,
+      fields: [],
       grantedActions: [{
         id: "longsword_attack",
         label: "Longsword Attack",

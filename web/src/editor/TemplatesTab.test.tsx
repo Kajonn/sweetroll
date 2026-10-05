@@ -68,6 +68,19 @@ describe("TemplatesTab", () => {
     expect(screen.getByTestId(`dice-kind-${actionId}`)).toBeInTheDocument();
   });
 
+  it("gives template fields document-wide unique IDs alongside character fields", async () => {
+    const user = userEvent.setup();
+    const doc = blankDocument();
+    doc.entities = [{ id: "hero", label: "Hero", fields: [{ id: "field", kind: "integer",
+      label: "Might", default: 2, required: true, min: 0, max: 20, step: 1 }] }];
+    renderTab(doc);
+    await user.click(screen.getByTestId("templates-add-button"));
+    const templateId = readTemplates(latest ?? blankDocument())[0]?.id ?? "";
+    await user.click(screen.getByTestId(`template-add-field-${templateId}`));
+    const fieldId = readTemplates(latest ?? blankDocument())[0]?.fields[0]?.id;
+    expect(fieldId).toBe("field_1");
+  });
+
   it("keeps the granted-roll expression entry across the replace dispatch", async () => {
     const user = userEvent.setup();
     renderTab();

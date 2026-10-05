@@ -198,9 +198,7 @@ function TemplateDetail({
   };
 
   const addField = () => {
-    const used = new Set(template.fields.map((f) => f.id));
-    let id = "field";
-    for (let i = 1; used.has(id); i++) id = `field_${i}`;
+    const id = nextScopedId(collectUsedIds(document), "field");
     const field = defaultField(fieldKind);
     field.id = id;
     field.label = t("editor.entity.newFieldLabel");

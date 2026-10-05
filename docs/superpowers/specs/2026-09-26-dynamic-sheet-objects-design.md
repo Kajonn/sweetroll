@@ -110,6 +110,9 @@ The roll result uses readable attribute labels when available. The original
 implementation journey and later GUI evidence are recorded in
 [`docs/acceptance/dynamic-objects-2026-09-26.md`](../../acceptance/dynamic-objects-2026-09-26.md).
 
-Step-1 limitations: templated entry values still lack an edit form on the
-character sheet; a quantity stepper is not present. These are remaining
-product work, rather than acceptance claims for this delivery.
+Follow-up (2026-10-05): the character sheet now edits supported templated
+field kinds through typed controls and item quantity through a positive
+integer input. The entry update command carries both under the existing
+revision/idempotency and offline replay flow. Template field IDs are allocated
+from the document-wide set to avoid collisions with entity fields. A browser
+journey for both Longsword rolls and these controls is included in the PR.

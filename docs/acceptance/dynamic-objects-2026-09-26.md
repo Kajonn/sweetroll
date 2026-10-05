@@ -148,6 +148,17 @@ commands remain historical results from the initial feature commit.
   limited text-edge pixel tolerance while retaining the explicit geometry
   checks. Production deployment was skipped on this PR run.
 
-Remaining UI coverage: edit fields on a templated entry, a quantity control,
-and a browser journey clicking both Longsword rolls. The original limitations
-on real devices, human playtests, and cross-user sharing still apply.
+The 2026-10-05 follow-up adds typed editing for templated entry fields and an
+item quantity input. Its update command accepts an optional positive integer
+quantity, projects it back to the sheet, and queues it with the existing
+offline revision/idempotency flow. `dynamicObjects.spec.ts` now authors
+Longsword Attack and Longsword Damage with Hero's Might, edits a Weapon bonus
+and quantity on the character, clicks both rolls, and checks retained history.
+The first CI run found a creator-generated template field ID colliding with
+an entity field; document-wide ID allocation and a component regression test
+were added. Local unit suites passed (server: 375 passed, 9 skipped; web:
+1,109 passed), and both type checks passed. Final browser CI evidence is
+pending on the follow-up commit.
+
+The original limitations on real devices, human playtests, and cross-user
+sharing still apply. The full ongoing-effects engine remains outside this plan.

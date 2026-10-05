@@ -10,12 +10,13 @@ with verified CI run [#75](https://github.com/Kajonn/sweetroll/actions/runs/3723
 successful after stabilizing the narrow preview snapshot. This plan is complete for its original
 step-1 scope; no remaining task in this file should be read as blocking PR #16.
 
-**Follow-up scope:** Provide a character-sheet editor for templated entry
-values and a quantity control if required by the template. Extend a GUI journey
-to execute both Longsword hit and damage rolls with the carrying character's
-attribute; the current automated proof for this pair is at compiler/runtime
-level. Preserve the existing out-of-scope boundaries for lookups, ongoing
-effects, and trading.
+**Follow-up status (2026-10-05):** The branch now includes typed character-sheet
+editing for templated values, item quantity updates, and an expanded browser
+journey for Longsword hit and damage using the carrying character's Might.
+Template field IDs now use document-wide allocation after the journey found a
+collision with entity fields. The journey's CI rerun is pending; local server
+and web unit suites and type checks pass. Lookups, ongoing effects, and
+trading remain outside this plan.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

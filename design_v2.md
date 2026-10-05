@@ -90,7 +90,7 @@ Roles are contextual capabilities, not account types. The same user can create a
 
 In character sheet item slots, show the item name once and reveal rename editing on request. Keep Remove visually secondary in each row and require confirmation before deleting an item. After a granted nominal action is acknowledged by the server, show a clear action confirmation with its authored output when meaningful; do not display unresolved roll placeholders as a result.
 
-Item granted rolls can use attributes of the carrying character alongside item values. The builder offers character attributes reachable through the item's slots and validates that a referenced attribute is available for every entity that can use that slot. An item may expose separate hit and damage rolls, each with its own expression and result.
+Templated entries expose schema-driven field editing on the character sheet. Item entries can update their positive integer quantity under the character revision and offline idempotency flow. Item granted rolls can use attributes of the carrying character alongside item values. The builder offers character attributes reachable through the item's slots and validates that a referenced attribute is available for every entity that can use that slot. An item may expose separate hit and damage rolls, each with its own expression and result.
 
 ## 4.2 Multi-device GM play
 

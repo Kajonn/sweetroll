@@ -201,7 +201,8 @@ test("dynamic objects: creator templates+slot -> player entries+granted roll -> 
     accepts: ["item"],
   });
 
-  // Sections tab: sheet section with a slot element bound to Inventory.
+  // Sections tab: show Might alongside the Inventory slot so the character
+  // sheet can label the attribute in both granted roll results.
   await page.getByTestId("document-editor-tab-sections").click();
   await page.getByTestId("sheet-add-button").click();
   await page.getByTestId("sheet-add-section").click();
@@ -209,10 +210,16 @@ test("dynamic objects: creator templates+slot -> player entries+granted roll -> 
   const sectionId = (sectionAttr ?? "").replace("section-label-", "");
   expect(sectionId).not.toBe("");
   await page.getByTestId(`section-label-${sectionId}`).fill("Gear");
+  await page.getByTestId(`section-add-element-field-${sectionId}`).click();
+  await page.getByTestId(`section-row-${sectionId}`)
+    .locator('[data-testid^="element-binding-"]')
+    .getByTestId("definition-id-input")
+    .fill(mightId);
   await page.getByTestId(`section-add-element-slot-${sectionId}`).click();
   const binding = page
     .getByTestId(`section-row-${sectionId}`)
     .locator('[data-testid^="element-binding-"]')
+    .last()
     .getByTestId("definition-id-input");
   await binding.fill(slotId);
   const renameConfirm = page.getByTestId("definition-id-rename-confirm-submit");

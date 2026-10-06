@@ -100,7 +100,7 @@ function makeMutableIdentity(actor: string | null) {
   };
 }
 
-function makeCreateAttempt(actorId: string, id = "create-1", firstAttemptAt = "2026-09-06T00:00:00.000Z"): OnlineAttempt {
+function makeCreateAttempt(actorId: string, id = "create-1", firstAttemptAt = new Date().toISOString()): OnlineAttempt {
   return {
     id,
     actorId,
@@ -350,9 +350,9 @@ describe("CreateCharacter", () => {
             name: "OldName",
             idempotencyKey: "old-key",
           },
-          firstAttemptAt: "2026-09-06T00:00:00.000Z",
+          firstAttemptAt: new Date().toISOString(),
         },
-        createdAt: "2026-09-06T00:00:00.000Z",
+        createdAt: new Date().toISOString(),
       });
       const view = renderCreate(
         <CreateCharacter api={api} store={store} identity={makeIdentity({ actorId: "actor-1" })} onCreated={vi.fn()} />,

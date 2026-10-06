@@ -42,6 +42,12 @@ function serverValue(snapshot: CharacterSnapshot, fieldId: string): string {
 function entryLabel(entry: CharacterSnapshot["entries"][number]): string {
   if (entry.intent.kind === "setField") return `${entry.intent.fieldId} → ${String(entry.intent.value)}`;
   if (entry.intent.kind === "bumpResource") return `${entry.intent.resourceId} ${entry.intent.direction}`;
+  if (entry.intent.kind === "addEntry") {
+    const template = entry.intent.entry.templateId ?? t("character.slot.customEntry");
+    return t("character.review.addEntry", { template, slot: entry.intent.entry.slotId });
+  }
+  if (entry.intent.kind === "removeEntry") return t("character.review.removeEntry", { entry: entry.intent.entryId });
+  if (entry.intent.kind === "updateEntryValues") return t("character.review.updateEntry", { entry: entry.intent.entryId });
   return `${entry.intent.actionId}`;
 }
 

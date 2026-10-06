@@ -28,7 +28,7 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
   };
   return {
     phase: "ready", confirmed: makeView({ characterId: "character", revision: 1, projection }), tentative: null,
-    entries: [], editing: { owned: true }, error: null, lastRoll: null, lastMigration: null, pendingOnlineAttempts: [], connected: true, ...overrides,
+    entries: [], editing: { owned: true }, error: null, lastRoll: null, lastNominal: null, lastMigration: null, pendingOnlineAttempts: [], connected: true, ...overrides,
   };
 }
 
@@ -87,12 +87,41 @@ describe("CharacterSheet", () => {
     expect(screen.queryByText("d20=14")).not.toBeInTheDocument();
   });
 
+  it("confirms a nominal granted action without displaying its unused roll template", () => {
+    render(<CharacterSheet snapshot={snapshot({ lastNominal: { actionId: "raise_torch", entryId: "torch-1", output: "Result: {total}" } })}
+      templates={[{ id: "torch", label: "Torch", kind: "item", grantedActions: [{ id: "raise_torch", label: "Raise Torch", actionKind: "roll", inputs: [] }] }]}
+      onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    expect(screen.getByText("Raise Torch recorded").closest('[role="status"]')).toBeInTheDocument();
+    expect(screen.queryByText("Result: {total}")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Roll result" })).not.toBeInTheDocument();
+  });
+
   it("shows roll dice and bindings only when details are requested", async () => {
     const user = userEvent.setup();
     render(<CharacterSheet snapshot={snapshot({ lastRoll: { actionId: "roll-check", expression: "d20 + 2", dice: [{ sides: 20, value: 14, kept: true }], bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }], total: 16, output: "Success", audience: "owner_only" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Show roll details" }));
     expect(screen.getByText("d20=14")).toBeVisible();
     expect(screen.getByText("inputs.bonus: 2")).toBeVisible();
+  });
+
+  it("uses projected attribute names in roll expressions and binding details", async () => {
+    const user = userEvent.setup();
+    const base = snapshot();
+    const projection = base.confirmed!.projection;
+    const sheets = projection.sheets.map(sheet => ({ ...sheet, sections: sheet.sections.map(section => ({
+      ...section,
+      elements: [...section.elements, { kind: "field" as const, id: "might-control", fieldId: "might", label: "Might", fieldKind: "integer" as const, value: 3, editable: true, constraints: {}, validations: [] }],
+    })) }));
+    render(<CharacterSheet snapshot={{ ...base, confirmed: { ...base.confirmed!, projection: { ...projection, sheets } }, lastRoll: {
+      actionId: "hit", expression: "d20 + fields.might + fields.unknown", dice: [{ sides: 20, value: 12, kept: true }],
+      bindings: [{ scope: "fields", definitionId: "might", value: 3 }, { scope: "fields", definitionId: "unknown", value: 1 }],
+      total: 16, output: "Hit: 16", audience: "owner_only",
+    } }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+
+    expect(screen.getByText("d20 + Might + fields.unknown")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Show roll details" }));
+    expect(screen.getByText("Might: 3")).toBeVisible();
+    expect(screen.getByText("fields.unknown: 1")).toBeVisible();
   });
 
   it("explains why actions are unavailable and preserves resource-bump actions", async () => {
@@ -206,7 +235,7 @@ describe("CharacterSheet", () => {
   });
 
   it("exposes no private detail once purged", () => {
-    render(<CharacterSheet snapshot={{ phase: "purged", confirmed: null, tentative: null, entries: [], editing: { owned: false }, error: { kind: "purged", message: "This character is no longer available." }, lastRoll: null, lastMigration: null, pendingOnlineAttempts: [], connected: false }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    render(<CharacterSheet snapshot={{ phase: "purged", confirmed: null, tentative: null, entries: [], editing: { owned: false }, error: { kind: "purged", message: "This character is no longer available." }, lastRoll: null, lastNominal: null, lastMigration: null, pendingOnlineAttempts: [], connected: false }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getByRole("status")).toHaveTextContent("This character is no longer available.");
     expect(screen.queryByText("Aria")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
@@ -241,5 +270,39 @@ describe("CharacterSheet", () => {
     expect(onExecuteAction).toHaveBeenCalledWith("roll-check", { bonus: 3 });
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not save this change");
     expect(bonus).toHaveValue(3);
+  });
+
+  it("renders slot elements through SlotListControl and skips synthetic granted actions", async () => {
+    const user = userEvent.setup();
+    const state = snapshot();
+    const moves = state.confirmed!.projection.sheets[1]!.sections[0]!;
+    moves.elements.push(
+      { kind: "slot", id: "inv-element", slotId: "inventory", label: "Inventory", accepts: ["item"], entries: [
+        { entryId: "aaaaaaaa-1111-4111-8111-111111111111", templateId: "longsword", label: "Longsword", values: { weapon_bonus: 1 } },
+      ] },
+      { kind: "action", id: "aaaaaaaa-1111-4111-8111-111111111111__longsword_attack", actionId: "longsword_attack", entryId: "aaaaaaaa-1111-4111-8111-111111111111", label: "Longsword Attack", actionKind: "roll", inputs: [], validations: [] },
+    );
+    const onExecuteGranted = vi.fn();
+    render(
+      <CharacterSheet
+        snapshot={state}
+        onSetField={vi.fn()}
+        onBump={vi.fn()}
+        onExecuteAction={vi.fn()}
+        onAddEntry={vi.fn()}
+        onRemoveEntry={vi.fn()}
+        onUpdateEntry={vi.fn()}
+        onExecuteGranted={onExecuteGranted}
+        templates={[{ id: "longsword", label: "Longsword", kind: "item", grantedActions: [
+          { id: "longsword_attack", label: "Longsword Attack", actionKind: "roll", inputs: [] },
+        ] }]}
+      />,
+    );
+    expect(screen.getByTestId("slot-list-inventory")).toBeVisible();
+    // The synthetic projection element is owned by the slot control: exactly
+    // one granted button exists, and it routes through onExecuteGranted.
+    expect(screen.getAllByRole("button", { name: "Longsword Attack" })).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Longsword Attack" }));
+    expect(onExecuteGranted).toHaveBeenCalledWith("aaaaaaaa-1111-4111-8111-111111111111", "longsword_attack", {});
   });
 });

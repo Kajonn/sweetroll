@@ -1,5 +1,25 @@
 # Dynamic sheet objects implementation plan
 
+**Delivery status (2026-10-04):** The dynamic-object implementation and the
+item UI follow-ups are in PR #16 (`feat/dynamic-objects` → `main`). The original
+checkboxes below preserve the task-by-task instructions and are not a reliable
+record of execution order or exact commands. The delivered behavior and
+verification are recorded in
+[`docs/acceptance/dynamic-objects-2026-09-26.md`](../../acceptance/dynamic-objects-2026-09-26.md),
+with verified CI run [#75](https://github.com/Kajonn/sweetroll/actions/runs/37234535137)
+successful after stabilizing the narrow preview snapshot. This plan is complete for its original
+step-1 scope; no remaining task in this file should be read as blocking PR #16.
+
+**Follow-up status (2026-10-05):** The branch now includes typed character-sheet
+editing for templated values, item quantity updates, and an expanded browser
+journey for Longsword hit and damage using the carrying character's Might.
+Template field IDs now use document-wide allocation after the journey found a
+collision with entity fields. [CI run #82](https://github.com/Kajonn/sweetroll/actions/runs/37414970764)
+passed all seven test jobs on commit `2b1c8b74d41abe75602491380aeb9c87b8f7a160`:
+server verification, web, offline, three journey shards (including both
+Longsword rolls and the breaking gate), and visual E2E. Lookups, ongoing
+effects, and trading remain outside this plan.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Characters gain player-managed dynamic entries (inventory items, talents, spells, effects) instantiated from creator-defined templates into typed sheet slots, with template-granted actions resolving against character stats.
@@ -192,7 +212,9 @@
 2. Placeholder scan: fixed during writing — structural test path made exact; Task 7 template-system setup made explicit (was "on the journey fixture content," which lacks templates); Task 5/7 command-split contradiction resolved (executeAction wiring in T5, new kinds in T7); no TBD/TODO; every API payload mirrors a cited existing call; every UI testid cites its source spec.
 3. Type consistency: `ObjectTemplateV1/SlotDefinitionV1/CharacterEntryV1`, `validateEntryForSlot`, `buildEntryScope`, `resolveGrantedAction`, `NominalActionResult`, and the `entryId` intent wiring are named identically in every producing and consuming task above.
 
-## Execution Handoff
+## Historical execution handoff
 
-Owner pre-committed: write plan, then execute in a worktree with subagents (subagent-driven). Proceed to: commit this plan, create the worktree, dispatch Task 1 implementer under superpowers:subagent-driven-development.
+The original handoff called for a worktree and task-by-task execution. The
+implementation has since landed on `feat/dynamic-objects`; use the delivery
+status and acceptance record above for the current state.
 

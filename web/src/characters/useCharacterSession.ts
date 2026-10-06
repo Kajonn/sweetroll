@@ -2,7 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CharacterSession, CharacterSnapshot } from "./session.js";
 
 const loading: CharacterSnapshot = {
-  phase: "loading", confirmed: null, tentative: null, entries: [], editing: { owned: false }, error: null, lastRoll: null,
+  phase: "loading", confirmed: null, tentative: null, entries: [], editing: { owned: false }, error: null, lastRoll: null, lastNominal: null,
   lastMigration: null, pendingOnlineAttempts: [], connected: false,
 };
 const emptySubscribe = () => () => {};

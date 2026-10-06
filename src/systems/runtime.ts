@@ -1,10 +1,18 @@
 import { PublishedPackageCorruptError, type PublishedPackageLoader } from "./implementation/runtime/package-loader.js";
 import { buildCharacterProjection } from "./implementation/runtime/projection.js";
+import { decodeActionInputs, resolveGrantedAction } from "./implementation/runtime/resolve-entries.js";
 import { resolveObservedValues } from "./implementation/runtime/resolve.js";
 import { createDeterministicRng } from "./implementation/runtime/deterministic-rng.js";
 import { buildFieldBindings, decodeRuntimeState, initializeState } from "./implementation/runtime/state.js";
 import { evaluate } from "./implementation/rules/evaluate.js";
-import type { ActionInputV1, EntityDefinitionV1, SystemPackageV1 } from "./implementation/package/schema/index.js";
+import type { CharacterEntryV1, EntityDefinitionV1, SystemPackageV1, TemplateKind } from "./implementation/package/schema/index.js";
+
+export { resolveGrantedAction } from "./implementation/runtime/resolve-entries.js";
+export type {
+  GrantedActionOutcome,
+  GrantedActionOwnership,
+  GrantedActionRequest,
+} from "./implementation/runtime/resolve-entries.js";
 
 export type VersionId = string;
 export type DefinitionId = string;
@@ -20,6 +28,9 @@ export type RuntimeStoredValue =
 export type RuntimeStateV1 = {
   schemaVersion: "1.0";
   values: Record<DefinitionId, RuntimeStoredValue>;
+  // Optional so legacy rows and hand-built states without entries keep
+  // decoding; decodeRuntimeState/initializeState always normalize to present.
+  entries?: Record<string, CharacterEntryV1>;
 };
 
 export type RuntimeIntent =
@@ -32,6 +43,12 @@ export type RuntimeIntent =
       actionId: DefinitionId;
       inputs: Record<DefinitionId, unknown>;
       executionId: CommandExecutionId;
+      /**
+       * Task 5: template-granted actions execute against the named character
+       * entry. Absent = entity action (unchanged path). Entry commands
+       * (add/remove/edit) belong to Task 7; only execution wires through here.
+       */
+      entryId?: string;
     };
 
 export type RuntimeRequest = {
@@ -76,6 +93,18 @@ export type NormalizedRoll = {
   total: number;
   output: string;
   audience: NormalizedRollAudience;
+};
+
+/**
+ * Task 5: activity-only outcome of a nominal template-granted action
+ * (template action flagged `nominal: true`). No evaluation, no state change,
+ * no roll — the caller records activity and surfaces `output` as display
+ * text. Consumed by Task 7 (entry commands + sheet UI).
+ */
+export type NominalActionResult = {
+  actionId: DefinitionId;
+  entryId: string;
+  output: string;
 };
 
 export type CharacterProjectionChoice = {
@@ -147,7 +176,28 @@ export type CharacterProjectionElement =
       actionKind: "roll" | "resourceBump";
       inputs: CharacterProjectionActionInput[];
       validations: RuntimeValidation[];
+      /**
+       * Task 5: set on synthetic granted-action elements projected after
+       * their entry inside a slot. Absent = sheet-placed entity action.
+       */
+      entryId?: string;
+    }
+  | {
+      kind: "slot";
+      id: DefinitionId;
+      slotId: DefinitionId;
+      label: string;
+      accepts: TemplateKind[];
+      entries: CharacterProjectionSlotEntry[];
     };
+
+export type CharacterProjectionSlotEntry = {
+  entryId: string;
+  templateId: DefinitionId | null;
+  label: string;
+  values: Record<string, unknown>;
+  quantity?: number;
+};
 
 export type CharacterProjectionSection = {
   id: DefinitionId;
@@ -182,6 +232,7 @@ export type RuntimeResolution = {
   validations: RuntimeValidation[];
   changedDefinitionIds: DefinitionId[];
   roll: NormalizedRoll | null;
+  nominal: NominalActionResult | null;
   projection: CharacterProjectionV1;
 };
 
@@ -260,6 +311,8 @@ export function createSystemRuntime(input: {
         executionId: CommandExecutionId;
         outputTemplate: string;
       } | null = null;
+      let roll: NormalizedRoll | null = null;
+      let nominal: NominalActionResult | null = null;
       if (request.intent.kind === "initialize") {
         if (request.state !== undefined) {
           return { ok: false, error: { code: "bad_request", message: "Initialize does not accept existing state." } };
@@ -304,6 +357,22 @@ export function createSystemRuntime(input: {
           if (!bumped.ok) return bumped;
           stateResult = { ok: true, value: bumped.value };
           changedDefinitionIds = [request.intent.resourceId];
+        } else if (request.intent.kind === "action" && request.intent.entryId !== undefined) {
+          const granted = resolveGrantedAction({
+            packageValue,
+            entity,
+            state: stateResult.value,
+            entryId: request.intent.entryId,
+            actionId: request.intent.actionId,
+            inputs: request.intent.inputs,
+            executionId: request.intent.executionId,
+            authoritativeRollSecret: input.authoritativeRollSecret,
+          });
+          if (!granted.ok) return granted;
+          stateResult = { ok: true, value: granted.value.state };
+          changedDefinitionIds = granted.value.changedDefinitionIds;
+          roll = granted.value.roll;
+          nominal = granted.value.nominal;
         } else {
           const action = findOwnedAction(packageValue, entity.id, request.intent.actionId);
           if (action === undefined) return badRequest("Action does not belong to the entity.", request.intent.actionId);
@@ -342,7 +411,6 @@ export function createSystemRuntime(input: {
 
       const observed = resolveObservedValues(packageValue, entity, stateResult.value);
       if (!observed.ok) return observed;
-      let roll: NormalizedRoll | null = null;
       if (pendingRoll !== null) {
         const expression = packageValue.expressions.find((candidate) => candidate.id === pendingRoll.expressionId);
         if (expression === undefined || expression.context !== "roll") return invalidPackage(pendingRoll.expressionId);
@@ -387,6 +455,7 @@ export function createSystemRuntime(input: {
           validations: observed.value.validations,
           changedDefinitionIds,
           roll,
+          nominal,
           projection,
         },
       };
@@ -429,39 +498,6 @@ function findOwnedAction(packageValue: SystemPackageV1, entityId: string, action
       section.elements.some((element) => element.kind === "action" && element.actionId === actionId)
     ));
   return owned ? packageValue.actions.find((action) => action.id === actionId) : undefined;
-}
-
-function decodeActionInputs(
-  definitions: ActionInputV1[],
-  supplied: Record<string, unknown>,
-): RuntimeResult<Record<string, RuntimeScalar>> {
-  const byId = new Map(definitions.map((definition) => [definition.id, definition]));
-  for (const id of Object.keys(supplied)) {
-    if (!byId.has(id)) return badRequest("Action input is unknown.", id);
-  }
-  const values: Record<string, RuntimeScalar> = {};
-  for (const definition of definitions) {
-    if (definition.required && !Object.hasOwn(supplied, definition.id)) {
-      return badRequest("Required action input is missing.", definition.id);
-    }
-    const value = Object.hasOwn(supplied, definition.id) ? supplied[definition.id] : definition.default;
-    if (!validActionInput(definition, value)) return badRequest("Action input value is invalid.", definition.id);
-    values[definition.id] = value as RuntimeScalar;
-  }
-  return { ok: true, value: values };
-}
-
-function validActionInput(definition: ActionInputV1, value: unknown): boolean {
-  switch (definition.valueType) {
-    case "integer":
-      return Number.isInteger(value);
-    case "decimal":
-      return typeof value === "number" && Number.isFinite(value);
-    case "boolean":
-      return typeof value === "boolean";
-    case "text":
-      return typeof value === "string";
-  }
 }
 
 function changeResource(

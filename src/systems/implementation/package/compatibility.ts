@@ -7,7 +7,11 @@ export type CompatibilityCode =
   | "breaking_action_removed"
   | "breaking_validation_removed"
   | "breaking_expression_context_change"
-  | "breaking_expression_result_type_change";
+  | "breaking_expression_result_type_change"
+  | "template_removed"
+  | "template_action_removed"
+  | "slot_removed"
+  | "slot_kind_narrowed";
 
 export type CompatibilityFinding = {
   code: CompatibilityCode;
@@ -98,6 +102,56 @@ export function comparePackages(prev: SystemPackageV1, next: SystemPackageV1): C
         code: "breaking_validation_removed",
         path: `/validations/${id}`,
         message: `Validation "${id}" was removed.`,
+      });
+    }
+  }
+
+  // Dynamic sheet objects: templates/slots are Type.Optional, so packages
+  // without them compare exactly as before. Adding templates, slots, or
+  // granted actions is non-breaking; removals and slot-kind narrowing break
+  // live entries and take the acknowledge-breaking path.
+  const prevTemplates = indexById(prev.templates ?? []);
+  const nextTemplates = indexById(next.templates ?? []);
+  for (const [id, prevTemplate] of prevTemplates) {
+    const nextTemplate = nextTemplates.get(id);
+    if (nextTemplate === undefined) {
+      findings.push({
+        code: "template_removed",
+        path: `/templates/${id}`,
+        message: `Template "${id}" was removed.`,
+      });
+      continue;
+    }
+    const prevGranted = indexById(prevTemplate.grantedActions ?? []);
+    for (const [actionId] of prevGranted) {
+      if (!(nextTemplate.grantedActions ?? []).some((a) => a.id === actionId)) {
+        findings.push({
+          code: "template_action_removed",
+          path: `/templates/${id}/grantedActions/${actionId}`,
+          message: `Granted action "${actionId}" was removed from template "${id}".`,
+        });
+      }
+    }
+  }
+
+  const prevSlots = indexById(prev.slots ?? []);
+  const nextSlots = indexById(next.slots ?? []);
+  for (const [id, prevSlot] of prevSlots) {
+    const nextSlot = nextSlots.get(id);
+    if (nextSlot === undefined) {
+      findings.push({
+        code: "slot_removed",
+        path: `/slots/${id}`,
+        message: `Slot "${id}" was removed.`,
+      });
+      continue;
+    }
+    const narrowed = prevSlot.accepts.filter((kind) => !nextSlot.accepts.includes(kind));
+    if (narrowed.length > 0) {
+      findings.push({
+        code: "slot_kind_narrowed",
+        path: `/slots/${id}/accepts`,
+        message: `Slot "${id}" no longer accepts ${narrowed.map((kind) => `"${kind}"`).join(", ")}.`,
       });
     }
   }

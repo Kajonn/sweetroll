@@ -308,6 +308,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/characters/{characterId}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_characters_characterId_entries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/entries/{entryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_characters_characterId_entries_entryId"];
+        options?: never;
+        head?: never;
+        patch: operations["patch_characters_characterId_entries_entryId"];
+        trace?: never;
+    };
+    "/characters/{characterId}/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_characters_characterId_templates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/characters/{characterId}/ownership-transfer": {
         parameters: {
             query?: never;
@@ -2863,6 +2911,17 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
+                                entries?: {
+                                    [key: string]: {
+                                        entryId: string;
+                                        slotId: string;
+                                        templateId: string | null;
+                                        values: {
+                                            [key: string]: unknown;
+                                        };
+                                        quantity?: number;
+                                    };
+                                };
                             };
                             derivedValues: {
                                 [key: string]: string | number | boolean | null;
@@ -2989,6 +3048,23 @@ export interface operations {
                                                 severity: "error" | "warning";
                                                 message: string;
                                                 targetDefinitionId: string;
+                                            }[];
+                                            entryId?: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "slot";
+                                            id: string;
+                                            slotId: string;
+                                            label: string;
+                                            accepts: ("item" | "spell" | "talent" | "effect")[];
+                                            entries: {
+                                                entryId: string;
+                                                templateId: string | null;
+                                                label: string;
+                                                values: {
+                                                    [key: string]: unknown;
+                                                };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];
@@ -3521,6 +3597,17 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
+                                entries?: {
+                                    [key: string]: {
+                                        entryId: string;
+                                        slotId: string;
+                                        templateId: string | null;
+                                        values: {
+                                            [key: string]: unknown;
+                                        };
+                                        quantity?: number;
+                                    };
+                                };
                             };
                             derivedValues: {
                                 [key: string]: string | number | boolean | null;
@@ -3647,6 +3734,23 @@ export interface operations {
                                                 severity: "error" | "warning";
                                                 message: string;
                                                 targetDefinitionId: string;
+                                            }[];
+                                            entryId?: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "slot";
+                                            id: string;
+                                            slotId: string;
+                                            label: string;
+                                            accepts: ("item" | "spell" | "talent" | "effect")[];
+                                            entries: {
+                                                entryId: string;
+                                                templateId: string | null;
+                                                label: string;
+                                                values: {
+                                                    [key: string]: unknown;
+                                                };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];
@@ -3834,6 +3938,17 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
+                                    entries?: {
+                                        [key: string]: {
+                                            entryId: string;
+                                            slotId: string;
+                                            templateId: string | null;
+                                            values: {
+                                                [key: string]: unknown;
+                                            };
+                                            quantity?: number;
+                                        };
+                                    };
                                 };
                                 derivedValues: {
                                     [key: string]: string | number | boolean | null;
@@ -3961,6 +4076,23 @@ export interface operations {
                                                     message: string;
                                                     targetDefinitionId: string;
                                                 }[];
+                                                entryId?: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "slot";
+                                                id: string;
+                                                slotId: string;
+                                                label: string;
+                                                accepts: ("item" | "spell" | "talent" | "effect")[];
+                                                entries: {
+                                                    entryId: string;
+                                                    templateId: string | null;
+                                                    label: string;
+                                                    values: {
+                                                        [key: string]: unknown;
+                                                    };
+                                                    quantity?: number;
+                                                }[];
                                             })[];
                                         }[];
                                     }[];
@@ -4007,6 +4139,11 @@ export interface operations {
                                 total: number;
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
                             } | null;
                         };
                         requestId: string;
@@ -4226,6 +4363,17 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
+                                    entries?: {
+                                        [key: string]: {
+                                            entryId: string;
+                                            slotId: string;
+                                            templateId: string | null;
+                                            values: {
+                                                [key: string]: unknown;
+                                            };
+                                            quantity?: number;
+                                        };
+                                    };
                                 };
                                 derivedValues: {
                                     [key: string]: string | number | boolean | null;
@@ -4353,6 +4501,23 @@ export interface operations {
                                                     message: string;
                                                     targetDefinitionId: string;
                                                 }[];
+                                                entryId?: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "slot";
+                                                id: string;
+                                                slotId: string;
+                                                label: string;
+                                                accepts: ("item" | "spell" | "talent" | "effect")[];
+                                                entries: {
+                                                    entryId: string;
+                                                    templateId: string | null;
+                                                    label: string;
+                                                    values: {
+                                                        [key: string]: unknown;
+                                                    };
+                                                    quantity?: number;
+                                                }[];
                                             })[];
                                         }[];
                                     }[];
@@ -4399,6 +4564,11 @@ export interface operations {
                                 total: number;
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
                             } | null;
                         };
                         requestId: string;
@@ -4618,6 +4788,17 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
+                                    entries?: {
+                                        [key: string]: {
+                                            entryId: string;
+                                            slotId: string;
+                                            templateId: string | null;
+                                            values: {
+                                                [key: string]: unknown;
+                                            };
+                                            quantity?: number;
+                                        };
+                                    };
                                 };
                                 derivedValues: {
                                     [key: string]: string | number | boolean | null;
@@ -4745,6 +4926,23 @@ export interface operations {
                                                     message: string;
                                                     targetDefinitionId: string;
                                                 }[];
+                                                entryId?: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "slot";
+                                                id: string;
+                                                slotId: string;
+                                                label: string;
+                                                accepts: ("item" | "spell" | "talent" | "effect")[];
+                                                entries: {
+                                                    entryId: string;
+                                                    templateId: string | null;
+                                                    label: string;
+                                                    values: {
+                                                        [key: string]: unknown;
+                                                    };
+                                                    quantity?: number;
+                                                }[];
                                             })[];
                                         }[];
                                     }[];
@@ -4791,6 +4989,11 @@ export interface operations {
                                 total: number;
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
                             } | null;
                         };
                         requestId: string;
@@ -4975,6 +5178,7 @@ export interface operations {
                         [key: string]: unknown;
                     };
                     audience?: "owner_only" | "gm_only" | "campaign";
+                    entryId?: string;
                     expectedRevision: number;
                     idempotencyKey: string;
                 };
@@ -5012,6 +5216,17 @@ export interface operations {
                                     schemaVersion: "1.0";
                                     values: {
                                         [key: string]: unknown;
+                                    };
+                                    entries?: {
+                                        [key: string]: {
+                                            entryId: string;
+                                            slotId: string;
+                                            templateId: string | null;
+                                            values: {
+                                                [key: string]: unknown;
+                                            };
+                                            quantity?: number;
+                                        };
                                     };
                                 };
                                 derivedValues: {
@@ -5140,6 +5355,23 @@ export interface operations {
                                                     message: string;
                                                     targetDefinitionId: string;
                                                 }[];
+                                                entryId?: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "slot";
+                                                id: string;
+                                                slotId: string;
+                                                label: string;
+                                                accepts: ("item" | "spell" | "talent" | "effect")[];
+                                                entries: {
+                                                    entryId: string;
+                                                    templateId: string | null;
+                                                    label: string;
+                                                    values: {
+                                                        [key: string]: unknown;
+                                                    };
+                                                    quantity?: number;
+                                                }[];
                                             })[];
                                         }[];
                                     }[];
@@ -5186,6 +5418,11 @@ export interface operations {
                                 total: number;
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
                             } | null;
                         };
                         requestId: string;
@@ -5353,7 +5590,7 @@ export interface operations {
             };
         };
     };
-    post_characters_characterId_ownership_transfer: {
+    post_characters_characterId_entries: {
         parameters: {
             query?: never;
             header?: never;
@@ -5365,8 +5602,16 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    /** Format: uuid */
-                    toUserId: string;
+                    entry: {
+                        /** Format: uuid */
+                        entryId: string;
+                        slotId: string;
+                        templateId: string | null;
+                        values: {
+                            [key: string]: unknown;
+                        };
+                        quantity?: number;
+                    };
                     expectedRevision: number;
                     idempotencyKey: string;
                 };
@@ -5404,6 +5649,17 @@ export interface operations {
                                     schemaVersion: "1.0";
                                     values: {
                                         [key: string]: unknown;
+                                    };
+                                    entries?: {
+                                        [key: string]: {
+                                            entryId: string;
+                                            slotId: string;
+                                            templateId: string | null;
+                                            values: {
+                                                [key: string]: unknown;
+                                            };
+                                            quantity?: number;
+                                        };
                                     };
                                 };
                                 derivedValues: {
@@ -5532,6 +5788,23 @@ export interface operations {
                                                     message: string;
                                                     targetDefinitionId: string;
                                                 }[];
+                                                entryId?: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "slot";
+                                                id: string;
+                                                slotId: string;
+                                                label: string;
+                                                accepts: ("item" | "spell" | "talent" | "effect")[];
+                                                entries: {
+                                                    entryId: string;
+                                                    templateId: string | null;
+                                                    label: string;
+                                                    values: {
+                                                        [key: string]: unknown;
+                                                    };
+                                                    quantity?: number;
+                                                }[];
                                             })[];
                                         }[];
                                     }[];
@@ -5578,6 +5851,1524 @@ export interface operations {
                                 total: number;
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
+                            } | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    delete_characters_characterId_entries_entryId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                entryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    expectedRevision: number;
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        result: {
+                            character: {
+                                /** Format: uuid */
+                                characterId: string;
+                                ownerId: string | null;
+                                campaignId: string | null;
+                                controllers: string[];
+                                placementGeneration: number;
+                                returnOwnerId: string | null;
+                                name: string;
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                entityDefinitionId: string;
+                                revision: number;
+                                lifecycle: "active" | "archived";
+                                archivedAt: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                                state: {
+                                    /** @constant */
+                                    schemaVersion: "1.0";
+                                    values: {
+                                        [key: string]: unknown;
+                                    };
+                                    entries?: {
+                                        [key: string]: {
+                                            entryId: string;
+                                            slotId: string;
+                                            templateId: string | null;
+                                            values: {
+                                                [key: string]: unknown;
+                                            };
+                                            quantity?: number;
+                                        };
+                                    };
+                                };
+                                derivedValues: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                                projection: {
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    entityId: string;
+                                    entityLabel: string;
+                                    completionFields?: {
+                                        /** @constant */
+                                        kind: "field";
+                                        id: string;
+                                        fieldId: string;
+                                        label: string;
+                                        fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                        value: string | number | boolean | null | string[];
+                                        editable: boolean;
+                                        constraints: {
+                                            required?: boolean;
+                                            min?: number;
+                                            max?: number;
+                                            step?: number;
+                                            minLength?: number;
+                                            maxLength?: number;
+                                            options?: {
+                                                id: string;
+                                                label: string;
+                                            }[];
+                                        };
+                                        validations: {
+                                            validationId: string;
+                                            severity: "error" | "warning";
+                                            message: string;
+                                            targetDefinitionId: string;
+                                        }[];
+                                    }[];
+                                    sheets: {
+                                        id: string;
+                                        label: string;
+                                        sections: {
+                                            id: string;
+                                            label: string;
+                                            elements: ({
+                                                /** @constant */
+                                                kind: "heading";
+                                                id: string;
+                                                text: string;
+                                                level: 2 | 3;
+                                            } | {
+                                                /** @constant */
+                                                kind: "field";
+                                                id: string;
+                                                fieldId: string;
+                                                label: string;
+                                                fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                                value: string | number | boolean | null | string[];
+                                                editable: boolean;
+                                                constraints: {
+                                                    required?: boolean;
+                                                    min?: number;
+                                                    max?: number;
+                                                    step?: number;
+                                                    minLength?: number;
+                                                    maxLength?: number;
+                                                    options?: {
+                                                        id: string;
+                                                        label: string;
+                                                    }[];
+                                                };
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "resource";
+                                                id: string;
+                                                resourceId: string;
+                                                label: string;
+                                                value: {
+                                                    current: number;
+                                                    max: number;
+                                                };
+                                                min: number;
+                                                max: number;
+                                                step: number;
+                                                resetTo: "min" | "max";
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "action";
+                                                id: string;
+                                                actionId: string;
+                                                label: string;
+                                                actionKind: "roll" | "resourceBump";
+                                                inputs: {
+                                                    id: string;
+                                                    label: string;
+                                                    valueType: "integer" | "decimal" | "boolean" | "text";
+                                                    required: boolean;
+                                                    default: string | number | boolean | null;
+                                                }[];
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                                entryId?: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "slot";
+                                                id: string;
+                                                slotId: string;
+                                                label: string;
+                                                accepts: ("item" | "spell" | "talent" | "effect")[];
+                                                entries: {
+                                                    entryId: string;
+                                                    templateId: string | null;
+                                                    label: string;
+                                                    values: {
+                                                        [key: string]: unknown;
+                                                    };
+                                                    quantity?: number;
+                                                }[];
+                                            })[];
+                                        }[];
+                                    }[];
+                                    derivedValues: {
+                                        [key: string]: string | number | boolean | null;
+                                    };
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                };
+                                reconciliation: {
+                                    /** Format: uuid */
+                                    characterId: string;
+                                    baseRevision: number | null;
+                                    revision: number;
+                                    packageChecksum: string;
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    commandExecutionId: string;
+                                    /** Format: date-time */
+                                    replayExpiresAt: string;
+                                    replayed: boolean;
+                                    changedDefinitionIds: string[];
+                                    activityCursor: string | null;
+                                    cacheDisposition: "retain" | "replace" | "purge";
+                                };
+                            };
+                            roll: {
+                                actionId: string;
+                                expression: string;
+                                dice: {
+                                    sides: number;
+                                    value: number;
+                                    kept: boolean;
+                                }[];
+                                bindings: {
+                                    scope: "fields" | "inputs";
+                                    definitionId: string;
+                                    value: string | number | boolean | null;
+                                }[];
+                                total: number;
+                                output: string;
+                                audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
+                            } | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    patch_characters_characterId_entries_entryId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                entryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    values: {
+                        [key: string]: unknown;
+                    };
+                    quantity?: number;
+                    expectedRevision: number;
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        result: {
+                            character: {
+                                /** Format: uuid */
+                                characterId: string;
+                                ownerId: string | null;
+                                campaignId: string | null;
+                                controllers: string[];
+                                placementGeneration: number;
+                                returnOwnerId: string | null;
+                                name: string;
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                entityDefinitionId: string;
+                                revision: number;
+                                lifecycle: "active" | "archived";
+                                archivedAt: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                                state: {
+                                    /** @constant */
+                                    schemaVersion: "1.0";
+                                    values: {
+                                        [key: string]: unknown;
+                                    };
+                                    entries?: {
+                                        [key: string]: {
+                                            entryId: string;
+                                            slotId: string;
+                                            templateId: string | null;
+                                            values: {
+                                                [key: string]: unknown;
+                                            };
+                                            quantity?: number;
+                                        };
+                                    };
+                                };
+                                derivedValues: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                                projection: {
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    entityId: string;
+                                    entityLabel: string;
+                                    completionFields?: {
+                                        /** @constant */
+                                        kind: "field";
+                                        id: string;
+                                        fieldId: string;
+                                        label: string;
+                                        fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                        value: string | number | boolean | null | string[];
+                                        editable: boolean;
+                                        constraints: {
+                                            required?: boolean;
+                                            min?: number;
+                                            max?: number;
+                                            step?: number;
+                                            minLength?: number;
+                                            maxLength?: number;
+                                            options?: {
+                                                id: string;
+                                                label: string;
+                                            }[];
+                                        };
+                                        validations: {
+                                            validationId: string;
+                                            severity: "error" | "warning";
+                                            message: string;
+                                            targetDefinitionId: string;
+                                        }[];
+                                    }[];
+                                    sheets: {
+                                        id: string;
+                                        label: string;
+                                        sections: {
+                                            id: string;
+                                            label: string;
+                                            elements: ({
+                                                /** @constant */
+                                                kind: "heading";
+                                                id: string;
+                                                text: string;
+                                                level: 2 | 3;
+                                            } | {
+                                                /** @constant */
+                                                kind: "field";
+                                                id: string;
+                                                fieldId: string;
+                                                label: string;
+                                                fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                                value: string | number | boolean | null | string[];
+                                                editable: boolean;
+                                                constraints: {
+                                                    required?: boolean;
+                                                    min?: number;
+                                                    max?: number;
+                                                    step?: number;
+                                                    minLength?: number;
+                                                    maxLength?: number;
+                                                    options?: {
+                                                        id: string;
+                                                        label: string;
+                                                    }[];
+                                                };
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "resource";
+                                                id: string;
+                                                resourceId: string;
+                                                label: string;
+                                                value: {
+                                                    current: number;
+                                                    max: number;
+                                                };
+                                                min: number;
+                                                max: number;
+                                                step: number;
+                                                resetTo: "min" | "max";
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "action";
+                                                id: string;
+                                                actionId: string;
+                                                label: string;
+                                                actionKind: "roll" | "resourceBump";
+                                                inputs: {
+                                                    id: string;
+                                                    label: string;
+                                                    valueType: "integer" | "decimal" | "boolean" | "text";
+                                                    required: boolean;
+                                                    default: string | number | boolean | null;
+                                                }[];
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                                entryId?: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "slot";
+                                                id: string;
+                                                slotId: string;
+                                                label: string;
+                                                accepts: ("item" | "spell" | "talent" | "effect")[];
+                                                entries: {
+                                                    entryId: string;
+                                                    templateId: string | null;
+                                                    label: string;
+                                                    values: {
+                                                        [key: string]: unknown;
+                                                    };
+                                                    quantity?: number;
+                                                }[];
+                                            })[];
+                                        }[];
+                                    }[];
+                                    derivedValues: {
+                                        [key: string]: string | number | boolean | null;
+                                    };
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                };
+                                reconciliation: {
+                                    /** Format: uuid */
+                                    characterId: string;
+                                    baseRevision: number | null;
+                                    revision: number;
+                                    packageChecksum: string;
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    commandExecutionId: string;
+                                    /** Format: date-time */
+                                    replayExpiresAt: string;
+                                    replayed: boolean;
+                                    changedDefinitionIds: string[];
+                                    activityCursor: string | null;
+                                    cacheDisposition: "retain" | "replace" | "purge";
+                                };
+                            };
+                            roll: {
+                                actionId: string;
+                                expression: string;
+                                dice: {
+                                    sides: number;
+                                    value: number;
+                                    kept: boolean;
+                                }[];
+                                bindings: {
+                                    scope: "fields" | "inputs";
+                                    definitionId: string;
+                                    value: string | number | boolean | null;
+                                }[];
+                                total: number;
+                                output: string;
+                                audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
+                            } | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_characters_characterId_templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        templates: {
+                            id: string;
+                            label: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            fields: ({
+                                /** @constant */
+                                kind: "text";
+                                id: string;
+                                label: string;
+                                default: string;
+                                required: boolean;
+                                minLength: number;
+                                maxLength: number;
+                            } | {
+                                /** @constant */
+                                kind: "integer";
+                                id: string;
+                                label: string;
+                                default: number;
+                                required: boolean;
+                                min: number;
+                                max: number;
+                                step: number;
+                            } | {
+                                /** @constant */
+                                kind: "decimal";
+                                id: string;
+                                label: string;
+                                default: number;
+                                required: boolean;
+                                min: number;
+                                max: number;
+                                step: number;
+                            } | {
+                                /** @constant */
+                                kind: "boolean";
+                                id: string;
+                                label: string;
+                                default: boolean;
+                                required: boolean;
+                            } | {
+                                /** @constant */
+                                kind: "singleChoice";
+                                id: string;
+                                label: string;
+                                required: boolean;
+                                default: string | null;
+                                options: {
+                                    id: string;
+                                    label: string;
+                                }[];
+                            } | {
+                                /** @constant */
+                                kind: "multiChoice";
+                                id: string;
+                                label: string;
+                                required: boolean;
+                                default: string[];
+                                options: {
+                                    id: string;
+                                    label: string;
+                                }[];
+                            } | {
+                                /** @constant */
+                                kind: "resource";
+                                id: string;
+                                label: string;
+                                default: {
+                                    current: number;
+                                    max: number;
+                                };
+                                min: number;
+                                max: number;
+                                step: number;
+                                resetTo: "min" | "max";
+                            } | {
+                                /** @constant */
+                                kind: "computed";
+                                id: string;
+                                label: string;
+                                valueType: "number" | "text" | "boolean";
+                                expressionId: string;
+                            } | {
+                                /** @constant */
+                                kind: "image";
+                                id: string;
+                                label: string;
+                                required: boolean;
+                            })[];
+                            grantedActions: {
+                                id: string;
+                                label: string;
+                                actionKind: "roll" | "resourceBump";
+                                inputs: {
+                                    id: string;
+                                    label: string;
+                                    valueType: "integer" | "decimal" | "boolean" | "text";
+                                    required: boolean;
+                                    default: string | number | boolean | null;
+                                }[];
+                            }[];
+                        }[];
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_characters_characterId_ownership_transfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    toUserId: string;
+                    expectedRevision: number;
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        result: {
+                            character: {
+                                /** Format: uuid */
+                                characterId: string;
+                                ownerId: string | null;
+                                campaignId: string | null;
+                                controllers: string[];
+                                placementGeneration: number;
+                                returnOwnerId: string | null;
+                                name: string;
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                entityDefinitionId: string;
+                                revision: number;
+                                lifecycle: "active" | "archived";
+                                archivedAt: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                                state: {
+                                    /** @constant */
+                                    schemaVersion: "1.0";
+                                    values: {
+                                        [key: string]: unknown;
+                                    };
+                                    entries?: {
+                                        [key: string]: {
+                                            entryId: string;
+                                            slotId: string;
+                                            templateId: string | null;
+                                            values: {
+                                                [key: string]: unknown;
+                                            };
+                                            quantity?: number;
+                                        };
+                                    };
+                                };
+                                derivedValues: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                                projection: {
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    entityId: string;
+                                    entityLabel: string;
+                                    completionFields?: {
+                                        /** @constant */
+                                        kind: "field";
+                                        id: string;
+                                        fieldId: string;
+                                        label: string;
+                                        fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                        value: string | number | boolean | null | string[];
+                                        editable: boolean;
+                                        constraints: {
+                                            required?: boolean;
+                                            min?: number;
+                                            max?: number;
+                                            step?: number;
+                                            minLength?: number;
+                                            maxLength?: number;
+                                            options?: {
+                                                id: string;
+                                                label: string;
+                                            }[];
+                                        };
+                                        validations: {
+                                            validationId: string;
+                                            severity: "error" | "warning";
+                                            message: string;
+                                            targetDefinitionId: string;
+                                        }[];
+                                    }[];
+                                    sheets: {
+                                        id: string;
+                                        label: string;
+                                        sections: {
+                                            id: string;
+                                            label: string;
+                                            elements: ({
+                                                /** @constant */
+                                                kind: "heading";
+                                                id: string;
+                                                text: string;
+                                                level: 2 | 3;
+                                            } | {
+                                                /** @constant */
+                                                kind: "field";
+                                                id: string;
+                                                fieldId: string;
+                                                label: string;
+                                                fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                                value: string | number | boolean | null | string[];
+                                                editable: boolean;
+                                                constraints: {
+                                                    required?: boolean;
+                                                    min?: number;
+                                                    max?: number;
+                                                    step?: number;
+                                                    minLength?: number;
+                                                    maxLength?: number;
+                                                    options?: {
+                                                        id: string;
+                                                        label: string;
+                                                    }[];
+                                                };
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "resource";
+                                                id: string;
+                                                resourceId: string;
+                                                label: string;
+                                                value: {
+                                                    current: number;
+                                                    max: number;
+                                                };
+                                                min: number;
+                                                max: number;
+                                                step: number;
+                                                resetTo: "min" | "max";
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "action";
+                                                id: string;
+                                                actionId: string;
+                                                label: string;
+                                                actionKind: "roll" | "resourceBump";
+                                                inputs: {
+                                                    id: string;
+                                                    label: string;
+                                                    valueType: "integer" | "decimal" | "boolean" | "text";
+                                                    required: boolean;
+                                                    default: string | number | boolean | null;
+                                                }[];
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                                entryId?: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "slot";
+                                                id: string;
+                                                slotId: string;
+                                                label: string;
+                                                accepts: ("item" | "spell" | "talent" | "effect")[];
+                                                entries: {
+                                                    entryId: string;
+                                                    templateId: string | null;
+                                                    label: string;
+                                                    values: {
+                                                        [key: string]: unknown;
+                                                    };
+                                                    quantity?: number;
+                                                }[];
+                                            })[];
+                                        }[];
+                                    }[];
+                                    derivedValues: {
+                                        [key: string]: string | number | boolean | null;
+                                    };
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                };
+                                reconciliation: {
+                                    /** Format: uuid */
+                                    characterId: string;
+                                    baseRevision: number | null;
+                                    revision: number;
+                                    packageChecksum: string;
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    commandExecutionId: string;
+                                    /** Format: date-time */
+                                    replayExpiresAt: string;
+                                    replayed: boolean;
+                                    changedDefinitionIds: string[];
+                                    activityCursor: string | null;
+                                    cacheDisposition: "retain" | "replace" | "purge";
+                                };
+                            };
+                            roll: {
+                                actionId: string;
+                                expression: string;
+                                dice: {
+                                    sides: number;
+                                    value: number;
+                                    kept: boolean;
+                                }[];
+                                bindings: {
+                                    scope: "fields" | "inputs";
+                                    definitionId: string;
+                                    value: string | number | boolean | null;
+                                }[];
+                                total: number;
+                                output: string;
+                                audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
                             } | null;
                         };
                         requestId: string;
@@ -5793,6 +7584,17 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
+                                entries?: {
+                                    [key: string]: {
+                                        entryId: string;
+                                        slotId: string;
+                                        templateId: string | null;
+                                        values: {
+                                            [key: string]: unknown;
+                                        };
+                                        quantity?: number;
+                                    };
+                                };
                             };
                             derivedValues: {
                                 [key: string]: string | number | boolean | null;
@@ -5919,6 +7721,23 @@ export interface operations {
                                                 severity: "error" | "warning";
                                                 message: string;
                                                 targetDefinitionId: string;
+                                            }[];
+                                            entryId?: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "slot";
+                                            id: string;
+                                            slotId: string;
+                                            label: string;
+                                            accepts: ("item" | "spell" | "talent" | "effect")[];
+                                            entries: {
+                                                entryId: string;
+                                                templateId: string | null;
+                                                label: string;
+                                                values: {
+                                                    [key: string]: unknown;
+                                                };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];
@@ -6305,6 +8124,17 @@ export interface operations {
                             values: {
                                 [key: string]: unknown;
                             };
+                            entries?: {
+                                [key: string]: {
+                                    entryId: string;
+                                    slotId: string;
+                                    templateId: string | null;
+                                    values: {
+                                        [key: string]: unknown;
+                                    };
+                                    quantity?: number;
+                                };
+                            };
                         };
                         migrationLineage: {
                             /** Format: uuid */
@@ -6451,6 +8281,17 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
+                                entries?: {
+                                    [key: string]: {
+                                        entryId: string;
+                                        slotId: string;
+                                        templateId: string | null;
+                                        values: {
+                                            [key: string]: unknown;
+                                        };
+                                        quantity?: number;
+                                    };
+                                };
                             };
                             candidateProjection: {
                                 /** @constant */
@@ -6568,6 +8409,23 @@ export interface operations {
                                                 severity: "error" | "warning";
                                                 message: string;
                                                 targetDefinitionId: string;
+                                            }[];
+                                            entryId?: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "slot";
+                                            id: string;
+                                            slotId: string;
+                                            label: string;
+                                            accepts: ("item" | "spell" | "talent" | "effect")[];
+                                            entries: {
+                                                entryId: string;
+                                                templateId: string | null;
+                                                label: string;
+                                                values: {
+                                                    [key: string]: unknown;
+                                                };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];
@@ -6802,6 +8660,17 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
+                                    entries?: {
+                                        [key: string]: {
+                                            entryId: string;
+                                            slotId: string;
+                                            templateId: string | null;
+                                            values: {
+                                                [key: string]: unknown;
+                                            };
+                                            quantity?: number;
+                                        };
+                                    };
                                 };
                                 derivedValues: {
                                     [key: string]: string | number | boolean | null;
@@ -6929,6 +8798,23 @@ export interface operations {
                                                     message: string;
                                                     targetDefinitionId: string;
                                                 }[];
+                                                entryId?: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "slot";
+                                                id: string;
+                                                slotId: string;
+                                                label: string;
+                                                accepts: ("item" | "spell" | "talent" | "effect")[];
+                                                entries: {
+                                                    entryId: string;
+                                                    templateId: string | null;
+                                                    label: string;
+                                                    values: {
+                                                        [key: string]: unknown;
+                                                    };
+                                                    quantity?: number;
+                                                }[];
                                             })[];
                                         }[];
                                     }[];
@@ -6975,6 +8861,11 @@ export interface operations {
                                 total: number;
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
                             } | null;
                         };
                         requestId: string;
@@ -7192,6 +9083,17 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
+                                    entries?: {
+                                        [key: string]: {
+                                            entryId: string;
+                                            slotId: string;
+                                            templateId: string | null;
+                                            values: {
+                                                [key: string]: unknown;
+                                            };
+                                            quantity?: number;
+                                        };
+                                    };
                                 };
                                 derivedValues: {
                                     [key: string]: string | number | boolean | null;
@@ -7319,6 +9221,23 @@ export interface operations {
                                                     message: string;
                                                     targetDefinitionId: string;
                                                 }[];
+                                                entryId?: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "slot";
+                                                id: string;
+                                                slotId: string;
+                                                label: string;
+                                                accepts: ("item" | "spell" | "talent" | "effect")[];
+                                                entries: {
+                                                    entryId: string;
+                                                    templateId: string | null;
+                                                    label: string;
+                                                    values: {
+                                                        [key: string]: unknown;
+                                                    };
+                                                    quantity?: number;
+                                                }[];
                                             })[];
                                         }[];
                                     }[];
@@ -7365,6 +9284,11 @@ export interface operations {
                                 total: number;
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
                             } | null;
                         };
                         requestId: string;
@@ -9917,6 +11841,17 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
+                                entries?: {
+                                    [key: string]: {
+                                        entryId: string;
+                                        slotId: string;
+                                        templateId: string | null;
+                                        values: {
+                                            [key: string]: unknown;
+                                        };
+                                        quantity?: number;
+                                    };
+                                };
                             };
                             derivedValues: {
                                 [key: string]: string | number | boolean | null;
@@ -10043,6 +11978,23 @@ export interface operations {
                                                 severity: "error" | "warning";
                                                 message: string;
                                                 targetDefinitionId: string;
+                                            }[];
+                                            entryId?: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "slot";
+                                            id: string;
+                                            slotId: string;
+                                            label: string;
+                                            accepts: ("item" | "spell" | "talent" | "effect")[];
+                                            entries: {
+                                                entryId: string;
+                                                templateId: string | null;
+                                                label: string;
+                                                values: {
+                                                    [key: string]: unknown;
+                                                };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];
@@ -10332,6 +12284,17 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
+                                entries?: {
+                                    [key: string]: {
+                                        entryId: string;
+                                        slotId: string;
+                                        templateId: string | null;
+                                        values: {
+                                            [key: string]: unknown;
+                                        };
+                                        quantity?: number;
+                                    };
+                                };
                             };
                             derivedValues: {
                                 [key: string]: string | number | boolean | null;
@@ -10458,6 +12421,23 @@ export interface operations {
                                                 severity: "error" | "warning";
                                                 message: string;
                                                 targetDefinitionId: string;
+                                            }[];
+                                            entryId?: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "slot";
+                                            id: string;
+                                            slotId: string;
+                                            label: string;
+                                            accepts: ("item" | "spell" | "talent" | "effect")[];
+                                            entries: {
+                                                entryId: string;
+                                                templateId: string | null;
+                                                label: string;
+                                                values: {
+                                                    [key: string]: unknown;
+                                                };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];
@@ -10651,6 +12631,17 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
+                                entries?: {
+                                    [key: string]: {
+                                        entryId: string;
+                                        slotId: string;
+                                        templateId: string | null;
+                                        values: {
+                                            [key: string]: unknown;
+                                        };
+                                        quantity?: number;
+                                    };
+                                };
                             };
                             derivedValues: {
                                 [key: string]: string | number | boolean | null;
@@ -10777,6 +12768,23 @@ export interface operations {
                                                 severity: "error" | "warning";
                                                 message: string;
                                                 targetDefinitionId: string;
+                                            }[];
+                                            entryId?: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "slot";
+                                            id: string;
+                                            slotId: string;
+                                            label: string;
+                                            accepts: ("item" | "spell" | "talent" | "effect")[];
+                                            entries: {
+                                                entryId: string;
+                                                templateId: string | null;
+                                                label: string;
+                                                values: {
+                                                    [key: string]: unknown;
+                                                };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];
@@ -10972,6 +12980,17 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
+                                entries?: {
+                                    [key: string]: {
+                                        entryId: string;
+                                        slotId: string;
+                                        templateId: string | null;
+                                        values: {
+                                            [key: string]: unknown;
+                                        };
+                                        quantity?: number;
+                                    };
+                                };
                             };
                             derivedValues: {
                                 [key: string]: string | number | boolean | null;
@@ -11098,6 +13117,23 @@ export interface operations {
                                                 severity: "error" | "warning";
                                                 message: string;
                                                 targetDefinitionId: string;
+                                            }[];
+                                            entryId?: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "slot";
+                                            id: string;
+                                            slotId: string;
+                                            label: string;
+                                            accepts: ("item" | "spell" | "talent" | "effect")[];
+                                            entries: {
+                                                entryId: string;
+                                                templateId: string | null;
+                                                label: string;
+                                                values: {
+                                                    [key: string]: unknown;
+                                                };
+                                                quantity?: number;
                                             }[];
                                         })[];
                                     }[];

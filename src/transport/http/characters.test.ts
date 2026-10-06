@@ -167,6 +167,7 @@ function makeCharacters(overrides: Partial<Characters> = {}): Characters {
     list: async () => ({ ok: true, value: { characters: [], nextCursor: null } }),
     open: async () => ({ ok: true, value: characterView() }),
     apply: async () => ({ ok: true, value: commandResult() }),
+    listEntryTemplates: async () => ({ ok: true, value: [] }),
     manage: async () => ({ ok: true, value: commandResult() }),
     duplicate: async () => ({ ok: true, value: characterView() }),
     listActivity: async () => ({ ok: true, value: { events: [], nextCursor: null } }),
@@ -206,13 +207,17 @@ describe("character HTTP routes", () => {
 
   it("rejects unauthenticated requests with 401 on every route", async () => {
     const app = await build(makeCharacters(), true);
-    const routes: Array<{ method: "get" | "post" | "patch"; url: string; payload?: unknown }> = [
+    const routes: Array<{ method: "get" | "post" | "patch" | "delete"; url: string; payload?: unknown }> = [
       { method: "post", url: "/characters", payload: { systemVersionId: randomUUID(), entityDefinitionId: "character", name: "Aria", idempotencyKey: "key-1" } },
       { method: "get", url: "/characters" },
       { method: "get", url: `/characters/${randomUUID()}` },
       { method: "post", url: `/characters/${randomUUID()}/fields/ability/set`, payload: { value: 12, expectedRevision: 1, idempotencyKey: "key-1" } },
       { method: "post", url: `/characters/${randomUUID()}/resources/health/bump`, payload: { direction: "up", expectedRevision: 1, idempotencyKey: "key-1" } },
       { method: "post", url: `/characters/${randomUUID()}/actions/check`, payload: { inputs: {}, expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "post", url: `/characters/${randomUUID()}/entries`, payload: { entry: { entryId: randomUUID(), slotId: "inventory", templateId: null, values: {} }, expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "delete", url: `/characters/${randomUUID()}/entries/${randomUUID()}`, payload: { expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "patch", url: `/characters/${randomUUID()}/entries/${randomUUID()}`, payload: { values: {}, expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "get", url: `/characters/${randomUUID()}/templates` },
       { method: "patch", url: `/characters/${randomUUID()}`, payload: { command: "archive", expectedRevision: 1, idempotencyKey: "key-1" } },
       { method: "post", url: `/characters/${randomUUID()}/ownership-transfer`, payload: { toUserId: randomUUID(), expectedRevision: 1, idempotencyKey: "key-1" } },
       { method: "post", url: `/characters/${randomUUID()}/duplicate`, payload: { idempotencyKey: "key-1" } },
@@ -515,7 +520,7 @@ describe("character HTTP routes", () => {
       payload: { value: 14, expectedRevision: 2, idempotencyKey: "key-1" },
     });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ result: { character: expect.any(Object), roll: null }, requestId: expect.any(String) });
+    expect(response.json()).toEqual({ result: { character: expect.any(Object), roll: null, nominal: null }, requestId: expect.any(String) });
     expect(received).toEqual({
       kind: "setField",
       characterId: id,
@@ -585,6 +590,19 @@ describe("character HTTP routes", () => {
     });
   });
 
+  it("returns the authoritative nominal granted-action outcome", async () => {
+    const nominal = { actionId: "raise_torch", entryId: randomUUID(), output: "Torch raised." };
+    const app = await build(makeCharacters({
+      apply: async () => ({ ok: true, value: { ...commandResult(), nominal } }),
+    }));
+    const response = await app.inject({
+      method: "POST", url: `/characters/${randomUUID()}/actions/raise_torch`, headers: cookie,
+      payload: { entryId: nominal.entryId, expectedRevision: 1, idempotencyKey: "nominal-1" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().result).toMatchObject({ roll: null, nominal });
+  });
+
   it("forwards the requested roll audience and serves campaign audiences", async () => {
     let received: unknown;
     const app = await build(
@@ -629,6 +647,205 @@ describe("character HTTP routes", () => {
     expect(response.json().error.code).toBe("bad_request");
   });
 
+  it("forwards the granted-action entryId to apply", async () => {
+    let received: unknown;
+    const app = await build(
+      makeCharacters({
+        apply: async (_ctx, input) => {
+          received = input;
+          return { ok: true, value: commandResult() };
+        },
+      }),
+    );
+    const id = randomUUID();
+    const entryId = randomUUID();
+    const response = await app.inject({
+      method: "POST",
+      url: `/characters/${id}/actions/longsword_attack`,
+      headers: cookie,
+      payload: { inputs: {}, entryId, expectedRevision: 2, idempotencyKey: "key-4" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(received).toEqual({
+      kind: "executeAction",
+      characterId: id,
+      actionId: "longsword_attack",
+      inputs: {},
+      expectedRevision: 2,
+      idempotencyKey: "key-4",
+      entryId,
+    });
+  });
+
+  it("maps entry writes to apply with direct entry input", async () => {
+    const seen: unknown[] = [];
+    const app = await build(
+      makeCharacters({
+        apply: async (_ctx, input) => {
+          seen.push(input);
+          return { ok: true, value: commandResult() };
+        },
+      }),
+    );
+    const id = randomUUID();
+    const entryId = randomUUID();
+
+    const added = await app.inject({
+      method: "POST",
+      url: `/characters/${id}/entries`,
+      headers: cookie,
+      payload: {
+        entry: { entryId, slotId: "inventory", templateId: "longsword", values: { weapon_bonus: 1 } },
+        expectedRevision: 1,
+        idempotencyKey: "key-5",
+      },
+    });
+    expect(added.statusCode).toBe(200);
+
+    const updated = await app.inject({
+      method: "PATCH",
+      url: `/characters/${id}/entries/${entryId}`,
+      headers: cookie,
+      payload: { values: { weapon_bonus: 2 }, expectedRevision: 2, idempotencyKey: "key-6" },
+    });
+    expect(updated.statusCode).toBe(200);
+
+    const removed = await app.inject({
+      method: "DELETE",
+      url: `/characters/${id}/entries/${entryId}`,
+      headers: cookie,
+      payload: { expectedRevision: 3, idempotencyKey: "key-7" },
+    });
+    expect(removed.statusCode).toBe(200);
+
+    expect(seen).toEqual([
+      {
+        kind: "addEntry",
+        characterId: id,
+        entry: { entryId, slotId: "inventory", templateId: "longsword", values: { weapon_bonus: 1 } },
+        expectedRevision: 1,
+        idempotencyKey: "key-5",
+      },
+      {
+        kind: "updateEntryValues",
+        characterId: id,
+        entryId,
+        values: { weapon_bonus: 2 },
+        expectedRevision: 2,
+        idempotencyKey: "key-6",
+      },
+      {
+        kind: "removeEntry",
+        characterId: id,
+        entryId,
+        expectedRevision: 3,
+        idempotencyKey: "key-7",
+      },
+    ]);
+  });
+
+  it("serves slot projections and entry state over the wire", async () => {
+    const entryId = randomUUID();
+    const versionId = randomUUID();
+    const view = characterView({
+      systemVersionId: versionId,
+      state: {
+        schemaVersion: "1.0",
+        values: { ability: 10 },
+        entries: {
+          [entryId]: {
+            entryId,
+            slotId: "inventory",
+            templateId: "longsword",
+            values: { weapon_bonus: 1 },
+          },
+        },
+      },
+      projection: {
+        ...makeProjection(versionId),
+        sheets: [{
+          id: "character_sheet",
+          label: "Character",
+          sections: [{
+            id: "gear",
+            label: "Gear",
+            elements: [
+              {
+                kind: "slot",
+                id: "inv_element",
+                slotId: "inventory",
+                label: "Inventory",
+                accepts: ["item"],
+                entries: [{
+                  entryId,
+                  templateId: "longsword",
+                  label: "Longsword",
+                  values: { weapon_bonus: 1 },
+                }],
+              },
+              {
+                kind: "action",
+                id: `${entryId}__longsword_attack`,
+                actionId: "longsword_attack",
+                entryId,
+                label: "Longsword Attack",
+                actionKind: "roll",
+                inputs: [],
+                validations: [],
+              },
+            ],
+          }],
+        }],
+      },
+    });
+    const app = await build(makeCharacters({ open: async () => ({ ok: true, value: view }) }));
+    const response = await app.inject({
+      method: "get",
+      url: `/characters/${view.characterId}`,
+      headers: cookie,
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as { character: Record<string, unknown> };
+    expect((body.character.state as Record<string, unknown>).entries).toEqual({
+      [entryId]: {
+        entryId,
+        slotId: "inventory",
+        templateId: "longsword",
+        values: { weapon_bonus: 1 },
+      },
+    });
+    const elements = (
+      body.character.projection as {
+        sheets: Array<{ sections: Array<{ elements: Array<Record<string, unknown>> }> }>;
+      }
+    ).sheets[0]!.sections[0]!.elements;
+    expect(elements[0]).toMatchObject({ kind: "slot", slotId: "inventory", accepts: ["item"] });
+    expect(elements[1]).toMatchObject({ kind: "action", actionId: "longsword_attack", entryId });
+  });
+
+  it("lists entry templates for the slot picker", async () => {
+    const catalog = [{
+      id: "longsword",
+      label: "Longsword",
+      kind: "item" as const,
+      fields: [],
+      grantedActions: [{
+        id: "longsword_attack",
+        label: "Longsword Attack",
+        actionKind: "roll" as const,
+        inputs: [],
+      }],
+    }];
+    const app = await build(makeCharacters({ listEntryTemplates: async () => ({ ok: true, value: catalog }) }));
+    const response = await app.inject({
+      method: "get",
+      url: `/characters/${randomUUID()}/templates`,
+      headers: cookie,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ templates: catalog, requestId: expect.any(String) });
+  });
+
   it("maps PATCH /characters/:characterId to manage for rename/archive/recover", async () => {
     const seen: unknown[] = [];
     const app = await build(
@@ -647,7 +864,7 @@ describe("character HTTP routes", () => {
       payload: { command: "rename", name: "Renamed", expectedRevision: 1, idempotencyKey: "key-1" },
     });
     expect(rename.statusCode).toBe(200);
-    expect(rename.json()).toEqual({ result: { character: expect.any(Object), roll: null }, requestId: expect.any(String) });
+    expect(rename.json()).toEqual({ result: { character: expect.any(Object), roll: null, nominal: null }, requestId: expect.any(String) });
 
     const archive = await app.inject({
       method: "PATCH",
@@ -899,6 +1116,7 @@ describe("character HTTP routes", () => {
         list: notFound,
         open: notFound,
         apply: notFound,
+        listEntryTemplates: notFound,
         manage: notFound,
         duplicate: notFound,
         listActivity: notFound,
@@ -908,13 +1126,17 @@ describe("character HTTP routes", () => {
         rollbackMigration: notFound,
       }),
     );
-    const routes: Array<{ method: "get" | "post" | "patch"; url: string; payload?: unknown }> = [
+    const routes: Array<{ method: "get" | "post" | "patch" | "delete"; url: string; payload?: unknown }> = [
       { method: "post", url: "/characters", payload: { systemVersionId: randomUUID(), entityDefinitionId: "character", name: "Aria", idempotencyKey: "key-1" } },
       { method: "get", url: "/characters" },
       { method: "get", url: `/characters/${randomUUID()}` },
       { method: "post", url: `/characters/${randomUUID()}/fields/ability/set`, payload: { value: 12, expectedRevision: 1, idempotencyKey: "key-1" } },
       { method: "post", url: `/characters/${randomUUID()}/resources/health/bump`, payload: { direction: "up", expectedRevision: 1, idempotencyKey: "key-1" } },
       { method: "post", url: `/characters/${randomUUID()}/actions/check`, payload: { inputs: {}, expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "post", url: `/characters/${randomUUID()}/entries`, payload: { entry: { entryId: randomUUID(), slotId: "inventory", templateId: null, values: {} }, expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "delete", url: `/characters/${randomUUID()}/entries/${randomUUID()}`, payload: { expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "patch", url: `/characters/${randomUUID()}/entries/${randomUUID()}`, payload: { values: {}, expectedRevision: 1, idempotencyKey: "key-1" } },
+      { method: "get", url: `/characters/${randomUUID()}/templates` },
       { method: "patch", url: `/characters/${randomUUID()}`, payload: { command: "archive", expectedRevision: 1, idempotencyKey: "key-1" } },
       { method: "post", url: `/characters/${randomUUID()}/ownership-transfer`, payload: { toUserId: randomUUID(), expectedRevision: 1, idempotencyKey: "key-1" } },
       { method: "post", url: `/characters/${randomUUID()}/duplicate`, payload: { idempotencyKey: "key-1" } },

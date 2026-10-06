@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/client.js";
 import type {
   ActivityResponse,
+  AddCharacterEntryResponse,
   BumpCharacterResourceResponse,
   CharacterExport,
   CharacterList,
@@ -10,11 +11,14 @@ import type {
   CreationOptions,
   CreationVersions,
   DuplicateCharacterResponse,
+  EntryTemplatesResponse,
   ExecuteCharacterActionResponse,
   FrozenRequest,
   MigrationPreviewBody,
   MigrationPreviewResponse,
   OpenCharacterResponse,
+  RemoveCharacterEntryResponse,
+  UpdateCharacterEntryResponse,
 } from "./types.js";
 import type { CharactersApi } from "./api.js";
 import { openCharacterStore, type CharacterStore } from "./store.js";
@@ -257,6 +261,18 @@ class FakeApi implements CharactersApi {
   executeCharacterAction(): Promise<ExecuteCharacterActionResponse> {
     throw new Error("unused");
   }
+  addCharacterEntry(): Promise<AddCharacterEntryResponse> {
+    throw new Error("unused");
+  }
+  removeCharacterEntry(): Promise<RemoveCharacterEntryResponse> {
+    throw new Error("unused");
+  }
+  updateCharacterEntry(): Promise<UpdateCharacterEntryResponse> {
+    throw new Error("unused");
+  }
+  listEntryTemplates(): Promise<EntryTemplatesResponse> {
+    throw new Error("unused");
+  }
   activityScript: Array<ActivityResponse | { __error: Error }> = [];
   activityCalls: Array<{ characterId: string; cursor: string | null }> = [];
   scriptActivity(response: ActivityResponse) {
@@ -363,7 +379,7 @@ async function makeHarness(characterId = "char-1", initialOwner = true): Promise
 }
 
 function successEnvelope(c: CharacterView): SendStep {
-  return { envelope: { result: { character: c, roll: null }, requestId: "req-1" } };
+  return { envelope: { result: { character: c, roll: null, nominal: null }, requestId: "req-1" } };
 }
 
 function deferredEnvelope() {
@@ -814,6 +830,53 @@ describe("CharacterSession", () => {
     await session.whenIdle();
     expect(session.getSnapshot().entries).toHaveLength(1);
     expect(session.getSnapshot().phase).toBe("offline");
+    await store.close();
+  });
+
+  it("queues entry intents offline and drains them to the entry routes on reconnect", async () => {
+    const { api, identity, store, session } = await makeHarness();
+    await seedConfirmed(store, "char-1", viewFor("char-1", 1));
+    api.scriptOpenView(viewFor("char-1", 1));
+    await session.open();
+
+    identity.online = false;
+    identity.signal();
+
+    // Granted rolls stay online-only like entity actions.
+    await expect(session.executeGrantedAction("entry-1", "attack", {})).rejects.toThrow();
+    // Entry writes queue durably offline and replay verbatim on reconnect.
+    await session.addEntry("inventory", "longsword", {});
+    await session.removeEntry("entry-9");
+    await session.updateEntryValues("entry-9", { name: "Stone" }, 2);
+    await session.whenIdle();
+    expect(session.getSnapshot().entries).toHaveLength(3);
+    expect(session.getSnapshot().phase).toBe("offline");
+
+    identity.online = true;
+    identity.signal();
+    api.scriptOpenView(viewFor("char-1", 1));
+    api.scriptSend(async () => successEnvelope(viewFor("char-1", 2)));
+    api.scriptSend(async () => successEnvelope(viewFor("char-1", 2)));
+    api.scriptSend(async () => successEnvelope(viewFor("char-1", 2)));
+    api.scriptSend(async () => successEnvelope(viewFor("char-1", 2)));
+    await session.whenIdle();
+
+    expect(api.sent.map((request) => `${request.method} ${request.path}`)).toEqual([
+      "POST /characters/char-1/entries",
+      "DELETE /characters/char-1/entries/entry-9",
+      "PATCH /characters/char-1/entries/entry-9",
+    ]);
+    expect(api.sent[0]?.body).toMatchObject({ expectedRevision: 1 });
+    expect(api.sent[2]?.body).toMatchObject({ values: { name: "Stone" }, quantity: 2 });
+    expect(session.getSnapshot().entries).toEqual([]);
+
+    await session.executeGrantedAction("entry-1", "attack", { edge: 0 });
+    await session.whenIdle();
+    expect(api.sent.at(-1)).toMatchObject({
+      method: "POST",
+      path: "/characters/char-1/actions/attack",
+      body: { inputs: { edge: 0 }, entryId: "entry-1", expectedRevision: 2 },
+    });
     await store.close();
   });
 
@@ -1972,7 +2035,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       output: "hit",
       audience: "owner_only" as const,
     };
-    api.scriptSend(async () => ({ envelope: { result: { character: viewFor("char-1", 3), roll }, requestId: "req-1" } }));
+    api.scriptSend(async () => ({ envelope: { result: { character: viewFor("char-1", 3), roll, nominal: null }, requestId: "req-1" } }));
     await session.executeAction("ironclad", { difficulty: 10 });
     await session.whenIdle();
     expect(session.getSnapshot().lastRoll).toEqual(roll);
@@ -1988,6 +2051,22 @@ describe("CharacterSession uncertain online outcomes", () => {
     await session.rollbackMigration("m-9");
     expect(session.getSnapshot().lastMigration).toEqual({ operation: "rollback", migrationId: "m-9", revision: 5 });
     expect(session.getSnapshot().lastRoll).toEqual(roll);
+    session.dispose();
+    await store.close();
+  });
+
+  it("shows a nominal outcome only after the server acknowledges the granted action", async () => {
+    const { api, store, session } = await makeHarness();
+    await seedConfirmed(store, "char-1", viewFor("char-1", 3));
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    const nominal = { actionId: "raise_torch", entryId: "torch-1", output: "Torch raised." };
+    api.scriptSend(async () => ({ envelope: { result: { character: viewFor("char-1", 4), roll: null, nominal }, requestId: "req-nominal" } }));
+    expect(session.getSnapshot().lastNominal).toBeNull();
+    await session.executeGrantedAction(nominal.entryId, nominal.actionId);
+    await session.whenIdle();
+    expect(session.getSnapshot().lastNominal).toEqual(nominal);
+    expect(session.getSnapshot().lastRoll).toBeNull();
     session.dispose();
     await store.close();
   });

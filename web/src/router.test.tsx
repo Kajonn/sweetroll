@@ -372,7 +372,7 @@ describe("character routes", () => {
       }
       if (url.pathname.startsWith(`/api/characters/${ROUTER_CHAR}/actions/`) && init?.method === "POST") {
         return new Response(
-          JSON.stringify({ result: { character: routerActionView(ROUTER_CHAR, 2), roll }, requestId: "r" }),
+          JSON.stringify({ result: { character: routerActionView(ROUTER_CHAR, 2), roll, nominal: null }, requestId: "r" }),
           { status: 200 },
         );
       }

@@ -33,7 +33,7 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
     ],
     editing: { owned: true },
     error: { kind: "conflict", message: "The character changed on the server. Review before re-sending." },
-    lastRoll: null,
+    lastRoll: null, lastNominal: null,
     lastMigration: null,
     pendingOnlineAttempts: [],
     connected: true,
@@ -322,7 +322,7 @@ describe("ConflictReview", () => {
         details: { diagnostics: [{ validationId: "v", severity: "error", message: "Level must be between 1 and 10", targetDefinitionId: "level" }] },
       },
     });
-    render(<ConflictReview snapshot={snap} onResolve={onResolve} onClose={vi.fn()} />);
+    render(<ConflictReview snapshot={snap} onResolve={onResolve} onClose={vi.fn()} now={Date.parse("2026-09-07T00:00:00.000Z")} />);
     await user.click(screen.getAllByRole("checkbox")[0]!);
     const correction = screen.getByLabelText(/correct.*level/i);
     await user.clear(correction);

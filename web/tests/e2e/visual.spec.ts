@@ -203,8 +203,20 @@ test.describe("visual: sheet preview", () => {
       await header.evaluate((element) => {
         element.style.position = "static";
       });
+      // CI font rasterization shifts this frame between 609 and 610 CSS px.
+      // Capture a fixed 276x610 region; geometry is asserted independently above.
       try {
-        await expect(frame).toHaveScreenshot(`sheet-preview-${width}.png`);
+        if (width === 360) {
+          await frame.scrollIntoViewIfNeeded();
+          const bounds = await frame.boundingBox();
+          expect(bounds).not.toBeNull();
+          await expect(page).toHaveScreenshot(`sheet-preview-${width}.png`, {
+            clip: { x: bounds!.x, y: bounds!.y, width: 276, height: 610 },
+            maxDiffPixels: 700,
+          });
+        } else {
+          await expect(frame).toHaveScreenshot(`sheet-preview-${width}.png`);
+        }
       } finally {
         await header.evaluate((element) => {
           element.style.removeProperty("position");

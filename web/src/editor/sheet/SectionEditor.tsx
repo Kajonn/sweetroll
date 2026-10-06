@@ -284,6 +284,11 @@ export function SectionEditor({
           kind="action"
           onClick={() => addElement("action")}
         />
+        <AddElementButton
+          sectionId={section.id}
+          kind="slot"
+          onClick={() => addElement("slot")}
+        />
       </div>
     </li>
   );

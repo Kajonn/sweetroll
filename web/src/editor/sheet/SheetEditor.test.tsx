@@ -281,4 +281,52 @@ describe("SheetEditor", () => {
     const next = lastCallPayload(onChange);
     expect(next?.sections[0]?.elements.map((e) => e.id)).toEqual(["str"]);
   });
+
+  it("offers slot in the section add-element menu and binds an empty slotId", async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderSheet();
+    expect(screen.getByTestId("section-add-element-slot-abilities")).toBeInTheDocument();
+    await user.click(screen.getByTestId("section-add-element-slot-abilities"));
+    const next = lastCallPayload(onChange);
+    expect(next?.sections[0]?.elements.at(-1)).toEqual({
+      kind: "slot",
+      id: expect.any(String),
+      slotId: "",
+    });
+  });
+
+  it("renders a slot binding input for the bound slot target", () => {
+    const sheet: SheetEditorV1 = {
+      id: "main_sheet",
+      label: "Main sheet",
+      targetEntityId: "character",
+      sections: [
+        {
+          id: "gear",
+          label: "Gear",
+          elements: [{ kind: "slot", id: "inv", slotId: "inventory" }],
+        },
+      ],
+    };
+    renderSheet({ sheet });
+    const binding = screen.getByTestId("element-binding-inv");
+    expect(within(binding).getByTestId("definition-id-input")).toHaveValue("inventory");
+  });
+
+  it("places an unplaced slot definition binding its slotId", async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderSheet({
+      unplacedDefinitions: [
+        { kind: "slot", id: "inventory", label: "Inventory" },
+      ],
+      allocateElementId: () => "element_9",
+    });
+    await user.click(screen.getByTestId("sheet-place-definition-inventory"));
+    const next = lastCallPayload(onChange);
+    expect(next?.sections[0]?.elements.at(-1)).toEqual({
+      kind: "slot",
+      id: "element_9",
+      slotId: "inventory",
+    });
+  });
 });

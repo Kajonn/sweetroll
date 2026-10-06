@@ -11,7 +11,7 @@ import styles from "./SheetEditor.module.css";
 import type { SheetEditorV1, SheetElementV1, SheetSectionV1 } from "./sheetTypes.js";
 
 export type UnplacedDefinition = {
-  kind: "field" | "resource" | "action";
+  kind: "field" | "resource" | "action" | "slot";
   id: DefinitionId;
   label: string;
 };
@@ -129,7 +129,9 @@ export function SheetEditor({
         ? { kind: "field", id, fieldId: definition.id }
         : definition.kind === "resource"
           ? { kind: "resource", id, resourceId: definition.id }
-          : { kind: "action", id, actionId: definition.id };
+          : definition.kind === "slot"
+            ? { kind: "slot", id, slotId: definition.id }
+            : { kind: "action", id, actionId: definition.id };
     if (sheet.sections.length === 0) {
       const section: SheetSectionV1 = {
         id: allocateSectionId?.() ?? nextSectionId([]),

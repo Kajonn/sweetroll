@@ -171,6 +171,7 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
     "character_exported", "character_migration_previewed", "character_migration_committed",
     "character_migration_rolled_back", "character_campaign_created", "character_adopted",
     "character_controllers_assigned", "character_claimed", "character_ownership_transferred",
+    "entry_added", "entry_removed", "entry_updated",
   ]);
   const label = knownKinds.has(event.kind)
     ? t(`character.activity.${event.kind}`)

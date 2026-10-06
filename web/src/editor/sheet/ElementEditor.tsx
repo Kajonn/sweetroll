@@ -10,6 +10,7 @@ import type {
   ResourceSheetElementV1,
   SheetElementKind,
   SheetElementV1,
+  SlotSheetElementV1,
 } from "./sheetTypes.js";
 
 export type ElementEditorProps = {
@@ -39,6 +40,7 @@ export function ElementEditor({ element, onChange }: ElementEditorProps) {
             { value: "field", label: t("editor.element.kind.field") },
             { value: "resource", label: t("editor.element.kind.resource") },
             { value: "action", label: t("editor.element.kind.action") },
+            { value: "slot", label: t("editor.element.kind.slot") },
           ]}
         />
       </div>
@@ -63,6 +65,8 @@ function ElementBodyRouter({
       return <ResourceEditor element={element} onChange={onChange} />;
     case "action":
       return <ActionEditor element={element} onChange={onChange} />;
+    case "slot":
+      return <SlotEditor element={element} onChange={onChange} />;
     default: {
       const exhaustive: never = element;
       void exhaustive;
@@ -178,6 +182,26 @@ function ActionEditor({
   );
 }
 
+function SlotEditor({
+  element,
+  onChange,
+}: {
+  element: SlotSheetElementV1;
+  onChange: (patch: Partial<SlotSheetElementV1>) => void;
+}) {
+  return (
+    <div className={styles.elementRow2}>
+      <div className={styles.elementField} data-testid={`element-binding-${element.id}`}>
+        {t("editor.element.kind.slot")}
+        <DefinitionIdInput
+          value={element.slotId}
+          onChange={(slotId) => onChange({ slotId })}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function makeElementOfKind(
   kind: SheetElementKind,
   id: DefinitionId,
@@ -191,5 +215,7 @@ export function makeElementOfKind(
       return { kind, id, resourceId: "" };
     case "action":
       return { kind, id, actionId: "" };
+    case "slot":
+      return { kind, id, slotId: "" };
   }
 }

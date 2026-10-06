@@ -383,4 +383,43 @@ describe("createCharactersApi GM session-board wrappers", () => {
       body: { audience: "campaign", expectedRevision: 4, idempotencyKey: "k2" },
     });
   });
+
+  it("sends entry commands to the entry routes with revision and key", async () => {
+    const client = makeClient();
+    client.fetch.mockResolvedValue({ result: {}, requestId: "r3" });
+    const api = createCharactersApi(client);
+    const entryId = "aaaaaaaa-1111-4111-8111-111111111111";
+    await api.addCharacterEntry("s1", {
+      entry: { entryId, slotId: "inventory", templateId: "longsword", values: { weapon_bonus: 1 } },
+      expectedRevision: 4,
+      idempotencyKey: "k3",
+    });
+    expect(client.fetch).toHaveBeenCalledWith("POST", "/characters/s1/entries", {
+      body: {
+        entry: { entryId, slotId: "inventory", templateId: "longsword", values: { weapon_bonus: 1 } },
+        expectedRevision: 4,
+        idempotencyKey: "k3",
+      },
+    });
+    await api.removeCharacterEntry("s1", entryId, { expectedRevision: 5, idempotencyKey: "k4" });
+    expect(client.fetch).toHaveBeenCalledWith("DELETE", `/characters/s1/entries/${entryId}`, {
+      body: { expectedRevision: 5, idempotencyKey: "k4" },
+    });
+    await api.updateCharacterEntry("s1", entryId, {
+      values: { weapon_bonus: 2 },
+      expectedRevision: 5,
+      idempotencyKey: "k5",
+    });
+    expect(client.fetch).toHaveBeenCalledWith("PATCH", `/characters/s1/entries/${entryId}`, {
+      body: { values: { weapon_bonus: 2 }, expectedRevision: 5, idempotencyKey: "k5" },
+    });
+  });
+
+  it("lists entry templates for the slot picker", async () => {
+    const client = makeClient();
+    client.fetch.mockResolvedValueOnce({ templates: [], requestId: "r4" });
+    const api = createCharactersApi(client);
+    await api.listEntryTemplates("s1");
+    expect(client.fetch).toHaveBeenCalledWith("GET", "/characters/s1/templates");
+  });
 });

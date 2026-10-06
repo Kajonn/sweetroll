@@ -82,5 +82,7 @@ export function documentFromPackage(pkg: SystemPackageV1): SystemDocumentV1 {
     })),
     actions: structuredClone(pkg.actions),
     validations: structuredClone(pkg.validations),
+    ...(pkg.templates !== undefined ? { templates: structuredClone(pkg.templates) } : {}),
+    ...(pkg.slots !== undefined ? { slots: structuredClone(pkg.slots) } : {}),
   };
 }

@@ -88,6 +88,10 @@ Roles are contextual capabilities, not account types. The same user can create a
 - Every visibility control states its audience in plain language and offers a preview-as-player check.
 - Provide undo for builder operations and recoverable deletion for user content where practical.
 
+In character sheet item slots, show the item name once and reveal rename editing on request. Keep Remove visually secondary in each row and require confirmation before deleting an item. After a granted nominal action is acknowledged by the server, show a clear action confirmation with its authored output when meaningful; do not display unresolved roll placeholders as a result.
+
+Templated entries expose schema-driven field editing on the character sheet. Item entries can update their positive integer quantity under the character revision and offline idempotency flow. Item granted rolls can use attributes of the carrying character alongside item values. The builder offers character attributes reachable through the item's slots and validates that a referenced attribute is available for every entity that can use that slot. An item may expose separate hit and damage rolls, each with its own expression and result.
+
 ## 4.2 Multi-device GM play
 
 A GM may use **multiple devices in the same session simultaneously**, with each device focused on a different task. Private control devices may share the GM account; a device handed to players uses restricted display access:
@@ -315,6 +319,7 @@ Use role-based permissions for coarse capabilities and resource-level policy che
 - Prominent action buttons and resource controls; numeric entry supports direct input and step controls.
 - Optimistic updates with visible pending/error state and automatic retry only when idempotent (offline-safe).
 - A roll result opens as a compact sheet showing dice, modifiers, total, and audience.
+- Roll expressions and field bindings use character attribute labels when available, retaining the field identifier for unresolved references. The creator presents the `talent` template kind as “ability” while preserving its stored kind value.
 
 ## 10.3 GM mobile session view
 

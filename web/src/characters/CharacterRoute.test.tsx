@@ -385,7 +385,7 @@ describe("CharacterRoute workflows", () => {
       openView: () => actionView(1),
       onSend: request => {
         expect(request.path).toBe(`/characters/${CHARACTER_ID}/actions/roll-check`);
-        return { result: { character: actionView(2), roll: ROLL_RESULT }, requestId: "req-roll" };
+        return { result: { character: actionView(2), roll: ROLL_RESULT, nominal: null }, requestId: "req-roll" };
       },
     });
     try {
@@ -623,7 +623,7 @@ describe("CharacterRoute workflows", () => {
         sequence: 1,
         baseRevision: 1,
         packageChecksum: "abc",
-        createdAt: "2026-09-06T00:00:00.000Z",
+        createdAt: new Date().toISOString(),
         intent: { kind: "setField", fieldId: "name", value: "Briar" },
         attempt: null,
       }),
@@ -669,7 +669,7 @@ describe("CharacterRoute workflows", () => {
         sequence: 1,
         baseRevision: 1,
         packageChecksum: "abc",
-        createdAt: "2026-09-06T00:00:00.000Z",
+        createdAt: new Date().toISOString(),
         intent: { kind: "setField", fieldId: "name", value: "Briar" },
         attempt: null,
       }),

@@ -157,8 +157,14 @@ and quantity on the character, clicks both rolls, and checks retained history.
 The first CI run found a creator-generated template field ID colliding with
 an entity field; document-wide ID allocation and a component regression test
 were added. Local unit suites passed (server: 375 passed, 9 skipped; web:
-1,109 passed), and both type checks passed. Final browser CI evidence is
-pending on the follow-up commit.
+1,109 passed), and both type checks passed. The expanded Chromium journey
+passed in [CI run #82](https://github.com/Kajonn/sweetroll/actions/runs/37414970764)
+on commit `2b1c8b74d41abe75602491380aeb9c87b8f7a160`. That run also passed
+`verify`, `web`, `web-offline`, the other two journey shards, and the visual
+suite. Earlier reruns exposed date-sensitive replay-window test fixtures and
+an orphaned expression in the breaking-change test; these test fixtures were
+corrected before the successful run. Production deployment was skipped because
+this is a pull request.
 
 The original limitations on real devices, human playtests, and cross-user
 sharing still apply. The full ongoing-effects engine remains outside this plan.

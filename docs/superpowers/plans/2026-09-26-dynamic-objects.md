@@ -14,9 +14,11 @@ step-1 scope; no remaining task in this file should be read as blocking PR #16.
 editing for templated values, item quantity updates, and an expanded browser
 journey for Longsword hit and damage using the carrying character's Might.
 Template field IDs now use document-wide allocation after the journey found a
-collision with entity fields. The journey's CI rerun is pending; local server
-and web unit suites and type checks pass. Lookups, ongoing effects, and
-trading remain outside this plan.
+collision with entity fields. [CI run #82](https://github.com/Kajonn/sweetroll/actions/runs/37414970764)
+passed all seven test jobs on commit `2b1c8b74d41abe75602491380aeb9c87b8f7a160`:
+server verification, web, offline, three journey shards (including both
+Longsword rolls and the breaking gate), and visual E2E. Lookups, ongoing
+effects, and trading remain outside this plan.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

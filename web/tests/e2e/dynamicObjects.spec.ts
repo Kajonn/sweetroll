@@ -355,7 +355,8 @@ test("dynamic objects: creator templates+slot -> player entries+granted roll -> 
     const cloneId = cloneWorkspace.system.systemId;
     createdSystemIds.push(cloneId);
     const cloneDoc = cloneWorkspace.draft.document as {
-      templates: Array<{ id: string; label: string }>;
+      templates: Array<{ id: string; label: string; grantedActions: Array<{ expressionId?: string }> }>;
+      expressions: Array<{ id: string }>;
     };
     expect(cloneDoc.templates.some((t) => t.label === "Longsword")).toBe(true);
 
@@ -373,7 +374,12 @@ test("dynamic objects: creator templates+slot -> player entries+granted roll -> 
     });
     expect(baseline.ok()).toBe(true);
 
+    const removedExpressions = new Set(
+      cloneDoc.templates.find((t) => t.label === "Longsword")?.grantedActions
+        .flatMap((action) => action.expressionId ? [action.expressionId] : []) ?? [],
+    );
     cloneDoc.templates = cloneDoc.templates.filter((t) => t.label !== "Longsword");
+    cloneDoc.expressions = cloneDoc.expressions.filter((expression) => !removedExpressions.has(expression.id));
     const cloneSave = await player.request.put(`/api/systems/${cloneId}/draft`, {
       data: { expectedRevision: cloneWorkspace.draft.revision, document: cloneDoc },
     });

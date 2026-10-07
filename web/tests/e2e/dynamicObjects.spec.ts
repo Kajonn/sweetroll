@@ -295,8 +295,8 @@ test("dynamic objects: creator templates+slot -> player entries+granted roll -> 
     await player.getByTestId(`slot-add-${slotId}`).click();
     await player.getByTestId(`slot-template-picker-${slotId}`).selectOption({ label: "Custom entry" });
     await player.getByTestId(`slot-custom-name-${slotId}`).fill("Lucky Stone");
-    await player.getByLabel("Description", { exact: true }).fill("A charm from the tower");
-    await player.getByLabel("Notes", { exact: true }).fill("Found by Ada");
+    await player.getByRole("textbox", { name: "Description", exact: true }).fill("A charm from the tower");
+    await player.getByRole("textbox", { name: "Notes", exact: true }).fill("Found by Ada");
     await player.getByLabel("Quantity", { exact: true }).fill("3");
     await player.getByTestId(`slot-add-confirm-${slotId}`).click();
     await expectSheetSaved(player);
@@ -306,7 +306,13 @@ test("dynamic objects: creator templates+slot -> player entries+granted roll -> 
     await expect(stoneLi).toContainText("Found by Ada");
     await expect(stoneLi).toContainText("×3");
     await stoneLi.getByRole("button", { name: "Edit entry" }).click();
-    await stoneLi.getByLabel("Notes", { exact: true }).fill("Keep safe");
+    // A populated textarea contributes its initial text to getByLabel's label
+    // text. The accessible textbox name excludes that value and stays stable.
+    const stoneDescription = stoneLi.getByRole("textbox", { name: "Description", exact: true });
+    const stoneNotes = stoneLi.getByRole("textbox", { name: "Notes", exact: true });
+    await expect(stoneDescription).toHaveValue("A charm from the tower");
+    await expect(stoneNotes).toHaveValue("Found by Ada");
+    await stoneNotes.fill("Keep safe");
     await stoneLi.getByLabel("Quantity", { exact: true }).fill("2");
     await stoneLi.getByRole("button", { name: "Save entry" }).click();
     await expectSheetSaved(player);
@@ -347,8 +353,8 @@ test("dynamic objects: creator templates+slot -> player entries+granted roll -> 
       await player.getByTestId(`slot-add-${slotId}`).click();
       await player.getByTestId(`slot-template-picker-${slotId}`).selectOption({ label: "Custom entry" });
       await player.getByLabel("Entry name", { exact: true }).fill("Tower key");
-      await player.getByLabel("Description", { exact: true }).fill("Opens the tower");
-      await player.getByLabel("Notes", { exact: true }).fill("Offline find");
+      await player.getByRole("textbox", { name: "Description", exact: true }).fill("Opens the tower");
+      await player.getByRole("textbox", { name: "Notes", exact: true }).fill("Offline find");
       await player.getByLabel("Quantity", { exact: true }).fill("4");
       await player.getByTestId(`slot-add-confirm-${slotId}`).click();
       await expect(player.getByText("Changes pending")).toBeVisible({ timeout: 30_000 });

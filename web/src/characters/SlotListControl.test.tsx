@@ -121,6 +121,24 @@ describe("SlotListControl", () => {
       { name: "Lucky Stone", description: "A charm", notes: "Keep safe" }, 2);
   });
 
+  it("exposes populated personal textareas by their accessible names", async () => {
+    const user = userEvent.setup();
+    const handlers = renderControl({ entries: [{
+      entryId: STONE_ENTRY_ID, templateId: null, label: "Lucky Stone", quantity: 3,
+      values: { name: "Lucky Stone", description: "A charm from the tower", notes: "Found by Ada" },
+    }] });
+    const row = within(screen.getByTestId(`slot-entry-${STONE_ENTRY_ID}`));
+    await user.click(row.getByRole("button", { name: "Edit entry" }));
+    expect(row.getByRole("textbox", { name: "Description" })).toHaveValue("A charm from the tower");
+    const notes = row.getByRole("textbox", { name: "Notes" });
+    expect(notes).toHaveValue("Found by Ada");
+    await user.clear(notes);
+    await user.type(notes, "Keep safe");
+    await user.click(row.getByRole("button", { name: "Save entry" }));
+    expect(handlers.onUpdateEntry).toHaveBeenCalledWith(STONE_ENTRY_ID,
+      { name: "Lucky Stone", description: "A charm from the tower", notes: "Keep safe" }, 3);
+  });
+
   it("keeps the personal form and data visible when saving fails", async () => {
     const user = userEvent.setup();
     renderControl({ onAddEntry: vi.fn().mockRejectedValue(new Error("Access revoked")) });

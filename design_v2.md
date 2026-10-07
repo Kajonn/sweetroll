@@ -127,6 +127,15 @@ A GM may use **multiple devices in the same session simultaneously**, with each 
 4. During play, update resources, trigger actions and rolls, and read shared content — at a physical table or online.
 5. Review a clear activity history for meaningful changes and rolls.
 
+## 5.4 Create adventure-specific items
+
+1. A player or authorized GM adds a personal custom entry to a character's compatible sheet slot and records its name, description, quantity and notes without changing the published system.
+2. A GM or co-GM may create a reusable campaign template for an item, spell, ability or effect. Data-only templates can start blank; a template based on the campaign's pinned system version may inherit that system item's validated actions.
+3. Publish the campaign template to its authorized members, then add it to a campaign character. Character-specific values stay with the instance. A later template edit creates a revision and does not silently alter existing entries.
+4. Remove an entry to remove its actions from the sheet while retaining prior rolls and activity. Player proposals, restricted-audience drafts and explicit instance upgrades are staged after the basic personal and shared flows.
+
+See the [adventure-specific custom items plan](docs/superpowers/plans/2026-10-07-adventure-custom-items.md) for permission, visibility, migration, offline and acceptance gates. The existing dynamic-object design's data-only rule continues to apply to personal entries.
+
 # 6. System Creator specification
 
 ## 6.1 System definition model
@@ -808,6 +817,10 @@ The first GM app is a responsive web surface within the shared PWA. Native packa
 Complete GUI plan G8: define media/scene/display contracts and persistence; add safe authorized image storage and rendering; implement revision-controlled manual fog and token operations; implement revocable display pairing and server-filtered scene projections; then build touch/keyboard scene controls and the minimal display shell. Keep this within the modular application. Do not add a second rules engine or expose GM credentials on a shared tablet.
 
 **Acceptance demonstration:** From a phone, use a monster sheet while an iPad shows a scene; manually reveal/conceal fog, place/move a token, change scene, reconnect, and revoke the display. Verify response bodies, media URLs, browser storage, deep links, and direct requests cannot expose originals, hidden tokens, GM notes, or administrative actions. Run the same permitted scene with a remote player. Concealing cannot undo information already seen.
+
+## 17.9b Adventure-specific custom entries (follow-up plan)
+
+The completed dynamic-object work added system templates and data-only character entries. [The adventure-specific custom items plan](docs/superpowers/plans/2026-10-07-adventure-custom-items.md) proposes richer personal entries and campaign-scoped reusable templates in phased slices. Its proposed behavior is not included in the I1–I7b completion claims; implement and verify it against the existing character, campaign, offline, authorization and GUI acceptance gates.
 
 ## 17.10 MVP acceptance criteria
 

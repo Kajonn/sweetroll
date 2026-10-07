@@ -1,6 +1,6 @@
 # Adventure-specific custom items — implementation plan
 
-**Status:** proposed follow-up, 2026-10-07. Planning only; no runtime or UI implementation is claimed.
+**Status:** slice A implemented in PR #17, 2026-10-07; CI and deployed acceptance gates tracked below. Slices B–D remain planned.
 **Authority:** [design_v2.md](../../../design_v2.md), especially §§3, 4.1, 5, 7.4, 9, 17; [dynamic sheet objects design](../specs/2026-09-26-dynamic-sheet-objects-design.md).
 **Dependency:** the delivered dynamic-object slots, system templates, character entries, granted actions, revision/idempotency and offline flows.
 
@@ -73,3 +73,11 @@ On phones, keep Add in the existing slot interaction, show scope and source in t
 2. Should a GM be able to edit action formulas for adventure items? Recommendation: no in this follow-up; base system actions only, with any freeform rule authoring designed separately.
 3. Should sharing be restricted at launch? Recommendation: all-players published catalog first; private drafts and placement need a separate secrecy model.
 4. Should changes to a shared template update existing copies? Recommendation: pin revisions and require explicit preview/update.
+
+## Slice A implementation — 2026-10-07
+
+Personal entry values now have three explicit text keys: required `name` (1–200 characters, nonblank), optional `description` and `notes` (up to 2,000 characters each). Unknown keys, nontext values and action definitions are rejected on add/update. Quantity uses the existing entry property and must be a positive safe integer. The target slot supplies the accepted kind; no client-authored kind or executable definition is accepted. All slot kinds support these data-only personal entries. Existing name-only records remain readable and editable without a database migration.
+
+The sheet offers the same labeled fields on create and edit, displays origin **Personal**, and retains text as escaped React content. Entry removal retains its confirmation. Add now waits for the command/queue acknowledgement and keeps entered data visible on failure. Quantity and details pass through the existing character session and durable offline queue. Permissions, revision checks, idempotency receipts, activity and export reuse the character Module.
+
+Evidence and outstanding gates: [personal entries acceptance](../../acceptance/personal-entries-2026-10-07.md). The database lifecycle regression and expanded browser journey cover retry, stale revision, denied access, export, edit/reload, and offline personal add/reconnect. A deployed GUI journey and GM/co-GM-specific personal-entry acceptance remain release gates; this code change does not close B–D.

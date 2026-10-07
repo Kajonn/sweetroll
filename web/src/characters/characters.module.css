@@ -42,3 +42,9 @@
 @media (prefers-reduced-motion: reduce) {
   .sheet, .dialog, .toolGroup, .dialogActions { transition: none; }
 }
+
+.personalText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+}

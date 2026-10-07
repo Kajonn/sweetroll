@@ -295,10 +295,24 @@ test("dynamic objects: creator templates+slot -> player entries+granted roll -> 
     await player.getByTestId(`slot-add-${slotId}`).click();
     await player.getByTestId(`slot-template-picker-${slotId}`).selectOption({ label: "Custom entry" });
     await player.getByTestId(`slot-custom-name-${slotId}`).fill("Lucky Stone");
+    await player.getByLabel("Description", { exact: true }).fill("A charm from the tower");
+    await player.getByLabel("Notes", { exact: true }).fill("Found by Ada");
+    await player.getByLabel("Quantity", { exact: true }).fill("3");
     await player.getByTestId(`slot-add-confirm-${slotId}`).click();
     await expectSheetSaved(player);
     const stoneLi = player.locator('li[data-testid^="slot-entry-"]', { hasText: "Lucky Stone" });
     await expect(stoneLi).toBeVisible();
+    await expect(stoneLi).toContainText("Personal");
+    await expect(stoneLi).toContainText("Found by Ada");
+    await expect(stoneLi).toContainText("×3");
+    await stoneLi.getByRole("button", { name: "Edit entry" }).click();
+    await stoneLi.getByLabel("Notes", { exact: true }).fill("Keep safe");
+    await stoneLi.getByLabel("Quantity", { exact: true }).fill("2");
+    await stoneLi.getByRole("button", { name: "Save entry" }).click();
+    await expectSheetSaved(player);
+    await player.reload();
+    await expect(stoneLi).toContainText("Keep safe");
+    await expect(stoneLi).toContainText("×2");
     await expect(stoneLi.locator('form[data-testid^="slot-granted-"]')).toHaveCount(0);
     await expect(player.getByRole("button", { name: "Longsword Attack" })).toHaveCount(1);
 
@@ -327,20 +341,24 @@ test("dynamic objects: creator templates+slot -> player entries+granted roll -> 
     expect(activityAfterRemove.events.filter((e) => e.kind === "character_action_executed")).toHaveLength(2);
     expect(activityAfterRemove.events.filter((e) => e.kind === "entry_removed")).toHaveLength(1);
 
-    // Offline leg: add torch while offline, reconnect, single replayed row.
+    // Offline leg: add a personal key with details, reconnect, single replayed row.
     await playerContext.setOffline(true);
     try {
       await player.getByTestId(`slot-add-${slotId}`).click();
-      await player.getByTestId(`slot-template-picker-${slotId}`).selectOption({ label: "Torch" });
+      await player.getByTestId(`slot-template-picker-${slotId}`).selectOption({ label: "Custom entry" });
+      await player.getByLabel("Entry name", { exact: true }).fill("Tower key");
+      await player.getByLabel("Description", { exact: true }).fill("Opens the tower");
+      await player.getByLabel("Notes", { exact: true }).fill("Offline find");
+      await player.getByLabel("Quantity", { exact: true }).fill("4");
       await player.getByTestId(`slot-add-confirm-${slotId}`).click();
       await expect(player.getByText("Changes pending")).toBeVisible({ timeout: 30_000 });
     } finally {
       await playerContext.setOffline(false);
     }
     await expectSheetSaved(player);
-    await expect(player.locator('li[data-testid^="slot-entry-"]', { hasText: "Torch" })).toBeVisible();
+    await expect(player.locator('li[data-testid^="slot-entry-"]', { hasText: "Tower key" })).toContainText("Offline find");
     const activityAfterSync = await readActivity(player.request, characterId);
-    // One add per entry (longsword, stone, torch): the offline add replayed
+    // One add per entry (longsword, stone, key): the offline add replayed
     // exactly once with no duplicate.
     expect(activityAfterSync.events.filter((e) => e.kind === "entry_added")).toHaveLength(3);
 

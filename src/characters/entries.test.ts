@@ -394,6 +394,38 @@ describeWithDatabase("Character entry commands", () => {
     expect(added.ok).toBe(true);
   });
 
+  it("persists personal details under revision, retry, authorization and export", async () => {
+    const owner = await createUser("Ada");
+    const outsider = await createUser("Outside");
+    const { versionId } = await publishEntryVersion(owner);
+    const characterId = await createEntryCharacter(owner, versionId);
+    const command: CharacterCommand = { kind: "addEntry", characterId,
+      entry: { entryId: STONE_ENTRY_ID, slotId: "inventory", templateId: null,
+        values: { name: "Ancient key", description: "Opens tower", notes: "Found by Ada" }, quantity: 3 },
+      expectedRevision: 1, idempotencyKey: randomUUID() };
+    expect(await characters.apply(ctx(outsider), command)).toMatchObject({ ok: false, error: { code: "not_found" } });
+    const added = await characters.apply(ctx(owner), command);
+    expect(added.ok).toBe(true);
+    expect(await characters.apply(ctx(owner), command)).toEqual(added);
+    const edit: CharacterCommand = { kind: "updateEntryValues", characterId, entryId: STONE_ENTRY_ID,
+      values: { notes: "Used once" }, quantity: 2, expectedRevision: 1, idempotencyKey: randomUUID() };
+    expect(await characters.apply(ctx(owner), edit)).toMatchObject({ ok: false, error: { code: "conflict" } });
+    const updated = await characters.apply(ctx(owner), { ...edit, expectedRevision: 2, idempotencyKey: randomUUID() });
+    expect(updated.ok).toBe(true);
+    if (!updated.ok) throw new Error("update failed");
+    expect(updated.value.character.state.entries?.[STONE_ENTRY_ID]).toMatchObject({
+      values: { name: "Ancient key", description: "Opens tower", notes: "Used once" }, quantity: 2,
+    });
+    expect(await activityKinds(characterId)).toEqual(["character_created", "entry_added", "entry_updated"]);
+    const exported = await characters.exportCharacter(ctx(owner), { characterId });
+    expect(exported.ok).toBe(true);
+    expect(JSON.stringify(exported)).toContain("Used once");
+    const removed = await characters.apply(ctx(owner), { kind: "removeEntry", characterId,
+      entryId: STONE_ENTRY_ID, expectedRevision: 3, idempotencyKey: randomUUID() });
+    expect(removed.ok).toBe(true);
+    expect(await activityKinds(characterId)).toEqual(["character_created", "entry_added", "entry_updated", "entry_removed"]);
+  });
+
   it("removes an entry so granted actions leave the projection while history stays", async () => {
     const owner = await createUser("Ada");
     const { versionId } = await publishEntryVersion(owner);

@@ -66,7 +66,7 @@ export type SlotListControlProps = {
    * entry edits stay enabled while rolls stay disabled.
    */
   actionsDisabled?: boolean;
-  onAddEntry(slotId: string, templateId: string | null, values: Record<string, unknown>): void | Promise<void>;
+  onAddEntry(slotId: string, templateId: string | null, values: Record<string, unknown>, quantity?: number): void | Promise<void>;
   onRemoveEntry(entryId: string): void | Promise<void>;
   onUpdateEntry(entryId: string, values: Record<string, unknown>, quantity?: number): void | Promise<void>;
   onExecuteGranted(entryId: string, actionId: string, inputs: Record<string, unknown>): void | Promise<void>;
@@ -201,58 +201,68 @@ function RemoveEntryButton({ entry, slotLabel, disabled, onRemove }: {
   );
 }
 
-function RenameEntryForm({ entry, disabled, onUpdate }: {
+function PersonalFields({ values, onChange, quantity, onQuantity, disabled, nameTestId }: {
+  values: Record<string, unknown>;
+  onChange(values: Record<string, unknown>): void;
+  quantity: number;
+  onQuantity(value: number): void;
+  nameTestId?: string;
+  disabled: boolean;
+}) {
+  return <>
+    <label className={styles.field}>{t("character.slot.customName")}
+      <input className={styles.dialogField} data-testid={nameTestId} required maxLength={200}
+        value={String(values.name ?? "")} disabled={disabled}
+        onChange={(event) => onChange({ ...values, name: event.target.value })} />
+    </label>
+    {(["description", "notes"] as const).map((key) => <label className={styles.field} key={key}>
+      {t(key === "description" ? "character.slot.description" : "character.slot.notes")}
+      <textarea className={styles.dialogField} maxLength={2000} rows={3}
+        value={String(values[key] ?? "")} disabled={disabled}
+        onChange={(event) => onChange({ ...values, [key]: event.target.value })} />
+    </label>)}
+    <label className={styles.field}>{t("character.slot.quantity")}
+      <input className={styles.dialogField} type="number" min={1} step={1} required
+        value={quantity} disabled={disabled}
+        onChange={(event) => onQuantity(event.target.value === "" ? 0 : Number(event.target.value))} />
+    </label>
+  </>;
+}
+
+function PersonalEntryForm({ entry, disabled, onUpdate }: {
   entry: SlotListEntry;
   disabled: boolean;
   onUpdate(entryId: string, values: Record<string, unknown>, quantity?: number): void | Promise<void>;
 }) {
-  const current = typeof entry.values.name === "string" ? entry.values.name : "";
-  const [draft, setDraft] = useState(current);
+  const [draft, setDraft] = useState(entry.values);
+  const [quantity, setQuantity] = useState(entry.quantity ?? 1);
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(false);
   const [commandError, setCommandError] = useState("");
-  useEffect(() => {
-    setDraft(current);
-  }, [current]);
-  if (!editing) {
-    return (
-      <Button type="button" variant="secondary" className={styles.slotEditButton}
-        disabled={disabled} onClick={() => setEditing(true)}>
-        {t("character.slot.rename")}
-      </Button>
-    );
-  }
-  return (
-    <form
-      className={styles.field}
-      data-testid={`slot-entry-rename-${entry.entryId}`}
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (disabled || pending || draft === current) return;
-        setCommandError("");
-        setPending(true);
-        void Promise.resolve().then(() => onUpdate(entry.entryId, { name: draft })).then(
-          () => setEditing(false),
-          (error: unknown) => setCommandError(describeCommandError(error)),
-        ).finally(() => setPending(false));
-      }}
-    >
-      <label>
-        {t("character.slot.customName")}
-        <input
-          type="text"
-          value={draft}
-          disabled={disabled || pending}
-          onChange={(event) => setDraft(event.target.value)}
-        />
-      </label>
-      <div className={styles.slotEditActions}>
-        <Button type="submit" variant="secondary" disabled={disabled || draft === current} pending={pending}>{t("character.slot.saveName")}</Button>
-        <Button type="button" variant="secondary" disabled={pending} onClick={() => { setDraft(current); setCommandError(""); setEditing(false); }}>{t("character.slot.cancel")}</Button>
-      </div>
-      {commandError !== "" ? <p role="alert" className={styles.commandError}>{commandError}</p> : null}
-    </form>
-  );
+  useEffect(() => { setDraft(entry.values); setQuantity(entry.quantity ?? 1); }, [entry.values, entry.quantity]);
+  if (!editing) return <Button type="button" variant="secondary" className={styles.slotEditButton}
+    disabled={disabled} onClick={() => setEditing(true)}>{t("character.slot.editEntry")}</Button>;
+  const valid = typeof draft.name === "string" && draft.name.trim() !== ""
+    && Number.isSafeInteger(quantity) && quantity >= 1;
+  const changed = JSON.stringify(draft) !== JSON.stringify(entry.values) || quantity !== (entry.quantity ?? 1);
+  return <form className={styles.field} data-testid={`slot-entry-personal-${entry.entryId}`}
+    onSubmit={(event) => {
+      event.preventDefault();
+      if (disabled || pending || !valid || !changed) return;
+      setCommandError(""); setPending(true);
+      void Promise.resolve().then(() => onUpdate(entry.entryId, { ...draft, name: String(draft.name).trim() }, quantity)).then(
+        () => setEditing(false), (error: unknown) => setCommandError(describeCommandError(error)),
+      ).finally(() => setPending(false));
+    }}>
+    <PersonalFields values={draft} onChange={setDraft} quantity={quantity} onQuantity={setQuantity} disabled={disabled || pending} />
+    <div className={styles.slotEditActions}>
+      <Button type="submit" variant="secondary" disabled={disabled || !valid || !changed} pending={pending}>{t("character.slot.saveEntry")}</Button>
+      <Button type="button" variant="secondary" disabled={pending} onClick={() => {
+        setDraft(entry.values); setQuantity(entry.quantity ?? 1); setCommandError(""); setEditing(false);
+      }}>{t("character.slot.cancel")}</Button>
+    </div>
+    {commandError !== "" ? <p role="alert" className={styles.commandError}>{commandError}</p> : null}
+  </form>;
 }
 
 function TemplateEntryForm({ entry, template, disabled, onUpdate }: {
@@ -362,12 +372,14 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
   accepts: string[];
   templates: SlotTemplate[];
   disabled: boolean;
-  onAdd(slotId: string, templateId: string | null, values: Record<string, unknown>): void | Promise<void>;
+  onAdd(slotId: string, templateId: string | null, values: Record<string, unknown>, quantity?: number): void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const offered = templates.filter((template) => accepts.includes(template.kind));
   const [selected, setSelected] = useState<string>(offered[0]?.id ?? "");
-  const [customName, setCustomName] = useState("");
+  const [customValues, setCustomValues] = useState<Record<string, unknown>>({ name: "" });
+  const [quantity, setQuantity] = useState(1);
+  const [pending, setPending] = useState(false);
   const [commandError, setCommandError] = useState("");
   const isCustom = selected === "";
   return (
@@ -380,7 +392,8 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
         onClick={() => {
           setCommandError("");
           setSelected(offered[0]?.id ?? "");
-          setCustomName("");
+          setCustomValues({ name: "" });
+          setQuantity(1);
           setOpen(true);
         }}
       >
@@ -388,7 +401,7 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
       </Button>
       <Dialog
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={(next) => { if (!pending) setOpen(next); }}
         title={t("character.slot.addTitle", { label })}
         description={t("character.slot.addDescription")}
         closeLabel={t("character.slot.cancel")}
@@ -396,18 +409,17 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
           <Button
             type="button"
             variant="primary"
-            disabled={disabled || (isCustom && customName.trim() === "")}
+            disabled={disabled || pending || (isCustom && (String(customValues.name ?? "").trim() === "" || !Number.isSafeInteger(quantity) || quantity < 1))}
+            pending={pending}
             data-testid={`slot-add-confirm-${slotId}`}
-            onClick={() => invokeCommand(
-              () => onAdd(slotId, isCustom ? null : selected, isCustom ? { name: customName.trim() } : {}),
-              (message) => {
-                if (message === "") {
-                  setOpen(false);
-                } else {
-                  setCommandError(message);
-                }
-              },
-            )}
+            onClick={() => {
+              setCommandError(""); setPending(true);
+              void Promise.resolve().then(() => isCustom
+                ? onAdd(slotId, null, { ...customValues, name: String(customValues.name).trim() }, quantity)
+                : onAdd(slotId, selected, {})).then(
+                () => setOpen(false), (error: unknown) => setCommandError(describeCommandError(error)),
+              ).finally(() => setPending(false));
+            }}
           >
             {t("character.slot.confirmAdd")}
           </Button>
@@ -417,26 +429,17 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
           label={t("character.slot.template")}
           data-testid={`slot-template-picker-${slotId}`}
           value={selected}
-          disabled={disabled}
+          disabled={disabled || pending}
           onChange={(event) => setSelected(event.target.value)}
           options={[
             ...offered.map((template) => ({ value: template.id, label: template.label })),
             { value: "", label: t("character.slot.customEntry") },
           ]}
         />
-        {isCustom ? (
-          <label className={styles.field}>
-            {t("character.slot.customName")}
-            <input
-              type="text"
-              className={styles.dialogField}
-              data-testid={`slot-custom-name-${slotId}`}
-              value={customName}
-              disabled={disabled}
-              onChange={(event) => setCustomName(event.target.value)}
-            />
-          </label>
-        ) : null}
+        {isCustom ? <div>
+          <PersonalFields values={customValues} onChange={setCustomValues} quantity={quantity}
+            onQuantity={setQuantity} disabled={disabled || pending} nameTestId={`slot-custom-name-${slotId}`} />
+        </div> : null}
         {commandError !== "" ? <p role="alert" className={styles.commandError}>{commandError}</p> : null}
       </Dialog>
     </>
@@ -476,12 +479,17 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
           <ul className={styles.slotList}>
             {entries.map((entry) => {
               const template = entry.templateId === null ? undefined : byId.get(entry.templateId);
-              const summary = scalarSummary(entry.values, entry.label);
+              const summary = entry.templateId === null ? null : scalarSummary(entry.values, entry.label);
               return (
                 <li key={entry.entryId} data-testid={`slot-entry-${entry.entryId}`} className={styles.slotEntry}>
                   <span className={styles.slotEntryLabel}>{entry.label}</span>
-                  {template?.kind === "item" && (entry.quantity ?? 1) > 1
+                  {(entry.templateId === null || template?.kind === "item") && (entry.quantity ?? 1) > 1
                     ? <span className={styles.meta}>×{entry.quantity}</span> : null}
+                  {entry.templateId === null ? <>
+                    <span className={styles.meta}>{t("character.slot.personal")}</span>
+                    {(["description", "notes"] as const).map((key) => typeof entry.values[key] === "string" && entry.values[key] !== ""
+                      ? <p className={styles.personalText} key={key}><strong>{t(key === "description" ? "character.slot.description" : "character.slot.notes")}: </strong>{String(entry.values[key])}</p> : null)}
+                  </> : null}
                   {summary !== null ? <span className={styles.meta}>{summary}</span> : null}
                   {template?.grantedActions.map((action) => (
                     <GrantedActionForm
@@ -493,7 +501,7 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
                     />
                   ))}
                   {entry.templateId === null ? (
-                    <RenameEntryForm entry={entry} disabled={disabled} onUpdate={onUpdateEntry} />
+                    <PersonalEntryForm entry={entry} disabled={disabled} onUpdate={onUpdateEntry} />
                   ) : template ? <TemplateEntryForm entry={entry} template={template}
                     disabled={disabled} onUpdate={onUpdateEntry} /> : null}
                   <RemoveEntryButton entry={entry} slotLabel={label} disabled={disabled} onRemove={onRemoveEntry} />

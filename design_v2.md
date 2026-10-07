@@ -820,6 +820,8 @@ Complete GUI plan G8: define media/scene/display contracts and persistence; add 
 
 ## 17.9b Adventure-specific custom entries (follow-up plan)
 
+Personal custom entries now support bounded name (200 characters), description and notes (2,000 each), plus positive integer quantity through the existing character revision and offline queue. The sheet provides create/edit controls and identifies their Personal origin; these entries remain data-only. Campaign catalogs and inherited actions remain planned.
+
 The completed dynamic-object work added system templates and data-only character entries. [The adventure-specific custom items plan](docs/superpowers/plans/2026-10-07-adventure-custom-items.md) proposes richer personal entries and campaign-scoped reusable templates in phased slices. Its proposed behavior is not included in the I1–I7b completion claims; implement and verify it against the existing character, campaign, offline, authorization and GUI acceptance gates.
 
 ## 17.10 MVP acceptance criteria

@@ -50,6 +50,15 @@ export function validateEntryForSlot(
         "Custom entries are data-only and cannot carry granted actions.",
       );
     }
+    const limits: Record<string, number> = { name: 200, description: 2000, notes: 2000 };
+    for (const [key, value] of Object.entries(entry.values)) {
+      if (!Object.hasOwn(limits, key) || typeof value !== "string" || value.length > limits[key]!) {
+        return invalid("entry_values_invalid", "Personal entries accept bounded name, description and notes only.", key);
+      }
+    }
+    if (typeof entry.values.name !== "string" || entry.values.name.trim().length === 0) {
+      return invalid("entry_values_invalid", "Personal entry name is required.", "name");
+    }
     return { ok: true };
   }
   const template = templates.find((candidate) => candidate.id === entry.templateId);

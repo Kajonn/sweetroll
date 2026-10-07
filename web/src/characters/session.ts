@@ -115,7 +115,7 @@ export type CharacterSession = {
    * resource bumps: they queue durably and replay verbatim, so offline
    * add/remove/edit sync on reconnect.
    */
-  addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>): Promise<void>;
+  addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>, quantity?: number): Promise<void>;
   removeEntry(entryId: string): Promise<void>;
   updateEntryValues(entryId: string, values: Record<string, unknown>, quantity?: number): Promise<void>;
   resolveConflict(input: ResolveConflictInput): Promise<void>;
@@ -1874,7 +1874,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         }),
       );
     },
-    async addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>): Promise<void> {
+    async addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>, quantity?: number): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
       if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({
@@ -1884,6 +1884,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           slotId,
           templateId,
           values: values ?? {},
+          ...(quantity === undefined ? {} : { quantity }),
         },
       }));
     },

@@ -406,7 +406,18 @@ describeWithDatabase("Character entry commands", () => {
     expect(await characters.apply(ctx(outsider), command)).toMatchObject({ ok: false, error: { code: "not_found" } });
     const added = await characters.apply(ctx(owner), command);
     expect(added.ok).toBe(true);
-    expect(await characters.apply(ctx(owner), command)).toEqual(added);
+    if (!added.ok) throw new Error("personal add failed");
+    const replay = await characters.apply(ctx(owner), command);
+    expect(replay).toEqual({
+      ...added,
+      value: {
+        ...added.value,
+        character: {
+          ...added.value.character,
+          reconciliation: { ...added.value.character.reconciliation, replayed: true },
+        },
+      },
+    });
     const edit: CharacterCommand = { kind: "updateEntryValues", characterId, entryId: STONE_ENTRY_ID,
       values: { notes: "Used once" }, quantity: 2, expectedRevision: 1, idempotencyKey: randomUUID() };
     expect(await characters.apply(ctx(owner), edit)).toMatchObject({ ok: false, error: { code: "conflict" } });

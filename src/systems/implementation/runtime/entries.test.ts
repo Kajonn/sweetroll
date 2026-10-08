@@ -105,6 +105,24 @@ describe("validateEntryForSlot", () => {
     ).toEqual({ ok: true });
   });
 
+  it("accepts bounded personal details in every supported slot kind", () => {
+    for (const kind of ["item", "spell", "talent", "effect"] as const) {
+      expect(validateEntryForSlot(entry({ templateId: null,
+        values: { name: "Ancient key", description: "Opens the tower", notes: "Found by Ada" }, quantity: 2 }),
+        [{ ...inventorySlot, accepts: [kind] }], [], 0)).toEqual({ ok: true });
+    }
+  });
+
+  it.each([
+    { name: " " }, { name: "x".repeat(201) }, { name: 4 },
+    { name: "Key", description: "x".repeat(2001) },
+    { name: "Key", notes: "x".repeat(2001) }, { name: "Key", notes: {} },
+    { name: "Key", kind: "spell" }, { name: "Key", formula: "d20" },
+  ])("rejects invalid or unbounded personal data %j", (values) => {
+    expect(validateEntryForSlot(entry({ templateId: null, values }), [inventorySlot], [], 0))
+      .toMatchObject({ ok: false, code: "entry_values_invalid" });
+  });
+
   it("rejects entry values violating template field types", () => {
     const result = validateEntryForSlot(
       entry({ values: { bonus: "lots" } }),

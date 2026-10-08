@@ -1067,7 +1067,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       if (!isRecord(entryInput.values)) return fail(errors.bad_request("Entry values must be an object."));
       if (
         entryInput.quantity !== undefined
-        && (!Number.isInteger(entryInput.quantity) || (entryInput.quantity as number) < 1)
+        && (!Number.isSafeInteger(entryInput.quantity) || (entryInput.quantity as number) < 1)
       ) {
         return fail(errors.bad_request("Entry quantity must be an integer of at least 1."));
       }
@@ -1121,7 +1121,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         return fail(errors.bad_request("Character entry reference is invalid."));
       }
       if (!isRecord(command.values)) return fail(errors.bad_request("Entry values must be an object."));
-      if (command.quantity !== undefined && (!Number.isInteger(command.quantity) || command.quantity < 1)) {
+      if (command.quantity !== undefined && (!Number.isSafeInteger(command.quantity) || command.quantity < 1)) {
         return fail(errors.bad_request("Entry quantity must be an integer of at least 1."));
       }
       const merged = { ...stored.values, ...command.values };

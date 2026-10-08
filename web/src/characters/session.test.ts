@@ -845,7 +845,7 @@ describe("CharacterSession", () => {
     // Granted rolls stay online-only like entity actions.
     await expect(session.executeGrantedAction("entry-1", "attack", {})).rejects.toThrow();
     // Entry writes queue durably offline and replay verbatim on reconnect.
-    await session.addEntry("inventory", "longsword", {});
+    await session.addEntry("inventory", null, { name: "Ancient key", description: "Opens tower", notes: "Found by Ada" }, 3);
     await session.removeEntry("entry-9");
     await session.updateEntryValues("entry-9", { name: "Stone" }, 2);
     await session.whenIdle();
@@ -866,7 +866,7 @@ describe("CharacterSession", () => {
       "DELETE /characters/char-1/entries/entry-9",
       "PATCH /characters/char-1/entries/entry-9",
     ]);
-    expect(api.sent[0]?.body).toMatchObject({ expectedRevision: 1 });
+    expect(api.sent[0]?.body).toMatchObject({ expectedRevision: 1, entry: { templateId: null, values: { name: "Ancient key", description: "Opens tower", notes: "Found by Ada" }, quantity: 3 } });
     expect(api.sent[2]?.body).toMatchObject({ values: { name: "Stone" }, quantity: 2 });
     expect(session.getSnapshot().entries).toEqual([]);
 

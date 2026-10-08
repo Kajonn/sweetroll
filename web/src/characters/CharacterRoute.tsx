@@ -305,7 +305,7 @@ function CharacterDetailLoaded({
         onSetField={session.setField}
         onBump={session.bumpResource}
         onExecuteAction={session.executeAction}
-        onAddEntry={(slotId, templateId, values) => session.addEntry(slotId, templateId, values)}
+        onAddEntry={(slotId, templateId, values, quantity) => session.addEntry(slotId, templateId, values, quantity)}
         onRemoveEntry={session.removeEntry}
         onUpdateEntry={session.updateEntryValues}
         onExecuteGranted={(entryId, actionId, inputs) => session.executeGrantedAction(entryId, actionId, inputs)}

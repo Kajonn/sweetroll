@@ -65,7 +65,7 @@ describe("SlotListControl", () => {
     expect(screen.getByTestId(`slot-entry-${SWORD_ENTRY_ID}`)).toHaveTextContent("weapon_bonus: 1");
     expect(screen.getByTestId(`slot-entry-${STONE_ENTRY_ID}`)).toHaveTextContent("Lucky Stone");
     expect(screen.getByTestId(`slot-entry-${STONE_ENTRY_ID}`)).not.toHaveTextContent("name: Lucky Stone");
-    expect(screen.queryByTestId(`slot-entry-rename-${STONE_ENTRY_ID}`)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`slot-entry-personal-${STONE_ENTRY_ID}`)).not.toBeInTheDocument();
 
     renderControl({ entries: [] });
     expect(screen.getByTestId("slot-empty-inventory")).toHaveTextContent("No entries yet.");
@@ -93,7 +93,67 @@ describe("SlotListControl", () => {
     await user.selectOptions(screen.getByTestId("slot-template-picker-inventory") as unknown as HTMLElement, "");
     await user.type(screen.getByTestId("slot-custom-name-inventory"), "Lucky Stone");
     await user.click(screen.getByTestId("slot-add-confirm-inventory"));
-    expect(handlers.onAddEntry).toHaveBeenCalledWith("inventory", null, { name: "Lucky Stone" });
+    expect(handlers.onAddEntry).toHaveBeenCalledWith("inventory", null, { name: "Lucky Stone" }, 1);
+  });
+
+  it("creates personal details and quantity and edits them together", async () => {
+    const user = userEvent.setup();
+    const handlers = renderControl();
+    await user.click(screen.getByTestId("slot-add-inventory"));
+    await user.selectOptions(screen.getByTestId("slot-template-picker-inventory"), "");
+    await user.type(screen.getByLabelText("Entry name"), "Ancient key");
+    await user.type(screen.getByLabelText("Description"), "Opens the tower");
+    await user.type(screen.getByLabelText("Notes"), "Found by Ada");
+    await user.clear(screen.getByLabelText("Quantity"));
+    await user.type(screen.getByLabelText("Quantity"), "3");
+    await user.click(screen.getByTestId("slot-add-confirm-inventory"));
+    expect(handlers.onAddEntry).toHaveBeenCalledWith("inventory", null,
+      { name: "Ancient key", description: "Opens the tower", notes: "Found by Ada" }, 3);
+    const row = within(screen.getByTestId(`slot-entry-${STONE_ENTRY_ID}`));
+    expect(row.getByText("Personal")).toBeVisible();
+    await user.click(row.getByRole("button", { name: "Edit entry" }));
+    await user.type(row.getByLabelText("Description"), "A charm");
+    await user.type(row.getByLabelText("Notes"), "Keep safe");
+    await user.clear(row.getByLabelText("Quantity"));
+    await user.type(row.getByLabelText("Quantity"), "2");
+    await user.click(row.getByRole("button", { name: "Save entry" }));
+    expect(handlers.onUpdateEntry).toHaveBeenCalledWith(STONE_ENTRY_ID,
+      { name: "Lucky Stone", description: "A charm", notes: "Keep safe" }, 2);
+  });
+
+  it("exposes populated personal textareas by their accessible names", async () => {
+    const user = userEvent.setup();
+    const handlers = renderControl({ entries: [{
+      entryId: STONE_ENTRY_ID, templateId: null, label: "Lucky Stone", quantity: 3,
+      values: { name: "Lucky Stone", description: "A charm from the tower", notes: "Found by Ada" },
+    }] });
+    const row = within(screen.getByTestId(`slot-entry-${STONE_ENTRY_ID}`));
+    await user.click(row.getByRole("button", { name: "Edit entry" }));
+    expect(row.getByRole("textbox", { name: "Description" })).toHaveValue("A charm from the tower");
+    const notes = row.getByRole("textbox", { name: "Notes" });
+    expect(notes).toHaveValue("Found by Ada");
+    await user.clear(notes);
+    await user.type(notes, "Keep safe");
+    await user.click(row.getByRole("button", { name: "Save entry" }));
+    expect(handlers.onUpdateEntry).toHaveBeenCalledWith(STONE_ENTRY_ID,
+      { name: "Lucky Stone", description: "A charm from the tower", notes: "Keep safe" }, 3);
+  });
+
+  it("keeps the personal form and data visible when saving fails", async () => {
+    const user = userEvent.setup();
+    renderControl({ onAddEntry: vi.fn().mockRejectedValue(new Error("Access revoked")) });
+    await user.click(screen.getByTestId("slot-add-inventory"));
+    await user.selectOptions(screen.getByTestId("slot-template-picker-inventory"), "");
+    await user.type(screen.getByLabelText("Entry name"), "Tower key");
+    await user.clear(screen.getByLabelText("Quantity"));
+    await user.type(screen.getByLabelText("Quantity"), "0");
+    expect(screen.getByTestId("slot-add-confirm-inventory")).toBeDisabled();
+    await user.clear(screen.getByLabelText("Quantity"));
+    await user.type(screen.getByLabelText("Quantity"), "2");
+    await user.click(screen.getByTestId("slot-add-confirm-inventory"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Access revoked");
+    expect(screen.getByLabelText("Entry name")).toHaveValue("Tower key");
+    expect(screen.getByRole("dialog")).toBeVisible();
   });
 
   it("asks for confirmation before removing an entry", async () => {
@@ -119,13 +179,13 @@ describe("SlotListControl", () => {
     const user = userEvent.setup();
     const handlers = renderControl();
 
-    await user.click(within(screen.getByTestId(`slot-entry-${STONE_ENTRY_ID}`)).getByRole("button", { name: "Rename" }));
-    const rename = screen.getByTestId(`slot-entry-rename-${STONE_ENTRY_ID}`);
-    await user.clear(within(rename).getByRole("textbox"));
-    await user.type(within(rename).getByRole("textbox"), "Unlucky Stone");
-    await user.click(within(rename).getByRole("button", { name: "Save name" }));
-    expect(handlers.onUpdateEntry).toHaveBeenCalledWith(STONE_ENTRY_ID, { name: "Unlucky Stone" });
-    expect(screen.queryByTestId(`slot-entry-rename-${STONE_ENTRY_ID}`)).not.toBeInTheDocument();
+    await user.click(within(screen.getByTestId(`slot-entry-${STONE_ENTRY_ID}`)).getByRole("button", { name: "Edit entry" }));
+    const rename = screen.getByTestId(`slot-entry-personal-${STONE_ENTRY_ID}`);
+    await user.clear(within(rename).getByLabelText("Entry name"));
+    await user.type(within(rename).getByLabelText("Entry name"), "Unlucky Stone");
+    await user.click(within(rename).getByRole("button", { name: "Save entry" }));
+    expect(handlers.onUpdateEntry).toHaveBeenCalledWith(STONE_ENTRY_ID, { name: "Unlucky Stone" }, 1);
+    expect(screen.queryByTestId(`slot-entry-personal-${STONE_ENTRY_ID}`)).not.toBeInTheDocument();
   });
 
   it("edits a templated value and item quantity through the update callback", async () => {

@@ -136,6 +136,8 @@ A GM may use **multiple devices in the same session simultaneously**, with each 
 
 See the [adventure-specific custom items plan](docs/superpowers/plans/2026-10-07-adventure-custom-items.md) for permission, visibility, migration, offline and acceptance gates. The existing dynamic-object design's data-only rule continues to apply to personal entries.
 
+**Next planned implementation (slice B, 2026-10-09):** [Campaign data-only templates execution plan](docs/superpowers/plans/2026-10-09-campaign-data-templates.md). An active GM/co-GM creates and publishes a blank template to all active campaign members in one operation, with fixed bounded name/description/notes and an item default quantity. Resource concurrency revision is separate from immutable content revision; edit appends content, while archive/recover changes lifecycle only. Placement validates the selected revisions and materializes a server-owned data-only snapshot; character-specific edits never update the catalog. Archive blocks new placement and preserves old copies. Returned sheets keep those copies under the existing return-owner exception, without campaign catalog/history access. Offline placement freezes the fetched reference and requires explicit review if it changes before first commit; an authorized committed retry preserves its original result. Until safe entry migration exists, upgrades and rollback that would discard populated entries must fail with an actionable conflict. These are planned contracts, not delivered behavior; inherited actions, proposals, restricted drafts and explicit instance upgrades remain later slices.
+
 # 6. System Creator specification
 
 ## 6.1 System definition model
@@ -821,6 +823,8 @@ Complete GUI plan G8: define media/scene/display contracts and persistence; add 
 ## 17.9b Adventure-specific custom entries (follow-up plan)
 
 Personal custom entries now support bounded name (200 characters), description and notes (2,000 each), plus positive integer quantity through the existing character revision and offline queue. The sheet provides create/edit controls and identifies their Personal origin; these entries remain data-only. Campaign catalogs and inherited actions remain planned.
+
+The next feature PR follows the [slice B execution plan](docs/superpowers/plans/2026-10-09-campaign-data-templates.md): reusable all-player data-only campaign templates, with server snapshots, offline/concurrency protection and explicit lifecycle acceptance. Its task list and release gates remain unchecked.
 
 The completed dynamic-object work added system templates and data-only character entries. [The adventure-specific custom items plan](docs/superpowers/plans/2026-10-07-adventure-custom-items.md) proposes richer personal entries and campaign-scoped reusable templates in phased slices. Its proposed behavior is not included in the I1–I7b completion claims; implement and verify it against the existing character, campaign, offline, authorization and GUI acceptance gates.
 

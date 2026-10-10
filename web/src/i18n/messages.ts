@@ -616,6 +616,8 @@ export const defaultMessages: MessageTable = {
   "character.rollResult.output": "Result",
   "character.rollResult.audience": "Audience",
   "character.rollResult.audience.owner_only": "Owner only",
+  "character.rollResult.audience.gm_only": "GM only",
+  "character.rollResult.audience.campaign": "Campaign",
   "character.rollResult.showDetails": "Show roll details",
   "character.rollResult.hideDetails": "Hide roll details",
   "character.tools.title": "Character tools",

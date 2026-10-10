@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +15,8 @@ import type {
   CharacterView,
   CommandResultResponse,
   FrozenRequest,
+  EntryTemplatesResponse,
+  OpenCharacterResponse,
   MigrationPreviewResponse,
 } from "./types.js";
 import { CharacterDetail } from "./CharacterRoute.js";
@@ -106,6 +108,70 @@ describe("CharacterRoute", () => {
   afterEach(() => {
     window.history.pushState({}, "", "/");
     vi.restoreAllMocks();
+  });
+
+  it.each(["before", "after"])("keeps template choices when the catalog arrives %s a same-revision projection refresh", async (order) => {
+    const store = await openStore();
+    const cached = completionView();
+    cached.campaignId = "campaign-a";
+    cached.projection.completionFields = [];
+    cached.projection.sheets = [{ id: "play", label: "Play", sections: [{
+      id: "gear", label: "Gear", elements: [{
+        kind: "slot", id: "inventory", slotId: "inventory", label: "Inventory",
+        accepts: ["item"], entries: [],
+      }],
+    }] }];
+    await store.confirmSnapshot(ACTOR, CHARACTER_ID, cached, 0);
+    // Projection-only refreshes also advance the durable generation.
+    const fresh = { ...cached, projection: { ...cached.projection, entityLabel: "Updated Hero" } };
+    let resolveOpen!: (response: OpenCharacterResponse) => void;
+    const api = makeApi();
+    api.open.mockImplementation(() => new Promise<OpenCharacterResponse>(resolve => { resolveOpen = resolve; }));
+    let resolveCatalog!: (response: EntryTemplatesResponse) => void;
+    const catalog: EntryTemplatesResponse = { requestId: "catalog", templates: [
+      { id: "longsword", label: "Longsword", kind: "item", fields: [], grantedActions: [], source: { kind: "system", templateId: "longsword" } },
+      { id: "key", label: "Tower key", kind: "item", fields: [], grantedActions: [], source: { kind: "campaign", campaignId: "campaign-a", templateId: "key", templateRevision: 1, contentRevision: 1 } },
+    ] };
+    const listTemplates = vi.fn(() => new Promise<EntryTemplatesResponse>(resolve => { resolveCatalog = resolve; }));
+    api.listEntryTemplates = listTemplates;
+    const saveTemplates = vi.spyOn(store, "saveEntryTemplates");
+    const confirmSnapshot = vi.spyOn(store, "confirmSnapshot");
+    try {
+      const { unmount } = render(<CharacterDetail characterId={CHARACTER_ID} api={api} store={store}
+        identity={makeIdentity()} coordination={makeCoordination(true)} />);
+      await waitFor(() => expect(api.open).toHaveBeenCalled());
+      await waitFor(() => expect(listTemplates).toHaveBeenCalled());
+      const callsBeforeRefresh = listTemplates.mock.calls.length;
+      const resolvePreviousCatalog = resolveCatalog;
+      if (order === "before") {
+        await act(async () => { resolveCatalog(catalog); });
+        await waitFor(() => expect(saveTemplates).toHaveBeenCalled());
+        await waitFor(async () => expect(await store.readEntryTemplates(ACTOR, CHARACTER_ID)).toEqual(catalog.templates));
+      }
+      await act(async () => { resolveOpen(makeOpenEnvelope(fresh)); });
+      await waitFor(() => expect(confirmSnapshot).toHaveBeenCalled());
+      // A new projection needs a fresh guard even though revision is still 1.
+      await waitFor(() => expect(listTemplates.mock.calls.length).toBeGreaterThan(callsBeforeRefresh));
+      await act(async () => { resolveCatalog(catalog); });
+      const user = userEvent.setup();
+      await waitFor(() => expect(screen.getByTestId("slot-add-inventory")).toBeEnabled());
+      await user.click(screen.getByTestId("slot-add-inventory"));
+      expect(await screen.findByRole("option", { name: "Longsword" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: /Tower key/ })).toBeInTheDocument();
+      await waitFor(async () => expect(await store.readEntryTemplates(ACTOR, CHARACTER_ID)).toEqual(catalog.templates));
+      if (order === "after") {
+        // A late response from the replaced snapshot cannot overwrite the
+        // fresh choices or cache, even when it contains an older revision.
+        await act(async () => { resolvePreviousCatalog({ ...catalog, templates: [
+          { ...catalog.templates[0]!, label: "Obsolete sword" },
+        ] }); });
+        expect(screen.queryByRole("option", { name: "Obsolete sword" })).not.toBeInTheDocument();
+        expect(await store.readEntryTemplates(ACTOR, CHARACTER_ID)).toEqual(catalog.templates);
+      }
+      unmount();
+    } finally {
+      await store.close();
+    }
   });
 
   it("opens a character through identity, store, session and renderer, then releases the session", async () => {

@@ -212,6 +212,7 @@ describe("AppShell", () => {
       expect(await screen.findByText("Private B", undefined, { timeout: 10_000 })).toBeInTheDocument();
       expect(screen.queryByText("Private A")).not.toBeInTheDocument();
       expect(qc.getQueryData(["account-label"])).toBe("Private B");
+      expect(screen.queryByText("Signed out.")).not.toBeInTheDocument();
     } finally {
       qc.clear();
     }

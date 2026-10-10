@@ -169,6 +169,9 @@ function CharacterDetailLoaded({
     return () => window.removeEventListener("focus", refresh);
   }, []);
   const [templates, setTemplates] = useState<SlotTemplate[]>([]);
+  // A projection-only refresh can advance the store generation without
+  // changing the character revision. Cancel its old catalog request and
+  // read a fresh guard whenever the confirmed snapshot is replaced.
   useEffect(() => {
     setTemplates([]);
     if (!hasSlots || characterIdForTemplates === undefined || snapshot.phase === "purged" || snapshot.confirmed === null) return;
@@ -197,7 +200,7 @@ function CharacterDetailLoaded({
       }
     })().catch(()=> { if(!cancelled) setTemplates([]); });
     return () => {cancelled=true;};
-  }, [api,store,actorId,hasSlots,characterIdForTemplates,online,templateRefresh,snapshot.confirmed?.campaignId,snapshot.confirmed?.revision,snapshot.phase === "purged"]);
+  }, [api,store,actorId,hasSlots,characterIdForTemplates,online,templateRefresh,snapshot.confirmed,snapshot.phase === "purged"]);
 
   const focusedFor = useRef<string | null>(null);
   useEffect(() => {

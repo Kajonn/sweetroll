@@ -96,6 +96,17 @@ describe("CharacterSheet", () => {
     expect(screen.queryByRole("heading", { name: "Roll result" })).not.toBeInTheDocument();
   });
 
+  it.each([
+    ["gm_only", "GM only"],
+    ["campaign", "Campaign"],
+  ] as const)("renders a readable %s roll audience", (audience, label) => {
+    render(<CharacterSheet snapshot={snapshot({ lastRoll: {
+      actionId: "roll-check", expression: "d20", dice: [], bindings: [], total: 12, output: "12", audience,
+    } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    expect(screen.getByText(label)).toBeVisible();
+    expect(screen.queryByText(`character.rollResult.audience.${audience}`)).not.toBeInTheDocument();
+  });
+
   it("shows roll dice and bindings only when details are requested", async () => {
     const user = userEvent.setup();
     render(<CharacterSheet snapshot={snapshot({ lastRoll: { actionId: "roll-check", expression: "d20 + 2", dice: [{ sides: 20, value: 14, kept: true }], bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }], total: 16, output: "Success", audience: "owner_only" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);

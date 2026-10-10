@@ -179,6 +179,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         // pendingLogout must not downgrade serverError/error back to generic
         // pending, and clearing the barrier resolves either into complete.
         if (snapshot.pendingLogout) setLogoutStatus(previous => previous === "error" || previous === "serverError" ? previous : "pending");
+        else if (snapshot.actorId !== null) setLogoutStatus(null);
         else setLogoutStatus(previous => previous === "pending" || previous === "serverError" ? "complete" : previous);
         setAuth(snapshot.actorId ? { state: "authenticated", userId: snapshot.actorId } : { state: "anonymous" });
         setSessionExpired(snapshot.sessionExpired);

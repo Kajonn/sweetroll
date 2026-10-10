@@ -132,6 +132,7 @@ export type TxBuildArgs = {
 };
 
 export type ApplyCommandInput = {
+  precondition?: (client: PoolClient) => Promise<import("./index.js").CharacterError | null>;
   executionId: ExecutionId;
   characterId: CharacterId;
   actorId: UserId;
@@ -169,6 +170,7 @@ export type ApplyCommandInput = {
 };
 
 export type ApplyCommandOutcome =
+  | {kind:"precondition_failed";error:import("./index.js").CharacterError}
   | { kind: "applied"; record: CharacterRecord; resultJson: unknown }
   | { kind: "already_completed"; resultJson: unknown }
   | { kind: "not_found" }
@@ -581,6 +583,10 @@ async function applyCommandCampaignTx(
     return { kind: "conflict", latestRevision };
   }
 
+  if (input.precondition !== undefined) {
+    const error = await input.precondition(client);
+    if (error !== null) { await client.query("ROLLBACK"); return {kind:"precondition_failed",error}; }
+  }
   let updatedRow = charRow;
   if (input.stateChanged) {
     const updated = await client.query<CharacterRow>(
@@ -1511,6 +1517,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           return { kind: "not_found" };
         }
         const latestRevision = charRow.revision;
+        if (Object.keys((charRow.state_json as RuntimeStateV1).entries ?? {}).length > 0) { await client.query("ROLLBACK"); return {kind:"conflict",latestRevision}; }
 
         if (previewRow.consumed_at !== null) {
           await client.query("ROLLBACK");

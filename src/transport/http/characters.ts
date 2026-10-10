@@ -1,3 +1,5 @@
+import { strictInputCompiler } from "./strictValidation.js";
+import {EntrySourceSchema, EntrySnapshotSchema, type EntrySource} from "../../systems/implementation/package/schema/dynamic.js";
 import { Type, type TSchema } from "@sinclair/typebox";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 import { FieldV1Schema } from "../../systems/implementation/package/schema/document.js";
@@ -55,6 +57,7 @@ const RuntimeStateDto = Type.Object({
     entryId: Type.String(),
     slotId: Type.String(),
     templateId: Type.Union([Type.String(), Type.Null()]),
+    source:Type.Optional(EntrySourceSchema),snapshot:Type.Optional(EntrySnapshotSchema),
     values: Type.Object({}, { additionalProperties: true }),
     quantity: Type.Optional(Type.Integer({ minimum: 1 })),
   }))),
@@ -124,6 +127,7 @@ const TemplateKindDto = Type.Union([
   Type.Literal("effect"),
 ]);
 const ProjectionSlotEntryDto = Type.Object({
+  source:Type.Optional(EntrySourceSchema),
   entryId: Type.String(),
   templateId: Type.Union([Type.String(), Type.Null()]),
   label: Type.String(),
@@ -453,12 +457,13 @@ const ExecuteActionBody = Type.Object({
 // Task 7: entry write bodies mirror the sibling command shapes
 // (expectedRevision + idempotencyKey discipline).
 const CharacterEntryBody = Type.Object({
+  source:Type.Optional(EntrySourceSchema),
   entryId: Type.String({ format: UUID_FORMAT }),
   slotId: Type.String({ minLength: 1 }),
   templateId: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
   values: Type.Object({}, { additionalProperties: true }),
   quantity: Type.Optional(Type.Integer({ minimum: 1 })),
-});
+},{additionalProperties:false});
 const AddEntryBody = Type.Object({
   entry: CharacterEntryBody,
   expectedRevision: Type.Integer(),
@@ -487,6 +492,8 @@ const EntryGrantedActionInputDto = Type.Object({
   default: RuntimeScalarDto,
 });
 const EntryTemplateDto = Type.Object({
+  source:Type.Optional(EntrySourceSchema),
+  defaultQuantity:Type.Optional(Type.Integer()),
   id: Type.String(),
   label: Type.String(),
   kind: TemplateKindDto,
@@ -1107,6 +1114,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         const params = request.params as { characterId: string };
         const body = request.body as {
           entry: {
+            source?:EntrySource;
             entryId: string;
             slotId: string;
             templateId: string | null;
@@ -1121,6 +1129,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
           characterId: params.characterId,
           entry: {
             entryId: body.entry.entryId,
+            ...(body.entry.source === undefined ? {} : {source:body.entry.source}),
             slotId: body.entry.slotId,
             templateId: body.entry.templateId,
             values: body.entry.values,
@@ -1322,6 +1331,6 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
     for (const route of charactersRouteDefinitions) {
       const response = toFastifyResponses(route.schema.response);
       const schema = response === undefined ? route.schema : { ...route.schema, response };
-      app[route.method](route.path, { schema }, handlers[route.operationId]!);
+      app[route.method](route.path, { schema, ...(route.path.includes("/entries") ? { validatorCompiler: strictInputCompiler } : {}) }, handlers[route.operationId]!);
     }
   };

@@ -119,6 +119,8 @@ export type CharacterStore = {
     guard: WriteGuard,
   ): Promise<void>;
 
+  readEntryTemplates(actorId:string,characterId:string):Promise<import("./types.js").EntryTemplate[]>;
+  saveEntryTemplates(actorId:string,characterId:string,templates:import("./types.js").EntryTemplate[],guard:WriteGuard):Promise<void>;
   readIdentity(): Promise<StoredIdentity>;
   setLastAccount(actorId: string, expected?: StoredIdentity): Promise<boolean>;
   readLastAccount(): Promise<string | null>;
@@ -135,7 +137,8 @@ export type CharacterStore = {
   saveActivityPage(page: CachedActivityPage, guard?: WriteGuard): Promise<void>;
 };
 
-const DB_VERSION = 2;
+const DB_VERSION = 3;
+const TEMPLATES="entryTemplates";
 
 const CHAR = "characters";
 const QUEUE = "queue";
@@ -185,6 +188,7 @@ function openDatabase(name: string): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(PENDING_LOGOUT)) {
         db.createObjectStore(PENDING_LOGOUT, { keyPath: "key" });
       }
+      if (!db.objectStoreNames.contains(TEMPLATES)) db.createObjectStore(TEMPLATES,{keyPath:["actorId","characterId"]});
       if (!db.objectStoreNames.contains(ACTIVITY)) {
         db.createObjectStore(ACTIVITY, { keyPath: ["actorId", "characterId", "cursorKey"] });
       }
@@ -536,7 +540,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
     },
 
     async purgeCharacter(actorId, characterId) {
-      await openTx(db, [CHAR, QUEUE, ATTEMPTS, ACTIVITY, LAST_ACCOUNT], "readwrite", async (tx) => {
+      await openTx(db, [CHAR, QUEUE, ATTEMPTS, ACTIVITY, TEMPLATES, LAST_ACCOUNT], "readwrite", async (tx) => {
         const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]) ?? {
           actorId, characterId, confirmed: null, generation: await accountGeneration(tx, actorId),
         };
@@ -546,11 +550,12 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
         await deleteByPrefix(tx, QUEUE, [actorId, characterId]);
         await deleteOnlineAttemptsForCharacter(tx, actorId, characterId);
         await deleteByPrefix(tx, ACTIVITY, [actorId, characterId]);
+        await deleteRequest(tx,TEMPLATES,[actorId,characterId]);
       });
     },
 
     async clearAccount(actorId) {
-      await openTx(db, [CHAR, QUEUE, ATTEMPTS, ACTIVITY, LAST_ACCOUNT], "readwrite", async (tx) => {
+      await openTx(db, [CHAR, QUEUE, ATTEMPTS, ACTIVITY, TEMPLATES, LAST_ACCOUNT], "readwrite", async (tx) => {
         await advanceIdentity(tx);
         await putRequest(tx, LAST_ACCOUNT, {
           key: `generation:${actorId}`, generation: await accountGeneration(tx, actorId) + 1,
@@ -567,6 +572,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
         }
         await deleteByPrefix(tx, QUEUE, [actorId]);
         await deleteByPrefix(tx, ACTIVITY, [actorId]);
+        await deleteByPrefix(tx,TEMPLATES,[actorId]);
         const attempts = await collectByKey<OnlineAttempt>(
           tx,
           ATTEMPTS,
@@ -696,6 +702,18 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
       });
     },
 
+    async readEntryTemplates(actorId,characterId) {
+      return openTx(db,[TEMPLATES],"readonly",async tx => (await getRequest<{templates:import("./types.js").EntryTemplate[]}>(tx,TEMPLATES,[actorId,characterId]))?.templates ?? []);
+    },
+    async saveEntryTemplates(actorId,characterId,templates,guard) {
+      await openTx(db,[CHAR,TEMPLATES,LAST_ACCOUNT,PENDING_LOGOUT],"readwrite",async tx => {
+        await assertWriteIdentity(tx,actorId,guard.accountGeneration);
+        const record=await getRequest<CharacterRecord>(tx,CHAR,[actorId,characterId]);
+        if ((record?.generation ?? await accountGeneration(tx,actorId)) !== guard.generation) throw new Error("stale template save: character generation changed");
+        if (templates.length>1000) throw new Error("Template cache limit exceeded");
+        await putRequest(tx,TEMPLATES,{actorId,characterId,templates});
+      });
+    },
     readIdentity() { return openTx(db, [LAST_ACCOUNT, PENDING_LOGOUT], "readonly", readIdentity); },
 
     async readActivityPage(actorId, characterId, cursor) {

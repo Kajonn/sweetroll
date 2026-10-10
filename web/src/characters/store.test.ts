@@ -923,3 +923,15 @@ describe("CharacterStore creation attempts", () => {
     await store.close();
   });
 });
+
+it("persists fetched template choices by actor and purges them without late repopulation", async () => {
+  const store=await openCharacterStore(crypto.randomUUID());
+  const choices=[{id:'key',label:'Key',kind:'item' as const,fields:[],grantedActions:[],source:{kind:'campaign' as const,campaignId:'campaign',templateId:'key',templateRevision:2,contentRevision:1}}];
+  await store.saveEntryTemplates('a','char',choices,initialGuard);
+  expect(await store.readEntryTemplates('a','char')).toEqual(choices);
+  expect(await store.readEntryTemplates('b','char')).toEqual([]);
+  await store.purgeCharacter('a','char');
+  expect(await store.readEntryTemplates('a','char')).toEqual([]);
+  await expect(store.saveEntryTemplates('a','char',choices,initialGuard)).rejects.toThrow(/stale/);
+  await store.close();
+});

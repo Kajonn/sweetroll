@@ -2645,3 +2645,28 @@ describe("CharacterSession activity cache", () => {
     await store.close();
   });
 });
+
+it("freezes campaign revisions into the durable offline placement request", async () => {
+  const { api, identity, store, session } = await makeHarness();
+  api.scriptOpenView(viewFor("char-1", 1)); await session.open();
+  identity.online=false; identity.signal();
+  const source={kind:"campaign" as const,campaignId:ARM,templateId:ARM,templateRevision:3,contentRevision:2};
+  await session.addEntry("inventory",null,{},undefined,source);
+  await session.whenIdle();
+  expect((await store.read(ARM,"char-1")).entries[0]?.intent).toMatchObject({kind:"addEntry",entry:{source,values:{}}});
+  identity.online=true; identity.signal();
+  api.scriptOpenView(viewFor("char-1",1));
+  api.scriptSend(async()=>successEnvelope(viewFor("char-1",2)));
+  await session.whenIdle();
+  expect(api.sent).toHaveLength(1);
+  expect(api.sent[0]?.body).toMatchObject({entry:{source,templateId:null,values:{}}});
+  session.dispose(); await store.close();
+});
+
+it('retains a campaign selection and explains stale catalog revisions during conflict review',async()=>{
+ const {api,identity,store,session}=await makeHarness();api.scriptOpenView(viewFor('char-1',1));await session.open();identity.online=false;identity.signal();
+ const source={kind:'campaign' as const,campaignId:ARM,templateId:ARM,templateRevision:2,contentRevision:1};await session.addEntry('inventory',null,{},undefined,source);await session.whenIdle();
+ api.setOpenFallback(async()=>({character:viewFor('char-1',1),requestId:'reconnect'}));api.scriptSend(async()=>({error:new ApiError({code:'conflict',message:'The campaign template has changed. Refresh and explicitly review the selected revision.',status:409,requestId:'req-1',latestRevision:null,diagnostics:[]})}));
+ identity.online=true;identity.signal();await vi.waitFor(()=>expect(session.getSnapshot().phase).toBe('conflict'));await session.whenIdle();expect(session.getSnapshot().error?.message).toContain('campaign template has changed');
+ expect((await store.read(ARM,'char-1')).entries[0]?.intent).toMatchObject({entry:{source}});session.dispose();await store.close();
+});

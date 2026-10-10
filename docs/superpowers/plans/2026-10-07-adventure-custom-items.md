@@ -1,6 +1,6 @@
 # Adventure-specific custom items — implementation plan
 
-**Status:** slice A implemented in PR #17, 2026-10-07; CI and deployed acceptance gates tracked below. Slices B–D remain planned.
+**Status:** slice A implemented in PR #17 and merged 2026-10-08; CI and deployed acceptance evidence tracked below. Slice B is implemented in PR #19 with required CI #91 green; isolated deployed multi-account/offline acceptance passed. Slices C–D remain planned. See the [slice B execution plan](2026-10-09-campaign-data-templates.md) and [acceptance evidence](../../acceptance/campaign-data-templates-2026-10-10.md).
 **Authority:** [design_v2.md](../../../design_v2.md), especially §§3, 4.1, 5, 7.4, 9, 17; [dynamic sheet objects design](../specs/2026-09-26-dynamic-sheet-objects-design.md).
 **Dependency:** the delivered dynamic-object slots, system templates, character entries, granted actions, revision/idempotency and offline flows.
 
@@ -43,8 +43,13 @@ On phones, keep Add in the existing slot interaction, show scope and source in t
 
 ### B. GM campaign catalog (reusable data-only templates)
 
+**Implementation status (2026-10-10):** [PR #19](https://github.com/Kajonn/sweetroll/pull/19) delivers the core slice, with required CI #91 passed; isolated deployed multi-account/offline acceptance passed. [Evidence and remaining gates](../../acceptance/campaign-data-templates-2026-10-10.md).
+
+**Execution plan:** [Campaign data-only templates — slice B](2026-10-09-campaign-data-templates.md). Deliver create-and-publish to all players, immutable content revisions distinct from resource revisions, explicit archive/recover, server-materialized copies and frozen offline references in one implementation PR. Private drafts, inherited actions and explicit instance updates remain later work. The plan also defines returned-sheet snapshots and a conservative guard against entry loss during migration/rollback.
+
 - Add a campaign-owned catalog resource keyed by campaign ID and stable template ID, with revision, lifecycle, creator, kind, labels, bounded fields, source metadata and audience. Keep it distinct from `campaign_content_items` notes and from immutable system packages.
 - Add campaign Module operations and HTTP contracts for create/list/read/update/archive; all mutations require expected revision and idempotency. Pagination filters by active membership and audience before returning results. Archive is recoverable while retention permits.
+- In B, creation publishes atomically; provide explicit recover alongside archive. Create uses expected absence (revision 0), and later writes use the template resource revision. Keep immutable content revision separate from archive/recover concurrency revision. No new retention/purge worker is included.
 - Add the GM catalog view and combine authorized compatible system and campaign choices in the slot picker. Character entries store a typed source and pinned catalog revision; legacy `templateId` system references and `null` custom entries continue to decode.
 - Gate: GM/co-GM writes; player reads/instantiates allowed templates; revoked/outside members get no catalog or cached data; independent character cannot attach; archive blocks new placement and preserves old instances.
 
@@ -68,6 +73,8 @@ On phones, keep Add in the existing slot interaction, show scope and source in t
 - Run relevant server/web tests and a deployed acceptance journey before release; record CI and findings in `docs/acceptance/`.
 
 ## Decisions to settle during design review
+
+**Slice B decisions recorded 2026-10-09:** the [execution plan](2026-10-09-campaign-data-templates.md) adopts the recommendations below: proposals later, no formula authoring, all-player publication first, and pinned copies. Restricted visibility and inherited-action implementation still require their own contracts and acceptance.
 
 1. Should players be allowed to submit proposals in the first campaign-catalog release, or is direct personal creation sufficient initially? Recommendation: later slice D.
 2. Should a GM be able to edit action formulas for adventure items? Recommendation: no in this follow-up; base system actions only, with any freeform rule authoring designed separately.

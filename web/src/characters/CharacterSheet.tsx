@@ -16,9 +16,9 @@ export type CharacterSheetCallbacks = {
    * Task 7: entry intents. Optional like onExecuteAction; slot controls
    * disable while any entry callback is absent.
    */
-  onAddEntry?(slotId: string, templateId: string | null, values: Record<string, unknown>, quantity?: number): void | Promise<void>;
+  onAddEntry?(slotId: string, templateId: string | null, values: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): void | Promise<void>;
   onRemoveEntry?(entryId: string): void | Promise<void>;
-  onUpdateEntry?(entryId: string, values: Record<string, unknown>, quantity?: number): void | Promise<void>;
+  onUpdateEntry?(entryId: string, values: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): void | Promise<void>;
   onExecuteGranted?(entryId: string, actionId: string, inputs?: Record<string, unknown>): void | Promise<void>;
 };
 

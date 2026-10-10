@@ -68,3 +68,21 @@ Read-only inspection of `proactive-expression` confirmed its existing production
 Inherited actions/system-derived templates, proposals, restricted drafts and explicit instance upgrades remain later slices. No offline catalog authoring or automatic effects were added. A disconnected browser cannot immediately learn remote revocation; current authorization is enforced at server commit and choices revalidate on reconnect/focus.
 
 Physical Android/iPad, real-provider production authentication, full manual keyboard/long-field accessibility review and broader I7/G9 release acceptance remain open. The original execution-plan bundles that ask for additional named race/test permutations remain unchecked unless the complete bundle has evidence; core behavior and required automated CI have passed.
+
+## Follow-up: manual journey defects repaired, 2026-10-10
+
+An additional manual preview journey found three defects: an intermittently empty character template picker after reload, the raw `character.rollResult.audience.campaign` translation key after a Longsword roll, and a retained `Signed out.` message after successful acceptance sign-in. Code fix: `7f04c8752cd32d7f38f55b99be14a183152cfa4f` (tree `458cb4959dd4e121de40c496603c986f830b5443`).
+
+The picker effect now follows replacements of the confirmed character snapshot, including projection-only refreshes that change the durable generation without changing the revision. It cancels the old request and reads a fresh write guard; account/character cache guards and purge handling are retained. Regression cases use the real session and IndexedDB store, defer the character/catalog responses in both orders, assert picker choices and durable cache contents, and verify that a late obsolete catalog cannot overwrite fresh choices. The shell clears logout feedback only once an authenticated actor is confirmed without a pending logout barrier. Both `gm_only` and `campaign` roll audiences have readable messages.
+
+TDD evidence: the five focused cases failed before the fixes (two catalog-order cases, two audience cases, and the existing account-A → sign-out → account-B journey with the added status assertion), then passed. Full frontend suite: **1,128 passed in 110 files**. The three affected suites passed all 68 tests after fixture type correction. TypeScript/product build and `git diff --check` passed; the existing bundle-size warning remains. [CI #93](https://github.com/Kajonn/sweetroll/actions/runs/38077875909) completed **success** for the fix commit, including server/integration/contracts/Docker verification, frontend, all three journey shards, visual and production-offline jobs. Production deployment was skipped for the PR as intended.
+
+The isolated preview service was pinned to the fix commit. Deployment `b5c25175-3ade-4537-9240-517575cf01dd` reached **SUCCESS** at 18:58:47 UTC; `/health/ready` returned HTTP 200 with `{"status":"ok"}`. The live DOM loaded `/assets/index-CJXObh--.js`, matching the locally tested production asset byte-for-byte.
+
+Manual Chromium retest on [the preview](https://sweetroll-items-production.up.railway.app):
+
+1. The existing Nyckelbärare PR19 character's Inventory picker showed Torch, Longsword, Dagger, Tornnyckel PR19 · Campaign and Custom entry on initial open and after three consecutive reloads. No extra recovery reload was needed.
+2. Longsword Attack returned `d20 + Might`, total 7, and readable audience **Campaign**.
+3. Account → sign out completed with `Signed out.`. Acceptance test sign-in restored the authenticated account and Sign out controls, with zero retained `Signed out.` nodes.
+
+These follow-up live checks used one supported acceptance identity. They do not constitute a new live multi-account or offline run; CI #93 supplies the automated offline/journey regression evidence. Original live multi-account evidence and remaining device/provider/manual accessibility gates above are unchanged. The PR remains open and production infrastructure was not changed.

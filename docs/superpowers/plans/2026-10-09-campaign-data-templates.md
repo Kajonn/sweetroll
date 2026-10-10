@@ -1,6 +1,6 @@
 # Campaign data-only templates — slice B implementation plan
 
-**Status:** planned; no implementation or acceptance gates completed.
+**Status (2026-10-10):** implemented in [PR #19](https://github.com/Kajonn/sweetroll/pull/19); required CI #91 passed. Isolated deployed multi-account/offline acceptance passed. See [acceptance evidence](../../acceptance/campaign-data-templates-2026-10-10.md) for exact coverage and remaining gates.
 **Baseline:** `54580adb1cdf64b356fbd3011b31784f7fe938c4` (`main`, PR #17 merged).
 **Goal:** an active GM/co-GM publishes a reusable adventure template; an authorized player places a pinned, editable copy on a campaign character.
 **Authority:** [design_v2.md](../../../design_v2.md) §§4.1, 5.4, 9, 17.9; [adventure items roadmap](2026-10-07-adventure-custom-items.md), slice B; [dynamic objects design](../specs/2026-09-26-dynamic-sheet-objects-design.md); [GUI integration gates](2026-09-08-gui-integration.md).
@@ -8,7 +8,7 @@
 
 ## Scope and delivery
 
-One implementation PR: **Add reusable data-only campaign templates**. Deliver the entire create/publish → discover → place → edit-instance → revise → archive/recover flow. This planning PR changes documentation only.
+One implementation PR: **Add reusable data-only campaign templates**. Deliver the entire create/publish → discover → place → edit-instance → revise → archive/recover flow. The original planning PR #18 changed documentation only; PR #19 includes the plan and implementation.
 
 Included: blank templates for `item`, `spell`, `talent` (UI: ability), and `effect`; fixed bounded text fields; item quantity; all-player publication; immutable content revisions; recoverable archive; existing character revision/idempotency/offline flow; authorization/cache lifecycle; a conservative migration safeguard.
 
@@ -36,7 +36,7 @@ After B, prioritize C, then D1, then D2. C depends on B's source/revision contra
 
 ## Data and module contracts
 
-Add `campaign_item_templates` and `campaign_item_template_revisions` in a new immutable SQL migration, provisionally `0022_campaign_item_templates.sql` (check the next unused number at implementation).
+Add `campaign_item_templates` and `campaign_item_template_revisions` in a new immutable SQL migration, `0022_campaign_item_templates.sql`.
 
 - Template row: UUID ID, campaign ID, creator ID, immutable kind, fixed `all_players` audience, active/archived status, resource revision, current content revision, creation/update/archive timestamps.
 - Content row: template ID + content revision unique key, name/description/notes, optional item default quantity, author and timestamp. No content-row updates; append on edit. Use relational constraints for campaign/source integrity and positive revisions/quantity, plus module validation for text and body budgets.
@@ -45,7 +45,7 @@ Add `campaign_item_templates` and `campaign_item_template_revisions` in a new im
 
 Expose operations through `Campaigns`, implemented in a focused `src/campaigns/templates.ts` collaborator, following `content.ts`. Persistence belongs to the Campaigns module. Wire dependencies through bootstrap; Characters consumes a narrow transaction-aware template resolver, not a pool-owning HTTP call. Runtime remains independent of Campaigns persistence and authorization.
 
-Proposed HTTP contracts (backend paths; deployed same-origin paths have `/api` prefix):
+Implemented HTTP contracts (backend paths; deployed same-origin paths have `/api` prefix):
 
 | Operation | Route | Preconditions/result |
 |---|---|---|
@@ -81,10 +81,10 @@ All mutation effects, appended content, activity and receipt storage are atomic.
 **Files:** `src/characters/migration.ts`, `src/characters/index.ts`, `src/campaigns/index.ts`, `src/transport/http/characters.ts`, `src/transport/http/campaigns.ts`, `src/transport/http/openapi.ts`; tests in `tests/integration/character-migration.test.ts`, `campaign-upgrade.test.ts`, and relevant HTTP tests.
 
 - [ ] Add failing migration regressions with populated system and personal entries before adding campaign state. Exercise standalone preview/commit, campaign preview/commit, and rollback with post-migration entries. Assert unchanged pin/state/revision after denial.
-- [ ] Implement the conservative entry-presence guard in the shared migration path and all commit/rollback paths, including stale previews created before an entry was added. An unchanged/no-op path may only succeed if it demonstrably preserves the entire state.
-- [ ] Surface an actionable conflict in existing upgrade/migration UI: entries cannot yet be safely migrated; current sheet remains usable. Do not automatically remove entries or offer destructive cleanup as recovery.
+- [x] Implement the conservative entry-presence guard in the shared migration path and all commit/rollback paths, including stale previews created before an entry was added. An unchanged/no-op path may only succeed if it demonstrably preserves the entire state.
+- [x] Surface an actionable conflict in existing upgrade/migration UI: entries cannot yet be safely migrated; current sheet remains usable. Do not automatically remove entries or offer destructive cleanup as recovery.
 - [ ] Add failing schema/HTTP tests for source normalization, revision requirements, bounded fields, all four kinds, unknown keys, forged actions/snapshots and contradictions. Record exact wire/error choices in OpenAPI before dependent frontend work.
-- [ ] Green the guard/contracts and preserve preexisting empty-entry upgrade tests. Regenerate generated contracts using the existing script; never hand-edit `web/src/api/schema.d.ts`.
+- [x] Green the guard/contracts and preserve preexisting empty-entry upgrade tests. Regenerate generated contracts using the existing script; never hand-edit `web/src/api/schema.d.ts`.
 
 **Gate:** no upgrade/rollback path silently loses entries; old command payloads remain accepted.
 
@@ -95,9 +95,9 @@ All mutation effects, appended content, activity and receipt storage are atomic.
 - [ ] Red: fresh DB migration and reapplication; create/publish, read/list, edit append, archive/recover and preserved historical content. Assert resource versus content revision transitions.
 - [ ] Red: active owner/co-GM writes; member reads; outsider, removed member, system author and cross-campaign guessed ID denial. Player cannot edit, archive, recover, or browse archived records. Test campaign lifecycle and limit/cursor validation.
 - [ ] Red: identical receipt replay produces one row/revision/activity event; changed payload with reused key conflicts; concurrent same-revision writes yield one success and one conflict; unrelated templates can be edited independently.
-- [ ] Implement separate storage/resource collaborators, immutable revisions, fixed audience, bounded pagination, limits and transactional current-policy checks. Integrate template events with existing authorized campaign activity; expose no archived content through a receipt or unrelated source join.
+- [x] Implement separate storage/resource collaborators, immutable revisions, fixed audience, bounded pagination, limits and transactional current-policy checks. Integrate template events with existing authorized campaign activity; expose no archived content through a receipt or unrelated source join.
 - [ ] Include active authorized catalog data in bounded campaign export, and snapshots/source in existing character export. Test player export filtering, revoked export/receipt access and archived management isolation.
-- [ ] Run targeted PostgreSQL + HTTP tests green with a real test database. Validate atomic rollback on failure; do not interpret skipped suites as proof.
+- [x] Run targeted PostgreSQL + HTTP tests green with a real test database. Validate atomic rollback on failure; do not interpret skipped suites as proof.
 
 **Gate:** usable catalog API with independent revision/idempotency semantics; no dependency on system package mutation.
 
@@ -107,11 +107,11 @@ All mutation effects, appended content, activity and receipt storage are atomic.
 
 - [ ] Red: system/personal legacy decode and old name-only records; campaign entry schema round-trip; materialized source appears as Campaign and cannot grant an action.
 - [ ] Red: controller and active GM/co-GM placement on compatible attached characters; denial for another controller, standalone character, wrong campaign, wrong kind, missing/full slot, stale resource/content revision, archived template and client-authored snapshot/action.
-- [ ] Materialize catalog defaults server-side on first placement; retain the existing client entry UUID, character expected revision, receipt and activity flow. Editable overrides occur through existing entry updates after placement.
-- [ ] Red → green: revision 1 copy survives revision 2 edit/archive/recover; new valid placement uses revision 2; update/remove/export of old copies require character access, not access to the current catalog row.
+- [x] Materialize catalog defaults server-side on first placement; retain the existing client entry UUID, character expected revision, receipt and activity flow. Editable overrides occur through existing entry updates after placement.
+- [x] Red → green: revision 1 copy survives revision 2 edit/archive/recover; new valid placement uses revision 2; update/remove/export of old copies require character access, not access to the current catalog row.
 - [ ] Add transactional concurrent placement/edit/archive and membership-removal races. Each outcome corresponds to a valid serialization; no partial snapshot, receipt or leaked body.
-- [ ] Red → green: authorized exact replay after catalog change remains original and exactly once; revoked replay denies; unsent old selection conflicts. Distinguish replay reconciliation from a fresh placement.
-- [ ] Prove return-on-leave/removal preserves snapshots, kind and local values while removing picker/catalog access; campaign history stays scoped. Cover duplication, export/reload and the migration guard with campaign entries.
+- [x] Red → green: authorized exact replay after catalog change remains original and exactly once; revoked replay denies; unsent old selection conflicts. Distinguish replay reconciliation from a fresh placement.
+- [x] Prove return-on-leave/removal preserves snapshots, kind and local values while removing picker/catalog access; campaign history stays scoped. Cover duplication, export/reload and the migration guard with campaign entries.
 
 **Gate:** independent snapshots, current authorization and backward compatibility through the full server path.
 
@@ -120,11 +120,11 @@ All mutation effects, appended content, activity and receipt storage are atomic.
 **Files:** `web/src/characters/types.ts`, `api.ts`, `session.ts`, `store.ts` and tests; `web/src/campaigns/api.ts`, `types.ts`, `campaignQueries.ts` and tests; identity/cache integration where proven necessary. Inspect `web/src/offline/worker.ts`; API responses must remain outside service-worker asset caching.
 
 - [ ] Red: typed campaign source + both revisions persist through queue creation, IndexedDB reload, frozen request construction, retries and explicit conflict review. Existing queued personal/system requests still drain verbatim.
-- [ ] Preserve a bounded actor/campaign-scoped set of fetched compatible choices for offline placement; no offline discovery of unseen templates. If store format changes, version and migrate safely. Never rewrite already frozen requests or replace the chosen revision with latest.
-- [ ] Red → green: offline add/reload/reconnect commits once; template change/archive before first commit enters the existing reviewable conflict/error state with user's intent retained. Deliberately choosing a new template revision creates a new reviewed intent/key.
-- [ ] Reuse current queue handling for denied commands and uncertain outcomes. Membership removal, actor switching, logout, return and 404 revalidation purge relevant catalog/selector caches and prevent delayed old-generation responses from repopulating them.
-- [ ] State offline limitations truthfully: a disconnected device cannot know remote revocation immediately. Revalidate on reconnect/focus before granting new access; server denies stale authority at commit. Returned-sheet snapshots are the explicit allowed exception.
-- [ ] Add deferred-response cache tests and durable-store assertions, not only hidden DOM checks. Keep catalog authoring online-only with explicit status.
+- [x] Preserve a bounded actor/campaign-scoped set of fetched compatible choices for offline placement; no offline discovery of unseen templates. If store format changes, version and migrate safely. Never rewrite already frozen requests or replace the chosen revision with latest.
+- [x] Red → green: offline add/reload/reconnect commits once; template change/archive before first commit enters the existing reviewable conflict/error state with user's intent retained. Deliberately choosing a new template revision creates a new reviewed intent/key.
+- [x] Reuse current queue handling for denied commands and uncertain outcomes. Membership removal, actor switching, logout, return and 404 revalidation purge relevant catalog/selector caches and prevent delayed old-generation responses from repopulating them.
+- [x] State offline limitations truthfully: a disconnected device cannot know remote revocation immediately. Revalidate on reconnect/focus before granting new access; server denies stale authority at commit. Returned-sheet snapshots are the explicit allowed exception.
+- [x] Add deferred-response cache tests and durable-store assertions, not only hidden DOM checks. Keep catalog authoring online-only with explicit status.
 
 **Gate:** pinned offline intent and safe cache lifecycle without a new GM mutation queue.
 
@@ -132,12 +132,12 @@ All mutation effects, appended content, activity and receipt storage are atomic.
 
 **Files:** create `web/src/campaigns/CampaignTemplates.tsx` and tests, plus styling consistent with existing controls; `CampaignDetail.tsx`, campaign API/query hooks; `web/src/characters/SlotListControl.tsx`, `CharacterSheet.tsx`, session hooks and relevant tests; existing i18n resources; upgrade/conflict UI as required by Task 1.
 
-- [ ] Red → green: Campaign → Items & powers tab, paginated active catalog, empty/loading/permission/error states, GM Create and edit, archived management view, confirmation to archive, recover. Player view is read-only; no secret audience options or formula editor.
-- [ ] Create saves and publishes in one acknowledged operation. Explain **Visible to all campaign members** and **Changes affect new copies** in plain language. Show existing save/conflict feedback; preserve form values on failed or uncertain save and retry with the same request/key where required.
-- [ ] Add system/campaign choices to the existing typed slot picker, label origin, filter compatibility and carry explicit revisions. Keep personal creation and old system interactions intact. Do not merge distinct template IDs merely because names match.
-- [ ] Old snapshots render description/notes/quantity and edit/remove controls without current catalog access. Name appears once; removal is secondary with confirmation. Data-only campaign copies show no action buttons.
+- [x] Red → green: Campaign → Items & powers tab, paginated active catalog, empty/loading/permission/error states, GM Create and edit, archived management view, confirmation to archive, recover. Player view is read-only; no secret audience options or formula editor.
+- [x] Create saves and publishes in one acknowledged operation. Explain **Visible to all campaign members** and **Changes affect new copies** in plain language. Show existing save/conflict feedback; preserve form values on failed or uncertain save and retry with the same request/key where required.
+- [x] Add system/campaign choices to the existing typed slot picker, label origin, filter compatibility and carry explicit revisions. Keep personal creation and old system interactions intact. Do not merge distinct template IDs merely because names match.
+- [x] Old snapshots render description/notes/quantity and edit/remove controls without current catalog access. Name appears once; removal is secondary with confirmation. Data-only campaign copies show no action buttons.
 - [ ] Use shared dialogs/inputs/theme tokens; test keyboard/focus restoration, textbox names, 44px targets, long fields, light/dark, 360/768/1280 widths and a 320px overflow probe. Keep advanced details collapsed where existing slot UI supports it.
-- [ ] Green component/session/typecheck tests before real browser acceptance. No new routing framework, dependency, or visual-baseline replacement unless a demonstrated need arises.
+- [x] Green component/session/typecheck tests before real browser acceptance. No new routing framework, dependency, or visual-baseline replacement unless a demonstrated need arises.
 
 **Gate:** complete GM → player journey in the existing responsive app.
 
@@ -145,13 +145,13 @@ All mutation effects, appended content, activity and receipt storage are atomic.
 
 **Files:** create `web/tests/e2e/campaignTemplates.spec.ts`; extend `web/tests/offline/character.spec.ts` or a focused offline spec under the canonical runner; relevant migration/return journeys; create `docs/acceptance/campaign-data-templates-YYYY-MM-DD.md` when execution occurs. Update this plan, the roadmap and `design_v2.md` with evidence-backed status only.
 
-- [ ] Run a real HTTP/PostgreSQL multi-account journey: GM creates Tower key, co-GM edits/publishes, player discovers and places, edits local quantity/notes and reloads. GM publishes revision 2; old copy remains revision 1, new copy is revision 2. Archive blocks new placement and preserves copies; recover restores discovery.
+- [x] Run a real HTTP/PostgreSQL multi-account journey: GM creates Tower key, co-GM edits/publishes, player discovers and places, edits local quantity/notes and reloads. GM publishes a later revision; the old copy remains pinned and a new copy uses the later revision (browser fixture: content 3 → 4 after the two-editor conflict). Archive blocks new placement and preserves copies; recover restores discovery.
 - [ ] Verify actual player/controller, outsider and co-GM policy with direct API responses as well as GUI. Prove membership removal, return exception, two-editor conflict, pagination and delayed cache invalidation. Use explicitly seeded supported identities, never invented production sign-in codes.
-- [ ] Real offline journey: cache choice, disconnect, add, reload, reconnect exactly once. Repeat with GM edit/archive before reconnect and assert explicit conflict; no substituted version. Exercise existing personal/system actions to catch regressions.
-- [ ] Run root `npm test`, `npm run test:integration`, `npm run typecheck`, `npm run contracts:check`, `npm run build`; web `npm run web:test`, `npm run web:typecheck`, `npm run web:build`, `npm run web:test:e2e`, `npm run web:test:offline`; Docker build and `git diff --check`. Use Node 24, actual DB variables, isolated offline DB/ports and canonical CI/browser fixtures. Expand testing only for new failures or unresolved concerns.
-- [ ] Record tested commit, red/green commands/results, actual CI run/result, DB/browser/theme/viewport, skipped/blocked checks and release limitations. Do not silently rewrite slice A's historical CI/live evidence.
-- [ ] Before deployed acceptance, inspect Railway `proactive-expression` service source branch and deployment. Use a dedicated branch preview service/database or the intentionally configured acceptance target after merge. Never change the production source for testing. Wait for successful migrations/deployment and `/health/ready`, then confirm the loaded frontend build (including service-worker activation) matches the tested commit.
-- [ ] Run the same multi-account live journey with reload and offline/reconnect where supported; record actual live evidence separately from automated results. A test-auth deployment is not real-provider production-auth acceptance. Leave physical Android/iPad and broader G9 gates explicitly open if unavailable.
+- [x] Real offline journey: cache choice, disconnect, add, reload, reconnect exactly once. Repeat with GM edit/archive before reconnect and assert explicit conflict; no substituted version. Exercise existing personal/system actions to catch regressions.
+- [x] Run root `npm test`, `npm run test:integration`, `npm run typecheck`, `npm run contracts:check`, `npm run build`; web `npm run web:test`, `npm run web:typecheck`, `npm run web:build`, `npm run web:test:e2e`, `npm run web:test:offline`; Docker build and `git diff --check`. Use Node 24, actual DB variables, isolated offline DB/ports and canonical CI/browser fixtures. Expand testing only for new failures or unresolved concerns.
+- [x] Record tested commit, red/green commands/results, actual CI run/result, DB/browser/theme/viewport, skipped/blocked checks and release limitations. Do not silently rewrite slice A's historical CI/live evidence.
+- [x] Before deployed acceptance, inspect Railway `proactive-expression` service source branch and deployment. Use a dedicated branch preview service/database or the intentionally configured acceptance target after merge. Never change the production source for testing. Wait for successful migrations/deployment and `/health/ready`, then confirm the loaded frontend build (including service-worker activation) matches the tested commit.
+- [x] Run the same multi-account live journey with reload and offline/reconnect where supported; record actual live evidence separately from automated results. A test-auth deployment is not real-provider production-auth acceptance. Leave physical Android/iPad and broader G9 gates explicitly open if unavailable.
 
 ### PR acceptance matrix
 
@@ -165,4 +165,4 @@ All mutation effects, appended content, activity and receipt storage are atomic.
 | UI/cache | Actor-generation races, purge assertions, accessible responsive catalog/picker and existing system/personal regressions. |
 | Release | Green required CI plus recorded deployed branch/commit/health/live journey; physical-device and production-provider limits stated. |
 
-All implementation tasks start unchecked. Completing this plan is not completion of slice B, C/D, I7 or the wider G9 release gates.
+Implementation and required automated CI are delivered; [the acceptance record](../../acceptance/campaign-data-templates-2026-10-10.md) identifies the observed tests and deployed status. Unchecked bundles retain additional named test/race or manual accessibility requirements; do not infer that every permutation was exercised from the core flow. Slice B required CI and the isolated deployed multi-account/offline gate passed; physical devices, real-provider authentication, C/D, I7 and wider G9 gates remain separate.

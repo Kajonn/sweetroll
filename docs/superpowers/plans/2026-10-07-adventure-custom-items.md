@@ -1,6 +1,6 @@
 # Adventure-specific custom items — implementation plan
 
-**Status:** slice A implemented in PR #17 and merged 2026-10-08; CI and deployed acceptance evidence tracked below. Slices B–D remain planned. The next implementation is detailed in the [slice B execution plan](2026-10-09-campaign-data-templates.md).
+**Status:** slice A implemented in PR #17 and merged 2026-10-08; CI and deployed acceptance evidence tracked below. Slice B is implemented in PR #19 with required CI #91 green; isolated deployed multi-account/offline acceptance passed. Slices C–D remain planned. See the [slice B execution plan](2026-10-09-campaign-data-templates.md) and [acceptance evidence](../../acceptance/campaign-data-templates-2026-10-10.md).
 **Authority:** [design_v2.md](../../../design_v2.md), especially §§3, 4.1, 5, 7.4, 9, 17; [dynamic sheet objects design](../specs/2026-09-26-dynamic-sheet-objects-design.md).
 **Dependency:** the delivered dynamic-object slots, system templates, character entries, granted actions, revision/idempotency and offline flows.
 
@@ -42,6 +42,8 @@ On phones, keep Add in the existing slot interaction, show scope and source in t
 - Gate: player and GM add/edit/remove; compatible slot checks; stale revision and retry; offline add/reconnect once; unauthorized character access denied; previous entries still render.
 
 ### B. GM campaign catalog (reusable data-only templates)
+
+**Implementation status (2026-10-10):** [PR #19](https://github.com/Kajonn/sweetroll/pull/19) delivers the core slice, with required CI #91 passed; isolated deployed multi-account/offline acceptance passed. [Evidence and remaining gates](../../acceptance/campaign-data-templates-2026-10-10.md).
 
 **Execution plan:** [Campaign data-only templates — slice B](2026-10-09-campaign-data-templates.md). Deliver create-and-publish to all players, immutable content revisions distinct from resource revisions, explicit archive/recover, server-materialized copies and frozen offline references in one implementation PR. Private drafts, inherited actions and explicit instance updates remain later work. The plan also defines returned-sheet snapshots and a conservative guard against entry loss during migration/rollback.
 

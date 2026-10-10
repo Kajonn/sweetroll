@@ -332,6 +332,7 @@ describeWithDatabase("campaign export projection (Task 7)", () => {
       "exportVersion",
       "members",
       "rolls",
+      "templates",
     ]);
     expect(createHash("sha256").update(serialized, "utf8").digest("hex")).toHaveLength(64);
   });
@@ -700,6 +701,7 @@ describeWithDatabase("campaign export projection (Task 7)", () => {
       "exportVersion",
       "members",
       "rolls",
+      "templates",
     ]);
   });
 });

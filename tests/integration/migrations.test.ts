@@ -185,6 +185,8 @@ describeWithDatabase("runMigrations", () => {
       "campaign_content_grants",
       "campaign_content_items",
       "campaign_invitations",
+      "campaign_item_template_revisions",
+      "campaign_item_templates",
       "campaign_members",
       "campaigns",
     ]);
@@ -272,6 +274,9 @@ describeWithDatabase("runMigrations", () => {
       "campaign_content_items_pkey",
       "campaign_invitations_campaign_page_idx",
       "campaign_invitations_pkey",
+      "campaign_item_template_revisions_pkey",
+      "campaign_item_templates_page_idx",
+      "campaign_item_templates_pkey",
       "campaign_members_pkey",
       "campaign_members_user_idx",
       "campaigns_owner_page_idx",

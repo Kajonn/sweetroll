@@ -468,6 +468,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns/{id}/item-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaigns_id_item_templates"];
+        put?: never;
+        post: operations["post_campaigns_id_item_templates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/item-templates/{templateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaigns_id_item_templates_templateId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["patch_campaigns_id_item_templates_templateId"];
+        trace?: never;
+    };
+    "/campaigns/{id}/item-templates/{templateId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_campaigns_id_item_templates_templateId_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/item-templates/{templateId}/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_campaigns_id_item_templates_templateId_recover"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/campaigns": {
         parameters: {
             query?: never;
@@ -2916,6 +2980,30 @@ export interface operations {
                                         entryId: string;
                                         slotId: string;
                                         templateId: string | null;
+                                        source?: {
+                                            /** @constant */
+                                            kind: "personal";
+                                        } | {
+                                            /** @constant */
+                                            kind: "system";
+                                            templateId: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "campaign";
+                                            /** Format: uuid */
+                                            campaignId: string;
+                                            /** Format: uuid */
+                                            templateId: string;
+                                            templateRevision: number;
+                                            contentRevision: number;
+                                        };
+                                        snapshot?: {
+                                            kind: "item" | "spell" | "talent" | "effect";
+                                            values: {
+                                                [key: string]: string;
+                                            };
+                                            quantity?: number;
+                                        };
                                         values: {
                                             [key: string]: unknown;
                                         };
@@ -3058,6 +3146,23 @@ export interface operations {
                                             label: string;
                                             accepts: ("item" | "spell" | "talent" | "effect")[];
                                             entries: {
+                                                source?: {
+                                                    /** @constant */
+                                                    kind: "personal";
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "system";
+                                                    templateId: string;
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "campaign";
+                                                    /** Format: uuid */
+                                                    campaignId: string;
+                                                    /** Format: uuid */
+                                                    templateId: string;
+                                                    templateRevision: number;
+                                                    contentRevision: number;
+                                                };
                                                 entryId: string;
                                                 templateId: string | null;
                                                 label: string;
@@ -3602,6 +3707,30 @@ export interface operations {
                                         entryId: string;
                                         slotId: string;
                                         templateId: string | null;
+                                        source?: {
+                                            /** @constant */
+                                            kind: "personal";
+                                        } | {
+                                            /** @constant */
+                                            kind: "system";
+                                            templateId: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "campaign";
+                                            /** Format: uuid */
+                                            campaignId: string;
+                                            /** Format: uuid */
+                                            templateId: string;
+                                            templateRevision: number;
+                                            contentRevision: number;
+                                        };
+                                        snapshot?: {
+                                            kind: "item" | "spell" | "talent" | "effect";
+                                            values: {
+                                                [key: string]: string;
+                                            };
+                                            quantity?: number;
+                                        };
                                         values: {
                                             [key: string]: unknown;
                                         };
@@ -3744,6 +3873,23 @@ export interface operations {
                                             label: string;
                                             accepts: ("item" | "spell" | "talent" | "effect")[];
                                             entries: {
+                                                source?: {
+                                                    /** @constant */
+                                                    kind: "personal";
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "system";
+                                                    templateId: string;
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "campaign";
+                                                    /** Format: uuid */
+                                                    campaignId: string;
+                                                    /** Format: uuid */
+                                                    templateId: string;
+                                                    templateRevision: number;
+                                                    contentRevision: number;
+                                                };
                                                 entryId: string;
                                                 templateId: string | null;
                                                 label: string;
@@ -3943,6 +4089,30 @@ export interface operations {
                                             entryId: string;
                                             slotId: string;
                                             templateId: string | null;
+                                            source?: {
+                                                /** @constant */
+                                                kind: "personal";
+                                            } | {
+                                                /** @constant */
+                                                kind: "system";
+                                                templateId: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "campaign";
+                                                /** Format: uuid */
+                                                campaignId: string;
+                                                /** Format: uuid */
+                                                templateId: string;
+                                                templateRevision: number;
+                                                contentRevision: number;
+                                            };
+                                            snapshot?: {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    [key: string]: string;
+                                                };
+                                                quantity?: number;
+                                            };
                                             values: {
                                                 [key: string]: unknown;
                                             };
@@ -4085,6 +4255,23 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    source?: {
+                                                        /** @constant */
+                                                        kind: "personal";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "system";
+                                                        templateId: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "campaign";
+                                                        /** Format: uuid */
+                                                        campaignId: string;
+                                                        /** Format: uuid */
+                                                        templateId: string;
+                                                        templateRevision: number;
+                                                        contentRevision: number;
+                                                    };
                                                     entryId: string;
                                                     templateId: string | null;
                                                     label: string;
@@ -4368,6 +4555,30 @@ export interface operations {
                                             entryId: string;
                                             slotId: string;
                                             templateId: string | null;
+                                            source?: {
+                                                /** @constant */
+                                                kind: "personal";
+                                            } | {
+                                                /** @constant */
+                                                kind: "system";
+                                                templateId: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "campaign";
+                                                /** Format: uuid */
+                                                campaignId: string;
+                                                /** Format: uuid */
+                                                templateId: string;
+                                                templateRevision: number;
+                                                contentRevision: number;
+                                            };
+                                            snapshot?: {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    [key: string]: string;
+                                                };
+                                                quantity?: number;
+                                            };
                                             values: {
                                                 [key: string]: unknown;
                                             };
@@ -4510,6 +4721,23 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    source?: {
+                                                        /** @constant */
+                                                        kind: "personal";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "system";
+                                                        templateId: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "campaign";
+                                                        /** Format: uuid */
+                                                        campaignId: string;
+                                                        /** Format: uuid */
+                                                        templateId: string;
+                                                        templateRevision: number;
+                                                        contentRevision: number;
+                                                    };
                                                     entryId: string;
                                                     templateId: string | null;
                                                     label: string;
@@ -4793,6 +5021,30 @@ export interface operations {
                                             entryId: string;
                                             slotId: string;
                                             templateId: string | null;
+                                            source?: {
+                                                /** @constant */
+                                                kind: "personal";
+                                            } | {
+                                                /** @constant */
+                                                kind: "system";
+                                                templateId: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "campaign";
+                                                /** Format: uuid */
+                                                campaignId: string;
+                                                /** Format: uuid */
+                                                templateId: string;
+                                                templateRevision: number;
+                                                contentRevision: number;
+                                            };
+                                            snapshot?: {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    [key: string]: string;
+                                                };
+                                                quantity?: number;
+                                            };
                                             values: {
                                                 [key: string]: unknown;
                                             };
@@ -4935,6 +5187,23 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    source?: {
+                                                        /** @constant */
+                                                        kind: "personal";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "system";
+                                                        templateId: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "campaign";
+                                                        /** Format: uuid */
+                                                        campaignId: string;
+                                                        /** Format: uuid */
+                                                        templateId: string;
+                                                        templateRevision: number;
+                                                        contentRevision: number;
+                                                    };
                                                     entryId: string;
                                                     templateId: string | null;
                                                     label: string;
@@ -5222,6 +5491,30 @@ export interface operations {
                                             entryId: string;
                                             slotId: string;
                                             templateId: string | null;
+                                            source?: {
+                                                /** @constant */
+                                                kind: "personal";
+                                            } | {
+                                                /** @constant */
+                                                kind: "system";
+                                                templateId: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "campaign";
+                                                /** Format: uuid */
+                                                campaignId: string;
+                                                /** Format: uuid */
+                                                templateId: string;
+                                                templateRevision: number;
+                                                contentRevision: number;
+                                            };
+                                            snapshot?: {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    [key: string]: string;
+                                                };
+                                                quantity?: number;
+                                            };
                                             values: {
                                                 [key: string]: unknown;
                                             };
@@ -5364,6 +5657,23 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    source?: {
+                                                        /** @constant */
+                                                        kind: "personal";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "system";
+                                                        templateId: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "campaign";
+                                                        /** Format: uuid */
+                                                        campaignId: string;
+                                                        /** Format: uuid */
+                                                        templateId: string;
+                                                        templateRevision: number;
+                                                        contentRevision: number;
+                                                    };
                                                     entryId: string;
                                                     templateId: string | null;
                                                     label: string;
@@ -5603,6 +5913,23 @@ export interface operations {
             content: {
                 "application/json": {
                     entry: {
+                        source?: {
+                            /** @constant */
+                            kind: "personal";
+                        } | {
+                            /** @constant */
+                            kind: "system";
+                            templateId: string;
+                        } | {
+                            /** @constant */
+                            kind: "campaign";
+                            /** Format: uuid */
+                            campaignId: string;
+                            /** Format: uuid */
+                            templateId: string;
+                            templateRevision: number;
+                            contentRevision: number;
+                        };
                         /** Format: uuid */
                         entryId: string;
                         slotId: string;
@@ -5655,6 +5982,30 @@ export interface operations {
                                             entryId: string;
                                             slotId: string;
                                             templateId: string | null;
+                                            source?: {
+                                                /** @constant */
+                                                kind: "personal";
+                                            } | {
+                                                /** @constant */
+                                                kind: "system";
+                                                templateId: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "campaign";
+                                                /** Format: uuid */
+                                                campaignId: string;
+                                                /** Format: uuid */
+                                                templateId: string;
+                                                templateRevision: number;
+                                                contentRevision: number;
+                                            };
+                                            snapshot?: {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    [key: string]: string;
+                                                };
+                                                quantity?: number;
+                                            };
                                             values: {
                                                 [key: string]: unknown;
                                             };
@@ -5797,6 +6148,23 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    source?: {
+                                                        /** @constant */
+                                                        kind: "personal";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "system";
+                                                        templateId: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "campaign";
+                                                        /** Format: uuid */
+                                                        campaignId: string;
+                                                        /** Format: uuid */
+                                                        templateId: string;
+                                                        templateRevision: number;
+                                                        contentRevision: number;
+                                                    };
                                                     entryId: string;
                                                     templateId: string | null;
                                                     label: string;
@@ -6079,6 +6447,30 @@ export interface operations {
                                             entryId: string;
                                             slotId: string;
                                             templateId: string | null;
+                                            source?: {
+                                                /** @constant */
+                                                kind: "personal";
+                                            } | {
+                                                /** @constant */
+                                                kind: "system";
+                                                templateId: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "campaign";
+                                                /** Format: uuid */
+                                                campaignId: string;
+                                                /** Format: uuid */
+                                                templateId: string;
+                                                templateRevision: number;
+                                                contentRevision: number;
+                                            };
+                                            snapshot?: {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    [key: string]: string;
+                                                };
+                                                quantity?: number;
+                                            };
                                             values: {
                                                 [key: string]: unknown;
                                             };
@@ -6221,6 +6613,23 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    source?: {
+                                                        /** @constant */
+                                                        kind: "personal";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "system";
+                                                        templateId: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "campaign";
+                                                        /** Format: uuid */
+                                                        campaignId: string;
+                                                        /** Format: uuid */
+                                                        templateId: string;
+                                                        templateRevision: number;
+                                                        contentRevision: number;
+                                                    };
                                                     entryId: string;
                                                     templateId: string | null;
                                                     label: string;
@@ -6507,6 +6916,30 @@ export interface operations {
                                             entryId: string;
                                             slotId: string;
                                             templateId: string | null;
+                                            source?: {
+                                                /** @constant */
+                                                kind: "personal";
+                                            } | {
+                                                /** @constant */
+                                                kind: "system";
+                                                templateId: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "campaign";
+                                                /** Format: uuid */
+                                                campaignId: string;
+                                                /** Format: uuid */
+                                                templateId: string;
+                                                templateRevision: number;
+                                                contentRevision: number;
+                                            };
+                                            snapshot?: {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    [key: string]: string;
+                                                };
+                                                quantity?: number;
+                                            };
                                             values: {
                                                 [key: string]: unknown;
                                             };
@@ -6649,6 +7082,23 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    source?: {
+                                                        /** @constant */
+                                                        kind: "personal";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "system";
+                                                        templateId: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "campaign";
+                                                        /** Format: uuid */
+                                                        campaignId: string;
+                                                        /** Format: uuid */
+                                                        templateId: string;
+                                                        templateRevision: number;
+                                                        contentRevision: number;
+                                                    };
                                                     entryId: string;
                                                     templateId: string | null;
                                                     label: string;
@@ -6893,6 +7343,24 @@ export interface operations {
                 content: {
                     "application/json": {
                         templates: {
+                            source?: {
+                                /** @constant */
+                                kind: "personal";
+                            } | {
+                                /** @constant */
+                                kind: "system";
+                                templateId: string;
+                            } | {
+                                /** @constant */
+                                kind: "campaign";
+                                /** Format: uuid */
+                                campaignId: string;
+                                /** Format: uuid */
+                                templateId: string;
+                                templateRevision: number;
+                                contentRevision: number;
+                            };
+                            defaultQuantity?: number;
                             id: string;
                             label: string;
                             kind: "item" | "spell" | "talent" | "effect";
@@ -7168,6 +7636,30 @@ export interface operations {
                                             entryId: string;
                                             slotId: string;
                                             templateId: string | null;
+                                            source?: {
+                                                /** @constant */
+                                                kind: "personal";
+                                            } | {
+                                                /** @constant */
+                                                kind: "system";
+                                                templateId: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "campaign";
+                                                /** Format: uuid */
+                                                campaignId: string;
+                                                /** Format: uuid */
+                                                templateId: string;
+                                                templateRevision: number;
+                                                contentRevision: number;
+                                            };
+                                            snapshot?: {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    [key: string]: string;
+                                                };
+                                                quantity?: number;
+                                            };
                                             values: {
                                                 [key: string]: unknown;
                                             };
@@ -7310,6 +7802,23 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    source?: {
+                                                        /** @constant */
+                                                        kind: "personal";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "system";
+                                                        templateId: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "campaign";
+                                                        /** Format: uuid */
+                                                        campaignId: string;
+                                                        /** Format: uuid */
+                                                        templateId: string;
+                                                        templateRevision: number;
+                                                        contentRevision: number;
+                                                    };
                                                     entryId: string;
                                                     templateId: string | null;
                                                     label: string;
@@ -7589,6 +8098,30 @@ export interface operations {
                                         entryId: string;
                                         slotId: string;
                                         templateId: string | null;
+                                        source?: {
+                                            /** @constant */
+                                            kind: "personal";
+                                        } | {
+                                            /** @constant */
+                                            kind: "system";
+                                            templateId: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "campaign";
+                                            /** Format: uuid */
+                                            campaignId: string;
+                                            /** Format: uuid */
+                                            templateId: string;
+                                            templateRevision: number;
+                                            contentRevision: number;
+                                        };
+                                        snapshot?: {
+                                            kind: "item" | "spell" | "talent" | "effect";
+                                            values: {
+                                                [key: string]: string;
+                                            };
+                                            quantity?: number;
+                                        };
                                         values: {
                                             [key: string]: unknown;
                                         };
@@ -7731,6 +8264,23 @@ export interface operations {
                                             label: string;
                                             accepts: ("item" | "spell" | "talent" | "effect")[];
                                             entries: {
+                                                source?: {
+                                                    /** @constant */
+                                                    kind: "personal";
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "system";
+                                                    templateId: string;
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "campaign";
+                                                    /** Format: uuid */
+                                                    campaignId: string;
+                                                    /** Format: uuid */
+                                                    templateId: string;
+                                                    templateRevision: number;
+                                                    contentRevision: number;
+                                                };
                                                 entryId: string;
                                                 templateId: string | null;
                                                 label: string;
@@ -8129,6 +8679,30 @@ export interface operations {
                                     entryId: string;
                                     slotId: string;
                                     templateId: string | null;
+                                    source?: {
+                                        /** @constant */
+                                        kind: "personal";
+                                    } | {
+                                        /** @constant */
+                                        kind: "system";
+                                        templateId: string;
+                                    } | {
+                                        /** @constant */
+                                        kind: "campaign";
+                                        /** Format: uuid */
+                                        campaignId: string;
+                                        /** Format: uuid */
+                                        templateId: string;
+                                        templateRevision: number;
+                                        contentRevision: number;
+                                    };
+                                    snapshot?: {
+                                        kind: "item" | "spell" | "talent" | "effect";
+                                        values: {
+                                            [key: string]: string;
+                                        };
+                                        quantity?: number;
+                                    };
                                     values: {
                                         [key: string]: unknown;
                                     };
@@ -8286,6 +8860,30 @@ export interface operations {
                                         entryId: string;
                                         slotId: string;
                                         templateId: string | null;
+                                        source?: {
+                                            /** @constant */
+                                            kind: "personal";
+                                        } | {
+                                            /** @constant */
+                                            kind: "system";
+                                            templateId: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "campaign";
+                                            /** Format: uuid */
+                                            campaignId: string;
+                                            /** Format: uuid */
+                                            templateId: string;
+                                            templateRevision: number;
+                                            contentRevision: number;
+                                        };
+                                        snapshot?: {
+                                            kind: "item" | "spell" | "talent" | "effect";
+                                            values: {
+                                                [key: string]: string;
+                                            };
+                                            quantity?: number;
+                                        };
                                         values: {
                                             [key: string]: unknown;
                                         };
@@ -8419,6 +9017,23 @@ export interface operations {
                                             label: string;
                                             accepts: ("item" | "spell" | "talent" | "effect")[];
                                             entries: {
+                                                source?: {
+                                                    /** @constant */
+                                                    kind: "personal";
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "system";
+                                                    templateId: string;
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "campaign";
+                                                    /** Format: uuid */
+                                                    campaignId: string;
+                                                    /** Format: uuid */
+                                                    templateId: string;
+                                                    templateRevision: number;
+                                                    contentRevision: number;
+                                                };
                                                 entryId: string;
                                                 templateId: string | null;
                                                 label: string;
@@ -8665,6 +9280,30 @@ export interface operations {
                                             entryId: string;
                                             slotId: string;
                                             templateId: string | null;
+                                            source?: {
+                                                /** @constant */
+                                                kind: "personal";
+                                            } | {
+                                                /** @constant */
+                                                kind: "system";
+                                                templateId: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "campaign";
+                                                /** Format: uuid */
+                                                campaignId: string;
+                                                /** Format: uuid */
+                                                templateId: string;
+                                                templateRevision: number;
+                                                contentRevision: number;
+                                            };
+                                            snapshot?: {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    [key: string]: string;
+                                                };
+                                                quantity?: number;
+                                            };
                                             values: {
                                                 [key: string]: unknown;
                                             };
@@ -8807,6 +9446,23 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    source?: {
+                                                        /** @constant */
+                                                        kind: "personal";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "system";
+                                                        templateId: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "campaign";
+                                                        /** Format: uuid */
+                                                        campaignId: string;
+                                                        /** Format: uuid */
+                                                        templateId: string;
+                                                        templateRevision: number;
+                                                        contentRevision: number;
+                                                    };
                                                     entryId: string;
                                                     templateId: string | null;
                                                     label: string;
@@ -9088,6 +9744,30 @@ export interface operations {
                                             entryId: string;
                                             slotId: string;
                                             templateId: string | null;
+                                            source?: {
+                                                /** @constant */
+                                                kind: "personal";
+                                            } | {
+                                                /** @constant */
+                                                kind: "system";
+                                                templateId: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "campaign";
+                                                /** Format: uuid */
+                                                campaignId: string;
+                                                /** Format: uuid */
+                                                templateId: string;
+                                                templateRevision: number;
+                                                contentRevision: number;
+                                            };
+                                            snapshot?: {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    [key: string]: string;
+                                                };
+                                                quantity?: number;
+                                            };
                                             values: {
                                                 [key: string]: unknown;
                                             };
@@ -9230,6 +9910,23 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    source?: {
+                                                        /** @constant */
+                                                        kind: "personal";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "system";
+                                                        templateId: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "campaign";
+                                                        /** Format: uuid */
+                                                        campaignId: string;
+                                                        /** Format: uuid */
+                                                        templateId: string;
+                                                        templateRevision: number;
+                                                        contentRevision: number;
+                                                    };
                                                     entryId: string;
                                                     templateId: string | null;
                                                     label: string;
@@ -9449,6 +10146,898 @@ export interface operations {
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_campaigns_id_item_templates: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+                kind?: "item" | "spell" | "talent" | "effect";
+                status?: "active" | "archived";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        templates: {
+                            templateId: string;
+                            campaignId: string;
+                            creatorId: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            /** @constant */
+                            audience: "all_players";
+                            status: "active" | "archived";
+                            revision: number;
+                            contentRevision: number;
+                            content: {
+                                name: string;
+                                description?: string;
+                                notes?: string;
+                                defaultQuantity?: number;
+                            };
+                            createdAt: string;
+                            updatedAt: string;
+                        }[];
+                        nextCursor: string | null;
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_campaigns_id_item_templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @constant */
+                    expectedTemplateRevision: 0;
+                    idempotencyKey: string;
+                    kind: "item" | "spell" | "talent" | "effect";
+                    content: {
+                        name: string;
+                        description?: string;
+                        notes?: string;
+                        defaultQuantity?: number;
+                    };
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        template: {
+                            templateId: string;
+                            campaignId: string;
+                            creatorId: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            /** @constant */
+                            audience: "all_players";
+                            status: "active" | "archived";
+                            revision: number;
+                            contentRevision: number;
+                            content: {
+                                name: string;
+                                description?: string;
+                                notes?: string;
+                                defaultQuantity?: number;
+                            };
+                            createdAt: string;
+                            updatedAt: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_campaigns_id_item_templates_templateId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                templateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        template: {
+                            templateId: string;
+                            campaignId: string;
+                            creatorId: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            /** @constant */
+                            audience: "all_players";
+                            status: "active" | "archived";
+                            revision: number;
+                            contentRevision: number;
+                            content: {
+                                name: string;
+                                description?: string;
+                                notes?: string;
+                                defaultQuantity?: number;
+                            };
+                            createdAt: string;
+                            updatedAt: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    patch_campaigns_id_item_templates_templateId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                templateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    expectedTemplateRevision: number;
+                    idempotencyKey: string;
+                    content: {
+                        name: string;
+                        description?: string;
+                        notes?: string;
+                        defaultQuantity?: number;
+                    };
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        template: {
+                            templateId: string;
+                            campaignId: string;
+                            creatorId: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            /** @constant */
+                            audience: "all_players";
+                            status: "active" | "archived";
+                            revision: number;
+                            contentRevision: number;
+                            content: {
+                                name: string;
+                                description?: string;
+                                notes?: string;
+                                defaultQuantity?: number;
+                            };
+                            createdAt: string;
+                            updatedAt: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_campaigns_id_item_templates_templateId_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                templateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    expectedTemplateRevision: number;
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        template: {
+                            templateId: string;
+                            campaignId: string;
+                            creatorId: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            /** @constant */
+                            audience: "all_players";
+                            status: "active" | "archived";
+                            revision: number;
+                            contentRevision: number;
+                            content: {
+                                name: string;
+                                description?: string;
+                                notes?: string;
+                                defaultQuantity?: number;
+                            };
+                            createdAt: string;
+                            updatedAt: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_campaigns_id_item_templates_templateId_recover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                templateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    expectedTemplateRevision: number;
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        template: {
+                            templateId: string;
+                            campaignId: string;
+                            creatorId: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            /** @constant */
+                            audience: "all_players";
+                            status: "active" | "archived";
+                            revision: number;
+                            contentRevision: number;
+                            content: {
+                                name: string;
+                                description?: string;
+                                notes?: string;
+                                defaultQuantity?: number;
+                            };
+                            createdAt: string;
+                            updatedAt: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
                         };
                         requestId: string;
                     };
@@ -11846,6 +13435,30 @@ export interface operations {
                                         entryId: string;
                                         slotId: string;
                                         templateId: string | null;
+                                        source?: {
+                                            /** @constant */
+                                            kind: "personal";
+                                        } | {
+                                            /** @constant */
+                                            kind: "system";
+                                            templateId: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "campaign";
+                                            /** Format: uuid */
+                                            campaignId: string;
+                                            /** Format: uuid */
+                                            templateId: string;
+                                            templateRevision: number;
+                                            contentRevision: number;
+                                        };
+                                        snapshot?: {
+                                            kind: "item" | "spell" | "talent" | "effect";
+                                            values: {
+                                                [key: string]: string;
+                                            };
+                                            quantity?: number;
+                                        };
                                         values: {
                                             [key: string]: unknown;
                                         };
@@ -11988,6 +13601,23 @@ export interface operations {
                                             label: string;
                                             accepts: ("item" | "spell" | "talent" | "effect")[];
                                             entries: {
+                                                source?: {
+                                                    /** @constant */
+                                                    kind: "personal";
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "system";
+                                                    templateId: string;
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "campaign";
+                                                    /** Format: uuid */
+                                                    campaignId: string;
+                                                    /** Format: uuid */
+                                                    templateId: string;
+                                                    templateRevision: number;
+                                                    contentRevision: number;
+                                                };
                                                 entryId: string;
                                                 templateId: string | null;
                                                 label: string;
@@ -12289,6 +13919,30 @@ export interface operations {
                                         entryId: string;
                                         slotId: string;
                                         templateId: string | null;
+                                        source?: {
+                                            /** @constant */
+                                            kind: "personal";
+                                        } | {
+                                            /** @constant */
+                                            kind: "system";
+                                            templateId: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "campaign";
+                                            /** Format: uuid */
+                                            campaignId: string;
+                                            /** Format: uuid */
+                                            templateId: string;
+                                            templateRevision: number;
+                                            contentRevision: number;
+                                        };
+                                        snapshot?: {
+                                            kind: "item" | "spell" | "talent" | "effect";
+                                            values: {
+                                                [key: string]: string;
+                                            };
+                                            quantity?: number;
+                                        };
                                         values: {
                                             [key: string]: unknown;
                                         };
@@ -12431,6 +14085,23 @@ export interface operations {
                                             label: string;
                                             accepts: ("item" | "spell" | "talent" | "effect")[];
                                             entries: {
+                                                source?: {
+                                                    /** @constant */
+                                                    kind: "personal";
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "system";
+                                                    templateId: string;
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "campaign";
+                                                    /** Format: uuid */
+                                                    campaignId: string;
+                                                    /** Format: uuid */
+                                                    templateId: string;
+                                                    templateRevision: number;
+                                                    contentRevision: number;
+                                                };
                                                 entryId: string;
                                                 templateId: string | null;
                                                 label: string;
@@ -12636,6 +14307,30 @@ export interface operations {
                                         entryId: string;
                                         slotId: string;
                                         templateId: string | null;
+                                        source?: {
+                                            /** @constant */
+                                            kind: "personal";
+                                        } | {
+                                            /** @constant */
+                                            kind: "system";
+                                            templateId: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "campaign";
+                                            /** Format: uuid */
+                                            campaignId: string;
+                                            /** Format: uuid */
+                                            templateId: string;
+                                            templateRevision: number;
+                                            contentRevision: number;
+                                        };
+                                        snapshot?: {
+                                            kind: "item" | "spell" | "talent" | "effect";
+                                            values: {
+                                                [key: string]: string;
+                                            };
+                                            quantity?: number;
+                                        };
                                         values: {
                                             [key: string]: unknown;
                                         };
@@ -12778,6 +14473,23 @@ export interface operations {
                                             label: string;
                                             accepts: ("item" | "spell" | "talent" | "effect")[];
                                             entries: {
+                                                source?: {
+                                                    /** @constant */
+                                                    kind: "personal";
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "system";
+                                                    templateId: string;
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "campaign";
+                                                    /** Format: uuid */
+                                                    campaignId: string;
+                                                    /** Format: uuid */
+                                                    templateId: string;
+                                                    templateRevision: number;
+                                                    contentRevision: number;
+                                                };
                                                 entryId: string;
                                                 templateId: string | null;
                                                 label: string;
@@ -12985,6 +14697,30 @@ export interface operations {
                                         entryId: string;
                                         slotId: string;
                                         templateId: string | null;
+                                        source?: {
+                                            /** @constant */
+                                            kind: "personal";
+                                        } | {
+                                            /** @constant */
+                                            kind: "system";
+                                            templateId: string;
+                                        } | {
+                                            /** @constant */
+                                            kind: "campaign";
+                                            /** Format: uuid */
+                                            campaignId: string;
+                                            /** Format: uuid */
+                                            templateId: string;
+                                            templateRevision: number;
+                                            contentRevision: number;
+                                        };
+                                        snapshot?: {
+                                            kind: "item" | "spell" | "talent" | "effect";
+                                            values: {
+                                                [key: string]: string;
+                                            };
+                                            quantity?: number;
+                                        };
                                         values: {
                                             [key: string]: unknown;
                                         };
@@ -13127,6 +14863,23 @@ export interface operations {
                                             label: string;
                                             accepts: ("item" | "spell" | "talent" | "effect")[];
                                             entries: {
+                                                source?: {
+                                                    /** @constant */
+                                                    kind: "personal";
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "system";
+                                                    templateId: string;
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "campaign";
+                                                    /** Format: uuid */
+                                                    campaignId: string;
+                                                    /** Format: uuid */
+                                                    templateId: string;
+                                                    templateRevision: number;
+                                                    contentRevision: number;
+                                                };
                                                 entryId: string;
                                                 templateId: string | null;
                                                 label: string;
@@ -14477,7 +16230,7 @@ export interface operations {
                         events: {
                             /** Format: uuid */
                             eventId: string;
-                            kind: "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed";
+                            kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed";
                             /** Format: uuid */
                             actorId: string;
                             sourceContentId: string | null;
@@ -14577,6 +16330,25 @@ export interface operations {
                 content: {
                     "application/json": {
                         export: {
+                            templates?: {
+                                templateId: string;
+                                campaignId: string;
+                                creatorId: string;
+                                kind: "item" | "spell" | "talent" | "effect";
+                                /** @constant */
+                                audience: "all_players";
+                                status: "active" | "archived";
+                                revision: number;
+                                contentRevision: number;
+                                content: {
+                                    name: string;
+                                    description?: string;
+                                    notes?: string;
+                                    defaultQuantity?: number;
+                                };
+                                createdAt: string;
+                                updatedAt: string;
+                            }[];
                             /** @constant */
                             exportVersion: 1;
                             campaign: {
@@ -14623,7 +16395,7 @@ export interface operations {
                             activity: {
                                 /** Format: uuid */
                                 eventId: string;
-                                kind: "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed";
+                                kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed";
                                 /** Format: uuid */
                                 actorId: string;
                                 sourceContentId: string | null;

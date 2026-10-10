@@ -1,3 +1,4 @@
+import {createCampaignTemplatesApi,type CampaignTemplatesApi} from "./campaignTemplateApi.js";
 import type { ApiClient } from "../api/client.js";
 import type {
   ApplyFogEditBody,
@@ -93,6 +94,7 @@ export type ClaimableCharactersQuery = { cursor?: string | null; limit?: number 
 export type ActivityListQuery = { cursor?: string | null; limit?: number };
 
 export type CampaignsApi = {
+  templates?:CampaignTemplatesApi;
   listCampaigns(input?: CampaignListQuery): Promise<CampaignListResponse>;
   openCampaign(campaignId: string): Promise<CampaignViewResponse>;
   reviewInvitation(body: ReviewInvitationBody): Promise<InvitationReviewResponse>;
@@ -144,6 +146,7 @@ export type CampaignsApi = {
 
 export function createCampaignsApi(client: ApiClient): CampaignsApi {
   return {
+    templates:createCampaignTemplatesApi(client),
     listCampaigns: (input) =>
       input === undefined
         ? client.fetch<CampaignListResponse>("GET", "/campaigns")

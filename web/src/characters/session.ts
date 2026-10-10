@@ -115,7 +115,7 @@ export type CharacterSession = {
    * resource bumps: they queue durably and replay verbatim, so offline
    * add/remove/edit sync on reconnect.
    */
-  addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>, quantity?: number): Promise<void>;
+  addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): Promise<void>;
   removeEntry(entryId: string): Promise<void>;
   updateEntryValues(entryId: string, values: Record<string, unknown>, quantity?: number): Promise<void>;
   resolveConflict(input: ResolveConflictInput): Promise<void>;
@@ -544,7 +544,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return "blocked";
   }
 
-  async function fetchLatestForConflict(latestRevision: number | null = null): Promise<void> {
+  async function fetchLatestForConflict(latestRevision: number | null = null, message?: string): Promise<void> {
     if (!await identityIsCurrent() || !isConnected() || !coordination.isOwner()) return;
     conflictRefreshPending = true;
     conflictMinimumRevision = Math.max(conflictMinimumRevision, latestRevision ?? 0);
@@ -565,8 +565,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       await handleOpenError(err);
       return;
     }
-    if (error === null) {
-      setBlocked("conflict", "The character changed on the server. Review before re-sending.");
+    if (error === null || (message !== undefined && error.kind === "conflict")) {
+      setBlocked("conflict", message ?? "The character changed on the server. Review before re-sending.");
     }
   }
 
@@ -588,7 +588,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           setBlocked("reauthenticate", "Your session expired. Sign in again to continue.");
           return "blocked";
         case 409:
-          await fetchLatestForConflict(err.latestRevision);
+          await fetchLatestForConflict(err.latestRevision, err.code === "conflict" ? err.message : undefined);
           return "blocked";
         case 422:
           setBlocked("invalid", err.message, { diagnostics: err.diagnostics });
@@ -1344,7 +1344,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         }
         if (err.status === 409 || err.code === "expected_revision_mismatch") {
           await retireRejectedOnlineAttempt(attempt);
-          await fetchLatestForConflict(err.latestRevision);
+          await fetchLatestForConflict(err.latestRevision, err.code === "conflict" ? err.message : undefined);
           emit();
           throw err;
         }
@@ -1874,7 +1874,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         }),
       );
     },
-    async addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>, quantity?: number): Promise<void> {
+    async addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
       if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({
@@ -1884,6 +1884,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           slotId,
           templateId,
           values: values ?? {},
+          ...(source === undefined ? {} : {source:structuredClone(source)}),
           ...(quantity === undefined ? {} : { quantity }),
         },
       }));

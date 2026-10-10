@@ -1,3 +1,4 @@
+import { createTemplateCommands, type TemplateCommands } from "./templates.js";
 import { randomUUID } from "node:crypto";
 
 import type { Pool, PoolClient } from "pg";
@@ -365,7 +366,7 @@ export type AssignCampaignControllersInput = Omit<AssignControllersInput, "membe
 export type ClaimCampaignCharacterInput = Omit<ClaimCharacterInput, "membershipGeneration">;
 export type AdoptCampaignCharacterInput = Omit<AdoptCharacterInput, "membershipGeneration">;
 
-export interface Campaigns {
+export interface Campaigns extends TemplateCommands {
   create(ctx: RequestContext, input: CreateCampaignInput): Promise<CampaignResult<CampaignView>>;
   open(ctx: RequestContext, input: OpenCampaignInput): Promise<CampaignResult<CampaignView>>;
   list(ctx: RequestContext, input: ListCampaignsInput): Promise<CampaignResult<ListCampaignsResult>>;
@@ -1012,6 +1013,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
   // Task 7 content/grants/activity/export. Same shared dependencies; the
   // commands own audience validation, grant atomicity, source-filtered
   // reads and the bounded deterministic export projection.
+  const templates = createTemplateCommands({ pool: input.pool, now, newId });
   const content = createContentCommands({ pool: input.pool, repo, limits, now, newId });
 
   // I7b Task 1: validated private image storage. Same shared dependencies;
@@ -1068,6 +1070,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
   }
 
   return {
+    ...templates,
     issueInvitation: invitations.issueInvitation,
     listInvitations: invitations.listInvitations,
     reviewInvitation: invitations.reviewInvitation,
@@ -1905,6 +1908,9 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
               // bad_request; anything else (runtime, storage) is internal.
               // Per-character not_found cannot happen inside this snapshot
               // (the row came from it; the target was just authorized).
+              if (built.error.code === "conflict") {
+                return { authorized: true as const, failure: errors.conflict(built.error.message, campaign.revision) as CampaignError };
+              }
               if (built.error.code === "invalid_value" || built.error.code === "bad_request") {
                 return { authorized: true as const, failure: errors.bad_request(built.error.message) as CampaignError };
               }

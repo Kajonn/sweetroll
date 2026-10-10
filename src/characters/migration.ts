@@ -441,6 +441,10 @@ export async function buildMigrationCandidate(
     };
   }
 
+  if (Object.keys(character.state.entries ?? {}).length > 0) {
+    return { ok: false, error: { code: "conflict", message: "This character has entries that cannot yet be safely migrated. Its current sheet remains unchanged." } };
+  }
+
   const sourceResolved = await deps.runtime.resolve({
     versionId: character.systemVersionId,
     entityId: character.entityDefinitionId,

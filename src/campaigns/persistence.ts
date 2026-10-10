@@ -52,6 +52,7 @@ export type ContentRecord = {
 };
 
 export type ActivityEventKind =
+  | "template_create" | "template_update" | "template_archive" | "template_recover"
   | "content_created"
   | "content_updated"
   | "content_deleted"
@@ -452,6 +453,7 @@ function toContentRecord(row: ContentRow): ContentRecord {
 
 function toActivityEventRecord(row: ActivityEventRow): ActivityEventRecord {
   switch (row.kind) {
+    case "template_create": case "template_update": case "template_archive": case "template_recover":
     case "content_created":
     case "content_updated":
     case "content_deleted":

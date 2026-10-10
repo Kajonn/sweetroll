@@ -210,3 +210,11 @@ describe("SlotListControl", () => {
     expect(screen.getByTestId(`slot-entry-${SWORD_ENTRY_ID}`)).toHaveTextContent("Longsword");
   });
 });
+
+it('edits a data-only campaign spell without adding an item quantity',async()=>{
+ const user=userEvent.setup();const source={kind:'campaign' as const,campaignId:STONE_ENTRY_ID,templateId:SWORD_ENTRY_ID,templateRevision:1,contentRevision:1};
+ const handlers=renderControl({accepts:['spell'],entries:[{entryId:STONE_ENTRY_ID,templateId:null,label:'Spark',source,values:{name:'Spark',notes:'Old'}}]});
+ await user.click(screen.getByRole('button',{name:'Edit entry'}));expect(screen.queryByRole('spinbutton',{name:'Quantity'})).toBeNull();
+ await user.clear(screen.getByRole('textbox',{name:'Notes'}));await user.type(screen.getByRole('textbox',{name:'Notes'}),'Local');await user.click(screen.getByRole('button',{name:'Save entry'}));
+ expect(handlers.onUpdateEntry).toHaveBeenCalledWith(STONE_ENTRY_ID,{name:'Spark',notes:'Local'},undefined);
+});

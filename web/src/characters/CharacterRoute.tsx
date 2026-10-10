@@ -5,7 +5,8 @@ import type { CharactersApi } from "./api.js";
 import { CharacterSheet } from "./CharacterSheet.js";
 import { CharacterTools } from "./CharacterTools.js";
 import { ConflictReview } from "./ConflictReview.js";
-import type { SlotTemplate } from "./SlotListControl.js";import { CreateCharacter, type CreateCharacterIdentity } from "./CreateCharacter.js";
+import type { SlotTemplate } from "./SlotListControl.js";
+import { CreateCharacter, type CreateCharacterIdentity } from "./CreateCharacter.js";
 import { createCharacterSession, type CoordinationPort, type IdentityPort } from "./session.js";
 import { openCharacterStore, type CharacterStore } from "./store.js";
 import { useCharacterSession } from "./useCharacterSession.js";
@@ -161,37 +162,42 @@ function CharacterDetailLoaded({
   const hasSlots = snapshot.confirmed?.projection.sheets.some((sheet) =>
     sheet.sections.some((section) => section.elements.some((element) => element.kind === "slot")),
   ) ?? false;
+  const [templateRefresh, setTemplateRefresh] = useState(0);
+  useEffect(() => {
+    const refresh = () => setTemplateRefresh(value => value + 1);
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, []);
   const [templates, setTemplates] = useState<SlotTemplate[]>([]);
   useEffect(() => {
-    if (!hasSlots || characterIdForTemplates === undefined) {
-      setTemplates([]);
-      return;
-    }
-    let cancelled = false;
-    void api.listEntryTemplates(characterIdForTemplates).then(
-      (response) => {
+    setTemplates([]);
+    if (!hasSlots || characterIdForTemplates === undefined || snapshot.phase === "purged" || snapshot.confirmed === null) return;
+    let cancelled=false;
+    const campaignId=snapshot.confirmed.campaignId;
+    const map=(choices:import("./types.js").EntryTemplate[]) => choices.filter(choice=>choice.source?.kind !== "campaign" || choice.source.campaignId === campaignId).map(template=>({...template,fields:template.fields.map(field=>({...field})),grantedActions:template.grantedActions.map(action=>({...action,inputs:action.inputs.map(input=>({...input}))}))}));
+    void (async () => {
+      const guard=await store.read(actorId,characterIdForTemplates);
+      if (cancelled) return;
+      if (!online) {
+        const cached=await store.readEntryTemplates(actorId,characterIdForTemplates);
+        if (!cancelled) setTemplates(map(cached));
+        return;
+      }
+      try {
+        const response=await api.listEntryTemplates(characterIdForTemplates);
         if (cancelled) return;
-        setTemplates(response.templates.map((template) => ({
-          id: template.id,
-          label: template.label,
-          kind: template.kind,
-          fields: template.fields.map((field) => ({ ...field })),
-          grantedActions: template.grantedActions.map((action) => ({
-            id: action.id,
-            label: action.label,
-            actionKind: action.actionKind,
-            inputs: action.inputs.map((input) => ({ ...input })),
-          })),
-        })));
-      },
-      () => {
-        if (!cancelled) setTemplates([]);
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [api, hasSlots, characterIdForTemplates]);
+        await store.saveEntryTemplates(actorId,characterIdForTemplates,response.templates,guard);
+        if (!cancelled) setTemplates(map(response.templates));
+      } catch (error) {
+        if (cancelled) return;
+        if (typeof error === "object" && error !== null && "status" in error && error.status === 404) {
+          await store.purgeCharacter(actorId,characterIdForTemplates);
+          if (!cancelled) setTemplates([]);
+        }
+      }
+    })().catch(()=> { if(!cancelled) setTemplates([]); });
+    return () => {cancelled=true;};
+  }, [api,store,actorId,hasSlots,characterIdForTemplates,online,templateRefresh,snapshot.confirmed?.campaignId,snapshot.confirmed?.revision,snapshot.phase === "purged"]);
 
   const focusedFor = useRef<string | null>(null);
   useEffect(() => {
@@ -305,7 +311,7 @@ function CharacterDetailLoaded({
         onSetField={session.setField}
         onBump={session.bumpResource}
         onExecuteAction={session.executeAction}
-        onAddEntry={(slotId, templateId, values, quantity) => session.addEntry(slotId, templateId, values, quantity)}
+        onAddEntry={(slotId, templateId, values, quantity, source) => session.addEntry(slotId, templateId, values, quantity, source)}
         onRemoveEntry={session.removeEntry}
         onUpdateEntry={session.updateEntryValues}
         onExecuteGranted={(entryId, actionId, inputs) => session.executeGrantedAction(entryId, actionId, inputs)}

@@ -114,6 +114,7 @@ function cookieFromSignIn(response: {
 export async function buildI6Harness(input?: {
   /** Wraps the runtime (e.g. to stall resolution for race tests). */
   wrapRuntime?: (runtime: SystemRuntime) => SystemRuntime;
+  document?:SystemDocumentV1;
   /** Overrides the shared campaign limits (e.g. tiny maxAttachedCharacters). */
   limits?: CampaignLimits;
 }): Promise<I6Harness> {
@@ -179,7 +180,7 @@ export async function buildI6Harness(input?: {
     outsider,
   };
 
-  const gmVersion = await publishVersion(handle, users.gm, d20Document, {
+  const gmVersion = await publishVersion(handle, users.gm, input?.document ?? d20Document, {
     name: "GM d20",
     semanticVersion: "1.0.0",
   });

@@ -12,7 +12,10 @@ export type FrozenRequest = {
   firstAttemptAt: string;
 };
 
+export type EntrySource = NonNullable<AddCharacterEntryBody["entry"]["source"]>;
+
 export type EntryInput = {
+  source?: EntrySource;
   entryId: string;
   slotId: string;
   templateId: string | null;

@@ -5,7 +5,6 @@ import { t } from "../../i18n/index.js";
 import { useShortcut } from "../../shell/useShortcut.js";
 import type { DefinitionId } from "../../state/documentFieldTypes.js";
 import { Button, EmptyState, FormField } from "../../ui/index.js";
-import { DefinitionReferenceSelect } from "./DefinitionReferenceSelect.js";
 import { SectionEditor } from "./SectionEditor.js";
 import styles from "./SheetEditor.module.css";
 import type { SheetEditorV1, SheetElementV1, SheetSectionV1 } from "./sheetTypes.js";

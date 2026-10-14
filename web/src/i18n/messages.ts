@@ -103,7 +103,7 @@ export const defaultMessages: MessageTable = {
   "editor.tab.basics": "Basics",
   "editor.tab.attributes": "Attributes",
   "editor.tab.dice": "Dice",
-  "editor.tab.sections": "Sections",
+  "editor.tab.sections": "Sheets",
   "editor.tab.advanced": "Advanced",
   "editor.tab.templates": "Templates",
   "editor.advanced.disclosure": "Advanced (expressions, validations, reference data)",

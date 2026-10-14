@@ -86,3 +86,37 @@ Manual Chromium retest on [the preview](https://sweetroll-items-production.up.ra
 3. Account → sign out completed with `Signed out.`. Acceptance test sign-in restored the authenticated account and Sign out controls, with zero retained `Signed out.` nodes.
 
 These follow-up live checks used one supported acceptance identity. They do not constitute a new live multi-account or offline run; CI #93 supplies the automated offline/journey regression evidence. Original live multi-account evidence and remaining device/provider/manual accessibility gates above are unchanged. The PR remains open and production infrastructure was not changed.
+
+
+## Review remediation — 2026-10-14
+
+Implementation commit: `0e61d157c62f622c8a6123ff3164a9b01fa7affe` (tree `8872c5a3368c5c745f37b1a4788431ad78e09fb8`). Implements Task 7 of the execution plan against planning commit `7fbf687`; the three reviewed defects at `6a9b0e1` are repaired.
+
+- **R1, active revocation:** a template-discovery 404 enters the session-owned purge path with a durable generation guard. The sheet, pending/roll feedback and editing ownership clear, and other tabs receive invalidation. Obsolete account or placement denials cannot delete a newer authorized snapshot.
+- **R3, durable scope:** snapshot confirmation and queue/online acknowledgment atomically invalidate catalog choices when campaign, placement generation or system/entity scope changes. IndexedDB version 4 discards old unverifiable selector caches while retaining character snapshots and frozen commands. Catalog writes require a current confirmed scope; late old-generation writes are rejected.
+- **R2, selection:** the Add dialog retains the complete selected reference through catalog refresh/removal. Submission keeps its original revisions and campaign origin; a changed choice offers explicit **Use latest revision**. No frozen queue request is rewritten.
+
+**Observed TDD:** the real route/session/IndexedDB revocation case failed before R1; the three scope-confirmation paths failed before R3; the revised/missing selection and explicit-review cases failed before R2. These seven focused red cases subsequently passed. Additional regressions cover a denial racing newer placement confirmation, account changes, cache transaction rollback, raw IndexedDB row deletion, safe v3 upgrade and retained frozen work.
+
+Local Node 24.19.0 verification: full frontend **1,140 tests passed in 110 files**; focused route/session/store/slot suites **195 passed**. Frontend typecheck/production build, backend build and `git diff --check` passed. The existing bundle-size warning remains. A local PostgreSQL/browser-server harness was not established, so database and real browser evidence comes from canonical CI, not local skips or mocks.
+
+[Required CI](https://github.com/Kajonn/sweetroll/actions/runs/38596526273) on the implementation commit completed **success**:
+
+| Check | Result |
+|---|---|
+| verify | 411 server tests, 364 PostgreSQL integration tests, typecheck, contracts, build and Docker passed. |
+| web | 1,140 frontend tests, typecheck and production build passed. |
+| web-e2e journeys | 17 + 17 + 17 = 51 passed, zero retries. |
+| web-e2e visual | 10 passed; existing baselines unchanged. |
+| web-offline | 24 passed against the production build, zero retries. |
+| Deploy production | Skipped as intended for a PR. |
+
+The new shared review journey runs in both canonical browser and production-offline suites. It uses supported GM/co-GM/player identities and real API membership changes: archive while a player's Add dialog is open, submit the original reference and observe conflict, explicitly review a later revision and place it, remove the player while a catalog request is held, verify two open tabs hide the denied character, and verify raw catalog rows clear. A separately owned/adopted character returns to the player; failed catalog transport cannot retain its old catalog, while its placed snapshot survives. The offline variant also reloads the returned sheet disconnected and confirms no former campaign choice remains.
+
+### Fix-commit deployed gate remains open
+
+Read-only Railway inspection confirmed the separate project **sweetroll-items-preview** (`f5662fc0-966a-4cc2-ba83-91bf8b0a2280`), service **sweetroll-items** (`f75d2a0b-66a6-49b7-95cc-a24ff99ac6f8`), with its own **preview-postgres**. Its environment is named `production` (`8016a027-c65d-4991-a7e8-7f38ff54dbf7`); this is distinct from the user's `proactive-expression` project.
+
+Automatic approval review rejected an unscoped source connect because it could trigger a production deployment. After verifying isolation, an environment-scoped staged source update was accepted. Patch `8d705b56-0d66-4f8f-b087-11a065a97a58` contains exactly one nondestructive change: pin this preview service from `7f04c87` to `0e61d15`. Applying that patch was not approved; no deployment was triggered. The latest deployment remains `b5c25175-3ade-4537-9240-517575cf01dd` on `7f04c87`.
+
+To close Task 7's deployed gate, approve that preview-only patch, observe successful deployment/migrations/readiness and matching frontend assets, then run the review journey against the new build. The production project was not changed. No new live result, physical-device validation or real-provider production-authentication result is claimed.

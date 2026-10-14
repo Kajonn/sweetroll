@@ -213,19 +213,15 @@ test("dynamic objects: creator templates+slot -> player entries+granted roll -> 
   await page.getByTestId(`section-add-element-field-${sectionId}`).click();
   await page.getByTestId(`section-row-${sectionId}`)
     .locator('[data-testid^="element-binding-"]')
-    .getByTestId("definition-id-input")
-    .fill(mightId);
+    .getByTestId("definition-reference-select")
+    .selectOption(mightId);
   await page.getByTestId(`section-add-element-slot-${sectionId}`).click();
   const binding = page
     .getByTestId(`section-row-${sectionId}`)
     .locator('[data-testid^="element-binding-"]')
     .last()
-    .getByTestId("definition-id-input");
-  await binding.fill(slotId);
-  const renameConfirm = page.getByTestId("definition-id-rename-confirm-submit");
-  if (await renameConfirm.isVisible().catch(() => false)) {
-    await renameConfirm.click();
-  }
+    .getByTestId("definition-reference-select");
+  await binding.selectOption(slotId);
   await waitForDraftPut(page, slotId);
   await expectSaved(page);
 

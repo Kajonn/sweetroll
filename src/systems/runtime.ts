@@ -192,6 +192,7 @@ export type CharacterProjectionElement =
     };
 
 export type CharacterProjectionSlotEntry = {
+  source?: import("./implementation/package/schema/dynamic.js").EntrySource;
   entryId: string;
   templateId: DefinitionId | null;
   label: string;

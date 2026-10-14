@@ -21,6 +21,10 @@ function isNotFound(error: unknown): boolean {
 
 export function activityKindLabel(kind: CampaignActivityEvent["kind"]): string {
   switch (kind) {
+    case "template_create": return t("campaign.templates.activity.create");
+    case "template_update": return t("campaign.templates.activity.update");
+    case "template_archive": return t("campaign.templates.activity.archive");
+    case "template_recover": return t("campaign.templates.activity.recover");
     case "content_created":
       return t("campaign.detail.activity.kind.content_created");
     case "content_updated":

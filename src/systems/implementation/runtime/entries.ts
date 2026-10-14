@@ -40,6 +40,12 @@ export function validateEntryForSlot(
   if (Math.max(0, siblingCount) >= capacity) {
     return invalid("slot_full", "Slot has reached its maximum entries.", slot.id);
   }
+  if (entry.source?.kind === "campaign") {
+    if (entry.templateId !== null || entry.snapshot === undefined) return invalid("entry_values_invalid", "Campaign entries require a data-only snapshot.");
+    if (!slot.accepts.includes(entry.snapshot.kind)) return invalid("kind_not_accepted", "Campaign template kind is not accepted by the slot.");
+  } else if (entry.snapshot !== undefined || (entry.source?.kind === "system" && entry.source.templateId !== entry.templateId) || (entry.source?.kind === "personal" && entry.templateId !== null)) {
+    return invalid("entry_values_invalid", "Entry source contradicts its template reference.");
+  }
   if (entry.templateId === null) {
     if (
       Object.hasOwn(entry.values, "actions")

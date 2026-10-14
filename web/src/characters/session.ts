@@ -1,6 +1,6 @@
 import { ApiError } from "../api/client.js";
 import type { CharactersApi } from "./api.js";
-import type { CharacterStore, OnlineAttempt } from "./store.js";
+import type { CharacterStore, OnlineAttempt, WriteGuard } from "./store.js";
 import type {
   ActivityEvent,
   CharacterView,
@@ -100,6 +100,8 @@ export type CharacterSnapshot = {
 
 export type CharacterSession = {
   open(): Promise<void>;
+  /** Apply a catalog access denial only to the generation it was fetched against. */
+  revokeAccess(guard: WriteGuard): Promise<void>;
   getSnapshot(): CharacterSnapshot;
   subscribe(listener: (snapshot: CharacterSnapshot) => void): () => void;
   setField(fieldId: string, value: unknown): Promise<void>;
@@ -115,7 +117,7 @@ export type CharacterSession = {
    * resource bumps: they queue durably and replay verbatim, so offline
    * add/remove/edit sync on reconnect.
    */
-  addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>, quantity?: number): Promise<void>;
+  addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): Promise<void>;
   removeEntry(entryId: string): Promise<void>;
   updateEntryValues(entryId: string, values: Record<string, unknown>, quantity?: number): Promise<void>;
   resolveConflict(input: ResolveConflictInput): Promise<void>;
@@ -494,19 +496,31 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return Date.parse(timestamp) < Date.parse(now()) - THIRTY_DAYS_MS;
   }
 
-  async function handleNotFound(err: ApiError): Promise<SendOutcome> {
-    if (err.cacheDisposition === "purge") {
-      try {
-        await store.purgeCharacter(actorId, characterId);
-        coordination.invalidate?.();
-      } catch {
-        // never surface private character contents
-      }
-      confirmed = null;
-      entries = [];
-      setBlocked("purged", "This character is no longer available.");
-      return "blocked";
+  async function purgeAccess(guard?: WriteGuard): Promise<SendOutcome> {
+    try {
+      await store.purgeCharacter(actorId, characterId, guard);
+      coordination.invalidate?.();
+    } catch (failure) {
+      if (guard !== undefined && isStaleAck(failure)) return "blocked";
+      // A storage failure must still hide private data in this session.
     }
+    if (!identityMatches()) return "blocked";
+    confirmed = null;
+    entries = [];
+    pendingOnline = [];
+    lastRoll = null;
+    lastNominal = null;
+    lastMigration = null;
+    editing = { owned: false, owner: null };
+    if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
+    setBlocked("purged", "This character is no longer available.");
+    emit();
+    coordination.letGo();
+    return "blocked";
+  }
+
+  async function handleNotFound(err: ApiError): Promise<SendOutcome> {
+    if (err.cacheDisposition === "purge") return purgeAccess();
     setBlocked("not-found", "This character could not be loaded.");
     return "blocked";
   }
@@ -544,7 +558,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return "blocked";
   }
 
-  async function fetchLatestForConflict(latestRevision: number | null = null): Promise<void> {
+  async function fetchLatestForConflict(latestRevision: number | null = null, message?: string): Promise<void> {
     if (!await identityIsCurrent() || !isConnected() || !coordination.isOwner()) return;
     conflictRefreshPending = true;
     conflictMinimumRevision = Math.max(conflictMinimumRevision, latestRevision ?? 0);
@@ -565,8 +579,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       await handleOpenError(err);
       return;
     }
-    if (error === null) {
-      setBlocked("conflict", "The character changed on the server. Review before re-sending.");
+    if (error === null || (message !== undefined && error.kind === "conflict")) {
+      setBlocked("conflict", message ?? "The character changed on the server. Review before re-sending.");
     }
   }
 
@@ -588,7 +602,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           setBlocked("reauthenticate", "Your session expired. Sign in again to continue.");
           return "blocked";
         case 409:
-          await fetchLatestForConflict(err.latestRevision);
+          await fetchLatestForConflict(err.latestRevision, err.code === "conflict" ? err.message : undefined);
           return "blocked";
         case 422:
           setBlocked("invalid", err.message, { diagnostics: err.diagnostics });
@@ -1344,7 +1358,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         }
         if (err.status === 409 || err.code === "expected_revision_mismatch") {
           await retireRejectedOnlineAttempt(attempt);
-          await fetchLatestForConflict(err.latestRevision);
+          await fetchLatestForConflict(err.latestRevision, err.code === "conflict" ? err.message : undefined);
           emit();
           throw err;
         }
@@ -1822,6 +1836,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   return {
     open,
+    async revokeAccess(guard) {
+      if (await identityIsCurrent()) await purgeAccess(guard);
+    },
     getSnapshot,
     subscribe(listener: (snapshot: CharacterSnapshot) => void) {
       listeners.add(listener);
@@ -1874,7 +1891,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         }),
       );
     },
-    async addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>, quantity?: number): Promise<void> {
+    async addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
       if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({
@@ -1884,6 +1901,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           slotId,
           templateId,
           values: values ?? {},
+          ...(source === undefined ? {} : {source:structuredClone(source)}),
           ...(quantity === undefined ? {} : { quantity }),
         },
       }));

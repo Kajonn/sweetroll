@@ -288,3 +288,9 @@ describe("UpgradeDialog", () => {
     );
   });
 });
+
+it('explains the populated-entry migration guard without suggesting destructive cleanup',async()=>{
+ const {api,versionsApi}=fakes();api.previewUpgrade.mockRejectedValue(new Error('Character entries cannot yet be safely migrated. The current sheet remains usable.'));
+ render(<UpgradeDialog {...dialogProps()} api={api} versionsApi={versionsApi}/>,{wrapper:wrapper()});
+ expect(await screen.findByText(/entries cannot yet be safely migrated/)).toBeVisible();expect(screen.queryByRole('button',{name:/remove entries/i})).toBeNull();
+});

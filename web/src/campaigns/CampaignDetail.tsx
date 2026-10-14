@@ -1,3 +1,4 @@
+import {CampaignTemplates} from "./CampaignTemplates.js";
 // Campaign detail shell: openCampaign on mount, tabbed Characters /
 // Content / Activity bodies, and the self-leave flow. The Characters tab
 // body lives in CampaignCharacters.tsx (claiming, creation, indicators).
@@ -140,6 +141,7 @@ export function CampaignDetail(props: {
     // key (e.g. ["campaigns","content",id,actor,gen] and detail item keys
     // [...listKey,"item",...]), leaving stale content after revocation.
     queryClient.removeQueries({ queryKey: ["campaigns", "content", props.campaignId] });
+    queryClient.removeQueries({queryKey:["campaigns","templates",props.campaignId]});
     queryClient.removeQueries({ queryKey: campaignActivityKey(props.campaignId) });
     queryClient.removeQueries({ queryKey: ["campaigns", "members", props.campaignId] });
     queryClient.removeQueries({ queryKey: ["campaigns", "session", props.campaignId] });
@@ -174,6 +176,7 @@ export function CampaignDetail(props: {
       // member, and invitation families (an open reader or session board
       // unmounts on leave, and nothing may survive for a later reader).
       queryClient.removeQueries({ queryKey: ["campaigns", "content", props.campaignId] });
+    queryClient.removeQueries({queryKey:["campaigns","templates",props.campaignId]});
       queryClient.removeQueries({ queryKey: campaignActivityKey(props.campaignId) });
       queryClient.removeQueries({ queryKey: ["campaigns", "members", props.campaignId] });
       queryClient.removeQueries({ queryKey: ["campaigns", "session", props.campaignId] });
@@ -336,6 +339,7 @@ export function CampaignDetail(props: {
               />
             ),
           },
+          ...(props.api.templates === undefined ? [] : [{id:"templates",label:t("campaign.templates.title"),content:<CampaignTemplates api={props.api.templates} campaignId={props.campaignId} actorId={props.actorId} generation={generation} isGm={isGm} online={online} readOnly={campaign.status !== "active"} onAccessRevoked={handleAccessRevoked}/>}]),
           {
             id: "activity",
             label: t("campaign.detail.tabs.activity"),

@@ -24,6 +24,8 @@ export type SlotGrantedAction = {
 };
 
 export type SlotTemplate = {
+  source?: import("./types.js").EntrySource;
+  defaultQuantity?: number;
   id: string;
   label: string;
   kind: string;
@@ -46,6 +48,7 @@ export type SlotTemplateField = {
 };
 
 export type SlotListEntry = {
+  source?: import("./types.js").EntrySource;
   entryId: string;
   templateId: string | null;
   label: string;
@@ -66,9 +69,9 @@ export type SlotListControlProps = {
    * entry edits stay enabled while rolls stay disabled.
    */
   actionsDisabled?: boolean;
-  onAddEntry(slotId: string, templateId: string | null, values: Record<string, unknown>, quantity?: number): void | Promise<void>;
+  onAddEntry(slotId: string, templateId: string | null, values: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): void | Promise<void>;
   onRemoveEntry(entryId: string): void | Promise<void>;
-  onUpdateEntry(entryId: string, values: Record<string, unknown>, quantity?: number): void | Promise<void>;
+  onUpdateEntry(entryId: string, values: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): void | Promise<void>;
   onExecuteGranted(entryId: string, actionId: string, inputs: Record<string, unknown>): void | Promise<void>;
 };
 
@@ -201,12 +204,13 @@ function RemoveEntryButton({ entry, slotLabel, disabled, onRemove }: {
   );
 }
 
-function PersonalFields({ values, onChange, quantity, onQuantity, disabled, nameTestId }: {
+function PersonalFields({ values, onChange, quantity, onQuantity, disabled, nameTestId, showQuantity = true }: {
   values: Record<string, unknown>;
   onChange(values: Record<string, unknown>): void;
   quantity: number;
   onQuantity(value: number): void;
   nameTestId?: string;
+  showQuantity?: boolean;
   disabled: boolean;
 }) {
   return <>
@@ -221,19 +225,20 @@ function PersonalFields({ values, onChange, quantity, onQuantity, disabled, name
         value={String(values[key] ?? "")} disabled={disabled}
         onChange={(event) => onChange({ ...values, [key]: event.target.value })} />
     </label>)}
-    <label className={styles.field}>{t("character.slot.quantity")}
+    {showQuantity ? <label className={styles.field}>{t("character.slot.quantity")}
       <input className={styles.dialogField} type="number" min={1} step={1} required
         value={quantity} disabled={disabled}
         onChange={(event) => onQuantity(event.target.value === "" ? 0 : Number(event.target.value))} />
-    </label>
+    </label> : null}
   </>;
 }
 
 function PersonalEntryForm({ entry, disabled, onUpdate }: {
   entry: SlotListEntry;
   disabled: boolean;
-  onUpdate(entryId: string, values: Record<string, unknown>, quantity?: number): void | Promise<void>;
+  onUpdate(entryId: string, values: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): void | Promise<void>;
 }) {
+  const hasQuantity = entry.source?.kind !== "campaign" || entry.quantity !== undefined;
   const [draft, setDraft] = useState(entry.values);
   const [quantity, setQuantity] = useState(entry.quantity ?? 1);
   const [editing, setEditing] = useState(false);
@@ -250,11 +255,11 @@ function PersonalEntryForm({ entry, disabled, onUpdate }: {
       event.preventDefault();
       if (disabled || pending || !valid || !changed) return;
       setCommandError(""); setPending(true);
-      void Promise.resolve().then(() => onUpdate(entry.entryId, { ...draft, name: String(draft.name).trim() }, quantity)).then(
+      void Promise.resolve().then(() => onUpdate(entry.entryId, { ...draft, name: String(draft.name).trim() }, hasQuantity ? quantity : undefined)).then(
         () => setEditing(false), (error: unknown) => setCommandError(describeCommandError(error)),
       ).finally(() => setPending(false));
     }}>
-    <PersonalFields values={draft} onChange={setDraft} quantity={quantity} onQuantity={setQuantity} disabled={disabled || pending} />
+    <PersonalFields values={draft} onChange={setDraft} quantity={quantity} onQuantity={setQuantity} disabled={disabled || pending} showQuantity={hasQuantity} />
     <div className={styles.slotEditActions}>
       <Button type="submit" variant="secondary" disabled={disabled || !valid || !changed} pending={pending}>{t("character.slot.saveEntry")}</Button>
       <Button type="button" variant="secondary" disabled={pending} onClick={() => {
@@ -269,7 +274,7 @@ function TemplateEntryForm({ entry, template, disabled, onUpdate }: {
   entry: SlotListEntry;
   template: SlotTemplate;
   disabled: boolean;
-  onUpdate(entryId: string, values: Record<string, unknown>, quantity?: number): void | Promise<void>;
+  onUpdate(entryId: string, values: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): void | Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(false);
@@ -372,16 +377,23 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
   accepts: string[];
   templates: SlotTemplate[];
   disabled: boolean;
-  onAdd(slotId: string, templateId: string | null, values: Record<string, unknown>, quantity?: number): void | Promise<void>;
+  onAdd(slotId: string, templateId: string | null, values: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const offered = templates.filter((template) => accepts.includes(template.kind));
   const [selected, setSelected] = useState<string>(offered[0]?.id ?? "");
+  const [selectedTemplate, setSelectedTemplate] = useState<SlotTemplate | null>(null);
   const [customValues, setCustomValues] = useState<Record<string, unknown>>({ name: "" });
   const [quantity, setQuantity] = useState(1);
   const [pending, setPending] = useState(false);
   const [commandError, setCommandError] = useState("");
   const isCustom = selected === "";
+  const latest = offered.find(template => template.id === selected);
+  const selectionChanged = selectedTemplate?.source?.kind === "campaign" &&
+    JSON.stringify(latest?.source) !== JSON.stringify(selectedTemplate.source);
+  // Keep the selected option visible while a refresh replaces or removes it.
+  const options = offered.map(template => template.id === selected ? selectedTemplate ?? template : template);
+  if (selectedTemplate && !latest) options.push(selectedTemplate);
   return (
     <>
       <Button
@@ -392,6 +404,7 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
         onClick={() => {
           setCommandError("");
           setSelected(offered[0]?.id ?? "");
+          setSelectedTemplate(offered[0] ? structuredClone(offered[0]) : null);
           setCustomValues({ name: "" });
           setQuantity(1);
           setOpen(true);
@@ -409,14 +422,16 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
           <Button
             type="button"
             variant="primary"
-            disabled={disabled || pending || (isCustom && (String(customValues.name ?? "").trim() === "" || !Number.isSafeInteger(quantity) || quantity < 1))}
+            disabled={disabled || pending || (!isCustom && selectedTemplate === null) || (isCustom && (String(customValues.name ?? "").trim() === "" || !Number.isSafeInteger(quantity) || quantity < 1))}
             pending={pending}
             data-testid={`slot-add-confirm-${slotId}`}
             onClick={() => {
               setCommandError(""); setPending(true);
               void Promise.resolve().then(() => isCustom
                 ? onAdd(slotId, null, { ...customValues, name: String(customValues.name).trim() }, quantity)
-                : onAdd(slotId, selected, {})).then(
+                : selectedTemplate?.source?.kind === "campaign"
+                  ? onAdd(slotId, null, {}, undefined, selectedTemplate.source)
+                  : onAdd(slotId, selectedTemplate!.id, {})).then(
                 () => setOpen(false), (error: unknown) => setCommandError(describeCommandError(error)),
               ).finally(() => setPending(false));
             }}
@@ -430,12 +445,23 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
           data-testid={`slot-template-picker-${slotId}`}
           value={selected}
           disabled={disabled || pending}
-          onChange={(event) => setSelected(event.target.value)}
+          onChange={(event) => {
+            setSelected(event.target.value);
+            const choice = offered.find(template => template.id === event.target.value);
+            setSelectedTemplate(choice ? structuredClone(choice) : null);
+          }}
           options={[
-            ...offered.map((template) => ({ value: template.id, label: template.label })),
+            ...options.map((template) => ({ value: template.id, label: template.source?.kind === "campaign" ? `${template.label} · ${t("character.slot.campaign")}` : template.label })),
             { value: "", label: t("character.slot.customEntry") },
           ]}
         />
+        {selectionChanged ? <div>
+          <p role="status">{t("character.slot.selectionChanged")}</p>
+          {latest?.source?.kind === "campaign" ? <Button type="button" variant="secondary"
+            disabled={disabled || pending} onClick={() => setSelectedTemplate(structuredClone(latest))}>
+            {t("character.slot.useLatestRevision")}
+          </Button> : null}
+        </div> : null}
         {isCustom ? <div>
           <PersonalFields values={customValues} onChange={setCustomValues} quantity={quantity}
             onQuantity={setQuantity} disabled={disabled || pending} nameTestId={`slot-custom-name-${slotId}`} />
@@ -486,7 +512,7 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
                   {(entry.templateId === null || template?.kind === "item") && (entry.quantity ?? 1) > 1
                     ? <span className={styles.meta}>×{entry.quantity}</span> : null}
                   {entry.templateId === null ? <>
-                    <span className={styles.meta}>{t("character.slot.personal")}</span>
+                    <span className={styles.meta}>{t(entry.source?.kind === "campaign" ? "character.slot.campaign" : "character.slot.personal")}</span>
                     {(["description", "notes"] as const).map((key) => typeof entry.values[key] === "string" && entry.values[key] !== ""
                       ? <p className={styles.personalText} key={key}><strong>{t(key === "description" ? "character.slot.description" : "character.slot.notes")}: </strong>{String(entry.values[key])}</p> : null)}
                   </> : null}

@@ -249,6 +249,7 @@ export function UpgradeDialog(props: UpgradeDialogProps) {
       {selectedTarget !== null && preview.status === "error" ? (
         <EmptyState
           title={t("campaign.detail.upgrade.preview.error")}
+          description={describeError(preview.error, t("campaign.detail.upgrade.preview.error"))}
           action={
             <Button variant="primary" onClick={() => void preview.refetch()}>
               {t("campaign.detail.upgrade.preview.retry")}

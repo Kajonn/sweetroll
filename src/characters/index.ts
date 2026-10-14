@@ -1,3 +1,5 @@
+import type { EntrySource, EntrySnapshot } from "../systems/implementation/package/schema/dynamic.js";
+import type { createTemplateRepository } from "../campaigns/templatePersistence.js";
 import { randomUUID } from "node:crypto";
 
 import type { Pool } from "pg";
@@ -302,6 +304,7 @@ export type CharacterCommand =
  * values and never produce rolls (setField/bumpResource parity).
  */
 export type CharacterEntryInput = {
+  source?: EntrySource;
   entryId: string;
   slotId: DefinitionId;
   templateId: DefinitionId | null;
@@ -340,6 +343,8 @@ export type CharacterUpdateEntryValuesCommand = {
  * picker and granted-action buttons need; entry values stay server-side.
  */
 export type EntryTemplateSummary = {
+  source?: EntrySource;
+  defaultQuantity?: number;
   id: DefinitionId;
   label: string;
   kind: TemplateKind;
@@ -535,12 +540,15 @@ export type CreateCharactersModuleInput = {
   runtime: SystemRuntime;
   authorizeVersionUse: SystemAuthoring["authorizeVersionUse"];
   listAuthorizedVersions: SystemAuthoring["listAuthorizedVersions"];
+  campaignTemplates?: ReturnType<typeof createTemplateRepository>;
   now?: () => Date;
   newId?: () => string;
   newExecutionId?: () => string;
 };
 
 export function createCharactersModule(input: CreateCharactersModuleInput): Characters {
+  const inputCampaignTemplates = input.campaignTemplates;
+  const modulePool = input.pool;
   const repo: CharacterPersistenceRepository = createCharacterPersistenceRepository(input.pool);
   const now = input.now ?? (() => new Date());
   const newId = input.newId ?? (() => randomUUID());
@@ -926,6 +934,10 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       });
       return { ok: false, error };
     }
+    if (outcome.kind === "precondition_failed") {
+      await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(outcome.error), expiresAt: replayExpiresAt });
+      return {ok:false,error:outcome.error};
+    }
     if (outcome.kind === "archived") {
       const error = errors.archived();
       await repo.finalizeExecutionError({
@@ -1044,6 +1056,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     const storedEntries: Record<string, CharacterEntryV1> = resolveSource.state.entries ?? {};
 
     let nextEntries: Record<string, CharacterEntryV1>;
+    let selectedSource: Extract<EntrySource, {kind:"campaign"}> | undefined;
     let activityKind: "entry_added" | "entry_removed" | "entry_updated";
     let activityFields: Record<string, unknown>;
     let changedDefinitionIds: DefinitionId[];
@@ -1074,12 +1087,37 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       if (storedEntries[entryInput.entryId] !== undefined) {
         return fail(errors.bad_request("Character entry already exists."));
       }
+      if (Object.keys(entryInput).some(key => !["entryId","slotId","templateId","source","values","quantity"].includes(key))) return fail(errors.bad_request("Unknown entry input field."));
+      if (entryInput.source !== undefined) {
+        const source = entryInput.source;
+        if (!isRecord(source) || !["personal", "system", "campaign"].includes(source.kind as string)) return fail(errors.bad_request("Invalid entry source."));
+        const keys = source.kind === "campaign" ? ["kind", "campaignId", "templateId", "templateRevision", "contentRevision"] : source.kind === "system" ? ["kind", "templateId"] : ["kind"];
+        if (Object.keys(source).some(key => !keys.includes(key))) return fail(errors.bad_request("Unknown entry source field."));
+        if (source.kind === "campaign" && (typeof source.campaignId !== "string" || !ENTRY_ID_PATTERN.test(source.campaignId) || typeof source.templateId !== "string" || !ENTRY_ID_PATTERN.test(source.templateId))) return fail(errors.bad_request("Invalid campaign template reference."));
+      }
+      let snapshot: EntrySnapshot | undefined;
+      let values = entryInput.values;
+      let quantity = entryInput.quantity;
+      if (entryInput.source?.kind === "campaign") {
+        selectedSource = entryInput.source;
+        if (entryInput.templateId !== null || Object.keys(values).length > 0 || quantity !== undefined) return fail(errors.bad_request("Campaign placement accepts a reference only; edit the copy after placement."));
+        if (attachedCampaignId === null || selectedSource.campaignId !== attachedCampaignId || input.campaignTemplates === undefined) return fail(errors.not_found());
+        if (!Number.isSafeInteger(selectedSource.templateRevision) || selectedSource.templateRevision < 1 || !Number.isSafeInteger(selectedSource.contentRevision) || selectedSource.contentRevision < 1 || !ENTRY_ID_PATTERN.test(selectedSource.templateId)) return fail(errors.bad_request("Invalid campaign template reference."));
+        const template = await input.campaignTemplates.read(input.pool, selectedSource);
+        if (template === null) return fail(errors.not_found());
+        if (template.status !== "active" || template.revision !== selectedSource.templateRevision || template.contentRevision !== selectedSource.contentRevision) return fail({code:"conflict",message:"The campaign template has changed. Refresh and explicitly review the selected revision.",cacheDisposition:"replace"});
+        values = {name:template.content.name,description:template.content.description ?? "",notes:template.content.notes ?? ""};
+        quantity = template.kind === "item" ? (template.content.defaultQuantity ?? 1) : undefined;
+        snapshot = {kind:template.kind,values:structuredClone(values) as Record<string,string>,...(quantity === undefined ? {} : {quantity})};
+      }
       const candidate: CharacterEntryV1 = {
         entryId: entryInput.entryId,
         slotId: entryInput.slotId,
         templateId: entryInput.templateId,
-        values: { ...(entryInput.values as Record<string, unknown>) },
-        ...(entryInput.quantity === undefined ? {} : { quantity: entryInput.quantity as number }),
+        values: structuredClone(values),
+        ...(entryInput.source === undefined ? {} : {source:structuredClone(entryInput.source)}),
+        ...(snapshot === undefined ? {} : {snapshot}),
+        ...(quantity === undefined ? {} : {quantity}),
       };
       const siblingCount = Object.values(storedEntries).filter((entry) => entry.slotId === candidate.slotId).length;
       const validation = validateEntryForSlot(candidate, slots, templates, siblingCount);
@@ -1170,6 +1208,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       expectedRevision: command.expectedRevision,
       nextState: resolved.value.state,
       stateChanged,
+      ...(selectedSource === undefined ? {} : { precondition: async (client: import("pg").PoolClient): Promise<CharacterError | null> => {
+        const current = await input.campaignTemplates!.read(client, selectedSource!);
+        if (current === null) return errors.not_found();
+        return current.status === "active" && current.revision === selectedSource!.templateRevision && current.contentRevision === selectedSource!.contentRevision ? null : {code:"conflict",message:"The campaign template has changed. Refresh and explicitly review the selected revision.",cacheDisposition:"replace"};
+      } }),
       roll: null,
       activity: {
         kind: activityKind,
@@ -1934,9 +1977,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           }
           return { ok: false, error: errors.internal() };
         }
-        return {
-          ok: true,
-          value: (packageValue.templates ?? []).map((template) => ({
+        const systemChoices: EntryTemplateSummary[] = (packageValue.templates ?? []).map((template) => ({
             id: template.id,
             label: template.label,
             kind: template.kind,
@@ -1947,8 +1988,20 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
               actionKind: action.kind,
               inputs: action.kind === "roll" ? action.inputs.map((actionInput) => ({ ...actionInput })) : [],
             })),
-          })),
-        };
+          }));
+        const campaignChoices: EntryTemplateSummary[] = [];
+        if (record.campaignId !== null && inputCampaignTemplates !== undefined) {
+          let cursor: string | null = null;
+          do {
+            const page = await inputCampaignTemplates.page(modulePool, {campaignId:record.campaignId,limit:100,cursor});
+            for (const template of page.templates) campaignChoices.push({id:template.templateId,label:template.content.name,kind:template.kind,fields:[],grantedActions:[],source:{kind:"campaign",campaignId:template.campaignId,templateId:template.templateId,templateRevision:template.revision,contentRevision:template.contentRevision},...(template.kind === "item" ? {defaultQuantity:template.content.defaultQuantity ?? 1}: {})});
+            cursor=page.nextCursor;
+          } while (cursor !== null);
+          // Reauthorization after catalog I/O prevents revoked/returned requests disclosing fetched choices.
+          const live = await loadAttachedSnapshot(ctx, input.characterId);
+          if (live === null || live.auth.record.campaignId !== record.campaignId) return {ok:false,error:errors.not_found()};
+        }
+        return {ok:true,value:[...systemChoices,...campaignChoices]};
       } catch {
         return { ok: false, error: errors.internal() };
       }

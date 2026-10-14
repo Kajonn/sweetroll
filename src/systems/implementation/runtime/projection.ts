@@ -144,6 +144,7 @@ function projectSlot(
     return {
       entryId: entry.entryId,
       templateId: entry.templateId,
+      ...(entry.source === undefined ? {} : {source:structuredClone(entry.source)}),
       label: template?.label ?? customEntryLabel(entry.values),
       values: structuredClone(entry.values),
       ...(entry.quantity === undefined ? {} : { quantity: entry.quantity }),

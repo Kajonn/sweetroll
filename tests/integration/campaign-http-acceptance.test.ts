@@ -473,6 +473,7 @@ describeWithDatabase("campaign HTTP acceptance demonstration (Task 10)", () => {
       "exportVersion",
       "members",
       "rolls",
+      "templates",
     ]);
 
     // Same-key replay through HTTP is byte-identical.

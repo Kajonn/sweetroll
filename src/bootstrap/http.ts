@@ -1,3 +1,4 @@
+import { createTemplateRepository } from "../campaigns/templatePersistence.js";
 import { loadConfig, createLogger, createPool } from "../platform/index.js";
 import { loadCampaignLimits } from "../platform/config.js";
 import { createIdentityModule } from "../identity/index.js";
@@ -96,6 +97,7 @@ const runtime = createSystemRuntime({
 });
 
 const characters = createCharactersModule({
+    campaignTemplates:createTemplateRepository(pool),
   pool,
   runtime,
   authorizeVersionUse: authoring.authorizeVersionUse,

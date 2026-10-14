@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { createTemplateRepository } from "../../src/campaigns/templatePersistence.js";
 import { Client, Pool } from "pg";
 import pino from "pino";
 import type { FastifyInstance, FastifyPluginCallback } from "fastify";
@@ -491,6 +493,7 @@ export async function createI3Schema(databaseUrl: string, schema: string): Promi
   await admin.query(`CREATE SCHEMA ${schema}`);
   await admin.query(`SET search_path TO ${schema}`);
   await admin.query(I3_SCHEMA_DDL);
+  await admin.query(await readFile(new URL("../../migrations/0022_campaign_item_templates.sql", import.meta.url), "utf8"));
   await admin.end();
 }
 
@@ -571,6 +574,7 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
   const effectiveRuntime = input.wrapRuntime === undefined ? runtime : input.wrapRuntime(runtime);
 
   const characters = createCharactersModule({
+    campaignTemplates:createTemplateRepository(input.pool),
     pool: input.pool,
     runtime: effectiveRuntime,
     authorizeVersionUse: authoring.authorizeVersionUse,

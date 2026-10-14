@@ -1,3 +1,5 @@
+import { strictInputCompiler } from "./strictValidation.js";
+import {campaignTemplateRoutes,campaignTemplateHandlers,CampaignTemplateDto} from "./campaignTemplates.js";
 import { Type, type TSchema } from "@sinclair/typebox";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 
@@ -235,6 +237,7 @@ const ContentViewDto = Type.Object({
 const ActivityEventDto = Type.Object({
   eventId: Type.String({ format: UUID_FORMAT }),
   kind: Type.Union([
+    Type.Literal("template_create"),Type.Literal("template_update"),Type.Literal("template_archive"),Type.Literal("template_recover"),
     Type.Literal("content_created"),
     Type.Literal("content_updated"),
     Type.Literal("content_deleted"),
@@ -250,6 +253,7 @@ const ActivityEventDto = Type.Object({
 });
 
 const CampaignExportDto = Type.Object({
+  templates:Type.Optional(Type.Array(CampaignTemplateDto)),
   exportVersion: Type.Literal(1),
   campaign: Type.Object({
     campaignId: Type.String({ format: UUID_FORMAT }),
@@ -770,6 +774,7 @@ export type CampaignsRouteDefinition = {
 };
 
 export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
+  ...campaignTemplateRoutes,
   {
     method: "post",
     path: "/campaigns",
@@ -1710,6 +1715,7 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
 
     type Handler = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown> | unknown;
     const handlers: Record<string, Handler> = {
+      ...campaignTemplateHandlers(campaigns),
       post_campaigns: async (request, reply) => {
         const body = request.body as {
           systemVersionId: string;
@@ -2650,6 +2656,6 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
     for (const route of campaignsRouteDefinitions) {
       const response = toFastifyResponses(route.schema.response);
       const schema = response === undefined ? route.schema : { ...route.schema, response };
-      app[route.method](route.path, { schema }, handlers[route.operationId]!);
+      app[route.method](route.path, { schema, ...(route.path.includes("/item-templates") ? { validatorCompiler: strictInputCompiler } : {}) }, handlers[route.operationId]!);
     }
   };

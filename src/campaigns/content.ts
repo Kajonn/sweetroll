@@ -1,3 +1,4 @@
+import {createTemplateRepository} from "./templatePersistence.js";
 import { randomUUID } from "node:crypto";
 
 import type { Pool, PoolClient } from "pg";
@@ -157,6 +158,7 @@ export type ListActivityResult = {
 };
 
 export type CampaignExportSnapshot = {
+  templates?:import("./templates.js").CampaignTemplateView[];
   exportVersion: 1;
   campaign: {
     campaignId: string;
@@ -1740,12 +1742,16 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
             client,
             content.map((record) => record.contentId),
           );
-          return { authorized: true as const, campaign, members, content, activity, rolls, grants };
+          const templates:import("./templates.js").CampaignTemplateView[]=[];
+          const catalog=createTemplateRepository(input.pool);
+          let cursor:string|null=null;
+          do { const page=await catalog.page(client,{campaignId:campaign.campaignId,limit:100,cursor});templates.push(...page.templates);cursor=page.nextCursor; } while(cursor!==null && templates.length<=limits.exportMaxRecords);
+          return { authorized: true as const, campaign, members, content, activity, rolls, grants, templates };
         });
         if (!snapshot.authorized) return { ok: false, error: errors.campaign_not_found() };
 
         const recordCount =
-          1 + snapshot.members.length + snapshot.content.length + snapshot.activity.length + snapshot.rolls.length;
+          1 + snapshot.templates.length + snapshot.members.length + snapshot.content.length + snapshot.activity.length + snapshot.rolls.length;
         if (
           snapshot.content.length > limits.exportMaxRecords ||
           snapshot.activity.length > limits.exportMaxRecords ||
@@ -1769,7 +1775,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
         // Canonicalized so the bytes survive the jsonb receipt round-trip
         // unchanged: same key plus same input always replays byte-identical.
         const value = canonicalizeJson({
-          exportVersion: 1,          campaign: {
+          exportVersion: 1, templates:snapshot.templates, campaign: {
             campaignId: snapshot.campaign.campaignId,
             ownerId: snapshot.campaign.ownerId,
             systemVersionId: snapshot.campaign.systemVersionId,

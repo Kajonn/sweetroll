@@ -113,10 +113,31 @@ Local Node 24.19.0 verification: full frontend **1,140 tests passed in 110 files
 
 The new shared review journey runs in both canonical browser and production-offline suites. It uses supported GM/co-GM/player identities and real API membership changes: archive while a player's Add dialog is open, submit the original reference and observe conflict, explicitly review a later revision and place it, remove the player while a catalog request is held, verify two open tabs hide the denied character, and verify raw catalog rows clear. A separately owned/adopted character returns to the player; failed catalog transport cannot retain its old catalog, while its placed snapshot survives. The offline variant also reloads the returned sheet disconnected and confirms no former campaign choice remains.
 
-### Fix-commit deployed gate remains open
+### Deployment approval history
 
 Read-only Railway inspection confirmed the separate project **sweetroll-items-preview** (`f5662fc0-966a-4cc2-ba83-91bf8b0a2280`), service **sweetroll-items** (`f75d2a0b-66a6-49b7-95cc-a24ff99ac6f8`), with its own **preview-postgres**. Its environment is named `production` (`8016a027-c65d-4991-a7e8-7f38ff54dbf7`); this is distinct from the user's `proactive-expression` project.
 
-Automatic approval review rejected an unscoped source connect because it could trigger a production deployment. After verifying isolation, an environment-scoped staged source update was accepted. Patch `8d705b56-0d66-4f8f-b087-11a065a97a58` contains exactly one nondestructive change: pin this preview service from `7f04c87` to `0e61d15`. Applying that patch was not approved; no deployment was triggered. The latest deployment remains `b5c25175-3ade-4537-9240-517575cf01dd` on `7f04c87`.
+Automatic approval review rejected an unscoped source connect because it could trigger a production deployment. After verifying isolation, an environment-scoped staged source update was accepted. Patch `8d705b56-0d66-4f8f-b087-11a065a97a58` contains exactly one nondestructive change: pin this preview service from `7f04c87` to `0e61d15`. The tool did not approve applying that patch, including after explicit approval in chat. At that point no deployment had been triggered and the latest deployment was still `b5c25175-3ade-4537-9240-517575cf01dd` on `7f04c87`. The user subsequently applied the single staged change directly in Railway; the resulting deployment and live evidence are recorded below.
 
-To close Task 7's deployed gate, approve that preview-only patch, observe successful deployment/migrations/readiness and matching frontend assets, then run the review journey against the new build. The production project was not changed. No new live result, physical-device validation or real-provider production-authentication result is claimed.
+The approval block is resolved by that user action. Task 7's deployed gate is closed by the observed results below. This workflow made no changes to the `proactive-expression` production project. Physical-device and real-provider production-authentication gates remain open.
+
+
+### Fix-commit deployed verification passed — 2026-10-14
+
+After the user applied the scoped preview patch, deployment `6c54fd6e-27a5-4158-a79a-2a6bdaae6119` reached **SUCCESS** at **17:37:56 UTC**. Runtime logs confirm completed migrations and supported test-auth mode; `/health/ready` returned HTTP 200 with `{"status":"ok"}`. No staged changes remained in the preview environment.
+
+The service source configuration still identifies pinned commit `0e61d15`; Railway deployment metadata identifies `ae71eb4b481a53fbc1babe31c56f47484ca563df`. The Git diff between those commits contains only this acceptance document and the implementation plan. All required checks also passed on `ae71eb4`. The deployed manifest is `build-mv8e52zs`; its assets match the tested local production build byte-for-byte:
+
+| Asset | SHA-256 |
+|---|---|
+| `/assets/index-CJPnMXjZ.js` | `3d55f21be6c79c9af0e20d16795419b7adbd908232e00ed04083fad19d9d4f69` |
+| `/assets/index--rnEHoQw.css` | `2649fa90f3974012ee0da3e55916a6a6d44a1fdd96f4fc507f4c41e2bb843504` |
+
+**Live Chromium result: 2 passed, zero retries, 5.9 minutes**, against [the isolated preview](https://sweetroll-items-production.up.railway.app). Passing run started 17:45:43 UTC and completed approximately 17:51:39 UTC. Both journeys used independent GM/co-GM/player browser contexts with the canonical supported identities.
+
+1. **Full publication/offline journey, 185.2 seconds:** GM published, co-GM resolved concurrent edit conflict with input retained, player placed/edited/reloaded a copy, and later publication preserved the old copy while a new copy used the newer content revision. Offline add/reload/reconnect committed exactly once. Archive/recover preserved copies, and archive before reconnect produced explicit conflict without a third committed entry. Responsive overflow and the catalog's serious/critical axe check also passed.
+2. **Review repairs journey, 169.1 seconds:** archiving during an open Add dialog retained the original campaign reference; submission produced the expected conflict. After recovery/revision, only explicit **Use latest revision** adopted and placed the newer content. Real membership removal while template discovery was held caused both open tabs to hide the denied GM-owned character and cleared its raw IndexedDB catalog row. A separately owned/adopted sheet returned to its owner; failed catalog transport cleared the former catalog while preserving the entire placed entry snapshot. Disconnected reload retained that copy and exposed no former campaign choice; raw IndexedDB remained clear.
+
+The temporary live harness reused the committed journey functions, with remote-transport assertion/overall limits and explicit proxy configuration. An initial run was blocked at **Available offline**: Chromium's trace reported an SSL certificate error fetching the service-worker script through the workspace proxy. Trusting that proxy certificate's specific public key allowed service-worker registration, then both complete journeys passed with no retries in the corrected run. Fresh contexts and the Available offline checks proved the controlling worker and disconnected reload behavior. This was a harness certificate repair, not an application or committed test-configuration change. Temporary harness files were removed after verification.
+
+The three review repairs and Task 7's CI/live gates are complete. Historical evidence above remains intact; physical Android/iPad, real-provider authentication, broader manual accessibility and I7/G9 release acceptance remain unclaimed. The PR remains open; no merge or production-source change was performed.

@@ -128,13 +128,13 @@ test("G5 exit: blank → simple system without expression → order sheet → pr
   await page
     .getByTestId("section-row-section_1")
     .locator('[data-testid^="element-binding-"]')
-    .getByTestId("definition-id-input")
-    .fill("field");
+    .getByTestId("definition-reference-select")
+    .selectOption("field");
   await page
     .getByTestId("section-row-section_2")
     .locator('[data-testid^="element-binding-"]')
-    .getByTestId("definition-id-input")
-    .fill("field_1");
+    .getByTestId("definition-reference-select")
+    .selectOption("field_1");
   await page.getByTestId("section-row-section_2-handle").click();
   await page.keyboard.press("Alt+ArrowUp");
   await expect(page.getByTestId("section-row-section_2-position")).toHaveText("1");

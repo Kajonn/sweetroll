@@ -1,7 +1,7 @@
 import { t } from "../../i18n/index.js";
 import type { DefinitionId } from "../../state/documentFieldTypes.js";
 import { FormField, Select } from "../../ui/index.js";
-import { DefinitionIdInput } from "../fields/DefinitionIdInput.js";
+import { DefinitionReferenceSelect, type ReferenceOption } from "./DefinitionReferenceSelect.js";
 import styles from "./SheetEditor.module.css";
 import type {
   ActionSheetElementV1,
@@ -16,9 +16,10 @@ import type {
 export type ElementEditorProps = {
   element: SheetElementV1;
   onChange: (next: SheetElementV1) => void;
+  definitions?: ReadonlyArray<{kind: "field" | "resource" | "action" | "slot"; id: string; label: string}>;
 };
 
-export function ElementEditor({ element, onChange }: ElementEditorProps) {
+export function ElementEditor({ element, onChange, definitions = [] }: ElementEditorProps) {
   const update = (patch: Partial<SheetElementV1>) => {
     onChange({ ...element, ...patch } as SheetElementV1);
   };
@@ -44,7 +45,7 @@ export function ElementEditor({ element, onChange }: ElementEditorProps) {
           ]}
         />
       </div>
-      <ElementBodyRouter element={element} onChange={update} />
+      <ElementBodyRouter element={element} onChange={update} definitions={definitions} />
     </div>
   );
 }
@@ -52,21 +53,23 @@ export function ElementEditor({ element, onChange }: ElementEditorProps) {
 function ElementBodyRouter({
   element,
   onChange,
+  definitions,
 }: {
   element: SheetElementV1;
   onChange: (patch: Partial<SheetElementV1>) => void;
+  definitions: ReadonlyArray<ReferenceOption>;
 }) {
   switch (element.kind) {
     case "heading":
       return <HeadingEditor element={element} onChange={onChange} />;
     case "field":
-      return <FieldEditor element={element} onChange={onChange} />;
+      return <FieldEditor element={element} onChange={onChange} options={definitions.filter((entry) => entry.kind === "field")} />;
     case "resource":
-      return <ResourceEditor element={element} onChange={onChange} />;
+      return <ResourceEditor element={element} onChange={onChange} options={definitions.filter((entry) => entry.kind === "resource")} />;
     case "action":
-      return <ActionEditor element={element} onChange={onChange} />;
+      return <ActionEditor element={element} onChange={onChange} options={definitions.filter((entry) => entry.kind === "action")} />;
     case "slot":
-      return <SlotEditor element={element} onChange={onChange} />;
+      return <SlotEditor element={element} onChange={onChange} options={definitions.filter((entry) => entry.kind === "slot")} />;
     default: {
       const exhaustive: never = element;
       void exhaustive;
@@ -125,18 +128,17 @@ function HeadingEditor({
 function FieldEditor({
   element,
   onChange,
+  options,
 }: {
   element: FieldSheetElementV1;
+  options: ReadonlyArray<ReferenceOption>;
   onChange: (patch: Partial<FieldSheetElementV1>) => void;
 }) {
   return (
     <div className={styles.elementRow2}>
       <div className={styles.elementField} data-testid={`element-binding-${element.id}`}>
         {t("editor.element.field.target")}
-        <DefinitionIdInput
-          value={element.fieldId}
-          onChange={(fieldId) => onChange({ fieldId })}
-        />
+        <DefinitionReferenceSelect value={element.fieldId} options={options} onChange={(fieldId) => onChange({ fieldId })} label={t("editor.element.field.target")} />
       </div>
     </div>
   );
@@ -145,18 +147,17 @@ function FieldEditor({
 function ResourceEditor({
   element,
   onChange,
+  options,
 }: {
   element: ResourceSheetElementV1;
+  options: ReadonlyArray<ReferenceOption>;
   onChange: (patch: Partial<ResourceSheetElementV1>) => void;
 }) {
   return (
     <div className={styles.elementRow2}>
       <div className={styles.elementField} data-testid={`element-binding-${element.id}`}>
         {t("editor.element.resource.target")}
-        <DefinitionIdInput
-          value={element.resourceId}
-          onChange={(resourceId) => onChange({ resourceId })}
-        />
+        <DefinitionReferenceSelect value={element.resourceId} options={options} onChange={(resourceId) => onChange({ resourceId })} label={t("editor.element.resource.target")} />
       </div>
     </div>
   );
@@ -165,18 +166,17 @@ function ResourceEditor({
 function ActionEditor({
   element,
   onChange,
+  options,
 }: {
   element: ActionSheetElementV1;
+  options: ReadonlyArray<ReferenceOption>;
   onChange: (patch: Partial<ActionSheetElementV1>) => void;
 }) {
   return (
     <div className={styles.elementRow2}>
       <div className={styles.elementField} data-testid={`element-binding-${element.id}`}>
         {t("editor.element.action.target")}
-        <DefinitionIdInput
-          value={element.actionId}
-          onChange={(actionId) => onChange({ actionId })}
-        />
+        <DefinitionReferenceSelect value={element.actionId} options={options} onChange={(actionId) => onChange({ actionId })} label={t("editor.element.action.target")} />
       </div>
     </div>
   );
@@ -185,18 +185,17 @@ function ActionEditor({
 function SlotEditor({
   element,
   onChange,
+  options,
 }: {
   element: SlotSheetElementV1;
+  options: ReadonlyArray<ReferenceOption>;
   onChange: (patch: Partial<SlotSheetElementV1>) => void;
 }) {
   return (
     <div className={styles.elementRow2}>
       <div className={styles.elementField} data-testid={`element-binding-${element.id}`}>
         {t("editor.element.kind.slot")}
-        <DefinitionIdInput
-          value={element.slotId}
-          onChange={(slotId) => onChange({ slotId })}
-        />
+        <DefinitionReferenceSelect value={element.slotId} options={options} onChange={(slotId) => onChange({ slotId })} label={t("editor.element.kind.slot")} />
       </div>
     </div>
   );

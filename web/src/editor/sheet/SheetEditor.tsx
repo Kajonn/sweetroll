@@ -5,7 +5,6 @@ import { t } from "../../i18n/index.js";
 import { useShortcut } from "../../shell/useShortcut.js";
 import type { DefinitionId } from "../../state/documentFieldTypes.js";
 import { Button, EmptyState, FormField } from "../../ui/index.js";
-import { DefinitionIdInput } from "../fields/DefinitionIdInput.js";
 import { SectionEditor } from "./SectionEditor.js";
 import styles from "./SheetEditor.module.css";
 import type { SheetEditorV1, SheetElementV1, SheetSectionV1 } from "./sheetTypes.js";
@@ -26,6 +25,8 @@ export type SheetEditorProps = {
   allocateSectionId?: (() => DefinitionId) | undefined;
   allocateElementId?: (() => DefinitionId) | undefined;
   unplacedDefinitions?: ReadonlyArray<UnplacedDefinition> | undefined;
+  allDefinitions?: ReadonlyArray<UnplacedDefinition> | undefined;
+  entities?: ReadonlyArray<{id: string; label: string}> | undefined;
 };
 
 type Focus =
@@ -38,6 +39,8 @@ export function SheetEditor({
   allocateSectionId,
   allocateElementId,
   unplacedDefinitions = [],
+  allDefinitions = [],
+  entities = [],
 }: SheetEditorProps) {
   const [focus, setFocus] = useState<Focus>(null);
   const [placementSectionId, setPlacementSectionId] = useState<DefinitionId | null>(null);
@@ -174,16 +177,13 @@ export function SheetEditor({
           </div>
           <div className={styles.elementField}>
             {t("editor.sheet.targetEntity")}
-            <DefinitionIdInput
-              value={sheet.targetEntityId}
-              onChange={(targetEntityId) => replaceSheet({ targetEntityId })}
-            />
+            <select aria-label={t("editor.sheet.targetEntity")} data-testid="sheet-target-entity" value={sheet.targetEntityId} onChange={(event) => replaceSheet({ targetEntityId: event.target.value })}>
+              {!entities.some((entity) => entity.id === sheet.targetEntityId) && <option value={sheet.targetEntityId}>Unknown entity ({sheet.targetEntityId})</option>}
+              {entities.map((entity) => <option key={entity.id} value={entity.id}>{entity.label} ({entity.id})</option>)}
+            </select>
           </div>
           <div className={styles.elementField}>
-            <DefinitionIdInput
-              value={sheet.id}
-              onChange={(id) => replaceSheet({ id })}
-            />
+            <span className={styles.monoLabel}>ID: {sheet.id}</span>
           </div>
           <div className={styles.headerMeta}>
             <RemoveSheetButton sheet={sheet} onRemove={() => undefined} />
@@ -266,6 +266,7 @@ export function SheetEditor({
               onMoveUp={() => moveSection(idx, -1)}
               onMoveDown={() => moveSection(idx, 1)}
               allocateElementId={allocateElementId}
+              definitions={allDefinitions}
             />
           ))}
         </ul>

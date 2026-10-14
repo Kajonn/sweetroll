@@ -259,7 +259,7 @@ describe("SheetEditor", () => {
   it("renders a DefinitionIdInput for the bound field target", () => {
     renderSheet();
     const binding = screen.getByTestId("element-binding-str");
-    expect(within(binding).getByTestId("definition-id-input")).toHaveValue(
+    expect(within(binding).getByTestId("definition-reference-select")).toHaveValue(
       "strength",
     );
   });
@@ -310,7 +310,7 @@ describe("SheetEditor", () => {
     };
     renderSheet({ sheet });
     const binding = screen.getByTestId("element-binding-inv");
-    expect(within(binding).getByTestId("definition-id-input")).toHaveValue("inventory");
+    expect(within(binding).getByTestId("definition-reference-select")).toHaveValue("inventory");
   });
 
   it("places an unplaced slot definition binding its slotId", async () => {

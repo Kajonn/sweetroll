@@ -4,7 +4,7 @@ import { t } from "../../i18n/index.js";
 import { useShortcut } from "../../shell/useShortcut.js";
 import type { DefinitionId } from "../../state/documentFieldTypes.js";
 import { Button, EmptyState, FormField } from "../../ui/index.js";
-import { DefinitionIdInput } from "../fields/DefinitionIdInput.js";
+
 import { ElementEditor, makeElementOfKind } from "./ElementEditor.js";
 import styles from "./SheetEditor.module.css";
 import type {
@@ -32,6 +32,7 @@ export type SectionEditorProps = {
    * to section-local allocation when absent (standalone/test use).
    */
   allocateElementId?: (() => DefinitionId) | undefined;
+  definitions?: ReadonlyArray<{kind: "field" | "resource" | "action" | "slot"; id: string; label: string}>;
 };
 
 export function SectionEditor({
@@ -47,6 +48,7 @@ export function SectionEditor({
   onMoveUp,
   onMoveDown,
   allocateElementId,
+  definitions = [],
 }: SectionEditorProps) {
   const replaceSection = (patch: Partial<SheetSectionV1>) => {
     onChange({ ...section, ...patch });
@@ -164,10 +166,7 @@ export function SectionEditor({
           </FormField>
         </div>
         <div className={styles.elementField}>
-          <DefinitionIdInput
-            value={section.id}
-            onChange={(id) => replaceSection({ id })}
-          />
+          <span className={styles.monoLabel}>ID: {section.id}</span>
         </div>
       </div>
       <div className={styles.elementsHeader}>
@@ -251,6 +250,7 @@ export function SectionEditor({
                 </div>
                 <ElementEditor
                   element={element}
+                  definitions={definitions}
                   onChange={(next) => replaceElement(idx, next)}
                 />
               </li>

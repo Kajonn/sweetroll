@@ -811,6 +811,8 @@ function SheetsTab({
                 allocateSectionId={() => allocateSheetChildId("section")}
                 allocateElementId={() => allocateSheetChildId("element")}
                 unplacedDefinitions={unplacedDefinitionsForSheet(document, sheet)}
+                allDefinitions={availableDefinitionsForSheet(document, sheet)}
+                entities={document.entities.map((entity) => ({ id: entity.id, label: entity.label }))}
               />
               <Button
                 variant="secondary"
@@ -830,6 +832,17 @@ function SheetsTab({
 }
 
 type SheetEditorView = SheetEditorV1;
+
+export function availableDefinitionsForSheet(document: SystemDocumentV1, sheet: SheetEditorV1): UnplacedDefinition[] {
+  const definitions: UnplacedDefinition[] = [];
+  const entity = document.entities.find((candidate) => candidate.id === sheet.targetEntityId);
+  for (const field of (entity?.fields ?? []) as unknown as Array<EntityFieldV1 & {kind: string; label: string}>) {
+    definitions.push({kind: field.kind === "resource" ? "resource" : "field", id: field.id, label: field.label});
+  }
+  for (const action of document.actions) definitions.push({kind: "action", id: action.id, label: action.label});
+  for (const slot of readSlots(document)) definitions.push({kind: "slot", id: slot.id, label: slot.label});
+  return definitions;
+}
 
 export function unplacedDefinitionsForSheet(
   document: SystemDocumentV1,

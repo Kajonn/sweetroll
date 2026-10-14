@@ -102,7 +102,7 @@ describe("basics-first creator workflow (G5 task 2)", () => {
     expect(screen.getByTestId("roll-action-input-input_1")).toBeInTheDocument();
 
     // Sections: add + reorder a sheet section with Move buttons and keyboard hints.
-    await user.click(screen.getByRole("link", { name: "Sections" }));
+    await user.click(screen.getByRole("link", { name: "Sheets" }));
     await user.click(screen.getByTestId("sheet-add-button"));
     await user.click(screen.getByTestId("sheet-add-section"));
     await user.click(screen.getByTestId("sheet-add-section"));

@@ -215,13 +215,13 @@ test("G7 exit: publish newer version via creator UI, upgrade campaign A with sta
     await page
       .getByTestId("section-row-section_1")
       .locator('[data-testid^="element-binding-"]')
-      .getByTestId("definition-id-input")
-      .fill("field");
+      .getByTestId("definition-reference-select")
+      .selectOption("field");
     await page
       .getByTestId("section-row-section_2")
       .locator('[data-testid^="element-binding-"]')
-      .getByTestId("definition-id-input")
-      .fill("field_1");
+      .getByTestId("definition-reference-select")
+      .selectOption("field_1");
     await waitForDraftPut(page, "section_2");
 
     await expect(page.getByTestId("document-editor-autosave")).toContainText("Saved", {

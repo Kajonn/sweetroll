@@ -382,11 +382,18 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
   const [open, setOpen] = useState(false);
   const offered = templates.filter((template) => accepts.includes(template.kind));
   const [selected, setSelected] = useState<string>(offered[0]?.id ?? "");
+  const [selectedTemplate, setSelectedTemplate] = useState<SlotTemplate | null>(null);
   const [customValues, setCustomValues] = useState<Record<string, unknown>>({ name: "" });
   const [quantity, setQuantity] = useState(1);
   const [pending, setPending] = useState(false);
   const [commandError, setCommandError] = useState("");
   const isCustom = selected === "";
+  const latest = offered.find(template => template.id === selected);
+  const selectionChanged = selectedTemplate?.source?.kind === "campaign" &&
+    JSON.stringify(latest?.source) !== JSON.stringify(selectedTemplate.source);
+  // Keep the selected option visible while a refresh replaces or removes it.
+  const options = offered.map(template => template.id === selected ? selectedTemplate ?? template : template);
+  if (selectedTemplate && !latest) options.push(selectedTemplate);
   return (
     <>
       <Button
@@ -397,6 +404,7 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
         onClick={() => {
           setCommandError("");
           setSelected(offered[0]?.id ?? "");
+          setSelectedTemplate(offered[0] ? structuredClone(offered[0]) : null);
           setCustomValues({ name: "" });
           setQuantity(1);
           setOpen(true);
@@ -414,14 +422,16 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
           <Button
             type="button"
             variant="primary"
-            disabled={disabled || pending || (isCustom && (String(customValues.name ?? "").trim() === "" || !Number.isSafeInteger(quantity) || quantity < 1))}
+            disabled={disabled || pending || (!isCustom && selectedTemplate === null) || (isCustom && (String(customValues.name ?? "").trim() === "" || !Number.isSafeInteger(quantity) || quantity < 1))}
             pending={pending}
             data-testid={`slot-add-confirm-${slotId}`}
             onClick={() => {
               setCommandError(""); setPending(true);
               void Promise.resolve().then(() => isCustom
                 ? onAdd(slotId, null, { ...customValues, name: String(customValues.name).trim() }, quantity)
-                : offered.find(t=>t.id === selected)?.source?.kind === "campaign" ? onAdd(slotId, null, {}, undefined, offered.find(t=>t.id === selected)?.source) : onAdd(slotId, selected, {})).then(
+                : selectedTemplate?.source?.kind === "campaign"
+                  ? onAdd(slotId, null, {}, undefined, selectedTemplate.source)
+                  : onAdd(slotId, selectedTemplate!.id, {})).then(
                 () => setOpen(false), (error: unknown) => setCommandError(describeCommandError(error)),
               ).finally(() => setPending(false));
             }}
@@ -435,12 +445,23 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
           data-testid={`slot-template-picker-${slotId}`}
           value={selected}
           disabled={disabled || pending}
-          onChange={(event) => setSelected(event.target.value)}
+          onChange={(event) => {
+            setSelected(event.target.value);
+            const choice = offered.find(template => template.id === event.target.value);
+            setSelectedTemplate(choice ? structuredClone(choice) : null);
+          }}
           options={[
-            ...offered.map((template) => ({ value: template.id, label: template.source?.kind === "campaign" ? `${template.label} · ${t("character.slot.campaign")}` : template.label })),
+            ...options.map((template) => ({ value: template.id, label: template.source?.kind === "campaign" ? `${template.label} · ${t("character.slot.campaign")}` : template.label })),
             { value: "", label: t("character.slot.customEntry") },
           ]}
         />
+        {selectionChanged ? <div>
+          <p role="status">{t("character.slot.selectionChanged")}</p>
+          {latest?.source?.kind === "campaign" ? <Button type="button" variant="secondary"
+            disabled={disabled || pending} onClick={() => setSelectedTemplate(structuredClone(latest))}>
+            {t("character.slot.useLatestRevision")}
+          </Button> : null}
+        </div> : null}
         {isCustom ? <div>
           <PersonalFields values={customValues} onChange={setCustomValues} quantity={quantity}
             onQuantity={setQuantity} disabled={disabled || pending} nameTestId={`slot-custom-name-${slotId}`} />

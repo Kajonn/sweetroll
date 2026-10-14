@@ -69,7 +69,7 @@ export type CharacterStore = {
     input: ResolveEntriesInput,
     guard: WriteGuard,
   ): Promise<void>;
-  purgeCharacter(actorId: string, characterId: string): Promise<void>;
+  purgeCharacter(actorId: string, characterId: string, guard?: WriteGuard): Promise<void>;
   clearAccount(actorId: string): Promise<void>;
   close(): Promise<void>;
   /** Locally cached characters for one account only; never enumerate across accounts. */
@@ -137,8 +137,28 @@ export type CharacterStore = {
   saveActivityPage(page: CachedActivityPage, guard?: WriteGuard): Promise<void>;
 };
 
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const TEMPLATES="entryTemplates";
+
+type CatalogScope = Pick<CharacterView, "campaignId" | "placementGeneration" | "systemVersionId" | "entityDefinitionId">;
+type TemplateCache = { actorId: string; characterId: string; scope: CatalogScope; templates: import("./types.js").EntryTemplate[] };
+
+function catalogScope(character: CharacterView): CatalogScope {
+  return { campaignId: character.campaignId, placementGeneration: character.placementGeneration,
+    systemVersionId: character.systemVersionId, entityDefinitionId: character.entityDefinitionId };
+}
+
+function sameCatalogScope(left: CatalogScope | null | undefined, right: CatalogScope): boolean {
+  return left !== null && left !== undefined && left.campaignId === right.campaignId &&
+    left.placementGeneration === right.placementGeneration && left.systemVersionId === right.systemVersionId &&
+    left.entityDefinitionId === right.entityDefinitionId;
+}
+
+async function invalidateCatalogScope(tx: IDBTransaction, actorId: string, characterId: string, previous: CharacterView | null, next: CharacterView) {
+  if (!sameCatalogScope(previous === null ? null : catalogScope(previous), catalogScope(next))) {
+    await deleteRequest(tx, TEMPLATES, [actorId, characterId]);
+  }
+}
 
 const CHAR = "characters";
 const QUEUE = "queue";
@@ -170,7 +190,7 @@ function toCachedActivityPage(record: ActivityRecord): CachedActivityPage {
 function openDatabase(name: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(name, DB_VERSION);
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const db = request.result;
       if (!db.objectStoreNames.contains(CHAR)) {
         db.createObjectStore(CHAR, { keyPath: ["actorId", "characterId"] });
@@ -189,6 +209,9 @@ function openDatabase(name: string): Promise<IDBDatabase> {
         db.createObjectStore(PENDING_LOGOUT, { keyPath: "key" });
       }
       if (!db.objectStoreNames.contains(TEMPLATES)) db.createObjectStore(TEMPLATES,{keyPath:["actorId","characterId"]});
+      // Old choices have no verified scope. Only this disposable cache is
+      // cleared; snapshots, queues and frozen online attempts survive.
+      else if (event.oldVersion < 4) request.transaction!.objectStore(TEMPLATES).clear();
       if (!db.objectStoreNames.contains(ACTIVITY)) {
         db.createObjectStore(ACTIVITY, { keyPath: ["actorId", "characterId", "cursorKey"] });
       }
@@ -424,7 +447,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
     },
 
     async acknowledge(actorId, characterId, entryId, character, generation) {
-      await openTx(db, [CHAR, QUEUE, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async (tx) => {
+      await openTx(db, [CHAR, QUEUE, LAST_ACCOUNT, PENDING_LOGOUT, TEMPLATES], "readwrite", async (tx) => {
         await assertWriteIdentity(tx, actorId);
         const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
         if (!record || record.generation !== generation) {
@@ -446,6 +469,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
             }
           }
         }
+        await invalidateCatalogScope(tx, actorId, characterId, record.confirmed, character);
         record.confirmed = character;
         record.generation += 1;
         await putRequest(tx, CHAR, record);
@@ -453,7 +477,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
     },
 
     async confirmSnapshot(actorId, characterId, character, generation) {
-      await openTx(db, [CHAR, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async (tx) => {
+      await openTx(db, [CHAR, LAST_ACCOUNT, PENDING_LOGOUT, TEMPLATES], "readwrite", async (tx) => {
         await assertWriteIdentity(tx, actorId);
         const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
         if ((record?.generation ?? await accountGeneration(tx, actorId)) !== generation) {
@@ -465,6 +489,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
           generation,
           confirmed: null as CharacterView | null,
         };
+        await invalidateCatalogScope(tx, actorId, characterId, fresh.confirmed, character);
         fresh.confirmed = character;
         fresh.generation += 1;
         await putRequest(tx, CHAR, fresh);
@@ -539,11 +564,15 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
       });
     },
 
-    async purgeCharacter(actorId, characterId) {
-      await openTx(db, [CHAR, QUEUE, ATTEMPTS, ACTIVITY, TEMPLATES, LAST_ACCOUNT], "readwrite", async (tx) => {
+    async purgeCharacter(actorId, characterId, guard) {
+      await openTx(db, [CHAR, QUEUE, ATTEMPTS, ACTIVITY, TEMPLATES, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async (tx) => {
         const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]) ?? {
           actorId, characterId, confirmed: null, generation: await accountGeneration(tx, actorId),
         };
+        if (guard !== undefined) {
+          await assertWriteIdentity(tx, actorId, guard.accountGeneration);
+          if (record.generation !== guard.generation) throw new Error("stale purge: character generation changed");
+        }
         record.confirmed = null;
         record.generation += 1;
         await putRequest(tx, CHAR, record);
@@ -641,7 +670,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
     },
 
     async acknowledgeOnlineAttempt(actorId, characterId, attemptId, character, guard) {
-      await openTx(db, [CHAR, ATTEMPTS, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async (tx) => {
+      await openTx(db, [CHAR, ATTEMPTS, LAST_ACCOUNT, PENDING_LOGOUT, TEMPLATES], "readwrite", async (tx) => {
         await assertWriteIdentity(tx, actorId, guard.accountGeneration);
         const attempt = await getRequest<OnlineAttempt>(tx, ATTEMPTS, [actorId, attemptId]);
         if (!attempt || attempt.actorId !== actorId || attempt.characterId !== characterId) {
@@ -653,6 +682,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
         }
         // Confirmed-state persistence and exact-attempt retirement commit or
         // roll back together: a failure keeps the attempt for verbatim replay.
+        await invalidateCatalogScope(tx, actorId, characterId, record.confirmed, character);
         record.confirmed = character;
         record.generation += 1;
         await putRequest(tx, CHAR, record);
@@ -702,16 +732,22 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
       });
     },
 
-    async readEntryTemplates(actorId,characterId) {
-      return openTx(db,[TEMPLATES],"readonly",async tx => (await getRequest<{templates:import("./types.js").EntryTemplate[]}>(tx,TEMPLATES,[actorId,characterId]))?.templates ?? []);
+    async readEntryTemplates(actorId, characterId) {
+      return openTx(db, [CHAR, TEMPLATES], "readonly", async tx => {
+        const character = (await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]))?.confirmed;
+        const cached = await getRequest<TemplateCache>(tx, TEMPLATES, [actorId, characterId]);
+        return character && sameCatalogScope(cached?.scope, catalogScope(character)) ? cached!.templates : [];
+      });
     },
-    async saveEntryTemplates(actorId,characterId,templates,guard) {
-      await openTx(db,[CHAR,TEMPLATES,LAST_ACCOUNT,PENDING_LOGOUT],"readwrite",async tx => {
-        await assertWriteIdentity(tx,actorId,guard.accountGeneration);
-        const record=await getRequest<CharacterRecord>(tx,CHAR,[actorId,characterId]);
-        if ((record?.generation ?? await accountGeneration(tx,actorId)) !== guard.generation) throw new Error("stale template save: character generation changed");
-        if (templates.length>1000) throw new Error("Template cache limit exceeded");
-        await putRequest(tx,TEMPLATES,{actorId,characterId,templates});
+    async saveEntryTemplates(actorId, characterId, templates, guard) {
+      await openTx(db, [CHAR, TEMPLATES, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async tx => {
+        await assertWriteIdentity(tx, actorId, guard.accountGeneration);
+        const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
+        if ((record?.generation ?? await accountGeneration(tx, actorId)) !== guard.generation || !record?.confirmed) throw new Error("stale template save: character generation changed");
+        const scope = catalogScope(record.confirmed);
+        if (templates.some(template => template.source?.kind === "campaign" && template.source.campaignId !== scope.campaignId)) throw new Error("stale template save: campaign scope changed");
+        if (templates.length > 1000) throw new Error("Template cache limit exceeded");
+        await putRequest(tx, TEMPLATES, { actorId, characterId, scope, templates } satisfies TemplateCache);
       });
     },
     readIdentity() { return openTx(db, [LAST_ACCOUNT, PENDING_LOGOUT], "readonly", readIdentity); },

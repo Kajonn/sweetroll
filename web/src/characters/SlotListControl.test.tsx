@@ -218,3 +218,32 @@ it('edits a data-only campaign spell without adding an item quantity',async()=>{
  await user.clear(screen.getByRole('textbox',{name:'Notes'}));await user.type(screen.getByRole('textbox',{name:'Notes'}),'Local');await user.click(screen.getByRole('button',{name:'Save entry'}));
  expect(handlers.onUpdateEntry).toHaveBeenCalledWith(STONE_ENTRY_ID,{name:'Spark',notes:'Local'},undefined);
 });
+
+it.each(["revised", "missing"])("keeps a selected campaign reference when its catalog is %s", async (change) => {
+  const source = { kind: "campaign" as const, campaignId: STONE_ENTRY_ID, templateId: SWORD_ENTRY_ID, templateRevision: 1, contentRevision: 1 };
+  const choice: SlotTemplate = { id: SWORD_ENTRY_ID, label: "Tower key", kind: "item", fields: [], grantedActions: [], source };
+  const handlers = callbacks();
+  const props = { slotId: "inventory", label: "Inventory", accepts: ["item"], entries: [], disabled: false, ...handlers };
+  const ui = render(<SlotListControl {...props} templates={[choice]} />);
+  const user = userEvent.setup();
+  await user.click(screen.getByTestId("slot-add-inventory"));
+  ui.rerender(<SlotListControl {...props} templates={change === "missing" ? [] : [{ ...choice, source: { ...source, templateRevision: 2, contentRevision: 2 } }]} />);
+  await user.click(screen.getByTestId("slot-add-confirm-inventory"));
+  expect(handlers.onAddEntry).toHaveBeenCalledWith("inventory", null, {}, undefined, source);
+});
+
+it("adopts a new campaign reference only after explicitly reviewing the refreshed choice", async () => {
+  const source = { kind: "campaign" as const, campaignId: STONE_ENTRY_ID, templateId: SWORD_ENTRY_ID, templateRevision: 1, contentRevision: 1 };
+  const choice: SlotTemplate = { id: SWORD_ENTRY_ID, label: "Tower key", kind: "item", fields: [], grantedActions: [], source };
+  const handlers = callbacks();
+  const props = { slotId: "inventory", label: "Inventory", accepts: ["item"], entries: [], disabled: false, ...handlers };
+  const ui = render(<SlotListControl {...props} templates={[choice]} />);
+  const user = userEvent.setup();
+  await user.click(screen.getByTestId("slot-add-inventory"));
+  const revised = { ...choice, source: { ...source, templateRevision: 2, contentRevision: 2 } };
+  ui.rerender(<SlotListControl {...props} templates={[revised]} />);
+  expect(screen.getByRole("status")).toHaveTextContent(/selected revision/i);
+  await user.click(screen.getByRole("button", { name: "Use latest revision" }));
+  await user.click(screen.getByTestId("slot-add-confirm-inventory"));
+  expect(handlers.onAddEntry).toHaveBeenCalledWith("inventory", null, {}, undefined, revised.source);
+});

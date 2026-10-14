@@ -37,6 +37,34 @@ beforeEach(() => {
 const ARM = "00000000-0000-4000-8000-000000000000";
 const EVER = "2026-09-06T00:00:00.000Z";
 
+it("does not purge a newer placement when catalog revocation races confirmation", async () => {
+  const { session, api, store } = await makeHarness();
+  const attached = { ...viewFor("char-1", 1), campaignId: "campaign-a" };
+  api.scriptOpenView(attached);
+  await session.open();
+  const guard = await store.read(ARM, "char-1");
+  const returned = { ...attached, campaignId: null, placementGeneration: 2, reconciliation: { ...attached.reconciliation, revision: 2 } };
+  const purge = store.purgeCharacter.bind(store);
+  vi.spyOn(store, "purgeCharacter").mockImplementation(async (...args) => {
+    await store.confirmSnapshot(ARM, "char-1", returned, guard.generation);
+    await purge(...args);
+  });
+  await session.revokeAccess(guard);
+  expect((await store.read(ARM, "char-1")).confirmed).toEqual(returned);
+  expect(session.getSnapshot().phase).not.toBe("purged");
+  session.dispose(); await store.close();
+});
+
+it("ignores catalog revocation after the session account has changed", async () => {
+  const { session, api, identity, store } = await makeHarness();
+  api.scriptOpenView(viewFor("char-1", 1)); await session.open();
+  const guard = await store.read(ARM, "char-1");
+  identity.actorId = "other"; identity.signal();
+  await session.revokeAccess(guard);
+  expect((await store.read(ARM, "char-1")).confirmed).not.toBeNull();
+  session.dispose(); await store.close();
+});
+
 it("rejects an already accepted edit whose enqueue arrives after another tab's logout", async () => {
   const { session, api, identity, store } = await makeHarness();
   api.scriptOpenView(viewFor("char-1", 1)); await session.open();

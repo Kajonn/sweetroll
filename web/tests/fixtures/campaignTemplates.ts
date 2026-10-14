@@ -3,6 +3,7 @@ import {
   expect,
   type Browser,
   type APIRequestContext,
+  type Page,
 } from "@playwright/test";
 import { uid, expectOfflineAvailable } from "../offline/test-auth.js";
 import AxeBuilder from "@axe-core/playwright";
@@ -16,6 +17,118 @@ async function post(
   const response = await request.post(path, { data });
   expect(response.status(), await response.text()).toBe(status);
   return response.json();
+}
+
+async function cachedCatalog(page: Page, actorId: string, characterId: string) {
+  return page.evaluate(({ actorId, characterId }) => new Promise<unknown>((resolve, reject) => {
+    const request = indexedDB.open("sweetroll-characters");
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const get = db.transaction("entryTemplates").objectStore("entryTemplates").get([actorId, characterId]);
+      get.onsuccess = () => { resolve(get.result ?? null); db.close(); };
+      get.onerror = () => { reject(get.error); db.close(); };
+    };
+  }), { actorId, characterId });
+}
+
+/** Review regressions use real authority changes; only the catalog transport failure is injected. */
+export async function campaignTemplateReviewJourney(
+  { browser, baseURL }: { browser: Browser; baseURL: string | undefined },
+  offlineReload = false,
+) {
+  test.setTimeout(120_000);
+  if (!baseURL) throw new Error("Browser base URL is required.");
+  const gm = await browser.newContext({ baseURL });
+  const co = await browser.newContext({ baseURL });
+  const player = await browser.newContext({ baseURL });
+  try {
+    const { campaignId, playerId, versionId } = await createCatalogCampaign(gm.request, co.request, player.request);
+    const published = await post(gm.request, `/api/campaigns/${campaignId}/item-templates`, {
+      kind: "item", content: { name: "Review key", notes: "Original", defaultQuantity: 2 }, expectedTemplateRevision: 0, idempotencyKey: uid(),
+    }, 201);
+    const template = published.template;
+    const own = (await post(player.request, "/api/characters", { systemVersionId: versionId, entityDefinitionId: "character", name: `Returnable hero ${uid()}`, idempotencyKey: uid() }, 201)).character;
+    const campaignRevision = async () => (await (await gm.request.get(`/api/campaigns/${campaignId}`)).json()).campaign.revision as number;
+    await post(player.request, `/api/campaigns/${campaignId}/characters/${own.characterId}/adopt`, {
+      expectedCampaignRevision: await campaignRevision(), expectedCharacterRevision: own.revision, acknowledgedDisclosure: true, idempotencyKey: uid(),
+    });
+    const page = await player.newPage();
+    await page.goto(`/characters/${own.characterId}`);
+    await page.getByTestId("slot-add-inventory").click();
+    const picker = page.getByTestId("slot-template-picker-inventory");
+    await expect(picker.locator("option", { hasText: "Review key" })).toHaveCount(1);
+    await picker.selectOption({ label: "Review key · Campaign" });
+    await post(gm.request, `/api/campaigns/${campaignId}/item-templates/${template.templateId}/archive`, { expectedTemplateRevision: template.revision, idempotencyKey: uid() });
+    // Disappearing choices retain the original campaign source. Recovery
+    // also changes resource revision without changing immutable content.
+    const refreshed = page.waitForResponse(response => response.url().endsWith(`/api/characters/${own.characterId}/templates`) && response.status() === 200);
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await refreshed;
+    const selected = page.waitForRequest(request => request.url().endsWith(`/api/characters/${own.characterId}/entries`) && request.method() === "POST");
+    await page.getByTestId("slot-add-confirm-inventory").click();
+    expect((await selected).postDataJSON().entry.source).toMatchObject({ kind: "campaign", templateRevision: 1, contentRevision: 1 });
+    await expect(page.getByText(/campaign template has changed/)).toBeVisible();
+    await page.getByRole("checkbox", { name: /Campaign template revision/ }).check();
+    await page.getByRole("button", { name: "Discard", exact: true }).click();
+    await page.getByRole("button", { name: "Confirm discard", exact: true }).click();
+    const recovered = (await post(gm.request, `/api/campaigns/${campaignId}/item-templates/${template.templateId}/recover`, { expectedTemplateRevision: 2, idempotencyKey: uid() })).template;
+    await page.reload();
+    await page.getByTestId("slot-add-inventory").click();
+    await expect(picker.locator("option", { hasText: "Review key" })).toHaveCount(1);
+    await picker.selectOption({ label: "Review key · Campaign" });
+    const revision2 = await gm.request.patch(`/api/campaigns/${campaignId}/item-templates/${template.templateId}`, { data: { expectedTemplateRevision: recovered.revision, content: { name: "Review key", notes: "Revised", defaultQuantity: 3 }, idempotencyKey: uid() } });
+    expect(revision2.status()).toBe(200);
+    const response = page.waitForResponse(response => response.url().endsWith(`/api/characters/${own.characterId}/templates`) && response.status() === 200);
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await response;
+    await page.getByRole("button", { name: "Use latest revision" }).click();
+    await page.getByTestId("slot-add-confirm-inventory").click();
+    await expect.poll(async () => Object.keys((await (await player.request.get(`/api/characters/${own.characterId}`)).json()).character.state.entries).length).toBe(1);
+    const before = (await (await player.request.get(`/api/characters/${own.characterId}`)).json()).character;
+    const entryId = Object.keys(before.state.entries)[0]!;
+    expect(before.state.entries[entryId].source.contentRevision).toBe(2);
+    expect(before.state.entries[entryId].quantity).toBe(3);
+    await expect.poll(() => cachedCatalog(page, playerId, own.characterId)).not.toBeNull();
+    if (offlineReload) await expectOfflineAvailable(page);
+
+    const restricted = (await post(gm.request, `/api/campaigns/${campaignId}/characters`, { name: `Restricted hero ${uid()}`, entityDefinitionId: "character", controllerUserIds: [playerId], expectedCampaignRevision: await campaignRevision(), idempotencyKey: uid() }, 201)).character;
+    const active = await player.newPage();
+    const reader = await player.newPage();
+    await active.goto(`/characters/${restricted.characterId}`);
+    await expect.poll(() => cachedCatalog(active, playerId, restricted.characterId)).not.toBeNull();
+    await reader.goto(`/characters/${restricted.characterId}`);
+    await expect(reader.getByRole("heading", { name: restricted.name, exact: true })).toBeVisible();
+    let continueCatalog!: () => void;
+    const catalogHeld = new Promise<void>(resolve => { continueCatalog = resolve; });
+    let observedCatalog!: () => void;
+    const observed = new Promise<void>(resolve => { observedCatalog = resolve; });
+    await active.route(`**/api/characters/${restricted.characterId}/templates`, async route => { observedCatalog(); await catalogHeld; await route.continue(); });
+    await active.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await observed;
+    const removed = await gm.request.delete(`/api/campaigns/${campaignId}/members/${playerId}`, { data: { expectedCampaignRevision: await campaignRevision(), idempotencyKey: uid() } });
+    expect(removed.status()).toBe(200);
+    continueCatalog();
+    for (const tab of [active, reader]) {
+      await expect(tab.getByRole("heading", { name: restricted.name, exact: true })).toHaveCount(0);
+      await expect(tab.getByRole("alert")).toContainText("unavailable");
+    }
+    expect(await cachedCatalog(active, playerId, restricted.characterId)).toBeNull();
+
+    // Return is a permitted scope change, not a character-access denial.
+    await page.route(`**/api/characters/${own.characterId}/templates`, route => route.abort());
+    await page.reload();
+    await expect(page.getByTestId(`slot-entry-${entryId}`)).toContainText("Revised");
+    await expect.poll(() => cachedCatalog(page, playerId, own.characterId)).toBeNull();
+    const returned = (await (await player.request.get(`/api/characters/${own.characterId}`)).json()).character;
+    expect(returned.campaignId).toBeNull();
+    expect(returned.state.entries).toEqual(before.state.entries);
+    if (offlineReload) { await player.setOffline(true); await page.reload(); }
+    await page.getByTestId("slot-add-inventory").click();
+    await expect(picker.locator("option", { hasText: "Review key" })).toHaveCount(0);
+    expect(await cachedCatalog(page, playerId, own.characterId)).toBeNull();
+    await player.setOffline(false);
+  } finally { await Promise.all([gm.close(), co.close(), player.close()]); }
 }
 async function signIn(request: APIRequestContext, code: string) {
   return (
@@ -53,6 +166,70 @@ async function join(
     idempotencyKey: uid(),
   });
 }
+async function createCatalogCampaign(gm: APIRequestContext, co: APIRequestContext, player: APIRequestContext) {
+  await signIn(gm, "code-test-a");
+  await signIn(co, "code-test-b");
+  const playerId = await signIn(player, "code-journey-p1");
+  const clone = await post(
+    gm,
+    "/api/systems",
+    {
+      source: {
+        kind: "clone",
+        versionId: "a0000000-0000-5000-8000-000000000002",
+      },
+      idempotencyKey: uid(),
+    },
+    201,
+  );
+  const systemId = clone.workspace.system.systemId;
+  const document = clone.workspace.draft.document;
+  document.slots = [
+    {
+      id: "inventory",
+      label: "Inventory",
+      accepts: ["item", "spell", "talent", "effect"],
+    },
+  ];
+  document.sheets[0].sections[0].elements.push({
+    kind: "slot",
+    id: "inventory_element",
+    slotId: "inventory",
+  });
+  const save = await gm.put(`/api/systems/${systemId}/draft`, {
+    data: { expectedRevision: clone.workspace.draft.revision, document },
+  });
+  expect(save.status()).toBe(200);
+  const published = await post(
+    gm,
+    `/api/systems/${systemId}/publish`,
+    {
+      expectedRevision: (await save.json()).workspace.draft.revision,
+      semanticVersion: "1.0.0",
+      releaseNotes: "",
+      acknowledgeBreaking: true,
+      idempotencyKey: uid(),
+    },
+  );
+  const campaign = await post(
+    gm,
+    "/api/campaigns",
+    {
+      systemVersionId: published.version.versionId,
+      title: `Templates ${uid()}`,
+      description: "",
+      idempotencyKey: uid(),
+    },
+    201,
+  );
+  const campaignId = campaign.campaign.campaignId;
+  await join(gm, co, campaignId, "co_gm");
+  await join(gm, player, campaignId, "player");
+  const sharing = await gm.patch(`/api/systems/${systemId}`, { data: { access: "link" } });
+  expect(sharing.status()).toBe(200);
+  return { campaignId, playerId, versionId: published.version.versionId as string };
+}
+
 export async function campaignTemplateJourney(
   { browser, baseURL }: { browser: Browser; baseURL: string | undefined },
   offlineReload = false,
@@ -63,64 +240,7 @@ export async function campaignTemplateJourney(
   const co = await browser.newContext({ baseURL });
   const player = await browser.newContext({ baseURL });
   try {
-    await signIn(gm.request, "code-test-a");
-    await signIn(co.request, "code-test-b");
-    const playerId = await signIn(player.request, "code-journey-p1");
-    const clone = await post(
-      gm.request,
-      "/api/systems",
-      {
-        source: {
-          kind: "clone",
-          versionId: "a0000000-0000-5000-8000-000000000002",
-        },
-        idempotencyKey: uid(),
-      },
-      201,
-    );
-    const systemId = clone.workspace.system.systemId;
-    const document = clone.workspace.draft.document;
-    document.slots = [
-      {
-        id: "inventory",
-        label: "Inventory",
-        accepts: ["item", "spell", "talent", "effect"],
-      },
-    ];
-    document.sheets[0].sections[0].elements.push({
-      kind: "slot",
-      id: "inventory_element",
-      slotId: "inventory",
-    });
-    const save = await gm.request.put(`/api/systems/${systemId}/draft`, {
-      data: { expectedRevision: clone.workspace.draft.revision, document },
-    });
-    expect(save.status()).toBe(200);
-    const published = await post(
-      gm.request,
-      `/api/systems/${systemId}/publish`,
-      {
-        expectedRevision: (await save.json()).workspace.draft.revision,
-        semanticVersion: "1.0.0",
-        releaseNotes: "",
-        acknowledgeBreaking: true,
-        idempotencyKey: uid(),
-      },
-    );
-    const campaign = await post(
-      gm.request,
-      "/api/campaigns",
-      {
-        systemVersionId: published.version.versionId,
-        title: `Templates ${uid()}`,
-        description: "",
-        idempotencyKey: uid(),
-      },
-      201,
-    );
-    const campaignId = campaign.campaign.campaignId;
-    await join(gm.request, co.request, campaignId, "co_gm");
-    await join(gm.request, player.request, campaignId, "player");
+    const { campaignId, playerId } = await createCatalogCampaign(gm.request, co.request, player.request);
     const gmPage = await gm.newPage();
     const coPage = await co.newPage();
     const playerPage = await player.newPage();

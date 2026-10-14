@@ -1,6 +1,8 @@
 export type MessageTable = Record<string, string>;
 
 export const defaultMessages: MessageTable = {
+  "character.slot.selectionChanged": "The catalog changed. Your selected revision is retained; adding it may require conflict review. Choose another template or explicitly use the latest revision.",
+  "character.slot.useLatestRevision": "Use latest revision",
   "character.review.campaignTemplate": "Campaign template revision {revision}",
   "campaign.templates.activity.create": "Template published",
   "campaign.templates.activity.update": "Template revised",

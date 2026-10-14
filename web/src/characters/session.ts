@@ -1,6 +1,6 @@
 import { ApiError } from "../api/client.js";
 import type { CharactersApi } from "./api.js";
-import type { CharacterStore, OnlineAttempt } from "./store.js";
+import type { CharacterStore, OnlineAttempt, WriteGuard } from "./store.js";
 import type {
   ActivityEvent,
   CharacterView,
@@ -100,6 +100,8 @@ export type CharacterSnapshot = {
 
 export type CharacterSession = {
   open(): Promise<void>;
+  /** Apply a catalog access denial only to the generation it was fetched against. */
+  revokeAccess(guard: WriteGuard): Promise<void>;
   getSnapshot(): CharacterSnapshot;
   subscribe(listener: (snapshot: CharacterSnapshot) => void): () => void;
   setField(fieldId: string, value: unknown): Promise<void>;
@@ -494,19 +496,31 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return Date.parse(timestamp) < Date.parse(now()) - THIRTY_DAYS_MS;
   }
 
-  async function handleNotFound(err: ApiError): Promise<SendOutcome> {
-    if (err.cacheDisposition === "purge") {
-      try {
-        await store.purgeCharacter(actorId, characterId);
-        coordination.invalidate?.();
-      } catch {
-        // never surface private character contents
-      }
-      confirmed = null;
-      entries = [];
-      setBlocked("purged", "This character is no longer available.");
-      return "blocked";
+  async function purgeAccess(guard?: WriteGuard): Promise<SendOutcome> {
+    try {
+      await store.purgeCharacter(actorId, characterId, guard);
+      coordination.invalidate?.();
+    } catch (failure) {
+      if (guard !== undefined && isStaleAck(failure)) return "blocked";
+      // A storage failure must still hide private data in this session.
     }
+    if (!identityMatches()) return "blocked";
+    confirmed = null;
+    entries = [];
+    pendingOnline = [];
+    lastRoll = null;
+    lastNominal = null;
+    lastMigration = null;
+    editing = { owned: false, owner: null };
+    if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
+    setBlocked("purged", "This character is no longer available.");
+    emit();
+    coordination.letGo();
+    return "blocked";
+  }
+
+  async function handleNotFound(err: ApiError): Promise<SendOutcome> {
+    if (err.cacheDisposition === "purge") return purgeAccess();
     setBlocked("not-found", "This character could not be loaded.");
     return "blocked";
   }
@@ -1822,6 +1836,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   return {
     open,
+    async revokeAccess(guard) {
+      if (await identityIsCurrent()) await purgeAccess(guard);
+    },
     getSnapshot,
     subscribe(listener: (snapshot: CharacterSnapshot) => void) {
       listeners.add(listener);

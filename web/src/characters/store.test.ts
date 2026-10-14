@@ -927,11 +927,108 @@ describe("CharacterStore creation attempts", () => {
 it("persists fetched template choices by actor and purges them without late repopulation", async () => {
   const store=await openCharacterStore(crypto.randomUUID());
   const choices=[{id:'key',label:'Key',kind:'item' as const,fields:[],grantedActions:[],source:{kind:'campaign' as const,campaignId:'campaign',templateId:'key',templateRevision:2,contentRevision:1}}];
-  await store.saveEntryTemplates('a','char',choices,initialGuard);
+  await store.confirmSnapshot('a','char',{...makeView('char',1),campaignId:'campaign'},0);
+  const guard = await store.read('a','char');
+  await store.saveEntryTemplates('a','char',choices,guard);
   expect(await store.readEntryTemplates('a','char')).toEqual(choices);
   expect(await store.readEntryTemplates('b','char')).toEqual([]);
   await store.purgeCharacter('a','char');
   expect(await store.readEntryTemplates('a','char')).toEqual([]);
-  await expect(store.saveEntryTemplates('a','char',choices,initialGuard)).rejects.toThrow(/stale/);
+  await expect(store.saveEntryTemplates('a','char',choices,guard)).rejects.toThrow(/stale/);
+  await store.close();
+});
+
+const campaignChoices = [{ id: "key", label: "Key", kind: "item" as const, fields: [], grantedActions: [], source: { kind: "campaign" as const, campaignId: "campaign", templateId: "key", templateRevision: 2, contentRevision: 1 } }];
+
+it.each(["confirm", "queue", "online"])("atomically invalidates catalog scope on %s confirmation and preserves unrelated frozen work", async (path) => {
+  const name = crypto.randomUUID();
+  const store = await openCharacterStore(name);
+  const attached = { ...makeView("char-1", 1), campaignId: "campaign" };
+  await store.confirmSnapshot("actor-A", "char-1", attached, 0);
+  const guard = await store.read("actor-A", "char-1");
+  await store.saveEntryTemplates("actor-A", "char-1", campaignChoices, guard);
+  const pending = makeEntry({ id: "pending", sequence: 1 });
+  await store.enqueue(pending, guard);
+  await store.freeze("actor-A", "char-1", pending.id, makeRequest());
+  const frozen = (await store.read("actor-A", "char-1")).entries;
+  const returned = { ...attached, campaignId: null, placementGeneration: 2, reconciliation: { ...attached.reconciliation, revision: 2 } };
+  if (path === "confirm") await store.confirmSnapshot("actor-A", "char-1", returned, guard.generation);
+  if (path === "queue") {
+    await store.enqueue(makeEntry({ id: "ack", sequence: 0 }), guard);
+    await store.acknowledge("actor-A", "char-1", "ack", returned, guard.generation);
+  }
+  if (path === "online") {
+    await store.saveOnlineAttempt({ id: "online", actorId: "actor-A", characterId: "char-1", kind: "archive", request: makeRequest(), createdAt: "2026-09-06T00:00:00.000Z" });
+    await store.acknowledgeOnlineAttempt("actor-A", "char-1", "online", returned, guard);
+  }
+  expect(await store.readEntryTemplates("actor-A", "char-1")).toEqual([]);
+  const raw = await new Promise<unknown>((resolve, reject) => {
+    const request = indexedDB.open(name);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const get = db.transaction("entryTemplates").objectStore("entryTemplates").get(["actor-A", "char-1"]);
+      get.onsuccess = () => { resolve(get.result); db.close(); };
+      get.onerror = () => { reject(get.error); db.close(); };
+    };
+  });
+  expect(raw).toBeUndefined();
+  expect((await store.read("actor-A", "char-1")).entries).toEqual(frozen);
+  expect((await store.read("actor-A", "char-1")).confirmed).toEqual(returned);
+  await expect(store.saveEntryTemplates("actor-A", "char-1", campaignChoices, guard)).rejects.toThrow(/stale/);
+  await store.close();
+  const reopened = await openCharacterStore(name);
+  expect(await reopened.readEntryTemplates("actor-A", "char-1")).toEqual([]);
+  expect((await reopened.read("actor-A", "char-1")).entries).toEqual(frozen);
+  await reopened.close();
+});
+
+it("rolls back scope invalidation when snapshot persistence fails", async () => {
+  const store = await openCharacterStore(crypto.randomUUID());
+  const attached = { ...makeView("char-1", 1), campaignId: "campaign" };
+  await store.confirmSnapshot("actor-A", "char-1", attached, 0);
+  const guard = await store.read("actor-A", "char-1");
+  await store.saveEntryTemplates("actor-A", "char-1", campaignChoices, guard);
+  const put = IDBObjectStore.prototype.put;
+  const spy = vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (this: IDBObjectStore, value: unknown, key?: IDBValidKey) {
+    if (this.name === "characters") throw new DOMException("Quota", "QuotaExceededError");
+    return put.apply(this, [value, key as IDBValidKey]);
+  });
+  await expect(store.confirmSnapshot("actor-A", "char-1", { ...attached, campaignId: null }, guard.generation)).rejects.toThrow();
+  spy.mockRestore();
+  expect((await store.read("actor-A", "char-1")).confirmed).toEqual(attached);
+  expect(await store.readEntryTemplates("actor-A", "char-1")).toEqual(campaignChoices);
+  await store.close();
+});
+
+it("upgrades an unscoped v3 catalog without losing snapshots or frozen commands", async () => {
+  const name = crypto.randomUUID();
+  const character = { ...makeView("char-1", 1), campaignId: "campaign" };
+  const entry = makeEntry({ attempt: makeRequest() });
+  const attempt: OnlineAttempt = { id: "online", actorId: "actor-A", characterId: "char-1", kind: "archive", request: makeRequest(), createdAt: entry.createdAt };
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open(name, 3);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore("characters", { keyPath: ["actorId", "characterId"] });
+      request.result.createObjectStore("entryTemplates", { keyPath: ["actorId", "characterId"] });
+      request.result.createObjectStore("onlineAttempts", { keyPath: ["actorId", "id"] });
+      request.result.createObjectStore("queue", { keyPath: ["actorId", "characterId", "id"] }).createIndex("by-seq", ["actorId", "characterId", "sequence"]);
+    };
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction(["characters", "entryTemplates", "onlineAttempts", "queue"], "readwrite");
+      tx.objectStore("characters").put({ actorId: "actor-A", characterId: "char-1", generation: 1, confirmed: character });
+      tx.objectStore("entryTemplates").put({ actorId: "actor-A", characterId: "char-1", templates: campaignChoices });
+      tx.objectStore("queue").put(entry);
+      tx.objectStore("onlineAttempts").put(attempt);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+  });
+  const store = await openCharacterStore(name);
+  expect(await store.readEntryTemplates("actor-A", "char-1")).toEqual([]);
+  expect(await store.read("actor-A", "char-1")).toMatchObject({ confirmed: character, entries: [entry], generation: 1 });
+  expect(await store.readOnlineAttempts("actor-A")).toEqual([attempt]);
   await store.close();
 });

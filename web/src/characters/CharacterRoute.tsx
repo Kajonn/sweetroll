@@ -194,13 +194,12 @@ function CharacterDetailLoaded({
       } catch (error) {
         if (cancelled) return;
         if (typeof error === "object" && error !== null && "status" in error && error.status === 404) {
-          await store.purgeCharacter(actorId,characterIdForTemplates);
-          if (!cancelled) setTemplates([]);
+          await session?.revokeAccess(guard);
         }
       }
     })().catch(()=> { if(!cancelled) setTemplates([]); });
     return () => {cancelled=true;};
-  }, [api,store,actorId,hasSlots,characterIdForTemplates,online,templateRefresh,snapshot.confirmed,snapshot.phase === "purged"]);
+  }, [api,store,session,actorId,hasSlots,characterIdForTemplates,online,templateRefresh,snapshot.confirmed,snapshot.phase === "purged"]);
 
   const focusedFor = useRef<string | null>(null);
   useEffect(() => {

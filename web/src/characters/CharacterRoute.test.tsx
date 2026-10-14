@@ -110,6 +110,59 @@ describe("CharacterRoute", () => {
     vi.restoreAllMocks();
   });
 
+  it("purges the active sheet and releases editing when template discovery denies access", async () => {
+    const store = await openStore();
+    const view = completionView();
+    view.campaignId = "campaign-a";
+    view.projection.sheets = [{ id: "play", label: "Play", sections: [{
+      id: "gear", label: "Gear", elements: [{ kind: "slot", id: "inventory", slotId: "inventory", label: "Inventory", accepts: ["item"], entries: [] }],
+    }] }];
+    await store.confirmSnapshot(ACTOR, CHARACTER_ID, view, 0);
+    const choices: EntryTemplatesResponse["templates"] = [{ id: "key", label: "Tower key", kind: "item", fields: [], grantedActions: [], source: { kind: "campaign", campaignId: "campaign-a", templateId: "key", templateRevision: 1, contentRevision: 1 } }];
+    await store.saveEntryTemplates(ACTOR, CHARACTER_ID, choices, await store.read(ACTOR, CHARACTER_ID));
+    let rejectCatalog!: (error: unknown) => void;
+    const catalog = new Promise<EntryTemplatesResponse>((_, reject) => { rejectCatalog = reject; });
+    const api = makeApi(view);
+    api.listEntryTemplates = vi.fn(() => catalog);
+    const letGo = vi.fn();
+    const coordination = makeCoordination(true, { letGo });
+    const invalidate = vi.fn();
+    coordination.invalidate = invalidate;
+    const ui = render(<CharacterDetail characterId={CHARACTER_ID} api={api} store={store}
+      identity={makeIdentity()} coordination={coordination} />);
+    try {
+      await screen.findByRole("heading", { name: "Briar" });
+      await screen.findByText("Saved");
+      await waitFor(() => expect(api.listEntryTemplates).toHaveBeenCalled());
+      await act(async () => { rejectCatalog(new ApiError({ status: 404, code: "not_found", message: "No access", requestId: "catalog", latestRevision: null, diagnostics: [], cacheDisposition: "purge" })); });
+      await waitFor(() => expect(screen.queryByRole("heading", { name: "Briar" })).not.toBeInTheDocument());
+      expect(await screen.findByText("This character is unavailable.")).toBeVisible();
+      expect(letGo).toHaveBeenCalled();
+      expect(invalidate).toHaveBeenCalled();
+      expect((await store.read(ACTOR, CHARACTER_ID)).confirmed).toBeNull();
+      expect(await store.readEntryTemplates(ACTOR, CHARACTER_ID)).toEqual([]);
+    } finally { ui.unmount(); await store.close(); }
+  });
+
+  it('removes cached campaign choices after return even if catalog refresh fails', async () => {
+  const store=await openCharacterStore(crypto.randomUUID());
+  const attached=makeView({characterId:'character',revision:1,campaignId:'campaign',name:'Returned hero'});
+  attached.projection.sheets=[{id:'play',label:'Play',sections:[{id:'gear',label:'Gear',elements:[{kind:'slot',id:'inventory',slotId:'inventory',label:'Inventory',accepts:['item'],entries:[]}]}]}];
+  await store.confirmSnapshot('actor','character',attached,0);
+  const guard=await store.read('actor','character');
+  await store.saveEntryTemplates('actor','character',[{id:"key",label:"Tower key",kind:"item",fields:[],grantedActions:[],source:{kind:"campaign",campaignId:"campaign",templateId:"key",templateRevision:1,contentRevision:1}}],guard);
+  const returned={...attached,campaignId:null,placementGeneration:2,reconciliation:{...attached.reconciliation,revision:2}};
+  const api={open:vi.fn(async()=>makeOpenEnvelope(returned)),listEntryTemplates:vi.fn(async()=>{throw new Error('Network interrupted');})} as unknown as CharactersApi;
+  const ui=render(<CharacterDetail characterId='character' api={api} store={store}
+    identity={{getActorId:()=>'actor',getGeneration:()=>0,isOnline:()=>true,isCurrent:async()=>true,subscribe:()=>()=>{}}}
+    coordination={{isOwner:()=>true,requestEditing:async()=>true,letGo:()=>{},subscribe:()=>()=>{},setQuiesce:()=>{},invalidate:()=>{},dispose:()=>{}}} />);
+  try {
+    await waitFor(async()=>expect((await store.read('actor','character')).confirmed?.campaignId).toBeNull());
+    await waitFor(()=>expect(api.listEntryTemplates).toHaveBeenCalled());
+    expect(await store.readEntryTemplates('actor','character')).toEqual([]);
+  } finally {ui.unmount();await store.close();}
+});
+
   it.each(["before", "after"])("keeps template choices when the catalog arrives %s a same-revision projection refresh", async (order) => {
     const store = await openStore();
     const cached = completionView();

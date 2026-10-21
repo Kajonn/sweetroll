@@ -186,7 +186,7 @@ describe("DocumentEditor", () => {
     expect(await screen.findByTestId("document-editor-name")).toHaveTextContent("Test System");
     expect(screen.getByTestId("document-editor-lifecycle")).toHaveTextContent("Active");
     expect(screen.getByTestId("document-editor-autosave")).toHaveTextContent("Not saved yet");
-    for (const label of ["Basics", "Attributes", "Dice", "Sections", "Advanced"]) {
+    for (const label of ["Basics", "Attributes", "Dice", "Sheets", "Advanced"]) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }
   });

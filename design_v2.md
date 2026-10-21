@@ -196,6 +196,8 @@ Grammar v0.1 is fixed by `docs/superpowers/specs/2026-09-04-system-package-contr
 
 **Rolls** are a button press → server evaluates → result shows normalized expression, individual dice, modifiers, total, and audience. Rolls are factual; the platform does **not** auto-apply outcomes to state.
 
+**Planned dice-pool follow-up (2026-10-21):** the [dice pool reliability plan](docs/superpowers/plans/2026-10-21-dice-pool-reliability.md) schedules A: compiler/evaluator operand agreement, explicit action-roll evaluation failures while preserving scalar fallbacks, non-destructive custom-formula editing, and truthful preview results; then B: versioned named dice groups and structured calculation results; then C: configurable pushes referencing saved rolls with authorization, immutable lineage and transactional retry/concurrency limits. These are open delivery gates. A preserves grammar v0.1; B/C require the versioned package/runtime contracts described in the plan before implementation and do not remove the current push/reroll exclusions merely by being scheduled. Outcomes remain factual and resource consequences remain manual.
+
 ## 6.5 Draft, validation, and publishing
 
 | **State**          | **Mutable?**  | **Use**                                                                 |

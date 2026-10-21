@@ -20,11 +20,27 @@ describe("sheet reference selection", () => {
     render(<SheetEditor sheet={sheet} onChange={onChange} allDefinitions={[
       {kind:"field",id:"strength",label:"Strength"},
       {kind:"field",id:"dexterity",label:"Dexterity"},
+      {kind:"resource",id:"health",label:"Health"},
     ]} />);
     const selector = screen.getByTestId("definition-reference-select");
     expect(within(selector).getByRole("option",{name:"Strength (strength)"})).toBeInTheDocument();
+    expect(within(selector).getByRole("option",{name:"Health (health)"})).toBeInTheDocument();
     fireEvent.change(selector,{target:{value:"dexterity"}});
     expect(onChange.mock.lastCall?.[0].sections[0].elements[0].fieldId).toBe("dexterity");
+  });
+
+  it("keeps resource element options limited to resources", () => {
+    const resourceSheet = {
+      ...sheet,
+      sections: [{id:"section_1", label:"Stats", elements:[{kind:"resource" as const,id:"element_1",resourceId:"health"}]}],
+    };
+    render(<SheetEditor sheet={resourceSheet} onChange={vi.fn()} allDefinitions={[
+      {kind:"field",id:"strength",label:"Strength"},
+      {kind:"resource",id:"health",label:"Health"},
+    ]} />);
+    const selector = screen.getByTestId("definition-reference-select");
+    expect(within(selector).getByRole("option",{name:"Health (health)"})).toBeInTheDocument();
+    expect(within(selector).queryByRole("option",{name:"Strength (strength)"})).not.toBeInTheDocument();
   });
 
   it("preserves an unresolved ID instead of silently changing data", () => {

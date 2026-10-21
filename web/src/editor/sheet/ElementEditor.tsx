@@ -63,7 +63,7 @@ function ElementBodyRouter({
     case "heading":
       return <HeadingEditor element={element} onChange={onChange} />;
     case "field":
-      return <FieldEditor element={element} onChange={onChange} options={definitions.filter((entry) => entry.kind === "field")} />;
+      return <FieldEditor element={element} onChange={onChange} options={definitions.filter((entry) => entry.kind === "field" || entry.kind === "resource")} />;
     case "resource":
       return <ResourceEditor element={element} onChange={onChange} options={definitions.filter((entry) => entry.kind === "resource")} />;
     case "action":

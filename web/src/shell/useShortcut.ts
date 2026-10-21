@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 
-const isTextInput = (el: EventTarget | null): boolean => {
+const isEditableTarget = (el: EventTarget | null): boolean => {
   if (!(el instanceof HTMLElement)) return false;
   const tag = el.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
 };
 
 export function parseCombo(combo: string): { key: string; alt: boolean; shift: boolean; ctrl: boolean } {
@@ -20,7 +20,7 @@ export function useShortcut(combo: string, handler: () => void): void {
   useEffect(() => {
     const target = parseCombo(combo);
     const onKey = (e: KeyboardEvent) => {
-      if (isTextInput(e.target)) return;
+      if (isEditableTarget(e.target)) return;
       if (e.key.toLowerCase() !== target.key) return;
       if (e.altKey !== target.alt) return;
       if (e.shiftKey !== target.shift) return;

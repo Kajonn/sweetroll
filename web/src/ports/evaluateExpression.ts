@@ -77,7 +77,7 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
     input.rng,
   );
   const expression = renderExpression(body.ast);
-  if (!evaluated.ok || evaluated.diagnostics.length > 0) {
+  if (!evaluated.ok) {
     return { ok: false, expression, diagnostics: evaluated.diagnostics };
   }
   const rollDice: DieResult[] = evaluated.roll?.dice ?? [];

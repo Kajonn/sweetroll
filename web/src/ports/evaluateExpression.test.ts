@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { evaluateRoll } from "../api/evaluateExpression.js";
 import { evaluateExpression, additiveRollModifier } from "./evaluateExpression.js";
 
 const numberEnv = { fields: {}, inputs: {} };
@@ -115,7 +116,14 @@ describe("truthful roll breakdown", () => {
   });
 
   it.each(["countSuccesses(dice(-1, 6), 6)", "d6 + 1/0"])("does not preview a fallback/partial roll as success: %s", (source) => {
-    const result = evaluateExpression({ source, env: { fields: {}, inputs: {} }, resultType: "number", fallback: 0, bindings: {} });
+    const { result } = evaluateRoll({ source, env: { fields: {}, inputs: {} }, resultType: "number", fallback: 0, bindings: {} });
     expect(result).toMatchObject({ ok: false, diagnostics: [{ code: "arithmetic_failure" }] });
   });
+});
+
+
+it("preserves scalar preview fallbacks while rejecting the same arithmetic failure as an action", () => {
+  const input = { source: "1 / 0", env: { fields: {}, inputs: {} }, resultType: "number" as const, fallback: 7, bindings: {} };
+  expect(evaluateExpression(input)).toMatchObject({ ok: true, value: 7, roll: null, diagnostics: [{ code: "arithmetic_failure" }] });
+  expect(evaluateRoll(input).result).toMatchObject({ ok: false, diagnostics: [{ code: "arithmetic_failure" }] });
 });

@@ -12,7 +12,13 @@ export type RollEvaluation = {
 };
 
 export function evaluateRoll(input: EvaluateExpressionInput): RollEvaluation {
-  return { audience: "preview", result: portEvaluateExpression(input) };
+  const result = portEvaluateExpression(input);
+  return {
+    audience: "preview",
+    result: result.ok && result.diagnostics.length > 0
+      ? { ok: false, expression: result.expression, diagnostics: result.diagnostics }
+      : result,
+  };
 }
 
 export type { EvaluateExpressionInput, EvaluateExpressionResult };

@@ -77,7 +77,7 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
     input.rng,
   );
   const expression = renderExpression(body.ast);
-  if (!evaluated.ok) {
+  if (!evaluated.ok || evaluated.diagnostics.length > 0) {
     return { ok: false, expression, diagnostics: evaluated.diagnostics };
   }
   const rollDice: DieResult[] = evaluated.roll?.dice ?? [];
@@ -89,4 +89,33 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
     roll: evaluated.roll === null ? null : { total: evaluated.roll.total, dice: rollDice, expression: evaluated.roll.expression },
     diagnostics: evaluated.diagnostics,
   };
+}
+
+
+/** A flat dice sum only explains additive rolls; count/scale/negation need their own breakdown. */
+export function additiveRollModifier(result: EvaluateExpressionResult): number | null {
+  if (!result.ok || result.roll === null || result.diagnostics.length > 0) return null;
+  function diceFree(ast: ExpressionAstV1): boolean {
+    switch (ast.kind) {
+      case "dice": case "keep": case "successCount": return false;
+      case "binary": return diceFree(ast.left) && diceFree(ast.right);
+      case "unary": return diceFree(ast.operand);
+      case "call": return ast.arguments.every(diceFree);
+      default: return true;
+    }
+  }
+  function additive(ast: ExpressionAstV1): boolean {
+    if (diceFree(ast)) return true;
+    switch (ast.kind) {
+      case "dice": return diceFree(ast.count);
+      case "keep": return ast.dice.kind === "dice" && diceFree(ast.dice.count);
+      case "binary": return ast.operator === "+"
+        ? additive(ast.left) && additive(ast.right)
+        : ast.operator === "-" && additive(ast.left) && diceFree(ast.right);
+      default: return false;
+    }
+  }
+  return additive(result.ast)
+    ? result.roll.total - result.roll.dice.reduce((sum, die) => die.kept ? sum + die.value : sum, 0)
+    : null;
 }

@@ -1,5 +1,7 @@
 # System Expression Engine v0.1 Implementation Plan
 
+**Follow-up (2026-10-21):** the completed tasks below record the original engine implementation. The [dice pool reliability and push-roll delivery plan](2026-10-21-dice-pool-reliability.md) tracks four later review findings, required regression-first repairs, and subsequent versioned named-group/push extensions. Those new gates are open; historical completion here does not close them.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Implement the math-and-dice tokenizer, parser, typed AST, type checker, dependency resolution, deterministic evaluator, normalized roll output, and node/depth budgets that compile `SystemDocumentV1` source expressions into `CompiledExpressionV1` values and deterministically evaluate them.

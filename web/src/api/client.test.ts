@@ -105,3 +105,10 @@ describe("createApiClient", () => {
     expect(error.status).toBe(200);
   });
 });
+
+
+it("preserves action evaluation diagnostics separately from sheet validations", async () => {
+  const actionDiagnostics = [{ code: "arithmetic_failure", actionId: "pool", expressionId: "pool_expr", message: "dice count must be a non-negative integer" }];
+  const client = createApiClient({ baseUrl: "http://api", fetch: vi.fn(async () => new Response(JSON.stringify({ error: { code: "invalid_value", message: "Review the inputs", actionDiagnostics }, requestId: "r-pool" }), { status: 422 })) as typeof fetch });
+  await expect(client.fetch("POST", "/characters/c/actions/pool")).rejects.toMatchObject({ actionDiagnostics, diagnostics: [], runtimeDiagnostics: [] });
+});

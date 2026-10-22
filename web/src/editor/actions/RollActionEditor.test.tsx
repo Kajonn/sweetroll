@@ -382,3 +382,31 @@ describe("RollActionEditor", () => {
     expect(onExpressionSourceChange).toHaveBeenCalledWith("d20 + inputs.bonus");
   });
 });
+
+
+describe("custom dice pools", () => {
+  it("preserves a custom pool instead of offering a destructive additive field control", () => {
+    const onSource = vi.fn();
+    renderEditor({ guided: true, diceKind: "custom", expressionSource: "countSuccesses(dice(fields.strength, 6), 6)", fieldTypes: { strength: "number" }, onExpressionSourceChange: onSource });
+    expect(screen.queryByTestId("roll-field-modifier-atk")).not.toBeInTheDocument();
+    expect(screen.getByTestId("expression-editor-source")).toHaveValue("countSuccesses(dice(fields.strength, 6), 6)");
+    expect(onSource).not.toHaveBeenCalled();
+  });
+
+  it("shows one success for [6,2,1] without inventing a -8 modifier", () => {
+    const rng = vi.spyOn(Math, "random").mockReturnValueOnce(1).mockReturnValueOnce(2/6).mockReturnValueOnce(1/6);
+    try {
+      renderEditor({ expressionSource: "countSuccesses(3d6, 6)" });
+      fireEvent.click(screen.getByTestId("roll-action-try-atk"));
+      expect(screen.getByTestId("roll-action-try-total-atk")).toHaveTextContent("1");
+      expect(screen.queryByTestId("roll-action-try-modifiers-atk")).not.toBeInTheDocument();
+    } finally { rng.mockRestore(); }
+  });
+
+  it("explains numeric zero sample bindings in the preview", () => {
+    renderEditor({ expressionSource: "countSuccesses(dice(fields.strength, 6), 6)", fieldTypes: { strength: "number" } });
+    fireEvent.click(screen.getByTestId("roll-action-try-atk"));
+    expect(screen.getByTestId("roll-action-try-bindings-atk")).toHaveTextContent("strength: 0");
+    expect(screen.getByTestId("roll-action-try-sample-note-atk")).toHaveTextContent(/zero|0/i);
+  });
+});

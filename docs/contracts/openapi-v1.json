@@ -5949,6 +5949,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -6093,6 +6122,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -6198,6 +6256,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -6313,6 +6400,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -6423,6 +6539,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -6528,6 +6673,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -6747,6 +6921,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -6891,6 +7094,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -6996,6 +7228,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -7197,6 +7458,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -7341,6 +7631,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -7446,6 +7765,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -7561,6 +7909,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -7666,6 +8043,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -7898,6 +8304,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -8042,6 +8477,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -8147,6 +8611,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -9659,6 +10152,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -9769,6 +10291,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -9874,6 +10425,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -11579,6 +12159,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -11723,6 +12332,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -11828,6 +12466,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -11943,6 +12610,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -12053,6 +12749,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -12158,6 +12883,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -13820,6 +14574,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -13964,6 +14747,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -14069,6 +14881,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -14184,6 +15025,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -14294,6 +15164,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -14399,6 +15298,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -16072,6 +17000,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -16216,6 +17173,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -16321,6 +17307,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -16436,6 +17451,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -16546,6 +17590,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -16651,6 +17724,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -18336,6 +19438,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -18480,6 +19611,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -18585,6 +19745,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -18700,6 +19889,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -18810,6 +20028,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -18915,6 +20162,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -20675,6 +21951,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -20819,6 +22124,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -20924,6 +22258,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -21039,6 +22402,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -21149,6 +22541,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -21254,6 +22675,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -22914,6 +24364,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -23058,6 +24537,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -23163,6 +24671,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -23278,6 +24815,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -23388,6 +24954,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -23493,6 +25088,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -25161,6 +26785,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -25305,6 +26958,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -25410,6 +27092,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -25525,6 +27236,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -25635,6 +27375,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -25740,6 +27509,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -26514,6 +28312,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -26658,6 +28485,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -26768,6 +28624,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -26873,6 +28758,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -28529,6 +30443,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -28673,6 +30616,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -28778,6 +30750,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -28893,6 +30894,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -29003,6 +31033,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -29108,6 +31167,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -30604,6 +32692,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -30748,6 +32865,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -30853,6 +32999,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -30968,6 +33143,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -31078,6 +33282,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -31183,6 +33416,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -31411,6 +33673,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -31555,6 +33846,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -31665,6 +33985,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -31770,6 +34119,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -32205,6 +34583,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -32315,6 +34722,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -32420,6 +34856,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -33712,6 +36177,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -33856,6 +36350,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -33961,6 +36484,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -34076,6 +36628,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -34186,6 +36767,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -34291,6 +36901,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -35951,6 +38590,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -36095,6 +38763,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -36200,6 +38897,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -36315,6 +39041,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -36425,6 +39180,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -36530,6 +39314,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -38186,6 +40999,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -38330,6 +41172,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -38435,6 +41306,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }
@@ -38550,6 +41450,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -38660,6 +41589,35 @@
                             }
                           }
                         },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "changedDefinitionIds": {
                           "type": "array",
                           "items": {
@@ -38765,6 +41723,35 @@
                                 "type": "string"
                               },
                               "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
                                 "type": "string"
                               }
                             }

@@ -160,7 +160,7 @@ Dynamic pools use `dice(countExpression, sidesLiteral)`. The count expression mu
 countSuccesses(dice(fields.attribute + fields.skill, 6), 6)
 ```
 
-`countSuccesses(diceExpression, threshold)` returns the number of individual dice greater than or equal to the integer threshold. Dice expressions are valid only in action-roll contexts. Computed fields and validations are deterministic.
+`countSuccesses(diceExpression, threshold)` requires a direct dice AST node (`NdS` or `dice(countExpression, sides)`) and returns the number of individual dice greater than or equal to the integer threshold. Scalar, boolean, keep-wrapped and combined-pool operands are rejected during compilation. Add separate `countSuccesses(...)` terms to combine success counts. Dice expressions are valid only in action-roll contexts. Computed fields and validations are deterministic.
 
 Rerolls, exploding dice, push mechanics, custom faces, failure cancellation, and arbitrary keep predicates are excluded from v0.1.
 
@@ -168,7 +168,7 @@ Rerolls, exploding dice, push mechanics, custom faces, failure cancellation, and
 
 Arithmetic requires numbers. Ordering comparisons require numbers. Equality operands must have the same scalar type. Boolean operators require booleans. Field and input references have the type declared by their definitions. A source expression's inferred type must equal its declared result type and fallback type.
 
-Division by zero and other safe arithmetic failures produce the declared fallback plus a runtime diagnostic. Parse, type, missing-reference, and budget failures reject compilation. Budget exhaustion never returns a partial AST or package.
+Division by zero and other safe arithmetic failures produce the declared fallback plus a runtime diagnostic at the scalar evaluator level. Computed fields and validations keep that behavior. Roll actions reject arithmetic diagnostics as `action_evaluation_failed` (Characters: `invalid_value`, HTTP 422), including template-granted actions; fallback and partially rolled dice are never successful action results. Valid zero-sized dynamic pools return zero successes; negative or fractional counts fail, and dice budgets remain enforced. Parse, type, missing-reference, and budget failures reject compilation. Budget exhaustion never returns a partial AST or package.
 
 Canonical rendering removes insignificant whitespace, uses explicit keep-high/keep-low notation, and preserves AST meaning. It does not claim algebraic equivalence between differently structured expressions.
 

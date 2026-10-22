@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { evaluateExpression } from "./evaluateExpression.js";
+import { evaluateExpression, additiveRollModifier } from "./evaluateExpression.js";
 
 const numberEnv = { fields: {}, inputs: {} };
 const intBindings: Record<string, number> = {};
@@ -98,5 +98,24 @@ describe("evaluateExpression", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value).toBe(5);
+  });
+});
+
+
+describe("truthful roll breakdown", () => {
+  it.each([
+    ["countSuccesses(3d6, 6)", null],
+    ["countSuccesses(2d6, 6) + countSuccesses(2d6, 5)", null],
+    ["d6 + countSuccesses(2d6, 6)", null],
+    ["2 * d6", null], ["-d6", null], ["10 - d6", null],
+    ["d20 + 5", 5], ["4d6kh3 + 2", 2], ["d6 + d6 - 3", -3],
+  ])("only explains additive dice: %s", (source, expected) => {
+    const result = evaluateExpression({ source, env: { fields: {}, inputs: {} }, resultType: "number", fallback: 0, bindings: {}, rng: () => 1 });
+    expect(additiveRollModifier(result)).toBe(expected);
+  });
+
+  it.each(["countSuccesses(dice(-1, 6), 6)", "d6 + 1/0"])("does not preview a fallback/partial roll as success: %s", (source) => {
+    const result = evaluateExpression({ source, env: { fields: {}, inputs: {} }, resultType: "number", fallback: 0, bindings: {} });
+    expect(result).toMatchObject({ ok: false, diagnostics: [{ code: "arithmetic_failure" }] });
   });
 });

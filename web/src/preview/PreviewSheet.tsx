@@ -4,7 +4,7 @@ import { renderExpression } from "@sweetroll/rules";
 
 import { evaluateRoll } from "../api/evaluateExpression.js";
 import { t } from "../i18n/index.js";
-import type { ScalarValue, ValueType } from "../ports/evaluateExpression.js";
+import { additiveRollModifier, type ScalarValue, type ValueType } from "../ports/evaluateExpression.js";
 
 import type {
   ChoiceOptionV1,
@@ -324,12 +324,6 @@ function renderFieldValue(
         field,
       );
   }
-}
-
-function modifiersFromRoll(
-  roll: { total: number; dice: Array<{ value: number; kept: boolean }> },
-): number {
-  return roll.total - roll.dice.reduce((s, d) => (d.kept ? s + d.value : s), 0);
 }
 
 function formatOutput(template: string, total: number): string {
@@ -720,14 +714,14 @@ function RollResultSheet({
               ))}
             </ul>
           </div>
-          <div className={styles.rollSheetRow}>
+          {additiveRollModifier(result) !== null ? <div className={styles.rollSheetRow}>
             <span className={styles.rollSheetLabel}>
               {t("preview.rollResult.modifiers")}
             </span>
             <span data-testid="preview-roll-result-modifiers">
-              {modifiersFromRoll(result.roll)}
+              {additiveRollModifier(result)}
             </span>
-          </div>
+          </div> : null}
           <div className={styles.rollSheetRow}>
             <span className={styles.rollSheetLabel}>
               {t("preview.rollResult.total")}

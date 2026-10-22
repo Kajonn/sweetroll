@@ -127,6 +127,7 @@ export type CharacterError = {
   message: string;
   latestRevision?: number | null;
   diagnostics?: RuntimeValidation[];
+  actionDiagnostics?: import("../systems/runtime.js").ActionEvaluationDiagnostic[];
   changedDefinitionIds?: DefinitionId[];
   activityCursor?: string | null;
   cacheDisposition?: "retain" | "replace" | "purge";

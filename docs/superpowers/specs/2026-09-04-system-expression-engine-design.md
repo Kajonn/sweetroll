@@ -386,3 +386,14 @@ Using only committed package APIs and the compiler:
 ## 20. Out of Scope Reaffirmed
 
 No `SystemRuntime` module, no persistence, no HTTP, no semantic versioning, no effects, no reroll/explode/push/collection/lookup semantics, no wall-clock budgets. These remain future increments per `design_v2.md`.
+
+
+## Dice-pool reliability follow-up — 2026-10-22
+
+Grammar v0.1 success-count operands must be direct dice nodes, including dynamic counts. The shared type checker rejects scalars, booleans, arithmetic-combined and keep-wrapped operands before assessment/preview/publication. Independently counted terms may be added. Valid package checksums and deterministic draw order do not change.
+
+The scalar evaluator still returns typed fallbacks plus arithmetic diagnostics. Both entity and item-granted action boundaries reject those diagnostics before producing a roll. Characters maps `action_evaluation_failed` to a definite `invalid_value` error (HTTP 422) and finalizes the error receipt without state, revision, roll or activity writes. Same-key retries replay the error; corrected input requires a new reviewed key. Existing budget failures retain their established behavior.
+
+Optional `actionDiagnostics` is distinct from sheet-validation `diagnostics`: at most eight `{code: "arithmetic_failure", actionId, expressionId, message}` records, each message at most 256 characters. The response contains no fallback total, partial dice, bindings, or source expression. Authorization and receipt-disclosure policy still run before evaluation/replay.
+
+Creator previews reject arithmetic failures too. A modifier is shown only when the shared compiled AST proves an additive dice sum; success counts, scaled or mixed rolls omit the modifier row. The action editor discloses numeric zero samples and input defaults. Custom pool sources do not expose the simple field-modifier control. Named groups and pushes remain future versioned slices.

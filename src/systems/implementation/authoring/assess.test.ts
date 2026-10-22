@@ -85,3 +85,15 @@ describe("assessment helpers", () => {
     expect(hashInput({ a: 1, b: 2 })).toBe(hashInput({ b: 2, a: 1 }));
   });
 });
+
+
+describe("success-count authoring assessment", () => {
+  it.each(["countSuccesses(5, 6)", "countSuccesses(dice(2, 6) + dice(2, 6), 6)", "countSuccesses(true, 6)", "countSuccesses(4d6kh3, 6)"])("rejects %s at its expression identity", (source) => {
+    const document = structuredClone(d6SuccessPoolDocument);
+    document.expressions.find((e) => e.id === "pool_roll_expr")!.source = source;
+    const result = assessDocument(document);
+    expect(result.ok).toBe(false);
+    const diagnostics = result.assessment.diagnostics;
+    expect(diagnostics).toContainEqual(expect.objectContaining({ code: "invalid_expression", path: "pool_roll_expr" }));
+  });
+});

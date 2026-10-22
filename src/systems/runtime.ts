@@ -4,6 +4,7 @@ import { decodeActionInputs, resolveGrantedAction } from "./implementation/runti
 import { resolveObservedValues } from "./implementation/runtime/resolve.js";
 import { createDeterministicRng } from "./implementation/runtime/deterministic-rng.js";
 import { buildFieldBindings, decodeRuntimeState, initializeState } from "./implementation/runtime/state.js";
+import { actionEvaluationFailure } from "./implementation/runtime/action-evaluation.js";
 import { evaluate } from "./implementation/rules/evaluate.js";
 import type { CharacterEntryV1, EntityDefinitionV1, SystemPackageV1, TemplateKind } from "./implementation/package/schema/index.js";
 
@@ -243,13 +244,22 @@ export type RuntimeErrorCode =
   | "invalid_package"
   | "invalid_state"
   | "unsupported_field_value"
+  | "action_evaluation_failed"
   | "budget_exceeded"
   | "internal";
+
+export type ActionEvaluationDiagnostic = {
+  code: "arithmetic_failure";
+  actionId: DefinitionId;
+  expressionId: DefinitionId;
+  message: string;
+};
 
 export type RuntimeError = {
   code: RuntimeErrorCode;
   message: string;
   definitionId?: DefinitionId;
+  actionDiagnostics?: ActionEvaluationDiagnostic[];
 };
 
 export type RuntimeResult<T> =
@@ -428,6 +438,8 @@ export function createSystemRuntime(input: {
             ? budgetExceeded()
             : invalidPackage(expression.id);
         }
+        const failure = actionEvaluationFailure(evaluated, pendingRoll.actionId, expression.id);
+        if (failure !== null) return { ok: false, error: failure };
         if (evaluated.roll === null) return invalidPackage(expression.id);
         roll = {
           actionId: pendingRoll.actionId,

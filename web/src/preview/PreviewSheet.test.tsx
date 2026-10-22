@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import {
-  d20Package,
+  d20Package, d6SuccessPoolPackage,
 } from "../../../src/systems/implementation/package/fixtures/index.js";
 import type { SystemPackageV1 } from "../../../src/systems/implementation/package/schema/index.js";
 
@@ -191,4 +191,14 @@ describe("PreviewSheet", () => {
       expect(screen.getByTestId("preview-frame-shortcut")).toHaveTextContent("Alt+P");
     });
   });
+});
+
+
+it("does not invent a modifier for a counted pool in the full sheet preview", async () => {
+  const user = userEvent.setup();
+  const pkg = asPackage(d6SuccessPoolPackage);
+  render(<PreviewSheet pkg={pkg} sample={generateSample(pkg)} />);
+  await user.click(screen.getByTestId("preview-action-test_pool_element"));
+  expect(screen.getByTestId("preview-roll-result-test_pool")).toBeInTheDocument();
+  expect(screen.queryByTestId("preview-roll-result-modifiers")).not.toBeInTheDocument();
 });

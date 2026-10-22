@@ -2849,6 +2849,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -2888,6 +2895,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -2911,6 +2925,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -3221,6 +3242,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -3260,6 +3288,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -3283,6 +3318,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -3308,6 +3350,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -3332,6 +3381,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -3355,6 +3411,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -3413,6 +3476,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -3452,6 +3522,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -3475,6 +3552,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -3500,6 +3584,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -3523,6 +3614,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -3587,6 +3685,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -3626,6 +3731,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -3649,6 +3761,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -3963,6 +4082,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -3987,6 +4113,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -4010,6 +4143,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -4353,6 +4493,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -4392,6 +4539,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -4415,6 +4569,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -4440,6 +4601,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -4464,6 +4632,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -4487,6 +4662,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -4819,6 +5001,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -4858,6 +5047,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -4881,6 +5077,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -4906,6 +5109,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -4930,6 +5140,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -4953,6 +5170,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -5285,6 +5509,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -5324,6 +5555,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -5347,6 +5585,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -5372,6 +5617,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -5396,6 +5648,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -5419,6 +5678,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -5755,6 +6021,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -5794,6 +6067,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -5817,6 +6097,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -5842,6 +6129,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -5866,6 +6160,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -5889,6 +6190,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -6246,6 +6554,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -6285,6 +6600,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -6308,6 +6630,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -6333,6 +6662,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -6357,6 +6693,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -6380,6 +6723,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -6711,6 +7061,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -6750,6 +7107,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -6773,6 +7137,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -6798,6 +7169,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -6822,6 +7200,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -6845,6 +7230,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -7180,6 +7572,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -7219,6 +7618,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -7242,6 +7648,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -7267,6 +7680,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -7291,6 +7711,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -7314,6 +7741,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -7482,6 +7916,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -7521,6 +7962,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -7545,6 +7993,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -7568,6 +8023,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -7900,6 +8362,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -7939,6 +8408,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -7962,6 +8438,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -7987,6 +8470,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -8011,6 +8501,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -8034,6 +8531,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -8339,6 +8843,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -8378,6 +8889,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -8401,6 +8919,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -8426,6 +8951,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -8450,6 +8982,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -8473,6 +9012,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -8537,6 +9083,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -8576,6 +9129,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -8600,6 +9160,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -8623,6 +9190,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -8752,6 +9326,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -8776,6 +9357,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -8799,6 +9387,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -9079,6 +9674,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -9118,6 +9720,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -9141,6 +9750,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -9166,6 +9782,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -9190,6 +9813,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -9213,6 +9843,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -9544,6 +10181,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -9583,6 +10227,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -9606,6 +10257,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -9631,6 +10289,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -9655,6 +10320,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -9678,6 +10350,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -10008,6 +10687,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -10047,6 +10733,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -10070,6 +10763,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
@@ -10095,6 +10795,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -10119,6 +10826,13 @@ export interface operations {
                                 message: string;
                                 targetDefinitionId: string;
                             }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;
                             cacheDisposition?: "retain" | "replace" | "purge";
@@ -10142,6 +10856,13 @@ export interface operations {
                                 severity: "error" | "warning";
                                 message: string;
                                 targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
                             }[];
                             changedDefinitionIds?: string[];
                             activityCursor?: string | null;

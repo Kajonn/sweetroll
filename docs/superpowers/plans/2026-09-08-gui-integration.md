@@ -5,6 +5,8 @@
 **Visual reference:** [Tablefolk GUI mockup](https://tablefolk-ttrpg-mockups.humdrumrat.chatgpt.site).  
 **Original baseline:** `be3efc89b536f563c0f11f2f929171dd8129463b`.
 
+**Dice-pool follow-up (2026-10-21):** the [dice pool reliability plan](2026-10-21-dice-pool-reliability.md) owns custom-formula preservation, truthful success-count preview, actionable roll errors, and author-to-player browser/deployed acceptance. Named groups and push controls follow its separate versioned B/C gates. These are open tasks; this link does not close G7/G9 or change current grammar/offline capabilities.
+
 **Reconciled baseline:** `d6bfd32b7016a3bdaf7d0b0585b7f4861f34374f` (after PR #1 merge and creation-picker work).
 
 **Remediation planning 2026-09-12:** GM Phase 1/2 and subsequent review fixes are present at `11aea84`. The [pre-upgrade remediation index](2026-09-12-remediation-index.md) records fresh full-suite results, confirmed failures, workflow gaps, approval-gated contract proposals, and remaining acceptance/release work. This is a planning cross-reference, not closure of the unchecked G7/G9 gates or approval of new discovery/recovery permissions; historical reconciliation notes below retain their original baseline.

@@ -435,7 +435,7 @@ export function RollActionEditor({
       </div>
       <p data-testid={`roll-action-try-sample-note-${action.id}`}>{t("editor.action.roll.tryIt.sampleNote")}</p>
       <ul data-testid={`roll-action-try-bindings-${action.id}`}>
-        {Object.entries(sampleBindings).map(([id, value]) => <li key={id}>{fieldLabels?.[id] ?? id}: {String(value)}</li>)}
+        {Object.entries(sampleBindings).map(([id, value]) => <li key={id}>{action.inputs.find(input => input.id === id)?.label || fieldLabels?.[id] || id}: {String(value)}</li>)}
       </ul>
       <div className={styles.tryItRow}>
         <Button

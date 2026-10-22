@@ -8,6 +8,18 @@ async function saved(page: Page) {
   await expect(page.getByTestId("document-editor-autosave")).toContainText("Saved");
 }
 
+async function setPoolSource(page: Page, systemId: string, source: string) {
+  const acknowledged = page.waitForResponse(response => {
+    if (response.request().method() !== "PUT" || !response.url().endsWith(`/api/systems/${systemId}/draft`)) return false;
+    const body = response.request().postDataJSON() as { document?: SystemDocumentV1 };
+    return body.document?.expressions.find(e => e.id === "pool_roll_expr")?.source === source;
+  });
+  await page.getByTestId("expression-editor-source").fill(source);
+  const response = await acknowledged;
+  expect(response.status()).toBe(200);
+  await saved(page);
+}
+
 async function discardRejectedRoll(page: Page) {
   const review = page.getByRole("heading", { name: "Review conflicts" }).locator("..");
   await review.getByRole("checkbox").first().check();
@@ -48,15 +60,13 @@ test("pool authoring, failed-roll review, zero pools and granted-action parity",
     await expect(page.getByTestId("expression-editor-source")).toHaveValue(poolSource);
     await expect(page.getByTestId("roll-field-modifier-test_pool")).toHaveCount(0);
     // A supported-looking but unevaluable operand must fail real server assessment.
-    await page.getByTestId("expression-editor-source").fill("countSuccesses(5, 6)");
-    await saved(page);
+    await setPoolSource(page, systemId, "countSuccesses(5, 6)");
     const rejectedAssessment = await page.request.post(`/api/systems/${systemId}/preview`);
     expect(rejectedAssessment.status()).toBe(422);
     expect((await rejectedAssessment.json()).error.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: "invalid_expression", path: "pool_roll_expr" }),
     ]));
-    await page.getByTestId("expression-editor-source").fill(poolSource);
-    await saved(page);
+    await setPoolSource(page, systemId, poolSource);
     await page.reload();
     await page.getByTestId("document-editor-tab-dice").click();
     await expect(page.getByTestId("expression-editor-source")).toHaveValue(poolSource);

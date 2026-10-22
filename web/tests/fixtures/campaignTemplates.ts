@@ -432,7 +432,16 @@ export async function campaignTemplateJourney(
     await expect(
       gmPage.getByRole("heading", { name: "Tower key", exact: true }),
     ).toHaveCount(0);
+    const refreshedCatalog = playerPage.waitForResponse(response => response.url().endsWith(`/api/characters/${char}/templates`) && response.status() === 200);
     await playerPage.reload();
+    await refreshedCatalog;
+    // Offline builds restore cached choices first. Wait for the fresh catalog to
+    // commit before opening a *new* selection; an already selected reference is
+    // intentionally retained across archive/refresh by the review contract.
+    await expect.poll(async () => {
+      const catalog = await cachedCatalog(playerPage, playerId, char) as { templates: Array<{ source?: { kind: string } }> } | null;
+      return catalog === null ? -1 : catalog.templates.filter(t => t.source?.kind === "campaign").length;
+    }).toBe(0);
     await expect(playerPage.getByTestId("slot-list-inventory")).toContainText(
       "Tower key",
     );

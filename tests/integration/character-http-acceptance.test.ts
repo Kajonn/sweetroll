@@ -831,7 +831,10 @@ expect(rollback.json().result.character.state.values).toEqual({
     const replay = await fail();
     expect(replay.statusCode).toBe(422);
     expect(replay.json().error).toEqual(rejected.json().error);
-    expect((await getCharacter(app, ada, characterId)).json().character).toEqual(before);
+    // GET reconciliation IDs and replay expiry identify the read, not persisted character state.
+    const { reconciliation: _beforeRead, ...beforeState } = before;
+    const { reconciliation: _afterRead, ...afterState } = (await getCharacter(app, ada, characterId)).json().character;
+    expect(afterState).toEqual(beforeState);
     expect((await listActivity(app, ada, characterId)).json().events).toEqual(activityBefore.events);
     expect((await app.pool.query("SELECT count(*)::int AS n FROM character_rolls WHERE character_id=$1", [characterId])).rows[0].n).toBe(0);
     const mismatch = await execute(0, baseRevision, "pool-fail");

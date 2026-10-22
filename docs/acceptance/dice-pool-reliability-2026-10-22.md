@@ -16,9 +16,23 @@ Initial focused green: 109 server tests and 67 frontend adapter/editor/preview t
 - Root/frontend typechecks and generated-contract check: passed on the initial implementation.
 - PostgreSQL: new HTTP acceptance covers entity and item errors, receipt replay, changed-key payload mismatch, unchanged state/revision/history, legal zero pool, valid correction and outsider denial. Local database execution remains unclaimed; the environment has no usable PostgreSQL service.
 - Browser: canonical `dicePoolReliability.spec.ts` authors and reloads a pool, checks server assessment, inspects truthful samples, publishes and creates a character, reviews a negative-pool failure, rolls a legal zero pool, repeats through an item, checks 320/360/768/1280 widths in both color schemes and reloads.
-- Required CI: pending.
+- Required CI: [PR #21 checks](https://github.com/Kajonn/sweetroll/pull/21/checks) track the current head; historical attempts and limitations are recorded below.
 - Isolated Railway preview: connection restored 2026-10-22. Project `sweetroll-items-preview`, service `sweetroll-items`, separate Postgres; pre-change deployment `25f47e4e-4994-47a8-88c2-f2b0db8b5246` is healthy and follows the prior Sheets branch. Dice-pool deployment/journey pending.
 
 ## Limits
 
 Physical Android/iPad interaction, real-provider authentication, full G9 playtests and broader release gates remain open. Creator undo/redo controls do not exist in the baseline and are not introduced here. No named groups, pushes, rerolls, new offline action queue or automatic effects are enabled. Production service/source/configuration are unchanged.
+
+
+## Follow-up verification
+
+The final local suites passed 427 server tests (10 existing DB-dependent skips) and 1,162 frontend tests. Root/frontend typechecks, production builds and generated-contract identity passed. Remote commit `ca1e5f6` has the exact locally verified tree `f4c155339641843aa21e2c3620c74a04e9fa462c`.
+
+CI run 108 caught test synchronization issues: the new DB assertion compared per-read reconciliation UUIDs/expiry instead of persisted character state; the authoring journey reloaded before the matching formula save response; and an existing campaign-template offline fixture opened a new selector while restoring stale cached choices. The fixes compare all character data except read reconciliation, await the exact saved expression response, and await fresh catalog persistence before opening a new selection. Selected-reference retention behavior is unchanged. No retries, timeouts, screenshot baselines or production configuration were loosened. Follow-up commit `6c184de` changes tests only.
+
+Railway is connected. The isolated preview source switch was rejected by automatic approval review because its environment is named `production` and direct deployment authorization was not considered explicit enough. A safer staged patch `122b2bfc-ece8-4bca-a9e4-774ec123b246` contains only the preview branch and pinned commit, with no destructive fields. It has not been activated. A live journey remains blocked on user approval; no production source, data or running preview deployment was changed.
+
+
+Run 109 passed server verification (including the two new real PostgreSQL error-receipt journeys), frontend checks, visual baselines, offline tests and two browser shards. The remaining browser assertion caught missing display-label plumbing in the Dice tab's sample bindings. Commit `f1002c2` supplies the document's field labels and input labels; 48 focused editor tests and frontend typecheck pass. The same canonical browser journey remains the acceptance gate for the repaired authoring-to-player path. No unrelated product behavior was changed to resolve the test races.
+
+The staged preview commit will be updated to the exact tested application revision before activation is requested. The live deployment/journey is still unclaimed until approval and execution. This document does not turn either the staged change or a CI browser run into deployed evidence.

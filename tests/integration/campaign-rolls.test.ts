@@ -635,7 +635,7 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
   // second system evidence (d6 pool) + idempotency stability
   // ------------------------------------------------------------------
 
-  it("records audiences for d6-pool rolls with stable same-key replay", async () => {
+  it("records audiences and reauthorizes same-key success and failure replays", async () => {
     const created = await h.campaigns.create(ctxFor(h.users.gm), {
       systemVersionId: h.otherVersionId,
       title: `Pool ${randomUUID()}`,
@@ -680,6 +680,30 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
         ...(audience === undefined ? {} : { audience }),
       });
 
+    const failedKey = randomUUID();
+    const failPool = () => h.characters.apply(ctxFor(h.users.player), {
+      kind: "executeAction",
+      characterId: personal.value.characterId,
+      actionId: "test_pool",
+      inputs: { bonus_dice: -3 },
+      expectedRevision: 2,
+      idempotencyKey: failedKey,
+    });
+    const firstFailure = await failPool();
+    expect(firstFailure).toMatchObject({ ok: false, error: { code: "invalid_value" } });
+    // Treat the first response as lost; a same-key retry must replay its
+    // reviewable failure while the original campaign authorization remains.
+    const replayedFailure = await failPool();
+    expect(replayedFailure).toEqual(firstFailure);
+    const failureReceipt = await h.pool.query<{ result_json: unknown }>(
+      `SELECT result_json FROM character_command_executions WHERE actor_id = $1 AND idempotency_key = $2`,
+      [h.users.player.actorId, failedKey],
+    );
+    expect(failureReceipt.rows[0]?.result_json).toMatchObject({
+      ok: false,
+      scope: { campaignId, placementGeneration: 2, membershipGeneration: 1, audience: null },
+    });
+
     const first = await applyPool(key, "gm_only");
     expect(first.ok).toBe(true);
     if (!first.ok) throw new Error(`pool roll failed: ${JSON.stringify(first.error)}`);
@@ -696,6 +720,15 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
     const exported = await exportedRolls(h.users.gm, campaignId);
     expect(exported.rolls).toHaveLength(1);
     expect(exported.rolls[0]).toMatchObject({ audience: "gm_only" });
+
+    const removed = await h.campaigns.removeMember(ctxFor(h.users.gm), {
+      campaignId,
+      userId: h.users.player.actorId,
+      expectedCampaignRevision: await campaignRevision(campaignId),
+      idempotencyKey: randomUUID(),
+    });
+    expect(removed.ok).toBe(true);
+    expect(await failPool()).toMatchObject({ ok: false, error: { code: "not_found" } });
   });
 
   async function rollIdOf(characterId: string): Promise<string> {

@@ -140,6 +140,7 @@ export function RollActionEditor({
   onDiceKindChange,
 }: RollActionEditorProps) {
   const [tryItResult, setTryItResult] = useState<ReturnType<typeof evaluateRoll> | null>(null);
+  const [tryItBindings, setTryItBindings] = useState<Record<string, ScalarValue> | null>(null);
   // Local custom-edit mode: picking "custom" reveals the inline formula
   // editor on the current source without persisting anything. It clears
   // when a canned kind is picked (which persists that kind instead).
@@ -172,20 +173,22 @@ export function RollActionEditor({
   };
 
   const runTryIt = () => {
+    const bindings = buildTryItBindings(action.inputs, fieldTypes);
+    setTryItBindings(bindings);
     setTryItResult(
       evaluateRoll({
         source: expressionSource,
         env: { fields: fieldTypes, inputs: inputTypes },
         resultType: "number",
         fallback: 0,
-        bindings: buildTryItBindings(action.inputs, fieldTypes),
+        bindings,
       }),
     );
   };
 
   const modifiers = tryItResult === null ? null : additiveRollModifier(tryItResult.result);
   const simpleSource = /^d(?:4|6|8|10|12|20)(?:\s*\+\s*fields\.[a-z][a-z0-9_]{0,63})?(?:\s*\+\s*inputs\.[a-z][a-z0-9_]{0,63})*$/.test(expressionSource);
-  const sampleBindings = buildTryItBindings(action.inputs, fieldTypes);
+  const sampleBindings = tryItBindings ?? buildTryItBindings(action.inputs, fieldTypes);
 
   const showEmpty = tryItResult === null;
   const numericFields = Object.entries(fieldTypes).filter(([, valueType]) => valueType === "number");

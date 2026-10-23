@@ -409,4 +409,24 @@ describe("custom dice pools", () => {
     expect(screen.getByTestId("roll-action-try-bindings-atk")).toHaveTextContent("strength: 0");
     expect(screen.getByTestId("roll-action-try-sample-note-atk")).toHaveTextContent(/zero|0/i);
   });
+
+  it("keeps disclosed bindings aligned with the displayed result after a default changes", () => {
+    const view = renderEditor({
+      action: {
+        ...defaultAction,
+        inputs: [{ id: "bonus", label: "Bonus", valueType: "integer", required: false, default: 0 }],
+      },
+      expressionSource: "countSuccesses(dice(inputs.bonus, 6), 6)",
+    });
+
+    fireEvent.click(screen.getByTestId("roll-action-try-atk"));
+    expect(screen.getByTestId("roll-action-try-bindings-atk")).toHaveTextContent("Bonus: 0");
+    expect(screen.getByTestId("roll-action-try-total-atk")).toHaveTextContent("0");
+
+    fireEvent.change(screen.getByTestId("roll-action-input-default-bonus"), { target: { value: "3" } });
+    view.applyChange();
+
+    expect(screen.getByTestId("roll-action-try-bindings-atk")).toHaveTextContent("Bonus: 0");
+    expect(screen.getByTestId("roll-action-try-total-atk")).toHaveTextContent("0");
+  });
 });

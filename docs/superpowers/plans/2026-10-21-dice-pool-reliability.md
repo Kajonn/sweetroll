@@ -92,13 +92,13 @@ The review ran 75 focused backend tests and 25 frontend tests successfully. Sepa
 
 **Files:** existing backend/unit/integration and frontend suites; extend `web/tests/e2e/character-sheet.spec.ts` and relevant authoring journeys; add a focused dice-pool browser spec under the canonical runner if needed; write a dated acceptance record under `docs/acceptance/` during execution.
 
-- [ ] Run an author → assess → preview → publish → create-character journey using a license-neutral pool system, with attributes, skill, a situational dice modifier, a resource, and a system item-granted roll.
-- [ ] Prove invalid formula rejection, custom formula preservation after reload, truthful preview, valid zero pool, negative-pool error/correction, valid roll/retry, and item-granted parity through actual UI and HTTP. Retain d20/PbtA journeys.
-- [ ] Run Node 24 checks: root `npm test`, `npm run test:integration`, `npm run typecheck`, `npm run contracts:check`, `npm run build`; then `npm run web:test`, `npm run web:typecheck`, `npm run web:build`, canonical `npm run web:test:e2e` and `npm run web:test:offline`. Use the repository's real isolated DB/ports and runner configuration; do not count skips as passing DB/browser coverage.
+- [x] Run an author → assess → preview → publish → create-character journey using a license-neutral pool system, with attributes, skill, a situational dice modifier, a resource, and a system item-granted roll.
+- [x] Prove invalid formula rejection, custom formula preservation after reload, truthful preview, valid zero pool, negative-pool error/correction, valid roll/retry, and item-granted parity through actual UI and HTTP. Retain d20/PbtA journeys.
+- [x] Run Node 24 checks: root `npm test`, `npm run test:integration`, `npm run typecheck`, `npm run contracts:check`, `npm run build`; then `npm run web:test`, `npm run web:typecheck`, `npm run web:build`, canonical `npm run web:test:e2e` and `npm run web:test:offline`. Use the repository's real isolated DB/ports and runner configuration; do not count skips as passing DB/browser coverage.
 - [ ] Verify the production web build, offline reopening/queued failed-action review where supported, and historical result/receipt decoding. Do not add a new offline or GM command queue as part of A.
 - [ ] Check 360/768/1280 widths, a 320px overflow probe, light/dark themes, keyboard/focus, and error recovery. Keep physical-device and real-provider authentication checks open if unavailable; do not change screenshot baselines merely to pass.
-- [ ] Before deployed acceptance, verify the acceptance service's source branch, exact deployment commit, completed build/migrations, `/health/ready`, and loaded frontend/service-worker assets. Test a dedicated branch preview or acceptance after merge; keep production sources unchanged.
-- [ ] Repeat the core pool and item journey against that verified deployment; record tested commit, red/green commands, CI, local/live evidence, browser/viewport/theme, failures, and limitations. Update this plan and GUI/design status only from observed results.
+- [x] Before deployed acceptance, verify the acceptance service's source branch, exact deployment commit, completed build/migrations, `/health/ready`, and loaded frontend/service-worker assets. Test a dedicated branch preview or acceptance after merge; keep production sources unchanged.
+- [x] Repeat the core pool and item journey against that verified deployment; record tested commit, red/green commands, CI, local/live evidence, browser/viewport/theme, failures, and limitations. Update this plan and GUI/design status only from observed results.
 
 **Gate:** R1–R4 have observed red → green regressions, required CI and actual deployed acceptance. Passing A does not close B/C or wider G9 release gates.
 
@@ -138,7 +138,7 @@ The review ran 75 focused backend tests and 25 frontend tests successfully. Sepa
 
 | Slice | Contract/spec | Red → green | CI | Deployed journey | Status |
 |---|---|---|---|---|---|
-| A | Package/expression specs updated; `actionDiagnostics` contract generated | R1–R4 observed red → green | Pending | Pending | Implemented; acceptance gates remain |
+| A | Package/expression specs updated; `actionDiagnostics` contract generated | R1–R4 observed red → green | Run 112: all seven verification jobs passed | `ad5de63`, 2026-10-23: core journey and offline reopening passed | Ready for A review; unchecked bundles and wider release gates remain |
 | B | Versioned design required in Task 6 | Pending | Pending | Pending | After A |
 | C | Push/lineage policy required in Task 7 | Pending | Pending | Pending | After B |
 
@@ -150,3 +150,8 @@ This document records execution steps. No checkbox or green test count from the 
 The shared type checker now enforces direct success-count operands. Both runtime action paths use one arithmetic-failure guard; Characters persists the definite error using its existing stable receipt path. HTTP/OpenAPI/client/session carry bounded `actionDiagnostics`. The editor preserves custom formulas, rejects fallback previews, shows sample bindings, and shares AST-based additive-modifier detection with full-sheet preview.
 
 Observed pre-fix red: 16 server regressions and three editor regressions failed. The subsequent adapter/full-preview regressions also failed before their repairs. Focused green and full-suite results, CI and deployed evidence are recorded separately in the dated acceptance record. Existing undo/redo controls are not provided by the creator; this slice does not add an unrelated history UI. Unchecked bundles retain their additional acceptance requirements. No named-group or push contract has been enabled.
+
+
+### Slice A deployed evidence — 2026-10-23
+
+Owner-approved isolated Railway deployment `d16eefbe-3863-4ea1-b83d-33d7bffbde1b` reached SUCCESS on exact application commit `ad5de63`, after the platform's earlier deployment pause. Migrations/readiness and served HTML/JS/CSS/service-worker/manifest identity were verified. The canonical core pool/item journey passed against the remote production build (53.6s), followed by a separate offline deep-link reopening check (24.7s). See the [acceptance record](../../acceptance/dice-pool-reliability-2026-10-22.md#final-ci-and-deployed-acceptance--2026-10-23) for exact IDs, artifact hashes, commands, cleanup and remaining limitations. CI on the same application commit passed all seven verification jobs, including real PostgreSQL, retained d20/PbtA journeys and production-offline coverage. Documentation-only evidence updates do not change the pinned application. A review precedes B; this evidence does not close the unchecked combined keyboard/focus or failed-action-offline-review gates or wider G9 release gates.

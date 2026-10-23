@@ -960,8 +960,8 @@ expect(rollback.json().result.character.state.values).toEqual({
     const original=document.actions.find(a=>a.id==="test_pool")!;
     if(source==="item"){
       document.slots=[{id:"gear_slot",label:"Gear",accepts:["item"]}];
-      document.templates=[{id:"tool",label:"Tool",kind:"item",fields:[],grantedActions:[{...structuredClone(original),id:"tool_pool",expressionId:"tool_expr"}]}];
-      document.expressions.push({...structuredClone(document.expressions.find(e=>e.id==="pool_roll_expr")!),id:"tool_expr"});
+      document.templates=[{id:"tool",label:"Tool",kind:"item",fields:[],grantedActions:[{...structuredClone(original),id:"tool_pool",expressionId:"tool_expr",inputs:[{id:"gear_bonus",label:"Gear Bonus",valueType:"integer",required:false,default:0}]}]}];
+      document.expressions.push({...structuredClone(document.expressions.find(e=>e.id==="pool_roll_expr")!),id:"tool_expr",source:document.expressions.find(e=>e.id==="pool_roll_expr")!.source.replaceAll("inputs.bonus_dice","inputs.gear_bonus")});
       document.sheets[0]!.sections[1]!.elements.push({kind:"slot",id:"gear_slot_element",slotId:"gear_slot"});
     }
     const {versionId}=await publishVersion(app,ada,document,{name:"Grouped pool",semanticVersion:"1.0.0"});
@@ -974,7 +974,7 @@ expect(rollback.json().result.character.state.values).toEqual({
       expect(added.statusCode,added.body).toBe(200); revision=2;
     }
     const url=`/characters/${id}/actions/${source==="item"?"tool_pool":"test_pool"}`;
-    const payload={inputs:{bonus_dice:1},expectedRevision:revision,idempotencyKey:randomUUID(),...(source==="item"?{entryId}:{})};
+    const payload={inputs:{[source==="item"?"gear_bonus":"bonus_dice"]:1},expectedRevision:revision,idempotencyKey:randomUUID(),...(source==="item"?{entryId}:{})};
     const rolled=await app.app.inject({method:"POST",url,headers:cookieHeader(ada),payload});
     expect(rolled.statusCode,rolled.body).toBe(200);const roll=rolled.json().result.roll;
     expect(roll.breakdown.groups.map((g:{id:string})=>g.id)).toEqual(["attribute","skill","gear"]);

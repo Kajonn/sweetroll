@@ -694,3 +694,17 @@ describe("CharacterTools", () => {
     expect(URL.revokeObjectURL).not.toHaveBeenCalledWith("blob:export");
   });
 });
+
+it("keeps activity keyboard focus on an enabled control during its initial load",async()=>{
+ const user=userEvent.setup();const session=makeSession(readySnapshot());
+ let finish!:(value:Awaited<ReturnType<CharacterSession["fetchActivityPage"]>>)=>void;
+ session.fetchActivityPage=vi.fn(()=>new Promise(resolve=>{finish=resolve;}));
+ render(<CharacterTools characterId="char-1" api={makeApi()} session={session}/>);
+ await user.click(screen.getByRole("button",{name:"Activity",exact:true}));
+ expect(screen.getByRole("button",{name:"Refresh activity",exact:true})).toBeDisabled();
+ expect(screen.getByRole("button",{name:"Close",exact:true})).toHaveFocus();
+ finish({events:[],nextCursor:null,stale:false,fetchedAt:"2026-10-23T00:00:00.000Z"});
+ await waitFor(()=>expect(screen.getByRole("button",{name:"Refresh activity",exact:true})).toBeEnabled());
+ await user.keyboard("{Escape}");expect(screen.queryByRole("dialog",{name:"Activity"})).toBeNull();
+ expect(screen.getByRole("button",{name:"Activity",exact:true})).toHaveFocus();
+});

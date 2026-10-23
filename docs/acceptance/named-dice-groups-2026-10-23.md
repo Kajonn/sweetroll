@@ -19,3 +19,12 @@ Real PostgreSQL integration tests cover both action sources, once-only stored re
 The canonical named-group browser journey exercises guided authoring and save/reload, preview, publish/create-character, entity and granted-item results, responsive light/dark display and history reload. A production-browser offline test reopens cached grouped history. These require actual execution in CI and a verified deployed preview before B acceptance is claimed.
 
 CI/deployed acceptance are pending at this checkpoint. Physical devices, real-provider authentication and wider G9 gates remain open. Personal character state export continues to exclude roll history; the campaign export and authorized character history carry grouped results. No C push policy, reroll, effect engine or new command queue has been enabled.
+
+
+## CI run 116 follow-up
+
+Run 116 on `51159ce` passed all 445 server tests with its DB available, 1,170 frontend tests, visual baselines and browser shard 1. The new entity-group persistence and upgrade/rollback PostgreSQL tests passed; the new granted-item fixture was correctly rejected because it reused the entity input ID. The item fixture now uses a distinct `gear_bonus` ID and source reference. This does not relax package uniqueness.
+
+The production offline test exposed initial Activity dialog focus loss: the effect focused Refresh and immediately disabled it during loading. A new unit regression reproduced this (red); starting in the busy state focuses the enabled Close control instead (green: 25 CharacterTools tests). Escape and opener restoration are exercised after the asynchronous load, and the original production-browser Escape assertion is retained.
+
+A retained campaign-template dev journey raced a fresh revision: the trace showed a frozen revision-3 command after GM publication of revision 4, followed by the correct reviewable HTTP 409. The fixture now awaits the fresh catalog response and revision-4 persistence before going offline. Selected-reference retention/product conflict handling, timeouts, retries and visual baselines are unchanged. The remaining delayed browser-install job is not counted as success.

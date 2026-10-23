@@ -120,8 +120,8 @@ test("named groups survive guided authoring, publishing, both action sources and
             expressionId: "gear_pool_expr",
             inputs: [
               {
-                id: "bonus_dice",
-                label: "Bonus Dice",
+                id: "gear_bonus",
+                label: "Gear Bonus",
                 valueType: "integer",
                 required: false,
                 default: 0,
@@ -137,7 +137,7 @@ test("named groups survive guided authoring, publishing, both action sources and
       context: "roll",
       resultType: "number",
       fallback: 0,
-      source: namedPoolSource,
+      source: namedPoolSource.replaceAll("inputs.bonus_dice", "inputs.gear_bonus"),
     });
     document.sheets[0].sections[1].elements.push({
       kind: "slot",

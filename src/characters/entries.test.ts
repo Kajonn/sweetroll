@@ -92,6 +92,7 @@ const DDL = `
     action_id          text NOT NULL,
     execution_id       uuid NOT NULL UNIQUE,
     expression         text NOT NULL,
+    breakdown_json     jsonb,
     dice_json          jsonb NOT NULL,
     bindings_json      jsonb NOT NULL,
     total              double precision NOT NULL,

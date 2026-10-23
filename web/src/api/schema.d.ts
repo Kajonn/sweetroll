@@ -4451,12 +4451,37 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                breakdown?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rootId: string;
+                                    groups: {
+                                        id: string;
+                                        label: string;
+                                        count: number;
+                                        sides: number;
+                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        threshold?: number;
+                                        diceIds: string[];
+                                        total: number;
+                                    }[];
+                                    terms: {
+                                        id: string;
+                                        operation: string;
+                                        operandIds: string[];
+                                        value: string | number | boolean | null;
+                                        groupId?: string;
+                                    }[];
+                                };
                                 actionId: string;
                                 expression: string;
                                 dice: {
                                     sides: number;
                                     value: number;
                                     kept: boolean;
+                                    id?: string;
+                                    groupId?: string;
+                                    success?: boolean;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs";
@@ -4959,12 +4984,37 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                breakdown?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rootId: string;
+                                    groups: {
+                                        id: string;
+                                        label: string;
+                                        count: number;
+                                        sides: number;
+                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        threshold?: number;
+                                        diceIds: string[];
+                                        total: number;
+                                    }[];
+                                    terms: {
+                                        id: string;
+                                        operation: string;
+                                        operandIds: string[];
+                                        value: string | number | boolean | null;
+                                        groupId?: string;
+                                    }[];
+                                };
                                 actionId: string;
                                 expression: string;
                                 dice: {
                                     sides: number;
                                     value: number;
                                     kept: boolean;
+                                    id?: string;
+                                    groupId?: string;
+                                    success?: boolean;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs";
@@ -5467,12 +5517,37 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                breakdown?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rootId: string;
+                                    groups: {
+                                        id: string;
+                                        label: string;
+                                        count: number;
+                                        sides: number;
+                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        threshold?: number;
+                                        diceIds: string[];
+                                        total: number;
+                                    }[];
+                                    terms: {
+                                        id: string;
+                                        operation: string;
+                                        operandIds: string[];
+                                        value: string | number | boolean | null;
+                                        groupId?: string;
+                                    }[];
+                                };
                                 actionId: string;
                                 expression: string;
                                 dice: {
                                     sides: number;
                                     value: number;
                                     kept: boolean;
+                                    id?: string;
+                                    groupId?: string;
+                                    success?: boolean;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs";
@@ -5709,6 +5784,11 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
+                    dice?: unknown;
+                    total?: unknown;
+                    breakdown?: unknown;
+                    groups?: unknown;
+                    seed?: unknown;
                     inputs?: {
                         [key: string]: unknown;
                     };
@@ -5979,12 +6059,37 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                breakdown?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rootId: string;
+                                    groups: {
+                                        id: string;
+                                        label: string;
+                                        count: number;
+                                        sides: number;
+                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        threshold?: number;
+                                        diceIds: string[];
+                                        total: number;
+                                    }[];
+                                    terms: {
+                                        id: string;
+                                        operation: string;
+                                        operandIds: string[];
+                                        value: string | number | boolean | null;
+                                        groupId?: string;
+                                    }[];
+                                };
                                 actionId: string;
                                 expression: string;
                                 dice: {
                                     sides: number;
                                     value: number;
                                     kept: boolean;
+                                    id?: string;
+                                    groupId?: string;
+                                    success?: boolean;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs";
@@ -6512,12 +6617,37 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                breakdown?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rootId: string;
+                                    groups: {
+                                        id: string;
+                                        label: string;
+                                        count: number;
+                                        sides: number;
+                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        threshold?: number;
+                                        diceIds: string[];
+                                        total: number;
+                                    }[];
+                                    terms: {
+                                        id: string;
+                                        operation: string;
+                                        operandIds: string[];
+                                        value: string | number | boolean | null;
+                                        groupId?: string;
+                                    }[];
+                                };
                                 actionId: string;
                                 expression: string;
                                 dice: {
                                     sides: number;
                                     value: number;
                                     kept: boolean;
+                                    id?: string;
+                                    groupId?: string;
+                                    success?: boolean;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs";
@@ -7019,12 +7149,37 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                breakdown?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rootId: string;
+                                    groups: {
+                                        id: string;
+                                        label: string;
+                                        count: number;
+                                        sides: number;
+                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        threshold?: number;
+                                        diceIds: string[];
+                                        total: number;
+                                    }[];
+                                    terms: {
+                                        id: string;
+                                        operation: string;
+                                        operandIds: string[];
+                                        value: string | number | boolean | null;
+                                        groupId?: string;
+                                    }[];
+                                };
                                 actionId: string;
                                 expression: string;
                                 dice: {
                                     sides: number;
                                     value: number;
                                     kept: boolean;
+                                    id?: string;
+                                    groupId?: string;
+                                    success?: boolean;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs";
@@ -7530,12 +7685,37 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                breakdown?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rootId: string;
+                                    groups: {
+                                        id: string;
+                                        label: string;
+                                        count: number;
+                                        sides: number;
+                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        threshold?: number;
+                                        diceIds: string[];
+                                        total: number;
+                                    }[];
+                                    terms: {
+                                        id: string;
+                                        operation: string;
+                                        operandIds: string[];
+                                        value: string | number | boolean | null;
+                                        groupId?: string;
+                                    }[];
+                                };
                                 actionId: string;
                                 expression: string;
                                 dice: {
                                     sides: number;
                                     value: number;
                                     kept: boolean;
+                                    id?: string;
+                                    groupId?: string;
+                                    success?: boolean;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs";
@@ -8320,12 +8500,37 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                breakdown?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rootId: string;
+                                    groups: {
+                                        id: string;
+                                        label: string;
+                                        count: number;
+                                        sides: number;
+                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        threshold?: number;
+                                        diceIds: string[];
+                                        total: number;
+                                    }[];
+                                    terms: {
+                                        id: string;
+                                        operation: string;
+                                        operandIds: string[];
+                                        value: string | number | boolean | null;
+                                        groupId?: string;
+                                    }[];
+                                };
                                 actionId: string;
                                 expression: string;
                                 dice: {
                                     sides: number;
                                     value: number;
                                     kept: boolean;
+                                    id?: string;
+                                    groupId?: string;
+                                    success?: boolean;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs";
@@ -9051,6 +9256,48 @@ export interface operations {
                 content: {
                     "application/json": {
                         events: {
+                            roll?: {
+                                breakdown?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rootId: string;
+                                    groups: {
+                                        id: string;
+                                        label: string;
+                                        count: number;
+                                        sides: number;
+                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        threshold?: number;
+                                        diceIds: string[];
+                                        total: number;
+                                    }[];
+                                    terms: {
+                                        id: string;
+                                        operation: string;
+                                        operandIds: string[];
+                                        value: string | number | boolean | null;
+                                        groupId?: string;
+                                    }[];
+                                };
+                                actionId: string;
+                                expression: string;
+                                dice: {
+                                    sides: number;
+                                    value: number;
+                                    kept: boolean;
+                                    id?: string;
+                                    groupId?: string;
+                                    success?: boolean;
+                                }[];
+                                bindings: {
+                                    scope: "fields" | "inputs";
+                                    definitionId: string;
+                                    value: string | number | boolean | null;
+                                }[];
+                                total: number;
+                                output: string;
+                                audience: "owner_only" | "gm_only" | "campaign";
+                            };
                             id: string;
                             characterRevision: number;
                             kind: string;
@@ -10139,12 +10386,37 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                breakdown?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rootId: string;
+                                    groups: {
+                                        id: string;
+                                        label: string;
+                                        count: number;
+                                        sides: number;
+                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        threshold?: number;
+                                        diceIds: string[];
+                                        total: number;
+                                    }[];
+                                    terms: {
+                                        id: string;
+                                        operation: string;
+                                        operandIds: string[];
+                                        value: string | number | boolean | null;
+                                        groupId?: string;
+                                    }[];
+                                };
                                 actionId: string;
                                 expression: string;
                                 dice: {
                                     sides: number;
                                     value: number;
                                     kept: boolean;
+                                    id?: string;
+                                    groupId?: string;
+                                    success?: boolean;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs";
@@ -10645,12 +10917,37 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                breakdown?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rootId: string;
+                                    groups: {
+                                        id: string;
+                                        label: string;
+                                        count: number;
+                                        sides: number;
+                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        threshold?: number;
+                                        diceIds: string[];
+                                        total: number;
+                                    }[];
+                                    terms: {
+                                        id: string;
+                                        operation: string;
+                                        operandIds: string[];
+                                        value: string | number | boolean | null;
+                                        groupId?: string;
+                                    }[];
+                                };
                                 actionId: string;
                                 expression: string;
                                 dice: {
                                     sides: number;
                                     value: number;
                                     kept: boolean;
+                                    id?: string;
+                                    groupId?: string;
+                                    success?: boolean;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs";
@@ -17134,6 +17431,28 @@ export interface operations {
                                 actionId: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                                 expression: string;
+                                breakdown?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rootId: string;
+                                    groups: {
+                                        id: string;
+                                        label: string;
+                                        count: number;
+                                        sides: number;
+                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        threshold?: number;
+                                        diceIds: string[];
+                                        total: number;
+                                    }[];
+                                    terms: {
+                                        id: string;
+                                        operation: string;
+                                        operandIds: string[];
+                                        value: string | number | boolean | null;
+                                        groupId?: string;
+                                    }[];
+                                };
                                 dice: unknown;
                                 bindings: unknown;
                                 total: number;

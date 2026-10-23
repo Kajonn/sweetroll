@@ -494,6 +494,7 @@ export async function createI3Schema(databaseUrl: string, schema: string): Promi
   await admin.query(`SET search_path TO ${schema}`);
   await admin.query(I3_SCHEMA_DDL);
   await admin.query(await readFile(new URL("../../migrations/0022_campaign_item_templates.sql", import.meta.url), "utf8"));
+  await admin.query(await readFile(new URL("../../migrations/0023_named_dice_group_results.sql", import.meta.url), "utf8"));
   await admin.end();
 }
 

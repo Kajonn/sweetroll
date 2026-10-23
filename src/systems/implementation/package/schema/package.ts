@@ -37,7 +37,7 @@ export type EffectivePackageLimitsV1 = Static<typeof EffectivePackageLimitsV1Sch
 
 export const SystemPackageV1Schema = Type.Object(
   {
-    schemaVersion: Type.Literal("1.0"),
+    schemaVersion: Type.Union([Type.Literal("1.0"), Type.Literal("1.1")]),
     systemId: Type.String({ pattern: UUID_PATTERN }),
     versionId: Type.String({ pattern: UUID_PATTERN }),
     semanticVersion: Type.String({ pattern: SEMANTIC_VERSION_PATTERN }),

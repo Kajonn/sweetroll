@@ -1,3 +1,4 @@
+import type { DieResult, RollBreakdown } from "./implementation/rules/result.js";
 import { PublishedPackageCorruptError, type PublishedPackageLoader } from "./implementation/runtime/package-loader.js";
 import { buildCharacterProjection } from "./implementation/runtime/projection.js";
 import { decodeActionInputs, resolveGrantedAction } from "./implementation/runtime/resolve-entries.js";
@@ -66,11 +67,7 @@ export type RuntimeValidation = {
   targetDefinitionId: DefinitionId;
 };
 
-export type NormalizedDie = {
-  sides: number;
-  value: number;
-  kept: boolean;
-};
+export type NormalizedDie = DieResult;
 
 export type NormalizedRollBinding = {
   scope: "fields" | "inputs";
@@ -87,6 +84,7 @@ export type NormalizedRollBinding = {
 export type NormalizedRollAudience = "owner_only" | "gm_only" | "campaign";
 
 export type NormalizedRoll = {
+  breakdown?: RollBreakdown;
   actionId: DefinitionId;
   expression: string;
   dice: NormalizedDie[];
@@ -445,6 +443,7 @@ export function createSystemRuntime(input: {
           actionId: pendingRoll.actionId,
           expression: evaluated.roll.expression,
           dice: evaluated.roll.dice,
+          ...(evaluated.roll.breakdown === undefined ? {} : {breakdown: evaluated.roll.breakdown}),
           bindings: evaluated.bindings,
           total: evaluated.roll.total,
           output: pendingRoll.outputTemplate.split("{total}").join(String(evaluated.roll.total)),

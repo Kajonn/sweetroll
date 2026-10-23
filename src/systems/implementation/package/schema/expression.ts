@@ -83,6 +83,7 @@ export const ExpressionAstV1Schema = Type.Recursive(
       Type.Object(
         {
           kind: Type.Literal("dice"),
+          group: Type.Optional(Type.Object({ id: DefinitionIdSchema, label: Type.String({minLength: 1, maxLength: 120}) }, {additionalProperties: false})),
           count: ExpressionAstV1,
           sides: Type.Integer({ minimum: 1, maximum: PACKAGE_LIMITS.sidesPerDie }),
         },
@@ -113,6 +114,7 @@ export type ExpressionAstV1 = Static<typeof ExpressionAstV1Schema>;
 export const CompiledExpressionV1Schema = Type.Object(
   {
     id: DefinitionIdSchema,
+    languageVersion: Type.Optional(Type.Literal("0.2")),
     context: Type.Union([
       Type.Literal("computed"),
       Type.Literal("roll"),

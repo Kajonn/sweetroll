@@ -1032,3 +1032,18 @@ it("upgrades an unscoped v3 catalog without losing snapshots or frozen commands"
   expect(await store.readOnlineAttempts("actor-A")).toEqual([attempt]);
   await store.close();
 });
+
+it("retains grouped history across reopening without crossing accounts or surviving purge",async()=>{
+ const {evaluateExpression}=await import("../ports/evaluateExpression.js");
+ const evaluated=evaluateExpression({source:'countSuccesses(group("skill", "Skill", d6), 6)',env:{fields:{},inputs:{}},resultType:"number",fallback:0,bindings:{},rng:()=>1});
+ expect(evaluated.ok&&evaluated.roll!==null).toBe(true);if(!evaluated.ok||!evaluated.roll)return;
+ const name=crypto.randomUUID();const store=await openCharacterStore(name);
+ const roll={...evaluated.roll,actionId:"test_pool",audience:"owner_only" as const,output:"Successes: 1",bindings:[]};
+ const event={id:"r1",characterRevision:1,kind:"character_action_executed",payload:{},rollId:"saved-roll",requestId:"request",occurredAt:"2026-10-23T00:00:00.000Z",roll};
+ await store.saveActivityPage({actorId:"actor-A",characterId:"char",cursor:null,events:[event],nextCursor:null,fetchedAt:event.occurredAt});
+ await store.close();const reopened=await openCharacterStore(name);
+ expect((await reopened.readActivityPage("actor-A","char",null))?.events[0]?.roll).toEqual(roll);
+ expect(await reopened.readActivityPage("actor-B","char",null)).toBeNull();
+ await reopened.purgeCharacter("actor-A","char");expect(await reopened.readActivityPage("actor-A","char",null)).toBeNull();
+ await reopened.close();
+});

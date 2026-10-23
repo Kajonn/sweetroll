@@ -1,3 +1,4 @@
+import {namedDicePoolDocument} from "../../src/systems/implementation/package/fixtures/named-dice-pool.js";
 import { randomUUID } from "node:crypto";
 
 import { afterEach } from "vitest";
@@ -953,4 +954,59 @@ expect(rollback.json().result.character.state.values).toEqual({
       for (const d of dice) expect(d.sides).toBe(s.dieSides);
     }
   });
+  it.each(["entity", "item"])("preserves named %s groups through HTTP, storage, replay and authorized history", async (source) => {
+    const app=await makeApp(); apps.push(app); const ada=app.users.ada;
+    const document=namedDicePoolDocument();
+    const original=document.actions.find(a=>a.id==="test_pool")!;
+    if(source==="item"){
+      document.slots=[{id:"gear_slot",label:"Gear",accepts:["item"]}];
+      document.templates=[{id:"tool",label:"Tool",kind:"item",fields:[],grantedActions:[{...structuredClone(original),id:"tool_pool",expressionId:"tool_expr"}]}];
+      document.expressions.push({...structuredClone(document.expressions.find(e=>e.id==="pool_roll_expr")!),id:"tool_expr"});
+      document.sheets[0]!.sections[1]!.elements.push({kind:"slot",id:"gear_slot_element",slotId:"gear_slot"});
+    }
+    const {versionId}=await publishVersion(app,ada,document,{name:"Grouped pool",semanticVersion:"1.0.0"});
+    const created=await createCharacter(app,ada,{systemVersionId:versionId,name:"Grouped Hero",idempotencyKey:randomUUID()});
+    expect(created.statusCode,created.body).toBe(201);
+    const id=created.json().character.characterId; const entryId=randomUUID();
+    let revision=1;
+    if(source==="item"){
+      const added=await app.app.inject({method:"POST",url:`/characters/${id}/entries`,headers:cookieHeader(ada),payload:{entry:{entryId,slotId:"gear_slot",templateId:"tool",values:{},quantity:1},expectedRevision:1,idempotencyKey:randomUUID()}});
+      expect(added.statusCode,added.body).toBe(200); revision=2;
+    }
+    const url=`/characters/${id}/actions/${source==="item"?"tool_pool":"test_pool"}`;
+    const payload={inputs:{bonus_dice:1},expectedRevision:revision,idempotencyKey:randomUUID(),...(source==="item"?{entryId}:{})};
+    const rolled=await app.app.inject({method:"POST",url,headers:cookieHeader(ada),payload});
+    expect(rolled.statusCode,rolled.body).toBe(200);const roll=rolled.json().result.roll;
+    expect(roll.breakdown.groups.map((g:{id:string})=>g.id)).toEqual(["attribute","skill","gear"]);
+    expect(roll.breakdown.groups.map((g:{count:number})=>g.count)).toEqual([2,1,0]);
+    const groups=roll.breakdown.groups; expect(roll.total).toBe(groups[0].total+2*groups[1].total+groups[2].total);
+    const replay=await app.app.inject({method:"POST",url,headers:cookieHeader(ada),payload});
+    expect(replay.json().result.roll).toEqual(roll);
+    const stored=await app.pool.query("SELECT dice_json,breakdown_json FROM character_rolls WHERE character_id=$1",[id]);
+    expect(stored.rows).toEqual([{dice_json:roll.dice,breakdown_json:roll.breakdown}]);
+    const activity=await listActivity(app,ada,id);
+    expect(activity.json().events.find((e:{rollId:string|null})=>e.rollId!==null).roll).toEqual(roll);
+    const outsider=await listActivity(app,app.users.bob,id); expect(outsider.statusCode).toBe(404);
+    const forged=await app.app.inject({method:"POST",url,headers:cookieHeader(ada),payload:{...payload,idempotencyKey:randomUUID(),dice:roll.dice,breakdown:roll.breakdown}});
+    expect(forged.statusCode).toBe(400);
+  });
+
+  it("upgrades 1.0 to 1.1 and rolls back without rewriting historical results",async()=>{
+    const app=await makeApp();apps.push(app);const ada=app.users.ada;const headers=cookieHeader(ada);
+    const v1=await publishVersion(app,ada,structuredClone(d6SuccessPoolDocument),{name:"Versioned groups",semanticVersion:"1.0.0"});
+    const created=await createCharacter(app,ada,{systemVersionId:v1.versionId,name:"Upgrade groups",idempotencyKey:randomUUID()});expect(created.statusCode).toBe(201);const id=created.json().character.characterId;
+    const legacy=await executeAction(app,ada,id,"test_pool",{bonus_dice:0},1,randomUUID());expect(legacy.statusCode).toBe(200);expect(legacy.json().result.roll.breakdown).toBeUndefined();
+    const opened=await app.app.inject({method:"GET",url:`/systems/${v1.systemId}`,headers});expect(opened.statusCode).toBe(200);
+    const saved=await app.app.inject({method:"PUT",url:`/systems/${v1.systemId}/draft`,headers,payload:{expectedRevision:opened.json().workspace.draft.revision,document:namedDicePoolDocument()}});expect(saved.statusCode,saved.body).toBe(200);
+    const published=await app.app.inject({method:"POST",url:`/systems/${v1.systemId}/publish`,headers,payload:{expectedRevision:saved.json().workspace.draft.revision,semanticVersion:"1.1.0",releaseNotes:"Grouped",idempotencyKey:randomUUID(),acknowledgeBreaking:true}});expect(published.statusCode,published.body).toBe(200);
+    const targetVersionId=published.json().version.versionId;
+    const preview=await app.app.inject({method:"POST",url:`/characters/${id}/migration-previews`,headers,payload:{targetVersionId}});expect(preview.statusCode,preview.body).toBe(201);
+    const committed=await app.app.inject({method:"POST",url:`/characters/${id}/migrations/${preview.json().preview.previewId}/commit`,headers,payload:{expectedRevision:1,idempotencyKey:randomUUID()}});expect(committed.statusCode,committed.body).toBe(200);
+    const grouped=await executeAction(app,ada,id,"test_pool",{bonus_dice:0},2,randomUUID());expect(grouped.statusCode,grouped.body).toBe(200);const breakdown=grouped.json().result.roll.breakdown;expect(breakdown.groups).toHaveLength(3);
+    const migration=(await app.pool.query("SELECT id FROM character_migrations WHERE character_id=$1",[id])).rows[0]!.id;
+    const rolledBack=await app.app.inject({method:"POST",url:`/characters/${id}/migrations/${migration}/rollback`,headers,payload:{idempotencyKey:randomUUID()}});expect(rolledBack.statusCode,rolledBack.body).toBe(200);expect(rolledBack.json().result.character.systemVersionId).toBe(v1.versionId);
+    const rows=await app.pool.query("SELECT breakdown_json FROM character_rolls WHERE character_id=$1 ORDER BY occurred_at,id",[id]);expect(rows.rows).toEqual([{breakdown_json:null},{breakdown_json:breakdown}]);
+    const history=await listActivity(app,ada,id);expect(history.json().events.find((e:{roll?:{breakdown:unknown}})=>e.roll?.breakdown!==undefined)?.roll.breakdown).toEqual(breakdown);
+  });
+
 });

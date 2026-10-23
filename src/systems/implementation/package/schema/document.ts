@@ -463,7 +463,7 @@ export type SystemMetadataV1 = Static<typeof SystemMetadataV1Schema>;
 
 export const SystemDocumentV1Schema = Type.Object(
   {
-    schemaVersion: Type.Literal("1.0"),
+    schemaVersion: Type.Union([Type.Literal("1.0"), Type.Literal("1.1")]),
     metadata: SystemMetadataV1Schema,
     entities: Type.Array(EntityDefinitionV1Schema, { maxItems: PACKAGE_LIMITS.entities }),
     referenceData: Type.Array(ReferenceDataV1Schema, {

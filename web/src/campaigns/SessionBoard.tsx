@@ -1,3 +1,4 @@
+import {RollBreakdown} from "../rolls/RollBreakdown.js";
 // SessionBoard: GM session tab body. Read-only latest content (limit 10)
 // + recent activity (limit 20) + character directory with inline resource
 // bumps and audience rolls. Bumps/rolls reuse the online-only
@@ -9,7 +10,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import type { CharactersApi } from "../characters/api.js";
-import type { CharacterView } from "../characters/types.js";
+import type { CommandResultResponse, CharacterView } from "../characters/types.js";
 import { t } from "../i18n/index.js";
 import { Button, EmptyState, FormField, Select } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
@@ -169,6 +170,7 @@ function SessionRollRow(props: {
   onRolled: () => Promise<void>;
 }) {
   const [audience, setAudience] = useState<RollAudience>("campaign");
+  const [lastRoll,setLastRoll]=useState<CommandResultResponse["result"]["roll"]>(null);
   const [resultText, setResultText] = useState<string | null>(null);
   const [uncertain, setUncertain] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -221,6 +223,7 @@ function SessionRollRow(props: {
         } else if (raw !== null && typeof raw === "object" &&
           typeof (raw as { total?: unknown }).total === "number") {
           setResultText(String((raw as { total: number }).total));
+          setLastRoll(response.result.roll);
         } else {
           setUncertain(true);
         }
@@ -273,6 +276,7 @@ function SessionRollRow(props: {
       >
         {t("campaign.detail.session.roll.execute", { label: props.element.label })}
       </Button>
+      {lastRoll===null?null:<RollBreakdown roll={lastRoll}/>}
       {resultText !== null ? <p role="status">{resultText}</p> : null}
       {uncertain ? <p role="status">{t("campaign.detail.session.roll.uncertain")}</p> : null}
       {failed ? <p role="alert">{t("campaign.detail.session.roll.error")}</p> : null}

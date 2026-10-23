@@ -55,8 +55,16 @@
       ],
       "properties": {
         "schemaVersion": {
-          "const": "1.0",
-          "type": "string"
+          "anyOf": [
+            {
+              "const": "1.0",
+              "type": "string"
+            },
+            {
+              "const": "1.1",
+              "type": "string"
+            }
+          ]
         },
         "systemId": {
           "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
@@ -819,6 +827,10 @@
                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                 "type": "string"
               },
+              "languageVersion": {
+                "const": "0.2",
+                "type": "string"
+              },
               "context": {
                 "anyOf": [
                   {
@@ -1151,6 +1163,25 @@
                       "kind": {
                         "const": "dice",
                         "type": "string"
+                      },
+                      "group": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "label"
+                        ],
+                        "properties": {
+                          "id": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "label": {
+                            "minLength": 1,
+                            "maxLength": 120,
+                            "type": "string"
+                          }
+                        }
                       },
                       "count": {
                         "$ref": "ExpressionAstV1"

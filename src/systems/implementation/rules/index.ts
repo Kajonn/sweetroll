@@ -13,3 +13,8 @@ export type {
   ExpressionAstV1Schema,
 } from "../package/schema/expression.js";
 export type { ScalarValue, ValueType } from "../package/schema/common.js";
+
+export type { RollBreakdown } from "./result.js";
+
+export {parse} from "./parser.js";
+export {hasDiceGroups} from "./groups.js";

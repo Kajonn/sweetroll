@@ -170,9 +170,23 @@ class Parser {
         return undefined;
     }
   }
-  private parseCall(name: "min" | "max" | "round" | "dice" | "countSuccesses"): ExpressionAstV1 | undefined {
+  private parseCall(name: "min" | "max" | "round" | "dice" | "countSuccesses" | "group"): ExpressionAstV1 | undefined {
     if (!this.at("lparen")) { this.fail(`expected '(' after ${name}`); return undefined; }
     this.take();
+    if (name === "group") {
+      const id = this.take();
+      if (id?.kind !== "string" || !this.at("comma")) { this.fail("group expects an ID and label string"); return undefined; }
+      this.take();
+      const label = this.take();
+      if (label?.kind !== "string" || !this.at("comma")) { this.fail("group expects a label string and dice"); return undefined; }
+      this.take();
+      const operand = this.parseOr();
+      const dice = operand?.kind === "dice" ? operand : operand?.kind === "keep" && operand.dice.kind === "dice" ? operand.dice : undefined;
+      if (!dice || dice.group !== undefined || !this.at("rparen")) { this.fail("group expects direct dice or static kept dice"); return undefined; }
+      this.take();
+      dice.group = {id: id.value, label: label.value};
+      return operand;
+    }
     if (name === "dice") {
       const count = this.parseOr();
       if (!count) return undefined;

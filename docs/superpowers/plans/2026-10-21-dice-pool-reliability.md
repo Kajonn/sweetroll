@@ -1,6 +1,6 @@
 # Dice pool reliability and push-roll delivery plan
 
-**Status (2026-10-22):** slice A implemented on `feat/dice-pool-reliability`, with observed regression-first red → green. CI and isolated deployment acceptance are tracked in [the acceptance record](../../acceptance/dice-pool-reliability-2026-10-22.md). B/C remain planned and must follow A review. No full-release claim.
+**Status (2026-10-23):** slice A merged as PR #21 (`740204f`). Slice B is being implemented on `feat/named-dice-groups` against its [versioned contract](../specs/2026-10-23-named-dice-groups.md), with observed compiler/evaluator and editor red → green. CI and isolated deployment acceptance are tracked in [the acceptance record](../../acceptance/dice-pool-reliability-2026-10-22.md). B verification remains open; C follows B acceptance. No full-release claim.
 **Baseline:** `4ab950c` (`main`, PR #19 merged), checked against remote `main` on 2026-10-21.
 **Goal:** make current dice-pool authoring and execution trustworthy, then extend the existing engine with named dice groups and configurable push rolls.
 **Authority:** [design_v2.md §6.4](../../../design_v2.md#64-rules-and-expression-engine), [expression engine design](../specs/2026-09-04-system-expression-engine-design.md), [package contract](../specs/2026-09-04-system-package-contract-design.md), [original engine plan](2026-09-04-system-expression-engine.md), and [GUI integration gates](2026-09-08-gui-integration.md).
@@ -106,7 +106,7 @@ The review ran 75 focused backend tests and 25 frontend tests successfully. Sepa
 
 **Files/seams:** expression/package schemas, compiler/evaluator/rendering, `src/systems/runtime.ts`, granted actions, Characters persistence/export, HTTP contracts, generated client types, authoring controls, player/GM result/history surfaces, and their existing tests. Add a new immutable SQL migration only if persisted storage requires it.
 
-- [ ] First write a versioned successor contract and update `design_v2.md` plus package/expression specs. Specify declarative group IDs/labels, count expressions, die sizes, thresholds, calculation terms and their operations, and stable per-die identity. Keep existing scalar `total` and legacy decoding meaningful.
+- [x] First write a versioned successor contract and update `design_v2.md` plus package/expression specs. Specify declarative group IDs/labels, count expressions, die sizes, thresholds, calculation terms and their operations, and stable per-die identity. Keep existing scalar `total` and legacy decoding meaningful.
 - [ ] Distinguish sum terms from success-count terms; preserve group identity through nested/multiple terms rather than adding one global `mode` flag. A mixed expression cannot be reconstructed correctly from a flat dice sum. Per-die/group metadata must describe thresholds and results without relying on display color alone.
 - [ ] Define compatibility before code: old published packages and stored receipts/results still load without mutation; new features require a capable package/engine version. Add import/export, clone, preview/publish, upgrade/rollback and mixed-client/service-worker tests; reject unsupported versions clearly. Do not silently backfill old group identities or change checksums.
 - [ ] Red → green: a three-group fixture uses distinct attribute, skill and gear counts, including an empty group, a situational modifier, different group thresholds, and mixed sum/count terms. Assert exact structured results under injected RNG and total/dice budget enforcement across all groups.
@@ -139,7 +139,7 @@ The review ran 75 focused backend tests and 25 frontend tests successfully. Sepa
 | Slice | Contract/spec | Red → green | CI | Deployed journey | Status |
 |---|---|---|---|---|---|
 | A | Package/expression specs updated; `actionDiagnostics` contract generated | R1–R4 observed red → green | Run 112: all seven verification jobs passed | `ad5de63`, 2026-10-23: core journey and offline reopening passed | Ready for A review; unchecked bundles and wider release gates remain |
-| B | Versioned design required in Task 6 | Pending | Pending | Pending | After A |
+| B | [Contract 1.1 / grammar 0.2](../specs/2026-10-23-named-dice-groups.md) | Compiler/evaluator + editor red → green; round-trip and cache regressions added | Pending | Pending | Implementation/verification in progress |
 | C | Push/lineage policy required in Task 7 | Pending | Pending | Pending | After B |
 
 This document records execution steps. No checkbox or green test count from the original engine plan closes these new findings or extension gates.

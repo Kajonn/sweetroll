@@ -179,6 +179,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     }
     const result = compileExpression(expr.source, {
       env,
+      languageVersion: document.schemaVersion === "1.1" ? "0.2" : "0.1",
       resultType: expr.resultType,
       context: expr.context,
       fallback: expr.fallback,
@@ -198,7 +199,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
   }
 
   const unsigned: UnsignedSystemPackageV1 = {
-    schemaVersion: "1.0",
+    schemaVersion: document.schemaVersion,
     systemId: opts.systemId,
     versionId: opts.versionId,
     semanticVersion: opts.semanticVersion,

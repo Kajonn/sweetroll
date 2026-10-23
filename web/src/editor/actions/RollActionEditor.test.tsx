@@ -430,3 +430,11 @@ describe("custom dice pools", () => {
     expect(screen.getByTestId("roll-action-try-total-atk")).toHaveTextContent("0");
   });
 });
+
+it("offers guided named groups without overwriting a custom expression on opening", () => {
+ const onSource=vi.fn();
+ renderEditor({guided:true,diceKind:"custom",expressionSource:"d20 * 2",onExpressionSourceChange:onSource,fieldTypes:{attribute:"number"}});
+ fireEvent.click(screen.getByRole("button",{name:"Named dice groups"}));
+ expect(onSource).not.toHaveBeenCalled();
+ expect(screen.getByText("Keep the custom formula, or explicitly replace it with a grouped pool.")).toBeVisible();
+});

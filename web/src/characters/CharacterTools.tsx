@@ -1,3 +1,4 @@
+import {RollBreakdown} from "../rolls/RollBreakdown.js";
 import { useEffect, useRef, useState } from "react";
 
 import { t } from "../i18n/index.js";
@@ -182,6 +183,7 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
     <li>
       <span>{label}</span>{" · "}
       <time dateTime={event.occurredAt}>{formattedDate}</time>
+      {event.roll===undefined?null:<RollBreakdown roll={event.roll}/>}
     </li>
   );
 }

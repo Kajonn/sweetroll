@@ -13,8 +13,16 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": "1.0",
-      "type": "string"
+      "anyOf": [
+        {
+          "const": "1.0",
+          "type": "string"
+        },
+        {
+          "const": "1.1",
+          "type": "string"
+        }
+      ]
     },
     "metadata": {
       "additionalProperties": false,

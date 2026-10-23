@@ -1,3 +1,4 @@
+import {RollBreakdown} from "../rolls/RollBreakdown.js";
 import { useState } from "react";
 
 import { renderExpression } from "@sweetroll/rules";
@@ -714,6 +715,7 @@ function RollResultSheet({
               ))}
             </ul>
           </div>
+          <RollBreakdown roll={result.roll}/>
           {additiveRollModifier(result) !== null ? <div className={styles.rollSheetRow}>
             <span className={styles.rollSheetLabel}>
               {t("preview.rollResult.modifiers")}

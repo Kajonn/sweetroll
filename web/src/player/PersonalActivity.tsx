@@ -1,3 +1,4 @@
+import {RollBreakdown} from "../rolls/RollBreakdown.js";
 import { useQueries } from "@tanstack/react-query";
 
 import type { CharactersApi } from "../characters/api.js";
@@ -139,6 +140,7 @@ export function PersonalActivity({ api, identity }: PersonalActivityProps) {
                 <span>{event.kind}</span>{" "}
                 <span>{t("character.tools.activitySummary", { revision: event.characterRevision, time: event.occurredAt })}</span>{" "}
                 <time dateTime={event.occurredAt}>{event.occurredAt}</time>
+                {event.roll===undefined?null:<RollBreakdown roll={event.roll}/>}
               </li>
             ))}
           </ul>

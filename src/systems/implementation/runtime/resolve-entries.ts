@@ -19,6 +19,7 @@ import { createDeterministicRng } from "./deterministic-rng.js";
 import { buildEntryScope, validateEntryForSlot } from "./entries.js";
 import { resolveObservedValues } from "./resolve.js";
 import { buildFieldBindings } from "./state.js";
+import { actionEvaluationFailure } from "./action-evaluation.js";
 import { evaluate } from "../rules/evaluate.js";
 
 export type GrantedActionRequest = {
@@ -141,6 +142,8 @@ export function resolveGrantedAction(request: GrantedActionRequest): RuntimeResu
       ? budgetExceeded()
       : invalidPackage(expression.id);
   }
+  const failure = actionEvaluationFailure(evaluated, action.id, expression.id);
+  if (failure !== null) return { ok: false, error: failure };
   if (evaluated.roll === null) return invalidPackage(expression.id);
   return {
     ok: true,

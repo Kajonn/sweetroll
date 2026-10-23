@@ -10,6 +10,13 @@ export type RuntimeDiagnostic = {
   targetDefinitionId: string;
 };
 
+export type ActionEvaluationDiagnostic = {
+  code: "arithmetic_failure";
+  actionId: string;
+  expressionId: string;
+  message: string;
+};
+
 export type CacheDisposition = "retain" | "replace" | "purge";
 
 export class ApiError extends Error {
@@ -19,6 +26,7 @@ export class ApiError extends Error {
   readonly latestRevision: number | null;
   readonly diagnostics: ReadonlyArray<ApiDiagnostic>;
   readonly runtimeDiagnostics: ReadonlyArray<RuntimeDiagnostic>;
+  readonly actionDiagnostics: ReadonlyArray<ActionEvaluationDiagnostic>;
   readonly changedDefinitionIds: ReadonlyArray<string> | undefined;
   readonly activityCursor: string | null;
   readonly cacheDisposition: CacheDisposition | undefined;
@@ -31,6 +39,7 @@ export class ApiError extends Error {
     latestRevision: number | null;
     diagnostics: ReadonlyArray<ApiDiagnostic>;
     runtimeDiagnostics?: ReadonlyArray<RuntimeDiagnostic>;
+    actionDiagnostics?: ReadonlyArray<ActionEvaluationDiagnostic>;
     changedDefinitionIds?: ReadonlyArray<string> | null;
     activityCursor?: string | null;
     cacheDisposition?: CacheDisposition | null;
@@ -42,6 +51,7 @@ export class ApiError extends Error {
     this.latestRevision = input.latestRevision;
     this.diagnostics = input.diagnostics;
     this.runtimeDiagnostics = input.runtimeDiagnostics ?? [];
+    this.actionDiagnostics = input.actionDiagnostics ?? [];
     this.changedDefinitionIds = input.changedDefinitionIds ?? undefined;
     this.activityCursor = input.activityCursor ?? null;
     this.cacheDisposition = input.cacheDisposition ?? undefined;
@@ -150,6 +160,7 @@ export function createApiClient(input: CreateApiClientInput): ApiClient {
               message?: string;
               latestRevision?: number | null;
               diagnostics?: ReadonlyArray<Record<string, unknown>>;
+              actionDiagnostics?: ActionEvaluationDiagnostic[];
               changedDefinitionIds?: string[] | null;
               activityCursor?: string | null;
               cacheDisposition?: CacheDisposition | null;
@@ -166,6 +177,7 @@ export function createApiClient(input: CreateApiClientInput): ApiClient {
             latestRevision: err?.latestRevision ?? null,
             diagnostics: authoring,
             runtimeDiagnostics: runtime,
+            actionDiagnostics: err?.actionDiagnostics ?? [],
             changedDefinitionIds: err?.changedDefinitionIds ?? [],
             activityCursor: err?.activityCursor ?? null,
             cacheDisposition: err?.cacheDisposition ?? null,

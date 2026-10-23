@@ -530,3 +530,21 @@ describe("slot projection", () => {
     expect(trailing.filter((element) => element.kind === "action")).toHaveLength(1);
   });
 });
+
+
+describe("granted pool evaluation failures", () => {
+  it.each(["countSuccesses(dice(inputs.edge, 6), 6)", "countSuccesses(dice(inputs.edge / 2, 6), 6)", "d6 + 1 / inputs.edge"])("rejects invalid/partial roll: %s", async (source) => {
+    const document = entryDocument();
+    document.expressions.find((e) => e.id === "longsword_attack_expr")!.source = source;
+    const pkg = compileEntryPackage(document);
+    const runtime = createRuntime(pkg);
+    const state = await initializedState(runtime, pkg);
+    state.entries = { [SWORD_ENTRY_ID]: { entryId: SWORD_ENTRY_ID, slotId: "inventory", templateId: "longsword", values: { weapon_bonus: 1 }, quantity: 1 } };
+    const before = structuredClone(state);
+    const result = await runtime.resolve({ versionId: pkg.versionId, entityId: "character", state,
+      intent: { kind: "action", actionId: "longsword_attack", entryId: SWORD_ENTRY_ID, inputs: { edge: source.includes("/ 2") ? 1 : source.startsWith("count") ? -1 : 0 }, executionId: "failed-grant" },
+    });
+    expect(result).toMatchObject({ ok: false, error: { code: "action_evaluation_failed", actionDiagnostics: [{ code: "arithmetic_failure", actionId: "longsword_attack", expressionId: "longsword_attack_expr" }] } });
+    expect(state).toEqual(before);
+  });
+});

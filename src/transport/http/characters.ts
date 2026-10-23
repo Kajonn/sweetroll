@@ -351,6 +351,12 @@ const CharacterErrorEnvelope = Type.Object({
     message: Type.String(),
     latestRevision: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
     diagnostics: Type.Optional(Type.Array(RuntimeValidationDto)),
+    actionDiagnostics: Type.Optional(Type.Array(Type.Object({
+      code: Type.Literal("arithmetic_failure"),
+      actionId: Type.String(),
+      expressionId: Type.String(),
+      message: Type.String({ maxLength: 256 }),
+    }), { maxItems: 8 })),
     changedDefinitionIds: Type.Optional(Type.Array(Type.String())),
     activityCursor: Type.Optional(Type.Union([Type.String(), Type.Null()])),
     cacheDisposition: Type.Optional(
@@ -934,6 +940,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
           message: normalized.message,
           ...(normalized.latestRevision === undefined ? {} : { latestRevision: normalized.latestRevision }),
           ...(normalized.diagnostics === undefined ? {} : { diagnostics: normalized.diagnostics }),
+          ...(normalized.actionDiagnostics === undefined ? {} : { actionDiagnostics: normalized.actionDiagnostics }),
           ...(normalized.changedDefinitionIds === undefined
             ? {}
             : { changedDefinitionIds: normalized.changedDefinitionIds }),

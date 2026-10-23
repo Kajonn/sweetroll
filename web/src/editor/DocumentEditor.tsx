@@ -1049,6 +1049,7 @@ function DiceTab({
                     persistExpressionSource(document, dispatch, action.expressionId, next);
                   }}
                   fieldTypes={buildFieldTypeMap(document, action.id)}
+                  fieldLabels={Object.fromEntries(document.entities.flatMap(entity => entity.fields.map(field => [field.id, typeof field.label === "string" ? field.label : field.id])))}
                   guided
                   diceKind={diceKindFor(expressionSourceFor(action.expressionId))}
                   onDiceKindChange={hasExpression(action.expressionId)

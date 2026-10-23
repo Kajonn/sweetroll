@@ -793,6 +793,67 @@ expect(rollback.json().result.character.state.values).toEqual({
     expect(execCount.rows[0]!.n).toBe(2);
   });
 
+  it.each(["entity", "item"])("rejects failed %s pool rolls without writes, replays the error and allows correction", async (source) => {
+    const app = await makeApp();
+    apps.push(app);
+    const ada = app.users.ada;
+    const document = structuredClone(d6SuccessPoolDocument);
+    if (source === "item") {
+      document.slots = [{ id: "gear", label: "Gear", accepts: ["item"] }];
+      document.templates = [{ id: "pool_tool", label: "Pool Tool", kind: "item", fields: [], grantedActions: [{
+        kind: "roll", id: "gear_pool", label: "Gear Pool", expressionId: "gear_pool_expr",
+        inputs: [{ id: "gear_dice", label: "Gear Dice", valueType: "integer", required: false, default: 0 }], outputTemplate: "Successes: {total}",
+      }] }];
+      document.expressions.push({ id: "gear_pool_expr", context: "roll", resultType: "number", fallback: 0, source: "countSuccesses(dice(fields.attribute + fields.skill + inputs.gear_dice, 6), 6)" });
+      document.sheets[0]!.sections[1]!.elements.push({ kind: "slot", id: "gear_element", slotId: "gear" });
+    }
+    const { versionId } = await publishVersion(app, ada, document, { name: "Pool failure receipts", semanticVersion: "1.0.0" });
+    const created = await createCharacter(app, ada, { systemVersionId: versionId, name: "Pool Hero", idempotencyKey: "pool-create" });
+    expect(created.statusCode, created.body).toBe(201);
+    const characterId = created.json().character.characterId as string;
+    const entryId = randomUUID();
+    if (source === "item") {
+      const added = await app.app.inject({ method: "POST", url: `/characters/${characterId}/entries`, headers: cookieHeader(ada), payload: { entry: { entryId, slotId: "gear", templateId: "pool_tool", values: {}, quantity: 1 }, expectedRevision: 1, idempotencyKey: "add-gear" } });
+      expect(added.statusCode, added.body).toBe(200);
+    }
+    const actionId = source === "item" ? "gear_pool" : "test_pool";
+    const expressionId = source === "item" ? "gear_pool_expr" : "pool_roll_expr";
+    const inputId = source === "item" ? "gear_dice" : "bonus_dice";
+    const baseRevision = source === "item" ? 2 : 1;
+    const execute = (bonus: number, revision: number, key: string, user = ada) => app.app.inject({ method: "POST", url: `/characters/${characterId}/actions/${actionId}`, headers: cookieHeader(user), payload: { inputs: { [inputId]: bonus }, expectedRevision: revision, idempotencyKey: key, ...(source === "item" ? { entryId } : {}) } });
+    const before = (await getCharacter(app, ada, characterId)).json().character;
+    const activityBefore = (await listActivity(app, ada, characterId)).json();
+    const fail = () => execute(-3, baseRevision, "pool-fail");
+    const rejected = await fail();
+    expect(rejected.statusCode, rejected.body).toBe(422);
+    expect(rejected.json().error).toMatchObject({ code: "invalid_value", actionDiagnostics: [{ code: "arithmetic_failure", actionId, expressionId, message: expect.stringContaining("non-negative integer") }] });
+    expect(rejected.json().error).not.toHaveProperty("diagnostics");
+    const replay = await fail();
+    expect(replay.statusCode).toBe(422);
+    expect(replay.json().error).toEqual(rejected.json().error);
+    // GET reconciliation IDs and replay expiry identify the read, not persisted character state.
+    const { reconciliation: _beforeRead, ...beforeState } = before;
+    const { reconciliation: _afterRead, ...afterState } = (await getCharacter(app, ada, characterId)).json().character;
+    expect(afterState).toEqual(beforeState);
+    expect((await listActivity(app, ada, characterId)).json().events).toEqual(activityBefore.events);
+    expect((await app.pool.query("SELECT count(*)::int AS n FROM character_rolls WHERE character_id=$1", [characterId])).rows[0].n).toBe(0);
+    const mismatch = await execute(0, baseRevision, "pool-fail");
+    expect(mismatch.statusCode).toBe(409);
+    expect(mismatch.json().error.code).toBe("idempotency_mismatch");
+    const zero = await execute(-2, baseRevision, "pool-corrected");
+    expect(zero.statusCode, zero.body).toBe(200);
+    expect(zero.json().result.roll).toMatchObject({ total: 0, dice: [] });
+    const revision = zero.json().result.character.revision;
+    const valid = await execute(0, revision, "pool-valid");
+    expect(valid.statusCode, valid.body).toBe(200);
+    const validReplay = await execute(0, revision, "pool-valid");
+    expect(validReplay.json().result.roll).toEqual(valid.json().result.roll);
+    expect((await app.pool.query("SELECT count(*)::int AS n FROM character_rolls WHERE character_id=$1", [characterId])).rows[0].n).toBe(2);
+    const outsider = await execute(-3, baseRevision, "pool-fail", app.users.bob);
+    expect(outsider.statusCode).toBe(404);
+    expect(outsider.json().error).not.toHaveProperty("actionDiagnostics");
+  });
+
   it("serves all three reference systems through the same HTTP surface", async () => {
     const systems: Array<{
       name: string;

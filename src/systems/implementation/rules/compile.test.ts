@@ -46,3 +46,24 @@ function repeatBinary(count: number): string {
   for (let i = 0; i < count; i++) parts.push("1");
   return parts.join(" + ");
 }
+
+
+describe("success-count operand agreement", () => {
+  it.each([
+    "countSuccesses(5, 6)",
+    "countSuccesses(true, 6)",
+    "countSuccesses(dice(2, 6) + dice(2, 6), 6)",
+    "countSuccesses(4d6kh3, 6)",
+  ])("rejects unsupported operand: %s", (source) => {
+    const result = compileExpression(source, numberOpts);
+    expect(result).toMatchObject({ ok: false, diagnostics: [{ code: "invalid_expression" }] });
+  });
+
+  it.each([
+    "countSuccesses(dice(fields.modifier + inputs.bonus, 6), 6)",
+    "countSuccesses(2d6, 6) + countSuccesses(3d6, 5)",
+    "d20 + 5", "2d6", "4d6kh3", "4d6kl2",
+  ])("retains supported roll: %s", (source) => {
+    expect(compileExpression(source, numberOpts).ok).toBe(true);
+  });
+});

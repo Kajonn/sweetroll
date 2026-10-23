@@ -77,6 +77,7 @@ export function inferType(ast: ExpressionAstV1, env: ExpressionCompileEnv): Infe
       return { ok: true, type: "number" };
     }
     case "successCount": {
+      if (ast.dice.kind !== "dice") return diag("invalid_expression", "countSuccesses expects a direct dice expression");
       const d = inferType(ast.dice, env);
       if (!d.ok) return d;
       return { ok: true, type: "number" };

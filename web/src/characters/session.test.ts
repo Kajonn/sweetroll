@@ -2698,3 +2698,33 @@ it('retains a campaign selection and explains stale catalog revisions during con
  identity.online=true;identity.signal();await vi.waitFor(()=>expect(session.getSnapshot().phase).toBe('conflict'));await session.whenIdle();expect(session.getSnapshot().error?.message).toContain('campaign template has changed');
  expect((await store.read(ARM,'char-1')).entries[0]?.intent).toMatchObject({entry:{source}});session.dispose();await store.close();
 });
+
+
+describe("pool error recovery", () => {
+  it("retains rejected inputs and diagnostics until explicit discard, then uses a new key", async () => {
+    const { api, store, session } = await makeHarness();
+    try {
+      api.scriptOpenView(viewFor("char-1", 1));
+      api.setOpenFallback(async () => ({ character: viewFor("char-1", 1), requestId: "req-open" }));
+      await session.open();
+      const actionDiagnostics = [{ code: "arithmetic_failure" as const, actionId: "pool", expressionId: "pool_expr", message: "dice count must be a non-negative integer" }];
+      api.scriptSend(async () => ({ error: new ApiError({ code: "invalid_value", message: "Roll could not be evaluated. Review inputs.", status: 422, requestId: "req-pool", latestRevision: null, diagnostics: [], actionDiagnostics }) }));
+      await session.executeAction("pool", { bonus: -3 });
+      await session.whenIdle();
+      const rejected = session.getSnapshot();
+      expect(rejected.phase).toBe("invalid");
+      expect(rejected.error).toMatchObject({ kind: "invalid", details: { actionDiagnostics } });
+      expect(rejected.lastRoll).toBeNull();
+      expect(rejected.entries[0]!.intent).toMatchObject({ kind: "executeAction", inputs: { bonus: -3 } });
+      const rejectedKey = api.sent[0]!.body.idempotencyKey;
+      expect(api.sent).toHaveLength(1);
+      await session.resolveConflict({ mode: "discard", selectedIds: rejected.entries.map((e) => e.id) });
+      api.scriptSend(async () => successEnvelope(viewFor("char-1", 2)));
+      await session.executeAction("pool", { bonus: 0 });
+      await session.whenIdle();
+      expect(api.sent).toHaveLength(2);
+      expect(api.sent[1]!.body.idempotencyKey).not.toBe(rejectedKey);
+      expect(session.getSnapshot().error).toBeNull();
+    } finally { session.dispose(); await store.close(); }
+  });
+});

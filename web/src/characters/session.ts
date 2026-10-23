@@ -605,7 +605,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           await fetchLatestForConflict(err.latestRevision, err.code === "conflict" ? err.message : undefined);
           return "blocked";
         case 422:
-          setBlocked("invalid", err.message, { diagnostics: err.diagnostics });
+          setBlocked("invalid", err.message, { diagnostics: err.diagnostics, actionDiagnostics: err.actionDiagnostics });
           return "blocked";
       }
       if (err.code === "expected_revision_mismatch") {
@@ -613,7 +613,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         return "blocked";
       }
       if (err.code === "invalid_value" || err.code === "bad_request") {
-        setBlocked("invalid", err.message, { diagnostics: err.diagnostics });
+        setBlocked("invalid", err.message, { diagnostics: err.diagnostics, actionDiagnostics: err.actionDiagnostics });
         return "blocked";
       }
       // command_in_progress/temporarily_unavailable are handled above; any
@@ -1364,7 +1364,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         }
         if (err.status === 422 || err.code === "invalid_value" || err.code === "bad_request") {
           await retireRejectedOnlineAttempt(attempt);
-          setBlocked("invalid", err.message, { diagnostics: err.diagnostics });
+          setBlocked("invalid", err.message, { diagnostics: err.diagnostics, actionDiagnostics: err.actionDiagnostics });
           emit();
           throw err;
         }
@@ -1381,6 +1381,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
             latestRevision: err.latestRevision,
             diagnostics: [...err.diagnostics],
             runtimeDiagnostics: [...err.runtimeDiagnostics],
+            actionDiagnostics: [...err.actionDiagnostics],
             changedDefinitionIds: err.changedDefinitionIds === undefined ? null : [...err.changedDefinitionIds],
             activityCursor: err.activityCursor,
             cacheDisposition: err.cacheDisposition ?? null,

@@ -339,6 +339,7 @@ export const defaultMessages: MessageTable = {
   "editor.action.roll.inputs.remove": "Remove input {id}",
   "editor.action.roll.inputs.remove.label": "Remove",
   "editor.action.roll.tryIt": "Try it",
+  "editor.action.roll.tryIt.sampleNote": "Sample only: numeric attributes use zero (0); inputs use the defaults shown below. These are not character values.",
   "editor.action.roll.tryIt.empty": "Click \"Try it\" to evaluate against sample data.",
   "editor.action.roll.tryIt.title": "Roll result",
   "editor.action.roll.tryIt.audience": "Audience",

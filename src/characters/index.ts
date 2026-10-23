@@ -127,6 +127,7 @@ export type CharacterError = {
   message: string;
   latestRevision?: number | null;
   diagnostics?: RuntimeValidation[];
+  actionDiagnostics?: import("../systems/runtime.js").ActionEvaluationDiagnostic[];
   changedDefinitionIds?: DefinitionId[];
   activityCursor?: string | null;
   cacheDisposition?: "retain" | "replace" | "purge";
@@ -706,14 +707,14 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           nominal?: NominalActionResult | null;
         };
       }
-    | { ok: false; error: CharacterError };
+    | { ok: false; error: CharacterError; scope?: StoredResultScope };
 
   type StoredDuplicateOutcome =
     | { ok: true; value: { scope: StoredResultScope; character: unknown } }
     | { ok: false; error: CharacterError };
 
-  function serializeCommandError(error: CharacterError): StoredCommandOutcome {
-    return { ok: false, error };
+  function serializeCommandError(error: CharacterError, scope: StoredResultScope = null): StoredCommandOutcome {
+    return scope === null ? { ok: false, error } : { ok: false, error, scope };
   }
 
   function serializeDuplicateError(error: CharacterError): StoredDuplicateOutcome {
@@ -776,9 +777,14 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
   // policy/placement generation.
   function peekStoredScope(resultJson: unknown): StoredResultScope {
     if (typeof resultJson !== "object" || resultJson === null) return null;
-    const outcome = resultJson as { ok?: unknown; value?: { scope?: StoredResultScope } };
-    if (outcome.ok !== true) return null;
-    return outcome.value?.scope ?? null;
+    const outcome = resultJson as {
+      ok?: unknown;
+      scope?: StoredResultScope;
+      value?: { scope?: StoredResultScope };
+    };
+    if (outcome.ok === true) return outcome.value?.scope ?? null;
+    if (outcome.ok === false) return outcome.scope ?? null;
+    return null;
   }
 
   function toMembershipRecord(snapshot: CampaignMembershipSnapshot): MembershipRecord {
@@ -914,10 +920,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     characterId: CharacterId;
     expectedRevision: number;
     attachedCampaignId: string | null;
+    resultScope: StoredResultScope;
     executionId: string;
     replayExpiresAt: Date;
   }): Promise<CharacterResult<CharacterCommandResult>> {
-    const { ctx, outcome, characterId, expectedRevision, attachedCampaignId, executionId, replayExpiresAt } = input;
+    const { ctx, outcome, characterId, expectedRevision, attachedCampaignId, resultScope, executionId, replayExpiresAt } = input;
     if (outcome.kind === "already_completed") {
       const placementDenial = await authorizeStoredOutcome(ctx, characterId, outcome.resultJson, () =>
         errors.not_found(),
@@ -929,20 +936,20 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       const error = errors.not_found();
       await repo.finalizeExecutionError({
         executionId,
-        resultJson: serializeCommandError(error),
+        resultJson: serializeCommandError(error, resultScope),
         expiresAt: replayExpiresAt,
       });
       return { ok: false, error };
     }
     if (outcome.kind === "precondition_failed") {
-      await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(outcome.error), expiresAt: replayExpiresAt });
+      await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(outcome.error, resultScope), expiresAt: replayExpiresAt });
       return {ok:false,error:outcome.error};
     }
     if (outcome.kind === "archived") {
       const error = errors.archived();
       await repo.finalizeExecutionError({
         executionId,
-        resultJson: serializeCommandError(error),
+        resultJson: serializeCommandError(error, resultScope),
         expiresAt: replayExpiresAt,
       });
       return { ok: false, error };
@@ -956,7 +963,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const error = errors.not_found();
         await repo.finalizeExecutionError({
           executionId,
-          resultJson: serializeCommandError(error),
+          resultJson: serializeCommandError(error, resultScope),
           expiresAt: replayExpiresAt,
         });
         return { ok: false, error };
@@ -971,7 +978,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       const error = errors.conflict(outcome.latestRevision, changedSinceBase.changedDefinitionIds, activityCursor);
       await repo.finalizeExecutionError({
         executionId,
-        resultJson: serializeCommandError(error),
+        resultJson: serializeCommandError(error, resultScope),
         expiresAt: replayExpiresAt,
       });
       return { ok: false, error };
@@ -992,6 +999,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     versionId: string,
     executionId: string,
     replayExpiresAt: Date,
+    resultScope: StoredResultScope,
   ): Promise<{ ok: true; value: SystemPackageV1 } | { ok: false; error: CharacterError }> {
     try {
       const loaded = await loadPackage(versionId);
@@ -1005,7 +1013,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         });
         await repo.finalizeExecutionError({
           executionId,
-          resultJson: serializeCommandError(mapped),
+          resultJson: serializeCommandError(mapped, resultScope),
           expiresAt: replayExpiresAt,
         });
         return { ok: false, error: mapped };
@@ -1036,19 +1044,20 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     command: CharacterAddEntryCommand | CharacterRemoveEntryCommand | CharacterUpdateEntryValuesCommand,
     resolveSource: CharacterRecord,
     attachedCampaignId: string | null,
+    resultScope: StoredResultScope,
     executionId: string,
     replayExpiresAt: Date,
   ): Promise<CharacterResult<CharacterCommandResult>> {
     const fail = async (error: CharacterError): Promise<CharacterResult<CharacterCommandResult>> => {
       await repo.finalizeExecutionError({
         executionId,
-        resultJson: serializeCommandError(error),
+        resultJson: serializeCommandError(error, resultScope),
         expiresAt: replayExpiresAt,
       });
       return { ok: false, error };
     };
 
-    const packaged = await loadEntryPackage(resolveSource.systemVersionId, executionId, replayExpiresAt);
+    const packaged = await loadEntryPackage(resolveSource.systemVersionId, executionId, replayExpiresAt, resultScope);
     if (!packaged.ok) return packaged;
     const slots: SlotDefinitionV1[] = packaged.value.slots ?? [];
     const templates: ObjectTemplateV1[] = packaged.value.templates ?? [];
@@ -1248,6 +1257,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       characterId: command.characterId,
       expectedRevision: command.expectedRevision,
       attachedCampaignId,
+      resultScope,
       executionId,
       replayExpiresAt,
     });
@@ -1762,6 +1772,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         // active players over controlled sheets) and commit through the
         // campaign-locked transaction below.
         let attachedCampaignId: string | null = null;
+        let resultScope: StoredResultScope = null;
         const snapshot = await repo.openOwnedCharacter(command.characterId, ctx.actorId);
         // I6 Task 5: the resolve source. Standalone commands read the owned
         // snapshot; attached commands read the campaign-authorized record.
@@ -1787,11 +1798,17 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             });
             return { ok: false, error };
           }
+          resultScope = {
+            campaignId: scope.campaignId,
+            placementGeneration: attached.auth.record.placementGeneration,
+            membershipGeneration: attached.auth.membership!.generation,
+            audience: null,
+          };
           if (attached.auth.campaign?.status !== "active") {
             const error = campaignArchivedError(attached.auth.record.revision);
             await repo.finalizeExecutionError({
               executionId,
-              resultJson: serializeCommandError(error),
+              resultJson: serializeCommandError(error, resultScope),
               expiresAt: replayExpiresAt,
             });
             return { ok: false, error };
@@ -1800,7 +1817,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             const error = errors.archived();
             await repo.finalizeExecutionError({
               executionId,
-              resultJson: serializeCommandError(error),
+              resultJson: serializeCommandError(error, resultScope),
               expiresAt: replayExpiresAt,
             });
             return { ok: false, error };
@@ -1843,7 +1860,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           || command.kind === "updateEntryValues"
         ) {
           const resolveSource: CharacterRecord = attachedRecord ?? snapshot!;
-          return applyEntryCommand(ctx, command, resolveSource, attachedCampaignId, executionId, replayExpiresAt);
+          return applyEntryCommand(ctx, command, resolveSource, attachedCampaignId, resultScope, executionId, replayExpiresAt);
         }
 
         const intent =
@@ -1871,7 +1888,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           if (isFinalizableRuntimeError(resolved.error.code)) {
             await repo.finalizeExecutionError({
               executionId,
-              resultJson: serializeCommandError(error),
+              resultJson: serializeCommandError(error, resultScope),
               expiresAt: replayExpiresAt,
             });
           }
@@ -1938,6 +1955,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           characterId: command.characterId,
           expectedRevision: command.expectedRevision,
           attachedCampaignId,
+          resultScope,
           executionId,
           replayExpiresAt,
         });

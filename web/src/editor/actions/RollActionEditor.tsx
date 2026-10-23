@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { evaluateRoll } from "../../api/evaluateExpression.js";
 import type { ApiClient } from "../../api/client.js";
 import { t } from "../../i18n/index.js";
-import type { ScalarValue, ValueType } from "../../ports/evaluateExpression.js";
+import { additiveRollModifier, type ScalarValue, type ValueType } from "../../ports/evaluateExpression.js";
 import { Button, Checkbox, FormField, NumberInput, Select } from "../../ui/index.js";
 import { ExpressionEditor } from "../expressions/ExpressionEditor.js";
 import styles from "./RollActionEditor.module.css";
@@ -140,6 +140,7 @@ export function RollActionEditor({
   onDiceKindChange,
 }: RollActionEditorProps) {
   const [tryItResult, setTryItResult] = useState<ReturnType<typeof evaluateRoll> | null>(null);
+  const [tryItBindings, setTryItBindings] = useState<Record<string, ScalarValue> | null>(null);
   // Local custom-edit mode: picking "custom" reveals the inline formula
   // editor on the current source without persisting anything. It clears
   // when a canned kind is picked (which persists that kind instead).
@@ -172,22 +173,22 @@ export function RollActionEditor({
   };
 
   const runTryIt = () => {
+    const bindings = buildTryItBindings(action.inputs, fieldTypes);
+    setTryItBindings(bindings);
     setTryItResult(
       evaluateRoll({
         source: expressionSource,
         env: { fields: fieldTypes, inputs: inputTypes },
         resultType: "number",
         fallback: 0,
-        bindings: buildTryItBindings(action.inputs, fieldTypes),
+        bindings,
       }),
     );
   };
 
-  const modifiers =
-    tryItResult !== null && tryItResult.result.ok && tryItResult.result.roll !== null
-      ? tryItResult.result.roll.total -
-        tryItResult.result.roll.dice.reduce((sum, d) => (d.kept ? sum + d.value : sum), 0)
-      : null;
+  const modifiers = tryItResult === null ? null : additiveRollModifier(tryItResult.result);
+  const simpleSource = /^d(?:4|6|8|10|12|20)(?:\s*\+\s*fields\.[a-z][a-z0-9_]{0,63})?(?:\s*\+\s*inputs\.[a-z][a-z0-9_]{0,63})*$/.test(expressionSource);
+  const sampleBindings = tryItBindings ?? buildTryItBindings(action.inputs, fieldTypes);
 
   const showEmpty = tryItResult === null;
   const numericFields = Object.entries(fieldTypes).filter(([, valueType]) => valueType === "number");
@@ -236,7 +237,7 @@ export function RollActionEditor({
                 ]}
               />
             </div>
-            {numericFields.length > 0 ? (
+            {numericFields.length > 0 && simpleSource ? (
               <div className={styles.field}>
                 <Select
                   label={t("editor.action.roll.fieldModifier")}
@@ -435,6 +436,10 @@ export function RollActionEditor({
           {t("editor.action.roll.inputs.add")}
         </Button>
       </div>
+      <p data-testid={`roll-action-try-sample-note-${action.id}`}>{t("editor.action.roll.tryIt.sampleNote")}</p>
+      <ul data-testid={`roll-action-try-bindings-${action.id}`}>
+        {Object.entries(sampleBindings).map(([id, value]) => <li key={id}>{action.inputs.find(input => input.id === id)?.label || fieldLabels?.[id] || id}: {String(value)}</li>)}
+      </ul>
       <div className={styles.tryItRow}>
         <Button
           variant="secondary"
@@ -511,14 +516,14 @@ export function RollActionEditor({
                   ))}
                 </ul>
               </div>
-              <div className={styles.resultRow}>
+              {modifiers !== null ? <div className={styles.resultRow}>
                 <span className={styles.resultLabel}>{t("editor.action.roll.tryIt.modifiers")}</span>
                 <span
                   data-testid={`roll-action-try-modifiers-${action.id}`}
                 >
-                  {modifiers ?? 0}
+                  {modifiers}
                 </span>
-              </div>
+              </div> : null}
               <div className={styles.resultRow}>
                 <span className={styles.resultLabel}>{t("editor.action.roll.tryIt.total")}</span>
                 <span

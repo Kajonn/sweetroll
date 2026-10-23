@@ -41,6 +41,7 @@ describe("SystemRuntime contract", () => {
       | "invalid_package"
       | "invalid_state"
       | "unsupported_field_value"
+      | "action_evaluation_failed"
       | "budget_exceeded"
       | "internal"
     >();
@@ -382,6 +383,50 @@ describe("SystemRuntime contract", () => {
     expect(first.value.changedDefinitionIds).toEqual([]);
     expect(first.value.roll).toMatchObject({ actionId, output: expect.stringMatching(`^${outputPrefix}`) });
     expect(first.value.roll?.dice.length).toBeGreaterThan(0);
+  });
+
+  it.each([-3, -2.5])("rejects invalid pool count with bonus %s instead of reporting fallback as a roll", async (bonus) => {
+    const pkg = structuredClone(d6SuccessPoolPackage);
+    const action = pkg.actions.find((a) => a.id === "test_pool");
+    if (action?.kind !== "roll") throw new Error("roll missing");
+    action.inputs[0]!.valueType = "decimal";
+    const runtime = createRuntime(signSystemPackage(pkg));
+    const initialized = await initialize(runtime, pkg);
+    const state = structuredClone(initialized.state);
+    const result = await runtime.resolve({
+      versionId: pkg.versionId, entityId: "character", state,
+      intent: { kind: "action", actionId: "test_pool", inputs: { bonus_dice: bonus }, executionId: "invalid-pool" },
+    });
+    expect(result).toMatchObject({ ok: false, error: {
+      code: "action_evaluation_failed", definitionId: "test_pool",
+      actionDiagnostics: [{ code: "arithmetic_failure", actionId: "test_pool", expressionId: "pool_roll_expr", message: expect.stringContaining("non-negative integer") }],
+    } });
+    expect(state).toEqual(initialized.state);
+  });
+
+  it.each(["partial division", "legacy scalar operand"])("rejects %s without returning fallback or partial dice", async (mode) => {
+    const pkg = structuredClone(d6SuccessPoolPackage);
+    const expression = pkg.expressions.find((e) => e.id === "pool_roll_expr")!;
+    expression.ast = mode === "legacy scalar operand"
+      ? { kind: "successCount", dice: { kind: "numberLiteral", value: 5 }, threshold: 6 }
+      : { kind: "binary", operator: "+", left: { kind: "dice", count: { kind: "numberLiteral", value: 1 }, sides: 6 }, right: { kind: "binary", operator: "/", left: { kind: "numberLiteral", value: 1 }, right: { kind: "numberLiteral", value: 0 } } };
+    const runtime = createRuntime(signSystemPackage(pkg));
+    const initialized = await initialize(runtime, pkg);
+    const result = await runtime.resolve({ versionId: pkg.versionId, entityId: "character", state: initialized.state,
+      intent: { kind: "action", actionId: "test_pool", inputs: {}, executionId: "legacy-failure" },
+    });
+    expect(result).toMatchObject({ ok: false, error: { code: "action_evaluation_failed", actionDiagnostics: [{ actionId: "test_pool", expressionId: "pool_roll_expr", code: "arithmetic_failure" }] } });
+    expect(result).not.toHaveProperty("value");
+  });
+
+  it("retains a legal zero-sized pool", async () => {
+    const runtime = createRuntime(d6SuccessPoolPackage);
+    const initialized = await initialize(runtime, d6SuccessPoolPackage);
+    const result = await runtime.resolve({
+      versionId: d6SuccessPoolPackage.versionId, entityId: "character", state: initialized.state,
+      intent: { kind: "action", actionId: "test_pool", inputs: { bonus_dice: -2 }, executionId: "zero-pool" },
+    });
+    expect(result).toMatchObject({ ok: true, value: { roll: { total: 0, dice: [] } } });
   });
 
   it("returns normalized scoped bindings and changes dice for a different execution ID", async () => {

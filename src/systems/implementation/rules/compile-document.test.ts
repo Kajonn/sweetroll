@@ -558,3 +558,15 @@ function twoEntityDocument(): SystemDocumentV1 {
   });
   return document;
 }
+
+
+describe("success-count authoring assessment", () => {
+  it.each(["countSuccesses(5, 6)", "countSuccesses(dice(2, 6) + dice(2, 6), 6)", "countSuccesses(true, 6)", "countSuccesses(4d6kh3, 6)"])("rejects %s at its expression identity", (source) => {
+    const document = structuredClone(d6SuccessPoolDocument);
+    document.expressions.find((e) => e.id === "pool_roll_expr")!.source = source;
+    const result = compileDocument(document, opts);
+    expect(result.ok).toBe(false);
+    const diagnostics = result.ok ? [] : result.diagnostics;
+    expect(diagnostics).toContainEqual(expect.objectContaining({ code: "invalid_expression", path: "pool_roll_expr" }));
+  });
+});

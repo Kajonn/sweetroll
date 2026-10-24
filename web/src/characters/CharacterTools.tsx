@@ -1,3 +1,4 @@
+import {RollBreakdown} from "../rolls/RollBreakdown.js";
 import { useEffect, useRef, useState } from "react";
 
 import { t } from "../i18n/index.js";
@@ -182,6 +183,7 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
     <li>
       <span>{label}</span>{" · "}
       <time dateTime={event.occurredAt}>{formattedDate}</time>
+      {event.roll===undefined?null:<RollBreakdown roll={event.roll}/>}
     </li>
   );
 }
@@ -191,7 +193,9 @@ function ActivityDialog({ characterId, session, onClose }: { characterId: string
   const [cursor, setCursor] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Start busy before choosing the initial focus target. Focusing Refresh
+  // and disabling it immediately afterwards drops keyboard focus to body.
+  const [loading, setLoading] = useState(true);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const errorRef = useRef<HTMLParagraphElement | null>(null);
 

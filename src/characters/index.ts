@@ -420,6 +420,7 @@ export type ListCharacterActivity = {
 };
 
 export type CharacterActivityEvent = {
+  roll?: NormalizedRoll;
   id: string;
   characterRevision: number;
   kind: string;
@@ -2322,6 +2323,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
               kind: row.kind,
               payload: minimizeActivityPayload(row.kind, row.payloadJson),
               rollId: redactRollIdForReader(row, attachedMembership, scopeCampaignId),
+              ...(row.roll !== undefined && redactRollIdForReader(row, attachedMembership, scopeCampaignId) !== null ? {roll:row.roll} : {}),
               requestId: row.requestId,
               occurredAt: row.occurredAt,
             })),

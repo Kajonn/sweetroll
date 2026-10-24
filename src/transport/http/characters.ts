@@ -1,3 +1,4 @@
+import {DieResultSchema, RollBreakdownSchema} from "../../systems/implementation/rules/result.js";
 import { strictInputCompiler } from "./strictValidation.js";
 import {EntrySourceSchema, EntrySnapshotSchema, type EntrySource} from "../../systems/implementation/package/schema/dynamic.js";
 import { Type, type TSchema } from "@sinclair/typebox";
@@ -265,11 +266,7 @@ const CharacterCreationVersionsDto = Type.Object({
   nextCursor: Type.Union([Type.String(), Type.Null()]),
 });
 
-const DiceDto = Type.Object({
-  sides: Type.Integer(),
-  value: Type.Integer(),
-  kept: Type.Boolean(),
-});
+const DiceDto = DieResultSchema;
 const RollBindingDto = Type.Object({
   scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs")]),
   definitionId: Type.String(),
@@ -281,6 +278,7 @@ const RollAudienceDto = Type.Union([
   Type.Literal("campaign"),
 ]);
 const RollDto = Type.Object({
+  breakdown: Type.Optional(RollBreakdownSchema),
   actionId: Type.String(),
   expression: Type.String(),
   dice: Type.Array(DiceDto),
@@ -302,6 +300,7 @@ const CharacterCommandResultDto = Type.Object({
 });
 
 const ActivityEventDto = Type.Object({
+  roll: Type.Optional(RollDto),
   id: Type.String(),
   characterRevision: Type.Integer(),
   kind: Type.String(),
@@ -449,6 +448,10 @@ const BumpResourceBody = Type.Object({
   idempotencyKey: Type.String({ minLength: 1 }),
 });
 const ExecuteActionBody = Type.Object({
+  // Outcomes and randomness belong to the server; never admit replacement
+  // dice/group/calculation data, even when another JSON field is tolerated.
+  dice: Type.Optional(Type.Never()), total: Type.Optional(Type.Never()),
+  breakdown: Type.Optional(Type.Never()), groups: Type.Optional(Type.Never()), seed: Type.Optional(Type.Never()),
   inputs: Type.Optional(Type.Object({}, { additionalProperties: true })),
   // I6 Task 8: optional requested roll audience. Unknown values fail schema
   // validation (400) and never fall back to a wider audience. Standalone

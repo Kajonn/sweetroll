@@ -59,6 +59,10 @@ function renderNode(ast: ExpressionAstV1): string {
       return `${ast.function}(${args})`;
     }
     case "dice": {
+      if (ast.group !== undefined) {
+        const {group, ...dice} = ast;
+        return `group(${JSON.stringify(group.id)}, ${JSON.stringify(group.label)}, ${renderNode(dice)})`;
+      }
       if (
         ast.count.kind === "numberLiteral" &&
         ast.count.value === 1
@@ -68,6 +72,10 @@ function renderNode(ast: ExpressionAstV1): string {
       return `dice(${renderNode(ast.count)}, ${ast.sides})`;
     }
     case "keep": {
+      if (ast.dice.kind === "dice" && ast.dice.group !== undefined) {
+        const {group, ...dice} = ast.dice;
+        return `group(${JSON.stringify(group.id)}, ${JSON.stringify(group.label)}, ${renderNode({...ast, dice})})`;
+      }
       if (
         ast.dice.kind === "dice" &&
         ast.dice.count.kind === "numberLiteral"

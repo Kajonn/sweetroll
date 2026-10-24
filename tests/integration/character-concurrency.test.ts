@@ -84,6 +84,7 @@ const DDL = `
     UNIQUE (actor_id, command_kind, idempotency_key)
   );
   CREATE TABLE character_rolls (
+    breakdown_json jsonb,
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     character_id       uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
     actor_id           uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,

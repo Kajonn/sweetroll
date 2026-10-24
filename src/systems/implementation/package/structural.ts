@@ -1,3 +1,4 @@
+import { validateDiceGroups } from "../rules/groups.js";
 import { Buffer } from "node:buffer";
 
 import { PACKAGE_LIMITS } from "./limits.js";
@@ -385,6 +386,8 @@ function validatePackageBudgets(
   }
 
   value.expressions.forEach((expression, expressionIndex) => {
+    diagnostics.push(...validateDiceGroups(expression.ast, expression.languageVersion).map(d => ({...d, path: `${prefix}/expressions/${expressionIndex}/ast`})));
+    if (expression.languageVersion !== undefined && value.schemaVersion !== "1.1") diagnostics.push({code: "invalid_schema",path: `${prefix}/schemaVersion`,message: "Grammar 0.2 requires package version 1.1."});
     const { depth, nodes } = measureAst(expression.ast);
     const path = `${prefix}/expressions/${expressionIndex}/ast`;
     if (nodes > PACKAGE_LIMITS.expressionAstNodes) {
@@ -521,7 +524,7 @@ function isLocallyValidAstNode(node: Record<string, unknown>): boolean {
           || node.roundMode === "down"
           || node.roundMode === "up");
     case "dice":
-      return hasOnlyKeys(node, ["kind", "count", "sides"])
+      return hasOnlyKeys(node, ["kind", "count", "sides"], ["group"])
         && isObject(node.count)
         && isIntegerBetween(node.sides, 1, PACKAGE_LIMITS.sidesPerDie);
     case "keep":

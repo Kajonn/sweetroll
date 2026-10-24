@@ -63,7 +63,7 @@ export function assessDocument(input: unknown): AssessedDocument {
 
 export function documentFromPackage(pkg: SystemPackageV1): SystemDocumentV1 {
   return {
-    schemaVersion: "1.0",
+    schemaVersion: pkg.schemaVersion,
     metadata: {
       name: pkg.name,
       description: pkg.description,

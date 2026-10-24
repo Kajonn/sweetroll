@@ -382,6 +382,7 @@ export type AttachedAuthorization = {
 export type ActivityScopeFilter = { scopeCampaignId?: string | null };
 
 export type CharacterActivityRow = {
+  roll?: NormalizedRoll;
   id: string;
   characterRevision: number;
   kind: string;
@@ -611,8 +612,8 @@ async function applyCommandCampaignTx(
   if (input.roll !== null) {
     const insertedRoll = await client.query<{ id: string }>(
       `INSERT INTO character_rolls
-         (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id, scope_campaign_id)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12)
+         (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id, scope_campaign_id, breakdown_json)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12, $13::jsonb)
        RETURNING id`,
       [
         updatedRow.id,
@@ -627,6 +628,7 @@ async function applyCommandCampaignTx(
         effectiveAudience,
         input.activity.requestId,
         campaignId,
+        input.roll.breakdown === undefined ? null : JSON.stringify(input.roll.breakdown),
       ],
     );
     rollId = requireRow(insertedRoll.rows[0], "applyCommandCampaignTx.roll").id;
@@ -1122,8 +1124,8 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         if (input.roll !== null) {
           const insertedRoll = await client.query<{ id: string }>(
             `INSERT INTO character_rolls
-               (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id)
-             VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11)
+               (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id, breakdown_json)
+             VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12::jsonb)
              RETURNING id`,
             [
               updatedRow.id,
@@ -1137,6 +1139,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
               input.roll.output,
               input.roll.audience,
               input.activity.requestId,
+              input.roll.breakdown === undefined ? null : JSON.stringify(input.roll.breakdown),
             ],
           );
           rollId = requireRow(insertedRoll.rows[0], "applyCommandTx.roll").id;
@@ -1301,10 +1304,12 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       // returns after detachment; campaign history never relabels into the
       // personal scope. The LEFT JOIN carries the roll's authorship/audience
       // so the read layer can redact `rollId` for out-of-audience sheet
-      // readers (fix round 1); dice/bindings never enter this projection.
+      // readers (fix round 1). New grouped-roll details are admitted by the
+      // module only when that same audience check permits the roll ID.
       const rowShape = `e.id, e.character_revision, e.kind, e.payload_json, e.roll_id, e.request_id,
              e.occurred_at, to_char(e.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS occurred_at_cursor,
-             r.actor_id AS roll_actor_id, r.audience AS roll_audience`;
+             r.actor_id AS roll_actor_id, r.audience AS roll_audience,
+             r.action_id, r.expression, r.dice_json, r.bindings_json, r.total, r.rendered_output, r.breakdown_json`;
       type ActivityRowShape = {
         id: string;
         character_revision: number;
@@ -1316,6 +1321,9 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         occurred_at_cursor: string;
         roll_actor_id: string | null;
         roll_audience: string | null;
+        action_id: string; expression: string; dice_json: NormalizedRoll["dice"];
+        bindings_json: NormalizedRoll["bindings"]; total: number; rendered_output: string;
+        breakdown_json: NormalizedRoll["breakdown"] | null;
       };
       const scopeValue = scope?.scopeCampaignId;
       const filters: string[] = [`e.character_id = $1`];
@@ -1353,6 +1361,11 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         cursorText: row.occurred_at_cursor,
         rollActorId: row.roll_actor_id,
         rollAudience: parseRollAudienceOrNull(row.roll_audience),
+        ...(row.breakdown_json == null ? {} : {roll: {
+          actionId: row.action_id, expression: row.expression, dice: row.dice_json,bindings: row.bindings_json,
+          total: row.total, output: row.rendered_output, audience: parseRollAudienceOrNull(row.roll_audience)!,
+          breakdown: row.breakdown_json,
+        }}),
       }));
     },
 

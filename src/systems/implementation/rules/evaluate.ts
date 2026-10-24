@@ -1,3 +1,6 @@
+import type {DieResult, RollBreakdown} from "./result.js";
+export type {DieResult, RollBreakdown} from "./result.js";
+import {children} from "./groups.js";
 import type { CompiledExpressionV1, ExpressionAstV1, ScalarValue } from "../package/schema/index.js";
 import { PACKAGE_LIMITS } from "../package/limits.js";
 import { renderExpression } from "./render.js";
@@ -26,9 +29,8 @@ export type RuntimeDiagnostic = {
   message: string;
 };
 
-export type DieResult = { sides: number; value: number; kept: boolean };
 
-export type RollResult = { total: number; dice: DieResult[]; expression: string };
+export type RollResult = { total: number; dice: DieResult[]; expression: string; breakdown?: RollBreakdown };
 
 export type EvalResult =
   | { ok: true; roll: RollResult | null; result: ScalarValue; diagnostics: RuntimeDiagnostic[]; bindings: EvaluationBinding[] }
@@ -42,6 +44,8 @@ type Ctx = {
   dice: DieResult[];
   diagnostics: RuntimeDiagnostic[];
   expression: string;
+  nodeIds: Map<ExpressionAstV1, string>;
+  breakdown?: RollBreakdown;
 };
 
 function fail(ctx: Ctx, message: string): undefined {
@@ -106,6 +110,38 @@ function equalValues(a: ScalarValue, b: ScalarValue): boolean {
 }
 
 function evalNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined {
+  const value = evalValueNode(node, ctx);
+  if (value !== undefined && ctx.breakdown !== undefined) {
+    const reduction = node.kind === "keep" || node.kind === "successCount";
+    const dice = node.kind === "dice" ? node : reduction && node.dice.kind === "dice" ? node.dice : undefined;
+    const operands = reduction && dice !== undefined ? [dice.count] : children(node);
+    const groupId = dice === undefined ? undefined : dice.group?.id ?? `@${ctx.nodeIds.get(dice)!}`;
+    ctx.breakdown.terms.push({
+      id: ctx.nodeIds.get(node)!,
+      operation: node.kind === "binary" || node.kind === "unary" ? node.operator
+        : node.kind === "call" ? node.function === "round" ? `round_${node.roundMode ?? "nearest"}` : node.function
+        : node.kind === "dice" ? "sum" : node.kind === "keep" ? node.mode === "highest" ? "keepHighest" : "keepLowest"
+        : node.kind === "reference" ? "binding" : node.kind.endsWith("Literal") ? "literal" : node.kind,
+      operandIds: operands.map(n => ctx.nodeIds.get(n)!), value,
+      ...(groupId === undefined ? {} : {groupId}),
+    });
+  }
+  return value;
+}
+
+function recordGroup(node: Extract<ExpressionAstV1, {kind:"dice"}>, ctx: Ctx, dice: DieResult[], operation: RollBreakdown["groups"][number]["operation"], total: number, threshold?: number): void {
+  if (ctx.breakdown === undefined) return;
+  const id = node.group?.id ?? `@${ctx.nodeIds.get(node)!}`;
+  dice.forEach((die, index) => {
+    die.id = `${id}:${index}`;
+    die.groupId = id;
+    if (threshold !== undefined) die.success = die.kept && die.value >= threshold;
+  });
+  ctx.breakdown.groups.push({id,label:node.group?.label ?? "Dice",count:dice.length,sides:node.sides,operation,
+    total,diceIds:dice.map(d => d.id!),...(threshold === undefined ? {} : {threshold})});
+}
+
+function evalValueNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined {
   switch (node.kind) {
     case "numberLiteral":
       return node.value;
@@ -234,7 +270,9 @@ function evalNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined {
       const dice = rollDice(cn, node.sides, ctx);
       if (dice === undefined) return undefined;
       ctx.dice.push(...dice);
-      return dice.reduce((s, d) => s + d.value, 0);
+      const total = dice.reduce((s, d) => s + d.value, 0);
+      recordGroup(node, ctx, dice, "sum", total);
+      return total;
     }
     case "keep": {
       if (node.dice.kind !== "dice") return fail(ctx, "keep expects a dice expression");
@@ -257,6 +295,7 @@ function evalNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined {
         }
       }
       ctx.dice.push(...dice);
+      recordGroup(node.dice, ctx, dice, node.mode === "highest" ? "keepHighest" : "keepLowest", total);
       return total;
     }
     case "successCount": {
@@ -268,7 +307,9 @@ function evalNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined {
       const dice = rollDice(cn, node.dice.sides, ctx);
       if (dice === undefined) return undefined;
       ctx.dice.push(...dice);
-      return dice.reduce((s, d) => (d.value >= node.threshold ? s + 1 : s), 0);
+      const total = dice.reduce((s, d) => (d.value >= node.threshold ? s + 1 : s), 0);
+      recordGroup(node.dice, ctx, dice, "successCount", total, node.threshold);
+      return total;
     }
   }
 }
@@ -280,7 +321,15 @@ export function evaluate(
   limits: EvaluationLimits = PACKAGE_LIMITS,
 ): EvalResult {
   const expression = renderExpression(compiled.ast);
+  const nodeIds = new Map<ExpressionAstV1, string>();
+  const identify = (node: ExpressionAstV1, path: string): void => {
+    nodeIds.set(node, path);
+    children(node).forEach((child, index) => identify(child, `${path}.${index}`));
+  };
+  identify(compiled.ast, "root");
   const ctx: Ctx = {
+    nodeIds,
+    ...(compiled.languageVersion === "0.2" ? {breakdown:{version:"1.0" as const,rootId:"root",groups:[],terms:[]}} : {}),
     bindings,
     bindingTrace: [],
     limits,
@@ -303,7 +352,7 @@ export function evaluate(
     return { ok: true, result: compiled.fallback, roll, diagnostics, bindings: ctx.bindingTrace };
   }
   const roll = containsRoll(compiled.ast)
-    ? { total: num(value) ?? 0, dice: ctx.dice, expression }
+    ? { total: num(value) ?? 0, dice: ctx.dice, expression, ...(ctx.breakdown === undefined ? {} : {breakdown:ctx.breakdown}) }
     : null;
   return { ok: true, result: value, roll, diagnostics: ctx.diagnostics, bindings: ctx.bindingTrace };
 }

@@ -1,3 +1,5 @@
+import {GroupedPoolEditor} from "./GroupedPoolEditor.js";
+import {RollBreakdown} from "../../rolls/RollBreakdown.js";
 import { useMemo, useState } from "react";
 
 import { evaluateRoll } from "../../api/evaluateExpression.js";
@@ -276,6 +278,10 @@ export function RollActionEditor({
           </div>
         )}
       </div>
+      <GroupedPoolEditor source={expressionSource} onChange={onExpressionSourceChange} disabled={disabled} choices={[
+        ...numericFields.map(([id])=>({value:`fields.${id}`,label:fieldLabels?.[id]??id})),
+        ...action.inputs.filter(input=>input.valueType==="integer"||input.valueType==="decimal").map(input=>({value:`inputs.${input.id}`,label:input.label})),
+      ]}/>
       {guided !== true || diceKind === "custom" || customEditing ? (
         <ExpressionEditor
           client={client}
@@ -516,6 +522,7 @@ export function RollActionEditor({
                   ))}
                 </ul>
               </div>
+              <RollBreakdown roll={tryItResult.result.roll}/>
               {modifiers !== null ? <div className={styles.resultRow}>
                 <span className={styles.resultLabel}>{t("editor.action.roll.tryIt.modifiers")}</span>
                 <span

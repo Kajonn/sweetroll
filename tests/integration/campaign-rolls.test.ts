@@ -1,3 +1,4 @@
+import {namedDicePoolDocument} from "../../src/systems/implementation/package/fixtures/named-dice-pool.js";
 import { randomUUID } from "node:crypto";
 
 import type { PoolClient } from "pg";
@@ -108,9 +109,9 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
    * outsider never joins. One adopted sheet (player's) and one
    * campaign-created sheet controlled by player + riley (two controllers).
    */
-  async function setup(): Promise<Setup> {
+  async function setup(versionId=h.versionId): Promise<Setup> {
     const created = await h.campaigns.create(ctxFor(h.users.gm), {
-      systemVersionId: h.versionId,
+      systemVersionId: versionId,
       title: `Rolls ${randomUUID()}`,
       description: "",
       idempotencyKey: randomUUID(),
@@ -125,7 +126,7 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
     await seedMember(campaignId, unassigned.actorId);
 
     const personal = await h.characters.create(ctxFor(h.users.player), {
-      systemVersionId: h.versionId,
+      systemVersionId: versionId,
       entityDefinitionId: "character",
       name: `Adopted ${randomUUID().slice(0, 8)}`,
       idempotencyKey: randomUUID(),
@@ -146,7 +147,7 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
     if (!adopted.ok) throw new Error("adopt failed");
 
     const prepared = await prepareCampaignCharacter(h.runtime, {
-      systemVersionId: h.versionId,
+      systemVersionId: versionId,
       entityDefinitionId: "character",
     });
     if (!prepared.ok) throw new Error("prepare failed");
@@ -739,4 +740,36 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
     if (rows.rows.length !== 1) throw new Error("expected exactly one roll");
     return rows.rows[0]!.id;
   }
+  it("preserves grouped results in campaign storage/export and audience-filtered history",async()=>{
+    const headers={cookie:h.users.gm.cookie};
+    const created=await h.app.inject({method:"POST",url:"/systems",headers,payload:{source:{kind:"blank",name:"Grouped campaign fixture"},idempotencyKey:randomUUID()}});
+    expect(created.statusCode,created.body).toBe(201);const workspace=created.json().workspace;
+    const saved=await h.app.inject({method:"PUT",url:`/systems/${workspace.system.systemId}/draft`,headers,payload:{expectedRevision:workspace.draft.revision,document:namedDicePoolDocument()}});
+    expect(saved.statusCode,saved.body).toBe(200);
+    const published=await h.app.inject({method:"POST",url:`/systems/${workspace.system.systemId}/publish`,headers,payload:{expectedRevision:saved.json().workspace.draft.revision,semanticVersion:"1.0.0",releaseNotes:"",idempotencyKey:randomUUID(),acknowledgeBreaking:true}});
+    expect(published.statusCode,published.body).toBe(200);
+    await h.pool.query("UPDATE systems SET access='public' WHERE id=$1",[workspace.system.systemId]);
+    const s=await setup(published.json().version.versionId);
+    const command={kind:"executeAction" as const,characterId:s.sharedId,actionId:"test_pool",inputs:{bonus_dice:1},expectedRevision:1,idempotencyKey:randomUUID(),audience:"owner_only" as const};
+    const first=await h.characters.apply(ctxFor(h.users.player),command);
+    expect(first.ok).toBe(true);if(!first.ok)throw new Error(JSON.stringify(first.error));
+    expect(first.value.roll?.breakdown?.groups).toHaveLength(3);
+    const replay=await h.characters.apply(ctxFor(h.users.player),command);expect(replay.ok&&replay.value.roll).toEqual(first.value.roll);
+    for(const who of [h.users.gm,h.users.other,secondController]){
+      const history=await h.characters.listActivity(ctxFor(who),{characterId:s.sharedId,limit:20,cursor:null});
+      expect(history.ok).toBe(true);if(!history.ok)throw new Error("history failed");
+      expect(history.value.events.every(e=>e.roll===undefined&&e.rollId===null)).toBe(true);
+    }
+    const own=await h.characters.listActivity(ctxFor(h.users.player),{characterId:s.sharedId,limit:20,cursor:null});
+    expect(own.ok&&own.value.events.some(e=>e.roll?.breakdown!==undefined)).toBe(true);
+    const shared=await h.characters.apply(ctxFor(h.users.player),{...command,idempotencyKey:randomUUID(),audience:"campaign"});
+    expect(shared.ok).toBe(true);if(!shared.ok)throw new Error("shared roll failed");
+    const exported=await h.campaigns.exportCampaign(ctxFor(h.users.gm),{campaignId:s.campaignId,idempotencyKey:randomUUID()});
+    expect(exported.ok).toBe(true);if(!exported.ok)throw new Error("export failed");
+    expect(exported.value.rolls).toHaveLength(1);
+    expect(exported.value.rolls[0]?.breakdown).toEqual(shared.value.roll?.breakdown);
+    await h.pool.query("UPDATE campaign_members SET status='removed',generation=generation+1 WHERE campaign_id=$1 AND user_id=$2",[s.campaignId,h.users.player.actorId]);
+    const revoked=await h.characters.apply(ctxFor(h.users.player),command);expect(revoked.ok).toBe(false);
+  });
+
 });

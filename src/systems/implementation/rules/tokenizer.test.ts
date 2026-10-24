@@ -56,4 +56,16 @@ describe("tokenizer", () => {
     if (!r.ok) return;
     expect(r.tokens.map((t) => t.kind)).toEqual(["id", "operator", "number", "operator", "boolean"]);
   });
+
+  it("rejects unescaped control characters in string literals", () => {
+    for (let code = 0; code <= 0x1f; code++) {
+      const r = tokenize(`"${String.fromCharCode(code)}"`);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.diagnostics[0]!.code).toBe("invalid_syntax");
+    }
+
+    const escaped = tokenize(String.raw`"\u0000\t"`);
+    expect(escaped.ok).toBe(true);
+    if (escaped.ok) expect(escaped.tokens[0]).toEqual({ kind: "string", value: "\0\t", start: 0 });
+  });
 });

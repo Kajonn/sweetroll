@@ -1,3 +1,4 @@
+import {parse,hasDiceGroups} from "@sweetroll/rules";
 export type SystemMetadataV1 = {
   name: string;
   description: string;
@@ -22,7 +23,7 @@ export type ActionV1 = { id: string; label: string; kind: string } & Record<stri
 export type ValidationV1 = { id: string; expressionId: string; severity: string; message: string; targetId: string };
 
 export type SystemDocumentV1 = {
-  schemaVersion: "1.0";
+  schemaVersion: "1.0" | "1.1";
   metadata: SystemMetadataV1;
   entities: EntityDefinitionV1[];
   referenceData: ReferenceDataV1[];
@@ -127,7 +128,8 @@ export function documentReducer(state: SystemDocumentV1, action: DocumentAction)
         };
       });
       if (!mutated) return state;
-      return { ...state, expressions };
+      const parsed=action.source===undefined?null:parse(action.source);
+      return { ...state, expressions, ...(parsed?.ok && hasDiceGroups(parsed.ast)?{schemaVersion:"1.1" as const}:{}) };
     }
     case "addExpression": {
       if (state.expressions.some((entry) => entry.id === action.expression.id)) return state;

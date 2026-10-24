@@ -1,6 +1,6 @@
 # Dice pool reliability and push-roll delivery plan
 
-**Status (2026-10-22):** slice A implemented on `feat/dice-pool-reliability`, with observed regression-first red → green. CI and isolated deployment acceptance are tracked in [the acceptance record](../../acceptance/dice-pool-reliability-2026-10-22.md). B/C remain planned and must follow A review. No full-release claim.
+**Status (2026-10-24):** slice A merged as PR #21 (`740204f`). Slice B is implemented on `feat/named-dice-groups` against its [versioned contract](../specs/2026-10-23-named-dice-groups.md), with observed compiler/evaluator, editor and async-focus red → green. All seven CI jobs passed on application `aa77d09` (run 118). Isolated deployment `ae7d1e8` has identical application code and passed named-group, retained legacy and production-offline live journeys; B is ready for review. See the [B acceptance record](../../acceptance/named-dice-groups-2026-10-23.md) for exact identities and limitations. The compatibility bundle and wider release gates remain open; C is not started. No full-release claim.
 **Baseline:** `4ab950c` (`main`, PR #19 merged), checked against remote `main` on 2026-10-21.
 **Goal:** make current dice-pool authoring and execution trustworthy, then extend the existing engine with named dice groups and configurable push rolls.
 **Authority:** [design_v2.md §6.4](../../../design_v2.md#64-rules-and-expression-engine), [expression engine design](../specs/2026-09-04-system-expression-engine-design.md), [package contract](../specs/2026-09-04-system-package-contract-design.md), [original engine plan](2026-09-04-system-expression-engine.md), and [GUI integration gates](2026-09-08-gui-integration.md).
@@ -106,14 +106,14 @@ The review ran 75 focused backend tests and 25 frontend tests successfully. Sepa
 
 **Files/seams:** expression/package schemas, compiler/evaluator/rendering, `src/systems/runtime.ts`, granted actions, Characters persistence/export, HTTP contracts, generated client types, authoring controls, player/GM result/history surfaces, and their existing tests. Add a new immutable SQL migration only if persisted storage requires it.
 
-- [ ] First write a versioned successor contract and update `design_v2.md` plus package/expression specs. Specify declarative group IDs/labels, count expressions, die sizes, thresholds, calculation terms and their operations, and stable per-die identity. Keep existing scalar `total` and legacy decoding meaningful.
-- [ ] Distinguish sum terms from success-count terms; preserve group identity through nested/multiple terms rather than adding one global `mode` flag. A mixed expression cannot be reconstructed correctly from a flat dice sum. Per-die/group metadata must describe thresholds and results without relying on display color alone.
+- [x] First write a versioned successor contract and update `design_v2.md` plus package/expression specs. Specify declarative group IDs/labels, count expressions, die sizes, thresholds, calculation terms and their operations, and stable per-die identity. Keep existing scalar `total` and legacy decoding meaningful.
+- [x] Distinguish sum terms from success-count terms; preserve group identity through nested/multiple terms rather than adding one global `mode` flag. A mixed expression cannot be reconstructed correctly from a flat dice sum. Per-die/group metadata must describe thresholds and results without relying on display color alone.
 - [ ] Define compatibility before code: old published packages and stored receipts/results still load without mutation; new features require a capable package/engine version. Add import/export, clone, preview/publish, upgrade/rollback and mixed-client/service-worker tests; reject unsupported versions clearly. Do not silently backfill old group identities or change checksums.
-- [ ] Red → green: a three-group fixture uses distinct attribute, skill and gear counts, including an empty group, a situational modifier, different group thresholds, and mixed sum/count terms. Assert exact structured results under injected RNG and total/dice budget enforcement across all groups.
-- [ ] Preserve old RNG draw order for legacy expressions. New grouped expressions have documented deterministic order. Server-owned IDs/metadata cannot be injected or changed by client-supplied roll outcomes.
-- [ ] Carry the structured result through runtime, item-granted actions, persistence, command replay, campaign audiences, activity/history, export, transport, frontend session/cache and display. Test full round trips and legacy result fallback, not only evaluator output.
-- [ ] Add guided pool authoring using existing definition choices, with custom expression editing preserved. Show separate group dice/counts, successes, kept/discarded state and a truthful breakdown in preview and actual play.
-- [ ] Run Task 5's relevant/full verification matrix and record a separate B acceptance result before introducing push commands.
+- [x] Red → green: a three-group fixture uses distinct attribute, skill and gear counts, including an empty group, a situational modifier, different group thresholds, and mixed sum/count terms. Assert exact structured results under injected RNG and total/dice budget enforcement across all groups.
+- [x] Preserve old RNG draw order for legacy expressions. New grouped expressions have documented deterministic order. Server-owned IDs/metadata cannot be injected or changed by client-supplied roll outcomes.
+- [x] Carry the structured result through runtime, item-granted actions, persistence, command replay, campaign audiences, activity/history, export, transport, frontend session/cache and display. Test full round trips and legacy result fallback, not only evaluator output.
+- [x] Add guided pool authoring using existing definition choices, with custom expression editing preserved. Show separate group dice/counts, successes, kept/discarded state and a truthful breakdown in preview and actual play.
+- [x] Run Task 5's relevant/full verification matrix and record a separate B acceptance result before introducing push commands.
 
 **Gate:** named groups and structured calculations survive the full author-to-player lifecycle without changing historical package/result behavior. B alone does not reroll anything.
 
@@ -139,7 +139,7 @@ The review ran 75 focused backend tests and 25 frontend tests successfully. Sepa
 | Slice | Contract/spec | Red → green | CI | Deployed journey | Status |
 |---|---|---|---|---|---|
 | A | Package/expression specs updated; `actionDiagnostics` contract generated | R1–R4 observed red → green | Run 112: all seven verification jobs passed | `ad5de63`, 2026-10-23: core journey and offline reopening passed | Ready for A review; unchecked bundles and wider release gates remain |
-| B | Versioned design required in Task 6 | Pending | Pending | Pending | After A |
+| B | [Contract 1.1 / grammar 0.2](../specs/2026-10-23-named-dice-groups.md) | Group evaluator/editor and async focus observed red → green | Run 118: all seven verification jobs passed | `ae7d1e8`, 2026-10-24: named groups, legacy and production-offline journeys passed | Ready for B review; compatibility bundle and wider release gates remain |
 | C | Push/lineage policy required in Task 7 | Pending | Pending | Pending | After B |
 
 This document records execution steps. No checkbox or green test count from the original engine plan closes these new findings or extension gates.
@@ -155,3 +155,17 @@ Observed pre-fix red: 16 server regressions and three editor regressions failed.
 ### Slice A deployed evidence — 2026-10-23
 
 Owner-approved isolated Railway deployment `d16eefbe-3863-4ea1-b83d-33d7bffbde1b` reached SUCCESS on exact application commit `ad5de63`, after the platform's earlier deployment pause. Migrations/readiness and served HTML/JS/CSS/service-worker/manifest identity were verified. The canonical core pool/item journey passed against the remote production build (53.6s), followed by a separate offline deep-link reopening check (24.7s). See the [acceptance record](../../acceptance/dice-pool-reliability-2026-10-22.md#final-ci-and-deployed-acceptance--2026-10-23) for exact IDs, artifact hashes, commands, cleanup and remaining limitations. CI on the same application commit passed all seven verification jobs, including real PostgreSQL, retained d20/PbtA journeys and production-offline coverage. Documentation-only evidence updates do not change the pinned application. A review precedes B; this evidence does not close the unchecked combined keyboard/focus or failed-action-offline-review gates or wider G9 release gates.
+
+
+### Slice B CI evidence and staged preview — 2026-10-23
+
+Application `aa77d09` passed [run 118](https://github.com/Kajonn/sweetroll/actions/runs/40002468608): 445 server, 370 real PostgreSQL integration, 1,171 frontend, 53 browser, 25 production-offline and 10 visual checks, plus typechecks/contracts/builds/Docker. The [B acceptance record](../../acceptance/named-dice-groups-2026-10-23.md) records red → green, intermediate failures and retained limitations. The new history projection admits full grouped results only under the originating roll's audience check; personal state exports still exclude roll history.
+
+Reviewed Railway patch `eb9e086b-a72f-423e-8668-707d45b2a8f8` pins the isolated acceptance service to this exact application commit. At this historical checkpoint the deployment tool cancelled activation for lack of tool approval; B live acceptance had not run. The later deployment and results below resolve this activation blocker. The remaining compatibility/release bundles are not closed by CI alone.
+
+
+### Slice B deployed evidence — 2026-10-24
+
+Isolated deployment `87604ee3-6f89-48b3-a86f-585b118fdd0d` reached SUCCESS on observed commit `ae7d1e8`, with completed migrations and healthy readiness. The service configuration reports pin `aa77d09`; the deployed metadata reports `ae7d1e8`. Only three documentation files differ, so application code matches CI run 118. Served HTML, JS, CSS, worker and manifest match the deployed source rebuild byte for byte. Three live journeys passed with zero retries: named groups (83.530s), legacy pool reliability (79.619s) and production-worker offline grouped history (65.786s). A separate persisted-history probe verified group membership, dice identity, subtotals and total consistency; test-created systems and characters were archived and read back. See [the B acceptance record](../../acceptance/named-dice-groups-2026-10-23.md#isolated-deployed-acceptance--2026-10-24) for exact deployment/artifact/resource IDs, environment and remaining limitations.
+
+This completes B's relevant verification/deployed core gate and makes PR #22 ready for review. The combined compatibility checkbox still requires additional explicit mixed old/new client/worker cases; physical-device, provider-authentication and wider G9 gates remain open. Slice C has not started and requires its own contract and execution evidence.

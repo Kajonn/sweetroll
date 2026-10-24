@@ -11954,6 +11954,157 @@
                                 "audience"
                               ],
                               "properties": {
+                                "breakdown": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "version",
+                                    "rootId",
+                                    "groups",
+                                    "terms"
+                                  ],
+                                  "properties": {
+                                    "version": {
+                                      "const": "1.0",
+                                      "type": "string"
+                                    },
+                                    "rootId": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "groups": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "count",
+                                          "sides",
+                                          "operation",
+                                          "diceIds",
+                                          "total"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "label": {
+                                            "minLength": 1,
+                                            "maxLength": 120,
+                                            "type": "string"
+                                          },
+                                          "count": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "sides": {
+                                            "minimum": 1,
+                                            "maximum": 1000,
+                                            "type": "integer"
+                                          },
+                                          "operation": {
+                                            "anyOf": [
+                                              {
+                                                "const": "sum",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "successCount",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepHighest",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepLowest",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "type": "integer"
+                                          },
+                                          "diceIds": {
+                                            "maxItems": 100,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "total": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "terms": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "operation",
+                                          "operandIds",
+                                          "value"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "operation": {
+                                            "minLength": 1,
+                                            "maxLength": 32,
+                                            "type": "string"
+                                          },
+                                          "operandIds": {
+                                            "maxItems": 2,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "value": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "groupId": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
                                 "actionId": {
                                   "type": "string"
                                 },
@@ -11963,6 +12114,7 @@
                                 "dice": {
                                   "type": "array",
                                   "items": {
+                                    "additionalProperties": false,
                                     "type": "object",
                                     "required": [
                                       "sides",
@@ -11971,12 +12123,28 @@
                                     ],
                                     "properties": {
                                       "sides": {
+                                        "minimum": 1,
+                                        "maximum": 1000,
                                         "type": "integer"
                                       },
                                       "value": {
+                                        "minimum": 1,
                                         "type": "integer"
                                       },
                                       "kept": {
+                                        "type": "boolean"
+                                      },
+                                      "id": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "groupId": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "success": {
                                         "type": "boolean"
                                       }
                                     }
@@ -14369,6 +14537,157 @@
                                 "audience"
                               ],
                               "properties": {
+                                "breakdown": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "version",
+                                    "rootId",
+                                    "groups",
+                                    "terms"
+                                  ],
+                                  "properties": {
+                                    "version": {
+                                      "const": "1.0",
+                                      "type": "string"
+                                    },
+                                    "rootId": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "groups": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "count",
+                                          "sides",
+                                          "operation",
+                                          "diceIds",
+                                          "total"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "label": {
+                                            "minLength": 1,
+                                            "maxLength": 120,
+                                            "type": "string"
+                                          },
+                                          "count": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "sides": {
+                                            "minimum": 1,
+                                            "maximum": 1000,
+                                            "type": "integer"
+                                          },
+                                          "operation": {
+                                            "anyOf": [
+                                              {
+                                                "const": "sum",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "successCount",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepHighest",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepLowest",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "type": "integer"
+                                          },
+                                          "diceIds": {
+                                            "maxItems": 100,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "total": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "terms": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "operation",
+                                          "operandIds",
+                                          "value"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "operation": {
+                                            "minLength": 1,
+                                            "maxLength": 32,
+                                            "type": "string"
+                                          },
+                                          "operandIds": {
+                                            "maxItems": 2,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "value": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "groupId": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
                                 "actionId": {
                                   "type": "string"
                                 },
@@ -14378,6 +14697,7 @@
                                 "dice": {
                                   "type": "array",
                                   "items": {
+                                    "additionalProperties": false,
                                     "type": "object",
                                     "required": [
                                       "sides",
@@ -14386,12 +14706,28 @@
                                     ],
                                     "properties": {
                                       "sides": {
+                                        "minimum": 1,
+                                        "maximum": 1000,
                                         "type": "integer"
                                       },
                                       "value": {
+                                        "minimum": 1,
                                         "type": "integer"
                                       },
                                       "kept": {
+                                        "type": "boolean"
+                                      },
+                                      "id": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "groupId": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "success": {
                                         "type": "boolean"
                                       }
                                     }
@@ -16795,6 +17131,157 @@
                                 "audience"
                               ],
                               "properties": {
+                                "breakdown": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "version",
+                                    "rootId",
+                                    "groups",
+                                    "terms"
+                                  ],
+                                  "properties": {
+                                    "version": {
+                                      "const": "1.0",
+                                      "type": "string"
+                                    },
+                                    "rootId": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "groups": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "count",
+                                          "sides",
+                                          "operation",
+                                          "diceIds",
+                                          "total"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "label": {
+                                            "minLength": 1,
+                                            "maxLength": 120,
+                                            "type": "string"
+                                          },
+                                          "count": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "sides": {
+                                            "minimum": 1,
+                                            "maximum": 1000,
+                                            "type": "integer"
+                                          },
+                                          "operation": {
+                                            "anyOf": [
+                                              {
+                                                "const": "sum",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "successCount",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepHighest",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepLowest",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "type": "integer"
+                                          },
+                                          "diceIds": {
+                                            "maxItems": 100,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "total": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "terms": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "operation",
+                                          "operandIds",
+                                          "value"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "operation": {
+                                            "minLength": 1,
+                                            "maxLength": 32,
+                                            "type": "string"
+                                          },
+                                          "operandIds": {
+                                            "maxItems": 2,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "value": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "groupId": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
                                 "actionId": {
                                   "type": "string"
                                 },
@@ -16804,6 +17291,7 @@
                                 "dice": {
                                   "type": "array",
                                   "items": {
+                                    "additionalProperties": false,
                                     "type": "object",
                                     "required": [
                                       "sides",
@@ -16812,12 +17300,28 @@
                                     ],
                                     "properties": {
                                       "sides": {
+                                        "minimum": 1,
+                                        "maximum": 1000,
                                         "type": "integer"
                                       },
                                       "value": {
+                                        "minimum": 1,
                                         "type": "integer"
                                       },
                                       "kept": {
+                                        "type": "boolean"
+                                      },
+                                      "id": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "groupId": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "success": {
                                         "type": "boolean"
                                       }
                                     }
@@ -17816,6 +18320,21 @@
                   "idempotencyKey"
                 ],
                 "properties": {
+                  "dice": {
+                    "not": {}
+                  },
+                  "total": {
+                    "not": {}
+                  },
+                  "breakdown": {
+                    "not": {}
+                  },
+                  "groups": {
+                    "not": {}
+                  },
+                  "seed": {
+                    "not": {}
+                  },
                   "inputs": {
                     "additionalProperties": true,
                     "type": "object",
@@ -19233,6 +19752,157 @@
                                 "audience"
                               ],
                               "properties": {
+                                "breakdown": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "version",
+                                    "rootId",
+                                    "groups",
+                                    "terms"
+                                  ],
+                                  "properties": {
+                                    "version": {
+                                      "const": "1.0",
+                                      "type": "string"
+                                    },
+                                    "rootId": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "groups": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "count",
+                                          "sides",
+                                          "operation",
+                                          "diceIds",
+                                          "total"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "label": {
+                                            "minLength": 1,
+                                            "maxLength": 120,
+                                            "type": "string"
+                                          },
+                                          "count": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "sides": {
+                                            "minimum": 1,
+                                            "maximum": 1000,
+                                            "type": "integer"
+                                          },
+                                          "operation": {
+                                            "anyOf": [
+                                              {
+                                                "const": "sum",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "successCount",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepHighest",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepLowest",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "type": "integer"
+                                          },
+                                          "diceIds": {
+                                            "maxItems": 100,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "total": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "terms": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "operation",
+                                          "operandIds",
+                                          "value"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "operation": {
+                                            "minLength": 1,
+                                            "maxLength": 32,
+                                            "type": "string"
+                                          },
+                                          "operandIds": {
+                                            "maxItems": 2,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "value": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "groupId": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
                                 "actionId": {
                                   "type": "string"
                                 },
@@ -19242,6 +19912,7 @@
                                 "dice": {
                                   "type": "array",
                                   "items": {
+                                    "additionalProperties": false,
                                     "type": "object",
                                     "required": [
                                       "sides",
@@ -19250,12 +19921,28 @@
                                     ],
                                     "properties": {
                                       "sides": {
+                                        "minimum": 1,
+                                        "maximum": 1000,
                                         "type": "integer"
                                       },
                                       "value": {
+                                        "minimum": 1,
                                         "type": "integer"
                                       },
                                       "kept": {
+                                        "type": "boolean"
+                                      },
+                                      "id": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "groupId": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "success": {
                                         "type": "boolean"
                                       }
                                     }
@@ -21746,6 +22433,157 @@
                                 "audience"
                               ],
                               "properties": {
+                                "breakdown": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "version",
+                                    "rootId",
+                                    "groups",
+                                    "terms"
+                                  ],
+                                  "properties": {
+                                    "version": {
+                                      "const": "1.0",
+                                      "type": "string"
+                                    },
+                                    "rootId": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "groups": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "count",
+                                          "sides",
+                                          "operation",
+                                          "diceIds",
+                                          "total"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "label": {
+                                            "minLength": 1,
+                                            "maxLength": 120,
+                                            "type": "string"
+                                          },
+                                          "count": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "sides": {
+                                            "minimum": 1,
+                                            "maximum": 1000,
+                                            "type": "integer"
+                                          },
+                                          "operation": {
+                                            "anyOf": [
+                                              {
+                                                "const": "sum",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "successCount",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepHighest",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepLowest",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "type": "integer"
+                                          },
+                                          "diceIds": {
+                                            "maxItems": 100,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "total": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "terms": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "operation",
+                                          "operandIds",
+                                          "value"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "operation": {
+                                            "minLength": 1,
+                                            "maxLength": 32,
+                                            "type": "string"
+                                          },
+                                          "operandIds": {
+                                            "maxItems": 2,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "value": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "groupId": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
                                 "actionId": {
                                   "type": "string"
                                 },
@@ -21755,6 +22593,7 @@
                                 "dice": {
                                   "type": "array",
                                   "items": {
+                                    "additionalProperties": false,
                                     "type": "object",
                                     "required": [
                                       "sides",
@@ -21763,12 +22602,28 @@
                                     ],
                                     "properties": {
                                       "sides": {
+                                        "minimum": 1,
+                                        "maximum": 1000,
                                         "type": "integer"
                                       },
                                       "value": {
+                                        "minimum": 1,
                                         "type": "integer"
                                       },
                                       "kept": {
+                                        "type": "boolean"
+                                      },
+                                      "id": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "groupId": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "success": {
                                         "type": "boolean"
                                       }
                                     }
@@ -24159,6 +25014,157 @@
                                 "audience"
                               ],
                               "properties": {
+                                "breakdown": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "version",
+                                    "rootId",
+                                    "groups",
+                                    "terms"
+                                  ],
+                                  "properties": {
+                                    "version": {
+                                      "const": "1.0",
+                                      "type": "string"
+                                    },
+                                    "rootId": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "groups": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "count",
+                                          "sides",
+                                          "operation",
+                                          "diceIds",
+                                          "total"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "label": {
+                                            "minLength": 1,
+                                            "maxLength": 120,
+                                            "type": "string"
+                                          },
+                                          "count": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "sides": {
+                                            "minimum": 1,
+                                            "maximum": 1000,
+                                            "type": "integer"
+                                          },
+                                          "operation": {
+                                            "anyOf": [
+                                              {
+                                                "const": "sum",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "successCount",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepHighest",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepLowest",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "type": "integer"
+                                          },
+                                          "diceIds": {
+                                            "maxItems": 100,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "total": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "terms": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "operation",
+                                          "operandIds",
+                                          "value"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "operation": {
+                                            "minLength": 1,
+                                            "maxLength": 32,
+                                            "type": "string"
+                                          },
+                                          "operandIds": {
+                                            "maxItems": 2,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "value": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "groupId": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
                                 "actionId": {
                                   "type": "string"
                                 },
@@ -24168,6 +25174,7 @@
                                 "dice": {
                                   "type": "array",
                                   "items": {
+                                    "additionalProperties": false,
                                     "type": "object",
                                     "required": [
                                       "sides",
@@ -24176,12 +25183,28 @@
                                     ],
                                     "properties": {
                                       "sides": {
+                                        "minimum": 1,
+                                        "maximum": 1000,
                                         "type": "integer"
                                       },
                                       "value": {
+                                        "minimum": 1,
                                         "type": "integer"
                                       },
                                       "kept": {
+                                        "type": "boolean"
+                                      },
+                                      "id": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "groupId": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "success": {
                                         "type": "boolean"
                                       }
                                     }
@@ -26580,6 +27603,157 @@
                                 "audience"
                               ],
                               "properties": {
+                                "breakdown": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "version",
+                                    "rootId",
+                                    "groups",
+                                    "terms"
+                                  ],
+                                  "properties": {
+                                    "version": {
+                                      "const": "1.0",
+                                      "type": "string"
+                                    },
+                                    "rootId": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "groups": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "count",
+                                          "sides",
+                                          "operation",
+                                          "diceIds",
+                                          "total"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "label": {
+                                            "minLength": 1,
+                                            "maxLength": 120,
+                                            "type": "string"
+                                          },
+                                          "count": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "sides": {
+                                            "minimum": 1,
+                                            "maximum": 1000,
+                                            "type": "integer"
+                                          },
+                                          "operation": {
+                                            "anyOf": [
+                                              {
+                                                "const": "sum",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "successCount",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepHighest",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepLowest",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "type": "integer"
+                                          },
+                                          "diceIds": {
+                                            "maxItems": 100,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "total": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "terms": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "operation",
+                                          "operandIds",
+                                          "value"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "operation": {
+                                            "minLength": 1,
+                                            "maxLength": 32,
+                                            "type": "string"
+                                          },
+                                          "operandIds": {
+                                            "maxItems": 2,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "value": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "groupId": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
                                 "actionId": {
                                   "type": "string"
                                 },
@@ -26589,6 +27763,7 @@
                                 "dice": {
                                   "type": "array",
                                   "items": {
+                                    "additionalProperties": false,
                                     "type": "object",
                                     "required": [
                                       "sides",
@@ -26597,12 +27772,28 @@
                                     ],
                                     "properties": {
                                       "sides": {
+                                        "minimum": 1,
+                                        "maximum": 1000,
                                         "type": "integer"
                                       },
                                       "value": {
+                                        "minimum": 1,
                                         "type": "integer"
                                       },
                                       "kept": {
+                                        "type": "boolean"
+                                      },
+                                      "id": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "groupId": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "success": {
                                         "type": "boolean"
                                       }
                                     }
@@ -30238,6 +31429,157 @@
                                 "audience"
                               ],
                               "properties": {
+                                "breakdown": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "version",
+                                    "rootId",
+                                    "groups",
+                                    "terms"
+                                  ],
+                                  "properties": {
+                                    "version": {
+                                      "const": "1.0",
+                                      "type": "string"
+                                    },
+                                    "rootId": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "groups": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "count",
+                                          "sides",
+                                          "operation",
+                                          "diceIds",
+                                          "total"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "label": {
+                                            "minLength": 1,
+                                            "maxLength": 120,
+                                            "type": "string"
+                                          },
+                                          "count": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "sides": {
+                                            "minimum": 1,
+                                            "maximum": 1000,
+                                            "type": "integer"
+                                          },
+                                          "operation": {
+                                            "anyOf": [
+                                              {
+                                                "const": "sum",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "successCount",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepHighest",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepLowest",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "type": "integer"
+                                          },
+                                          "diceIds": {
+                                            "maxItems": 100,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "total": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "terms": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "operation",
+                                          "operandIds",
+                                          "value"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "operation": {
+                                            "minLength": 1,
+                                            "maxLength": 32,
+                                            "type": "string"
+                                          },
+                                          "operandIds": {
+                                            "maxItems": 2,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "value": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "groupId": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
                                 "actionId": {
                                   "type": "string"
                                 },
@@ -30247,6 +31589,7 @@
                                 "dice": {
                                   "type": "array",
                                   "items": {
+                                    "additionalProperties": false,
                                     "type": "object",
                                     "required": [
                                       "sides",
@@ -30255,12 +31598,28 @@
                                     ],
                                     "properties": {
                                       "sides": {
+                                        "minimum": 1,
+                                        "maximum": 1000,
                                         "type": "integer"
                                       },
                                       "value": {
+                                        "minimum": 1,
                                         "type": "integer"
                                       },
                                       "kept": {
+                                        "type": "boolean"
+                                      },
+                                      "id": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "groupId": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "success": {
                                         "type": "boolean"
                                       }
                                     }
@@ -33553,6 +34912,282 @@
                           "occurredAt"
                         ],
                         "properties": {
+                          "roll": {
+                            "type": "object",
+                            "required": [
+                              "actionId",
+                              "expression",
+                              "dice",
+                              "bindings",
+                              "total",
+                              "output",
+                              "audience"
+                            ],
+                            "properties": {
+                              "breakdown": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "version",
+                                  "rootId",
+                                  "groups",
+                                  "terms"
+                                ],
+                                "properties": {
+                                  "version": {
+                                    "const": "1.0",
+                                    "type": "string"
+                                  },
+                                  "rootId": {
+                                    "minLength": 1,
+                                    "maxLength": 256,
+                                    "type": "string"
+                                  },
+                                  "groups": {
+                                    "maxItems": 256,
+                                    "type": "array",
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "id",
+                                        "label",
+                                        "count",
+                                        "sides",
+                                        "operation",
+                                        "diceIds",
+                                        "total"
+                                      ],
+                                      "properties": {
+                                        "id": {
+                                          "minLength": 1,
+                                          "maxLength": 256,
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "minLength": 1,
+                                          "maxLength": 120,
+                                          "type": "string"
+                                        },
+                                        "count": {
+                                          "minimum": 0,
+                                          "maximum": 100,
+                                          "type": "integer"
+                                        },
+                                        "sides": {
+                                          "minimum": 1,
+                                          "maximum": 1000,
+                                          "type": "integer"
+                                        },
+                                        "operation": {
+                                          "anyOf": [
+                                            {
+                                              "const": "sum",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "successCount",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "keepHighest",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "keepLowest",
+                                              "type": "string"
+                                            }
+                                          ]
+                                        },
+                                        "threshold": {
+                                          "type": "integer"
+                                        },
+                                        "diceIds": {
+                                          "maxItems": 100,
+                                          "type": "array",
+                                          "items": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          }
+                                        },
+                                        "total": {
+                                          "type": "number"
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "terms": {
+                                    "maxItems": 256,
+                                    "type": "array",
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "id",
+                                        "operation",
+                                        "operandIds",
+                                        "value"
+                                      ],
+                                      "properties": {
+                                        "id": {
+                                          "minLength": 1,
+                                          "maxLength": 256,
+                                          "type": "string"
+                                        },
+                                        "operation": {
+                                          "minLength": 1,
+                                          "maxLength": 32,
+                                          "type": "string"
+                                        },
+                                        "operandIds": {
+                                          "maxItems": 2,
+                                          "type": "array",
+                                          "items": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          }
+                                        },
+                                        "value": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "number"
+                                            },
+                                            {
+                                              "type": "boolean"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "groupId": {
+                                          "minLength": 1,
+                                          "maxLength": 256,
+                                          "type": "string"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expression": {
+                                "type": "string"
+                              },
+                              "dice": {
+                                "type": "array",
+                                "items": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "sides",
+                                    "value",
+                                    "kept"
+                                  ],
+                                  "properties": {
+                                    "sides": {
+                                      "minimum": 1,
+                                      "maximum": 1000,
+                                      "type": "integer"
+                                    },
+                                    "value": {
+                                      "minimum": 1,
+                                      "type": "integer"
+                                    },
+                                    "kept": {
+                                      "type": "boolean"
+                                    },
+                                    "id": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "groupId": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "success": {
+                                      "type": "boolean"
+                                    }
+                                  }
+                                }
+                              },
+                              "bindings": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "required": [
+                                    "scope",
+                                    "definitionId",
+                                    "value"
+                                  ],
+                                  "properties": {
+                                    "scope": {
+                                      "anyOf": [
+                                        {
+                                          "const": "fields",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "inputs",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    },
+                                    "definitionId": {
+                                      "type": "string"
+                                    },
+                                    "value": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "boolean"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              "total": {
+                                "type": "number"
+                              },
+                              "output": {
+                                "type": "string"
+                              },
+                              "audience": {
+                                "anyOf": [
+                                  {
+                                    "const": "owner_only",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "gm_only",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "campaign",
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            }
+                          },
                           "id": {
                             "type": "string"
                           },
@@ -38385,6 +40020,157 @@
                                 "audience"
                               ],
                               "properties": {
+                                "breakdown": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "version",
+                                    "rootId",
+                                    "groups",
+                                    "terms"
+                                  ],
+                                  "properties": {
+                                    "version": {
+                                      "const": "1.0",
+                                      "type": "string"
+                                    },
+                                    "rootId": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "groups": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "count",
+                                          "sides",
+                                          "operation",
+                                          "diceIds",
+                                          "total"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "label": {
+                                            "minLength": 1,
+                                            "maxLength": 120,
+                                            "type": "string"
+                                          },
+                                          "count": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "sides": {
+                                            "minimum": 1,
+                                            "maximum": 1000,
+                                            "type": "integer"
+                                          },
+                                          "operation": {
+                                            "anyOf": [
+                                              {
+                                                "const": "sum",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "successCount",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepHighest",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepLowest",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "type": "integer"
+                                          },
+                                          "diceIds": {
+                                            "maxItems": 100,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "total": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "terms": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "operation",
+                                          "operandIds",
+                                          "value"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "operation": {
+                                            "minLength": 1,
+                                            "maxLength": 32,
+                                            "type": "string"
+                                          },
+                                          "operandIds": {
+                                            "maxItems": 2,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "value": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "groupId": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
                                 "actionId": {
                                   "type": "string"
                                 },
@@ -38394,6 +40180,7 @@
                                 "dice": {
                                   "type": "array",
                                   "items": {
+                                    "additionalProperties": false,
                                     "type": "object",
                                     "required": [
                                       "sides",
@@ -38402,12 +40189,28 @@
                                     ],
                                     "properties": {
                                       "sides": {
+                                        "minimum": 1,
+                                        "maximum": 1000,
                                         "type": "integer"
                                       },
                                       "value": {
+                                        "minimum": 1,
                                         "type": "integer"
                                       },
                                       "kept": {
+                                        "type": "boolean"
+                                      },
+                                      "id": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "groupId": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "success": {
                                         "type": "boolean"
                                       }
                                     }
@@ -40794,6 +42597,157 @@
                                 "audience"
                               ],
                               "properties": {
+                                "breakdown": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "version",
+                                    "rootId",
+                                    "groups",
+                                    "terms"
+                                  ],
+                                  "properties": {
+                                    "version": {
+                                      "const": "1.0",
+                                      "type": "string"
+                                    },
+                                    "rootId": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "groups": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "count",
+                                          "sides",
+                                          "operation",
+                                          "diceIds",
+                                          "total"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "label": {
+                                            "minLength": 1,
+                                            "maxLength": 120,
+                                            "type": "string"
+                                          },
+                                          "count": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "sides": {
+                                            "minimum": 1,
+                                            "maximum": 1000,
+                                            "type": "integer"
+                                          },
+                                          "operation": {
+                                            "anyOf": [
+                                              {
+                                                "const": "sum",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "successCount",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepHighest",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "keepLowest",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "type": "integer"
+                                          },
+                                          "diceIds": {
+                                            "maxItems": 100,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "total": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "terms": {
+                                      "maxItems": 256,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "operation",
+                                          "operandIds",
+                                          "value"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          },
+                                          "operation": {
+                                            "minLength": 1,
+                                            "maxLength": 32,
+                                            "type": "string"
+                                          },
+                                          "operandIds": {
+                                            "maxItems": 2,
+                                            "type": "array",
+                                            "items": {
+                                              "minLength": 1,
+                                              "maxLength": 256,
+                                              "type": "string"
+                                            }
+                                          },
+                                          "value": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "groupId": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
                                 "actionId": {
                                   "type": "string"
                                 },
@@ -40803,6 +42757,7 @@
                                 "dice": {
                                   "type": "array",
                                   "items": {
+                                    "additionalProperties": false,
                                     "type": "object",
                                     "required": [
                                       "sides",
@@ -40811,12 +42766,28 @@
                                     ],
                                     "properties": {
                                       "sides": {
+                                        "minimum": 1,
+                                        "maximum": 1000,
                                         "type": "integer"
                                       },
                                       "value": {
+                                        "minimum": 1,
                                         "type": "integer"
                                       },
                                       "kept": {
+                                        "type": "boolean"
+                                      },
+                                      "id": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "groupId": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "success": {
                                         "type": "boolean"
                                       }
                                     }
@@ -62280,6 +64251,157 @@
                               },
                               "expression": {
                                 "type": "string"
+                              },
+                              "breakdown": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "version",
+                                  "rootId",
+                                  "groups",
+                                  "terms"
+                                ],
+                                "properties": {
+                                  "version": {
+                                    "const": "1.0",
+                                    "type": "string"
+                                  },
+                                  "rootId": {
+                                    "minLength": 1,
+                                    "maxLength": 256,
+                                    "type": "string"
+                                  },
+                                  "groups": {
+                                    "maxItems": 256,
+                                    "type": "array",
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "id",
+                                        "label",
+                                        "count",
+                                        "sides",
+                                        "operation",
+                                        "diceIds",
+                                        "total"
+                                      ],
+                                      "properties": {
+                                        "id": {
+                                          "minLength": 1,
+                                          "maxLength": 256,
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "minLength": 1,
+                                          "maxLength": 120,
+                                          "type": "string"
+                                        },
+                                        "count": {
+                                          "minimum": 0,
+                                          "maximum": 100,
+                                          "type": "integer"
+                                        },
+                                        "sides": {
+                                          "minimum": 1,
+                                          "maximum": 1000,
+                                          "type": "integer"
+                                        },
+                                        "operation": {
+                                          "anyOf": [
+                                            {
+                                              "const": "sum",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "successCount",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "keepHighest",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "keepLowest",
+                                              "type": "string"
+                                            }
+                                          ]
+                                        },
+                                        "threshold": {
+                                          "type": "integer"
+                                        },
+                                        "diceIds": {
+                                          "maxItems": 100,
+                                          "type": "array",
+                                          "items": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          }
+                                        },
+                                        "total": {
+                                          "type": "number"
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "terms": {
+                                    "maxItems": 256,
+                                    "type": "array",
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "id",
+                                        "operation",
+                                        "operandIds",
+                                        "value"
+                                      ],
+                                      "properties": {
+                                        "id": {
+                                          "minLength": 1,
+                                          "maxLength": 256,
+                                          "type": "string"
+                                        },
+                                        "operation": {
+                                          "minLength": 1,
+                                          "maxLength": 32,
+                                          "type": "string"
+                                        },
+                                        "operandIds": {
+                                          "maxItems": 2,
+                                          "type": "array",
+                                          "items": {
+                                            "minLength": 1,
+                                            "maxLength": 256,
+                                            "type": "string"
+                                          }
+                                        },
+                                        "value": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "number"
+                                            },
+                                            {
+                                              "type": "boolean"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "groupId": {
+                                          "minLength": 1,
+                                          "maxLength": 256,
+                                          "type": "string"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
                               },
                               "dice": {},
                               "bindings": {},

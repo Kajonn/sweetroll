@@ -2,9 +2,10 @@ import type { RulesDiagnostic } from "./diagnostic.js";
 
 export type Token =
   | { kind: "number"; value: number; start: number }
+  | { kind: "string"; value: string; start: number }
   | { kind: "boolean"; value: boolean; start: number }
   | { kind: "id"; scope: "fields" | "inputs"; id: string; start: number }
-  | { kind: "function"; name: "min" | "max" | "round" | "dice" | "countSuccesses"; start: number }
+  | { kind: "function"; name: "min" | "max" | "round" | "dice" | "countSuccesses" | "group"; start: number }
   | { kind: "advDis"; which: "adv" | "dis"; start: number }
   | { kind: "dice"; count: number; sides: number; keep?: { mode: "highest" | "lowest"; count: number }; start: number }
   | { kind: "operator"; op: "+" | "-" | "*" | "/" | "<" | "<=" | ">" | ">=" | "==" | "!=" | "&&" | "||" | "!"; start: number }
@@ -17,7 +18,7 @@ export type TokenizeResult =
   | { ok: true; tokens: Token[] }
   | { ok: false; diagnostics: RulesDiagnostic[] };
 
-const FUNCTIONS = new Set(["min", "max", "round", "dice", "countSuccesses"]);
+const FUNCTIONS = new Set(["min", "max", "round", "dice", "countSuccesses", "group"]);
 const ASSIGNED_FUNCTIONS = new Set(["adv", "dis"]);
 const ID_RE = /^[a-z][a-z0-9_]{0,63}$/;
 const SCOPE_RE = /^(fields|inputs)$/;
@@ -38,6 +39,13 @@ export function tokenize(source: string): TokenizeResult {
     if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") { i++; continue; }
     const start = i;
 
+    if (ch === '"') {
+      const match = /^"(?:[^"\\\u0000-\u001f]|\\["\\/bfnrt]|\\u[0-9a-fA-F]{4})*"/.exec(source.slice(i));
+      if (!match) return fail("invalid group string literal");
+      tokens.push({kind: "string", value: JSON.parse(match[0]) as string, start});
+      i += match[0].length;
+      continue;
+    }
     const diceMatch = matchStaticDice(source, i);
     if (diceMatch) {
       if ("keep" in diceMatch) {
@@ -88,7 +96,7 @@ export function tokenize(source: string): TokenizeResult {
         return fail(`invalid identifier after '${word}.'`);
       }
 
-      if (FUNCTIONS.has(word)) { tokens.push({ kind: "function", name: word as "min" | "max" | "round" | "dice" | "countSuccesses", start }); i = j; continue; }
+      if (FUNCTIONS.has(word)) { tokens.push({ kind: "function", name: word as "min" | "max" | "round" | "dice" | "countSuccesses" | "group", start }); i = j; continue; }
       if (word === "true" || word === "false") { tokens.push({ kind: "boolean", value: word === "true", start }); i = j; continue; }
       if (ASSIGNED_FUNCTIONS.has(word)) { tokens.push({ kind: "advDis", which: word as "adv" | "dis", start }); i = j; continue; }
       if (word === "nearest" || word === "down" || word === "up") { tokens.push({ kind: "roundMode", mode: word as "nearest" | "down" | "up", start }); i = j; continue; }

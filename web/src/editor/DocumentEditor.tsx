@@ -1540,6 +1540,7 @@ function compilePreviewExpressions(
     if (shapeOk) {
       const result = compileExpression(entry.source as string, {
         env: { fields, inputs: inputsByExpression.get(entry.id) ?? {} },
+        languageVersion: document.schemaVersion === "1.1" ? "0.2" : "0.1",
         resultType,
         context,
         fallback,

@@ -7,6 +7,8 @@ import {
   type EvaluationBindings,
   type ExpressionAstV1,
   type Rng,
+  type RollResult,
+  type DieResult as SharedDieResult,
   type ScalarValue,
   type ValueType,
 } from "@sweetroll/rules";
@@ -29,7 +31,7 @@ export type EvaluateExpressionInput = {
 
 export type EvaluateDiagnostic = { code: string; path: string; message: string };
 
-export type DieResult = { sides: number; value: number; kept: boolean };
+export type DieResult = SharedDieResult;
 
 /** `EvaluationBindings` with its scopes populated from the flat binding map. */
 type EvaluateExpressionBindings = EvaluationBindings;
@@ -51,7 +53,7 @@ export type EvaluateExpressionResult =
       expression: string;
       ast: ExpressionAstV1;
       value: ScalarValue;
-      roll: { total: number; dice: DieResult[]; expression: string } | null;
+      roll: RollResult | null;
       diagnostics: EvaluateDiagnostic[];
     }
   | { ok: false; expression: string | null; diagnostics: EvaluateDiagnostic[] };
@@ -61,6 +63,7 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
     env: input.env,
     resultType: input.resultType,
     context: "roll",
+    languageVersion: "0.2",
     fallback: input.fallback,
   });
   if (!compiled.ok) {
@@ -86,7 +89,7 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
     expression,
     ast: body.ast,
     value: evaluated.result,
-    roll: evaluated.roll === null ? null : { total: evaluated.roll.total, dice: rollDice, expression: evaluated.roll.expression },
+    roll: evaluated.roll === null ? null : {...evaluated.roll, dice: rollDice},
     diagnostics: evaluated.diagnostics,
   };
 }

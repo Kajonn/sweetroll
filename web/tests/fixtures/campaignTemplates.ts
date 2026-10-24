@@ -381,7 +381,15 @@ export async function campaignTemplateJourney(
       .fill("New catalog revision");
     await gmPage.getByRole("button", { name: "Save revision" }).click();
     await expect(gmPage.getByRole("dialog")).toHaveCount(0);
+    const revisedCatalog = playerPage.waitForResponse(response => response.url().endsWith(`/api/characters/${char}/templates`) && response.status() === 200);
     await playerPage.reload();
+    await revisedCatalog;
+    // Existing entry text can render from cache before the new revision is
+    // fetched. Freeze the offline addition only after revision 4 is durable.
+    await expect.poll(async () => {
+      const catalog = await cachedCatalog(playerPage, playerId, char) as {templates: Array<{source?: {kind: string; contentRevision?: number}}> } | null;
+      return catalog?.templates.find(template => template.source?.kind === "campaign")?.source?.contentRevision;
+    }).toBe(4);
     await expect(playerPage.getByTestId(`slot-entry-${firstId}`)).toContainText(
       "Player notes",
     );

@@ -185,3 +185,11 @@ describe("documentReducer", () => {
     expect(next.referenceData.map((r) => r.id)).toEqual(["skills"]);
   });
 });
+
+it("promotes only an explicitly authored grouped formula and never downgrades it",()=>{
+ const doc=blankDocument();doc.expressions=[{id:"roll",context:"roll",resultType:"number",fallback:0,source:"d6"}];
+ const grouped=documentReducer(doc,{type:"setExpressionSource",expressionId:"roll",source:'group("attribute", "Attribute", d6)'});
+ expect(grouped.schemaVersion).toBe("1.1");expect(doc.schemaVersion).toBe("1.0");
+ expect(documentReducer(grouped,{type:"setExpressionSource",expressionId:"roll",source:"d20"}).schemaVersion).toBe("1.1");
+ expect(documentReducer(doc,{type:"setExpressionSource",expressionId:"missing",source:'group("a", "A", d6)'})).toBe(doc);
+});

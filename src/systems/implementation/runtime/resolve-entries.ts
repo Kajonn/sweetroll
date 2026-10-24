@@ -154,6 +154,7 @@ export function resolveGrantedAction(request: GrantedActionRequest): RuntimeResu
         actionId: action.id,
         expression: evaluated.roll.expression,
         dice: evaluated.roll.dice,
+        ...(evaluated.roll.breakdown === undefined ? {} : {breakdown: evaluated.roll.breakdown}),
         bindings: evaluated.bindings,
         total: evaluated.roll.total,
         output: action.outputTemplate.split("{total}").join(String(evaluated.roll.total)),

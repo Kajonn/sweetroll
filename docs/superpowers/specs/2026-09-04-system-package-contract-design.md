@@ -1,5 +1,8 @@
 # System Package Contract and Grammar v0.1 - Design
 
+**Versioned successor (2026-10-23):** [slice B's named-group contract](2026-10-23-named-dice-groups.md) extends this baseline with document/package **1.1**, grammar **0.2**, optional compiled dice-group metadata and a versioned factual calculation breakdown. The V1 schema/type names denote major version 1. Old 1.0 packages/results remain immutable and decode unchanged; the version-1 export envelope preserves either enclosed package version. New grouped formulas require 1.1; unknown versions fail schema validation. This amendment takes precedence over historical claims below that named groups remain future work. Push/reroll/effect exclusions remain in force.
+
+
 **Status:** Draft for review
 
 ## 1. Purpose

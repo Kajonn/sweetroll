@@ -1,3 +1,4 @@
+import {PushPanel,type PushApi} from "../rolls/PushPanel.js";
 import {RollBreakdown} from "../rolls/RollBreakdown.js";
 import { useEffect, useRef, useState } from "react";
 
@@ -72,7 +73,7 @@ export function CharacterTools({ characterId, api, session, now = () => new Date
       </Button>
       {lifecycle === "archived" ? <p>{t("character.tools.archivedReadOnly")}</p> : null}
       {dialog === "activity" ? (
-        <ActivityDialog characterId={characterId} session={session} onClose={closeDialog} />
+        <ActivityDialog characterId={characterId} api={api} session={session} onClose={closeDialog} />
       ) : null}
       {dialog === "archive" ? (
         <ConfirmDialog
@@ -165,7 +166,7 @@ function ConfirmDialog({ title, confirmLabel, onConfirm, onClose }: { title: str
   );
 }
 
-function ActivityRow({ event }: { event: ActivityEvent }) {
+function ActivityRow({ event,api,session,snapshot }: { event: ActivityEvent;api:PushApi;session:CharacterSession;snapshot:ReturnType<CharacterSession["getSnapshot"]> }) {
   const knownKinds = new Set([
     "character_created", "character_duplicated", "character_field_set", "character_resource_bumped",
     "character_action_executed", "character_renamed", "character_archived", "character_recovered",
@@ -183,12 +184,13 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
     <li>
       <span>{label}</span>{" · "}
       <time dateTime={event.occurredAt}>{formattedDate}</time>
-      {event.roll===undefined?null:<RollBreakdown roll={event.roll}/>}
+      {event.roll===undefined?null:event.roll.push?<PushPanel roll={event.roll} characterId={snapshot.confirmed?.characterId??""} api={api} online={snapshot.connected} revision={snapshot.confirmed?.revision} disabled={!snapshot.editing.owned||snapshot.phase!=="ready"||snapshot.entries.length>0||snapshot.pendingOnlineAttempts.length>0||snapshot.confirmed?.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh}/>:<RollBreakdown roll={event.roll}/>}
     </li>
   );
 }
 
-function ActivityDialog({ characterId, session, onClose }: { characterId: string; session: CharacterSession; onClose(): void }) {
+function ActivityDialog({ characterId, api, session, onClose }: { characterId: string; api:PushApi; session: CharacterSession; onClose(): void }) {
+  const snapshot=useSnapshot(session);
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
@@ -248,7 +250,7 @@ function ActivityDialog({ characterId, session, onClose }: { characterId: string
       {error !== null ? <p ref={errorRef} tabIndex={-1} role="alert">{error}</p> : null}
       <ul>
         {events.map((event) => (
-          <ActivityRow key={event.id} event={event} />
+          <ActivityRow key={event.id} event={event} api={api} session={session} snapshot={snapshot}/>
         ))}
       </ul>
       <div className={styles.dialogActions}>

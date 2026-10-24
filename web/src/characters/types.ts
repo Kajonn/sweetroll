@@ -160,3 +160,6 @@ export type MigrationPreview = MigrationPreviewResponse["preview"];
 export type MigrationPreviewBody = NonNullable<
   operations["post_characters_characterId_migration_previews"]["requestBody"]
 >["content"]["application/json"];
+
+export type PushOptionsResponse=operations["get_characters_characterId_rolls_rollId_push_options"]["responses"]["200"]["content"]["application/json"];
+export type ReadRollResponse=operations["get_characters_characterId_rolls_rollId"]["responses"]["200"]["content"]["application/json"];

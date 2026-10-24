@@ -224,6 +224,8 @@ function viewFor(characterId: string, revision: number, overrides: Partial<Chara
 type SendStep = { error?: unknown; envelope?: import("./types.js").CommandResultResponse };
 
 class FakeApi implements CharactersApi {
+  pushOptions:CharactersApi["pushOptions"]=async()=>({options:{canPush:true,reason:null,eligibleDiceIds:[],revision:1,nextAttempt:1,maxAttempts:2},requestId:"options"});
+  readRoll:CharactersApi["readRoll"]=async()=>{throw new Error("Unused read roll");};
   sent: FrozenRequest[] = [];
   private sendScript: Array<(req: FrozenRequest) => Promise<SendStep>> = [];
   private sendFallback: (req: FrozenRequest) => Promise<SendStep> = () =>

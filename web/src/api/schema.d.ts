@@ -292,6 +292,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/characters/{characterId}/rolls/{rollId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_characters_characterId_rolls_rollId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/characters/{characterId}/rolls/{rollId}/push-options": {
         parameters: {
             query?: never;
@@ -5675,6 +5691,295 @@ export interface operations {
                                 entryId: string;
                                 output: string;
                             } | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_characters_characterId_rolls_rollId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                rollId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        roll: {
+                            push?: {
+                                /** @constant */
+                                version: "1.0";
+                                rollId: string;
+                                rootRollId: string;
+                                parentRollId: string | null;
+                                attempt: number;
+                                maxAttempts: number;
+                                rerolledDiceIds: string[];
+                                faceOutcomes: {
+                                    groupId: string;
+                                    face: number;
+                                    combinedCount: number;
+                                    rerolledCount: number;
+                                }[];
+                            };
+                            breakdown?: {
+                                /** @constant */
+                                version: "1.0";
+                                rootId: string;
+                                groups: {
+                                    id: string;
+                                    label: string;
+                                    count: number;
+                                    sides: number;
+                                    operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                    threshold?: number;
+                                    diceIds: string[];
+                                    total: number;
+                                }[];
+                                terms: {
+                                    id: string;
+                                    operation: string;
+                                    operandIds: string[];
+                                    value: string | number | boolean | null;
+                                    groupId?: string;
+                                }[];
+                            };
+                            actionId: string;
+                            expression: string;
+                            dice: {
+                                sides: number;
+                                value: number;
+                                kept: boolean;
+                                id?: string;
+                                groupId?: string;
+                                success?: boolean;
+                            }[];
+                            bindings: {
+                                scope: "fields" | "inputs";
+                                definitionId: string;
+                                value: string | number | boolean | null;
+                            }[];
+                            total: number;
+                            output: string;
+                            audience: "owner_only" | "gm_only" | "campaign";
                         };
                         requestId: string;
                     };

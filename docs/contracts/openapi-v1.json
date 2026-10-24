@@ -18744,6 +18744,1314 @@
         }
       }
     },
+    "/characters/{characterId}/rolls/{rollId}": {
+      "get": {
+        "operationId": "get_characters_characterId_rolls_rollId",
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "rollId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "roll",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "roll": {
+                      "type": "object",
+                      "required": [
+                        "actionId",
+                        "expression",
+                        "dice",
+                        "bindings",
+                        "total",
+                        "output",
+                        "audience"
+                      ],
+                      "properties": {
+                        "push": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "version",
+                            "rollId",
+                            "rootRollId",
+                            "parentRollId",
+                            "attempt",
+                            "maxAttempts",
+                            "rerolledDiceIds",
+                            "faceOutcomes"
+                          ],
+                          "properties": {
+                            "version": {
+                              "const": "1.0",
+                              "type": "string"
+                            },
+                            "rollId": {
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                              "type": "string"
+                            },
+                            "rootRollId": {
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                              "type": "string"
+                            },
+                            "parentRollId": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "attempt": {
+                              "minimum": 0,
+                              "maximum": 10,
+                              "type": "integer"
+                            },
+                            "maxAttempts": {
+                              "minimum": 1,
+                              "maximum": 10,
+                              "type": "integer"
+                            },
+                            "rerolledDiceIds": {
+                              "maxItems": 100,
+                              "uniqueItems": true,
+                              "type": "array",
+                              "items": {
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            },
+                            "faceOutcomes": {
+                              "maxItems": 32000,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "groupId",
+                                  "face",
+                                  "combinedCount",
+                                  "rerolledCount"
+                                ],
+                                "properties": {
+                                  "groupId": {
+                                    "minLength": 1,
+                                    "maxLength": 256,
+                                    "type": "string"
+                                  },
+                                  "face": {
+                                    "minimum": 1,
+                                    "maximum": 1000,
+                                    "type": "integer"
+                                  },
+                                  "combinedCount": {
+                                    "minimum": 0,
+                                    "maximum": 100,
+                                    "type": "integer"
+                                  },
+                                  "rerolledCount": {
+                                    "minimum": 0,
+                                    "maximum": 100,
+                                    "type": "integer"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "breakdown": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "version",
+                            "rootId",
+                            "groups",
+                            "terms"
+                          ],
+                          "properties": {
+                            "version": {
+                              "const": "1.0",
+                              "type": "string"
+                            },
+                            "rootId": {
+                              "minLength": 1,
+                              "maxLength": 256,
+                              "type": "string"
+                            },
+                            "groups": {
+                              "maxItems": 256,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "label",
+                                  "count",
+                                  "sides",
+                                  "operation",
+                                  "diceIds",
+                                  "total"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "minLength": 1,
+                                    "maxLength": 256,
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "minLength": 1,
+                                    "maxLength": 120,
+                                    "type": "string"
+                                  },
+                                  "count": {
+                                    "minimum": 0,
+                                    "maximum": 100,
+                                    "type": "integer"
+                                  },
+                                  "sides": {
+                                    "minimum": 1,
+                                    "maximum": 1000,
+                                    "type": "integer"
+                                  },
+                                  "operation": {
+                                    "anyOf": [
+                                      {
+                                        "const": "sum",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "successCount",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "keepHighest",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "keepLowest",
+                                        "type": "string"
+                                      }
+                                    ]
+                                  },
+                                  "threshold": {
+                                    "type": "integer"
+                                  },
+                                  "diceIds": {
+                                    "maxItems": 100,
+                                    "type": "array",
+                                    "items": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "total": {
+                                    "type": "number"
+                                  }
+                                }
+                              }
+                            },
+                            "terms": {
+                              "maxItems": 256,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "operation",
+                                  "operandIds",
+                                  "value"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "minLength": 1,
+                                    "maxLength": 256,
+                                    "type": "string"
+                                  },
+                                  "operation": {
+                                    "minLength": 1,
+                                    "maxLength": 32,
+                                    "type": "string"
+                                  },
+                                  "operandIds": {
+                                    "maxItems": 2,
+                                    "type": "array",
+                                    "items": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "value": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "groupId": {
+                                    "minLength": 1,
+                                    "maxLength": 256,
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "actionId": {
+                          "type": "string"
+                        },
+                        "expression": {
+                          "type": "string"
+                        },
+                        "dice": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "sides",
+                              "value",
+                              "kept"
+                            ],
+                            "properties": {
+                              "sides": {
+                                "minimum": 1,
+                                "maximum": 1000,
+                                "type": "integer"
+                              },
+                              "value": {
+                                "minimum": 1,
+                                "type": "integer"
+                              },
+                              "kept": {
+                                "type": "boolean"
+                              },
+                              "id": {
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "type": "string"
+                              },
+                              "groupId": {
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "type": "string"
+                              },
+                              "success": {
+                                "type": "boolean"
+                              }
+                            }
+                          }
+                        },
+                        "bindings": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "scope",
+                              "definitionId",
+                              "value"
+                            ],
+                            "properties": {
+                              "scope": {
+                                "anyOf": [
+                                  {
+                                    "const": "fields",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "inputs",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "definitionId": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        "total": {
+                          "type": "number"
+                        },
+                        "output": {
+                          "type": "string"
+                        },
+                        "audience": {
+                          "anyOf": [
+                            {
+                              "const": "owner_only",
+                              "type": "string"
+                            },
+                            {
+                              "const": "gm_only",
+                              "type": "string"
+                            },
+                            {
+                              "const": "campaign",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "const": "unauthorized",
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/characters/{characterId}/rolls/{rollId}/push-options": {
       "get": {
         "operationId": "get_characters_characterId_rolls_rollId_push_options",

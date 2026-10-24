@@ -679,6 +679,7 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
       },
     },
   },
+  {method:"get",path:"/characters/:characterId/rolls/:rollId",operationId:"get_characters_characterId_rolls_rollId",schema:{params:PushParams,response:{"200":Type.Object({roll:RollDto,requestId:Type.String()}),...ErrorResponses}}},
   {method:"get",path:"/characters/:characterId/rolls/:rollId/push-options",operationId:"get_characters_characterId_rolls_rollId_push_options",schema:{params:PushParams,response:{"200":Type.Object({options:PushOptionsDto,requestId:Type.String()}),...ErrorResponses}}},
   {method:"post",path:"/characters/:characterId/rolls/:rollId/push",operationId:"post_characters_characterId_rolls_rollId_push",schema:{params:PushParams,body:PushBody,response:{"200":Type.Object({result:CharacterCommandResultDto,requestId:Type.String()}),...ErrorResponses}}},
   {
@@ -1105,6 +1106,10 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         return { result: toCommandResultDto(result.value), requestId: request.id };
       },
 
+      get_characters_characterId_rolls_rollId:async(request,reply)=>{
+        const result=await characters.readRoll(ctxOf(request),request.params as {characterId:string;rollId:string});
+        if(!result.ok)return sendError(reply,result.error,request.id);reply.header("cache-control","no-store");return {roll:result.value,requestId:request.id};
+      },
       get_characters_characterId_rolls_rollId_push_options:async(request,reply)=>{
         const params=request.params as {characterId:string;rollId:string};const result=await characters.pushOptions(ctxOf(request),params);
         if(!result.ok)return sendError(reply,result.error,request.id);reply.header("cache-control","no-store");return {options:result.value,requestId:request.id};

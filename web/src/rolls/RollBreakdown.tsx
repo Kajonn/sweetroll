@@ -1,4 +1,4 @@
-import type { RollBreakdown as Breakdown, DieResult } from "@sweetroll/rules";
+import type { RollBreakdown as Breakdown, DieResult, PushResult } from "@sweetroll/rules";
 import { t } from "../i18n/index.js";
 
 /** One shared view for authoritative results, history, GM and non-factual previews. */
@@ -6,6 +6,7 @@ export function RollBreakdown({
   roll,
 }: {
   roll: {
+    push?:PushResult | undefined;
     dice: DieResult[];
     breakdown?: Breakdown | undefined;
     total?: number | undefined;
@@ -50,6 +51,7 @@ export function RollBreakdown({
       data-testid="roll-breakdown"
       style={{ overflowWrap: "anywhere", minWidth: 0 }}
     >
+      {roll.push?<p>{roll.push.attempt===0?`Original roll · up to ${roll.push.maxAttempts} pushes`:`Push ${roll.push.attempt} of ${roll.push.maxAttempts}`} · Original saved pool</p>:null}
       <ul>
         {b.groups.map((group) => (
           <li key={group.id} data-testid={`roll-group-${group.id}`}>
@@ -80,6 +82,7 @@ export function RollBreakdown({
                   .map((die) => (
                     <li key={die.id}>
                       d{die.sides}={die.value}
+                      {roll.push&&roll.push.attempt>0?` · ${roll.push.rerolledDiceIds.includes(die.id??"")?"Rerolled":"Retained"}`:null}
                       {" · "}
                       {t(
                         die.kept ? "roll.groups.kept" : "roll.groups.discarded",
@@ -102,6 +105,7 @@ export function RollBreakdown({
           </li>
         ))}
       </ul>
+      {roll.push?.faceOutcomes.map(o=><p key={`${o.groupId}:${o.face}`}>{groups.get(o.groupId)?.label??o.groupId} face {o.face}: {o.combinedCount} in combined pool, {o.rerolledCount} newly rolled. Manual bookkeeping only.</p>)}
       <p>
         {t("roll.groups.calculation")}: {explain(b.rootId)} ={" "}
         {String(terms.get(b.rootId)?.value ?? roll.total ?? "?")}

@@ -447,5 +447,5 @@ describe("push policy authoring",()=>{
   expect(v.current().pushPolicy).toMatchObject({version:"1.0",maxAttempts:1,groups:[{groupId:"attribute"}]});expect(changed).not.toHaveBeenCalled();
   fireEvent.change(screen.getByLabelText("Maximum pushes"),{target:{value:"2"}});v.applyChange();expect(v.current().pushPolicy?.maxAttempts).toBe(2);
  });
- it("explains unsupported formulas and leaves the source intact",()=>{const v=renderEditor({expressionSource:"d20 / d6"});fireEvent.click(screen.getByText("Push rules"));expect(screen.getByLabelText("Enable pushing")).toBeDisabled();expect(screen.getByText(/named dice group.*additive/i)).toBeVisible();expect(v.onChange).not.toHaveBeenCalled();});
+ it("explains unsupported formulas and leaves the source intact",()=>{const v=renderEditor({expressionSource:'group("base","Base",2d6) / d6'});fireEvent.click(screen.getByText("Push rules"));expect(screen.getByLabelText("Enable pushing")).toBeDisabled();expect(screen.getByText(/named dice group.*additive/i)).toBeVisible();expect(v.onChange).not.toHaveBeenCalled();});
 });

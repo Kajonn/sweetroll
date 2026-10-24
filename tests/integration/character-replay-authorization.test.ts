@@ -723,6 +723,8 @@ describeWithDatabase("Character replay authorization (I6 Task 1)", () => {
         "manage",
         "open",
         "previewMigration",
+        "pushOptions",
+        "readRoll",
         "rollbackMigration",
       ].sort(),
     );

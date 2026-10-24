@@ -108,6 +108,7 @@ export type CharacterSession = {
   bumpResource(resourceId: string, direction: "up" | "down"): Promise<void>;
   executeAction(actionId: string, inputs?: Record<string, unknown>): Promise<void>;
   pushRoll(parentRollId:string):Promise<void>;
+  refresh():Promise<void>;
   /**
    * Task 7: template-granted roll routed through the executeAction intent
    * with its owning entry. Online-only, like entity actions.
@@ -1924,6 +1925,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       await persistEntry(newEntry({ kind: "updateEntryValues", entryId, values,
         ...(quantity === undefined ? {} : { quantity }) }));
     },
+    async refresh():Promise<void>{assertOnlineOperationAllowed();if(entries.length||pendingOnline.length||isBlocked())throw new Error("Resolve pending changes before refreshing.");await reconcileFresh();emit();},
     async pushRoll(parentRollId:string):Promise<void>{await runOnlineOperation({kind:"push",operation:"push",parentRollId});},
     async archive(): Promise<void> {
       await runOnlineOperation({ kind: "archive", operation: "archive" });

@@ -1,3 +1,4 @@
+import {PushPanel,type PushApi} from "../rolls/PushPanel.js";
 import {RollBreakdown} from "../rolls/RollBreakdown.js";
 import { useState } from "react";
 
@@ -23,7 +24,7 @@ export type CharacterSheetCallbacks = {
   onExecuteGranted?(entryId: string, actionId: string, inputs?: Record<string, unknown>): void | Promise<void>;
 };
 
-export type CharacterSheetProps = { snapshot: CharacterSnapshot } & CharacterSheetCallbacks & {
+export type CharacterSheetProps = { snapshot: CharacterSnapshot;pushApi?:PushApi|undefined;onPushRoll?:((id:string)=>Promise<void>)|undefined;onRefreshRoll?:(()=>Promise<void>)|undefined } & CharacterSheetCallbacks & {
   /** Offline availability once determined; omitted while unknown. */
   offlineAvailable?: boolean | undefined;
   /** Template catalog for slot pickers and granted-action buttons; omitted while unknown. */
@@ -134,7 +135,7 @@ function RollResult({ roll, fieldLabels }: { roll: NonNullable<CharacterSnapshot
   return <section className={styles.rollResult} aria-labelledby="character-roll-result"><h2 id="character-roll-result">{t("character.rollResult.title")}</h2><dl><dt>{t("character.rollResult.expression")}</dt><dd>{expression}</dd><dt>{t("character.rollResult.total")}</dt><dd>{roll.total}</dd><dt>{t("character.rollResult.output")}</dt><dd>{roll.output}</dd><dt>{t("character.rollResult.audience")}</dt><dd>{audienceLabel(roll.audience)}</dd></dl><RollBreakdown roll={roll}/><Button variant="secondary" onClick={() => setDetailsOpen(open => !open)} aria-expanded={detailsOpen}>{t(detailsOpen ? "character.rollResult.hideDetails" : "character.rollResult.showDetails")}</Button>{detailsOpen ? <div className={styles.rollDetails}><ul>{roll.dice.map((die, index) => <li key={`${die.sides}-${index}`}>d{die.sides}={die.value}</li>)}</ul><ul>{roll.bindings.map(binding => <li key={`${binding.scope}-${binding.definitionId}`}>{binding.scope === "fields" ? fieldLabels.get(binding.definitionId) ?? `${binding.scope}.${binding.definitionId}` : `${binding.scope}.${binding.definitionId}`}: {String(binding.value)}</li>)}</ul></div> : null}</section>;
 }
 
-export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates }: CharacterSheetProps) {
+export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, pushApi, onPushRoll, onRefreshRoll }: CharacterSheetProps) {
   const character = snapshot.confirmed;
   const [commandError, setCommandError] = useState<string | null>(null);
   // A purged snapshot carries no private content: the session nulls
@@ -250,6 +251,6 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, 
     {projection.sheets.map(sheet => <section key={sheet.id} className={styles.sheetSection} aria-labelledby={`sheet-${sheet.id}`}><h2 id={`sheet-${sheet.id}`}>{sheet.label}</h2>{sheet.sections.map(section => <section key={section.id} className={styles.section} aria-labelledby={`section-${section.id}`}><h3 id={`section-${section.id}`}>{section.label}</h3>{section.elements.filter((element, index) => !(index === 0 && element.kind === "heading" && element.text.trim() === section.label.trim())).map(renderElement)}</section>)}</section>)}
     {projection.completionFields === undefined ? <p className={styles.completionUnavailable}>{t("character.completion.unavailable")}</p> : projection.completionFields.length > 0 ? <section className={styles.completion} aria-labelledby="character-completion"><h2 id="character-completion" tabIndex={-1}>{t("character.completion.title")}</h2>{projection.completionFields.map(field => <FieldControl key={field.id} field={field} tentativeValue={tentativeValue(snapshot, field.fieldId)} disabled={!editable} pending={pending} onCommit={onSetField} />)}</section> : null}
     {nominal !== null ? <section className={styles.nominalResult} role="status" aria-live="polite"><strong>{nominalLabel === null ? t("character.nominal.recorded") : t("character.nominal.recordedNamed", { label: nominalLabel })}</strong>{nominal.output.includes("{total}") || nominal.output === nominalLabel ? null : <p>{nominal.output}</p>}</section> : null}
-    {snapshot.lastRoll !== null ? <RollResult roll={snapshot.lastRoll} fieldLabels={fieldLabels} /> : null}
+    {snapshot.lastRoll !== null ? snapshot.lastRoll.push&&pushApi?<PushPanel roll={snapshot.lastRoll} characterId={character.characterId} api={pushApi} online={snapshot.connected} revision={character.revision} disabled={!editable||snapshot.phase!=="ready"||pending||snapshot.pendingOnlineAttempts.length>0} onPush={onPushRoll} onRefresh={onRefreshRoll}/>:<RollResult roll={snapshot.lastRoll} fieldLabels={fieldLabels} /> : null}
   </main>;
 }

@@ -498,6 +498,7 @@ export type RollbackCharacterMigration = {
 // ---------------------------------------------------------------------------
 
 export interface Characters {
+  readRoll(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<NormalizedRoll>>;
   pushOptions(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<PushOptions>>;
   create(ctx: RequestContext, input: CreateCharacter): Promise<CharacterResult<CharacterView>>;
   creationOptions(
@@ -1718,6 +1719,20 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       }
     },
 
+    async readRoll(ctx,rollInput){
+      try{
+        const owned=await repo.openOwnedCharacter(rollInput.characterId,ctx.actorId);
+        const attached=owned?null:await loadAttachedSnapshot(ctx,rollInput.characterId);
+        const record=owned??attached?.auth.record;
+        if(!record)return {ok:false,error:errors.not_found()};
+        const saved=await readPushRoll(input.pool,record.characterId,rollInput.rollId);
+        if(!saved||!mayReadPush(saved,ctx.actorId,record,attached?toMembershipRecord(attached.auth.membership!):null))return {ok:false,error:errors.not_found()};
+        // Authorization is read again after the roll I/O.
+        const current=await repo.openOwnedCharacter(record.characterId,ctx.actorId),live=current?null:await loadAttachedSnapshot(ctx,record.characterId);
+        if(!(current??live?.auth.record)||!mayReadPush(saved,ctx.actorId,(current??live!.auth.record),live?toMembershipRecord(live.auth.membership!):null))return {ok:false,error:errors.not_found()};
+        return {ok:true,value:saved.roll};
+      }catch{return {ok:false,error:errors.internal()};}
+    },
     async pushOptions(ctx,optionsInput){
       try{
         const owned=await repo.openOwnedCharacter(optionsInput.characterId,ctx.actorId);

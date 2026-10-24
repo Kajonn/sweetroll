@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { makePushApp } from "./push-fixture.js";
 const handles: Awaited<ReturnType<typeof makePushApp>>[] = [];
@@ -7,6 +7,23 @@ afterEach(async () => {
 });
 const dbDescribe = process.env.TEST_DATABASE_URL ? describe : describe.skip;
 dbDescribe("saved-pool push commands", () => {
+  it("rejects a future-revision push resolved before its source is removed", async () => {
+    const h = await makePushApp("item"); handles.push(h);
+    const resolve = h.runtime.resolve.bind(h.runtime);
+    vi.spyOn(h.runtime, "resolve").mockImplementation(async (input) => {
+      const result = await resolve(input);
+      if (input.intent.kind === "push" && !input.intent.optionsOnly) {
+        const removed = await h.app.inject({method:"DELETE",url:`/characters/${h.id}/entries/${h.entryId}`,headers:h.headers,payload:{expectedRevision:2,idempotencyKey:randomUUID()}});
+        expect(removed.statusCode, removed.body).toBe(200);
+      }
+      return result;
+    });
+    const result = await h.push(h.root.push.rollId, 3);
+    expect(result.statusCode, result.body).toBe(409);
+    expect((await h.pool.query("SELECT count(*)::int AS n FROM character_rolls WHERE parent_roll_id=$1",[h.root.push.rollId])).rows[0].n).toBe(0);
+    const current = await h.app.inject({method:"GET",url:`/characters/${h.id}`,headers:h.headers});
+    expect(current.json().character.state.entries[h.entryId]).toBeUndefined();
+  });
   it("uses original values after edits, replays exactly, consumes only leaves and enforces the chain maximum", async () => {
     const h = await makePushApp();
     handles.push(h);

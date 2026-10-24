@@ -2,10 +2,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { openCharacterStore } from "./store.js";
 import type { CharacterView, FrozenRequest, QueueEntry } from "./types.js";
 import type { OnlineAttempt } from "./store.js";
+import { makePushRoll } from "./testing.js";
 
 let counter = 0;
 let dbName = "sweetroll-test-store";
 const initialGuard = { generation: 0, accountGeneration: 0 };
+
+it.each(["purge", "clear", "scope"])("removes private saved dice across %s and reopening", async (mode) => {
+  const name = crypto.randomUUID(), store = await openCharacterStore(name), character=makeView("char-1",1);
+  await store.confirmSnapshot("actor-A","char-1",character,0);
+  const before=await store.read("actor-A","char-1");
+  await store.acknowledge("actor-A","char-1","none",character,before.generation,makePushRoll());
+  expect((await store.read("actor-A","char-1")).lastRoll).toBeDefined();
+  if(mode==="purge")await store.purgeCharacter("actor-A","char-1");
+  if(mode==="clear")await store.clearAccount("actor-A");
+  if(mode==="scope")await store.confirmSnapshot("actor-A","char-1",{...character,campaignId:"campaign",placementGeneration:2},(await store.read("actor-A","char-1")).generation);
+  expect((await store.read("actor-A","char-1")).lastRoll).toBeUndefined();
+  await store.close();const reopened=await openCharacterStore(name);expect((await reopened.read("actor-A","char-1")).lastRoll).toBeUndefined();await reopened.close();
+});
 
 it("rolls back identity confirmation if persisting its generation fails", async () => {
   const store = await openCharacterStore(crypto.randomUUID());

@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import type { CharactersApi } from "./api.js";
 import { openCharacterStore, type CharacterStore } from "./store.js";
-import { makeEntry, makeView } from "./testing.js";
+import { makeEntry, makeView, makePushRoll, PUSH_ROOT_ID } from "./testing.js";
 import { createCharacterSession } from "./session.js";
 import type { CharacterSession, CoordinationEvent, CoordinationPort, IdentityPort } from "./session.js";
 
@@ -376,6 +376,9 @@ class FakeCoordination implements CoordinationPort {
   signalOwnership(owned: boolean, ownerId: string | null = null) {
     this.owner = owned;
     for (const l of [...this.listeners]) l({ type: "ownership-changed", owned, owner: ownerId });
+  }
+  signalInvalidation(characterId: string) {
+    for (const l of [...this.listeners]) l({type:"invalidate",characterId});
   }
 }
 
@@ -2732,6 +2735,35 @@ describe("pool error recovery", () => {
 });
 
 describe("durable online push recovery",()=>{
+ it.each(["missing", "parent", "attempt", "dice", "execution"])("retains the exact frozen push after a malformed %s response",async(mode)=>{
+  const h=await makeHarness();
+  try {
+   h.api.scriptOpenView(viewFor("char-1",3));await h.session.open();h.api.setOpenFallback(async()=>({character:viewFor("char-1",3),requestId:"open"}));
+   h.api.scriptSend(async()=>{
+    const roll=makePushRoll(),character=viewFor("char-1",3);character.reconciliation.commandExecutionId=roll.push!.rollId;
+    if(mode==="parent")roll.push!.parentRollId="30000000-0000-4000-8000-000000000099";
+    if(mode==="attempt")roll.push!.attempt=9;
+    if(mode==="dice")roll.dice[0]!.value=7;
+    if(mode==="execution")character.reconciliation.commandExecutionId=PUSH_ROOT_ID;
+    h.identity.online=false;h.identity.signal();
+    return {envelope:{result:{character,roll:mode==="missing"?null:roll,nominal:null},requestId:"malformed"}};
+   });
+   await expect(h.session.pushRoll(PUSH_ROOT_ID)).rejects.toThrow(/unexpected response/);
+   expect((await h.store.readOnlineAttempts(ARM)).map(a=>a.request)).toEqual([h.api.sent[0]]);
+   expect(h.session.getSnapshot().lastRoll).toBeNull();
+  } finally {h.session.dispose();await h.store.close();}
+ });
+ it.each(["takeover", "invalidation"])("adopts a same-revision durable child and its later removal on %s",async(mode)=>{
+  const h=await makeHarness();h.identity.online=false;
+  try {
+   await seedConfirmed(h.store,"char-1",viewFor("char-1",3));await h.session.open();
+   const child=makePushRoll();await h.store.acknowledge(ARM,"char-1","none",viewFor("char-1",3),(await h.store.read(ARM,"char-1")).generation,child);
+   const notify=()=>{if(mode==="takeover")h.coordination.signalOwnership(true);else {h.coordination.signalOwnership(false);h.coordination.signalInvalidation("char-1");}};
+   notify();await vi.waitFor(()=>expect(h.session.getSnapshot().lastRoll).toEqual(child));
+   await h.store.confirmSnapshot(ARM,"char-1",viewFor("char-1",4,{placementGeneration:2}),(await h.store.read(ARM,"char-1")).generation);
+   notify();await vi.waitFor(()=>expect(h.session.getSnapshot().lastRoll).toBeNull());
+  }finally{h.session.dispose();await h.store.close();}
+ });
  it("replays the exact timed-out parent request after reload and durably retains an unchanged-revision child",async()=>{
   const h=await makeHarness();h.api.scriptOpenView(viewFor("char-1",3));await h.session.open();
   h.api.setOpenFallback(async()=>({character:viewFor("char-1",3),requestId:"open"}));h.api.scriptSend(async()=>({error:new TypeError("lost response")}));

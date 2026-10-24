@@ -1,3 +1,5 @@
+import {makePushContext} from "./push.js";
+import type {PushContext} from "./push-context.js";
 import type {
   ActionInputV1,
   CharacterEntryV1,
@@ -34,6 +36,7 @@ export type GrantedActionRequest = {
 };
 
 export type GrantedActionOutcome = {
+  pushContext?: PushContext;
   state: RuntimeStateV1;
   changedDefinitionIds: DefinitionId[];
   roll: NormalizedRoll | null;
@@ -161,6 +164,7 @@ export function resolveGrantedAction(request: GrantedActionRequest): RuntimeResu
         audience: "owner_only",
       },
       nominal: null,
+      ...(action.pushPolicy?{pushContext:makePushContext(request.packageValue,request.entity.id,action,entry)!}:{}),
     },
   };
 }

@@ -3,6 +3,9 @@
 **Versioned successor (2026-10-23):** [slice B's named-group contract](2026-10-23-named-dice-groups.md) extends this baseline with document/package **1.1**, grammar **0.2**, optional compiled dice-group metadata and a versioned factual calculation breakdown. The V1 schema/type names denote major version 1. Old 1.0 packages/results remain immutable and decode unchanged; the version-1 export envelope preserves either enclosed package version. New grouped formulas require 1.1; unknown versions fail schema validation. This amendment takes precedence over historical claims below that named groups remain future work. Push/reroll/effect exclusions remain in force.
 
 
+**Next command capability (2026-10-24, not implemented):** [slice C's push contract](2026-10-24-configurable-push-rolls.md) specifies optional package 1.2 action policies and a separate saved-parent command, with grammar 0.2 unchanged. It defines immutable original bindings, eligible-only RNG, bounded lineage, audience inheritance and durable replay. This proposal does not enable 1.2 or change the running 1.0/1.1 engine; push/effect exclusions above still describe current behavior.
+
+
 **Status:** Draft for review
 
 ## 1. Purpose

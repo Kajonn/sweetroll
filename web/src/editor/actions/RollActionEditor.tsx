@@ -1,3 +1,5 @@
+import {PushPolicyEditor} from "./PushPolicyEditor.js";
+import type {PushPolicy} from "@sweetroll/rules";
 import {GroupedPoolEditor} from "./GroupedPoolEditor.js";
 import {RollBreakdown} from "../../rolls/RollBreakdown.js";
 import { useMemo, useState } from "react";
@@ -21,6 +23,7 @@ export type ActionInputV1 = {
 };
 
 export type RollActionV1 = {
+  pushPolicy?: PushPolicy;
   kind: "roll";
   id: DefinitionId;
   label: string;
@@ -278,6 +281,7 @@ export function RollActionEditor({
           </div>
         )}
       </div>
+      <PushPolicyEditor source={expressionSource} policy={action.pushPolicy} disabled={disabled || ("nominal" in action && action.nominal===true)} onChange={policy=>{const {pushPolicy:_old,...rest}=action;onChange(policy?{...rest,pushPolicy:policy}:rest);}}/>
       <GroupedPoolEditor source={expressionSource} onChange={onExpressionSourceChange} disabled={disabled} choices={[
         ...numericFields.map(([id])=>({value:`fields.${id}`,label:fieldLabels?.[id]??id})),
         ...action.inputs.filter(input=>input.valueType==="integer"||input.valueType==="decimal").map(input=>({value:`inputs.${input.id}`,label:input.label})),

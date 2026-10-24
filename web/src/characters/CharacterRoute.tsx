@@ -310,6 +310,10 @@ function CharacterDetailLoaded({
       {snapshot.error !== null && !reviewOpen ? <p role="alert">{snapshot.error.message}</p> : null}
       <CharacterSheet
         snapshot={snapshot}
+        pushApi={api}
+        onPushRoll={session.pushRoll}
+        onRefreshRoll={session.refresh}
+        onDeniedRoll={session.forgetRoll}
         onSetField={session.setField}
         onBump={session.bumpResource}
         onExecuteAction={session.executeAction}

@@ -1,5 +1,6 @@
 import { ApiError, type ApiClient } from "../api/client.js";
 import type {
+  PushOptionsResponse,ReadRollResponse,
   ActivityResponse,
   AddCharacterEntryBody,
   AddCharacterEntryResponse,
@@ -38,6 +39,8 @@ export type CharacterListQuery = {
 };
 
 export type CharactersApi = {
+  pushOptions(characterId:string,rollId:string):Promise<PushOptionsResponse>;
+  readRoll(characterId:string,rollId:string):Promise<ReadRollResponse>;
   open(characterId: string): Promise<OpenCharacterResponse>;
   creationOptions(versionId: string): Promise<CreationOptions>;
   listCreationVersions(input?: VersionCatalogQuery): Promise<CreationVersions>;
@@ -91,6 +94,8 @@ export function createCharactersApi(client: ApiClient): CharactersApi {
   };
 
   return {
+    pushOptions:(characterId,rollId)=>client.fetch<PushOptionsResponse>("GET",`/characters/${characterId}/rolls/${rollId}/push-options`),
+    readRoll:(characterId,rollId)=>client.fetch<ReadRollResponse>("GET",`/characters/${characterId}/rolls/${rollId}`),
     open: (characterId) => client.fetch<OpenCharacterResponse>("GET", `/characters/${characterId}`),
     creationOptions: (versionId) =>
       client.fetch<CreationOptions>("GET", "/characters/creation-options", {

@@ -1,3 +1,6 @@
+import {PushPanel,type PushApi} from "../rolls/PushPanel.js";
+import type {CharacterSession} from "../characters/session.js";
+import {useCharacterSession} from "../characters/useCharacterSession.js";
 import {RollBreakdown} from "../rolls/RollBreakdown.js";
 // SessionBoard: GM session tab body. Read-only latest content (limit 10)
 // + recent activity (limit 20) + character directory with inline resource
@@ -6,7 +9,7 @@ import {RollBreakdown} from "../rolls/RollBreakdown.js";
 // still open via onOpenCharacter; the I4 session queue is untouched.
 // Row state lives in per-characterId child components so the 15s poll
 // never resets it. 404 on any feed → onAccessRevoked.
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import type { CharactersApi } from "../characters/api.js";
@@ -22,7 +25,8 @@ import { randomUUID } from "../utils/uuid";
 
 export type SessionBoardProps = {
   campaignsApi: Pick<CampaignsApi, "listContent" | "listActivity" | "listCampaignCharacters">;
-  charactersApi: Pick<CharactersApi, "open" | "bumpCharacterResource" | "executeCharacterAction">;
+  charactersApi: Pick<CharactersApi, "open" | "bumpCharacterResource" | "executeCharacterAction"> & Partial<PushApi>;
+  createSession?:((characterId:string)=>CharacterSession)|undefined;
   campaignId: string;
   actorId: string;
   generation: number;
@@ -168,6 +172,7 @@ function SessionRollRow(props: {
   onCommandEnd: () => void;
   onOpenCharacter: (characterId: string) => void;
   onRolled: () => Promise<void>;
+  onRollResult?:(roll:CommandResultResponse["result"]["roll"])=>void;
 }) {
   const [audience, setAudience] = useState<RollAudience>("campaign");
   const [lastRoll,setLastRoll]=useState<CommandResultResponse["result"]["roll"]>(null);
@@ -224,6 +229,7 @@ function SessionRollRow(props: {
           typeof (raw as { total?: unknown }).total === "number") {
           setResultText(String((raw as { total: number }).total));
           setLastRoll(response.result.roll);
+          props.onRollResult?.(response.result.roll);
         } else {
           setUncertain(true);
         }
@@ -276,7 +282,7 @@ function SessionRollRow(props: {
       >
         {t("campaign.detail.session.roll.execute", { label: props.element.label })}
       </Button>
-      {lastRoll===null?null:<RollBreakdown roll={lastRoll}/>}
+      {lastRoll===null||lastRoll.push?null:<RollBreakdown roll={lastRoll}/>}
       {resultText !== null ? <p role="status">{resultText}</p> : null}
       {uncertain ? <p role="status">{t("campaign.detail.session.roll.uncertain")}</p> : null}
       {failed ? <p role="alert">{t("campaign.detail.session.roll.error")}</p> : null}
@@ -284,7 +290,17 @@ function SessionRollRow(props: {
   );
 }
 
+function SessionPushPanel({factory,characterId,api,roll,onBlocked}:{factory:(id:string)=>CharacterSession;characterId:string;api:PushApi;roll:CommandResultResponse["result"]["roll"];onBlocked:(blocked:boolean)=>void}){
+ const create=useMemo(()=>()=>factory(characterId),[factory,characterId]);const {session,snapshot}=useCharacterSession(create);
+ const blocked=snapshot.phase!=="ready"||!snapshot.editing.owned||snapshot.entries.length>0||snapshot.pendingOnlineAttempts.length>0;
+ useEffect(()=>{onBlocked(blocked);return()=>onBlocked(false);},[blocked,onBlocked]);
+ const retained=snapshot.lastRoll;
+ const current=retained?.push&&(!roll?.push||(retained.push.rootRollId===roll.push.rootRollId&&retained.push.attempt>=roll.push.attempt))?retained:roll;
+ return <div>{snapshot.error?<p role="alert">{snapshot.error.message}</p>:null}{current?.push&&session?<PushPanel roll={current} characterId={characterId} api={api} online={snapshot.connected} revision={snapshot.confirmed?.revision} disabled={blocked||snapshot.confirmed?.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh} onDenied={session.forgetRoll}/>:null}</div>;
+}
+
 function SessionCharacterRow(props: {
+  createSession?:SessionBoardProps["createSession"];
   charactersApi: SessionBoardProps["charactersApi"];
   campaignId: string;
   actorId: string;
@@ -294,6 +310,8 @@ function SessionCharacterRow(props: {
   onOpenCharacter: (characterId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [pushBlocked,setPushBlocked]=useState(false);
+  const [boardRoll,setBoardRoll]=useState<CommandResultResponse["result"]["roll"]>(null);
   const [commandPending, setCommandPending] = useState(false);
   const [refreshPending, setRefreshPending] = useState(false);
   const [refreshFailed, setRefreshFailed] = useState(false);
@@ -369,7 +387,7 @@ function SessionCharacterRow(props: {
               revision={sheet.data.character.revision}
               element={element}
               online={props.online}
-              commandPending={commandPending}
+              commandPending={commandPending||pushBlocked}
               refreshPending={refreshPending}
               refreshFailed={refreshFailed}
               onCommandStart={() => setCommandPending(true)}
@@ -387,7 +405,7 @@ function SessionCharacterRow(props: {
               revision={sheet.data.character.revision}
               element={element}
               online={props.online}
-              commandPending={commandPending}
+              commandPending={commandPending||pushBlocked}
               refreshPending={refreshPending}
               refreshFailed={refreshFailed}
               onCommandStart={() => setCommandPending(true)}
@@ -396,8 +414,10 @@ function SessionCharacterRow(props: {
               }}
               onOpenCharacter={props.onOpenCharacter}
               onRolled={reloadSheet}
+              onRollResult={setBoardRoll}
             />
           ))}
+          {props.createSession&&props.charactersApi.pushOptions&&props.charactersApi.readRoll?<SessionPushPanel factory={props.createSession} characterId={props.character.characterId} api={props.charactersApi as PushApi} roll={boardRoll} onBlocked={setPushBlocked}/>:null}
         </div>
       );
     }
@@ -515,6 +535,7 @@ export function SessionBoard(props: SessionBoardProps) {
       <ul>
         {visible.map((character) => (
           <SessionCharacterRow
+            createSession={props.createSession}
             key={character.characterId}
             charactersApi={props.charactersApi}
             campaignId={props.campaignId}

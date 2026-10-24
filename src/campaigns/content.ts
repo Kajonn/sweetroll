@@ -1,4 +1,4 @@
-import type {RollBreakdown} from "../systems/implementation/rules/result.js";
+import type {RollBreakdown, PushResult} from "../systems/implementation/rules/result.js";
 import {createTemplateRepository} from "./templatePersistence.js";
 import { randomUUID } from "node:crypto";
 
@@ -210,6 +210,7 @@ export type CampaignExportSnapshot = {
     audience: "owner_only" | "gm_only" | "campaign";
     expression: string;
     breakdown?: RollBreakdown;
+    push?: PushResult;
     dice: unknown;
     bindings: unknown;
     total: number;
@@ -1828,6 +1829,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
             expression: roll.expression,
             dice: roll.dice,
             ...(roll.breakdown === undefined ? {} : {breakdown:roll.breakdown}),
+            ...(roll.push === undefined ? {} : {push:roll.push}),
             bindings: roll.bindings,
             total: roll.total,
             output: roll.output,

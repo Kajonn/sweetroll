@@ -29,6 +29,10 @@
         {
           "const": "1.1",
           "type": "string"
+        },
+        {
+          "const": "1.2",
+          "type": "string"
         }
       ]
     },
@@ -1238,6 +1242,76 @@
               "outputTemplate"
             ],
             "properties": {
+              "pushPolicy": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "version",
+                  "maxAttempts",
+                  "successThreshold",
+                  "allowOnSuccess",
+                  "groups"
+                ],
+                "properties": {
+                  "version": {
+                    "const": "1.0",
+                    "type": "string"
+                  },
+                  "maxAttempts": {
+                    "minimum": 1,
+                    "maximum": 10,
+                    "type": "integer"
+                  },
+                  "successThreshold": {
+                    "minimum": -1000000000,
+                    "maximum": 1000000000,
+                    "type": "number"
+                  },
+                  "allowOnSuccess": {
+                    "type": "boolean"
+                  },
+                  "groups": {
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "groupId",
+                        "lockedFaces",
+                        "reportedFaces"
+                      ],
+                      "properties": {
+                        "groupId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
+                        "lockedFaces": {
+                          "maxItems": 1000,
+                          "uniqueItems": true,
+                          "type": "array",
+                          "items": {
+                            "minimum": 1,
+                            "maximum": 1000,
+                            "type": "integer"
+                          }
+                        },
+                        "reportedFaces": {
+                          "maxItems": 1000,
+                          "uniqueItems": true,
+                          "type": "array",
+                          "items": {
+                            "minimum": 1,
+                            "maximum": 1000,
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
               "kind": {
                 "const": "roll",
                 "type": "string"
@@ -1918,6 +1992,76 @@
                     "outputTemplate"
                   ],
                   "properties": {
+                    "pushPolicy": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "version",
+                        "maxAttempts",
+                        "successThreshold",
+                        "allowOnSuccess",
+                        "groups"
+                      ],
+                      "properties": {
+                        "version": {
+                          "const": "1.0",
+                          "type": "string"
+                        },
+                        "maxAttempts": {
+                          "minimum": 1,
+                          "maximum": 10,
+                          "type": "integer"
+                        },
+                        "successThreshold": {
+                          "minimum": -1000000000,
+                          "maximum": 1000000000,
+                          "type": "number"
+                        },
+                        "allowOnSuccess": {
+                          "type": "boolean"
+                        },
+                        "groups": {
+                          "minItems": 1,
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "groupId",
+                              "lockedFaces",
+                              "reportedFaces"
+                            ],
+                            "properties": {
+                              "groupId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
+                              "lockedFaces": {
+                                "maxItems": 1000,
+                                "uniqueItems": true,
+                                "type": "array",
+                                "items": {
+                                  "minimum": 1,
+                                  "maximum": 1000,
+                                  "type": "integer"
+                                }
+                              },
+                              "reportedFaces": {
+                                "maxItems": 1000,
+                                "uniqueItems": true,
+                                "type": "array",
+                                "items": {
+                                  "minimum": 1,
+                                  "maximum": 1000,
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
                     "kind": {
                       "const": "roll",
                       "type": "string"

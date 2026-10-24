@@ -65,3 +65,19 @@ export const RollBreakdownSchema = Type.Object(
   { additionalProperties: false },
 );
 export type RollBreakdown = Static<typeof RollBreakdownSchema>;
+
+export const PushResultSchema=Type.Object({
+ version:Type.Literal("1.0"),rollId:Type.String({pattern:"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}),rootRollId:Type.String({pattern:"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}),parentRollId:Type.Union([Type.String({pattern:"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}),Type.Null()]),attempt:Type.Integer({minimum:0,maximum:10}),maxAttempts:Type.Integer({minimum:1,maximum:10}),rerolledDiceIds:Type.Array(Identity,{maxItems:100,uniqueItems:true}),
+ faceOutcomes:Type.Array(Type.Object({groupId:Identity,face:Type.Integer({minimum:1,maximum:1000}),combinedCount:Type.Integer({minimum:0,maximum:100}),rerolledCount:Type.Integer({minimum:0,maximum:100})},{additionalProperties:false}),{maxItems:32000})
+},{additionalProperties:false});
+export type PushResult=Static<typeof PushResultSchema>;
+
+/** Complete public outcome required before a durable push can be acknowledged. */
+export const SavedPushRollSchema = Type.Object({
+  actionId: Type.String({ minLength: 1 }), expression: Type.String({ minLength: 1 }),
+  dice: Type.Array(DieResultSchema, { maxItems: 100 }),
+  bindings: Type.Array(Type.Object({scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs")]), definitionId: Type.String({minLength:1}), value: ScalarValueSchema}), {maxItems:256}),
+  total: Type.Number(), output: Type.String(),
+  audience: Type.Union([Type.Literal("owner_only"),Type.Literal("gm_only"),Type.Literal("campaign")]),
+  breakdown: RollBreakdownSchema, push: PushResultSchema,
+});

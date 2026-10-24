@@ -308,3 +308,13 @@ describe("SessionBoard", () => {
     unmount();
   });
 });
+
+it("routes GM pushes through the shared durable character session",async()=>{
+ const roll={actionId:"a1",expression:"2d6",dice:[],bindings:[],total:4,output:"GM saved pool",audience:"campaign",breakdown:{version:"1.0",rootId:"root",groups:[],terms:[]},push:{version:"1.0",rollId:"root",rootRollId:"root",parentRollId:null,attempt:0,maxAttempts:2,rerolledDiceIds:[],faceOutcomes:[]}};
+ const snapshot={phase:"ready",confirmed:sheet(),tentative:null,entries:[],editing:{owned:true},error:null,lastRoll:roll,lastNominal:null,lastMigration:null,pendingOnlineAttempts:[],connected:true};
+ const push=vi.fn(async()=>{});const factory=vi.fn(()=>({open:vi.fn(async()=>{}),subscribe:()=>()=>{},getSnapshot:()=>snapshot,pushRoll:push,refresh:vi.fn(async()=>{}),dispose:vi.fn()}));
+ const chars={open:vi.fn().mockResolvedValue({character:sheet()}),executeCharacterAction:vi.fn(),bumpCharacterResource:vi.fn(),pushOptions:vi.fn().mockResolvedValue({options:{canPush:true,reason:null,eligibleDiceIds:[],revision:7,nextAttempt:1,maxAttempts:2}}),readRoll:vi.fn()};
+ const campaigns={listContent:vi.fn().mockResolvedValue({content:[],nextCursor:null}),listActivity:vi.fn().mockResolvedValue({events:[],nextCursor:null}),listCampaignCharacters:vi.fn().mockResolvedValue({characters:[{characterId:"s1",name:"Bram",controllers:[]}],nextCursor:null})};
+ render(<SessionBoard campaignsApi={campaigns as never} charactersApi={chars as never} createSession={factory as never} campaignId="c1" actorId="u1" generation={0} online onOpenCharacter={()=>{}} onAccessRevoked={()=>{}}/>,{wrapper:wrapper()});
+ fireEvent.click(await screen.findByRole("button",{name:/open bram/i}));const button=await screen.findByRole("button",{name:"Push saved roll"});await waitFor(()=>expect(button).toBeEnabled());fireEvent.click(button);await waitFor(()=>expect(push).toHaveBeenCalledWith("root"));expect(factory).toHaveBeenCalledWith("s1");expect(chars.executeCharacterAction).not.toHaveBeenCalled();
+});

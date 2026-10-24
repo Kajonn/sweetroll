@@ -40,7 +40,7 @@ export function tokenize(source: string): TokenizeResult {
     const start = i;
 
     if (ch === '"') {
-      const match = /^"(?:[^"\\\r\n]|\\["\\/bfnrt]|\\u[0-9a-fA-F]{4})*"/.exec(source.slice(i));
+      const match = /^"(?:[^"\\\u0000-\u001f]|\\["\\/bfnrt]|\\u[0-9a-fA-F]{4})*"/.exec(source.slice(i));
       if (!match) return fail("invalid group string literal");
       tokens.push({kind: "string", value: JSON.parse(match[0]) as string, start});
       i += match[0].length;

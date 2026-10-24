@@ -1,7 +1,7 @@
 import {Value} from "@sinclair/typebox/value";
 import {PushPolicySchema} from "../package/schema/push-policy.js";
 import type {ActionV1, ExpressionAstV1, ObjectTemplateV1} from "../package/schema/index.js";
-import type {PackageDiagnostic} from "../package/diagnostics.js";
+import type {RulesDiagnostic} from "./diagnostic.js";
 import {children} from "./groups.js";
 export function containsDice(n:ExpressionAstV1):boolean{return n.kind==="dice"||children(n).some(containsDice);}
 /** Only additive dice reductions and bounded literal scaling can vary on a push. */
@@ -20,8 +20,8 @@ function affine(n:ExpressionAstV1,scale=1):boolean{
  }
  return false;
 }
-export function validatePushPolicies(value:{schemaVersion:string;actions:ActionV1[];templates?:ObjectTemplateV1[];expressions:{id:string;ast?:ExpressionAstV1}[]}):PackageDiagnostic[]{
- const errors:PackageDiagnostic[]=[];
+export function validatePushPolicies(value:{schemaVersion:string;actions:ActionV1[];templates?:ObjectTemplateV1[];expressions:{id:string;ast?:ExpressionAstV1}[]}):RulesDiagnostic[]{
+ const errors:RulesDiagnostic[]=[];
  const actions=[...value.actions.map((action,i)=>({action,path:`/actions/${i}/pushPolicy`})),...(value.templates??[]).flatMap((t,i)=>t.grantedActions.map((action,j)=>({action,path:`/templates/${i}/grantedActions/${j}/pushPolicy`})) )];
  for(const {action,path} of actions){
   if(action.kind!=="roll"||action.pushPolicy===undefined)continue;

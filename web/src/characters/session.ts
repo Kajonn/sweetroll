@@ -107,6 +107,7 @@ export type CharacterSession = {
   setField(fieldId: string, value: unknown): Promise<void>;
   bumpResource(resourceId: string, direction: "up" | "down"): Promise<void>;
   executeAction(actionId: string, inputs?: Record<string, unknown>): Promise<void>;
+  pushRoll(parentRollId:string):Promise<void>;
   /**
    * Task 7: template-granted roll routed through the executeAction intent
    * with its owning entry. Online-only, like entity actions.
@@ -702,7 +703,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
 
     try {
-      await store.acknowledge(actorId, characterId, current.id, character, generationAtSend);
+      await store.acknowledge(actorId, characterId, current.id, character, generationAtSend,response.result.roll);
     } catch (err) {
       if (!await identityIsCurrent()) return "blocked";
       return handleAckError(err);
@@ -1065,12 +1066,14 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   type OnlineOperation =
+    | {kind:"push";operation:"push";parentRollId:string}
     | { kind: "archive" | "recover"; operation: "archive" | "recover" }
     | { kind: "migration"; operation: "commit"; previewId: string }
     | { kind: "migration"; operation: "rollback"; migrationId: string };
 
   function onlineAttemptMatches(attempt: OnlineAttempt, op: OnlineOperation): boolean {
     if (attempt.characterId !== characterId) return false;
+    if(op.operation==="push")return attempt.kind==="push"&&attempt.request.path===`/characters/${characterId}/rolls/${op.parentRollId}/push`;
     if (op.operation === "commit") {
       return attempt.kind === "migration" && attempt.request.path === `/characters/${characterId}/migrations/${op.previewId}/commit`;
     }
@@ -1098,6 +1101,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       return;
     }
     const stored = await store.readOnlineAttempts(actorId);
+    if(stored.some(a=>a.characterId===characterId&&!["archive","recover","migration","push"].includes(a.kind)))throw new Error("Update Sweetroll to recover this pending operation.");
     if (!identityMatches()) return;
     pendingOnline = stored
       .filter((attempt) => attempt.characterId === characterId)
@@ -1177,6 +1181,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   function buildOnlineRequest(op: OnlineOperation, expectedRevision: number): FrozenRequest {
     const firstAttemptAt = now();
     const key = newId();
+    if(op.operation==="push")return {method:"POST",path:`/characters/${characterId}/rolls/${op.parentRollId}/push`,body:{expectedRevision,idempotencyKey:key},firstAttemptAt};
     if (op.operation === "archive" || op.operation === "recover") {
       return {
         method: "PATCH",
@@ -1405,7 +1410,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     // attempt retirement commit together. A storage failure aborts the whole
     // transaction, so the attempt survives for verbatim replay.
     try {
-      await store.acknowledgeOnlineAttempt(actorId, characterId, attempt.id, character, guard);
+      await store.acknowledgeOnlineAttempt(actorId, characterId, attempt.id, character, guard,response.result.roll);
     } catch (err) {
       if (!await identityIsCurrent()) throw err instanceof Error ? err : new Error("Account changed.");
       if (await retiredByConcurrentReview(attempt)) {
@@ -1707,6 +1712,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     const loaded = await store.read(actorId, characterId);
     if (!identityMatches()) return;
     confirmed = loaded.confirmed;
+    lastRoll=loaded.lastRoll??null;
     entries = loaded.entries;
     generation = loaded.generation;
     accountGeneration = loaded.accountGeneration;
@@ -1918,6 +1924,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       await persistEntry(newEntry({ kind: "updateEntryValues", entryId, values,
         ...(quantity === undefined ? {} : { quantity }) }));
     },
+    async pushRoll(parentRollId:string):Promise<void>{await runOnlineOperation({kind:"push",operation:"push",parentRollId});},
     async archive(): Promise<void> {
       await runOnlineOperation({ kind: "archive", operation: "archive" });
     },

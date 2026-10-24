@@ -86,6 +86,8 @@ describe("buildOpenApiDocument", () => {
       "/characters/{characterId}/migrations/{previewId}/commit",
       "/characters/{characterId}/ownership-transfer",
       "/characters/{characterId}/resources/{resourceId}/bump",
+      "/characters/{characterId}/rolls/{rollId}/push",
+      "/characters/{characterId}/rolls/{rollId}/push-options",
       "/characters/{characterId}/templates",
       "/content/{id}",
       "/content/{id}/grants",

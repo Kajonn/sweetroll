@@ -2728,3 +2728,18 @@ describe("pool error recovery", () => {
     } finally { session.dispose(); await store.close(); }
   });
 });
+
+describe("durable online push recovery",()=>{
+ it("replays the exact timed-out parent request after reload and durably retains an unchanged-revision child",async()=>{
+  const h=await makeHarness();h.api.scriptOpenView(viewFor("char-1",3));await h.session.open();
+  h.api.setOpenFallback(async()=>({character:viewFor("char-1",3),requestId:"open"}));h.api.scriptSend(async()=>({error:new TypeError("lost response")}));
+  await expect(h.session.pushRoll("root-roll")).rejects.toThrow();
+  const first=h.api.sent[0]!;expect(first.path).toBe("/characters/char-1/rolls/root-roll/push");expect(first.body.expectedRevision).toBe(3);
+  expect(await h.store.readOnlineAttempts(ARM)).toHaveLength(1);h.session.dispose();await h.store.close();
+  const child={actionId:"roll",expression:"2d6",dice:[],bindings:[],total:7,output:"7",audience:"owner_only" as const,push:{version:"1.0" as const,rollId:"child-roll",rootRollId:"root-roll",parentRollId:"root-roll",attempt:1,maxAttempts:2,rerolledDiceIds:[],faceOutcomes:[]}};
+  const reopened=await makeHarness();reopened.api.setOpenFallback(async()=>({character:viewFor("char-1",3),requestId:"open"}));reopened.api.setSendFallback(async()=>({envelope:{result:{character:viewFor("char-1",3),roll:child,nominal:null},requestId:"replay"}}));
+  await reopened.session.open();await reopened.session.whenIdle();expect(reopened.api.sent[0]).toEqual(first);expect(reopened.session.getSnapshot().lastRoll).toEqual(child);expect(await reopened.store.readOnlineAttempts(ARM)).toEqual([]);reopened.session.dispose();await reopened.store.close();
+  const offline=await makeHarness();offline.identity.online=false;offline.identity.signal();await offline.session.open();expect(offline.session.getSnapshot().lastRoll).toEqual(child);expect(offline.api.sent).toEqual([]);offline.session.dispose();await offline.store.close();
+ });
+ it("never creates a new push while offline",async()=>{const h=await makeHarness();h.api.scriptOpenView(viewFor("char-1",1));await h.session.open();h.identity.online=false;h.identity.signal();await expect(h.session.pushRoll("root")).rejects.toThrow(/connectivity|offline/);expect(await h.store.readOnlineAttempts(ARM)).toEqual([]);expect(h.api.sent).toEqual([]);h.session.dispose();await h.store.close();});
+});

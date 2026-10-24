@@ -1,3 +1,5 @@
+import {readPushRoll,mayReadPush,type StoredPushRoll} from "./push.js";
+import {pushEligibility} from "../systems/implementation/rules/push.js";
 import type { EntrySource, EntrySnapshot } from "../systems/implementation/package/schema/dynamic.js";
 import type { createTemplateRepository } from "../campaigns/templatePersistence.js";
 import { randomUUID } from "node:crypto";
@@ -64,6 +66,7 @@ const COMMAND_KIND: Record<CharacterCommand["kind"], string> = {
   setField: "character_set_field",
   bumpResource: "character_bump_resource",
   executeAction: "character_execute_action",
+  pushRoll: "character_push_roll",
   addEntry: "character_add_entry",
   removeEntry: "character_remove_entry",
   updateEntryValues: "character_update_entry_values",
@@ -123,6 +126,7 @@ export type CharacterErrorCode =
   | "result_unavailable";
 
 export type CharacterError = {
+  pushReason?: string;
   code: CharacterErrorCode;
   message: string;
   latestRevision?: number | null;
@@ -291,7 +295,11 @@ export type CharacterActionCommand = {
   audience?: RollAudience;
 };
 
+export type CharacterPushCommand={kind:"pushRoll";characterId:CharacterId;parentRollId:string;expectedRevision:number;idempotencyKey:string};
+export type PushOptions={canPush:boolean;reason:string|null;eligibleDiceIds:string[];revision:number;nextAttempt:number;maxAttempts:number};
+
 export type CharacterCommand =
+  | CharacterPushCommand
   | CharacterFieldSetCommand
   | CharacterResourceBumpCommand
   | CharacterActionCommand
@@ -490,6 +498,7 @@ export type RollbackCharacterMigration = {
 // ---------------------------------------------------------------------------
 
 export interface Characters {
+  pushOptions(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<PushOptions>>;
   create(ctx: RequestContext, input: CreateCharacter): Promise<CharacterResult<CharacterView>>;
   creationOptions(
     ctx: RequestContext,
@@ -855,8 +864,17 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     denied: () => CharacterError,
   ): Promise<CharacterResult<never> | null> {
     const scope = peekStoredScope(resultJson);
-    if (scope === null) return denyStoredOutcomeUnlessStandaloneOwned(ctx, characterId, denied);
-    return authorizeStoredCampaignOutcome(ctx, characterId, scope, denied);
+    const denial=scope===null?await denyStoredOutcomeUnlessStandaloneOwned(ctx,characterId,denied):await authorizeStoredCampaignOutcome(ctx,characterId,scope,denied);
+    if(denial)return denial;
+    const stored=resultJson as StoredCommandOutcome;
+    if(stored.ok&&stored.value.roll?.push){
+      const record=await repo.openOwnedCharacter(characterId,ctx.actorId);
+      const attached=record?null:await loadAttachedSnapshot(ctx,characterId);
+      const current=record??attached?.auth.record;
+      const parent=await readPushRoll(input.pool,characterId,stored.value.roll.push.rollId);
+      if(!current||!parent||!mayReadPush(parent,ctx.actorId,current,attached?toMembershipRecord(attached.auth.membership!):null))return {ok:false,error:denied()};
+    }
+    return null;
   }
 
   /**
@@ -1700,6 +1718,31 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       }
     },
 
+    async pushOptions(ctx,optionsInput){
+      try{
+        const owned=await repo.openOwnedCharacter(optionsInput.characterId,ctx.actorId);
+        const attached=owned?null:await loadAttachedSnapshot(ctx,optionsInput.characterId);
+        const record=owned??attached?.auth.record;
+        if(!record)return {ok:false,error:errors.not_found()};
+        const parent=await readPushRoll(input.pool,record.characterId,optionsInput.rollId);
+        if(!parent||!mayReadPush(parent,ctx.actorId,record,attached?toMembershipRecord(attached.auth.membership!):null))return {ok:false,error:errors.not_found()};
+        let reason:string|null=null;
+        if(record.lifecycle!=="active"||(attached&&attached.auth.campaign?.status!=="active"))reason="archived";
+        const child=await input.pool.query("SELECT id FROM character_rolls WHERE parent_roll_id=$1 LIMIT 1",[optionsInput.rollId]);
+        if(child.rows.length)reason="parent_consumed";
+        if(!reason){
+          const validated=await input.runtime.resolve({versionId:record.systemVersionId,entityId:record.entityDefinitionId,state:record.state,intent:{kind:"push",parent:parent.roll,context:parent.context,executionId:optionsInput.rollId,optionsOnly:true}});
+          if(!validated.ok){if(validated.error.code!=="push_unavailable")return {ok:false,error:mapRuntimeError(validated.error)};reason=validated.error.pushReason??"invalid_snapshot";}
+        }
+        const eligible=pushEligibility(parent.context.policy,parent.roll,parent.roll.push!.attempt);
+        if(!reason)reason=eligible.reason;
+        // Recheck current authorization after package/database I/O.
+        const current=await repo.openOwnedCharacter(record.characterId,ctx.actorId);
+        const live=current?null:await loadAttachedSnapshot(ctx,record.characterId);
+        if(!(current??live?.auth.record)||!mayReadPush(parent,ctx.actorId,(current??live!.auth.record),live?toMembershipRecord(live.auth.membership!):null))return {ok:false,error:errors.not_found()};
+        return {ok:true,value:{canPush:reason===null,reason,eligibleDiceIds:reason===null?eligible.eligibleDiceIds:[],revision:record.revision,nextAttempt:parent.roll.push!.attempt+1,maxAttempts:parent.context.policy.maxAttempts}};
+      }catch{return {ok:false,error:errors.internal()};}
+    },
     async apply(ctx, command) {
       try {
         if (!Number.isInteger(command.expectedRevision) || command.expectedRevision < 1) {
@@ -1717,6 +1760,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             ? { fieldId: command.fieldId, value: command.value }
             : command.kind === "bumpResource"
               ? { resourceId: command.resourceId, direction: command.direction }
+              : command.kind === "pushRoll"
+                ? {parentRollId:command.parentRollId}
               : command.kind === "executeAction"
                 ? {
                     actionId: command.actionId,
@@ -1778,6 +1823,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         // I6 Task 5: the resolve source. Standalone commands read the owned
         // snapshot; attached commands read the campaign-authorized record.
         let attachedRecord: CharacterRecord | null = null;
+        let pushMembership: MembershipRecord | null = null;
         if (snapshot === null) {
           const scope = await repo.loadCharacterScope(command.characterId);
           if (scope === null || scope.campaignId === null) {
@@ -1825,6 +1871,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           }
           attachedCampaignId = scope.campaignId;
           attachedRecord = attached.auth.record;
+          pushMembership = toMembershipRecord(attached.auth.membership!);
         } else if (snapshot.lifecycle === "archived") {
           const error = errors.archived();
           await repo.finalizeExecutionError({
@@ -1864,8 +1911,18 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           return applyEntryCommand(ctx, command, resolveSource, attachedCampaignId, resultScope, executionId, replayExpiresAt);
         }
 
+        const resolveSource: CharacterRecord = attachedRecord ?? snapshot!;
+        let pushParent:StoredPushRoll|null=null;
+        if(command.kind==="pushRoll"){
+          pushParent=await readPushRoll(input.pool,command.characterId,command.parentRollId);
+          if(!pushParent||!mayReadPush(pushParent,ctx.actorId,resolveSource,pushMembership)){
+            const error=errors.not_found();await repo.finalizeExecutionError({executionId,resultJson:serializeCommandError(error,resultScope),expiresAt:replayExpiresAt});return {ok:false,error};
+          }
+        }
         const intent =
-          command.kind === "setField"
+          command.kind === "pushRoll"
+            ? ({kind:"push",parent:pushParent!.roll,context:pushParent!.context,executionId} as const)
+          : command.kind === "setField"
             ? ({ kind: "set", fieldId: command.fieldId, value: command.value } as const)
             : command.kind === "bumpResource"
               ? ({ kind: "bump", resourceId: command.resourceId, direction: command.direction } as const)
@@ -1877,7 +1934,6 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
                   ...(command.entryId !== undefined ? { entryId: command.entryId } : {}),
                 } as const);
 
-        const resolveSource: CharacterRecord = attachedRecord ?? snapshot!;
         const resolved = await input.runtime.resolve({
           versionId: resolveSource.systemVersionId,
           entityId: resolveSource.entityDefinitionId,
@@ -1901,9 +1957,13 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             ? "character_field_set"
             : command.kind === "bumpResource"
               ? "character_resource_bumped"
-              : "character_action_executed";
+              : command.kind==="pushRoll"?"character_roll_pushed":"character_action_executed";
         const changedDefinitionIds = resolved.value.changedDefinitionIds;
         const roll = resolved.value.roll;
+        if(roll&&resolved.value.pushContext&&!roll.push){
+          const policy=resolved.value.pushContext.policy;
+          roll.push={version:"1.0",rollId:executionId,rootRollId:executionId,parentRollId:null,attempt:0,maxAttempts:policy.maxAttempts,rerolledDiceIds:[],faceOutcomes:policy.groups.flatMap(g=>g.reportedFaces.map(face=>({groupId:g.groupId,face,combinedCount:roll.dice.filter(d=>d.groupId===g.groupId&&d.value===face).length,rerolledCount:0})))};
+        }
         const nominal = resolved.value.nominal;
 
         const outcome = await repo.applyCommandTx({
@@ -1914,6 +1974,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           nextState: resolved.value.state,
           stateChanged: changedDefinitionIds.length > 0,
           roll,
+          ...(resolved.value.pushContext?{pushContext:resolved.value.pushContext}:{}),
           activity: {
             kind: activityKind,
             payloadJson: { ...payload, changedDefinitionIds },

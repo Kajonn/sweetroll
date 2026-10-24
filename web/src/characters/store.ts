@@ -1,10 +1,10 @@
-import type { ActivityEvent, CharacterView, FrozenRequest, QueueEntry, ResolveEntriesInput } from "./types.js";
+import type { CommandResult, ActivityEvent, CharacterView, FrozenRequest, QueueEntry, ResolveEntriesInput } from "./types.js";
 
 export type OnlineAttempt = {
   id: string;
   actorId: string;
   characterId: string | null;
-  kind: "create" | "archive" | "recover" | "export" | "migration";
+  kind: "create" | "archive" | "recover" | "export" | "migration" | "push";
   request: FrozenRequest;
   createdAt: string;
   /**
@@ -39,7 +39,7 @@ export type CharacterStore = {
   read(
     actorId: string,
     characterId: string,
-  ): Promise<{ confirmed: CharacterView | null; entries: QueueEntry[] } & WriteGuard>;
+  ): Promise<{ confirmed: CharacterView | null; entries: QueueEntry[]; lastRoll?:CommandResult["roll"] } & WriteGuard>;
   enqueue(entry: QueueEntry, guard: WriteGuard): Promise<void>;
   freeze(actorId: string, characterId: string, entryId: string, request: FrozenRequest): Promise<void>;
   acknowledge(
@@ -48,6 +48,7 @@ export type CharacterStore = {
     entryId: string,
     character: CharacterView,
     generation: number,
+    roll?:CommandResult["roll"],
   ): Promise<void>;
   confirmSnapshot(
     actorId: string,
@@ -91,6 +92,7 @@ export type CharacterStore = {
     attemptId: string,
     character: CharacterView,
     guard: WriteGuard,
+    roll?:CommandResult["roll"],
   ): Promise<void>;
   /**
    * Guarded retirement of exactly one online attempt (explicit review and
@@ -137,7 +139,7 @@ export type CharacterStore = {
   saveActivityPage(page: CachedActivityPage, guard?: WriteGuard): Promise<void>;
 };
 
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const TEMPLATES="entryTemplates";
 
 type CatalogScope = Pick<CharacterView, "campaignId" | "placementGeneration" | "systemVersionId" | "entityDefinitionId">;
@@ -170,6 +172,7 @@ const ACTIVITY = "activity";
 const MAX_STRING = "\uffff";
 
 type CharacterRecord = {
+  lastRoll?:CommandResult["roll"];
   actorId: string;
   characterId: string;
   confirmed: CharacterView | null;
@@ -216,7 +219,8 @@ function openDatabase(name: string): Promise<IDBDatabase> {
         db.createObjectStore(ACTIVITY, { keyPath: ["actorId", "characterId", "cursorKey"] });
       }
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onblocked=()=>reject(new Error("Close older Sweetroll tabs to update push recovery support."));
+    request.onsuccess = () => {request.result.onversionchange=()=>request.result.close();resolve(request.result);};
     request.onerror = () => reject(request.error);
   });
 }
@@ -405,6 +409,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
         const entries = await collectByIndex<QueueEntry>(tx, QUEUE, "by-seq", keyRange);
         return {
           confirmed: record?.confirmed ?? null,
+          ...(record?.lastRoll?{lastRoll:record.lastRoll}:{}),
           entries,
           generation: record?.generation ?? await accountGeneration(tx, actorId),
           accountGeneration: await identityGeneration(tx),
@@ -446,7 +451,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
       });
     },
 
-    async acknowledge(actorId, characterId, entryId, character, generation) {
+    async acknowledge(actorId, characterId, entryId, character, generation, roll) {
       await openTx(db, [CHAR, QUEUE, LAST_ACCOUNT, PENDING_LOGOUT, TEMPLATES], "readwrite", async (tx) => {
         await assertWriteIdentity(tx, actorId);
         const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
@@ -470,7 +475,9 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
           }
         }
         await invalidateCatalogScope(tx, actorId, characterId, record.confirmed, character);
+        if(!sameCatalogScope(record.confirmed?catalogScope(record.confirmed):null,catalogScope(character)))delete record.lastRoll;
         record.confirmed = character;
+        if(roll?.push)record.lastRoll=roll;
         record.generation += 1;
         await putRequest(tx, CHAR, record);
       });
@@ -669,7 +676,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
       );
     },
 
-    async acknowledgeOnlineAttempt(actorId, characterId, attemptId, character, guard) {
+    async acknowledgeOnlineAttempt(actorId, characterId, attemptId, character, guard, roll) {
       await openTx(db, [CHAR, ATTEMPTS, LAST_ACCOUNT, PENDING_LOGOUT, TEMPLATES], "readwrite", async (tx) => {
         await assertWriteIdentity(tx, actorId, guard.accountGeneration);
         const attempt = await getRequest<OnlineAttempt>(tx, ATTEMPTS, [actorId, attemptId]);
@@ -683,7 +690,9 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
         // Confirmed-state persistence and exact-attempt retirement commit or
         // roll back together: a failure keeps the attempt for verbatim replay.
         await invalidateCatalogScope(tx, actorId, characterId, record.confirmed, character);
+        if(!sameCatalogScope(record.confirmed?catalogScope(record.confirmed):null,catalogScope(character)))delete record.lastRoll;
         record.confirmed = character;
+        if(roll?.push)record.lastRoll=roll;
         record.generation += 1;
         await putRequest(tx, CHAR, record);
         await deleteRequest(tx, ATTEMPTS, [actorId, attemptId]);

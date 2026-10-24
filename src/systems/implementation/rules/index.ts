@@ -18,3 +18,7 @@ export type { RollBreakdown } from "./result.js";
 
 export {parse} from "./parser.js";
 export {hasDiceGroups} from "./groups.js";
+
+export {children} from "./groups.js";
+export {validatePushPolicies} from "./push-policy.js";
+export type {PushPolicy} from "../package/schema/push-policy.js";

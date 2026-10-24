@@ -193,3 +193,11 @@ it("promotes only an explicitly authored grouped formula and never downgrades it
  expect(documentReducer(grouped,{type:"setExpressionSource",expressionId:"roll",source:"d20"}).schemaVersion).toBe("1.1");
  expect(documentReducer(doc,{type:"setExpressionSource",expressionId:"missing",source:'group("a", "A", d6)'})).toBe(doc);
 });
+
+it("promotes an explicit policy to 1.2 and never downgrades on group edits or policy removal",()=>{
+ let doc=blankDocument();doc.expressions=[{id:"roll",context:"roll",resultType:"number",source:'group("base","Base",dice(2,6))',fallback:0}];
+ doc=documentReducer(doc,{type:"setActions",actions:[{id:"roll_action",kind:"roll",label:"Roll",pushPolicy:{version:"1.0",maxAttempts:1,successThreshold:1,allowOnSuccess:false,groups:[{groupId:"base",lockedFaces:[6],reportedFaces:[]}]}}]});
+ expect(doc.schemaVersion).toBe("1.2");
+ doc=documentReducer(doc,{type:"setExpressionSource",expressionId:"roll",source:'group("base","Base",dice(3,6))'});expect(doc.schemaVersion).toBe("1.2");
+ expect(documentReducer(doc,{type:"setActions",actions:[]}).schemaVersion).toBe("1.2");
+});

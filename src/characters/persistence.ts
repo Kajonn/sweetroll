@@ -1,3 +1,5 @@
+import {preparePushCommit,insertPushRoll} from "./push.js";
+import type {PushContext} from "../systems/runtime.js";
 import type { Pool, PoolClient } from "pg";
 
 import { hashInput } from "../systems/implementation/authoring/assess.js";
@@ -132,6 +134,7 @@ export type TxBuildArgs = {
 };
 
 export type ApplyCommandInput = {
+  pushContext?: PushContext;
   precondition?: (client: PoolClient) => Promise<import("./index.js").CharacterError | null>;
   executionId: ExecutionId;
   characterId: CharacterId;
@@ -588,6 +591,8 @@ async function applyCommandCampaignTx(
     const error = await input.precondition(client);
     if (error !== null) { await client.query("ROLLBACK"); return {kind:"precondition_failed",error}; }
   }
+  const pushCommit=await preparePushCommit(client,input,toCharacterRecord(charRow),input.rollAudience?.requested??campaign.rollAudienceDefault,{campaignId,userId:input.actorId,role:membership.role as "owner"|"co_gm"|"player",status:membership.status as "active"|"removed",generation:membership.generation,createdAt:new Date(0),updatedAt:new Date(0)});
+  if(!pushCommit.ok){await client.query("ROLLBACK");return {kind:"precondition_failed",error:pushCommit.error};}
   let updatedRow = charRow;
   if (input.stateChanged) {
     const updated = await client.query<CharacterRow>(
@@ -606,10 +611,11 @@ async function applyCommandCampaignTx(
   // path (early replay / already_completed), so later default changes
   // cannot move the recorded audience or dice.
   const requested = input.rollAudience?.requested ?? null;
-  const effectiveAudience: RollAudience = requested ?? campaign.rollAudienceDefault;
+  const effectiveAudience: RollAudience = pushCommit.value?.audience ?? requested ?? campaign.rollAudienceDefault;
 
   let rollId: string | null = null;
-  if (input.roll !== null) {
+  if(input.roll?.push&&pushCommit.value){rollId=await insertPushRoll(client,input,pushCommit.value);}
+  else if (input.roll !== null) {
     const insertedRoll = await client.query<{ id: string }>(
       `INSERT INTO character_rolls
          (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id, scope_campaign_id, breakdown_json)
@@ -1108,6 +1114,9 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           return { kind: "conflict", latestRevision };
         }
 
+        if(input.precondition){const error=await input.precondition(client);if(error){await client.query("ROLLBACK");return {kind:"precondition_failed",error};}}
+        const pushCommit=await preparePushCommit(client,input,toCharacterRecord(charRow),"owner_only",null);
+        if(!pushCommit.ok){await client.query("ROLLBACK");return {kind:"precondition_failed",error:pushCommit.error};}
         let updatedRow = charRow;
         if (input.stateChanged) {
           const updated = await client.query<CharacterRow>(
@@ -1121,7 +1130,8 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         }
 
         let rollId: string | null = null;
-        if (input.roll !== null) {
+        if(input.roll?.push&&pushCommit.value){rollId=await insertPushRoll(client,input,pushCommit.value);}
+        else if (input.roll !== null) {
           const insertedRoll = await client.query<{ id: string }>(
             `INSERT INTO character_rolls
                (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id, breakdown_json)
@@ -1177,6 +1187,8 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         return { kind: "applied", record, resultJson };
       } catch (error) {
         await client.query("ROLLBACK");
+        const constraint=error as {code?:string;constraint?:string};
+        if(constraint.code==="23505"&&["character_rolls_one_push_child","character_rolls_push_attempt"].includes(constraint.constraint??""))return {kind:"precondition_failed",error:{code:"conflict",message:"This roll already has a push. Review its child before continuing.",pushReason:"parent_consumed",latestRevision:input.expectedRevision}};
         throw error;
       } finally {
         client.release();
@@ -1308,8 +1320,8 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       // module only when that same audience check permits the roll ID.
       const rowShape = `e.id, e.character_revision, e.kind, e.payload_json, e.roll_id, e.request_id,
              e.occurred_at, to_char(e.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS occurred_at_cursor,
-             r.actor_id AS roll_actor_id, r.audience AS roll_audience,
-             r.action_id, r.expression, r.dice_json, r.bindings_json, r.total, r.rendered_output, r.breakdown_json`;
+             COALESCE(r.audience_actor_id,r.actor_id) AS roll_actor_id, r.audience AS roll_audience,
+             r.action_id, r.expression, r.dice_json, r.bindings_json, r.total, r.rendered_output, r.breakdown_json, r.push_result_json`;
       type ActivityRowShape = {
         id: string;
         character_revision: number;
@@ -1324,6 +1336,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         action_id: string; expression: string; dice_json: NormalizedRoll["dice"];
         bindings_json: NormalizedRoll["bindings"]; total: number; rendered_output: string;
         breakdown_json: NormalizedRoll["breakdown"] | null;
+        push_result_json: NormalizedRoll["push"] | null;
       };
       const scopeValue = scope?.scopeCampaignId;
       const filters: string[] = [`e.character_id = $1`];
@@ -1365,6 +1378,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           actionId: row.action_id, expression: row.expression, dice: row.dice_json,bindings: row.bindings_json,
           total: row.total, output: row.rendered_output, audience: parseRollAudienceOrNull(row.roll_audience)!,
           breakdown: row.breakdown_json,
+          ...(row.push_result_json?{push:row.push_result_json}:{}),
         }}),
       }));
     },

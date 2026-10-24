@@ -1,4 +1,4 @@
-import type {RollBreakdown} from "../systems/implementation/rules/result.js";
+import type {RollBreakdown,PushResult} from "../systems/implementation/rules/result.js";
 import type { Pool, PoolClient } from "pg";
 
 export type DbClient = Pool | PoolClient;
@@ -87,6 +87,7 @@ export type RollExportRecord = {
   audience: "owner_only" | "gm_only" | "campaign";
   expression: string;
   breakdown?: RollBreakdown;
+  push?: PushResult;
   dice: unknown;
   bindings: unknown;
   total: number;
@@ -320,6 +321,7 @@ type RollExportRow = {
   audience: string;
   expression: string;
   breakdown_json: RollBreakdown | null;
+  push_result_json: PushResult | null;
   dice_json: unknown;
   bindings_json: unknown;
   total: number;
@@ -492,6 +494,7 @@ function toRollExportRecord(row: RollExportRow): RollExportRecord {
     expression: row.expression,
     dice: row.dice_json,
     ...(row.breakdown_json == null ? {} : {breakdown:row.breakdown_json}),
+    ...(row.push_result_json == null ? {} : {push:row.push_result_json}),
     bindings: row.bindings_json,
     total: row.total,
     output: row.rendered_output,
@@ -574,8 +577,8 @@ const CONTENT_VISIBILITY_PREDICATE = `(
  */
 const ROLL_VISIBILITY_PREDICATE = `(
   r.audience = 'campaign'
-  OR (r.audience = 'gm_only' AND ($2::boolean OR r.actor_id = $1))
-  OR (r.audience = 'owner_only' AND r.actor_id = $1)
+  OR (r.audience = 'gm_only' AND ($2::boolean OR COALESCE(r.audience_actor_id,r.actor_id) = $1))
+  OR (r.audience = 'owner_only' AND COALESCE(r.audience_actor_id,r.actor_id) = $1)
 )`;
 const INVITATION_COLUMNS =
   "id, campaign_id, issued_by, intended_role, token_hash, status, revision, consuming_actor_id, accepted_membership_generation, expires_at, created_at, updated_at";
@@ -1621,7 +1624,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
     ): Promise<RollExportRecord[]> {
       const result = await client.query<RollExportRow>(
         `SELECT r.id, r.character_id, r.actor_id, r.action_id, r.audience,
-                r.expression, r.dice_json, r.bindings_json, r.breakdown_json, r.total, r.rendered_output, r.occurred_at
+                r.expression, r.dice_json, r.bindings_json, r.breakdown_json, r.push_result_json, r.total, r.rendered_output, r.occurred_at
            FROM character_rolls r
           WHERE r.scope_campaign_id = $3 AND ${ROLL_VISIBILITY_PREDICATE}
           ORDER BY r.id

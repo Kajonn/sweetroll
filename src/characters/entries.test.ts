@@ -93,6 +93,7 @@ const DDL = `
     execution_id       uuid NOT NULL UNIQUE,
     expression         text NOT NULL,
     breakdown_json     jsonb,
+    parent_roll_id uuid, root_roll_id uuid, push_attempt integer, push_context_json jsonb, push_result_json jsonb, audience_actor_id uuid,
     dice_json          jsonb NOT NULL,
     bindings_json      jsonb NOT NULL,
     total              double precision NOT NULL,

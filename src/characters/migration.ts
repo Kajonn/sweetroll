@@ -336,6 +336,7 @@ function toMigrationCharacterRecord(row: MigrationCharacterRow): CharacterRecord
  * programmer-error internals.
  */
 export function mapMigrationRuntimeError(error: {
+  pushReason?:string;
   code: string;
   message: string;
   definitionId?: string;
@@ -344,6 +345,8 @@ export function mapMigrationRuntimeError(error: {
   switch (error.code) {
     case "not_found":
       return { code: "not_found", message: "The published version or entity definition does not exist." };
+    case "push_unavailable":
+      return {code:"invalid_value",message:error.message,...(error.pushReason?{pushReason:error.pushReason}:{})};
     case "action_evaluation_failed":
       return { code: "invalid_value", message: error.message, ...(error.actionDiagnostics === undefined ? {} : { actionDiagnostics: error.actionDiagnostics }) };
     case "bad_request":
@@ -360,6 +363,7 @@ export function mapMigrationRuntimeError(error: {
 // Only these runtime error codes are stable/deterministic for the same input
 // and safe to permanently finalize on the idempotency key (standalone path).
 const STABLE_MIGRATION_RUNTIME_ERROR_CODES = new Set([
+  "push_unavailable",
   "action_evaluation_failed",
   "not_found",
   "bad_request",

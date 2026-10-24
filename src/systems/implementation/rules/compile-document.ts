@@ -1,3 +1,4 @@
+import {validatePushPolicies} from "./push-policy.js";
 import type { ActionV1, FieldV1, SystemDocumentV1, SystemPackageV1, ValueType } from "../package/schema/index.js";
 import type { UnsignedSystemPackageV1 } from "../package/schema/index.js";
 import { signSystemPackage } from "../package/canonical.js";
@@ -179,7 +180,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     }
     const result = compileExpression(expr.source, {
       env,
-      languageVersion: document.schemaVersion === "1.1" ? "0.2" : "0.1",
+      languageVersion: document.schemaVersion !== "1.0" ? "0.2" : "0.1",
       resultType: expr.resultType,
       context: expr.context,
       fallback: expr.fallback,
@@ -224,6 +225,8 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     },
   };
 
+  const pushErrors=validatePushPolicies(unsigned);
+  if(pushErrors.length)return {ok:false,diagnostics:pushErrors};
   return { ok: true, value: signSystemPackage(unsigned) };
 }
 

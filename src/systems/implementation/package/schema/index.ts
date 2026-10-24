@@ -27,3 +27,5 @@ export type {
 export * from "./export.js";
 export * from "./expression.js";
 export * from "./package.js";
+
+export * from "./push-policy.js";

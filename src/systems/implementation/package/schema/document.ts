@@ -1,5 +1,7 @@
 import { Type, type Static } from "@sinclair/typebox";
 
+import {PushPolicySchema} from "./push-policy.js";
+
 import { PACKAGE_LIMITS } from "../limits.js";
 import { DefinitionIdSchema, ValueTypeSchema } from "./common.js";
 
@@ -326,6 +328,7 @@ export type ActionInputV1 = Static<typeof ActionInputV1Schema>;
 
 export const RollActionV1Schema = Type.Object(
   {
+    pushPolicy: Type.Optional(PushPolicySchema),
     kind: Type.Literal("roll"),
     id: DefinitionIdSchema,
     label: LabelSchema,
@@ -463,7 +466,7 @@ export type SystemMetadataV1 = Static<typeof SystemMetadataV1Schema>;
 
 export const SystemDocumentV1Schema = Type.Object(
   {
-    schemaVersion: Type.Union([Type.Literal("1.0"), Type.Literal("1.1")]),
+    schemaVersion: Type.Union([Type.Literal("1.0"), Type.Literal("1.1"), Type.Literal("1.2")]),
     metadata: SystemMetadataV1Schema,
     entities: Type.Array(EntityDefinitionV1Schema, { maxItems: PACKAGE_LIMITS.entities }),
     referenceData: Type.Array(ReferenceDataV1Schema, {

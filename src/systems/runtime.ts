@@ -1,3 +1,7 @@
+import {findOwnedAction} from "./implementation/runtime/action-ownership.js";
+import {makePushContext,resolveRuntimePush} from "./implementation/runtime/push.js";
+import type {PushContext} from "./implementation/runtime/push-context.js";
+export type {PushContext} from "./implementation/runtime/push-context.js";
 import type { DieResult, RollBreakdown } from "./implementation/rules/result.js";
 import { PublishedPackageCorruptError, type PublishedPackageLoader } from "./implementation/runtime/package-loader.js";
 import { buildCharacterProjection } from "./implementation/runtime/projection.js";
@@ -36,6 +40,7 @@ export type RuntimeStateV1 = {
 };
 
 export type RuntimeIntent =
+  | {kind:"push";parent:NormalizedRoll;context:PushContext;executionId:string;optionsOnly?:boolean}
   | { kind: "initialize"; values?: Record<DefinitionId, unknown> }
   | { kind: "observe" }
   | { kind: "set"; fieldId: DefinitionId; value: unknown }
@@ -84,6 +89,7 @@ export type NormalizedRollBinding = {
 export type NormalizedRollAudience = "owner_only" | "gm_only" | "campaign";
 
 export type NormalizedRoll = {
+  push?: import("./implementation/rules/result.js").PushResult;
   breakdown?: RollBreakdown;
   actionId: DefinitionId;
   expression: string;
@@ -225,6 +231,7 @@ export type CharacterProjectionV1 = {
 };
 
 export type RuntimeResolution = {
+  pushContext?: PushContext;
   versionId: VersionId;
   packageChecksum: string;
   state: RuntimeStateV1;
@@ -242,6 +249,7 @@ export type RuntimeErrorCode =
   | "invalid_package"
   | "invalid_state"
   | "unsupported_field_value"
+  | "push_unavailable"
   | "action_evaluation_failed"
   | "budget_exceeded"
   | "internal";
@@ -254,6 +262,7 @@ export type ActionEvaluationDiagnostic = {
 };
 
 export type RuntimeError = {
+  pushReason?: string;
   code: RuntimeErrorCode;
   message: string;
   definitionId?: DefinitionId;
@@ -319,9 +328,11 @@ export function createSystemRuntime(input: {
         inputs: Record<DefinitionId, RuntimeScalar>;
         executionId: CommandExecutionId;
         outputTemplate: string;
+        action: Extract<SystemPackageV1["actions"][number],{kind:"roll"}>;
       } | null = null;
       let roll: NormalizedRoll | null = null;
       let nominal: NominalActionResult | null = null;
+      let pushContext: PushContext | undefined;
       if (request.intent.kind === "initialize") {
         if (request.state !== undefined) {
           return { ok: false, error: { code: "bad_request", message: "Initialize does not accept existing state." } };
@@ -339,7 +350,10 @@ export function createSystemRuntime(input: {
         stateResult = decodeRuntimeState(entity, request.state);
         if (!stateResult.ok) return stateResult;
 
-        if (request.intent.kind === "set") {
+        if(request.intent.kind==="push"){
+          const pushed=resolveRuntimePush({pkg:packageValue,entity,state:stateResult.value,parent:request.intent.parent,context:request.intent.context,executionId:request.intent.executionId,secret:input.authoritativeRollSecret,...(request.intent.optionsOnly?{optionsOnly:true}:{})});
+          if(!pushed.ok)return pushed;roll=pushed.value.roll;pushContext=pushed.value.context;
+        } else if (request.intent.kind === "set") {
           const fieldId = request.intent.fieldId;
           const field = entity.fields.find((candidate) => candidate.id === fieldId);
           if (field === undefined || field.kind === "computed" || field.kind === "resource") {
@@ -382,6 +396,7 @@ export function createSystemRuntime(input: {
           changedDefinitionIds = granted.value.changedDefinitionIds;
           roll = granted.value.roll;
           nominal = granted.value.nominal;
+          pushContext = granted.value.pushContext;
         } else {
           const action = findOwnedAction(packageValue, entity.id, request.intent.actionId);
           if (action === undefined) return badRequest("Action does not belong to the entity.", request.intent.actionId);
@@ -407,6 +422,7 @@ export function createSystemRuntime(input: {
             const actionInputs = decodeActionInputs(action.inputs, request.intent.inputs);
             if (!actionInputs.ok) return actionInputs;
             pendingRoll = {
+              action,
               actionId: action.id,
               expressionId: action.expressionId,
               inputs: actionInputs.value,
@@ -439,6 +455,7 @@ export function createSystemRuntime(input: {
         const failure = actionEvaluationFailure(evaluated, pendingRoll.actionId, expression.id);
         if (failure !== null) return { ok: false, error: failure };
         if (evaluated.roll === null) return invalidPackage(expression.id);
+        pushContext=makePushContext(packageValue,entity.id,pendingRoll.action);
         roll = {
           actionId: pendingRoll.actionId,
           expression: evaluated.roll.expression,
@@ -468,6 +485,7 @@ export function createSystemRuntime(input: {
           changedDefinitionIds,
           roll,
           nominal,
+          ...(pushContext?{pushContext}:{}),
           projection,
         },
       };
@@ -501,15 +519,6 @@ async function loadPublishedPackage(
     };
   }
   return { ok: true, value: packageValue };
-}
-
-function findOwnedAction(packageValue: SystemPackageV1, entityId: string, actionId: string) {
-  const owned = packageValue.sheets
-    .filter((sheet) => sheet.targetEntityId === entityId)
-    .some((sheet) => sheet.sections.some((section) =>
-      section.elements.some((element) => element.kind === "action" && element.actionId === actionId)
-    ));
-  return owned ? packageValue.actions.find((action) => action.id === actionId) : undefined;
 }
 
 function changeResource(

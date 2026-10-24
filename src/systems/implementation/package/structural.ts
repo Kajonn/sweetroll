@@ -1,3 +1,4 @@
+import {validatePushPolicies} from "../rules/push-policy.js";
 import { validateDiceGroups } from "../rules/groups.js";
 import { Buffer } from "node:buffer";
 
@@ -62,7 +63,7 @@ function validateStructure(value: StructuralValue, prefix: string): PackageDiagn
   const budgetDiagnostics = validateBudgets(value, prefix);
   if (budgetDiagnostics.length > 0) return budgetDiagnostics;
 
-  const diagnostics: PackageDiagnostic[] = [];
+  const diagnostics: PackageDiagnostic[] = validatePushPolicies(value);
   const definitionIds = new Set<string>();
   const entityIds = new Set<string>();
   const fieldIds = new Set<string>();
@@ -387,7 +388,7 @@ function validatePackageBudgets(
 
   value.expressions.forEach((expression, expressionIndex) => {
     diagnostics.push(...validateDiceGroups(expression.ast, expression.languageVersion).map(d => ({...d, path: `${prefix}/expressions/${expressionIndex}/ast`})));
-    if (expression.languageVersion !== undefined && value.schemaVersion !== "1.1") diagnostics.push({code: "invalid_schema",path: `${prefix}/schemaVersion`,message: "Grammar 0.2 requires package version 1.1."});
+    if (expression.languageVersion !== undefined && value.schemaVersion === "1.0") diagnostics.push({code: "invalid_schema",path: `${prefix}/schemaVersion`,message: "Grammar 0.2 requires package version 1.1."});
     const { depth, nodes } = measureAst(expression.ast);
     const path = `${prefix}/expressions/${expressionIndex}/ast`;
     if (nodes > PACKAGE_LIMITS.expressionAstNodes) {

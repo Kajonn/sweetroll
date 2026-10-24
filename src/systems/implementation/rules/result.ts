@@ -65,3 +65,9 @@ export const RollBreakdownSchema = Type.Object(
   { additionalProperties: false },
 );
 export type RollBreakdown = Static<typeof RollBreakdownSchema>;
+
+export const PushResultSchema=Type.Object({
+ version:Type.Literal("1.0"),rollId:Type.String({format:"uuid"}),rootRollId:Type.String({format:"uuid"}),parentRollId:Type.Union([Type.String({format:"uuid"}),Type.Null()]),attempt:Type.Integer({minimum:0,maximum:10}),maxAttempts:Type.Integer({minimum:1,maximum:10}),rerolledDiceIds:Type.Array(Identity,{maxItems:100,uniqueItems:true}),
+ faceOutcomes:Type.Array(Type.Object({groupId:Identity,face:Type.Integer({minimum:1,maximum:1000}),combinedCount:Type.Integer({minimum:0,maximum:100}),rerolledCount:Type.Integer({minimum:0,maximum:100})},{additionalProperties:false}),{maxItems:32000})
+},{additionalProperties:false});
+export type PushResult=Static<typeof PushResultSchema>;

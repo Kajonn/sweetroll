@@ -1,6 +1,6 @@
 # Configurable pushes — slice C contract
 
-Status: implemented in draft PR #23 after merged B (`759323a`); review corrections and full acceptance are in progress. Follow the [C execution plan](../plans/2026-10-24-configurable-push-rolls.md) and [review regression record](../../acceptance/configurable-push-review-2026-10-24.md). This contract does not claim deployed acceptance.
+Status: implemented in draft PR #23 after merged B (`759323a`); review corrections passed CI 129 and [core isolated live journeys](../../acceptance/configurable-push-rolls-2026-10-24.md) passed on `f75cb02`. Full compatibility/transition acceptance remains open. Follow the [C execution plan](../plans/2026-10-24-configurable-push-rolls.md) and [review regression record](../../acceptance/configurable-push-review-2026-10-24.md). The linked live record defines the tested deployment and its limits.
 
 ## 1. Version and supported policy
 

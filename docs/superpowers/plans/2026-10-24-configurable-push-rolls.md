@@ -1,6 +1,6 @@
 # Configurable push rolls — slice C execution plan
 
-**Status (2026-10-24):** implementation is in draft [PR #23](https://github.com/Kajonn/sweetroll/pull/23), based on merged B (`759323a`). Package/evaluator, storage/API, creator controls and shared player/GM sessions are implemented. Review regressions and their repairs are recorded in the [review record](../../acceptance/configurable-push-review-2026-10-24.md). Remaining checklist items are acceptance gates, not a claim that the branch is documentation-only. Canonical C browser journeys, compatibility cases and isolated deployed acceptance remain open.
+**Status (2026-10-24):** implementation is in draft [PR #23](https://github.com/Kajonn/sweetroll/pull/23), based on merged B (`759323a`). Package/evaluator, storage/API, creator controls and shared player/GM sessions are implemented. Review regressions and their repairs are recorded in the [review record](../../acceptance/configurable-push-review-2026-10-24.md). Remaining checklist items are acceptance gates, not a claim that the branch is documentation-only. Three canonical core C journeys passed live on isolated deployment `0d776788-110d-403a-8350-3e7dc0e6a4a9`, actual commit `f75cb02`; see the [live record](../../acceptance/configurable-push-rolls-2026-10-24.md). The remaining compatibility, transition and wider acceptance bundles stay open.
 
 **Authority:** [design §6.4](../../../design_v2.md#64-rules-and-expression-engine), [parent plan Task 7](2026-10-21-dice-pool-reliability.md#task-7--design-and-deliver-configurable-pushes-slice-c-tdd), [B contract](../specs/2026-10-23-named-dice-groups.md), [GUI gates](2026-09-08-gui-integration.md). Follow current module ownership. For each numbered implementation task, record an observed meaningful failure before the smallest repair, then green and appropriate retained checks. No assertion/retry/timeout/baseline loosening to make acceptance pass.
 
@@ -95,9 +95,9 @@ These checks mean the design work exists, not that any behavior below is impleme
 ## C8 — Full CI and isolated deployed acceptance
 
 - [ ] Run focused red → green at each step and record actual commands/results; finish with server, real PostgreSQL integration, frontend typecheck/tests/build, generated-contract identity, production build/Docker, every canonical browser shard, offline and unchanged visual checks. DB skips are not integration success.
-- [ ] Isolated preview only: verify source/actual deployed commit, terminal SUCCESS, migrations/readiness and served frontend/worker artifact identity before claiming deployed evidence. Do not change `proactive-expression` for this acceptance.
+- [x] Isolated preview only: actual `f75cb02`, terminal SUCCESS, migration/readiness and all five served artifact hashes verified; see live record. `proactive-expression` was untouched.
 - [ ] Repeat authoring and both action-source pushes with multiple accounts; verify frozen original pool after field edits, competing different-key pushes, same-key lost-response recovery/reload, principal/role/default narrowing and authorized campaign export/history.
-- [ ] Record exact commit/deployment/resource IDs, browser/viewport/theme, observed output/rows and scoped test-resource cleanup. Keep existing B compatibility and wider G9/device/provider-authentication gates open until separately proven.
+- [x] Record exact commit/deployment/resource IDs, browser/viewport/theme, sampled outputs/rows and scoped cleanup in the live record/JSON. Existing B compatibility and wider G9/device/provider-authentication gates remain open.
 - [ ] Update design/parent plan/acceptance record only from observed evidence; make the implementation PR ready for review after the required gates. Do not claim every Year Zero variant from this fixture.
 
 ## Delivery boundary

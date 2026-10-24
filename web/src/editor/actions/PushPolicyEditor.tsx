@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   parse,
   children,
@@ -22,6 +22,11 @@ function Faces({
 }) {
   const [raw, setRaw] = useState(value.join(", "));
   const [error, setError] = useState<string | null>(null);
+  const supplied = value.join(", ");
+  useEffect(() => {
+    setRaw(supplied);
+    setError(null);
+  }, [supplied]);
   return (
     <FormField label={label}>
       <input

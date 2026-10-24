@@ -24,3 +24,4 @@ export {validatePushPolicies} from "./push-policy.js";
 export type {PushPolicy} from "../package/schema/push-policy.js";
 
 export type {PushResult} from "./result.js";
+export {SavedPushRollSchema} from "./result.js";

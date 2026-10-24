@@ -32,6 +32,7 @@ export function PushPanel({
   onPush,
   onRefresh,
   onComplete,
+  onDenied,
 }: {
   roll: Roll;
   characterId: string;
@@ -42,17 +43,18 @@ export function PushPanel({
   onPush?: ((rollId: string) => Promise<void>) | undefined;
   onRefresh?: (() => Promise<void>) | undefined;
   onComplete?: (() => void) | undefined;
+  onDenied?: ((rootRollId: string) => Promise<void>) | undefined;
 }) {
   const [options, setOptions] = useState<PushOptionsResponse["options"] | null>(
       null,
     ),
     [error, setError] = useState<string | null>(null),
-    [hidden, setHidden] = useState(false),
+    [deniedId, setDeniedId] = useState<string | null>(null),
     [refresh, setRefresh] = useState(0),
     [busy, setBusy] = useState(false),
     [ancestor, setAncestor] = useState<Roll | null>(null);
   const ref = useRef<HTMLElement | null>(null),
-    mounted = useRef(true);
+    mounted = useRef(true), navigation = useRef(0);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -63,7 +65,7 @@ export function PushPanel({
   useEffect(() => {
     let alive = true;
     setOptions(null);
-    setHidden(false);
+    navigation.current += 1;
     setError(null);
     setAncestor(null);
     if (!online || !id)
@@ -72,11 +74,16 @@ export function PushPanel({
       };
     void api.pushOptions(characterId, id).then(
       (r) => {
-        if (alive) setOptions(r.options);
+        if (alive) {setDeniedId(null); setOptions(r.options);}
       },
       (e) => {
         if (!alive) return;
-        if ((e as { status?: number }).status === 404) setHidden(true);
+        if ((e as { status?: number }).status === 404) {
+          setDeniedId(id);
+          void onDenied?.(roll.push!.rootRollId).catch(() => {
+            if (alive) setError("Could not clear the saved result. Reconnect before reopening it.");
+          });
+        }
         else
           setError(
             "Could not refresh push availability. Try again when connected.",
@@ -85,10 +92,11 @@ export function PushPanel({
     );
     return () => {
       alive = false;
+      navigation.current += 1;
     };
-  }, [api, characterId, id, revision, online, refresh]);
+  }, [api, characterId, id, revision, online, refresh, onDenied, roll.push?.rootRollId]);
   if (!id) return <RollBreakdown roll={roll} />;
-  if (hidden) return <p role="status">This roll is no longer available.</p>;
+  if (deniedId === id) return <p role="status">This roll is no longer available.</p>;
   const push = async () => {
     if (busy || disabled || !online || !options?.canPush || !onPush) return;
     ref.current?.focus();
@@ -111,12 +119,13 @@ export function PushPanel({
     }
   };
   const view = async (rollId: string) => {
+    const request = ++navigation.current;
     setError(null);
     try {
       const result = await api.readRoll(characterId, rollId);
-      if (mounted.current) setAncestor(result.roll);
+      if (mounted.current && request === navigation.current) setAncestor(result.roll);
     } catch {
-      if (mounted.current) {
+      if (mounted.current && request === navigation.current) {
         setAncestor(null);
         setError("That earlier roll is no longer available.");
       }

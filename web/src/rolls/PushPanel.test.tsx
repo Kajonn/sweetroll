@@ -68,12 +68,14 @@ function api() {
 describe("authoritative push controls", () => {
   it("keeps a denied private result hidden when switching offline", async () => {
     const a=api();a.pushOptions.mockRejectedValue(Object.assign(new Error("denied"),{status:404}));
-    const props={roll:root,characterId:"hero",api:a,revision:3};
+    const onDenied=vi.fn(async()=>{});
+    const props={roll:root,characterId:"hero",api:a,revision:3,onDenied};
     const view=render(<PushPanel {...props} online />);
     await screen.findByText("This roll is no longer available.");
     view.rerender(<PushPanel {...props} online={false} />);
     expect(screen.queryByText("Private result")).toBeNull();
     expect(screen.getByText("This roll is no longer available.")).toBeVisible();
+    expect(onDenied).toHaveBeenCalledWith("root");
   });
   it("explains narrowed child visibility and disables pushing", async () => {
     const a = api(), onPush = vi.fn();

@@ -832,7 +832,7 @@ describe("CharacterSession", () => {
     api.scriptSend(async () => d.promise);
     const pending = session.setField("health", 13).catch(() => {});
     // Await the send to be in flight before purging beneath it.
-    await new Promise((r) => setTimeout(r, 5));
+    await vi.waitFor(() => expect(api.sent).toHaveLength(1));
 
     await store.purgeCharacter(ARM, "char-1");
     d.release(viewFor("char-1", 2));
@@ -2735,6 +2735,40 @@ describe("pool error recovery", () => {
 });
 
 describe("durable online push recovery",()=>{
+ it("removes a denied chain from durable results and history without losing frozen work",async()=>{
+  const h=await makeHarness();
+  try {
+   h.api.scriptOpenView(viewFor("char-1",3));await h.session.open();
+   const roll=makePushRoll(),view=viewFor("char-1",3);
+   await h.store.acknowledge(ARM,"char-1","none",view,(await h.store.read(ARM,"char-1")).generation,roll);
+   h.coordination.signalInvalidation("char-1");await vi.waitFor(()=>expect(h.session.getSnapshot().lastRoll).toEqual(roll));
+   const page=activityPage([{id:"private-roll"}],null);page.events[0]!.roll=roll;page.events[0]!.rollId=roll.push!.rollId;
+   h.api.scriptActivity(page);await h.session.fetchActivityPage(null);
+   const attempt={id:"pending",actorId:ARM,characterId:"char-1",kind:"push" as const,createdAt:EVER,request:{method:"POST" as const,path:`/characters/char-1/rolls/${PUSH_ROOT_ID}/push`,body:{expectedRevision:3,idempotencyKey:"original-key"},firstAttemptAt:EVER}};
+   await h.store.saveOnlineAttempt(attempt);
+   let finish!:(v:ActivityResponse)=>void;
+   vi.spyOn(h.api,"activity").mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
+   const late=h.session.fetchActivityPage(null);await vi.waitFor(()=>expect(finish).toBeDefined());
+   await h.session.forgetRoll(PUSH_ROOT_ID);
+   finish(page);await expect(late).rejects.toThrow(/stale/);
+   expect(await h.store.readActivityPage(ARM,"char-1",null)).toBeNull();
+   expect(await h.store.readOnlineAttempts(ARM)).toEqual([attempt]);
+   h.session.dispose();await h.store.close();
+   const reopened=await makeHarness();reopened.identity.online=false;
+   try{await reopened.session.open();expect(reopened.session.getSnapshot().lastRoll).toBeNull();await expect(reopened.session.fetchActivityPage(null)).rejects.toThrow(/nothing was cached/);expect(reopened.api.sent).toEqual([]);}finally{reopened.session.dispose();await reopened.store.close();}
+  }finally{h.session.dispose();await h.store.close();}
+ });
+ it("retains the push and previous result after acknowledgment storage fails",async()=>{
+  const h=await makeHarness();
+  try {
+   h.api.scriptOpenView(viewFor("char-1",3));await h.session.open();h.api.setOpenFallback(async()=>({character:viewFor("char-1",3),requestId:"open"}));
+   h.api.scriptSend(async()=>{const roll=makePushRoll(),character=viewFor("char-1",3);character.reconciliation.commandExecutionId=roll.push!.rollId;return {envelope:{result:{character,roll,nominal:null},requestId:"accepted"}};});
+   vi.spyOn(h.store,"acknowledgeOnlineAttempt").mockRejectedValueOnce(new DOMException("Quota","QuotaExceededError"));
+   await expect(h.session.pushRoll(PUSH_ROOT_ID)).rejects.toThrow(/Quota/);
+   expect((await h.store.readOnlineAttempts(ARM)).map(a=>a.request)).toEqual([h.api.sent[0]]);
+   expect(h.session.getSnapshot().lastRoll).toBeNull();expect(h.session.getSnapshot().phase).toBe("storage-error");
+  }finally{h.session.dispose();await h.store.close();}
+ });
  it.each(["missing", "parent", "attempt", "dice", "execution"])("retains the exact frozen push after a malformed %s response",async(mode)=>{
   const h=await makeHarness();
   try {
@@ -2753,12 +2787,12 @@ describe("durable online push recovery",()=>{
    expect(h.session.getSnapshot().lastRoll).toBeNull();
   } finally {h.session.dispose();await h.store.close();}
  });
- it.each(["takeover", "invalidation"])("adopts a same-revision durable child and its later removal on %s",async(mode)=>{
+ it.each(["takeover", "invalidation", "owner-invalidation"])("adopts a same-revision durable child and its later removal on %s",async(mode)=>{
   const h=await makeHarness();h.identity.online=false;
   try {
    await seedConfirmed(h.store,"char-1",viewFor("char-1",3));await h.session.open();
    const child=makePushRoll();await h.store.acknowledge(ARM,"char-1","none",viewFor("char-1",3),(await h.store.read(ARM,"char-1")).generation,child);
-   const notify=()=>{if(mode==="takeover")h.coordination.signalOwnership(true);else {h.coordination.signalOwnership(false);h.coordination.signalInvalidation("char-1");}};
+   const notify=()=>{if(mode==="takeover")h.coordination.signalOwnership(true);else {if(mode==="invalidation")h.coordination.signalOwnership(false);h.coordination.signalInvalidation("char-1");}};
    notify();await vi.waitFor(()=>expect(h.session.getSnapshot().lastRoll).toEqual(child));
    await h.store.confirmSnapshot(ARM,"char-1",viewFor("char-1",4,{placementGeneration:2}),(await h.store.read(ARM,"char-1")).generation);
    notify();await vi.waitFor(()=>expect(h.session.getSnapshot().lastRoll).toBeNull());
@@ -2767,11 +2801,11 @@ describe("durable online push recovery",()=>{
  it("replays the exact timed-out parent request after reload and durably retains an unchanged-revision child",async()=>{
   const h=await makeHarness();h.api.scriptOpenView(viewFor("char-1",3));await h.session.open();
   h.api.setOpenFallback(async()=>({character:viewFor("char-1",3),requestId:"open"}));h.api.scriptSend(async()=>({error:new TypeError("lost response")}));
-  await expect(h.session.pushRoll("root-roll")).rejects.toThrow();
-  const first=h.api.sent[0]!;expect(first.path).toBe("/characters/char-1/rolls/root-roll/push");expect(first.body.expectedRevision).toBe(3);
+  await expect(h.session.pushRoll(PUSH_ROOT_ID)).rejects.toThrow();
+  const first=h.api.sent[0]!;expect(first.path).toBe(`/characters/char-1/rolls/${PUSH_ROOT_ID}/push`);expect(first.body.expectedRevision).toBe(3);
   expect(await h.store.readOnlineAttempts(ARM)).toHaveLength(1);h.session.dispose();await h.store.close();
-  const child={actionId:"roll",expression:"2d6",dice:[],bindings:[],total:7,output:"7",audience:"owner_only" as const,push:{version:"1.0" as const,rollId:"child-roll",rootRollId:"root-roll",parentRollId:"root-roll",attempt:1,maxAttempts:2,rerolledDiceIds:[],faceOutcomes:[]}};
-  const reopened=await makeHarness();reopened.api.setOpenFallback(async()=>({character:viewFor("char-1",3),requestId:"open"}));reopened.api.setSendFallback(async()=>({envelope:{result:{character:viewFor("char-1",3),roll:child,nominal:null},requestId:"replay"}}));
+  const child=makePushRoll(); const accepted=viewFor("char-1",3);accepted.reconciliation.commandExecutionId=child.push!.rollId;
+  const reopened=await makeHarness();reopened.api.setOpenFallback(async()=>({character:viewFor("char-1",3),requestId:"open"}));reopened.api.setSendFallback(async()=>({envelope:{result:{character:accepted,roll:child,nominal:null},requestId:"replay"}}));
   await reopened.session.open();await reopened.session.whenIdle();expect(reopened.api.sent[0]).toEqual(first);expect(reopened.session.getSnapshot().lastRoll).toEqual(child);expect(await reopened.store.readOnlineAttempts(ARM)).toEqual([]);reopened.session.dispose();await reopened.store.close();
   const offline=await makeHarness();offline.identity.online=false;offline.identity.signal();await offline.session.open();expect(offline.session.getSnapshot().lastRoll).toEqual(child);expect(offline.api.sent).toEqual([]);offline.session.dispose();await offline.store.close();
  });

@@ -1990,7 +1990,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           nextState: resolved.value.state,
           stateChanged: changedDefinitionIds.length > 0,
           roll,
-          ...(resolved.value.pushContext?{pushContext:resolved.value.pushContext}:{}),
+          ...(resolved.value.pushContext?{pushContext:resolved.value.pushContext,pushResolutionRevision:resolveSource.revision}:{}),
           activity: {
             kind: activityKind,
             payloadJson: { ...payload, changedDefinitionIds },

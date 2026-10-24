@@ -1,6 +1,7 @@
 import { ApiError } from "../api/client.js";
 import type { CharactersApi } from "./api.js";
 import type { CharacterStore, OnlineAttempt, WriteGuard } from "./store.js";
+import { validPushResponse } from "./push-response.js";
 import type {
   ActivityEvent,
   CharacterView,
@@ -109,6 +110,7 @@ export type CharacterSession = {
   executeAction(actionId: string, inputs?: Record<string, unknown>): Promise<void>;
   pushRoll(parentRollId:string):Promise<void>;
   refresh():Promise<void>;
+  forgetRoll(rootRollId:string):Promise<void>;
   /**
    * Task 7: template-granted roll routed through the executeAction intent
    * with its owning entry. Online-only, like entity actions.
@@ -203,6 +205,12 @@ function isStaleAck(err: unknown): boolean {
 
 function projectionsEqual(a: CharacterView["projection"], b: CharacterView["projection"]): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function sameRollScope(a: CharacterView | null, b: CharacterView): boolean {
+  return a !== null && a.ownerId === b.ownerId && a.campaignId === b.campaignId &&
+    a.placementGeneration === b.placementGeneration && a.systemVersionId === b.systemVersionId &&
+    a.entityDefinitionId === b.entityDefinitionId;
 }
 
 /**
@@ -531,6 +539,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (isStaleAck(err)) {
       const fresh = await store.read(actorId, characterId);
       confirmed = fresh.confirmed;
+      lastRoll = fresh.lastRoll ?? null;
       entries = fresh.entries;
       generation = fresh.generation;
       if (confirmed === null) {
@@ -548,6 +557,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       const fresh = await store.read(actorId, characterId).catch(() => null);
       if (fresh !== null && identityMatches() && fresh.confirmed === null) {
         confirmed = null;
+        lastRoll = null;
         entries = fresh.entries;
         generation = fresh.generation;
         accountGeneration = fresh.accountGeneration;
@@ -711,6 +721,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     if (!identityMatches()) return "blocked";
     coordination.invalidate?.();
+    if (!sameRollScope(confirmed, character)) lastRoll = null;
     confirmed = character;
     if (current.intent.kind === "executeAction") {
       lastRoll = response.result.roll;
@@ -857,6 +868,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (!identityMatches() || fresh === null) return;
     if (fresh.confirmed === null && (confirmed !== null || error?.kind === "purged")) {
       confirmed = null;
+      lastRoll = null;
       entries = fresh.entries;
       generation = fresh.generation;
       accountGeneration = fresh.accountGeneration;
@@ -868,6 +880,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     if (fresh.generation !== generation || fresh.accountGeneration !== accountGeneration) {
       confirmed = fresh.confirmed;
+      lastRoll = fresh.lastRoll ?? null;
       entries = fresh.entries;
       generation = fresh.generation;
       accountGeneration = fresh.accountGeneration;
@@ -887,11 +900,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     const drifted = local
       ? server.reconciliation.revision !== local.reconciliation.revision || server.projection.packageChecksum !== local.projection.packageChecksum
       : entries.some(e => e.baseRevision !== server.reconciliation.revision || e.packageChecksum !== server.projection.packageChecksum);
-    if (!local || drifted || !projectionsEqual(server.projection, local.projection)) {
+    if (!local || drifted || !sameRollScope(local, server) || !projectionsEqual(server.projection, local.projection)) {
       try {
         await store.confirmSnapshot(actorId, characterId, server, generation);
         if (!identityMatches()) return;
         coordination.invalidate?.();
+        if (!sameRollScope(confirmed, server)) lastRoll = null;
         confirmed = server;
         generation += 1;
       } catch (err) {
@@ -1037,6 +1051,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       // Another tab cleared or replaced the account mid-review: adopt the
       // cleared state and fail instead of recreating intentions.
       confirmed = fresh.confirmed;
+      lastRoll = fresh.lastRoll ?? null;
       entries = fresh.entries;
       generation = fresh.generation;
       accountGeneration = fresh.accountGeneration;
@@ -1045,6 +1060,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       throw new Error("stale recovery: account changed during review");
     }
     confirmed = fresh.confirmed;
+    lastRoll = fresh.lastRoll ?? null;
     entries = fresh.entries;
     generation = fresh.generation;
     accountGeneration = fresh.accountGeneration;
@@ -1257,6 +1273,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     const fresh = await store.read(actorId, characterId).catch(() => null);
     if (fresh === null || !identityMatches() || fresh.confirmed === null) return false;
     confirmed = fresh.confirmed;
+    lastRoll = fresh.lastRoll ?? null;
     entries = fresh.entries;
     generation = fresh.generation;
     accountGeneration = fresh.accountGeneration;
@@ -1402,7 +1419,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       throw new Error("Account changed. Reopen this character.");
     }
     const character = response?.result?.character;
-    if (!character) {
+    if (!character || (attempt.kind === "push" && !validPushResponse(response.result, attempt.request, characterId))) {
       phase = "uncertain";
       emit();
       throw structuredError("The server returned an unexpected response.", "network-unavailable");
@@ -1426,6 +1443,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
     coordination.invalidate?.();
+    if (!sameRollScope(confirmed, character)) lastRoll = null;
     confirmed = character;
     // Authoritative action results survive later online acknowledgments: only
     // a non-null roll replaces the retained one (online ops return null).
@@ -1617,6 +1635,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       // Another tab cleared or replaced the account mid-review: adopt the
       // cleared state and fail instead of recreating anything.
       confirmed = fresh.confirmed;
+      lastRoll = fresh.lastRoll ?? null;
       entries = fresh.entries;
       generation = fresh.generation;
       accountGeneration = fresh.accountGeneration;
@@ -1626,6 +1645,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       throw new Error("stale recovery: account changed during review");
     }
     confirmed = fresh.confirmed;
+    lastRoll = fresh.lastRoll ?? null;
     entries = fresh.entries;
     generation = fresh.generation;
     accountGeneration = fresh.accountGeneration;
@@ -1676,10 +1696,15 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       return { events: cached.events, nextCursor: cached.nextCursor, stale: true, fetchedAt: cached.fetchedAt };
     }
     let response;
+    const fetchGuard = { generation, accountGeneration };
     try {
       response = await api.activity(characterId, cursor);
     } catch (err) {
       if (!await identityIsCurrent()) throw err instanceof Error ? err : new Error("Account changed.");
+      if (err instanceof ApiError && (err.status === 404 || err.status === 403)) {
+        if (err.cacheDisposition === "purge") await purgeAccess();
+        throw err;
+      }
       const cached = await store.readActivityPage(actorId, characterId, cursor).catch(() => null);
       if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
       if (cached !== null) {
@@ -1701,9 +1726,10 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     // write failure must never block read-only panels from fresh data.
     if (identityMatches()) {
       try {
-        await store.saveActivityPage(page, { generation, accountGeneration });
-      } catch {
+        await store.saveActivityPage(page, fetchGuard);
+      } catch (err) {
         if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
+        if (isStaleAck(err)) throw err;
       }
     }
     return { events: page.events, nextCursor: page.nextCursor, stale: false, fetchedAt: page.fetchedAt };
@@ -1713,7 +1739,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     const loaded = await store.read(actorId, characterId);
     if (!identityMatches()) return;
     confirmed = loaded.confirmed;
-    lastRoll=loaded.lastRoll??null;
+    lastRoll = loaded.lastRoll ?? null;
     entries = loaded.entries;
     generation = loaded.generation;
     accountGeneration = loaded.accountGeneration;
@@ -1757,7 +1783,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return reloading ??= (async () => {
       const loaded = await store.read(actorId, characterId);
       if (!identityMatches() || !coordination.isOwner()) return;
-      confirmed = loaded.confirmed; entries = loaded.entries; generation = loaded.generation;
+      confirmed = loaded.confirmed;
+      lastRoll = loaded.lastRoll ?? null;
+      entries = loaded.entries; generation = loaded.generation;
       accountGeneration = loaded.accountGeneration;
       nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), 0);
       // A new owner resolves any inherited uncertain outcome first.
@@ -1802,7 +1830,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   const unsubscribeIdentity = identity.subscribe(() => {
     if (disposed) return;
     if (!identityMatches()) {
-      confirmed = null; entries = []; pendingOnline = []; error = null; editing = { owned: false, owner: null };
+      confirmed = null; lastRoll = null; entries = []; pendingOnline = []; error = null; editing = { owned: false, owner: null };
       coordination.letGo();
     }
     if (!isConnected()) needsFresh = true;
@@ -1829,10 +1857,17 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       emit();
     }
     if (event.type === "invalidate" && event.characterId === characterId) {
-      void store.read(actorId, characterId).then(loaded => {
+      void store.read(actorId, characterId).then(async loaded => {
         if (!identityMatches()) return;
-        if (editing.owned && (loaded.confirmed !== null || loaded.generation <= generation)) return;
-        confirmed = loaded.confirmed; entries = loaded.entries; generation = loaded.generation;
+        if (loaded.accountGeneration === accountGeneration &&
+            (loaded.generation < generation || (editing.owned && loaded.generation === generation))) return;
+        confirmed = loaded.confirmed;
+        lastRoll = loaded.lastRoll ?? null;
+        entries = loaded.entries;
+        generation = loaded.generation;
+        accountGeneration = loaded.accountGeneration;
+        await refreshPendingOnline();
+        if (!identityMatches()) return;
         if (confirmed === null) setBlocked("purged", "This character is no longer available.");
         emit();
       }).catch(() => {
@@ -1844,6 +1879,26 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   return {
     open,
+    async forgetRoll(rootRollId) {
+      if (!await identityIsCurrent()) return;
+      if (lastRoll?.push?.rootRollId === rootRollId) lastRoll = null;
+      emit();
+      try {
+        await store.forgetRoll(actorId, characterId, rootRollId);
+        if (!identityMatches()) return;
+        const fresh = await store.read(actorId, characterId);
+        if (!identityMatches()) return;
+        confirmed = fresh.confirmed;
+        lastRoll = fresh.lastRoll ?? null;
+        entries = fresh.entries;
+        generation = fresh.generation;
+        accountGeneration = fresh.accountGeneration;
+        coordination.invalidate?.();
+      } catch {
+        if (identityMatches()) setBlocked("storage-error", "Could not clear the saved roll. Reconnect before reopening it.");
+      }
+      emit();
+    },
     async revokeAccess(guard) {
       if (await identityIsCurrent()) await purgeAccess(guard);
     },

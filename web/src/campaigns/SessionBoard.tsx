@@ -296,7 +296,7 @@ function SessionPushPanel({factory,characterId,api,roll,onBlocked}:{factory:(id:
  useEffect(()=>{onBlocked(blocked);return()=>onBlocked(false);},[blocked,onBlocked]);
  const retained=snapshot.lastRoll;
  const current=retained?.push&&(!roll?.push||(retained.push.rootRollId===roll.push.rootRollId&&retained.push.attempt>=roll.push.attempt))?retained:roll;
- return <div>{snapshot.error?<p role="alert">{snapshot.error.message}</p>:null}{current?.push&&session?<PushPanel roll={current} characterId={characterId} api={api} online={snapshot.connected} revision={snapshot.confirmed?.revision} disabled={blocked||snapshot.confirmed?.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh}/>:null}</div>;
+ return <div>{snapshot.error?<p role="alert">{snapshot.error.message}</p>:null}{current?.push&&session?<PushPanel roll={current} characterId={characterId} api={api} online={snapshot.connected} revision={snapshot.confirmed?.revision} disabled={blocked||snapshot.confirmed?.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh} onDenied={session.forgetRoll}/>:null}</div>;
 }
 
 function SessionCharacterRow(props: {

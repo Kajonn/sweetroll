@@ -184,7 +184,7 @@ function ActivityRow({ event,api,session,snapshot }: { event: ActivityEvent;api:
     <li>
       <span>{label}</span>{" · "}
       <time dateTime={event.occurredAt}>{formattedDate}</time>
-      {event.roll===undefined?null:event.roll.push?<PushPanel roll={event.roll} characterId={snapshot.confirmed?.characterId??""} api={api} online={snapshot.connected} revision={snapshot.confirmed?.revision} disabled={!snapshot.editing.owned||snapshot.phase!=="ready"||snapshot.entries.length>0||snapshot.pendingOnlineAttempts.length>0||snapshot.confirmed?.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh}/>:<RollBreakdown roll={event.roll}/>}
+      {event.roll===undefined?null:event.roll.push?<PushPanel roll={event.roll} characterId={snapshot.confirmed?.characterId??""} api={api} online={snapshot.connected} revision={snapshot.confirmed?.revision} disabled={!snapshot.editing.owned||snapshot.phase!=="ready"||snapshot.entries.length>0||snapshot.pendingOnlineAttempts.length>0||snapshot.confirmed?.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh} onDenied={session.forgetRoll}/>:<RollBreakdown roll={event.roll}/>}
     </li>
   );
 }

@@ -134,6 +134,8 @@ export type TxBuildArgs = {
 };
 
 export type ApplyCommandInput = {
+  /** Revision of the source state validated by Systems, checked under the character lock. */
+  pushResolutionRevision?: number;
   pushContext?: PushContext;
   precondition?: (client: PoolClient) => Promise<import("./index.js").CharacterError | null>;
   executionId: ExecutionId;

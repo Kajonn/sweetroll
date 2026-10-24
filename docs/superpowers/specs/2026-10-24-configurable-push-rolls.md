@@ -1,6 +1,6 @@
 # Configurable pushes — slice C contract
 
-Status: design contract for implementation after merged B, reviewed against main `759323a529a50569a22b5d3db9172bb81a153d29` (PR #22). This document specifies the next delivery; it does not enable pushes or claim implementation/acceptance. Follow the [C execution plan](../plans/2026-10-24-configurable-push-rolls.md) and parent [dice-pool plan, Task 7](../plans/2026-10-21-dice-pool-reliability.md#task-7--design-and-deliver-configurable-pushes-slice-c-tdd).
+Status: implemented in draft PR #23 after merged B (`759323a`); review corrections and full acceptance are in progress. Follow the [C execution plan](../plans/2026-10-24-configurable-push-rolls.md) and [review regression record](../../acceptance/configurable-push-review-2026-10-24.md). This contract does not claim deployed acceptance.
 
 ## 1. Version and supported policy
 
@@ -67,7 +67,7 @@ Validate action ownership through the existing entity sheet placement or `findGr
 
 ## 4. Command, receipt and concurrency contract
 
-Proposed routes use the existing Characters module and command result envelope:
+The routes use the existing Characters module and command result envelope:
 
 - `GET /characters/{characterId}/rolls/{rollId}/push-options`: current authorized availability; no mutation or receipt. Does not disclose a hidden/foreign roll.
 - `GET /characters/{characterId}/rolls/{rollId}`: current authorized public saved result for parent/root navigation; never returns the private execution context.
@@ -89,7 +89,7 @@ Strict schemas reject supplied seed/dice/total/bindings/inputs/action/policy/att
 
 Ordinary rolls can leave character revision unchanged in current code. Therefore `expectedRevision` **cannot** be the only protection against two different keys consuming one parent.
 
-Commit in the existing lock order: execution claim/row, then campaign when attached, character, root and parent roll. Root/parent locks follow character locking consistently; lock an identical root/parent only once. Recheck current membership, controller/GM capability, lifecycle, revision, placement/version/source, parent read audience, policy, leaf status and remaining attempts under these locks. The root pins policy and lineage; `attempt = parent.attempt + 1` cannot exceed its maximum.
+Commit in the existing lock order: execution claim/row, then campaign when attached, character, root and parent roll. Root/parent locks follow character locking consistently; lock an identical root/parent only once. Recheck current membership, controller/GM capability, lifecycle, revision, placement/version/source, parent read audience, policy, leaf status and remaining attempts under these locks. Bind the runtime source validation to the revision actually resolved, not merely the client’s expected revision. Reject if that resolution revision differs from the locked character revision, so a future expected revision cannot race source removal. The root pins policy and lineage; `attempt = parent.attempt + 1` cannot exceed its maximum.
 
 Add database uniqueness on non-null parent roll IDs (one accepted child per parent) and on `(rootRollId, attempt)` for push-capable rows. Scope composite parent/root foreign keys to the same character. These are required even when the application has already checked for an existing child. Distinct-key and distinct-actor races must produce one accepted child, with the loser receiving a definite conflict. Do not return an unrelated winner's receipt under a different key. Map unique-conflict errors deliberately; do not expose them as an indefinite 500 retry loop.
 
@@ -123,9 +123,11 @@ Player and GM result/history surfaces reuse RollBreakdown and add parent/root na
 
 Pushes are online-only, using the existing per-character durable **OnlineAttempt** machinery shared with lifecycle/migration operations. Persist the complete frozen POST, parent reference, actor/character/account generation and original key before sending. Do not add push to offline-capable EditIntent or automatically create one on reconnect. An already-sent uncertain push is replayed verbatim after reconnect/reload/takeover before any newer write. A timeout, malformed 2xx or failed IndexedDB acknowledgement must retain the original attempt. A conclusive rejection may retire it through existing guarded rules; no fresh-key substitute is automatic.
 
-Acknowledging a child must preserve recoverable authoritative lineage/result before retiring its attempt; confirmed character state alone is insufficient because pushes may leave revision/state unchanged. Use the existing durable history/cache store or a guarded result record in the same acknowledgement transaction. Reload must recover the accepted child even when the UI has not yet fetched Activity.
+Acknowledging a child must preserve recoverable authoritative lineage/result before retiring its attempt; confirmed character state alone is insufficient because pushes may leave revision/state unchanged. Use the existing durable history/cache store or a guarded result record in the same acknowledgement transaction. Reload and cross-tab takeover/invalidation must adopt the saved child together with its stored snapshot, including clearing it when absent. A complete child must have valid bounded dice/breakdown/lineage, match the frozen parent reference, and match the receipt execution identity before acknowledgement. Otherwise the original frozen request stays uncertain for verbatim replay.
 
-GM SessionBoard currently calls direct online wrappers; it must participate in equivalent durable uncertain-attempt handling rather than bypass it. Reuse/extract the existing session/attempt coordinator for this path, with the same ownership and account guards. It must not gain a separate weaker retry queue. An expired replay window requires explicit unknown-outcome review, never a silent fresh push; fetching current sheet revision alone cannot prove a push did not commit. Availability/history may locate the child for review but cannot authorize a replacement automatically.
+GM SessionBoard participates in equivalent durable uncertain-attempt handling through the same session coordinator. Reuse/extract the existing session/attempt coordinator for this path, with the same ownership and account guards. It must not gain a separate weaker retry queue. An expired replay window requires explicit unknown-outcome review, never a silent fresh push; fetching current sheet revision alone cannot prove a push did not commit. Availability/history may locate the child for review but cannot authorize a replacement automatically.
+
+A known roll-access denial remains attached to that roll across connectivity changes until a successful authorized read. Clear its chain from the durable last-result and activity caches; a late response cannot repopulate it under an old storage generation. Character purge, account clear and owner/placement/version/entity changes also remove private results. IndexedDB version 5 closes capable old connections on version change and rejects a blocked upgrade with instructions to close older tabs; version 4 readers cannot open version 5 data and reinterpret a pending push as another operation.
 
 ## 8. Deterministic acceptance fixture and gates
 

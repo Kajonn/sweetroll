@@ -159,6 +159,8 @@ export async function preparePushCommit(
     },
   });
   const context = input.pushContext;
+  if (input.pushResolutionRevision !== record.revision)
+    return fail("conflict", "The character changed while its roll source was being validated. Refresh before pushing.");
   if (
     !context ||
     !input.roll ||

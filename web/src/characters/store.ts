@@ -72,6 +72,7 @@ export type CharacterStore = {
   ): Promise<void>;
   purgeCharacter(actorId: string, characterId: string, guard?: WriteGuard): Promise<void>;
   clearAccount(actorId: string): Promise<void>;
+  forgetRoll(actorId: string, characterId: string, rootRollId: string): Promise<void>;
   close(): Promise<void>;
   /** Locally cached characters for one account only; never enumerate across accounts. */
   listCharacters(actorId: string): Promise<Array<{ characterId: string; name: string }>>;
@@ -142,16 +143,16 @@ export type CharacterStore = {
 const DB_VERSION = 5;
 const TEMPLATES="entryTemplates";
 
-type CatalogScope = Pick<CharacterView, "campaignId" | "placementGeneration" | "systemVersionId" | "entityDefinitionId">;
+type CatalogScope = Pick<CharacterView, "ownerId" | "campaignId" | "placementGeneration" | "systemVersionId" | "entityDefinitionId">;
 type TemplateCache = { actorId: string; characterId: string; scope: CatalogScope; templates: import("./types.js").EntryTemplate[] };
 
 function catalogScope(character: CharacterView): CatalogScope {
-  return { campaignId: character.campaignId, placementGeneration: character.placementGeneration,
+  return { ownerId: character.ownerId, campaignId: character.campaignId, placementGeneration: character.placementGeneration,
     systemVersionId: character.systemVersionId, entityDefinitionId: character.entityDefinitionId };
 }
 
 function sameCatalogScope(left: CatalogScope | null | undefined, right: CatalogScope): boolean {
-  return left !== null && left !== undefined && left.campaignId === right.campaignId &&
+  return left !== null && left !== undefined && left.ownerId === right.ownerId && left.campaignId === right.campaignId &&
     left.placementGeneration === right.placementGeneration && left.systemVersionId === right.systemVersionId &&
     left.entityDefinitionId === right.entityDefinitionId;
 }
@@ -159,6 +160,7 @@ function sameCatalogScope(left: CatalogScope | null | undefined, right: CatalogS
 async function invalidateCatalogScope(tx: IDBTransaction, actorId: string, characterId: string, previous: CharacterView | null, next: CharacterView) {
   if (!sameCatalogScope(previous === null ? null : catalogScope(previous), catalogScope(next))) {
     await deleteRequest(tx, TEMPLATES, [actorId, characterId]);
+    await deleteByPrefix(tx, ACTIVITY, [actorId, characterId]);
   }
 }
 
@@ -452,7 +454,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
     },
 
     async acknowledge(actorId, characterId, entryId, character, generation, roll) {
-      await openTx(db, [CHAR, QUEUE, LAST_ACCOUNT, PENDING_LOGOUT, TEMPLATES], "readwrite", async (tx) => {
+      await openTx(db, [CHAR, QUEUE, LAST_ACCOUNT, PENDING_LOGOUT, TEMPLATES, ACTIVITY], "readwrite", async (tx) => {
         await assertWriteIdentity(tx, actorId);
         const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
         if (!record || record.generation !== generation) {
@@ -484,7 +486,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
     },
 
     async confirmSnapshot(actorId, characterId, character, generation) {
-      await openTx(db, [CHAR, LAST_ACCOUNT, PENDING_LOGOUT, TEMPLATES], "readwrite", async (tx) => {
+      await openTx(db, [CHAR, LAST_ACCOUNT, PENDING_LOGOUT, TEMPLATES, ACTIVITY], "readwrite", async (tx) => {
         await assertWriteIdentity(tx, actorId);
         const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
         if ((record?.generation ?? await accountGeneration(tx, actorId)) !== generation) {
@@ -497,6 +499,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
           confirmed: null as CharacterView | null,
         };
         await invalidateCatalogScope(tx, actorId, characterId, fresh.confirmed, character);
+        if(!sameCatalogScope(fresh.confirmed?catalogScope(fresh.confirmed):null,catalogScope(character)))delete (fresh as CharacterRecord).lastRoll;
         fresh.confirmed = character;
         fresh.generation += 1;
         await putRequest(tx, CHAR, fresh);
@@ -581,6 +584,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
           if (record.generation !== guard.generation) throw new Error("stale purge: character generation changed");
         }
         record.confirmed = null;
+        delete record.lastRoll;
         record.generation += 1;
         await putRequest(tx, CHAR, record);
         await deleteByPrefix(tx, QUEUE, [actorId, characterId]);
@@ -603,6 +607,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
         );
         for (const record of characters) {
           record.confirmed = null;
+          delete record.lastRoll;
           record.generation += 1;
           await putRequest(tx, CHAR, record);
         }
@@ -622,6 +627,20 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
         if (marker && marker.actorId === actorId) {
           await deleteRequest(tx, LAST_ACCOUNT, "last");
         }
+      });
+    },
+
+    async forgetRoll(actorId, characterId, rootRollId) {
+      await openTx(db, [CHAR, ACTIVITY, LAST_ACCOUNT, PENDING_LOGOUT], "readwrite", async (tx) => {
+        await assertWriteIdentity(tx, actorId);
+        const record = await getRequest<CharacterRecord>(tx, CHAR, [actorId, characterId]);
+        if (record) {
+          if (record.lastRoll?.push?.rootRollId === rootRollId) delete record.lastRoll;
+          record.generation += 1;
+          await putRequest(tx, CHAR, record);
+        }
+        const pages = await collectByKey<ActivityRecord>(tx, ACTIVITY, IDBKeyRange.bound([actorId, characterId, ""], [actorId, characterId, MAX_STRING]));
+        for (const page of pages) if (page.events.some(event => event.roll?.push?.rootRollId === rootRollId)) await deleteRequest(tx, ACTIVITY, activityKey(page));
       });
     },
 
@@ -677,7 +696,7 @@ export async function openCharacterStore(name: string): Promise<CharacterStore> 
     },
 
     async acknowledgeOnlineAttempt(actorId, characterId, attemptId, character, guard, roll) {
-      await openTx(db, [CHAR, ATTEMPTS, LAST_ACCOUNT, PENDING_LOGOUT, TEMPLATES], "readwrite", async (tx) => {
+      await openTx(db, [CHAR, ATTEMPTS, LAST_ACCOUNT, PENDING_LOGOUT, TEMPLATES, ACTIVITY], "readwrite", async (tx) => {
         await assertWriteIdentity(tx, actorId, guard.accountGeneration);
         const attempt = await getRequest<OnlineAttempt>(tx, ATTEMPTS, [actorId, attemptId]);
         if (!attempt || attempt.actorId !== actorId || attempt.characterId !== characterId) {

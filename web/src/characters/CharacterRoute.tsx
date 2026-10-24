@@ -313,6 +313,7 @@ function CharacterDetailLoaded({
         pushApi={api}
         onPushRoll={session.pushRoll}
         onRefreshRoll={session.refresh}
+        onDeniedRoll={session.forgetRoll}
         onSetField={session.setField}
         onBump={session.bumpResource}
         onExecuteAction={session.executeAction}

@@ -66,6 +66,14 @@ function api() {
   };
 }
 describe("authoritative push controls", () => {
+  it("explains narrowed child visibility and disables pushing", async () => {
+    const a = api(), onPush = vi.fn();
+    a.pushOptions.mockResolvedValue({options:{canPush:false,reason:"audience_restricted",eligibleDiceIds:[],revision:3,nextAttempt:1,maxAttempts:2}});
+    render(<PushPanel roll={root} characterId="hero" api={a} online revision={3} onPush={onPush} />);
+    expect(await screen.findByText("The current sharing rules do not let you push this roll.")).toBeVisible();
+    expect(screen.getByRole("button", {name:"Push saved roll"})).toBeDisabled();
+    expect(onPush).not.toHaveBeenCalled();
+  });
   it("loads fresh options and sends only the saved parent, retaining keyboard focus while busy", async () => {
     const a = api(),
       onPush = vi.fn(async () => {});

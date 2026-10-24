@@ -228,12 +228,19 @@ export async function preparePushCommit(
       "This roll already has a push. Review its child before continuing.",
       "parent_consumed",
     );
+  const audience = narrowerAudience(parent.roll.audience, defaultAudience);
+  // Parent visibility does not imply visibility of a child narrowed by the
+  // current campaign default. Never disclose an unreadable child in its receipt.
+  if (record.campaignId !== null && !canReadRoll({
+    roll: { campaignId: record.campaignId, actorId: parent.principalId, audience },
+    membership,
+  })) return fail("not_found", "The roll does not exist.");
   return {
     ok: true,
     value: {
       context,
       principalId: parent.principalId,
-      audience: narrowerAudience(parent.roll.audience, defaultAudience),
+      audience,
     },
   };
 }

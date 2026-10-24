@@ -1,4 +1,4 @@
-import {readPushRoll,mayReadPush,type StoredPushRoll} from "./push.js";
+import {readPushRoll,mayReadPush,narrowerAudience,type StoredPushRoll} from "./push.js";
 import {pushEligibility} from "../systems/implementation/rules/push.js";
 import type { EntrySource, EntrySnapshot } from "../systems/implementation/package/schema/dynamic.js";
 import type { createTemplateRepository } from "../campaigns/templatePersistence.js";
@@ -1755,6 +1755,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const current=await repo.openOwnedCharacter(record.characterId,ctx.actorId);
         const live=current?null:await loadAttachedSnapshot(ctx,record.characterId);
         if(!(current??live?.auth.record)||!mayReadPush(parent,ctx.actorId,(current??live!.auth.record),live?toMembershipRecord(live.auth.membership!):null))return {ok:false,error:errors.not_found()};
+        if(live && !canReadRoll({roll:{campaignId:live.auth.record.campaignId!,actorId:parent.principalId,audience:narrowerAudience(parent.roll.audience,live.auth.campaign!.rollAudienceDefault)},membership:toMembershipRecord(live.auth.membership!)}))reason="audience_restricted";
         return {ok:true,value:{canPush:reason===null,reason,eligibleDiceIds:reason===null?eligible.eligibleDiceIds:[],revision:record.revision,nextAttempt:parent.roll.push!.attempt+1,maxAttempts:parent.context.policy.maxAttempts}};
       }catch{return {ok:false,error:errors.internal()};}
     },

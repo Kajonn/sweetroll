@@ -70,6 +70,7 @@ Validate action ownership through the existing entity sheet placement or `findGr
 Proposed routes use the existing Characters module and command result envelope:
 
 - `GET /characters/{characterId}/rolls/{rollId}/push-options`: current authorized availability; no mutation or receipt. Does not disclose a hidden/foreign roll.
+- `GET /characters/{characterId}/rolls/{rollId}`: current authorized public saved result for parent/root navigation; never returns the private execution context.
 - `POST /characters/{characterId}/rolls/{rollId}/push`: body exactly `{expectedRevision, idempotencyKey}`. Positive integer revision; existing key bounds. Parent ID is part of the hashed request identity together with character ID and expected revision.
 
 Strict schemas reject supplied seed/dice/total/bindings/inputs/action/policy/attempt/eligible IDs/lineage/audience/output metadata with HTTP 400, rather than silently dropping it. The command kind is distinct from execute-action and still uses the existing actor-scoped claim/replay/lease protocol. Root/child IDs are allocated once for the claimed execution and reused on lease reclaim; a lease retry cannot mint a different child or seed.
@@ -101,6 +102,8 @@ Preserve `actor_id` as the actor who executed each roll for audit. Add a nullabl
 Evaluate `owner_only`/`gm_only` against this inherited principal, not the latest child executor. With that fixed principal, the existing audiences form a safe order: `owner_only` is narrower than `gm_only`, which is narrower than `campaign`. Each child's effective audience is the narrower of its parent's audience and the current locked campaign default. Standalone stays owner-only. No per-push audience override is accepted. Later default widening cannot widen a chain; later narrowing is applied to the next child. Historical recorded audiences remain historical; current membership, role and placement are still rechecked on reads/replays.
 
 Example: a co-GM pushes a player's GM-only roll and later becomes an ordinary player. That child must not become visible to them merely because they executed it. Keep command actor and audience principal separate throughout history/activity/export and receipts. A GM cannot push another actor's owner-only roll without parent read permission.
+
+If the current default would narrow a readable parent to a child hidden from the executor, availability reports `audience_restricted`; POST rejects without creating a child or consuming an attempt. Parent read permission alone cannot authorize disclosure of the proposed child in a receipt. This check uses the inherited principal and the locked current default inside the commit transaction.
 
 All full-result disclosure paths use the inherited principal: push-options, POST precondition, same-key replay, character activity/cache, campaign roll/activity/export, player and GM results. Existing receipt scope checks cover placement/membership generations but do not by themselves establish this new parent/child audience rule. Explicitly reauthorize roll/principal access before replaying child bytes. A stale or revoked reader gets no dice, bindings, parent/root correlation IDs, eligibility or lineage. Minimized sheet events continue to null hidden roll references. Personal state exports still exclude history.
 

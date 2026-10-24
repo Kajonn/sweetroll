@@ -788,7 +788,7 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
     const command={kind:"pushRoll" as const,characterId:s.sharedId,parentRollId:root.push!.rollId,expectedRevision:1,idempotencyKey:randomUUID()};
     const child=await h.characters.apply(ctxFor(h.users.other),command);expect(child.ok).toBe(true);if(!child.ok)throw Error(JSON.stringify(child.error));
     const row=await h.pool.query("SELECT actor_id,audience_actor_id,audience FROM character_rolls WHERE id=$1",[child.value.roll!.push!.rollId]);expect(row.rows[0]).toEqual({actor_id:h.users.other.actorId,audience_actor_id:h.users.player.actorId,audience:"gm_only"});
-    await h.pool.query("INSERT INTO character_controllers (character_id,user_id) VALUES ($1,$2)",[s.sharedId,h.users.other.actorId]);
+    await h.pool.query("INSERT INTO character_controllers (character_id,campaign_id,user_id) VALUES ($1,$2,$3)",[s.sharedId,s.campaignId,h.users.other.actorId]);
     // Keep generation unchanged deliberately: this tests principal visibility rather than only the receipt-generation barrier.
     await h.pool.query("UPDATE campaign_members SET role='player' WHERE campaign_id=$1 AND user_id=$2",[s.campaignId,h.users.other.actorId]);
     expect((await h.characters.open(ctxFor(h.users.other),s.sharedId)).ok).toBe(true);
@@ -796,12 +796,14 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
     expect((await h.characters.pushOptions(ctxFor(h.users.other),{characterId:s.sharedId,rollId:child.value.roll!.push!.rollId})).ok).toBe(false);
     const replay=await h.characters.apply(ctxFor(h.users.other),command);expect(replay).toMatchObject({ok:false,error:{code:"not_found"}});
     const history=await h.characters.listActivity(ctxFor(h.users.other),{characterId:s.sharedId,limit:20,cursor:null});expect(history.ok&&history.value.events.every(e=>e.roll===undefined&&e.rollId===null)).toBe(true);
-    const exp=await h.campaigns.exportCampaign(ctxFor(h.users.other),{campaignId:s.campaignId,idempotencyKey:randomUUID()});expect(exp.ok&&exp.value.rolls).toEqual([]);
+    expect(await visibleRollSources(h.users.other,s.campaignId)).toEqual([]);
+    const exp=await h.campaigns.exportCampaign(ctxFor(h.users.other),{campaignId:s.campaignId,idempotencyKey:randomUUID()});expect(exp.ok).toBe(false);
     const gm=await h.campaigns.exportCampaign(ctxFor(h.users.gm),{campaignId:s.campaignId,idempotencyKey:randomUUID()});expect(gm.ok&&gm.value.rolls.find(r=>r.rollId===child.value.roll!.push!.rollId)?.push).toEqual(child.value.roll!.push);
   });
   it("rejects a push whose narrowed child would be hidden from its executor, and never widens later",async()=>{
     const s=await setupPushCampaign(),root=await pushRoot(s);
     await h.pool.query("UPDATE campaigns SET roll_audience_default='owner_only' WHERE id=$1",[s.campaignId]);
+    const options=await h.characters.pushOptions(ctxFor(h.users.other),{characterId:s.sharedId,rollId:root.push!.rollId});expect(options).toMatchObject({ok:true,value:{canPush:false,reason:"audience_restricted",eligibleDiceIds:[]}});
     const hidden=await h.characters.apply(ctxFor(h.users.other),{kind:"pushRoll",characterId:s.sharedId,parentRollId:root.push!.rollId,expectedRevision:1,idempotencyKey:randomUUID()});expect(hidden.ok).toBe(false);
     expect((await h.pool.query("SELECT count(*)::int AS n FROM character_rolls WHERE parent_roll_id=$1",[root.push!.rollId])).rows[0].n).toBe(0);
     const child=await h.characters.apply(ctxFor(h.users.player),{kind:"pushRoll",characterId:s.sharedId,parentRollId:root.push!.rollId,expectedRevision:1,idempotencyKey:randomUUID()});expect(child.ok).toBe(true);if(!child.ok)throw Error(JSON.stringify(child.error));expect(child.value.roll!.audience).toBe("owner_only");

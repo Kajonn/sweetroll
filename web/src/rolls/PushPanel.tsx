@@ -17,6 +17,7 @@ const reasons: Record<string, string> = {
     "No eligible dice remain. Empty and fully locked pools cannot be pushed.",
   source_unavailable: "The original action or item is no longer available.",
   rules_changed: "The character uses different rules from the saved roll.",
+  audience_restricted: "The current sharing rules do not let you push this roll.",
   archived:
     "Pushing is unavailable while the character or campaign is archived.",
   invalid_snapshot: "The saved pool cannot be safely pushed.",

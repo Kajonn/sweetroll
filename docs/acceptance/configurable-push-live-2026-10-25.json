@@ -1,0 +1,3137 @@
+{
+  "date": "2026-10-25",
+  "applicationCommit": "f75cb02fe2ee54021338d612f2506b3907264d24",
+  "testBaseCommit": "c2685b1ace02425355814a0f131ddbf43c62f6c3",
+  "preview": "https://sweetroll-items-production.up.railway.app",
+  "deploymentId": "0d776788-110d-403a-8350-3e7dc0e6a4a9",
+  "browser": "Chromium 130 / Playwright 1.48 / Linux",
+  "configuredRetries": 0,
+  "boundedScenariosPassed": 10,
+  "releaseAccepted": false,
+  "openFindings": [
+    {
+      "id": "C-ACCEPT-01",
+      "severity": "medium",
+      "summary": "Automatic UI rollback uses previewId; server migration ID is the commit commandExecutionId. Correct-ID API rollback passed."
+    },
+    {
+      "id": "C-ACCEPT-02",
+      "severity": "low",
+      "summary": "Early Activity click during reconciliation can display stale activity save: character generation changed."
+    }
+  ],
+  "verification": {
+    "checkedAt": "2026-10-25T06:22:48.849Z",
+    "commit": "f75cb02fe2ee54021338d612f2506b3907264d24",
+    "deploymentId": "0d776788-110d-403a-8350-3e7dc0e6a4a9",
+    "health": {
+      "status": "ok"
+    },
+    "assets": [
+      {
+        "path": "/index.html",
+        "sha256": "4b530a3ceaa6bc7b98874e486f3ba63eac8b125a94c75b6acf27f2bc34617572",
+        "bytes": 2338,
+        "matchesPriorVerifiedDeployment": true
+      },
+      {
+        "path": "/assets/index--rnEHoQw.css",
+        "sha256": "2649fa90f3974012ee0da3e55916a6a6d44a1fdd96f4fc507f4c41e2bb843504",
+        "bytes": 77838,
+        "matchesPriorVerifiedDeployment": true
+      },
+      {
+        "path": "/assets/index-Dg8Ty4oA.js",
+        "sha256": "cc7ea6d82b4338af40f985253a30fd387c742a9ba49bb01aad3d4706b124d3d6",
+        "bytes": 888443,
+        "matchesPriorVerifiedDeployment": true
+      },
+      {
+        "path": "/sw.js",
+        "sha256": "b55964c9b0faed93c292b3a98e376a6820ef992244c442cde2e5363a50248fce",
+        "bytes": 3545,
+        "matchesPriorVerifiedDeployment": true
+      },
+      {
+        "path": "/offline-manifest.json",
+        "sha256": "61dfa0dbfe0d0d524030106a14ec4c42b0766c8c66fef0d392dfd6b0dd3f76e5",
+        "bytes": 137,
+        "matchesPriorVerifiedDeployment": true
+      }
+    ]
+  },
+  "cases": [
+    {
+      "title": "GM board and co-GM pushes inherit the original audience and erase denied cached results after demotion",
+      "file": "e2e/campaignPush.spec.ts",
+      "durationMs": 176156,
+      "startedAt": "2026-10-25T06:12:41.635Z",
+      "attachments": [
+        {
+          "name": "campaign-push-evidence",
+          "data": {
+            "systemId": "ace0632f-0746-4565-a9f4-eb3f8f2b1587",
+            "campaignId": "4cc9b08c-f610-4d2e-8924-2f7cffdcbfc3",
+            "characterId": "9a234db8-88b0-463b-b948-00f9c3c99fc6",
+            "root": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 6,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": true
+                },
+                {
+                  "sides": 8,
+                  "value": 4,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 1,
+              "output": "Successes: 1",
+              "audience": "gm_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "59f21198-cc68-42e8-b5a4-d81e985c4a52",
+                "rootRollId": "59f21198-cc68-42e8-b5a4-d81e985c4a52",
+                "parentRollId": null,
+                "attempt": 0,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 1,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "child": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 3,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 4,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 0,
+              "output": "Successes: 0",
+              "audience": "gm_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "e2115eb3-8f4d-40c9-b294-7f9f9d1910b1",
+                "rootRollId": "59f21198-cc68-42e8-b5a4-d81e985c4a52",
+                "parentRollId": "59f21198-cc68-42e8-b5a4-d81e985c4a52",
+                "attempt": 1,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [
+                  "attribute:0"
+                ],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "next": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 5,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 4,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 0,
+              "output": "Successes: 0",
+              "audience": "gm_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "7041d1d8-ada6-462b-b3be-ee22c4b8545b",
+                "rootRollId": "59f21198-cc68-42e8-b5a4-d81e985c4a52",
+                "parentRollId": "e2115eb3-8f4d-40c9-b294-7f9f9d1910b1",
+                "attempt": 2,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [
+                  "attribute:0"
+                ],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "exportPreserved": true,
+            "demotedControllerStillReadsSheet": true,
+            "privateRollDenied": true,
+            "offlineDenialChecked": true,
+            "cleanup": {
+              "characters": [
+                "9a234db8-88b0-463b-b948-00f9c3c99fc6"
+              ],
+              "campaign": "4cc9b08c-f610-4d2e-8924-2f7cffdcbfc3",
+              "system": "ace0632f-0746-4565-a9f4-eb3f8f2b1587"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "title": "creator publishes push rules; entity and item pushes preserve the original pool and reload with lineage",
+      "file": "e2e/configurablePush.spec.ts",
+      "durationMs": 67446,
+      "startedAt": "2026-10-25T06:15:37.936Z",
+      "attachments": [
+        {
+          "name": "push-journey-evidence",
+          "data": {
+            "systemId": "50ce1914-979b-4965-9dea-99a099937d76",
+            "characterId": "0ab0c528-8add-4bca-86c6-a915cadd87bc",
+            "original": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 3,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 4,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 0,
+              "output": "Successes: 0",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "03b848e2-8acc-4229-a7c0-fc7dc84b9cd0",
+                "rootRollId": "03b848e2-8acc-4229-a7c0-fc7dc84b9cd0",
+                "parentRollId": null,
+                "attempt": 0,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "child": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 5,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 4,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 0,
+              "output": "Successes: 0",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "9b1f0886-13bc-4077-be1d-8c7f30cae99c",
+                "rootRollId": "03b848e2-8acc-4229-a7c0-fc7dc84b9cd0",
+                "parentRollId": "03b848e2-8acc-4229-a7c0-fc7dc84b9cd0",
+                "attempt": 1,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [
+                  "attribute:0"
+                ],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "next": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 4,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 4,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 0,
+              "output": "Successes: 0",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "f42bdc26-d641-4963-8ae3-4f953dcfea77",
+                "rootRollId": "03b848e2-8acc-4229-a7c0-fc7dc84b9cd0",
+                "parentRollId": "9b1f0886-13bc-4077-be1d-8c7f30cae99c",
+                "attempt": 2,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [
+                  "attribute:0"
+                ],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "itemRoot": {
+              "actionId": "tool_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 3,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 6,
+                  "value": 4,
+                  "kept": true,
+                  "id": "attribute:1",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 6,
+                  "value": 5,
+                  "kept": true,
+                  "id": "attribute:2",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 6,
+                  "value": 5,
+                  "kept": true,
+                  "id": "attribute:3",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 2,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 4
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "gear_bonus",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 0,
+              "output": "Successes: 0",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "0087ec62-b20d-4214-9ddc-927b5a78dbb6",
+                "rootRollId": "0087ec62-b20d-4214-9ddc-927b5a78dbb6",
+                "parentRollId": null,
+                "attempt": 0,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 4,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0",
+                      "attribute:1",
+                      "attribute:2",
+                      "attribute:3"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "itemChild": {
+              "actionId": "tool_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 6,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": true
+                },
+                {
+                  "sides": 6,
+                  "value": 1,
+                  "kept": true,
+                  "id": "attribute:1",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 6,
+                  "value": 3,
+                  "kept": true,
+                  "id": "attribute:2",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 6,
+                  "value": 4,
+                  "kept": true,
+                  "id": "attribute:3",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 2,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 4
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "gear_bonus",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 1,
+              "output": "Successes: 1",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "274981ef-e930-46bb-993a-26c4f97db29e",
+                "rootRollId": "0087ec62-b20d-4214-9ddc-927b5a78dbb6",
+                "parentRollId": "0087ec62-b20d-4214-9ddc-927b5a78dbb6",
+                "attempt": 1,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [
+                  "attribute:0",
+                  "attribute:1",
+                  "attribute:2",
+                  "attribute:3"
+                ],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 1,
+                    "rerolledCount": 1
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 4,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0",
+                      "attribute:1",
+                      "attribute:2",
+                      "attribute:3"
+                    ],
+                    "total": 1,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "historyRolls": 5,
+            "cleanup": {
+              "characters": [
+                "0ab0c528-8add-4bca-86c6-a915cadd87bc"
+              ],
+              "system": "50ce1914-979b-4965-9dea-99a099937d76"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "title": "a committed but unseen push replays the frozen request after offline reload and retains its child offline",
+      "file": "offline/pushRecovery.spec.ts",
+      "durationMs": 53764,
+      "startedAt": "2026-10-25T06:16:45.397Z",
+      "attachments": [
+        {
+          "name": "push-recovery-evidence",
+          "data": {
+            "systemId": "e6743c58-b1d9-4e96-b64e-dd0713d2b207",
+            "characterId": "f7046c45-01c9-4e61-b8d2-df3959160dc6",
+            "root": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 1,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 7,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": true
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 2,
+              "output": "Successes: 2",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "fb0cf3c9-88c7-4d9f-84a0-9f75aaa2d05f",
+                "rootRollId": "fb0cf3c9-88c7-4d9f-84a0-9f75aaa2d05f",
+                "parentRollId": null,
+                "attempt": 0,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 1,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 1,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "child": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 6,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": true
+                },
+                {
+                  "sides": 8,
+                  "value": 7,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": true
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 3,
+              "output": "Successes: 3",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "7ec7a64c-eab4-4b04-a520-e4502d5a77b5",
+                "rootRollId": "fb0cf3c9-88c7-4d9f-84a0-9f75aaa2d05f",
+                "parentRollId": "fb0cf3c9-88c7-4d9f-84a0-9f75aaa2d05f",
+                "attempt": 1,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [
+                  "attribute:0"
+                ],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 1,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 1,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "identicalRequestCount": 2,
+            "historyRolls": 2,
+            "offlineReload": true,
+            "cleanup": {
+              "characters": [
+                "f7046c45-01c9-4e61-b8d2-df3959160dc6"
+              ],
+              "system": "e6743c58-b1d9-4e96-b64e-dd0713d2b207"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "title": "two authorized GM actors consume one parent once and preserve exact replay and shared history",
+      "file": "e2e/pushTransitions.spec.ts",
+      "durationMs": 127015,
+      "startedAt": "2026-10-25T06:15:33.032Z",
+      "attachments": [
+        {
+          "name": "push-race-evidence",
+          "data": {
+            "systemId": "50885b8b-f2b6-41f6-948c-2a7a6ad23aa5",
+            "campaignId": "eedf563a-ed7a-4bd8-899e-fae40b88167b",
+            "characterId": "3638e0a6-f793-4b0a-b0f2-4ae1972bdea8",
+            "root": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 5,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 4,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 0,
+              "output": "Successes: 0",
+              "audience": "campaign",
+              "push": {
+                "version": "1.0",
+                "rollId": "9a29e2df-ba06-461c-9e35-9ea0fa87db2d",
+                "rootRollId": "9a29e2df-ba06-461c-9e35-9ea0fa87db2d",
+                "parentRollId": null,
+                "attempt": 0,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "child": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 4,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 4,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 0,
+              "output": "Successes: 0",
+              "audience": "campaign",
+              "push": {
+                "version": "1.0",
+                "rollId": "dc18d659-c1d3-4874-a787-04d55ef8684a",
+                "rootRollId": "9a29e2df-ba06-461c-9e35-9ea0fa87db2d",
+                "parentRollId": "9a29e2df-ba06-461c-9e35-9ea0fa87db2d",
+                "attempt": 1,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [
+                  "attribute:0"
+                ],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "concurrentStatuses": [
+              200,
+              409
+            ],
+            "exactReplay": true,
+            "acceptedChildren": 1,
+            "cleanup": {
+              "characters": [
+                "3638e0a6-f793-4b0a-b0f2-4ae1972bdea8"
+              ],
+              "campaign": "eedf563a-ed7a-4bd8-899e-fae40b88167b",
+              "system": "50885b8b-f2b6-41f6-948c-2a7a6ad23aa5"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "title": "adoption and return invalidate saved pools from earlier placement generations",
+      "file": "e2e/pushTransitions.spec.ts",
+      "durationMs": 132915,
+      "startedAt": "2026-10-25T06:18:35.795Z",
+      "attachments": [
+        {
+          "name": "push-placement-evidence",
+          "data": {
+            "systemId": "a86b0fe1-1989-46a0-b610-f747f9e41efd",
+            "campaignId": "9c62e2ba-d2d8-4682-93ae-8ad359976422",
+            "characterId": "7b91a377-2f2c-42d2-ab1c-02f1a5885bdb",
+            "generations": [
+              1,
+              2,
+              3
+            ],
+            "personal": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 3,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 8,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": true
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 2,
+              "output": "Successes: 2",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "03d1b02d-034e-47b3-9860-6f41bfcaca6a",
+                "rootRollId": "03d1b02d-034e-47b3-9860-6f41bfcaca6a",
+                "parentRollId": null,
+                "attempt": 0,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 1,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "attached": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 4,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 7,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": true
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 2,
+              "output": "Successes: 2",
+              "audience": "campaign",
+              "push": {
+                "version": "1.0",
+                "rollId": "5a65ca7e-c58c-4fae-9fd0-8507125ec02a",
+                "rootRollId": "5a65ca7e-c58c-4fae-9fd0-8507125ec02a",
+                "parentRollId": null,
+                "attempt": 0,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 1,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "fresh": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 4,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 5,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": true
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 2,
+              "output": "Successes: 2",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "83f1cd99-f45a-4a2e-9630-a59d4a4092a4",
+                "rootRollId": "83f1cd99-f45a-4a2e-9630-a59d4a4092a4",
+                "parentRollId": null,
+                "attempt": 0,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 1,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "child": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 3,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 5,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": true
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 2,
+              "output": "Successes: 2",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "d1d931b2-5a8e-4fee-9068-6c376260325b",
+                "rootRollId": "83f1cd99-f45a-4a2e-9630-a59d4a4092a4",
+                "parentRollId": "83f1cd99-f45a-4a2e-9630-a59d4a4092a4",
+                "attempt": 1,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [
+                  "attribute:0"
+                ],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 1,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "formerGmDenied": true,
+            "cleanup": {
+              "characters": [],
+              "campaign": "9c62e2ba-d2d8-4682-93ae-8ad359976422",
+              "system": "a86b0fe1-1989-46a0-b610-f747f9e41efd"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "title": "a waiting production worker preserves a committed unseen push, activates without dropping it, and clears private results on sign-out",
+      "file": "offline/pushWorkerUpdate.spec.ts",
+      "durationMs": 14271,
+      "startedAt": "2026-10-25T06:20:19.252Z",
+      "attachments": [
+        {
+          "name": "push-worker-update-evidence",
+          "data": {
+            "systemId": "202aa802-6a0d-4d53-a450-4422a47223a6",
+            "characterId": "bb4e4220-ef6e-4955-b4d2-622029d7ef22",
+            "root": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 5,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 3,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 0,
+              "output": "Successes: 0",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "b1f3581c-2c84-4901-a0f9-c798bd320ef1",
+                "rootRollId": "b1f3581c-2c84-4901-a0f9-c798bd320ef1",
+                "parentRollId": null,
+                "attempt": 0,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "child": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 1,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 3,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 0,
+              "output": "Successes: 0",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "fa41a2c5-726e-4b31-a812-d4e3c43f0c56",
+                "rootRollId": "b1f3581c-2c84-4901-a0f9-c798bd320ef1",
+                "parentRollId": "b1f3581c-2c84-4901-a0f9-c798bd320ef1",
+                "attempt": 1,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [
+                  "attribute:0"
+                ],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 1,
+                    "rerolledCount": 1
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "originalBuild": "acceptance-push-a",
+            "nextBuild": "acceptance-push-b",
+            "exactRequestPreserved": true,
+            "historyRolls": 2,
+            "assetOnlyCaches": true,
+            "signOutErasedPrivateResult": true,
+            "otherAccountOfflineDenied": true,
+            "cleanup": {
+              "characters": [
+                "bb4e4220-ef6e-4955-b4d2-622029d7ef22"
+              ],
+              "system": "202aa802-6a0d-4d53-a450-4422a47223a6"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "title": "locked, empty and successful saved pools explain why pushing is unavailable",
+      "file": "e2e/pushTransitions.spec.ts",
+      "durationMs": 83107,
+      "startedAt": "2026-10-25T06:22:10.696Z",
+      "attachments": [
+        {
+          "name": "push-edge-evidence",
+          "data": {
+            "systemId": "6f805a0f-6103-4ae8-9087-0b1a15b19b8c",
+            "outcomes": [
+              {
+                "action": "locked_pool",
+                "reason": "no_eligible_dice",
+                "root": {
+                  "actionId": "locked_pool",
+                  "dice": [
+                    {
+                      "sides": 6,
+                      "value": 3,
+                      "kept": true,
+                      "id": "attribute:0",
+                      "groupId": "attribute",
+                      "success": false
+                    },
+                    {
+                      "sides": 8,
+                      "value": 5,
+                      "kept": true,
+                      "id": "skill:0",
+                      "groupId": "skill",
+                      "success": true
+                    }
+                  ],
+                  "bindings": [
+                    {
+                      "scope": "fields",
+                      "definitionId": "attribute",
+                      "value": 1
+                    },
+                    {
+                      "scope": "inputs",
+                      "definitionId": "locked_pool_bonus_dice",
+                      "value": 0
+                    },
+                    {
+                      "scope": "fields",
+                      "definitionId": "skill",
+                      "value": 1
+                    },
+                    {
+                      "scope": "fields",
+                      "definitionId": "gear",
+                      "value": 0
+                    }
+                  ],
+                  "total": 2,
+                  "output": "Successes: 2",
+                  "audience": "owner_only",
+                  "push": {
+                    "version": "1.0",
+                    "rollId": "c63740fc-4631-4a35-b71d-5902c9c79c42",
+                    "rootRollId": "c63740fc-4631-4a35-b71d-5902c9c79c42",
+                    "parentRollId": null,
+                    "attempt": 0,
+                    "maxAttempts": 2,
+                    "rerolledDiceIds": [],
+                    "faceOutcomes": []
+                  },
+                  "breakdown": {
+                    "version": "1.0",
+                    "rootId": "root",
+                    "groups": [
+                      {
+                        "id": "attribute",
+                        "label": "Attribute",
+                        "count": 1,
+                        "sides": 6,
+                        "operation": "successCount",
+                        "diceIds": [
+                          "attribute:0"
+                        ],
+                        "total": 0,
+                        "threshold": 6
+                      },
+                      {
+                        "id": "skill",
+                        "label": "Skill",
+                        "count": 1,
+                        "sides": 8,
+                        "operation": "successCount",
+                        "diceIds": [
+                          "skill:0"
+                        ],
+                        "total": 1,
+                        "threshold": 5
+                      },
+                      {
+                        "id": "gear",
+                        "label": "Gear",
+                        "count": 0,
+                        "sides": 4,
+                        "operation": "sum",
+                        "diceIds": [],
+                        "total": 0
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "action": "empty_pool",
+                "reason": "no_eligible_dice",
+                "root": {
+                  "actionId": "empty_pool",
+                  "dice": [
+                    {
+                      "sides": 6,
+                      "value": 3,
+                      "kept": true,
+                      "id": "attribute:0",
+                      "groupId": "attribute",
+                      "success": false
+                    },
+                    {
+                      "sides": 8,
+                      "value": 1,
+                      "kept": true,
+                      "id": "skill:0",
+                      "groupId": "skill",
+                      "success": false
+                    }
+                  ],
+                  "bindings": [
+                    {
+                      "scope": "fields",
+                      "definitionId": "attribute",
+                      "value": 1
+                    },
+                    {
+                      "scope": "inputs",
+                      "definitionId": "empty_pool_bonus_dice",
+                      "value": 0
+                    },
+                    {
+                      "scope": "fields",
+                      "definitionId": "skill",
+                      "value": 1
+                    },
+                    {
+                      "scope": "fields",
+                      "definitionId": "gear",
+                      "value": 0
+                    }
+                  ],
+                  "total": 0,
+                  "output": "Successes: 0",
+                  "audience": "owner_only",
+                  "push": {
+                    "version": "1.0",
+                    "rollId": "41b87362-f51f-4179-904a-77c12cdc47a7",
+                    "rootRollId": "41b87362-f51f-4179-904a-77c12cdc47a7",
+                    "parentRollId": null,
+                    "attempt": 0,
+                    "maxAttempts": 2,
+                    "rerolledDiceIds": [],
+                    "faceOutcomes": []
+                  },
+                  "breakdown": {
+                    "version": "1.0",
+                    "rootId": "root",
+                    "groups": [
+                      {
+                        "id": "attribute",
+                        "label": "Attribute",
+                        "count": 1,
+                        "sides": 6,
+                        "operation": "successCount",
+                        "diceIds": [
+                          "attribute:0"
+                        ],
+                        "total": 0,
+                        "threshold": 6
+                      },
+                      {
+                        "id": "skill",
+                        "label": "Skill",
+                        "count": 1,
+                        "sides": 8,
+                        "operation": "successCount",
+                        "diceIds": [
+                          "skill:0"
+                        ],
+                        "total": 0,
+                        "threshold": 5
+                      },
+                      {
+                        "id": "gear",
+                        "label": "Gear",
+                        "count": 0,
+                        "sides": 4,
+                        "operation": "sum",
+                        "diceIds": [],
+                        "total": 0
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "action": "successful_pool",
+                "reason": "successful_roll",
+                "root": {
+                  "actionId": "successful_pool",
+                  "dice": [
+                    {
+                      "sides": 6,
+                      "value": 5,
+                      "kept": true,
+                      "id": "attribute:0",
+                      "groupId": "attribute",
+                      "success": false
+                    },
+                    {
+                      "sides": 8,
+                      "value": 7,
+                      "kept": true,
+                      "id": "skill:0",
+                      "groupId": "skill",
+                      "success": true
+                    }
+                  ],
+                  "bindings": [
+                    {
+                      "scope": "fields",
+                      "definitionId": "attribute",
+                      "value": 1
+                    },
+                    {
+                      "scope": "inputs",
+                      "definitionId": "successful_pool_bonus_dice",
+                      "value": 0
+                    },
+                    {
+                      "scope": "fields",
+                      "definitionId": "skill",
+                      "value": 1
+                    },
+                    {
+                      "scope": "fields",
+                      "definitionId": "gear",
+                      "value": 0
+                    }
+                  ],
+                  "total": 2,
+                  "output": "Successes: 2",
+                  "audience": "owner_only",
+                  "push": {
+                    "version": "1.0",
+                    "rollId": "b1e992cd-5c70-4c20-ace3-cb254224861b",
+                    "rootRollId": "b1e992cd-5c70-4c20-ace3-cb254224861b",
+                    "parentRollId": null,
+                    "attempt": 0,
+                    "maxAttempts": 2,
+                    "rerolledDiceIds": [],
+                    "faceOutcomes": [
+                      {
+                        "groupId": "attribute",
+                        "face": 1,
+                        "combinedCount": 0,
+                        "rerolledCount": 0
+                      }
+                    ]
+                  },
+                  "breakdown": {
+                    "version": "1.0",
+                    "rootId": "root",
+                    "groups": [
+                      {
+                        "id": "attribute",
+                        "label": "Attribute",
+                        "count": 1,
+                        "sides": 6,
+                        "operation": "successCount",
+                        "diceIds": [
+                          "attribute:0"
+                        ],
+                        "total": 0,
+                        "threshold": 6
+                      },
+                      {
+                        "id": "skill",
+                        "label": "Skill",
+                        "count": 1,
+                        "sides": 8,
+                        "operation": "successCount",
+                        "diceIds": [
+                          "skill:0"
+                        ],
+                        "total": 1,
+                        "threshold": 5
+                      },
+                      {
+                        "id": "gear",
+                        "label": "Gear",
+                        "count": 0,
+                        "sides": 4,
+                        "operation": "sum",
+                        "diceIds": [],
+                        "total": 0
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "cleanup": {
+              "characters": [
+                "fead1b7d-8da8-448b-914a-fcc6cd64e351"
+              ],
+              "system": "6f805a0f-6103-4ae8-9087-0b1a15b19b8c"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "title": "the version-5 store preserves older frozen work and rejects a version-4 reader without losing a pending push",
+      "file": "offline/pushCompatibility.spec.ts",
+      "durationMs": 4212,
+      "startedAt": "2026-10-25T06:26:18.096Z",
+      "attachments": [
+        {
+          "name": "push-reader-evidence",
+          "data": {
+            "blockedUpgrade": "Close older Sweetroll tabs to update push recovery support.",
+            "previousError": "VersionError",
+            "older": {
+              "id": "older-archive",
+              "actorId": "compat-actor",
+              "characterId": "compat-character",
+              "kind": "archive",
+              "createdAt": "2026-10-25T06:26:22.273Z",
+              "request": {
+                "method": "PATCH",
+                "path": "/characters/compat-character",
+                "body": {
+                  "command": "archive",
+                  "expectedRevision": 1
+                },
+                "firstAttemptAt": "2026-10-25T06:26:22.273Z"
+              }
+            },
+            "frozen": {
+              "id": "pending-push",
+              "actorId": "compat-actor",
+              "characterId": "compat-character",
+              "kind": "push",
+              "createdAt": "2026-10-25T06:26:22.278Z",
+              "request": {
+                "method": "POST",
+                "path": "/characters/compat-character/rolls/original/push",
+                "body": {
+                  "expectedRevision": 1
+                },
+                "firstAttemptAt": "2026-10-25T06:26:22.278Z"
+              }
+            },
+            "attempts": [
+              {
+                "id": "older-archive",
+                "actorId": "compat-actor",
+                "characterId": "compat-character",
+                "kind": "archive",
+                "createdAt": "2026-10-25T06:26:22.273Z",
+                "request": {
+                  "method": "PATCH",
+                  "path": "/characters/compat-character",
+                  "body": {
+                    "command": "archive",
+                    "expectedRevision": 1
+                  },
+                  "firstAttemptAt": "2026-10-25T06:26:22.273Z"
+                }
+              },
+              {
+                "id": "pending-push",
+                "actorId": "compat-actor",
+                "characterId": "compat-character",
+                "kind": "push",
+                "createdAt": "2026-10-25T06:26:22.278Z",
+                "request": {
+                  "method": "POST",
+                  "path": "/characters/compat-character/rolls/original/push",
+                  "body": {
+                    "expectedRevision": 1
+                  },
+                  "firstAttemptAt": "2026-10-25T06:26:22.278Z"
+                }
+              }
+            ],
+            "historicalSource": true
+          }
+        }
+      ]
+    },
+    {
+      "title": "saved item pools follow source removal, exact restoration and archive/recovery",
+      "file": "e2e/pushTransitions.spec.ts",
+      "durationMs": 157411,
+      "startedAt": "2026-10-25T06:25:09.823Z",
+      "attachments": [
+        {
+          "name": "push-transition-evidence",
+          "data": {
+            "systemId": "cd288ea0-d897-4900-9d6c-4c701afeb635",
+            "characterIds": [
+              "d25cd7b7-3269-4c31-bcbd-fe2224e4513d"
+            ],
+            "entryId": "d7e7b1cb-3781-45f3-a4e1-be62861849d2",
+            "versionId": "d1d59137-ef33-42ac-805f-7a6a1726a60b",
+            "itemRoot": {
+              "actionId": "tool_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 6,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": true
+                },
+                {
+                  "sides": 8,
+                  "value": 3,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "gear_bonus",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 1,
+              "output": "Successes: 1",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "37f43981-a1ac-45c4-a82b-6d574a44de83",
+                "rootRollId": "37f43981-a1ac-45c4-a82b-6d574a44de83",
+                "parentRollId": null,
+                "attempt": 0,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 1,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "itemChild": {
+              "actionId": "tool_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 2,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 3,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "gear_bonus",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 0,
+              "output": "Successes: 0",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "c57f0eed-b0cd-4885-9ae3-e8fa84e3725e",
+                "rootRollId": "37f43981-a1ac-45c4-a82b-6d574a44de83",
+                "parentRollId": "37f43981-a1ac-45c4-a82b-6d574a44de83",
+                "attempt": 1,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [
+                  "attribute:0"
+                ],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "transitions": [
+              "remove",
+              "exact restore",
+              "archive",
+              "recover"
+            ],
+            "cleanup": {
+              "characters": [
+                "d25cd7b7-3269-4c31-bcbd-fe2224e4513d"
+              ],
+              "system": "cd288ea0-d897-4900-9d6c-4c701afeb635"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "title": "a saved entity pool rejects changed rules and resumes after exact version rollback",
+      "file": "e2e/pushTransitions.spec.ts",
+      "durationMs": 139115,
+      "startedAt": "2026-10-25T06:31:44.873Z",
+      "attachments": [
+        {
+          "name": "push-version-evidence",
+          "data": {
+            "systemId": "c7e07896-6049-49fb-b372-247cd1725233",
+            "characterId": "a8fc4830-6212-47f4-bcb0-26834c5b4216",
+            "versionId": "907c1428-9ff4-46fe-bc65-e012e2966362",
+            "nextVersion": "e6b0fa04-398f-4785-997b-1c21920ec133",
+            "migrationId": "6a1f27a1-00e2-4ef1-97ea-d9853fa00984",
+            "root": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 2,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 2,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 0,
+              "output": "Successes: 0",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "d335564a-3519-4629-a899-cf2abe7aa685",
+                "rootRollId": "d335564a-3519-4629-a899-cf2abe7aa685",
+                "parentRollId": null,
+                "attempt": 0,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "child": {
+              "actionId": "test_pool",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 5,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 2,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 0,
+              "output": "Successes: 0",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "eefe50f5-7ecd-49ed-8131-b3fd3b019edc",
+                "rootRollId": "d335564a-3519-4629-a899-cf2abe7aa685",
+                "parentRollId": "d335564a-3519-4629-a899-cf2abe7aa685",
+                "attempt": 1,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [
+                  "attribute:0"
+                ],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ]
+              }
+            },
+            "oldPoolReason": "rules_changed",
+            "cleanup": {
+              "characters": [
+                "a8fc4830-6212-47f4-bcb0-26834c5b4216"
+              ],
+              "system": "c7e07896-6049-49fb-b372-247cd1725233"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "cleanupReadback": {
+    "checkedAt": "2026-10-25T06:35:34.169Z",
+    "systems": [
+      {
+        "systemId": "07debec7-e56a-4705-9d83-4369e4ce0e90",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "202aa802-6a0d-4d53-a450-4422a47223a6",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "50885b8b-f2b6-41f6-948c-2a7a6ad23aa5",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "50ce1914-979b-4965-9dea-99a099937d76",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "51a14825-16df-4a3b-a9d6-e0b23d0893a7",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "68e130d3-9251-4acc-908c-29f53167231c",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "6f805a0f-6103-4ae8-9087-0b1a15b19b8c",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "7473ef56-5a7f-4bf1-9cc1-8b87569f45ca",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "7ee23381-1a55-479a-9b7c-1cb4f07d0033",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "8e89ebba-57c2-4577-bce8-7f11d5cbfe75",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "a81a5461-7c25-4fc1-97e8-674d0bcf156e",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "a86b0fe1-1989-46a0-b610-f747f9e41efd",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "ace0632f-0746-4565-a9f4-eb3f8f2b1587",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "ba12a5ac-5253-4e47-ae33-3bd42ae9b997",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "bc78362c-24c7-43c7-b5e3-f2bbe5231b42",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "c7e07896-6049-49fb-b372-247cd1725233",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "cd288ea0-d897-4900-9d6c-4c701afeb635",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "d2f6dc55-ab16-4641-af79-b0af41d8cafe",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "e6743c58-b1d9-4e96-b64e-dd0713d2b207",
+        "lifecycle": "archived",
+        "access": "private"
+      }
+    ]
+  },
+  "interruptedCleanup": {
+    "characters": [
+      {
+        "characterId": "b10ce84b-6bb9-46ec-85ff-02503db00cb1",
+        "lifecycle": "archived"
+      },
+      {
+        "characterId": "3c3e22d1-4b20-4323-97be-3027b91b0d59",
+        "lifecycle": "archived"
+      }
+    ],
+    "systems": [
+      {
+        "systemId": "d2f6dc55-ab16-4641-af79-b0af41d8cafe",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "bc78362c-24c7-43c7-b5e3-f2bbe5231b42",
+        "lifecycle": "archived",
+        "access": "private"
+      }
+    ]
+  },
+  "limitations": [
+    "Worker replacement used two actual current-source builds with a controlled HTTPS static server and the real preview API, not a second Railway deployment.",
+    "Compatibility covered the actual historical v4 IndexedDB adapter and v5, including a held old connection. It did not run the whole previous client bundle.",
+    "No physical-device, real provider OAuth or live campaign-default mutation acceptance.",
+    "Item-bearing migrations intentionally return 409; entry-free version migration and rollback were tested separately."
+  ]
+}

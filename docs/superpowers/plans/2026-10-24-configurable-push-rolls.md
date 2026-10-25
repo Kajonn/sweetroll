@@ -1,6 +1,6 @@
 # Configurable push rolls — slice C execution plan
 
-**Status (2026-10-24):** implementation is in draft [PR #23](https://github.com/Kajonn/sweetroll/pull/23), based on merged B (`759323a`). Package/evaluator, storage/API, creator controls and shared player/GM sessions are implemented. Review regressions and their repairs are recorded in the [review record](../../acceptance/configurable-push-review-2026-10-24.md). Remaining checklist items are acceptance gates, not a claim that the branch is documentation-only. Three canonical core C journeys passed live on isolated deployment `0d776788-110d-403a-8350-3e7dc0e6a4a9`, actual commit `f75cb02`; see the [live record](../../acceptance/configurable-push-rolls-2026-10-24.md). The remaining compatibility, transition and wider acceptance bundles stay open.
+**Status (2026-10-24):** implementation is in draft [PR #23](https://github.com/Kajonn/sweetroll/pull/23), based on merged B (`759323a`). Package/evaluator, storage/API, creator controls and shared player/GM sessions are implemented. Review regressions and their repairs are recorded in the [review record](../../acceptance/configurable-push-review-2026-10-24.md). Remaining checklist items are acceptance gates, not a claim that the branch is documentation-only. Three canonical core C journeys passed live on isolated deployment `0d776788-110d-403a-8350-3e7dc0e6a4a9`, actual commit `f75cb02`; see the [live record](../../acceptance/configurable-push-rolls-2026-10-24.md). The [2026-10-25 follow-up](../../acceptance/configurable-push-rolls-2026-10-25.md) records ten passed bounded scenarios, including source/lifecycle/version/placement transitions, competing actors, worker replacement and adapter compatibility. Automatic rollback identity and early Activity-loading findings remain open, alongside the wider acceptance boundary.
 
 **Authority:** [design §6.4](../../../design_v2.md#64-rules-and-expression-engine), [parent plan Task 7](2026-10-21-dice-pool-reliability.md#task-7--design-and-deliver-configurable-pushes-slice-c-tdd), [B contract](../specs/2026-10-23-named-dice-groups.md), [GUI gates](2026-09-08-gui-integration.md). Follow current module ownership. For each numbered implementation task, record an observed meaningful failure before the smallest repair, then green and appropriate retained checks. No assertion/retry/timeout/baseline loosening to make acceptance pass.
 
@@ -105,3 +105,17 @@ These checks mean the design work exists, not that any behavior below is impleme
 C0 is complete and C1–C6 plus the result-control portion of C7 have implementations and focused regressions. The unchecked bundles still require their complete listed evidence; in particular, the pre-existing browser suites do not substitute for new C journeys. Follow C7–C8 before marking the PR ready or claiming C accepted. No automatic damage/effect engine, arbitrary scripts, new offline push creation or unrelated editor/campaign redesign belongs here.
 
 **Observed document validation (2026-10-24):** `git diff --check` passed; all 23 local link/anchor destinations in the new documents and added cross-references resolved. The deterministic fixture arithmetic was checked independently: parent 11, child 15, four eligible draws. This is document validation, not evaluator/test/CI or deployed C evidence.
+
+
+## Acceptance follow-up — 2026-10-25
+
+See the [follow-up record](../../acceptance/configurable-push-rolls-2026-10-25.md) and its structured evidence for scope, exact deployment/resources, durations, setup failures and cleanup. No application code changed for this test extension.
+
+- [x] Repeat the three core creator/player/GM and lost-response journeys directly against the verified preview.
+- [x] Exercise source removal/exact restoration, archive/recovery, changed rules/exact server rollback, adoption/return and policy-edge denial in canonical journeys.
+- [x] Verify two authorized actors racing different keys create one child, and same-key replay returns that exact child.
+- [x] Preserve an unresolved push across waiting/active production-worker builds, then prove sign-out and other-account offline isolation. This used controlled current-source builds with the real deployed backend.
+- [x] Exercise the exact preceding version-4 store adapter, blocked-tab upgrade guidance, preserved old work, and refusal to read version 5 without losing the pending push. The whole previous UI bundle was not tested.
+- [ ] Fix automatic rollback's preview-ID/execution-ID mismatch and add a UI commit → automatic rollback regression. The correct-ID server path passed.
+- [ ] Replace the raw early Activity generation error with guarded retry or usable loading/reload handling; cover an immediate click during reconciliation.
+- [ ] Retain the unperformed live default-narrowing, broader multi-account authoring, whole-client compatibility, physical-device and provider-authentication gates. Keep PR #23 draft.

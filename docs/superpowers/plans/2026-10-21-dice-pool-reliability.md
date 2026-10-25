@@ -174,3 +174,8 @@ This completes B's relevant verification/deployed core gate and makes PR #22 rea
 ### Slice C contract and implementation sequence — 2026-10-24
 
 After B merged, main `759323a` was reviewed for command/replay, ordinary roll revisions, standalone/campaign transactions, audience checks, package version gates, editor promotion and player/GM uncertainty handling. The [C contract](../specs/2026-10-24-configurable-push-rolls.md) specifies bounded group policies, original-pool snapshots, deterministic eligible-only RNG, one-child uniqueness, inherited audience principal, scoped lineage, online-only durable attempts and a concrete mixed-pool fixture. The [C execution plan](2026-10-24-configurable-push-rolls.md) maps red → green implementation tasks to those existing seams. This completes the initial before-code policy specification only; the command/storage/UI and verification checkboxes above remain open until implemented and observed. Runtime/package 1.2 capability is not enabled by these documents.
+
+
+### Slice C acceptance follow-up — 2026-10-25
+
+[PR #23](https://github.com/Kajonn/sweetroll/pull/23) implements C; the earlier contract-only paragraph describes the initial planning checkpoint. [The acceptance follow-up](../../acceptance/configurable-push-rolls-2026-10-25.md) records ten passed bounded software scenarios on the unchanged verified application, plus canonical transition, worker-update and adapter-compatibility tests. The automatic rollback ID mismatch and early Activity-loading error remain open. The C plan retains these findings and the unperformed wider release gates; the PR remains draft.

@@ -592,14 +592,39 @@ describe("CharacterTools", () => {
   it("exposes the authoritative migration ID for rollback without manual guessing", async () => {
     const user = userEvent.setup();
     const session = makeSession(
-      readySnapshot({ lastMigration: { operation: "commit", previewId: "p-1", revision: 5 } }),
+      readySnapshot({ lastMigration: { operation: "commit", previewId: "p-1", migrationId: "execution-m-9", revision: 5 } }),
     );
     render(<CharacterTools characterId="char-1" api={makeApi()} session={session} now={() => "2026-09-06T00:00:00.000Z"} />);
     await user.click(screen.getByRole("button", { name: /migration/i }));
     expect(screen.getByText(/last migration can be rolled back/i)).toBeVisible();
     expect(screen.queryByText(/p-1/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /roll back migration/i }));
-    expect(session.rollbackMigration).toHaveBeenCalledWith("p-1");
+    expect(session.rollbackMigration).toHaveBeenCalledWith("execution-m-9");
+  });
+
+  it("does not substitute a preview ID when a migration result lacks an execution ID", async () => {
+    const user = userEvent.setup();
+    const session = makeSession(readySnapshot({ lastMigration: { operation: "commit", previewId: "p-1", migrationId: null, revision: 5 } }));
+    render(<CharacterTools characterId="char-1" api={makeApi()} session={session} />);
+    await user.click(screen.getByRole("button", { name: /migration/i }));
+    expect(screen.queryByText(/last migration can be rolled back/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /roll back migration/i })).toBeDisabled();
+    expect(session.rollbackMigration).not.toHaveBeenCalled();
+  });
+
+  it("offers readable recovery when an Activity response loses its cache generation", async () => {
+    const user = userEvent.setup();
+    const session = makeSession(readySnapshot());
+    session.fetchActivityPage = vi.fn()
+      .mockRejectedValueOnce(new Error("stale activity save: character generation changed"))
+      .mockResolvedValueOnce({ events: [], nextCursor: null, stale: false, fetchedAt: "2026-10-25T00:00:00Z" });
+    render(<CharacterTools characterId="char-1" api={makeApi()} session={session} />);
+    await user.click(screen.getByRole("button", { name: /^Activity$/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Activity changed while loading. Refresh activity to try again.");
+    expect(screen.queryByText(/stale activity save/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /refresh activity/i }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(session.fetchActivityPage).toHaveBeenCalledTimes(2);
   });
 
   it("blocks export while an uncertain online outcome is pending", async () => {

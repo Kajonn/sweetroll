@@ -1186,7 +1186,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   function migrationResultFor(attempt: OnlineAttempt, character: CharacterView): LastMigrationResult | null {
     const commit = new RegExp(`^/characters/${characterId}/migrations/(.+)/commit$`).exec(attempt.request.path);
     if (attempt.kind === "migration" && commit !== null) {
-      return { operation: "commit", previewId: commit[1]!, revision: character.reconciliation.revision };
+      const executionId = character.reconciliation.commandExecutionId;
+      return { operation: "commit", previewId: commit[1]!, migrationId: typeof executionId === "string" && executionId.length > 0 ? executionId : null, revision: character.reconciliation.revision };
     }
     const rollback = new RegExp(`^/characters/${characterId}/migrations/(.+)/rollback$`).exec(attempt.request.path);
     if (attempt.kind === "migration" && rollback !== null) {
@@ -1684,6 +1685,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (disposed) throw new Error("Session closed.");
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
     if (cursor !== null && typeof cursor !== "string") throw new Error("An activity cursor must be a string or null.");
+    // Initial reconciliation can advance the cache generation. Let it
+    // finish before capturing the read guard; do not weaken stale-write
+    // rejection for a later purge, scope change, or authorization denial.
+    await open();
+    if (disposed) throw new Error("Session closed.");
+    if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
     if (!isConnected()) {
       const cached = await store.readActivityPage(actorId, characterId, cursor).catch(() => null);
       if (!identityMatches()) throw new Error("Account changed. Reopen this character.");

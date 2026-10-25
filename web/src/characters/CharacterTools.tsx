@@ -217,7 +217,13 @@ function ActivityDialog({ characterId, api, session, onClose }: { characterId: s
       setCursor(page.nextCursor);
       setStale(page.stale);
     } catch (err) {
-      setError(err instanceof Error && err.message ? err.message : t("character.tools.activityFailed"));
+      if (err instanceof Error && err.message.startsWith("stale ")) {
+        setEvents([]);
+        setCursor(null);
+        setError(t("character.tools.activityChanged"));
+      } else {
+        setError(err instanceof Error && err.message ? err.message : t("character.tools.activityFailed"));
+      }
     } finally {
       setLoading(false);
     }
@@ -433,12 +439,7 @@ function MigrationDialog({
   const staleRevision =
     preview !== null && confirmedRevision !== undefined && preview.sourceRevision !== confirmedRevision;
   const candidateValues = preview !== null ? Object.entries(preview.candidateState.values as Record<string, unknown>) : [];
-  const lastMigrationId =
-    snapshot.lastMigration === null
-      ? null
-      : snapshot.lastMigration.operation === "commit"
-        ? snapshot.lastMigration.previewId
-        : snapshot.lastMigration.migrationId;
+  const lastMigrationId = snapshot.lastMigration?.migrationId ?? null;
 
   const previewBlockReason = offline
     ? t("character.tools.migrationPreviewOffline")

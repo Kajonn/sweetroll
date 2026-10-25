@@ -665,6 +665,7 @@ export const defaultMessages: MessageTable = {
   "character.tools.activityLoadMore": "Load more",
   "character.tools.activityRefresh": "Refresh activity",
   "character.tools.activityFailed": "Activity failed to load.",
+  "character.tools.activityChanged": "Activity changed while loading. Refresh activity to try again.",
   "character.activity.character_created": "Character created",
   "character.activity.character_duplicated": "Character duplicated",
   "character.activity.character_field_set": "Field updated",

@@ -1377,7 +1377,10 @@ describe("CharacterSession online operations", () => {
     api.scriptSend(async () => ({ error: new TypeError("network down") }));
     api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4)));
     await expect(session.commitMigration("p-1")).rejects.toThrow();
-    await session.commitMigration("p-1");
+    // Observe the scheduled retry, rather than racing it with another user
+    // command after it may already have acknowledged the first migration.
+    await vi.waitFor(() => expect(api.sent).toHaveLength(2));
+    await session.whenIdle();
     expect(api.sent).toHaveLength(2);
     expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
     session.dispose();
@@ -2074,9 +2077,11 @@ describe("CharacterSession uncertain online outcomes", () => {
     expect(session.getSnapshot().lastRoll).toEqual(roll);
     expect(session.getSnapshot().lastMigration).toBeNull();
     api.scriptOpenView(viewFor("char-1", 3));
-    api.scriptSend(async () => successEnvelope(viewFor("char-1", 4)));
+    const migrated = viewFor("char-1", 4);
+    migrated.reconciliation.commandExecutionId = "m-9";
+    api.scriptSend(async () => successEnvelope(migrated));
     await session.commitMigration("p-1");
-    expect(session.getSnapshot().lastMigration).toEqual({ operation: "commit", previewId: "p-1", revision: 4 });
+    expect(session.getSnapshot().lastMigration).toEqual({ operation: "commit", previewId: "p-1", migrationId: "m-9", revision: 4 });
     // Authoritative action results survive later online acknowledgments.
     expect(session.getSnapshot().lastRoll).toEqual(roll);
     api.scriptOpenView(viewFor("char-1", 4));
@@ -2176,7 +2181,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       await session.commitMigration("p-1");
       expect(api.sent).toHaveLength(2);
       expect(api.sent[1]?.body.idempotencyKey).not.toBe(api.sent[0]?.body.idempotencyKey);
-      expect(session.getSnapshot().lastMigration).toEqual({ operation: "commit", previewId: "p-1", revision: 4 });
+      expect(session.getSnapshot().lastMigration).toEqual({ operation: "commit", previewId: "p-1", migrationId: null, revision: 4 });
       session.dispose();
       await store.close();
     });
@@ -2621,6 +2626,28 @@ function activityPage(events: Array<{ id: string }>, nextCursor: string | null):
 }
 
 describe("CharacterSession activity cache", () => {
+  it("waits for initial reconciliation before reading and caching early Activity", async () => {
+    const { api, session, store } = await makeHarness();
+    let finish!: (response: OpenCharacterResponse) => void;
+    vi.spyOn(api, "open").mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    api.scriptActivity(activityPage([{ id: "after-initial-confirmation" }], null));
+    const opening = session.open();
+    try {
+      await vi.waitFor(() => expect(finish).toBeDefined());
+      const activity = session.fetchActivityPage(null).then(value => ({ value }), error => ({ error }));
+      expect(api.activityCalls).toEqual([]);
+      finish({ character: viewFor("char-1", 1), requestId: "initial" });
+      await opening;
+      expect(await activity).toMatchObject({ value: { events: [{ id: "after-initial-confirmation" }], stale: false } });
+      expect((await store.readActivityPage(ARM, "char-1", null))?.events.map(e => e.id)).toEqual(["after-initial-confirmation"]);
+    } finally {
+      finish?.({ character: viewFor("char-1", 1), requestId: "cleanup" });
+      await opening;
+      session.dispose();
+      await store.close();
+    }
+  });
+
   it("fetches a page online, caches it and forwards the server cursor", async () => {
     const { api, session, store } = await makeHarness();
     api.scriptOpenView(viewFor("char-1", 1));

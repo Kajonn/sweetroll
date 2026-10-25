@@ -660,6 +660,7 @@ describe("CharacterRoute workflows", () => {
       openView: () => current,
       onSend: () => {
         current = actionView(current.reconciliation.revision + 1);
+        current.reconciliation.commandExecutionId = "migration-execution-9";
         return makeEnvelope(current);
       },
     });
@@ -690,7 +691,7 @@ describe("CharacterRoute workflows", () => {
       expect(await screen.findByText(/last migration can be rolled back/i)).toBeVisible();
       await user.click(screen.getByRole("button", { name: "Roll back migration" }));
       await waitFor(() => expect(api.send).toHaveBeenCalledTimes(2));
-      expect(api.send.mock.calls[1]?.[0].path).toBe(`/characters/${CHARACTER_ID}/migrations/p-1/rollback`);
+      expect(api.send.mock.calls[1]?.[0].path).toBe(`/characters/${CHARACTER_ID}/migrations/migration-execution-9/rollback`);
     } finally {
       await store.close();
     }

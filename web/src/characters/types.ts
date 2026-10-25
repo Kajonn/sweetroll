@@ -77,11 +77,12 @@ export type ReviewExpiredAttemptInput = {
 /**
  * The latest successful online lifecycle/migration result, preserved for
  * later UI consumption (e.g. offering rollback without manual guessing).
- * The migration identifier comes from the deliberate commit/rollback input;
- * the server commit response carries no separate migration id.
+ * A committed migration is identified by the server's command execution ID.
+ * Keep its preview ID for request correlation, never as a rollback fallback.
+ * A missing execution ID leaves automatic rollback unavailable.
  */
 export type LastMigrationResult =
-  | { operation: "commit"; previewId: string; revision: number }
+  | { operation: "commit"; previewId: string; migrationId: string | null; revision: number }
   | { operation: "rollback"; migrationId: string; revision: number };
 export type SessionPhase =
   | "loading"

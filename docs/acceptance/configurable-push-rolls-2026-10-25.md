@@ -1,6 +1,6 @@
 # Slice C acceptance follow-up — 2026-10-25
 
-Ten bounded software acceptance scenarios passed with zero configured retries. Software acceptance was exercised against the isolated preview and in production-browser compatibility checks. **The PR remains draft:** the automatic rollback UI and an early Activity-loading race need follow-up. Passing the bounded journeys below does not close those findings or the wider device/provider-authentication gates.
+Ten bounded software acceptance scenarios passed with zero configured retries. Software acceptance was exercised against the isolated preview and in production-browser compatibility checks. The automatic rollback and early Activity findings from this run were subsequently [fixed and verified](character-tools-fixes-2026-10-25.md). The PR remains draft for the unperformed wider acceptance gates.
 
 ## Target and verification
 
@@ -27,7 +27,9 @@ Ten bounded software acceptance scenarios passed with zero configured retries. S
 
 The [structured record](configurable-push-live-2026-10-25.json) contains durations, public sampled rolls, exact fixture/deployment IDs and cleanup read-back. It excludes credentials, live idempotency keys, seeds and private server snapshots.
 
-## Findings that remain open
+## Findings observed during this run
+
+Both findings below were subsequently resolved; see the [repair evidence](character-tools-fixes-2026-10-25.md). The original observations are retained for traceability.
 
 1. **Automatic migration rollback uses the wrong ID (medium).** Migration persistence uses the command execution ID as `character_migrations.id`. The commit exposes it in `result.character.reconciliation.commandExecutionId`. The session instead records the preview ID for its last commit, and `CharacterTools` selects that preview ID for automatic rollback. A preview-ID rollback returned 404 in the live probe. Correct the recorded/UI migration identity and add a UI commit → automatic rollback regression before closing this gate. Supplying the authoritative execution ID exercises the server contract separately.
 2. **Early Activity can show a raw cache-generation error (low).** Opening Activity during initial character reconciliation produced `stale activity save: character generation changed` instead of the requested history. The privacy guard correctly refused the stale cache write. The completed transition journeys wait for editing readiness before opening history; this does not repair the early-click UX. Add bounded retry or a clear loading/reload state while retaining the generation guard, then verify an immediate Activity click.
@@ -44,7 +46,7 @@ All 21 run-created systems were read back as archived/private, including failed 
 
 ## Remaining boundary
 
-Keep the two findings above open. Live changes to the campaign's default roll audience were not performed: the public campaign settings API exposes no mutation for that internal policy; its narrowing/replay cases remain covered by the existing PostgreSQL integration suite. Broader multi-account authoring of both action sources, whole-previous-client compatibility, physical Android/iPad playtests and real provider authentication remain unclaimed. No public-release or all-acceptance-complete claim is made.
+The two findings above are repaired in the linked follow-up. Live changes to the campaign's default roll audience were not performed: the public campaign settings API exposes no mutation for that internal policy; its narrowing/replay cases remain covered by the existing PostgreSQL integration suite. Broader multi-account authoring of both action sources, whole-previous-client compatibility, physical Android/iPad playtests and real provider authentication remain unclaimed. No public-release or all-acceptance-complete claim is made.
 
 The new files run in the normal journey/offline suites. For focused local replay with their documented test database/backend configuration:
 

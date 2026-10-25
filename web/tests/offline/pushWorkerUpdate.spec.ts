@@ -17,7 +17,7 @@ async function workerBuild(page: Page, which: "controller" | "waiting") {
   }, which);
 }
 
-test("a waiting production worker preserves a committed unseen push, activates without dropping it, and clears private results on sign-out", async ({ page, context }, info) => {
+test("a waiting production worker preserves a committed unseen push, activates without dropping it, and clears private results on sign-out", async ({ page, context, browser }, info) => {
   test.setTimeout(420_000);
   const actorId = await signIn(page), system = await workspace(page.request), ids: string[] = [];
   const evidence: Record<string, unknown> = { systemId: system.id };
@@ -94,9 +94,16 @@ test("a waiting production worker preserves a committed unseen push, activates w
   } finally {
     await context.setOffline(false);
     await context.unroute(pattern);
-    if (page.isClosed()) page = await context.newPage();
-    await signIn(page);
-    evidence.cleanup = await cleanup(page.request, system.id, ids);
+    // The page's account switch can still have identity work in flight.
+    // Cleanup owns an independent cookie jar and never reuses that lifetime.
+    const owner = await browser.newContext({ baseURL: new URL(page.url()).origin, ignoreHTTPSErrors: true });
+    try {
+      const signed = await json(owner.request, "POST", "/dev/signin", { code: "code-test-a", redirectUri: new URL("/cb", page.url()).href });
+      expect(signed.userId).toBe(actorId);
+      evidence.cleanup = await cleanup(owner.request, system.id, ids);
+    } finally {
+      await owner.close();
+    }
     await info.attach("push-worker-update-evidence", { body: JSON.stringify(evidence, null, 2), contentType: "application/json" });
   }
 });

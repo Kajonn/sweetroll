@@ -38,7 +38,9 @@ Migration previews also intentionally reject sheets containing entries with 409 
 
 Invalid early edge fixtures reused input IDs and left an unowned expression; the real compiler rejected them. The final fixtures use unique action/input/expression IDs. An initial history probe raced reconciliation (finding 2). A combined item/version journey both encountered the entry-migration restriction and exceeded its fixed remote-run budget, so source/lifecycle and entry-free version cases were split without increasing their 180-second timeouts or weakening assertions. The controlled worker harness needed HTTPS for secure cookies and explicit confirmation plus completion of server sign-out. Failed setup attempts are excluded from the successful-case count.
 
-All 19 run-created systems were read back as archived/private, including failed fixture attempts. Run-created characters and campaigns were also archived; system access was restored to private and read back. The two characters left by the timed-out combined run and the workspace rejected before a fixture could return were explicitly archived and verified. Immutable published versions/history were retained. No unrelated service, deployment or user resource was changed.
+CI 132 passed its six other verification jobs but the new worker case failed during same-page account-transition cleanup. The sign-in helper now observes `/api/me` confirming the requested actor before asserting shell readiness, and cleanup authenticates the owner in an independent cookie jar. The hardened live worker replay passed with the same recovery, privacy and cleanup assertions; no assertion timeout or retry allowance was increased.
+
+All 21 run-created systems were read back as archived/private, including failed fixture attempts. Run-created characters and campaigns were also archived; system access was restored to private and read back. The two characters left by the timed-out combined run and the workspace rejected before a fixture could return were explicitly archived and verified. Immutable published versions/history were retained. No unrelated service, deployment or user resource was changed.
 
 ## Remaining boundary
 

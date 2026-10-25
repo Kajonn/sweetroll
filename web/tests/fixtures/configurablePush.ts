@@ -27,7 +27,20 @@ export async function signIn(page: Page, code = "code-test-a") {
     code,
     redirectUri: new URL("/cb", page.url()).href,
   });
-  await page.reload();
+  // Observe verification for the requested actor before inspecting shell
+  // controls. Account-transition work from the old page is not readiness.
+  await Promise.all([
+    page.waitForResponse(async response => {
+      if (!response.url().endsWith("/api/me") || response.request().method() !== "GET" || response.status() !== 200) return false;
+      try {
+        const me = await response.json();
+        return me.state === "authenticated" && me.userId === signed.userId;
+      } catch {
+        return false;
+      }
+    }),
+    page.reload(),
+  ]);
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
   return signed.userId as string;
 }

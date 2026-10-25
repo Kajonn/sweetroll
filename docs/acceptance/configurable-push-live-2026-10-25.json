@@ -1898,14 +1898,14 @@
     {
       "title": "a waiting production worker preserves a committed unseen push, activates without dropping it, and clears private results on sign-out",
       "file": "offline/pushWorkerUpdate.spec.ts",
-      "durationMs": 14271,
-      "startedAt": "2026-10-25T06:20:19.252Z",
+      "durationMs": 42782,
+      "startedAt": "2026-10-25T06:43:34.791Z",
       "attachments": [
         {
           "name": "push-worker-update-evidence",
           "data": {
-            "systemId": "202aa802-6a0d-4d53-a450-4422a47223a6",
-            "characterId": "bb4e4220-ef6e-4955-b4d2-622029d7ef22",
+            "systemId": "da08631a-c366-46dd-9c3d-cfc313d19e68",
+            "characterId": "748e4686-af09-46e0-acd9-c51fb36bb708",
             "root": {
               "actionId": "test_pool",
               "dice": [
@@ -1919,11 +1919,11 @@
                 },
                 {
                   "sides": 8,
-                  "value": 3,
+                  "value": 6,
                   "kept": true,
                   "id": "skill:0",
                   "groupId": "skill",
-                  "success": false
+                  "success": true
                 }
               ],
               "bindings": [
@@ -1948,13 +1948,13 @@
                   "value": 0
                 }
               ],
-              "total": 0,
-              "output": "Successes: 0",
+              "total": 2,
+              "output": "Successes: 2",
               "audience": "owner_only",
               "push": {
                 "version": "1.0",
-                "rollId": "b1f3581c-2c84-4901-a0f9-c798bd320ef1",
-                "rootRollId": "b1f3581c-2c84-4901-a0f9-c798bd320ef1",
+                "rollId": "d58ab4e6-15b2-4261-beab-ffbb13c233e9",
+                "rootRollId": "d58ab4e6-15b2-4261-beab-ffbb13c233e9",
                 "parentRollId": null,
                 "attempt": 0,
                 "maxAttempts": 2,
@@ -1993,7 +1993,7 @@
                     "diceIds": [
                       "skill:0"
                     ],
-                    "total": 0,
+                    "total": 1,
                     "threshold": 5
                   },
                   {
@@ -2013,7 +2013,7 @@
               "dice": [
                 {
                   "sides": 6,
-                  "value": 1,
+                  "value": 2,
                   "kept": true,
                   "id": "attribute:0",
                   "groupId": "attribute",
@@ -2021,11 +2021,11 @@
                 },
                 {
                   "sides": 8,
-                  "value": 3,
+                  "value": 6,
                   "kept": true,
                   "id": "skill:0",
                   "groupId": "skill",
-                  "success": false
+                  "success": true
                 }
               ],
               "bindings": [
@@ -2050,14 +2050,14 @@
                   "value": 0
                 }
               ],
-              "total": 0,
-              "output": "Successes: 0",
+              "total": 2,
+              "output": "Successes: 2",
               "audience": "owner_only",
               "push": {
                 "version": "1.0",
-                "rollId": "fa41a2c5-726e-4b31-a812-d4e3c43f0c56",
-                "rootRollId": "b1f3581c-2c84-4901-a0f9-c798bd320ef1",
-                "parentRollId": "b1f3581c-2c84-4901-a0f9-c798bd320ef1",
+                "rollId": "14dccc0b-9fef-402c-93b1-51909aaa96f1",
+                "rootRollId": "d58ab4e6-15b2-4261-beab-ffbb13c233e9",
+                "parentRollId": "d58ab4e6-15b2-4261-beab-ffbb13c233e9",
                 "attempt": 1,
                 "maxAttempts": 2,
                 "rerolledDiceIds": [
@@ -2067,8 +2067,8 @@
                   {
                     "groupId": "attribute",
                     "face": 1,
-                    "combinedCount": 1,
-                    "rerolledCount": 1
+                    "combinedCount": 0,
+                    "rerolledCount": 0
                   }
                 ]
               },
@@ -2097,7 +2097,7 @@
                     "diceIds": [
                       "skill:0"
                     ],
-                    "total": 0,
+                    "total": 1,
                     "threshold": 5
                   },
                   {
@@ -2121,9 +2121,9 @@
             "otherAccountOfflineDenied": true,
             "cleanup": {
               "characters": [
-                "bb4e4220-ef6e-4955-b4d2-622029d7ef22"
+                "748e4686-af09-46e0-acd9-c51fb36bb708"
               ],
-              "system": "202aa802-6a0d-4d53-a450-4422a47223a6"
+              "system": "da08631a-c366-46dd-9c3d-cfc313d19e68"
             }
           }
         }
@@ -3005,7 +3005,7 @@
     }
   ],
   "cleanupReadback": {
-    "checkedAt": "2026-10-25T06:35:34.169Z",
+    "checkedAt": "2026-10-25T06:44:56.132Z",
     "systems": [
       {
         "systemId": "07debec7-e56a-4705-9d83-4369e4ce0e90",
@@ -3049,6 +3049,11 @@
       },
       {
         "systemId": "7ee23381-1a55-479a-9b7c-1cb4f07d0033",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
+        "systemId": "86bb0e3f-c94b-46db-828c-08ffcca0cc22",
         "lifecycle": "archived",
         "access": "private"
       },
@@ -3098,6 +3103,11 @@
         "access": "private"
       },
       {
+        "systemId": "da08631a-c366-46dd-9c3d-cfc313d19e68",
+        "lifecycle": "archived",
+        "access": "private"
+      },
+      {
         "systemId": "e6743c58-b1d9-4e96-b64e-dd0713d2b207",
         "lifecycle": "archived",
         "access": "private"
@@ -3133,5 +3143,12 @@
     "Compatibility covered the actual historical v4 IndexedDB adapter and v5, including a held old connection. It did not run the whole previous client bundle.",
     "No physical-device, real provider OAuth or live campaign-default mutation acceptance.",
     "Item-bearing migrations intentionally return 409; entry-free version migration and rollback were tested separately."
-  ]
+  ],
+  "retainedCiFollowup": {
+    "run": 132,
+    "runId": 40169758032,
+    "sixOtherVerificationJobs": "success",
+    "offline": "failed in same-page account-transition cleanup",
+    "testHardening": "Observe the requested actor in /api/me before shell readiness; use an independent owner context for cleanup. Hardened worker replay passed."
+  }
 }

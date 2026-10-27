@@ -30,7 +30,7 @@
 | Pagination backend | `src/characters/index.ts` (interface+facade ~340,374,695), `src/systems/authoring.ts` (decl ~172, passthrough ~587), `src/systems/implementation/persistence/repository.ts` (impl ~296), `src/transport/http/characters.ts` (schema ~473, handler ~800) | Keyset page + filters under discovery predicate |
 | Contracts | `scripts/generate-system-contracts.ts`, `docs/contracts/openapi-v1.json`, `web/src/api/schema.d.ts`, `web/src/characters/types.ts:89-93` | Regenerate + check |
 | Library | NEW `web/src/player/` (library, onboarding, activity, account screens); `web/src/characters/api.ts` (+list client); `web/src/router.tsx` (+routes); `web/src/shell/AppShell.tsx` (bottom nav); NEW `web/tests/e2e/player*.spec.ts` | Library/search/recent + shell |
-| Theme pref | NEW migration `migrations/00NN_user_preferences.sql`; `src/identity/` (repo+index+http); `web/src/theme/theme.ts`; account screen | Account default + device override |
+| Theme pref | current schema baseline `database/schema.sql`; `src/identity/` (repo+index+http); `web/src/theme/theme.ts`; account screen | Account default + device override |
 | G4 restyle | `web/src/characters/FieldControl.tsx`, `CharacterSheet.tsx:87-199`, `CharacterTools.tsx`, `ConflictReview.tsx`, `*.module.css` | Visual restyle, same DOM contracts |
 | Auth | `src/identity/repository.ts:87-132`, `src/identity/index.ts:47-101`, `src/transport/http/dev-signin.ts`, `web/src/router.tsx` (+`/cb`), `web/src/characters/identity.ts` | Concurrency, return route, expired-session UI |
 | PWA | NEW `web/public/manifest.webmanifest` + icons; `web/index.html`; install prompt wiring; e2e PWA checks | Installable shell |
@@ -195,7 +195,7 @@ git commit -m "feat(g6): player shell with onboarding, activity, account, and PW
 ### Task 4: Account theme default with device override
 
 **Files:**
-- Create: `migrations/00NN_user_preferences.sql` (`user_preferences(user_id PK/FK users, theme_default TEXT NULL CHECK (theme_default IN ('light','dark','system')), updated_at)` — next sequence number at implementation time)
+- Modify: `database/schema.sql` (`user_preferences(user_id PK/FK users, theme_default TEXT NULL CHECK (theme_default IN ('light','dark','system')), updated_at)` in the current schema)
 - Modify: `src/identity/repository.ts` (get/set preference, actor-scoped), `src/identity/index.ts` (Module methods `getThemeDefault`/`setThemeDefault`), `src/transport/http/identity.ts` (`GET/PATCH /me/preferences`, 401 anonymous, stable codes)
 - Modify: `web/src/theme/theme.ts` (resolution: stored device preference ?? account default ?? `system`; document precedence in the `theme.ts:14-16` comment), `web/src/player/Account.tsx` (`AccountThemeSection`: device `Select` + account-default `Select` + loading/error states), `web/src/shell/AppShell.tsx:42-70` (ThemeSwitcher resolves via the same function — no fork)
 - Test: `tests/integration/identity-preferences.test.ts` (actor isolation, invalid value 4xx, anonymous 401), `web/src/theme/accountTheme.test.ts` (precedence matrix: device>account>system; account load failure → device-only fallback)
@@ -235,7 +235,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add migrations/00NN_user_preferences.sql src/identity web/src/theme web/src/player/Account.tsx web/src/shell/AppShell.tsx tests/integration/identity-preferences.test.ts
+git add database/schema.sql src/identity web/src/theme web/src/player/Account.tsx web/src/shell/AppShell.tsx tests/integration/identity-preferences.test.ts
 git commit -m "feat(g6): account theme default with device override"
 ```
 

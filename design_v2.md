@@ -26,7 +26,7 @@ The core strength versus existing VTTs is:
 
 The MVP is a modular monolith backed by PostgreSQL and object storage. System definitions are declarative, versioned documents. Math and dice expressions are parsed into a lightweight AST and evaluated by the platform; creator-supplied executable code is never run. Published system versions are immutable; campaigns and characters pin to an immutable published version. Version upgrades are excluded by the development policy in Sections 6.7 and 12.4.
 
-> **MVP scope.** Build a trustworthy shared-character-sheet and campaign platform — not a full virtual tabletop and not an auto-applying rules simulator. The first Player and GM applications are mobile-first web apps delivered as an installable PWA. Native binaries and app-store distribution are post-MVP. Simple background images, manually edited fog, GM-positioned tokens, and a restricted player display are included in I7b. Video, voice, tactical movement, dynamic lighting, marketplace payments, and arbitrary scripting are excluded from the first release.
+> **MVP scope.** Build a trustworthy shared-character-sheet and campaign platform — not a full virtual tabletop and not an auto-applying rules simulator. The first Player and GM applications are mobile-first web apps delivered as an installable PWA. Native binaries and app-store distribution are post-MVP. Simple background images, manually edited fog, GM-positioned tokens, and a restricted player display are included in I7b. Video, voice, tactical movement, dynamic lighting, marketplace payments, and arbitrary scripting are excluded from the first release tag.
 
 # 2. Positioning and differentiation
 
@@ -201,7 +201,7 @@ Grammar v0.1 is fixed by `docs/superpowers/specs/2026-09-04-system-package-contr
 
 **Named dice groups, slice B (2026-10-23 implementation):** document/package 1.1 and grammar 0.2 add declarative `group("attribute", "Attribute", dice(fields.attribute, 6))` operands. `countSuccesses` may count a named group; bare groups sum dice. A versioned calculation graph records group subtotals, thresholds, individual stable dice identities and nested operations. Entity/granted actions, receipts, persistent rolls, audience-filtered grouped history and campaign export preserve the structure. The same text-based group breakdown is used in creator preview, play, GM session results and cached activity. Legacy 1.0 packages/results/checksums/RNG order remain unchanged; character state exports continue to exclude history. See the [B contract](docs/superpowers/specs/2026-10-23-named-dice-groups.md) and [delivery plan](docs/superpowers/plans/2026-10-21-dice-pool-reliability.md) for compatibility and acceptance status. Grouped history details are returned only to readers permitted to see the originating roll, independently of sheet-read permission.
 
-Slice A was merged as PR #21. B passed all seven CI verification jobs on `aa77d09` (run 118). On 2026-10-24 isolated deployment `87604ee3-6f89-48b3-a86f-585b118fdd0d`, observed commit `ae7d1e8` with identical application code, passed named-group, legacy and production-offline live journeys; B is ready for review. Mixed-client/worker compatibility is deferred until after the first release under Section 17.0; wider device/provider-authentication gates remain open. See the [B acceptance record](docs/acceptance/named-dice-groups-2026-10-23.md). No public-release claim. Configurable pushes remain **slice C**, after B acceptance: server-owned parent-roll references, immutable lineage and transactional retry/concurrency limits. B does not reroll dice or change resources automatically.
+Slice A was merged as PR #21. B passed all seven CI verification jobs on `aa77d09` (run 118). On 2026-10-24 isolated deployment `87604ee3-6f89-48b3-a86f-585b118fdd0d`, observed commit `ae7d1e8` with identical application code, passed named-group, legacy and production-offline live journeys; B is ready for review. Mixed-client/worker compatibility is deferred until after the first release tag under Section 17.0; wider device/provider-authentication gates remain open. See the [B acceptance record](docs/acceptance/named-dice-groups-2026-10-23.md). No public-release claim. Configurable pushes remain **slice C**, after B acceptance: server-owned parent-roll references, immutable lineage and transactional retry/concurrency limits. B does not reroll dice or change resources automatically.
 
 ## 6.5 Draft, validation, and publishing
 
@@ -537,7 +537,7 @@ templates without rewriting existing immutable versions. Character/campaign
 rules-version upgrades and rollback are also excluded. See [database policy](database/README.md).
 
 Application-version migrations and compatibility with older app builds become
-requirements only after the first supported release. Before then, update the
+requirements only after the first application release tag. Before then, update the
 current database, package/API and browser-storage contracts directly and rebuild
 disposable fixtures as needed. No historical-build migration, backfill, legacy
 decoder, previous-client bundle or mixed-version service-worker matrix is required
@@ -649,15 +649,16 @@ Foundational work belongs to the first increment that needs it. For example, rep
 ## 17.0 Release status and application-version policy
 
 **Owner decision (2026-10-27):** Sweetroll has no released app version or users;
-deployments are test environments. Application-version migration and support for
-multiple app versions are post-first-release requirements. This policy takes
+deployments are test environments until the first application release Git tag
+(`v*.*.*`, used by the release workflow). App/database migration and support for
+multiple app versions are required only for changes after that tag. This policy takes
 precedence over historical plans, specifications and unchecked compatibility gates.
 
 | Phase | Required behavior |
 |---|---|
-| Before the first release (current) | Implement and verify the current app and schema. Edit the schema baseline and recreate test databases/profiles when needed. Do not add or maintain upgrade chains, one-off data repairs, old-build payload/cache adapters or mixed old/new app-client support. These are not acceptance or merge gates. |
-| First release | Record the initial supported database, API/package and browser-storage baseline. No conversion from never-released development builds is required. |
-| After the first release | Add migrations and compatibility handling when a subsequent change affects data or clients from an actually supported released version. Define the supported versions and retirement policy, and test those real transitions. |
+| Before the first release tag (current) | Implement and verify the current app and schema. Edit the schema baseline and recreate test databases/profiles when needed. Do not add or maintain upgrade chains, one-off data repairs, old-build payload/cache adapters or mixed old/new app-client support. No implementation-plan tasks or transition tests may require this work before the tag. |
+| First application release tag | Freeze and record the initial supported database, API/package and browser-storage baseline. No conversion from never-released development builds is required. |
+| After the first release tag | Add migrations and compatibility handling when a subsequent change affects data or clients from an actually supported released version. Define the supported versions and retirement policy, and test those real transitions. |
 
 Current-version schema validation, unsupported-input rejection, authorization,
 transactional integrity, exact-request retry/reload recovery and offline behavior
@@ -666,8 +667,7 @@ requirement. Creator-published rules snapshots and pinning remain supported.
 The owner also removed character/campaign upgrade previews, commits and rollback
 from the current app scope (Section 6.7); recreate test characters/campaigns when
 changing their published rules snapshot.
-Historical verification records remain evidence of what was run, not new work or
-open merge blockers under the current policy.
+The [post-tag migration plan](docs/superpowers/plans/2026-10-27-application-migration-policy.md) defines the strategy now: a frozen tagged baseline, ordered migrations for later changes, released-data/client compatibility, validation and recovery. Implement no transition code or tests before the first release tag. Dated verification records are evidence, not tasks to repeat.
 
 ## 17.1 Increment definition of done
 
@@ -678,7 +678,7 @@ Every increment must meet all applicable criteria before work begins on the next
 - Its primary workflow runs end to end without direct database changes or unpublished internal procedures.
 - Public interfaces are documented and versioned. Backend-only workflows are usable through the OpenAPI contract.
 - Authentication, authorization, validation, concurrency, idempotency, and audit requirements are implemented where the increment introduces them.
-- Current-schema initialization, deployment configuration, structured logs, health checks, and relevant operational metrics are included. Application-version migrations and backward compatibility are required only after the first release, as defined in Section 17.0.
+- Current-schema initialization, deployment configuration, structured logs, health checks, and relevant operational metrics are included. Application-version migrations and backward compatibility are required only after the first release tag, as defined in Section 17.0.
 - Unit, integration, contract, security, accessibility, responsive, offline, and end-to-end tests required by the delivered capability pass in CI.
 - Failure and recovery behavior is visible to users or HTTP callers; no operation silently loses or overwrites acknowledged state.
 - The capability is exercised by the applicable reference systems and has an explicit acceptance demonstration.

@@ -5,7 +5,8 @@ Sweetroll is the modular TypeScript application described in `design_v2.md`.
 ## Design and implementation plan
 
 - [Product design and delivery increments](design_v2.md)
-- [Release-phase version policy](design_v2.md#170-release-status-and-application-version-policy): app-version migrations and backward compatibility are required only after the first release; pre-release test databases/profiles can be recreated.
+- [Agreed post-tag migration strategy](docs/superpowers/plans/2026-10-27-application-migration-policy.md): plan now; implement transitions and their tests only after the first application release Git tag.
+- [Release-phase version policy](design_v2.md#170-release-status-and-application-version-policy): app-version migrations and backward compatibility are required only after the first application release Git tag (`v*.*.*`); pre-release test databases/profiles can be recreated.
 - [GUI integration plan](docs/superpowers/plans/2026-09-08-gui-integration.md): I4a frontend integration, I5-I7 view rollout, and I7b simple scenes/player display.
 - [Dynamic items, spells, and abilities design](docs/superpowers/specs/2026-09-26-dynamic-sheet-objects-design.md), [implementation plan](docs/superpowers/plans/2026-09-26-dynamic-objects.md), and [acceptance evidence](docs/acceptance/dynamic-objects-2026-09-26.md).
 

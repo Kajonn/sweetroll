@@ -41,15 +41,13 @@
 
 ### Characters and persistence
 
-- Create `migrations/0009_create_characters.sql`: character tables, constraints, indexes, compatibility findings, lifecycle normalization.
+- Update `database/schema.sql`: current character tables, constraints, indexes and compatibility findings; initialize lifecycle defaults directly.
 - Create `src/characters/index.ts`: public Characters Interface/types and Module implementation.
 - Create `src/characters/persistence.ts`: private SQL/transaction helpers.
 - Create `src/characters/idempotency.ts`: private execution claim/lease/finalization protocol.
 - Create `src/characters/export.ts`: canonical character export v1.
-- Create `src/characters/migration.ts`: mapping and migration-preview helpers.
 - Create `tests/integration/characters.test.ts`: PostgreSQL workflow tests.
 - Create `tests/integration/character-concurrency.test.ts`: command race/replay tests.
-- Create `tests/integration/character-migration.test.ts`: schema and migration workflow tests.
 - Create `tests/integration/character-http-acceptance.test.ts`: complete HTTP demonstration.
 - Create `tests/integration/character-load.test.ts`: bounded session-burst test.
 
@@ -335,21 +333,21 @@ git commit -m "feat: execute deterministic runtime commands"
 ### Task 4: Character Schema and System-Version Access
 
 **Files:**
-- Create: `migrations/0009_create_characters.sql`
+- Modify: `database/schema.sql`
 - Modify: `src/systems/authoring.ts`
 - Modify: `src/systems/implementation/persistence/repository.ts`
 - Modify: `src/transport/http/systems.ts`
 - Modify: `src/transport/http/systems.test.ts`
-- Modify: `tests/integration/migrations.test.ts`
+- Modify: `tests/integration/current-schema.test.ts`
 - Modify: `tests/integration/system-authoring.test.ts`
 
 **Interfaces:**
 - Consumes: existing SystemAuthoring and PostgreSQL migration patterns.
 - Produces: character schema, `SystemAuthoring.authorizeVersionUse`, acknowledged breaking publication, and stable system-delete conflict.
 
-- [x] **Step 1: Write failing production-migration assertions**
+- [x] **Step 1: Write failing current-schema assertions**
 
-Extend `migrations.test.ts` to apply actual migrations through 0009 in an isolated schema. Assert all seven character tables, `owner_only`/lifecycle/revision checks, command uniqueness, execution-ID uniqueness, pagination indexes, migration-preview expiry fields, restrictive version FK, and `compatibility_findings_json` exist.
+Extend `current-schema.test.ts` to initialize the current schema baseline in an isolated schema. Assert all current character tables, `owner_only`/lifecycle/revision checks, command uniqueness, execution-ID uniqueness, pagination indexes, restrictive version FK, and `compatibility_findings_json` exist.
 
 - [x] **Step 2: Write failing version-access and publication tests**
 
@@ -361,13 +359,13 @@ Insert a character pinned to an owned system version, call `deleteSystem`, and e
 
 - [x] **Step 4: Run integration tests and verify red**
 
-Run: `TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npx vitest run tests/integration/migrations.test.ts tests/integration/system-authoring.test.ts`
+Run: `TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npx vitest run tests/integration/current-schema.test.ts tests/integration/system-authoring.test.ts`
 
-Expected: FAIL because migration 0009 and new workflows do not exist.
+Expected: FAIL until the current schema and new workflows exist.
 
-- [x] **Step 5: Create migration 0009**
+- [x] **Step 5: Define the current schema**
 
-Create the tables and constraints from spec section 6. Store all result timestamps as ISO strings in JSON. Add `compatibility_findings_json jsonb not null default '[]'::jsonb` to `system_versions`. Normalize existing version lifecycle `active` to `published`, and change both SQL/template seeding paths to write `published` going forward.
+Create the tables and constraints from spec section 6. Store all result timestamps as ISO strings in JSON. Add `compatibility_findings_json jsonb not null default '[]'::jsonb` to `system_versions`. Create `system_versions.lifecycle` with the `published` default and seed real fixtures directly. Do not convert development rows.
 
 - [x] **Step 6: Add version-use authorization**
 
@@ -394,7 +392,7 @@ Add required `acknowledgeBreaking: boolean` to authoring and TypeBox inputs and 
 
 Change `deleteOwnedSystem` to return a discriminated repository result and map PostgreSQL `23503` to `referenced`. Authoring maps it to a stable `conflict`; HTTP returns 409.
 
-- [x] **Step 9: Run migration, integration, HTTP, contracts, and typecheck**
+- [x] **Step 9: Run initialization, integration, HTTP, contracts, and typecheck**
 
 Run: `TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run test:integration`
 
@@ -405,7 +403,7 @@ Expected: PASS after updating all `SystemAuthoring` fakes with `authorizeVersion
 - [x] **Step 10: Commit**
 
 ```bash
-git add migrations/0009_create_characters.sql src/systems src/transport/http/systems.ts src/transport/http/systems.test.ts tests/integration
+git add database/schema.sql src/systems src/transport/http/systems.ts src/transport/http/systems.test.ts tests/integration
 git commit -m "feat: add character schema and version access"
 ```
 
@@ -640,62 +638,12 @@ git commit -m "feat: manage and export characters"
 
 ---
 
-### Task 9: Character Migration Preview, Commit, and Rollback
+### Task 9: Version Conversion Removed from Pre-release Scope
 
-**Files:**
-- Create: `src/characters/migration.ts`
-- Modify: `src/characters/index.ts`
-- Modify: `src/characters/persistence.ts`
-- Create: `tests/integration/character-migration.test.ts`
-
-**Interfaces:**
-- Consumes: Runtime initialize/observe, version-use authorization, command protocol, stored compatibility findings.
-- Produces: `previewMigration`, `commitMigration`, and `rollbackMigration`.
-
-- [x] **Step 1: Write failing preview tests**
-
-Cover compatible same-ID/default migration, removed field with explicit map, literal default, invalid target field, target in another system, inaccessible/deprecated target, and 24-hour expiry. Assert preview leaves version/state/revision unchanged.
-
-- [x] **Step 2: Write failing commit tests**
-
-Assert exact candidate state/projection commit, one revision increment, consumed preview, before/after snapshots, activity/audit, stale-source rejection, expired/consumed rejection, and two concurrent commits yielding one winner.
-
-- [x] **Step 3: Write failing rollback tests**
-
-Assert rollback before 30 days restores source version/state into a new revision. Assert rollback after subsequent edit or after deadline returns conflict and preserves edits.
-
-- [x] **Step 4: Run tests and verify red**
-
-Run: `TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npx vitest run tests/integration/character-migration.test.ts`
-
-Expected: FAIL because migration workflows do not exist.
-
-- [x] **Step 5: Implement deterministic mapping**
-
-In `migration.ts`, retain same-ID compatible values; apply explicit `{ sourceFieldId, targetFieldId }` maps; apply literal defaults keyed by target field; reject duplicate targets and type-incompatible values; report dropped source IDs/defaulted target IDs/tightened constraints. Call target Runtime initialize for final validation and projection.
-
-- [x] **Step 6: Persist immutable previews**
-
-Bind preview checksum to character ID, source revision/version/checksum, target version/checksum, mappings/defaults, candidate state, projection, warnings, owner, and expiry. Do not store executable migration code.
-
-- [x] **Step 7: Implement commit and rollback transactions**
-
-Commit locks preview/character/execution, rechecks every binding, Runtime-observes stored candidate, updates pin/entity/state/revision, stores snapshots, and consumes preview atomically. Rollback requires migration commit revision still current and deadline valid, then restores source pin/state while incrementing revision.
-
-- [x] **Step 8: Run migration and all integration tests**
-
-Run: `TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run test:integration`
-
-Expected: PASS.
-
-- [x] **Step 9: Commit**
-
-```bash
-git add src/characters tests/integration/character-migration.test.ts
-git commit -m "feat: migrate characters explicitly"
-```
-
----
+No character migration previews, commits, rollback or transition tests are planned
+before the first application release tag. Keep immutable rules snapshots and create
+new test characters when changing pins. The [post-tag strategy](2026-10-27-application-migration-policy.md)
+replaces the former conversion checklist; it is not pre-release implementation work.
 
 ### Task 10: Character HTTP Adapter, OpenAPI, and Bootstrap
 

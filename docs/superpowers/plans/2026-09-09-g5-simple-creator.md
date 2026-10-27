@@ -336,7 +336,7 @@ test("editing a published reference system preserves its advanced definitions", 
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx playwright test tests/e2e/creatorToCharacter.spec.ts` from `web/` (needs backend: `npm run migrate && npm run dev:http` + `npm run web:dev` per `playwright.config.ts:17-47`)
+Run: `npx playwright test tests/e2e/creatorToCharacter.spec.ts` from `web/` (needs backend: `npm run db:init && npm run dev:http` + `npm run web:dev` per `playwright.config.ts:17-47`)
 Expected: FAIL (missing CTA / guided path)
 
 - [ ] **Step 3: Write minimal implementation**

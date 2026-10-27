@@ -22,7 +22,7 @@
 - Ordinary HTTP operations target p95 below 300 ms; session resolution is a single indexed read.
 - Uses the existing strict TypeScript config (NodeNext, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`).
 - No System, Character, or Campaign behavior; no email/password auth; no production OIDC adapter; no CSRF token issuance yet.
-- All integration tests follow the existing unique-schema pattern in `tests/integration/migrations.test.ts` and gate on `TEST_DATABASE_URL`.
+- All integration tests follow the existing unique-schema pattern in `tests/integration/current-schema.test.ts` and gate on `TEST_DATABASE_URL`.
 
 ---
 
@@ -158,7 +158,7 @@ git commit -m "feat: add identity OIDC port and test adapter"
 ### Task 2: Identity Tables Migration And Repository
 
 **Files:**
-- Create: `migrations/0001_create_identity.sql`
+- Modify: `database/schema.sql`
 - Create: `src/identity/repository.ts`
 - Create: `tests/integration/identity-repository.test.ts`
 
@@ -168,7 +168,7 @@ git commit -m "feat: add identity OIDC port and test adapter"
 
 - [x] **Step 1: Write the identity schema migration**
 
-Create `migrations/0001_create_identity.sql`:
+Update `database/schema.sql`:
 
 ```sql
 CREATE TABLE users (
@@ -463,14 +463,14 @@ Expected: PASS with 3 tests.
 
 - [x] **Step 6: Run the real migration against the compose database**
 
-Run: `docker compose up -d --wait postgres` then `DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run migrate`
+Run: `docker compose up -d --wait postgres` then `DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run db:init`
 
 Expected: `database migrations complete`; the three tables are created (verify with `psql \dt`).
 
 - [x] **Step 7: Commit**
 
 ```bash
-git add migrations/0001_create_identity.sql src/identity/repository.ts tests/integration/identity-repository.test.ts
+git add database/schema.sql src/identity/repository.ts tests/integration/identity-repository.test.ts
 git commit -m "feat: add identity persistence"
 ```
 

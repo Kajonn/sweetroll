@@ -472,7 +472,7 @@ describe("compileDocument", () => {
       .toBe("d20 + fields.bonus + inputs.edge");
   });
 
-  it("omits templates and slots from packages compiled from legacy documents", () => {
+  it("omits optional templates and slots when the source document omits them", () => {
     const document = validDocument();
     document.expressions = document.expressions.filter((expression) => expression.id !== "title_expr");
     const result = compileDocument(document, opts);

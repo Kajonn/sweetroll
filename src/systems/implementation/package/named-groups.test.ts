@@ -59,7 +59,7 @@ describe("versioned named-group package round trips", () => {
       }).ok,
     ).toBe(false);
   });
-  it("decodes legacy published packages without changing checksums or adding metadata", () => {
+  it("decodes the supported plain dice fixture without mutating its checksum or metadata", () => {
     const before = JSON.stringify(d6SuccessPoolPackage);
     expect(decodeSystemPackage(d6SuccessPoolPackage).ok).toBe(true);
     expect(JSON.stringify(d6SuccessPoolPackage)).toBe(before);

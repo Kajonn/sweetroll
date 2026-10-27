@@ -190,7 +190,7 @@ function toCachedActivityPage(record: ActivityRecord): CachedActivityPage {
 function openDatabase(name: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(name, DB_VERSION);
-    request.onupgradeneeded = (event) => {
+    request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(CHAR)) {
         db.createObjectStore(CHAR, { keyPath: ["actorId", "characterId"] });
@@ -209,9 +209,6 @@ function openDatabase(name: string): Promise<IDBDatabase> {
         db.createObjectStore(PENDING_LOGOUT, { keyPath: "key" });
       }
       if (!db.objectStoreNames.contains(TEMPLATES)) db.createObjectStore(TEMPLATES,{keyPath:["actorId","characterId"]});
-      // Old choices have no verified scope. Only this disposable cache is
-      // cleared; snapshots, queues and frozen online attempts survive.
-      else if (event.oldVersion < 4) request.transaction!.objectStore(TEMPLATES).clear();
       if (!db.objectStoreNames.contains(ACTIVITY)) {
         db.createObjectStore(ACTIVITY, { keyPath: ["actorId", "characterId", "cursorKey"] });
       }

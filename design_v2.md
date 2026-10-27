@@ -374,7 +374,7 @@ The execution checklist is [GUI integration implementation plan](docs/superpower
 | HTTP Adapter   | Wire decoding, authentication context, HTTP status mapping, OpenAPI description       | Fastify on Node.js LTS; stateless replicas               |
 | Modules        | Authorization, lifecycle rules, policy, idempotency, transactions, returned outcomes | TypeScript; workflow-level Interfaces                    |
 | Package logic  | Decode, validate, compile, canonicalize, compare, and evaluate packages               | Private in-process implementation with strict budgets    |
-| Database       | Identity, relational selectors, JSONB package/state documents, audit records          | PostgreSQL with constraints and explicit SQL migrations  |
+| Database       | Identity, relational selectors, JSONB package/state documents, audit records          | PostgreSQL with constraints and explicit current-schema initialization  |
 | External tools | OIDC and, when introduced, transactional email                                        | Narrow ports with production and deterministic adapters  |
 
 The Player and GM applications are role-oriented surfaces within the responsive web client, not separate native applications. The PWA must remain directly usable in supported mobile browsers and installable to a device home screen. A later release may package the web client for app stores, but the MVP does not select a native wrapper, depend on native-only platform interfaces, or include app-store submission work.
@@ -523,6 +523,19 @@ Mutable aggregates carry an integer revision. Update requests include the expect
 - Soft deletion for systems, campaigns, characters, and content during a configurable recovery window.
 - Immutable published packages retained while referenced by active or retained campaign data.
 - Audit/activity payloads minimize sensitive content and have an explicit retention policy.
+
+## 12.4 Development database policy (2026-10-27)
+
+The application is unreleased and all existing databases are disposable test data.
+Initialize an empty PostgreSQL database directly from `migrations/0001_current_schema.sql`.
+The generic locked/checksummed SQL runner stays in place, but historical development
+migration chains, data backfills, synthetic template repair and version-specific
+local-cache conversions are not supported. Modify the current baseline and rebuild
+test databases for schema changes; startup never resets them automatically. Seed
+missing reference templates without replacing existing immutable versions. See
+[migration policy](migrations/README.md). A supported release will establish its own
+migration policy. This does not change the generic rules-system version upgrade
+and rollback functionality in Section 6.7, or declared package-format capabilities.
 
 # 13. HTTP interface and real-time contract
 

@@ -1001,38 +1001,6 @@ it("rolls back scope invalidation when snapshot persistence fails", async () => 
   await store.close();
 });
 
-it("upgrades an unscoped v3 catalog without losing snapshots or frozen commands", async () => {
-  const name = crypto.randomUUID();
-  const character = { ...makeView("char-1", 1), campaignId: "campaign" };
-  const entry = makeEntry({ attempt: makeRequest() });
-  const attempt: OnlineAttempt = { id: "online", actorId: "actor-A", characterId: "char-1", kind: "archive", request: makeRequest(), createdAt: entry.createdAt };
-  await new Promise<void>((resolve, reject) => {
-    const request = indexedDB.open(name, 3);
-    request.onupgradeneeded = () => {
-      request.result.createObjectStore("characters", { keyPath: ["actorId", "characterId"] });
-      request.result.createObjectStore("entryTemplates", { keyPath: ["actorId", "characterId"] });
-      request.result.createObjectStore("onlineAttempts", { keyPath: ["actorId", "id"] });
-      request.result.createObjectStore("queue", { keyPath: ["actorId", "characterId", "id"] }).createIndex("by-seq", ["actorId", "characterId", "sequence"]);
-    };
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      const db = request.result;
-      const tx = db.transaction(["characters", "entryTemplates", "onlineAttempts", "queue"], "readwrite");
-      tx.objectStore("characters").put({ actorId: "actor-A", characterId: "char-1", generation: 1, confirmed: character });
-      tx.objectStore("entryTemplates").put({ actorId: "actor-A", characterId: "char-1", templates: campaignChoices });
-      tx.objectStore("queue").put(entry);
-      tx.objectStore("onlineAttempts").put(attempt);
-      tx.oncomplete = () => { db.close(); resolve(); };
-      tx.onerror = () => { db.close(); reject(tx.error); };
-    };
-  });
-  const store = await openCharacterStore(name);
-  expect(await store.readEntryTemplates("actor-A", "char-1")).toEqual([]);
-  expect(await store.read("actor-A", "char-1")).toMatchObject({ confirmed: character, entries: [entry], generation: 1 });
-  expect(await store.readOnlineAttempts("actor-A")).toEqual([attempt]);
-  await store.close();
-});
-
 it("retains grouped history across reopening without crossing accounts or surviving purge",async()=>{
  const {evaluateExpression}=await import("../ports/evaluateExpression.js");
  const evaluated=evaluateExpression({source:'countSuccesses(group("skill", "Skill", d6), 6)',env:{fields:{},inputs:{}},resultType:"number",fallback:0,bindings:{},rng:()=>1});

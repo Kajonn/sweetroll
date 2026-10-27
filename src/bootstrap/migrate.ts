@@ -16,9 +16,9 @@ try {
   await client.connect();
   await runMigrations(client, directory);
   const seeded = await seedReferenceTemplates(client);
-  if (seeded.systemsInserted > 0 || seeded.versionsReplaced > 0) {
+  if (seeded.systemsInserted > 0 || seeded.versionsInserted > 0) {
     logger.info(
-      { systemsInserted: seeded.systemsInserted, versionsReplaced: seeded.versionsReplaced },
+      { systemsInserted: seeded.systemsInserted, versionsInserted: seeded.versionsInserted },
       "reference templates seeded",
     );
   }

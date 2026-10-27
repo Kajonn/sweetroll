@@ -910,20 +910,14 @@ export const REFERENCE_TEMPLATES: ReadonlyArray<ReferenceTemplate> = [
 
 export type SeedReferenceTemplatesResult = {
   systemsInserted: number;
-  versionsReplaced: number;
+  versionsInserted: number;
 };
 
 type SeedRunner = Pick<Pool | PoolClient, "query">;
 
-function storedPackageIdentity(packageJson: unknown): { versionId: unknown; systemId: unknown } {
-  if (packageJson === null || typeof packageJson !== "object") return { versionId: null, systemId: null };
-  const record = packageJson as { versionId?: unknown; systemId?: unknown };
-  return { versionId: record.versionId, systemId: record.systemId };
-}
-
 export async function seedReferenceTemplates(runner: SeedRunner): Promise<SeedReferenceTemplatesResult> {
   let systemsInserted = 0;
-  let versionsReplaced = 0;
+  let versionsInserted = 0;
   for (const tpl of REFERENCE_TEMPLATES) {
     const inserted = await runner.query<{ id: string }>(
       `INSERT INTO systems (id, owner_id, name, access, lifecycle, created_at, updated_at)
@@ -933,79 +927,14 @@ export async function seedReferenceTemplates(runner: SeedRunner): Promise<SeedRe
       [tpl.systemId, tpl.name],
     );
     if ((inserted.rowCount ?? 0) > 0) systemsInserted += 1;
-    const existing = await runner.query<{ id: string; checksum: string; package_json: unknown }>(
-      `SELECT id, checksum, package_json
-         FROM system_versions
-        WHERE id = $1`,
-      [tpl.versionId],
-    );
-    const row = existing.rows[0];
-    if (row === undefined) {
-      await runner.query(
-        `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at)
-         VALUES ($1, $2, '1.0.0', $3, $4::jsonb, 'Template seed', 'published', now())`,
-        [tpl.versionId, tpl.systemId, tpl.package.integrity.checksum, JSON.stringify(tpl.package)],
-      );
-      versionsReplaced += 1;
-      continue;
-    }
-    const identity = storedPackageIdentity(row.package_json);
-    const alreadySeeded =
-      row.checksum === tpl.package.integrity.checksum &&
-      identity.versionId === tpl.versionId &&
-      identity.systemId === tpl.systemId;
-    if (alreadySeeded) continue;
-    // Replace placeholder ("pending:") rows and repair rows whose stored
-    // package identity drifted from the fixture, so the runtime loader's
-    // package/row identity invariant holds. Legacy rows under retired
-    // synthetic ids are removed by migration 0010, not here.
-    //
-    // RESTRICT guard (Task 11 I4): characters.system_version_id plus
-    // character_migration_previews.source/target_version_id and
-    // character_migrations.source/target_version_id reference
-    // system_versions with ON DELETE RESTRICT. A repair-by-delete would
-    // fail (23503) — or worse, remove a row live characters depend on —
-    // once drift coincides with real usage. Skip the repair, keep the old
-    // row, and log so the drift is visible instead of crashing boot.
-    const isUndefinedTable = (error: unknown): boolean =>
-      (error as { code?: string }).code === "42P01";
-    const probeReferences = async (text: string): Promise<boolean> => {
-      try {
-        const hit = await runner.query<{ one: number }>(text, [tpl.versionId]);
-        return (hit.rows.length ?? 0) > 0;
-      } catch (error) {
-        // Isolated seeder schemas (e.g. reference-templates.test.ts) have no
-        // characters/migration tables yet — undefined_table means "no references".
-        if (isUndefinedTable(error)) return false;
-        throw error;
-      }
-    };
-    let referenced = await probeReferences(
-      "SELECT 1 AS one FROM characters WHERE system_version_id = $1 LIMIT 1",
-    );
-    if (!referenced) {
-      referenced = await probeReferences(
-        "SELECT 1 AS one FROM character_migration_previews WHERE source_version_id = $1 OR target_version_id = $1 LIMIT 1",
-      );
-    }
-    if (!referenced) {
-      referenced = await probeReferences(
-        "SELECT 1 AS one FROM character_migrations WHERE source_version_id = $1 OR target_version_id = $1 LIMIT 1",
-      );
-    }
-    if (referenced) {
-      console.warn(
-        `[seedReferenceTemplates] skipping repair of ${tpl.versionId}: referenced by characters; keeping existing row`,
-      );
-      continue;
-    }
-    await runner.query("DELETE FROM system_versions WHERE id = $1", [tpl.versionId]);
-    await runner.query(
+    const version = await runner.query<{ id: string }>(
       `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at)
-       VALUES ($1, $2, '1.0.0', $3, $4::jsonb, 'Template seed', 'published', now())`,
+       VALUES ($1, $2, '1.0.0', $3, $4::jsonb, 'Template seed', 'published', now())
+       ON CONFLICT (id) DO NOTHING
+       RETURNING id`,
       [tpl.versionId, tpl.systemId, tpl.package.integrity.checksum, JSON.stringify(tpl.package)],
     );
-    versionsReplaced += 1;
+    if ((version.rowCount ?? 0) > 0) versionsInserted += 1;
   }
-  return { systemsInserted, versionsReplaced };
+  return { systemsInserted, versionsInserted };
 }

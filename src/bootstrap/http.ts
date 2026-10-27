@@ -29,12 +29,11 @@ const logger = createLogger(config.logLevel);
 const pool = createPool(config.databaseUrl, logger);
 
 // Reference template fixtures are global rows (NULL owner, link) used by
-// CloneFromTemplate. They are inserted by migration 0008 and/or this seed call
-// (idempotent — no-op once the rows are populated).
+// CloneFromTemplate. Insert missing fixtures without rewriting published versions.
 const seeded = await seedReferenceTemplates(pool);
-if (seeded.systemsInserted > 0 || seeded.versionsReplaced > 0) {
+if (seeded.systemsInserted > 0 || seeded.versionsInserted > 0) {
   logger.info(
-    { systemsInserted: seeded.systemsInserted, versionsReplaced: seeded.versionsReplaced },
+    { systemsInserted: seeded.systemsInserted, versionsInserted: seeded.versionsInserted },
     "reference templates seeded",
   );
 }

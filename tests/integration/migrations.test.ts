@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { Client } from "pg";
@@ -150,11 +148,10 @@ describeWithDatabase("runMigrations", () => {
     const lifecycles = await client.query<{ lifecycle: string }>(
       "SELECT DISTINCT lifecycle FROM system_versions ORDER BY lifecycle",
     );
-    // Migration 0010 retires the synthetic placeholder rows; the migrate
-    // process reseeds fixture-identical template rows immediately after.
+    // Schema initialization creates no placeholder data; seed real fixtures separately.
     expect(lifecycles.rows).toEqual([]);
     const seeded = await seedReferenceTemplates(client);
-    expect(seeded).toMatchObject({ systemsInserted: 3, versionsReplaced: 3 });
+    expect(seeded).toMatchObject({ systemsInserted: 3, versionsInserted: 3 });
     const reseeded = await client.query<{ id: string; lifecycle: string }>(
       "SELECT id, lifecycle FROM system_versions ORDER BY id",
     );
@@ -299,36 +296,33 @@ describeWithDatabase("runMigrations", () => {
     ]);
 
     const records = await client.query<{ filename: string }>(
-      "SELECT filename FROM schema_migrations WHERE filename = '0012_campaigns.sql'",
+      "SELECT filename FROM schema_migrations WHERE filename = '0001_current_schema.sql'",
     );
-    expect(records.rows).toEqual([{ filename: "0012_campaigns.sql" }]);
+    expect(records.rows).toEqual([{ filename: "0001_current_schema.sql" }]);
   });
 
-  it("upgrades a pre-I6 schema without changing standalone data and rolls back invalid campaign writes", async () => {
+  it("preserves standalone data on repeated initialization and rolls back invalid campaign writes", async () => {
     const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
-    const filenames = (await readdir(productionDirectory)).sort();
-    for (const filename of filenames.filter((name) => name < "0012_campaigns.sql")) {
-      await client.query(await readFile(join(productionDirectory, filename), "utf8"));
-    }
+    await runMigrations(client, productionDirectory);
 
     const userId = randomUUID();
     const systemId = randomUUID();
     const versionId = randomUUID();
     const characterId = randomUUID();
-    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Pre-I6')", [userId]);
+    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Standalone')", [userId]);
     await client.query(
       `INSERT INTO systems (id, owner_id, name, access, lifecycle)
-       VALUES ($1, $2, 'Pre-I6 system', 'private', 'active')`,
+       VALUES ($1, $2, 'Standalone system', 'private', 'active')`,
       [systemId, userId],
     );
     await client.query(
       `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle)
        VALUES ($1, $2, '1.0.0', $3, '{}'::jsonb, '', 'published')`,
-      [versionId, systemId, `pre-i6-${randomUUID()}`],
+      [versionId, systemId, `standalone-${randomUUID()}`],
     );
     await client.query(
       `INSERT INTO characters (id, owner_id, system_version_id, entity_definition_id, name, state_json)
-       VALUES ($1, $2, $3, 'character', 'Pre-I6 hero', '{}'::jsonb)`,
+       VALUES ($1, $2, $3, 'character', 'Standalone hero', '{}'::jsonb)`,
       [characterId, userId, versionId],
     );
     const before = {
@@ -338,7 +332,7 @@ describeWithDatabase("runMigrations", () => {
       characters: (await client.query("SELECT id, owner_id, name FROM characters")).rows,
     };
 
-    await client.query(await readFile(join(productionDirectory, "0012_campaigns.sql"), "utf8"));
+    await runMigrations(client, productionDirectory);
 
     expect((await client.query("SELECT id, display_name FROM users")).rows).toEqual(before.users);
     expect((await client.query("SELECT id, owner_id, name FROM systems")).rows).toEqual(before.systems);
@@ -410,35 +404,29 @@ describeWithDatabase("runMigrations", () => {
     ]);
   });
 
-  it("applies the 0013 ownership union, backfills standalone scope and rejects invalid placement", async () => {
+  it("enforces the ownership union and rejects invalid placement", async () => {
     const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
-    const filenames = (await readdir(productionDirectory)).sort();
-    // 0013 must be a fresh number: no other migration may claim it.
-    expect(filenames.filter((name) => name.startsWith("0013"))).toEqual(["0013_campaign_character_scope.sql"]);
-    for (const filename of filenames.filter((name) => name < "0013_campaign_character_scope.sql")) {
-      await client.query(await readFile(join(productionDirectory, filename), "utf8"));
-    }
+    await runMigrations(client, productionDirectory);
 
-    // Seed a full standalone footprint before 0013: user, system, version,
-    // character plus history/receipt rows that must backfill to standalone scope.
+    // Standalone state, history and receipts default to standalone scope.
     const userId = randomUUID();
     const systemId = randomUUID();
     const versionId = randomUUID();
     const characterId = randomUUID();
-    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Pre-0013')", [userId]);
+    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Current')", [userId]);
     await client.query(
       `INSERT INTO systems (id, owner_id, name, access, lifecycle)
-       VALUES ($1, $2, 'Pre-0013 system', 'private', 'active')`,
+       VALUES ($1, $2, 'Current system', 'private', 'active')`,
       [systemId, userId],
     );
     await client.query(
       `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle)
        VALUES ($1, $2, '1.0.0', $3, '{}'::jsonb, '', 'published')`,
-      [versionId, systemId, `pre-0013-${randomUUID()}`],
+      [versionId, systemId, `current-${randomUUID()}`],
     );
     await client.query(
       `INSERT INTO characters (id, owner_id, system_version_id, entity_definition_id, name, state_json)
-       VALUES ($1, $2, $3, 'character', 'Pre-0013 hero', '{"schemaVersion":"1.0","values":{}}'::jsonb)`,
+       VALUES ($1, $2, $3, 'character', 'Current hero', '{"schemaVersion":"1.0","values":{}}'::jsonb)`,
       [characterId, userId, versionId],
     );
     const executionId = randomUUID();
@@ -447,7 +435,7 @@ describeWithDatabase("runMigrations", () => {
          (actor_id, command_kind, idempotency_key, input_hash, character_id, execution_id,
           status, lease_expires_at, result_json, expires_at)
        VALUES ($1, 'character_create', $2, 'hash', $3, $4, 'completed', now(), '{}'::jsonb, now() + interval '1 day')`,
-      [userId, `pre-0013-${randomUUID()}`, characterId, executionId],
+      [userId, `current-${randomUUID()}`, characterId, executionId],
     );
     await client.query(
       `INSERT INTO character_rolls
@@ -467,9 +455,7 @@ describeWithDatabase("runMigrations", () => {
       [characterId],
     );
 
-    await client.query(await readFile(join(productionDirectory, "0013_campaign_character_scope.sql"), "utf8"));
-
-    // Standalone rows survive byte-identical: same IDs, same owner, same state.
+    // Standalone rows keep their owner and receive standalone placement defaults.
     const after = await client.query(
       `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id,
               system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle
@@ -485,7 +471,7 @@ describeWithDatabase("runMigrations", () => {
       },
     ]);
 
-    // History/receipts backfill to standalone scope (NULL) without rewrites.
+    // Standalone history and receipts default to NULL campaign scope.
     for (const table of ["character_command_executions", "character_rolls", "character_activity_events"]) {
       const scopes = await client.query(`SELECT DISTINCT scope_campaign_id FROM ${table}`);
       expect(scopes.rows).toEqual([{ scope_campaign_id: null }]);
@@ -576,40 +562,31 @@ describeWithDatabase("runMigrations", () => {
       ),
     ).rejects.toThrow();
 
-    // Full-directory double-apply (including 0013) is covered by the
-    // production-schema tests above; here the file applied once after seeding.
   });
 
-  it("applies the 0014 invitation table with hash-only storage and lifecycle guards", async () => {
+  it("enforces hash-only invitation storage and lifecycle guards", async () => {
     const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
-    const filenames = (await readdir(productionDirectory)).sort();
-    // 0014 must be a fresh number: no other migration may claim it.
-    expect(filenames.filter((name) => name.startsWith("0014"))).toEqual(["0014_campaign_invitations.sql"]);
-    for (const filename of filenames.filter((name) => name < "0014_campaign_invitations.sql")) {
-      await client.query(await readFile(join(productionDirectory, filename), "utf8"));
-    }
+    await runMigrations(client, productionDirectory);
 
     const userId = randomUUID();
     const systemId = randomUUID();
     const versionId = randomUUID();
-    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Pre-0014')", [userId]);
+    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Current')", [userId]);
     await client.query(
       `INSERT INTO systems (id, owner_id, name, access, lifecycle)
-       VALUES ($1, $2, 'Pre-0014 system', 'private', 'active')`,
+       VALUES ($1, $2, 'Current system', 'private', 'active')`,
       [systemId, userId],
     );
     await client.query(
       `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle)
        VALUES ($1, $2, '1.0.0', $3, '{}'::jsonb, '', 'published')`,
-      [versionId, systemId, `pre-0014-${randomUUID()}`],
+      [versionId, systemId, `current-${randomUUID()}`],
     );
     const campaignId = randomUUID();
     await client.query(
       `INSERT INTO campaigns (id, owner_id, system_version_id, title) VALUES ($1, $2, $3, 'Invite campaign')`,
       [campaignId, userId, versionId],
     );
-
-    await client.query(await readFile(join(productionDirectory, "0014_campaign_invitations.sql"), "utf8"));
 
     // Hash-only storage: no plaintext token column exists.
     const columns = await client.query<{ column_name: string }>(
@@ -667,35 +644,25 @@ describeWithDatabase("runMigrations", () => {
     await client.query("DELETE FROM campaigns WHERE id = $1", [campaignId]);
     const remaining = await client.query("SELECT COUNT(*)::int AS count FROM campaign_invitations");
     expect(remaining.rows).toEqual([{ count: 0 }]);
-    // (This test seeds then applies the file directly, so no
-    // schema_migrations row exists here; full-directory double-apply
-    // including 0014 is covered by the production campaign-tables test.)
   });
 
-  it("applies the 0015 content, grant and activity tables with relational guards", async () => {
+  it("enforces content, grant and activity relational guards", async () => {
     const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
-    const filenames = (await readdir(productionDirectory)).sort();
-    // 0015 must be a fresh number: no other migration may claim it.
-    expect(filenames.filter((name) => name.startsWith("0015"))).toEqual([
-      "0015_campaign_content_activity.sql",
-    ]);
-    for (const filename of filenames.filter((name) => name < "0015_campaign_content_activity.sql")) {
-      await client.query(await readFile(join(productionDirectory, filename), "utf8"));
-    }
+    await runMigrations(client, productionDirectory);
 
     const userId = randomUUID();
     const systemId = randomUUID();
     const versionId = randomUUID();
-    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Pre-0015')", [userId]);
+    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Current')", [userId]);
     await client.query(
       `INSERT INTO systems (id, owner_id, name, access, lifecycle)
-       VALUES ($1, $2, 'Pre-0015 system', 'private', 'active')`,
+       VALUES ($1, $2, 'Current system', 'private', 'active')`,
       [systemId, userId],
     );
     await client.query(
       `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle)
        VALUES ($1, $2, '1.0.0', $3, '{}'::jsonb, '', 'published')`,
-      [versionId, systemId, `pre-0015-${randomUUID()}`],
+      [versionId, systemId, `current-${randomUUID()}`],
     );
     const campaignId = randomUUID();
     await client.query(
@@ -706,8 +673,6 @@ describeWithDatabase("runMigrations", () => {
       `INSERT INTO campaign_members (campaign_id, user_id, role) VALUES ($1, $2, 'owner')`,
       [campaignId, userId],
     );
-
-    await client.query(await readFile(join(productionDirectory, "0015_campaign_content_activity.sql"), "utf8"));
 
     // The roll audience default is storage: existing rows read 'campaign'.
     const campaign = await client.query(
@@ -821,52 +786,42 @@ describeWithDatabase("runMigrations", () => {
     ).rejects.toThrow();
   });
 
-  it("applies the 0016 roll audiences and roll activity references", async () => {
+  it("enforces roll audiences and roll activity references", async () => {
     const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
-    const filenames = (await readdir(productionDirectory)).sort();
-    // 0016 must be a fresh number: no other migration may claim it.
-    expect(filenames.filter((name) => name.startsWith("0016"))).toEqual([
-      "0016_campaign_roll_audiences.sql",
-    ]);
-    for (const filename of filenames.filter((name) => name < "0016_campaign_roll_audiences.sql")) {
-      await client.query(await readFile(join(productionDirectory, filename), "utf8"));
-    }
+    await runMigrations(client, productionDirectory);
 
     const userId = randomUUID();
     const systemId = randomUUID();
     const versionId = randomUUID();
-    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Pre-0016')", [userId]);
+    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Current')", [userId]);
     await client.query(
       `INSERT INTO systems (id, owner_id, name, access, lifecycle)
-       VALUES ($1, $2, 'Pre-0016 system', 'private', 'active')`,
+       VALUES ($1, $2, 'Current system', 'private', 'active')`,
       [systemId, userId],
     );
     await client.query(
       `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle)
        VALUES ($1, $2, '1.0.0', $3, '{}'::jsonb, '', 'published')`,
-      [versionId, systemId, `pre-0016-${randomUUID()}`],
+      [versionId, systemId, `current-${randomUUID()}`],
     );
     const characterId = randomUUID();
     await client.query(
       `INSERT INTO characters (id, owner_id, system_version_id, entity_definition_id, name, state_json)
-       VALUES ($1, $2, $3, 'character', 'Pre-0016 hero', '{}'::jsonb)`,
+       VALUES ($1, $2, $3, 'character', 'Current hero', '{}'::jsonb)`,
       [characterId, userId, versionId],
     );
     const executionId = randomUUID();
-    const legacyRollId = randomUUID();
+    const ownerRollId = randomUUID();
     await client.query(
       `INSERT INTO character_rolls
          (id, character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, request_id)
        VALUES ($1, $2, $3, 'check', $4, 'd20', '[]', '[]', 12, 'Result: 12', $5)`,
-      [legacyRollId, characterId, userId, executionId, randomUUID()],
+      [ownerRollId, characterId, userId, executionId, randomUUID()],
     );
 
-    await client.query(await readFile(join(productionDirectory, "0016_campaign_roll_audiences.sql"), "utf8"));
-
-    // Legacy owner-only rows survive byte-identical; the campaign vocabulary
-    // inserts while unknown values still reject.
-    const legacy = await client.query(`SELECT audience FROM character_rolls WHERE id = $1`, [legacyRollId]);
-    expect(legacy.rows).toEqual([{ audience: "owner_only" }]);
+    // Owner-only is the default; campaign audiences are valid and unknown values reject.
+    const ownerRoll = await client.query(`SELECT audience FROM character_rolls WHERE id = $1`, [ownerRollId]);
+    expect(ownerRoll.rows).toEqual([{ audience: "owner_only" }]);
     for (const audience of ["gm_only", "campaign"] as const) {
       await client.query(
         `INSERT INTO character_rolls
@@ -895,13 +850,13 @@ describeWithDatabase("runMigrations", () => {
     await client.query(
       `INSERT INTO campaign_activity_events (campaign_id, actor_id, kind, source_roll_id, request_id)
        VALUES ($1, $2, 'roll_executed', $3, $4)`,
-      [campaignId, userId, legacyRollId, requestId],
+      [campaignId, userId, ownerRollId, requestId],
     );
     const events = await client.query(
       `SELECT kind, source_roll_id, source_content_id FROM campaign_activity_events WHERE request_id = $1`,
       [requestId],
     );
-    expect(events.rows).toEqual([{ kind: "roll_executed", source_roll_id: legacyRollId, source_content_id: null }]);
+    expect(events.rows).toEqual([{ kind: "roll_executed", source_roll_id: ownerRollId, source_content_id: null }]);
     await expect(
       client.query(
         `INSERT INTO campaign_activity_events (campaign_id, actor_id, kind, request_id)
@@ -918,13 +873,8 @@ describeWithDatabase("runMigrations", () => {
     ).rejects.toThrow();
   });
 
-  it("applies the 0017 campaign export roll index and keeps scoped export correct", async () => {
+  it("indexes campaign rolls and keeps scoped export correct", async () => {
     const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
-    const filenames = (await readdir(productionDirectory)).sort();
-    // 0017 must be a fresh number: no other migration may claim it.
-    expect(filenames.filter((name) => name.startsWith("0017"))).toEqual([
-      "0017_campaign_export_roll_index.sql",
-    ]);
     await runMigrations(client, productionDirectory);
     await runMigrations(client, productionDirectory);
 
@@ -944,16 +894,16 @@ describeWithDatabase("runMigrations", () => {
     const userId = randomUUID();
     const systemId = randomUUID();
     const versionId = randomUUID();
-    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Pre-0017')", [userId]);
+    await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Current')", [userId]);
     await client.query(
       `INSERT INTO systems (id, owner_id, name, access, lifecycle)
-       VALUES ($1, $2, 'Pre-0017 system', 'private', 'active')`,
+       VALUES ($1, $2, 'Current system', 'private', 'active')`,
       [systemId, userId],
     );
     await client.query(
       `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle)
        VALUES ($1, $2, '1.0.0', $3, '{}'::jsonb, '', 'published')`,
-      [versionId, systemId, `pre-0017-${randomUUID()}`],
+      [versionId, systemId, `current-${randomUUID()}`],
     );
     const campaignId = randomUUID();
     const otherCampaignId = randomUUID();
@@ -1001,33 +951,4 @@ describeWithDatabase("runMigrations", () => {
     expect(rolls[0]).toMatchObject({ characterId, actorId: userId, audience: "campaign" });
   });
 
-  it("normalizes existing active system versions during the 0009 upgrade", async () => {
-    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
-    const filenames = (await readdir(productionDirectory)).sort();
-    for (const filename of filenames.filter((name) => name < "0009_create_characters.sql")) {
-      await client.query(await readFile(join(productionDirectory, filename), "utf8"));
-    }
-    const systemId = randomUUID();
-    await client.query(
-      `INSERT INTO systems (id, owner_id, name, access, lifecycle)
-       VALUES ($1, NULL, 'Upgrade fixture', 'link', 'active')`,
-      [systemId],
-    );
-    await client.query(
-      `INSERT INTO system_versions
-         (system_id, semantic_version, checksum, package_json, release_notes, lifecycle)
-       VALUES ($1, '9.0.0', $2, '{}'::jsonb, '', 'active')`,
-      [systemId, `upgrade-${randomUUID()}`],
-    );
-
-    await client.query(
-      await readFile(join(productionDirectory, "0009_create_characters.sql"), "utf8"),
-    );
-
-    const version = await client.query<{ lifecycle: string }>(
-      "SELECT lifecycle FROM system_versions WHERE system_id = $1 AND semantic_version = '9.0.0'",
-      [systemId],
-    );
-    expect(version.rows).toEqual([{ lifecycle: "published" }]);
-  });
 });

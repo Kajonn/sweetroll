@@ -82,3 +82,11 @@ The default command runs HTTP. Run migrations from the same image with
 
 See [Railway setup](docs/operations/railway.md) for GitHub integration, PostgreSQL,
 media storage, environment variables, and the outstanding application-login gate.
+
+## Unreleased database development
+
+The database contains disposable test data. `npm run migrate` initializes the
+current schema and inserts missing reference templates. After changing the schema,
+recreate your test database; databases from the previous numbered migration chain
+also need recreation. Startup never resets data automatically. See
+[development database policy](migrations/README.md).

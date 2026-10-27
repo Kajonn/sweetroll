@@ -230,10 +230,21 @@ function ActivityDialog({ characterId, api, session, onClose }: { characterId: s
   };
 
   useEffect(() => {
+    let active = true;
     focusFirst(dialogRef.current);
-    void load(null, false);
+    // An effect restarted by StrictMode (or a closed dialog) must not
+    // start its own read after the shared session finishes opening.
+    void session.open().then(() => {
+      if (active) void load(null, false);
+    }, () => {
+      if (active) {
+        setError(t("character.tools.activityFailed"));
+        setLoading(false);
+      }
+    });
+    return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [characterId]);
+  }, [characterId, session]);
 
   useEffect(() => {
     if (error !== null) errorRef.current?.focus();

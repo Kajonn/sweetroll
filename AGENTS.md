@@ -12,3 +12,7 @@ The app is unreleased and databases contain only disposable test data. Follow th
 [development database policy](migrations/README.md): update the current schema
 baseline instead of adding migrations or repair code for obsolete app versions.
 Generic rules-system character/campaign upgrades remain product functionality.
+Application-version migrations and support for older app/API/package/cache/client
+versions are required only after the first release for supported released versions.
+Follow [design Section 17.0](design_v2.md#170-release-status-and-application-version-policy);
+older compatibility checklists must not introduce pre-release acceptance or merge gates.

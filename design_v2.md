@@ -201,7 +201,7 @@ Grammar v0.1 is fixed by `docs/superpowers/specs/2026-09-04-system-package-contr
 
 **Named dice groups, slice B (2026-10-23 implementation):** document/package 1.1 and grammar 0.2 add declarative `group("attribute", "Attribute", dice(fields.attribute, 6))` operands. `countSuccesses` may count a named group; bare groups sum dice. A versioned calculation graph records group subtotals, thresholds, individual stable dice identities and nested operations. Entity/granted actions, receipts, persistent rolls, audience-filtered grouped history and campaign export preserve the structure. The same text-based group breakdown is used in creator preview, play, GM session results and cached activity. Legacy 1.0 packages/results/checksums/RNG order remain unchanged; character state exports continue to exclude history. See the [B contract](docs/superpowers/specs/2026-10-23-named-dice-groups.md) and [delivery plan](docs/superpowers/plans/2026-10-21-dice-pool-reliability.md) for compatibility and acceptance status. Grouped history details are returned only to readers permitted to see the originating roll, independently of sheet-read permission.
 
-Slice A was merged as PR #21. B passed all seven CI verification jobs on `aa77d09` (run 118). On 2026-10-24 isolated deployment `87604ee3-6f89-48b3-a86f-585b118fdd0d`, observed commit `ae7d1e8` with identical application code, passed named-group, legacy and production-offline live journeys; B is ready for review. Additional mixed-client/worker compatibility cases and wider device/provider-authentication gates remain open. See the [B acceptance record](docs/acceptance/named-dice-groups-2026-10-23.md). No public-release claim. Configurable pushes remain **slice C**, after B acceptance: server-owned parent-roll references, immutable lineage and transactional retry/concurrency limits. B does not reroll dice or change resources automatically.
+Slice A was merged as PR #21. B passed all seven CI verification jobs on `aa77d09` (run 118). On 2026-10-24 isolated deployment `87604ee3-6f89-48b3-a86f-585b118fdd0d`, observed commit `ae7d1e8` with identical application code, passed named-group, legacy and production-offline live journeys; B is ready for review. Mixed-client/worker compatibility is deferred until after the first release under Section 17.0; wider device/provider-authentication gates remain open. See the [B acceptance record](docs/acceptance/named-dice-groups-2026-10-23.md). No public-release claim. Configurable pushes remain **slice C**, after B acceptance: server-owned parent-roll references, immutable lineage and transactional retry/concurrency limits. B does not reroll dice or change resources automatically.
 
 ## 6.5 Draft, validation, and publishing
 
@@ -537,6 +537,14 @@ missing reference templates without replacing existing immutable versions. See
 migration policy. This does not change the generic rules-system version upgrade
 and rollback functionality in Section 6.7, or declared package-format capabilities.
 
+Application-version migrations and compatibility with older app builds become
+requirements only after the first supported release. Before then, update the
+current database, package/API and browser-storage contracts directly and rebuild
+disposable fixtures as needed. No historical-build migration, backfill, legacy
+decoder, previous-client bundle or mixed-version service-worker matrix is required
+for an increment's acceptance or merge. The release-phase policy in Section 17.0
+supersedes older implementation checklists that prescribe such work.
+
 # 13. HTTP interface and real-time contract
 
 Expose a versioned REST HTTP interface described by OpenAPI. Use resource-oriented reads and command endpoints for behavior that must enforce rules atomically. Each endpoint maps to one deep Module call rather than reproducing authorization, validation, or transaction ordering in the HTTP Adapter. Cursor pagination is required for potentially unbounded lists. Every error has a stable code, human message, request ID, and optional field paths.
@@ -637,6 +645,28 @@ Delivery retains I1-I7 and adds I4a for GUI integration and I7b for simple scene
 
 Foundational work belongs to the first increment that needs it. For example, repository setup, CI/CD, identity seams, database conventions, and baseline observability are tasks in I1 rather than a separate non-functional milestone.
 
+## 17.0 Release status and application-version policy
+
+**Owner decision (2026-10-27):** Sweetroll has no released app version or users;
+deployments are test environments. Application-version migration and support for
+multiple app versions are post-first-release requirements. This policy takes
+precedence over historical plans, specifications and unchecked compatibility gates.
+
+| Phase | Required behavior |
+|---|---|
+| Before the first release (current) | Implement and verify the current app and schema. Edit the schema baseline and recreate test databases/profiles when needed. Do not add or maintain upgrade chains, one-off data repairs, old-build payload/cache adapters or mixed old/new app-client support. These are not acceptance or merge gates. |
+| First release | Record the initial supported database, API/package and browser-storage baseline. No conversion from never-released development builds is required. |
+| After the first release | Add migrations and compatibility handling when a subsequent change affects data or clients from an actually supported released version. Define the supported versions and retirement policy, and test those real transitions. |
+
+Current-version schema validation, unsupported-input rejection, authorization,
+transactional integrity, exact-request retry/reload recovery and offline behavior
+remain required. Supported browser vendors/versions are a separate platform
+requirement. Creator-published rules-system versions, pinning and generic explicit
+character/campaign upgrades are product functionality (Section 6.7); they do not
+create a requirement to preserve obsolete application builds or their test data.
+Historical verification records remain evidence of what was run, not new work or
+open merge blockers under the current policy.
+
 ## 17.1 Increment definition of done
 
 Every increment must meet all applicable criteria before work begins on the next increment:
@@ -646,7 +676,7 @@ Every increment must meet all applicable criteria before work begins on the next
 - Its primary workflow runs end to end without direct database changes or unpublished internal procedures.
 - Public interfaces are documented and versioned. Backend-only workflows are usable through the OpenAPI contract.
 - Authentication, authorization, validation, concurrency, idempotency, and audit requirements are implemented where the increment introduces them.
-- Database migrations, deployment configuration, structured logs, health checks, and relevant operational metrics are included.
+- Current-schema initialization, deployment configuration, structured logs, health checks, and relevant operational metrics are included. Application-version migrations and backward compatibility are required only after the first release, as defined in Section 17.0.
 - Unit, integration, contract, security, accessibility, responsive, offline, and end-to-end tests required by the delivered capability pass in CI.
 - Failure and recovery behavior is visible to users or HTTP callers; no operation silently loses or overwrites acknowledged state.
 - The capability is exercised by the applicable reference systems and has an explicit acceptance demonstration.

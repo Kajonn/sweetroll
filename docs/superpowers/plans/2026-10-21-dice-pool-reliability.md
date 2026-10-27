@@ -1,6 +1,8 @@
 # Dice pool reliability and push-roll delivery plan
 
-**Status (2026-10-24):** slice A merged as PR #21 (`740204f`). Slice B is implemented on `feat/named-dice-groups` against its [versioned contract](../specs/2026-10-23-named-dice-groups.md), with observed compiler/evaluator, editor and async-focus red → green. All seven CI jobs passed on application `aa77d09` (run 118). Isolated deployment `ae7d1e8` has identical application code and passed named-group, retained legacy and production-offline live journeys; B is ready for review. See the [B acceptance record](../../acceptance/named-dice-groups-2026-10-23.md) for exact identities and limitations. The compatibility bundle and wider release gates remain open; C is not started. No full-release claim.
+**Owner scope decision (2026-10-27):** Follow [design Section 17.0](../../../design_v2.md#170-release-status-and-application-version-policy). The app is unreleased and test data is disposable. Application-version migrations, old-build package/receipt/cache conversion and previous/mixed-client compatibility are deferred until after the first release; they are not current acceptance or merge gates. Edit the current schema baseline instead of adding historical upgrade migrations. Current-format validation, supported dice behavior, permissions and exact-request online/offline recovery remain required. This decision supersedes older compatibility instructions and open-gate wording below; recorded completed checks remain historical evidence.
+
+**Status (2026-10-24):** slice A merged as PR #21 (`740204f`). Slice B is implemented on `feat/named-dice-groups` against its [versioned contract](../specs/2026-10-23-named-dice-groups.md), with observed compiler/evaluator, editor and async-focus red → green. All seven CI jobs passed on application `aa77d09` (run 118). Isolated deployment `ae7d1e8` has identical application code and passed named-group, retained legacy and production-offline live journeys; B is ready for review. See the [B acceptance record](../../acceptance/named-dice-groups-2026-10-23.md) for exact identities and limitations. Application-version compatibility is deferred until after the first release; wider release gates remain open. This dated status predates C. No full-release claim.
 **Baseline:** `4ab950c` (`main`, PR #19 merged), checked against remote `main` on 2026-10-21.
 **Goal:** make current dice-pool authoring and execution trustworthy, then extend the existing engine with named dice groups and configurable push rolls.
 **Authority:** [design_v2.md §6.4](../../../design_v2.md#64-rules-and-expression-engine), [expression engine design](../specs/2026-09-04-system-expression-engine-design.md), [package contract](../specs/2026-09-04-system-package-contract-design.md), [original engine plan](2026-09-04-system-expression-engine.md), and [GUI integration gates](2026-09-08-gui-integration.md).
@@ -95,7 +97,7 @@ The review ran 75 focused backend tests and 25 frontend tests successfully. Sepa
 - [x] Run an author → assess → preview → publish → create-character journey using a license-neutral pool system, with attributes, skill, a situational dice modifier, a resource, and a system item-granted roll.
 - [x] Prove invalid formula rejection, custom formula preservation after reload, truthful preview, valid zero pool, negative-pool error/correction, valid roll/retry, and item-granted parity through actual UI and HTTP. Retain d20/PbtA journeys.
 - [x] Run Node 24 checks: root `npm test`, `npm run test:integration`, `npm run typecheck`, `npm run contracts:check`, `npm run build`; then `npm run web:test`, `npm run web:typecheck`, `npm run web:build`, canonical `npm run web:test:e2e` and `npm run web:test:offline`. Use the repository's real isolated DB/ports and runner configuration; do not count skips as passing DB/browser coverage.
-- [ ] Verify the production web build, offline reopening/queued failed-action review where supported, and historical result/receipt decoding. Do not add a new offline or GM command queue as part of A.
+- [ ] Verify the production web build, offline reopening/queued failed-action review where supported, and current-format result/receipt decoding. Historical app-build decoding is deferred until after the first release. Do not add a new offline or GM command queue as part of A.
 - [ ] Check 360/768/1280 widths, a 320px overflow probe, light/dark themes, keyboard/focus, and error recovery. Keep physical-device and real-provider authentication checks open if unavailable; do not change screenshot baselines merely to pass.
 - [x] Before deployed acceptance, verify the acceptance service's source branch, exact deployment commit, completed build/migrations, `/health/ready`, and loaded frontend/service-worker assets. Test a dedicated branch preview or acceptance after merge; keep production sources unchanged.
 - [x] Repeat the core pool and item journey against that verified deployment; record tested commit, red/green commands, CI, local/live evidence, browser/viewport/theme, failures, and limitations. Update this plan and GUI/design status only from observed results.
@@ -104,22 +106,22 @@ The review ran 75 focused backend tests and 25 frontend tests successfully. Sepa
 
 ## Task 6 — Design and deliver structured, named dice groups (slice B, TDD)
 
-**Files/seams:** expression/package schemas, compiler/evaluator/rendering, `src/systems/runtime.ts`, granted actions, Characters persistence/export, HTTP contracts, generated client types, authoring controls, player/GM result/history surfaces, and their existing tests. Add a new immutable SQL migration only if persisted storage requires it.
+**Files/seams:** expression/package schemas, compiler/evaluator/rendering, `src/systems/runtime.ts`, granted actions, Characters persistence/export, HTTP contracts, generated client types, authoring controls, player/GM result/history surfaces, and their existing tests. Update the current schema baseline if persisted storage requires it; rebuild disposable test databases.
 
 - [x] First write a versioned successor contract and update `design_v2.md` plus package/expression specs. Specify declarative group IDs/labels, count expressions, die sizes, thresholds, calculation terms and their operations, and stable per-die identity. Keep existing scalar `total` and legacy decoding meaningful.
 - [x] Distinguish sum terms from success-count terms; preserve group identity through nested/multiple terms rather than adding one global `mode` flag. A mixed expression cannot be reconstructed correctly from a flat dice sum. Per-die/group metadata must describe thresholds and results without relying on display color alone.
-- [ ] Define compatibility before code: old published packages and stored receipts/results still load without mutation; new features require a capable package/engine version. Add import/export, clone, preview/publish, upgrade/rollback and mixed-client/service-worker tests; reject unsupported versions clearly. Do not silently backfill old group identities or change checksums.
+- [ ] Verify current-format import/export, clone, preview/publish and result/receipt round trips, with clear rejection of unsupported inputs. Preserve immutable saved results within the current app. Old app-format decoding, migration and mixed-client/service-worker compatibility are in the post-first-release backlog below.
 - [x] Red → green: a three-group fixture uses distinct attribute, skill and gear counts, including an empty group, a situational modifier, different group thresholds, and mixed sum/count terms. Assert exact structured results under injected RNG and total/dice budget enforcement across all groups.
 - [x] Preserve old RNG draw order for legacy expressions. New grouped expressions have documented deterministic order. Server-owned IDs/metadata cannot be injected or changed by client-supplied roll outcomes.
 - [x] Carry the structured result through runtime, item-granted actions, persistence, command replay, campaign audiences, activity/history, export, transport, frontend session/cache and display. Test full round trips and legacy result fallback, not only evaluator output.
 - [x] Add guided pool authoring using existing definition choices, with custom expression editing preserved. Show separate group dice/counts, successes, kept/discarded state and a truthful breakdown in preview and actual play.
 - [x] Run Task 5's relevant/full verification matrix and record a separate B acceptance result before introducing push commands.
 
-**Gate:** named groups and structured calculations survive the full author-to-player lifecycle without changing historical package/result behavior. B alone does not reroll anything.
+**Gate:** named groups and structured calculations survive the full current-app author-to-player lifecycle without rewriting saved results. Historical app-version compatibility is not a pre-release gate. B alone does not reroll anything.
 
 ## Task 7 — Design and deliver configurable pushes (slice C, TDD)
 
-**Files/seams:** versioned action/package definitions; a pure eligibility/result evaluator within Systems; Characters command/idempotency/persistence and a new immutable migration for lineage constraints if needed; character HTTP/OpenAPI/client contracts; existing session, player/GM roll UI, history/export and tests.
+**Files/seams:** versioned action/package definitions; a pure eligibility/result evaluator within Systems; Characters command/idempotency/persistence and the current schema baseline for lineage constraints if needed; character HTTP/OpenAPI/client contracts; existing session, player/GM roll UI, history/export and tests.
 
 - [ ] Before code, specify a bounded declarative policy per action/group: pushable dice, locked face values, maximum attempts, recalculation of totals, reported face outcomes, and whether pushing a successful or empty roll is permitted. No arbitrary predicates, scripts, or automatic state effects.
 - [ ] Define a push command referencing an authoritative saved parent roll ID and expected revision, with its own idempotency key. Load the original dice, groups, bindings and pinned rules server-side; accept no replacement dice, seed, eligibility list, count, or total from the client.
@@ -134,12 +136,24 @@ The review ran 75 focused backend tests and 25 frontend tests successfully. Sepa
 
 **Gate:** a push is an authorized, traceable transformation of a saved roll, with no extra rerolls from retries/races and no loss or disclosure of historical results.
 
+## Post-first-release compatibility backlog
+
+These tasks become applicable only to subsequent changes involving an actually
+supported released version. They are deferred, not unfinished gates for A/B/C:
+
+- [ ] Define supported released app, API/package and local-storage versions and their retirement policy.
+- [ ] Implement and test required database upgrades and released-format receipt/result/cache migrations against that baseline.
+- [ ] Verify previous/current released client and service-worker coexistence, pending-request recovery and explicit unsupported-version handling where the support policy requires them.
+
+No support or migration path from never-released development builds is required.
+Generic rules-system content versioning remains distinct from app-release compatibility.
+
 ## Delivery tracking
 
 | Slice | Contract/spec | Red → green | CI | Deployed journey | Status |
 |---|---|---|---|---|---|
 | A | Package/expression specs updated; `actionDiagnostics` contract generated | R1–R4 observed red → green | Run 112: all seven verification jobs passed | `ad5de63`, 2026-10-23: core journey and offline reopening passed | Ready for A review; unchecked bundles and wider release gates remain |
-| B | [Contract 1.1 / grammar 0.2](../specs/2026-10-23-named-dice-groups.md) | Group evaluator/editor and async focus observed red → green | Run 118: all seven verification jobs passed | `ae7d1e8`, 2026-10-24: named groups, legacy and production-offline journeys passed | Ready for B review; compatibility bundle and wider release gates remain |
+| B | [Contract 1.1 / grammar 0.2](../specs/2026-10-23-named-dice-groups.md) | Group evaluator/editor and async focus observed red → green | Run 118: all seven verification jobs passed | `ae7d1e8`, 2026-10-24: named groups, legacy and production-offline journeys passed | Ready for B review; app-version compatibility deferred, wider release gates remain |
 | C | Push/lineage policy required in Task 7 | Pending | Pending | Pending | After B |
 
 This document records execution steps. No checkbox or green test count from the original engine plan closes these new findings or extension gates.
@@ -168,4 +182,4 @@ Reviewed Railway patch `eb9e086b-a72f-423e-8668-707d45b2a8f8` pins the isolated 
 
 Isolated deployment `87604ee3-6f89-48b3-a86f-585b118fdd0d` reached SUCCESS on observed commit `ae7d1e8`, with completed migrations and healthy readiness. The service configuration reports pin `aa77d09`; the deployed metadata reports `ae7d1e8`. Only three documentation files differ, so application code matches CI run 118. Served HTML, JS, CSS, worker and manifest match the deployed source rebuild byte for byte. Three live journeys passed with zero retries: named groups (83.530s), legacy pool reliability (79.619s) and production-worker offline grouped history (65.786s). A separate persisted-history probe verified group membership, dice identity, subtotals and total consistency; test-created systems and characters were archived and read back. See [the B acceptance record](../../acceptance/named-dice-groups-2026-10-23.md#isolated-deployed-acceptance--2026-10-24) for exact deployment/artifact/resource IDs, environment and remaining limitations.
 
-This completes B's relevant verification/deployed core gate and makes PR #22 ready for review. The combined compatibility checkbox still requires additional explicit mixed old/new client/worker cases; physical-device, provider-authentication and wider G9 gates remain open. Slice C has not started and requires its own contract and execution evidence.
+This completes B's relevant verification/deployed core gate and makes PR #22 ready for review. The former mixed old/new client/worker requirement is deferred until after the first release by the 2026-10-27 owner decision; physical-device, provider-authentication and wider G9 gates remain open. Slice C has not started and requires its own contract and execution evidence.

@@ -22,4 +22,6 @@ cleared instead of adding compatibility conversions for obsolete local schemas.
 This policy does not remove the product's generic character/campaign upgrade and
 rollback features: those move player data between creator-published rules-system
 versions, independently of application releases. Establish a migration baseline
-and append-only upgrade policy when the first supported app release is prepared.
+at the first supported app release. Only subsequent releases require upgrade and
+compatibility paths for supported released versions; never-released test builds
+need no migration path. See [product delivery policy](../design_v2.md#170-release-status-and-application-version-policy).

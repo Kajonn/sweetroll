@@ -15,7 +15,7 @@ test("creator publishes push rules; entity and item pushes preserve the original
   page,
 }, info) => {
   test.setTimeout(180000);
-  await signIn(page);
+  await signIn(page, process.env.PUSH_ACCEPTANCE_AUTHOR_CODE ?? "code-test-a");
   const created = await workspace(page.request, namedDicePoolDocument()),
     systemId = created.id;
   const characters: string[] = [];

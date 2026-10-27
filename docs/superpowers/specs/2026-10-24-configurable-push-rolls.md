@@ -1,5 +1,7 @@
 # Configurable pushes — slice C contract
 
+**Owner scope decision (2026-10-27):** Sweetroll has no release or existing users. Client/data upgrades, character-version migration/rollback and compatibility with older clients are deferred, outside the current slice and its merge acceptance. Historical version-transition requirements below describe future behavior; they do not require implementation or additional tests now. Current authentication, authorization, source/placement checks, immutable saved rolls and exact-request offline recovery remain in scope.
+
 Status: implemented in draft PR #23 after merged B (`759323a`); review corrections passed CI 129 and [core isolated live journeys](../../acceptance/configurable-push-rolls-2026-10-24.md) passed on `f75cb02`. Full compatibility/transition acceptance remains open. Follow the [C execution plan](../plans/2026-10-24-configurable-push-rolls.md) and [review regression record](../../acceptance/configurable-push-review-2026-10-24.md). The linked live record defines the tested deployment and its limits.
 
 ## 1. Version and supported policy

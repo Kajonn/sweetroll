@@ -1,5 +1,7 @@
 # Dice pool reliability and push-roll delivery plan
 
+**Owner scope decision (2026-10-27):** There is no released application or existing user data. Upgrade, migration/rollback and historical-client compatibility are future work, not current implementation or merge requirements. The [C plan](2026-10-24-configurable-push-rolls.md) defines the narrowed fresh-system acceptance scope.
+
 **Status (2026-10-24, after B merge):** slice A merged as PR #21 (`740204f`), B as PR #22 (`759323a`). B's final branch head `4cfc04a` passed all seven verification jobs in [run 121](https://github.com/Kajonn/sweetroll/actions/runs/40109298631); earlier [B live acceptance](../../acceptance/named-dice-groups-2026-10-23.md) was on `ae7d1e8`, before the later parser fix. Slice C's [versioned push contract](../specs/2026-10-24-configurable-push-rolls.md) and [execution plan](2026-10-24-configurable-push-rolls.md) now define the before-code prerequisite. C implementation/acceptance, the B compatibility bundle and wider release gates remain open. No full-release claim.
 **Baseline:** `4ab950c` (`main`, PR #19 merged), checked against remote `main` on 2026-10-21.
 **Goal:** make current dice-pool authoring and execution trustworthy, then extend the existing engine with named dice groups and configurable push rolls.
@@ -14,7 +16,7 @@
 | B — structured results | Named dice groups and an explicit calculation breakdown survive execution, persistence, transport, history, export, and display. | Task 6, after A. Versioned contract and compatibility design precede implementation. |
 | C — push rolls | An authorized player pushes a saved roll under declarative eligibility and attempt limits; retries and concurrent requests cannot grant extra attempts. | Task 7, after B. A new command references the authoritative parent roll. |
 
-Implement and review A first, B second, and C third. Do not wait for B/C to repair A, or declare full dice-pool support from the basic fixture. B is delivered with package 1.1 / grammar 0.2. C's planned package 1.2 keeps pushes outside formula grammar: an explicit command operates on an authoritative saved roll. C remains unimplemented; its contract/plan does not change current runtime capabilities.
+Implement and review A first, B second, and C third. Do not wait for B/C to repair A, or declare full dice-pool support from the basic fixture. B is delivered with package 1.1 / grammar 0.2. C's planned package 1.2 keeps pushes outside formula grammar: an explicit command operates on an authoritative saved roll. C is implemented in PR #23; its live acceptance is tracked in the C plan. No upgrade/migration work is required for this pre-release slice.
 
 Keep arbitrary scripting, collection traversal, automatic damage/resource effects, exploding dice, custom faces, and unrelated editor redesign outside this plan. Push consequences can be reported for manual bookkeeping without introducing an effect engine. Existing personal/campaign data-only entries continue to grant no actions.
 
@@ -179,3 +181,10 @@ After B merged, main `759323a` was reviewed for command/replay, ordinary roll re
 ### Slice C acceptance follow-up — 2026-10-25
 
 [PR #23](https://github.com/Kajonn/sweetroll/pull/23) implements C; the earlier contract-only paragraph describes the initial planning checkpoint. [The acceptance follow-up](../../acceptance/configurable-push-rolls-2026-10-25.md) records ten passed bounded software scenarios on the unchanged verified application, plus canonical transition, worker-update and adapter-compatibility tests. The automatic rollback ID mismatch and early Activity-loading error were subsequently [repaired and verified](../../acceptance/character-tools-fixes-2026-10-25.md). The C plan retains the unperformed wider release gates; the PR remains draft.
+
+
+### Scoped C acceptance — 2026-10-27
+
+[Current deployed acceptance](../../acceptance/configurable-push-rolls-2026-10-27.md) passed nine current-scope browser journeys on exact application `dfae37f`, isolated deployment `90462834-5fbd-4aea-865c-2f9cdc9680b5`, with all five served artifacts matching the tested source rebuild. CI 135 passed all seven jobs. Independent cleanup read-back verified nine archived/private systems, nine archived characters and three archived campaigns. Two independent authors exercised policy authoring, publish and entity/item pushes. The early Activity single-read regression passed live.
+
+The owner's pre-release decision defers upgrade, migration/rollback and historical-client compatibility; no implementation or merge requirement remains for those cases. The C report separately records the unperformed live internal-default-policy mutation and its passing PostgreSQL coverage. It does not claim production OAuth or physical-device release acceptance.

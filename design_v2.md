@@ -24,7 +24,7 @@ The core strength versus existing VTTs is:
 - **System-agnostic.** Unlike D&D Beyond, it supports any rules system. Because copyrighted systems cannot be shipped, the MVP ships **pre-built open-license templates** plus a **minimal no-code creator**.
 - **Not a simulation.** It captures the basics to make rolls and show results, then hands freedom back to the GM and players to update stats.
 
-The MVP is a modular monolith backed by PostgreSQL and object storage. System definitions are declarative, versioned documents. Math and dice expressions are parsed into a lightweight AST and evaluated by the platform; creator-supplied executable code is never run. Published system versions are immutable; campaigns and characters pin to a version and upgrade explicitly.
+The MVP is a modular monolith backed by PostgreSQL and object storage. System definitions are declarative, versioned documents. Math and dice expressions are parsed into a lightweight AST and evaluated by the platform; creator-supplied executable code is never run. Published system versions are immutable; campaigns and characters pin to an immutable published version. Version upgrades are excluded by the development policy in Sections 6.7 and 12.4.
 
 > **MVP scope.** Build a trustworthy shared-character-sheet and campaign platform — not a full virtual tabletop and not an auto-applying rules simulator. The first Player and GM applications are mobile-first web apps delivered as an installable PWA. Native binaries and app-store distribution are post-MVP. Simple background images, manually edited fog, GM-positioned tokens, and a restricted player display are included in I7b. Video, voice, tactical movement, dynamic lighting, marketplace payments, and arbitrary scripting are excluded from the first release.
 
@@ -134,9 +134,9 @@ A GM may use **multiple devices in the same session simultaneously**, with each 
 3. Publish the campaign template to its authorized members, then add it to a campaign character. Character-specific values stay with the instance. A later template edit creates a revision and does not silently alter existing entries.
 4. Remove an entry to remove its actions from the sheet while retaining prior rolls and activity. Player proposals, restricted-audience drafts and explicit instance upgrades are staged after the basic personal and shared flows.
 
-See the [adventure-specific custom items plan](docs/superpowers/plans/2026-10-07-adventure-custom-items.md) for permission, visibility, migration, offline and acceptance gates. The existing dynamic-object design's data-only rule continues to apply to personal entries.
+See the [adventure-specific custom items plan](docs/superpowers/plans/2026-10-07-adventure-custom-items.md) for permission, visibility, offline and acceptance gates. The existing dynamic-object design's data-only rule continues to apply to personal entries.
 
-**Implemented in PR #19 (slice B, 2026-10-10):** [Campaign data-only templates execution plan](docs/superpowers/plans/2026-10-09-campaign-data-templates.md). An active GM/co-GM creates and publishes a blank template to all active campaign members in one operation, with fixed bounded name/description/notes and an item default quantity. Resource concurrency revision is separate from immutable content revision; edit appends content, while archive/recover changes lifecycle only. Placement validates the selected revisions and materializes a server-owned data-only snapshot; character-specific edits never update the catalog. Archive blocks new placement and preserves old copies. Returned sheets keep those copies under the existing return-owner exception, without campaign catalog/history access. Offline placement freezes the fetched reference and requires explicit review if it changes before first commit; an authorized committed retry preserves its original result. Until safe entry migration exists, upgrades and rollback that would discard populated entries must fail with an actionable conflict. The implemented contract passed required CI #91; [acceptance evidence](docs/acceptance/campaign-data-templates-2026-10-10.md) records server/browser/offline coverage and passed isolated deployed multi-account/offline acceptance. Inherited actions, proposals, restricted drafts and explicit instance upgrades remain later slices.
+**Implemented in PR #19 (slice B, 2026-10-10):** [Campaign data-only templates execution plan](docs/superpowers/plans/2026-10-09-campaign-data-templates.md). An active GM/co-GM creates and publishes a blank template to all active campaign members in one operation, with fixed bounded name/description/notes and an item default quantity. Resource concurrency revision is separate from immutable content revision; edit appends content, while archive/recover changes lifecycle only. Placement validates the selected revisions and materializes a server-owned data-only snapshot; character-specific edits never update the catalog. Archive blocks new placement and preserves old copies. Returned sheets keep those copies under the existing return-owner exception, without campaign catalog/history access. Offline placement freezes the fetched reference and requires explicit review if it changes before first commit; an authorized committed retry preserves its original result. The implemented contract passed required CI #91; [acceptance evidence](docs/acceptance/campaign-data-templates-2026-10-10.md) records server/browser/offline coverage and passed isolated deployed multi-account/offline acceptance. Inherited actions, proposals, restricted drafts and explicit instance upgrades remain later slices.
 
 # 6. System Creator specification
 
@@ -230,16 +230,17 @@ Templates are exported declarative packages that users can clone and customize w
 
 I1 contract validation uses three original, license-neutral reference fixtures: a d20 ability/check family, a 2d6 PbtA-style move family, and a d6 counted-success pool family. These fixtures define the capability ceiling without being represented as reviewed launch templates. Shipping any named open-license template still requires the separate license review.
 
-## 6.7 Version upgrades and migration
+## 6.7 Pinned rules; no version upgrades (2026-10-27)
 
-Campaigns and standalone characters pin to an exact system version. A creator can publish a newer version without changing existing play. A GM or independent character owner may preview an upgrade, review warnings, and commit it atomically.
+Campaigns and characters retain the exact published rules snapshot chosen at
+creation. Publishing a new snapshot does not change existing play. The owner has
+removed version migration from the current scope: there are no mapping/default
+previews, upgrade commits, rollback commands, lineage tables or upgrade UI.
+Create a new test character/campaign to use a different snapshot. Existing
+publication, immutable version IDs, character saves and dice history remain.
 
-- Compatible changes (labels, layout, new optional fields, new reference data) migrate automatically.
-- Potentially breaking changes (type changes, removed definitions, changed required fields) require an explicit mapping or default.
-- Every migration produces a before/after snapshot and audit event; rollback is available for a bounded retention period.
-- MVP supports platform-generated field mappings and defaults. Creator-authored migration scripts are excluded.
-
-The character migration dialog lists discoverable published versions of the same system by system name and semantic version, excluding the currently pinned version. Because link-only versions are intentionally absent from discovery, a known version ID remains available through an advanced disclosure. Preview and explicit confirmation precede commit. The last successful migration can be rolled back directly; an advanced ID field remains for other eligible migrations. Character activity uses readable action names and local date/time formatting; server identifiers and revision numbers are not primary display text. A published system version updates the open editor's status immediately after publish succeeds.
+Character activity uses readable action names and local date/time formatting.
+A published system version updates the open editor's status immediately.
 
 # 7. Campaign and play specification
 
@@ -366,7 +367,7 @@ The execution checklist is [GUI integration implementation plan](docs/superpower
 
 # 11. Technical architecture
 
-> **Architecture.** Begin with one modular TypeScript application, one PostgreSQL database, and one deployable artifact. I1 has `http` and `migrate` process modes. Add a worker mode only when a concrete asynchronous consumer exists. Preserve deep Module Interfaces so extraction remains possible if measured load or team scale later justifies it.
+> **Architecture.** Begin with one modular TypeScript application, one PostgreSQL database, and one deployable artifact. I1 has `http` and `db:init` process modes. Add a worker mode only when a concrete asynchronous consumer exists. Preserve deep Module Interfaces so extraction remains possible if measured load or team scale later justifies it.
 
 | **Area**       | **Recommended responsibility**                                                       | **MVP technology direction**                             |
 |----------------|--------------------------------------------------------------------------------------|----------------------------------------------------------|
@@ -483,10 +484,10 @@ src/
       persistence/           # SQL and transactions
   transport/http/            # HTTP Adapter and OpenAPI mapping
   platform/                  # config, PostgreSQL pool, logging, metrics
-  bootstrap/                 # http and migrate process composition
+  bootstrap/                 # HTTP and database initialization
 ```
 
-Use Node.js LTS, TypeScript, Fastify, a thin PostgreSQL driver, explicit SQL migrations, and runtime schema decoding. Generate transport types for the web client, but keep published-package semantics owned by the systems implementation. Internal directories organize implementation knowledge; they do not imply additional public seams.
+Use Node.js LTS, TypeScript, Fastify, a thin PostgreSQL driver, explicit current-schema SQL, and runtime schema decoding. Generate transport types for the web client, but keep published-package semantics owned by the systems implementation. Internal directories organize implementation knowledge; they do not imply additional public seams.
 
 # 12. Data design
 
@@ -526,16 +527,14 @@ Mutable aggregates carry an integer revision. Update requests include the expect
 
 ## 12.4 Development database policy (2026-10-27)
 
-The application is unreleased and all existing databases are disposable test data.
-Initialize an empty PostgreSQL database directly from `migrations/0001_current_schema.sql`.
-The generic locked/checksummed SQL runner stays in place, but historical development
-migration chains, data backfills, synthetic template repair and version-specific
-local-cache conversions are not supported. Modify the current baseline and rebuild
-test databases for schema changes; startup never resets them automatically. Seed
-missing reference templates without replacing existing immutable versions. See
-[migration policy](migrations/README.md). A supported release will establish its own
-migration policy. This does not change the generic rules-system version upgrade
-and rollback functionality in Section 6.7, or declared package-format capabilities.
+The app is unreleased, runs only in test environments and has no users. Initialize
+an empty PostgreSQL database from `database/schema.sql` with `npm run db:init`.
+Initialization is transactional and serialized; repeated startup preserves data.
+There is no migration history/checksum ledger, incremental migration runner,
+backfill, repair, old-client conversion or automatic reset. Edit the current schema
+and recreate disposable test databases when it changes. Seed missing reference
+templates without rewriting existing immutable versions. Character/campaign
+rules-version upgrades and rollback are also excluded. See [database policy](database/README.md).
 
 Application-version migrations and compatibility with older app builds become
 requirements only after the first supported release. Before then, update the
@@ -555,7 +554,7 @@ Expose a versioned REST HTTP interface described by OpenAPI. Use resource-orient
 | Versions   | GET/PATCH /system-versions/{id}; GET /system-versions/{id}/export                                                                        |
 | Templates  | GET /templates; create a system with a version source to clone a template                                                               |
 | Campaigns  | POST /campaigns; GET/PATCH /campaigns/{id}; POST /campaigns/{id}/invitations; DELETE /campaigns/{id}/members/{memberId}                 |
-| Characters | POST /characters; GET /characters/creation-options; GET /characters/creation-versions; POST /campaigns/{id}/characters; GET/PATCH /characters/{id}; POST /characters/{id}/actions/{actionId}; POST /characters/{id}/migrations |
+| Characters | POST /characters; GET /characters/creation-options; GET /characters/creation-versions; POST /campaigns/{id}/characters; GET/PATCH /characters/{id}; POST /characters/{id}/actions/{actionId} |
 | Content    | POST /campaigns/{id}/content; PATCH /content/{id}; POST /content/{id}/grants                                                            |
 | Session    | GET /campaigns/{id}/session (GM session board); POST /characters/{id}/resources/{resourceId}/bump                                        |
 | Activity   | GET /campaigns/{id}/activity; GET /characters/{id}/activity                                                                             |
@@ -569,7 +568,7 @@ System sharing (owner-approved 2026-09-14): a system owner may set system access
 
 ## 13.1 Idempotency
 
-Create, roll, action, invitation, migration, and export commands accept an idempotency key scoped to user and endpoint. The server stores the completed result for a bounded interval. This prevents duplicated damage, resource spending, rolls, and invitations after mobile or offline retries.
+Create, roll, action, invitation, and export commands accept an idempotency key scoped to user and endpoint. The server stores the completed result for a bounded interval. This prevents duplicated damage, resource spending, rolls, and invitations after mobile or offline retries.
 
 ## 13.2 Approved pre-upgrade remediation contracts (2026-09-12)
 
@@ -637,7 +636,9 @@ Detailed contracts and required regression matrices are in the [I6 backend spec]
 
 ## 16.2 Reference systems
 
-Maintain three internal reference systems as acceptance fixtures: a minimal rules-light system, a class-and-level fantasy system with derived statistics and inventory, and a dice-pool system with resources. They must exercise every supported field, sheet element, formula feature, action, visibility path, migration category, and mobile breakpoint. Where an open license permits, the shipped templates correspond to these fixtures.
+Maintain three internal reference systems as acceptance fixtures: a minimal rules-light system, a class-and-level fantasy system with derived statistics and inventory, and a dice-pool system with resources. They must exercise every supported field, sheet element, formula feature, action, visibility path and mobile breakpoint. Where an open license permits, the shipped templates correspond to these fixtures.
+
+> **Current scope (2026-10-27):** character/campaign version migration, upgrade previews/commits and rollback have been removed at the owner's request. Historical implementation/acceptance notes below do not reintroduce them. See Sections 6.7 and 12.4.
 
 # 17. Delivery plan
 
@@ -661,9 +662,10 @@ precedence over historical plans, specifications and unchecked compatibility gat
 Current-version schema validation, unsupported-input rejection, authorization,
 transactional integrity, exact-request retry/reload recovery and offline behavior
 remain required. Supported browser vendors/versions are a separate platform
-requirement. Creator-published rules-system versions, pinning and generic explicit
-character/campaign upgrades are product functionality (Section 6.7); they do not
-create a requirement to preserve obsolete application builds or their test data.
+requirement. Creator-published rules snapshots and pinning remain supported.
+The owner also removed character/campaign upgrade previews, commits and rollback
+from the current app scope (Section 6.7); recreate test characters/campaigns when
+changing their published rules snapshot.
 Historical verification records remain evidence of what was run, not new work or
 open merge blockers under the current policy.
 
@@ -699,7 +701,7 @@ Every increment must meet all applicable criteria before work begins on the next
 
 **Tasks:**
 
-1. Establish the TypeScript workspace, single deployable artifact with `http` and `migrate` modes, PostgreSQL migration conventions, local environment, CI/CD, health checks, structured logging, request IDs, and baseline metrics. Do not add a worker until a concrete asynchronous consumer exists.
+1. Establish the TypeScript workspace, single deployable artifact with `http` and `db:init` modes, PostgreSQL initialization conventions, local environment, CI/CD, health checks, structured logging, request IDs, and baseline metrics. Do not add a worker until a concrete asynchronous consumer exists.
 2. Implement the Identity Module and replaceable OIDC Adapter needed to own systems and authorize draft and publication operations; defer role-specific application shells.
 3. Specify and version the system-package schema, stable definition IDs, limits, canonical serialization, checksum rules, and documented import/export format.
 4. Persist system metadata, revision-controlled drafts, immutable published versions, lifecycle state, idempotency receipts, and audit records with relational ownership and access columns. Add an outbox only with the first concrete asynchronous consumer.
@@ -742,11 +744,11 @@ Every increment must meet all applicable criteria before work begins on the next
 4. Implement atomic field updates and built-in resource bump commands with expected revisions, idempotency keys, bounded values, machine-readable `409` conflicts, and `set` or `bump` runtime intents.
 5. Implement server-authoritative character actions and rolls with an `action` runtime intent, deterministic command execution ID, normalized expression, individual dice, modifiers, total, audience, actor, timestamp, and request ID; do not auto-apply roll outcomes.
 6. Implement character ownership changes, archive/recovery, activity history, and documented JSON export without leaking account data.
-7. Implement compatible and mapped character migration previews, atomic commits, before/after snapshots, and bounded rollback while leaving the standalone character unchanged until commit.
+7. Version migration is excluded by the current owner decision in Section 6.7.
 8. Define offline synchronization responses for cached reads and queued writes, including idempotent replay, stale revisions, revoked access, and reconciliation metadata.
-9. Add state-schema, derived-value, command atomicity, idempotency, concurrency, ownership, migration, export, and session-burst load tests against all reference systems.
+9. Add state-schema, derived-value, command atomicity, idempotency, concurrency, ownership, export, and session-burst load tests against all reference systems.
 
-**Acceptance demonstration:** Through the documented HTTP interface, create a standalone character from a published reference system, edit fields, bump a resource, execute a roll, replay the command safely, observe a concurrent-write conflict, export the character, and migrate it explicitly to a newer version.
+**Acceptance demonstration:** Through the documented HTTP interface, create a standalone character from a published reference system, edit fields, bump a resource, execute a roll, replay the command safely, observe a concurrent-write conflict, export the character, and verify that publishing preserves its original rules snapshot.
 
 > **I3 closed 2026-09-05; merged to main at `62a482f`.** Production `SystemRuntime` and the standalone Characters backend are implemented, with HTTP acceptance, offline replay, concurrency, migration, and load verification recorded in `docs/acceptance/i3-2026-09-05.md`. Standalone characters have one transferable owner and fixed owner-only visibility; campaign assignment and multiple-owner rules remain in I6. Offline synchronization replays ordinary idempotent commands rather than introducing a second mutation protocol. Image fields remain null-only until a later increment introduces object storage. See `docs/superpowers/specs/2026-09-05-i3-character-backend-design.md`. This status note was reconciled on 2026-09-06; I4 scope is unchanged.
 
@@ -758,7 +760,7 @@ Every increment must meet all applicable criteria before work begins on the next
 2. Build standalone character creation and required-field completion from a selected published system version.
 3. Add accessible field editing, direct numeric entry, resource step controls, optimistic pending/error states, and explicit recovery from revision conflicts.
 4. Add action input, roll execution, and compact roll-result presentation with expression, dice, modifiers, total, and audience.
-5. Add derived values, validation messages, character activity, archive/recovery, export, and migration preview/confirmation surfaces.
+5. Add derived values, validation messages, character activity, archive/recovery and export.
 6. Implement cached package and character reads, offline sheet rendering, queued idempotent writes, reconnect synchronization, and user-visible conflict resolution.
 7. Define a stable routing seam so the sheet can be embedded unchanged in the Player and GM applications.
 8. Add UI, accessibility, offline, browser, and responsive visual tests at 360 and 1280 px for all reference systems.
@@ -825,7 +827,7 @@ Apply GUI plan G7 to the player campaign routes using I4a components and the own
 6. Implement campaign activity reads, poll-on-view revision behavior, authorized notifications without secret payload broadcast, membership revocation, and cache-invalidation signals.
 7. Add invitation idempotency, concurrent membership and content tests, expired/replayed token tests, revocation tests, campaign export, and four-player session-burst load tests.
 
-**Backend slice policy (2026-09-09):** [Campaign backend spec](docs/superpowers/specs/2026-09-09-i6-campaign-backend-design.md) defines the backend-only contracts; it does not close I6 or its Player acceptance gates. Active GMs/co-GMs see full attached sheet state, disclosed before join/claim/adoption, with no I6 visibility toggle. This does not grant access to owner-only notes or actor-private rolls. Campaign-created characters have campaign custody and zero or more active member controllers; they stay in the campaign when controllers leave. Controller records survive role promotion, and a GM adopting their own character retains the return-owner controller invariant. Adoption requires the exact pinned version and explicit current-owner consent. On the original owner's departure/removal, the adopted character returns to that owner with its current sheet values and unchanged pin; all other campaign controllers lose live access. This return right cannot be reassigned. Adoption discloses that GM edits to sheet values return too: secrets belong in separately authorized content, not that sheet. Historical campaign rolls, activity and receipts remain campaign-scoped and do not return as personal history. Full membership revocation therefore removes campaign data access, with this explicit returned-sheet exception. Independent migration/rollback is denied while attached; I7 owns campaign upgrades. Existing Characters routes, exports and idempotency/recovery responses must enforce current policy and original placement scope, not just standalone ownership. Membership removal and character return are one revision-safe transaction.
+**Backend slice policy (2026-09-09):** [Campaign backend spec](docs/superpowers/specs/2026-09-09-i6-campaign-backend-design.md) defines the backend-only contracts; it does not close I6 or its Player acceptance gates. Active GMs/co-GMs see full attached sheet state, disclosed before join/claim/adoption, with no I6 visibility toggle. This does not grant access to owner-only notes or actor-private rolls. Campaign-created characters have campaign custody and zero or more active member controllers; they stay in the campaign when controllers leave. Controller records survive role promotion, and a GM adopting their own character retains the return-owner controller invariant. Adoption requires the exact pinned version and explicit current-owner consent. On the original owner's departure/removal, the adopted character returns to that owner with its current sheet values and unchanged pin; all other campaign controllers lose live access. This return right cannot be reassigned. Adoption discloses that GM edits to sheet values return too: secrets belong in separately authorized content, not that sheet. Historical campaign rolls, activity and receipts remain campaign-scoped and do not return as personal history. Full membership revocation therefore removes campaign data access, with this explicit returned-sheet exception. Existing Characters routes, exports and idempotency/recovery responses must enforce current policy and original placement scope, not just standalone ownership. Membership removal and character return are one revision-safe transaction.
 
 **Player integration tasks:**
 
@@ -857,10 +859,10 @@ The first GM app is a responsive web surface within the shared PWA. Native packa
 6. Build one-tap authorized resource bumps across characters with optimistic status, idempotent retry, and immediate revision-conflict recovery.
 7. Implement disclosed GM character visibility, character oversight, roll-audience controls, and audit views without granting system creators campaign access.
 8. Support simultaneous GM devices and co-GMs through polling/revision refresh, authorized activity updates, and clear conflict handling without a single-session lock.
-9. Expose one deep Campaigns Module command for system-version upgrade preview and commit. Its implementation coordinates field mappings/defaults, warnings, character migrations, the campaign pin, before/after audit, rollback, and proof that publishing alone never upgrades a campaign; the GM caller never loops through characters.
+9. Campaign version upgrades are excluded by the current owner decision in Section 6.7.
 10. Complete WCAG 2.2 AA review, responsive testing, cross-campaign authorization tests, session load/soak tests, SLO dashboards, alerting, backup restoration drill, and incident runbook exercise.
 
-**Acceptance demonstration:** A GM creates a campaign without direct HTTP tools, invites four players, manages visibility, previews each player's view, runs the session board from a phone while showing content on a second device, resolves a concurrent edit, and explicitly upgrades the campaign without changing another pinned campaign.
+**Acceptance demonstration:** A GM creates a campaign without direct HTTP tools, invites four players, manages visibility, previews each player's view, runs the session board from a phone while showing content on a second device, resolves a concurrent edit, and verifies that publishing preserves every campaign pin.
 
 ## 17.9a I7b - Simple scenes and restricted player display
 
@@ -874,7 +876,7 @@ Complete GUI plan G8: define media/scene/display contracts and persistence; add 
 
 Personal custom entries now support bounded name (200 characters), description and notes (2,000 each), plus positive integer quantity through the existing character revision and offline queue. The sheet provides create/edit controls and identifies their Personal origin; these entries remain data-only. All-player data-only campaign catalogs are implemented in PR #19; inherited actions remain planned.
 
-PR #19 implements the [slice B execution plan](docs/superpowers/plans/2026-10-09-campaign-data-templates.md): reusable all-player data-only campaign templates with server snapshots, offline/concurrency protection, archive/recover and guarded upgrades/rollback. Required CI #91 passed; [the acceptance record](docs/acceptance/campaign-data-templates-2026-10-10.md) distinguishes automated evidence, passed isolated deployed multi-account/offline acceptance and remaining manual/device gates. This does not close I7 or wider G9 acceptance.
+PR #19 implements the [slice B execution plan](docs/superpowers/plans/2026-10-09-campaign-data-templates.md): reusable all-player data-only campaign templates with server snapshots, offline/concurrency protection, archive/recover. Required CI #91 passed; [the acceptance record](docs/acceptance/campaign-data-templates-2026-10-10.md) distinguishes automated evidence, passed isolated deployed multi-account/offline acceptance and remaining manual/device gates. This does not close I7 or wider G9 acceptance.
 
 The completed dynamic-object work added system templates and data-only character entries. [The adventure-specific custom items plan](docs/superpowers/plans/2026-10-07-adventure-custom-items.md) tracks delivered personal entries (A), implemented data-only campaign catalogs (B), and planned inherited actions/proposals/restricted audiences (C/D). These slices are separate from the historical I1–I7b completion claims and require their own character, campaign, offline, authorization and GUI acceptance evidence.
 
@@ -882,7 +884,7 @@ The completed dynamic-object work added system templates and data-only character
 
 - **I1:** A complete reference system can be validated, published immutably, cloned, exported, and evaluated through the documented HTTP interface; hostile or over-budget packages are rejected safely.
 - **I2:** A non-programmer can reproduce or modify a reference system using only the GUI and publish it without database or code changes.
-- **I3:** A client can create, operate, export, and explicitly migrate a character through HTTP; retries do not duplicate effects and concurrent edits do not silently overwrite state.
+- **I3:** A client can create, operate and export a character through HTTP; retries do not duplicate effects and concurrent edits do not silently overwrite state.
 - **I4:** The player sheet works at 360 and 1280 px, renders without connectivity, and synchronizes queued writes idempotently on reconnect.
 - **I4a:** Existing creator/character routes meet the GUI plan G0-G5 gates with safe save/account lifecycles, flexible themes, responsive layouts, and frontend CI.
 - **I5:** A player can manage and play personal characters in a mobile browser or installed PWA with no campaign dependency.
@@ -890,7 +892,7 @@ The completed dynamic-object work added system templates and data-only character
 - **I7:** A GM can use the mobile-first web app to create a campaign from a shipped open-license template, invite four players, manage content visibility, verify each player's view, and run a session across two devices.
 - **I7b:** A GM phone and restricted tablet/remote display support simple images, manual fog, and tokens, with no GM secrets in display responses or caches.
 - **GUI release:** Apply G9 to each migrated view and final release: actual routed visual review, real phone/iPad checks, built frontend/API deployment, and physical-table/remote playtests.
-- Publishing a new system version never changes an existing character or campaign until its authorized owner completes an explicit upgrade.
+- Publishing a new system version never changes an existing character or campaign; using a different snapshot requires creating a new test character/campaign.
 - Users can export system, character, and campaign data in documented formats.
 - Backup restoration, monitoring, alerting, load testing, and an incident runbook have been exercised before public beta.
 
@@ -968,7 +970,7 @@ built frontend and HTTP backend together. With `SWEETROLL_SERVE_STATIC=1`,
 application API routes are mounted at `/api`, leaving browser deep links for the
 SPA. Backend-only development retains its unprefixed API and Vite proxy.
 Health, metrics, and explicitly enabled dev routes keep their existing paths.
-Railway service settings run migrations before deployment, check PostgreSQL
+Railway service settings initialize empty databases before deployment, check PostgreSQL
 readiness, and start one app instance with a separately provisioned media
 volume and PostgreSQL service. See [setup instructions](docs/operations/railway.md).
 This configuration does not close the production-authentication, deployed

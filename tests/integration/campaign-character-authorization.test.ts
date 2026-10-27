@@ -3,10 +3,8 @@ import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { compileDocument } from "../../src/systems/implementation/rules/compile-document.js";
 import { prepareCampaignCharacter } from "../../src/characters/campaignPlacement.js";
 import { buildI6Harness, ctxFor, type I6Harness, type TestActor } from "./i6-app.js";
-import { buildD20V2Document } from "./i3-app.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const describeWithDatabase = databaseUrl === undefined ? describe.skip : describe;
@@ -217,19 +215,6 @@ describeWithDatabase("campaign character authorization matrix (Task 5)", () => {
   }
 
   let v2Counter = 0;
-  async function publishV2(): Promise<string> {
-    v2Counter += 1;
-    const versionId = randomUUID();
-    const document = buildD20V2Document();
-    const semanticVersion = `2.0.${v2Counter}`;
-    const compiled = compileDocument(document, { systemId: h.systemId, versionId, semanticVersion });
-    if (!compiled.ok) throw new Error(`v2 did not compile: ${JSON.stringify(compiled.diagnostics)}`);
-    await h.pool.query(
-      "INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, lifecycle) VALUES ($1, $2, $3, $4, $5::jsonb, 'published')",
-      [versionId, h.systemId, semanticVersion, compiled.value.integrity.checksum, JSON.stringify(compiled.value)],
-    );
-    return versionId;
-  }
 
   async function setField(
     actor: TestActor,
@@ -612,7 +597,6 @@ describeWithDatabase("campaign character authorization matrix (Task 5)", () => {
       const exported = await h.characters.exportCharacter(ctxFor(actor), { characterId: s.adoptedId });
       expect(exported.ok).toBe(true);
       if (!exported.ok) throw new Error(`export failed: ${JSON.stringify(exported.error)}`);
-      expect(exported.value.migrationLineage).toEqual([]);
       expect(exported.value).not.toHaveProperty("ownerId");
       expect(exported.value).not.toHaveProperty("campaignId");
     }
@@ -637,135 +621,6 @@ describeWithDatabase("campaign character authorization matrix (Task 5)", () => {
     expect(exported.ok).toBe(true);
     if (!exported.ok) throw new Error("unreachable");
     expect(exported.value.state.values).toMatchObject({ ability: 14 });
-    expect(exported.value.migrationLineage).toEqual([]);
-  });
-
-  // ------------------------------------------------------------------
-  // migration + duplicate denial while attached
-  // ------------------------------------------------------------------
-
-  it("denies attached migration preview, commit and rollback", async () => {
-    const s = await setup();
-    const targetVersionId = await publishV2();
-    for (const actor of [h.users.player, h.users.gm]) {
-      const preview = await h.characters.previewMigration(ctxFor(actor), {
-        characterId: s.adoptedId,
-        targetVersionId,
-      });
-      expect(preview.ok).toBe(false);
-    }
-
-    // A preview built before adoption cannot commit once attached.
-    const personal = await h.characters.create(ctxFor(unassigned), {
-      systemVersionId: h.versionId,
-      entityDefinitionId: "character",
-      name: `Migrate ${randomUUID().slice(0, 8)}`,
-      idempotencyKey: randomUUID(),
-    });
-    if (!personal.ok) throw new Error("personal create failed");
-    const preview = await h.characters.previewMigration(ctxFor(unassigned), {
-      characterId: personal.value.characterId,
-      targetVersionId,
-      mappings: { ability: "ability_score" },
-    });
-    if (!preview.ok) throw new Error(`preview failed: ${JSON.stringify(preview.error)}`);
-    await inPlacementTxn(async (client) =>
-      h.placement.adopt(client, ctxFor(unassigned), {
-        campaignId: s.campaignId,
-        expectedCampaignRevision: await campaignRevision(s.campaignId),
-        membershipGeneration: await memberGeneration(s.campaignId, unassigned.actorId),
-        characterId: personal.value.characterId,
-        expectedCharacterRevision: personal.value.revision,
-        acknowledgedDisclosure: true,
-        idempotencyKey: randomUUID(),
-      }),
-    );
-    // A preview built before adoption cannot commit once attached. The
-    // scope-first explicit gate denies before the owner-only lookup, so every
-    // capable role (return owner, GM) gets the explicit attached-denial code.
-    for (const actor of [unassigned, h.users.gm]) {
-      const commit = await h.characters.commitMigration(ctxFor(actor), {
-        characterId: personal.value.characterId,
-        previewId: preview.value.previewId,
-        expectedRevision: personal.value.revision,
-        idempotencyKey: randomUUID(),
-      });
-      expect(commit.ok).toBe(false);
-      if (commit.ok) throw new Error("attached commit must deny");
-      expect(commit.error.code).toBe("not_found");
-    }
-    expect(await count("character_migrations", "character_id = $1", [personal.value.characterId])).toBe(0);
-  });
-
-  it("denies attached rollback", async () => {
-    const targetVersionId = await publishV2();
-    const personal = await h.characters.create(ctxFor(h.users.player), {
-      systemVersionId: h.versionId,
-      entityDefinitionId: "character",
-      name: `Rollback ${randomUUID().slice(0, 8)}`,
-      idempotencyKey: randomUUID(),
-    });
-    if (!personal.ok) throw new Error("personal create failed");
-    const preview = await h.characters.previewMigration(ctxFor(h.users.player), {
-      characterId: personal.value.characterId,
-      targetVersionId,
-      mappings: { ability: "ability_score" },
-    });
-    if (!preview.ok) throw new Error("preview failed");
-    const commit = await h.characters.commitMigration(ctxFor(h.users.player), {
-      characterId: personal.value.characterId,
-      previewId: preview.value.previewId,
-      expectedRevision: personal.value.revision,
-      idempotencyKey: randomUUID(),
-    });
-    if (!commit.ok) throw new Error("commit failed");
-    const migrationRows = await h.pool.query<{ id: string }>(
-      `SELECT id FROM character_migrations WHERE character_id = $1`,
-      [personal.value.characterId],
-    );
-    const migrationId = migrationRows.rows[0]?.id;
-    if (migrationId === undefined) throw new Error("migration row missing");
-
-    // Adopt into a campaign pinned to the migrated version (exact pin).
-    const created = await h.campaigns.create(ctxFor(h.users.gm), {
-      systemVersionId: targetVersionId,
-      title: `Rollback campaign ${randomUUID()}`,
-      description: "",
-      idempotencyKey: randomUUID(),
-    });
-    if (!created.ok) throw new Error("campaign create failed");
-    const campaignId = created.value.campaignId;
-    await seedMember(campaignId, h.users.player.actorId);
-    const adopted = await inPlacementTxn(async (client) =>
-      h.placement.adopt(client, ctxFor(h.users.player), {
-        campaignId,
-        expectedCampaignRevision: await campaignRevision(campaignId),
-        membershipGeneration: 1,
-        characterId: personal.value.characterId,
-        expectedCharacterRevision: commit.value.character.revision,
-        acknowledgedDisclosure: true,
-        idempotencyKey: randomUUID(),
-      }),
-    );
-    expect(adopted.ok).toBe(true);
-
-    // Attached rollback denies via the scope-first explicit gate for every
-    // capable role (controller/return owner, GM), not via null-lookup failure.
-    for (const actor of [h.users.player, h.users.gm]) {
-      const rollback = await h.characters.rollbackMigration(ctxFor(actor), {
-        characterId: personal.value.characterId,
-        migrationId,
-        idempotencyKey: randomUUID(),
-      });
-      expect(rollback.ok).toBe(false);
-      if (rollback.ok) throw new Error("attached rollback must deny");
-      expect(rollback.error.code).toBe("not_found");
-    }
-    const rolledBack = await h.pool.query<{ rolled_back_at: string | null }>(
-      `SELECT rolled_back_at FROM character_migrations WHERE id = $1`,
-      [migrationId],
-    );
-    expect(rolledBack.rows[0]?.rolled_back_at).toBeNull();
   });
 
   it("denies duplicating attached sheets into personal libraries", async () => {

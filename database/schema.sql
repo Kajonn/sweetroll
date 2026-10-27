@@ -197,7 +197,7 @@ CREATE TABLE campaign_command_executions (
 CREATE INDEX campaign_command_executions_expiry_idx
   ON campaign_command_executions (expires_at);
 
--- Characters and rules-system version upgrades
+-- Characters
 -- A character has exactly one custody scope: a standalone owner or a campaign.
 -- History/receipts retain their original scope_campaign_id after character return.
 CREATE TABLE characters (
@@ -287,47 +287,6 @@ CREATE TABLE character_audit_records (
   summary      text NOT NULL,
   request_id   text NOT NULL,
   occurred_at  timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE character_migration_previews (
-  id                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  character_id             uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
-  owner_id                 uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-  source_revision          integer NOT NULL CHECK (source_revision >= 1),
-  source_version_id        uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
-  source_checksum          text NOT NULL,
-  target_version_id        uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
-  target_checksum          text NOT NULL,
-  mapping_json             jsonb NOT NULL,
-  candidate_state_json     jsonb NOT NULL,
-  candidate_projection_json jsonb NOT NULL,
-  warnings_json            jsonb NOT NULL,
-  preview_checksum         text NOT NULL,
-  created_at               timestamptz NOT NULL DEFAULT now(),
-  expires_at               timestamptz NOT NULL,
-  consumed_at              timestamptz
-);
-
-CREATE INDEX character_migration_previews_expiry_idx
-  ON character_migration_previews (expires_at)
-  WHERE consumed_at IS NULL;
-
-CREATE TABLE character_migrations (
-  id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  character_id          uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
-  preview_id            uuid NOT NULL UNIQUE REFERENCES character_migration_previews(id) ON DELETE RESTRICT,
-  source_version_id     uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
-  target_version_id     uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
-  before_state_json     jsonb NOT NULL,
-  after_state_json      jsonb NOT NULL,
-  commit_revision       integer NOT NULL CHECK (commit_revision >= 2),
-  rollback_deadline     timestamptz NOT NULL,
-  actor_id              uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-  request_id            text NOT NULL,
-  committed_at          timestamptz NOT NULL DEFAULT now(),
-  rollback_revision     integer CHECK (rollback_revision >= 1),
-  rolled_back_at        timestamptz,
-  scope_campaign_id uuid REFERENCES campaigns(id) ON DELETE RESTRICT
 );
 
 -- Campaign character placement

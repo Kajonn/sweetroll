@@ -20,7 +20,7 @@ export const PREVIEW_ORIGIN = `http://localhost:${process.env.PREVIEW_PORT ?? "4
 
 export type ReferenceSystem = {
   key: "d20" | "pbta" | "pool";
-  /** Published template version seeded by migration/http bootstrap. */
+  /** Published template version seeded by database/HTTP bootstrap. */
   systemVersionId: string;
   resourceId: string;
   resourceLabel: string;

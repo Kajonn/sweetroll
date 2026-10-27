@@ -23,7 +23,7 @@ import {
  * server applies the effect before the client loses the response.
  *
  * Covered: resource bump (same page), archive across a page restart (a newer
- * mutation cannot overtake it; a new migration preview does not erase it),
+ * mutation cannot overtake it),
  * and expiry/manual review via backdated persisted timestamps (backend
  * retention is never weakened). Pending uncertain outcomes block export.
  */
@@ -124,7 +124,6 @@ test.describe("applied-but-unseen mutations", () => {
         systemVersionId: system.systemVersionId,
         name,
       });
-      const migrationTarget = await publishCompletionVariant(setup.request, system.systemVersionId, "ancestry_element");
       await setup.close();
       for (const p of context.pages()) await p.close();
 
@@ -179,17 +178,6 @@ test.describe("applied-but-unseen mutations", () => {
         await expect(bumpButton).toBeDisabled();
         expect(bumpRequests).toBe(0);
       }
-
-      // A new migration preview must not erase or overtake the frozen
-      // request: while the archive outcome is uncertain the dialog refuses
-      // to preview at all (disabled control + explicit reason).
-      await page.getByRole("button", { name: "Migration" }).click();
-      await page.getByText("Use a version from a direct link").click();
-      await page.getByLabel("Version ID").fill(migrationTarget);
-      await expect(page.getByRole("button", { name: "Preview migration" })).toBeDisabled();
-      const migrationDialogText = (await page.getByRole("dialog").last().textContent()) ?? "";
-      expect(migrationDialogText).toMatch(/uncertain outcome|pending edits/i);
-      await page.keyboard.press("Escape");
 
       // Restart the page: the frozen archive must replay first, verbatim.
       const url = page.url();

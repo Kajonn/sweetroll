@@ -28,7 +28,6 @@ function makeApi(): CharactersApi & {
     activity: vi.fn(),
     send: vi.fn(),
     export: vi.fn(),
-    previewMigration: vi.fn(),
   } as unknown as CharactersApi & {
     listCharacters: ReturnType<typeof vi.fn>;
     duplicateCharacter: ReturnType<typeof vi.fn>;

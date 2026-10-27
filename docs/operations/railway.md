@@ -73,21 +73,21 @@ followed by privilege dropping before removing that override. Do not use chmod 7
 The mounting/ownership check must happen at runtime: pre-deploy containers do not
 have access to the media volume.
 
-## Build, migrate, and start
+## Build, initialize, and start
 
 `railway.json` specifies:
 
 - Docker build from the repository root.
-- Pre-deploy: `npm run start:migrate` using the compiled migration runner and
-  production dependencies in the image. Migration failure blocks the deploy.
+- Pre-deploy: `npm run start:db:init` using the compiled database initializer and
+  production dependencies in the image. Initialization failure blocks the deploy.
 - Start: `node dist/bootstrap/http.js`.
 - Readiness: `/health/ready`, with a 120-second startup allowance.
 - One replica, and up to three restarts on failure.
 
-The media volume is persistent; other container writes are disposable. Avoid
-parallel deployments against the same database. Database migrations are not
-rolled back automatically when rolling back an app image; back up before schema
-changes and confirm compatibility before reverting an image.
+The media volume is persistent; other container writes are disposable. The app
+uses disposable test databases. Recreate them after schema changes, then run the
+initializer; there is no database-version conversion or automatic reset. See
+[database policy](../../database/README.md).
 
 ## Domain and verification
 

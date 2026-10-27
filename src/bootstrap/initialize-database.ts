@@ -1,20 +1,17 @@
-import { fileURLToPath } from "node:url";
-
 import { Client } from "pg";
 
 import { loadConfig } from "../platform/config.js";
 import { createLogger } from "../platform/logging.js";
-import { runMigrations } from "../platform/migrations.js";
+import { initializeDatabase } from "../platform/initialize-database.js";
 import { seedReferenceTemplates } from "../systems/implementation/persistence/index.js";
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel);
 const client = new Client({ connectionString: config.databaseUrl });
-const directory = fileURLToPath(new URL("../../migrations", import.meta.url));
 
 try {
   await client.connect();
-  await runMigrations(client, directory);
+  await initializeDatabase(client);
   const seeded = await seedReferenceTemplates(client);
   if (seeded.systemsInserted > 0 || seeded.versionsInserted > 0) {
     logger.info(
@@ -22,9 +19,9 @@ try {
       "reference templates seeded",
     );
   }
-  logger.info("database migrations complete");
+  logger.info("database initialization complete");
 } catch (error) {
-  logger.error({ err: error }, "database migrations failed");
+  logger.error({ err: error }, "database initialization failed");
   process.exitCode = 1;
 } finally {
   await client.end();

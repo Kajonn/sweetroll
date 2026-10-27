@@ -116,19 +116,6 @@ export type PreviewContentBody = NonNullable<
 export type PreviewContentResponse =
   operations["post_campaigns_id_content_preview"]["responses"]["200"]["content"]["application/json"];
 
-export type PreviewUpgradeBody = NonNullable<
-  operations["post_campaigns_id_upgrade_previews"]["requestBody"]
->["content"]["application/json"];
-export type PreviewUpgradeResponse =
-  operations["post_campaigns_id_upgrade_previews"]["responses"]["200"]["content"]["application/json"];
-export type UpgradeCharacterPreview = PreviewUpgradeResponse["characters"][number];
-
-export type CommitUpgradeBody = NonNullable<
-  operations["post_campaigns_id_upgrade_commits"]["requestBody"]
->["content"]["application/json"];
-export type CommitUpgradeResponse =
-  operations["post_campaigns_id_upgrade_commits"]["responses"]["200"]["content"]["application/json"];
-
 export type UploadImageBody = NonNullable<
   operations["post_campaigns_id_images"]["requestBody"]
 >["content"]["application/json"];

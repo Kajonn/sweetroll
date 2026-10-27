@@ -810,7 +810,7 @@ export function createCampaignPlacement(input: CreateCampaignPlacementInput): Ca
         }
 
         // Attachment advances revision, which invalidates outstanding
-        // migration previews bound to the old source revision.
+        // the character view bound to the old revision.
         const controllers = await loadControllers(client, character.id);
         const value = toPlacedView(row, controllers, false);
         await completeExecution(client, claimed.executionId, { campaignId: campaign.id, value: serializePlaced(value), idempotencyKey: adoptInput.idempotencyKey });

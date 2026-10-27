@@ -81,20 +81,16 @@ docker compose exec -T postgres psql -U sweetroll -d postgres \
 
 ## Verification queries
 
-The two `SELECT` statements (run against the recovery target;
+The marker query (run against the recovery target;
 expect exactly one row, `pitr-marker-1`):
 
 ```bash
 docker compose exec -T postgres psql -U sweetroll -d sweetroll_drill_pitr_recovery \
   -c "SELECT label, created_at FROM pitr_markers ORDER BY id;"
-docker compose exec -T postgres psql -U sweetroll -d sweetroll_drill_pitr_recovery \
-  -tAc "SELECT max(filename) FROM schema_migrations"
 ```
 
-The second query is the migrations high-water mark
-(`schema_migrations(max(filename))`, cf.
-`docs/operations/backup-restore.md`); on a fully replayed target it matches
-the source value recorded before step 6.
+The database has no migration ledger; compare the marker and application data
+against the expected recovery point.
 
 ## Status
 

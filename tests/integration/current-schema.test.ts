@@ -1,10 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { fileURLToPath } from "node:url";
 
 import { Client } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { runMigrations } from "../../src/platform/migrations.js";
+import { initializeDatabase } from "../../src/platform/initialize-database.js";
 import { createCampaignPersistenceRepository } from "../../src/campaigns/persistence.js";
 import {
   REFERENCE_TEMPLATES,
@@ -14,9 +13,8 @@ import {
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const describeWithDatabase = databaseUrl === undefined ? describe.skip : describe;
 
-describeWithDatabase("runMigrations", () => {
-  const schema = `migration_test_${randomUUID().replaceAll("-", "")}`;
-  const directory = fileURLToPath(new URL("../fixtures/migrations", import.meta.url));
+describeWithDatabase("current database schema", () => {
+  const schema = `schema_test_${randomUUID().replaceAll("-", "")}`;
   let client: Client;
 
   beforeEach(async () => {
@@ -31,28 +29,42 @@ describeWithDatabase("runMigrations", () => {
     await client.end();
   });
 
-  it("applies each migration once and records its checksum", async () => {
-    await runMigrations(client, directory);
-    await runMigrations(client, directory);
+  it("creates no migration history, previews or rollback tables", async () => {
+    await initializeDatabase(client);
+    const result = await client.query<{ table_name: string }>(
+      "SELECT table_name FROM information_schema.tables WHERE table_schema = $1 AND table_name LIKE '%migration%'",
+      [schema],
+    );
+    expect(result.rows).toEqual([]);
+  });
 
+  it("rolls back failed initialization without leaving a partial schema", async () => {
+    await client.query("CREATE TABLE sessions (original boolean)");
+    await expect(initializeDatabase(client)).rejects.toThrow(/already exists/);
     const tables = await client.query<{ table_name: string }>(
       "SELECT table_name FROM information_schema.tables WHERE table_schema = $1 ORDER BY table_name",
       [schema],
     );
-    const records = await client.query<{ filename: string }>(
-      "SELECT filename FROM schema_migrations ORDER BY filename",
-    );
+    expect(tables.rows).toEqual([{ table_name: "sessions" }]);
+  });
 
-    expect(tables.rows.map(({ table_name }) => table_name)).toEqual([
-      "migration_probe",
-      "schema_migrations",
-    ]);
-    expect(records.rows).toEqual([{ filename: "0001_create_probe.sql" }]);
+  it("serializes concurrent initialization without resetting current data", async () => {
+    const peer = new Client({ connectionString: databaseUrl });
+    await peer.connect();
+    try {
+      await peer.query(`SET search_path TO ${schema}`);
+      await Promise.all([initializeDatabase(client), initializeDatabase(peer)]);
+      const id = randomUUID();
+      await client.query("INSERT INTO users (id, display_name) VALUES ($1, 'Keep me')", [id]);
+      await initializeDatabase(peer);
+      expect((await client.query("SELECT display_name FROM users WHERE id = $1", [id])).rows).toEqual([{ display_name: "Keep me" }]);
+    } finally {
+      await peer.end();
+    }
   });
 
   it("applies the production character schema and enforces its storage contracts", async () => {
-    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
-    await runMigrations(client, productionDirectory);
+    await initializeDatabase(client);
 
     const tables = await client.query<{ table_name: string }>(
       `SELECT table_name
@@ -68,8 +80,6 @@ describeWithDatabase("runMigrations", () => {
       "character_claim_designations",
       "character_command_executions",
       "character_controllers",
-      "character_migration_previews",
-      "character_migrations",
       "character_placements",
       "character_rolls",
       "characters",
@@ -84,21 +94,6 @@ describeWithDatabase("runMigrations", () => {
       [schema],
     );
     expect(versionColumn.rows).toEqual([{ column_default: "'[]'::jsonb", is_nullable: "NO" }]);
-
-    const previewColumns = await client.query<{ column_name: string }>(
-      `SELECT column_name
-         FROM information_schema.columns
-        WHERE table_schema = $1
-          AND table_name = 'character_migration_previews'
-          AND column_name IN ('created_at', 'expires_at', 'consumed_at')
-        ORDER BY column_name`,
-      [schema],
-    );
-    expect(previewColumns.rows.map(({ column_name }) => column_name)).toEqual([
-      "consumed_at",
-      "created_at",
-      "expires_at",
-    ]);
 
     const constraints = await client.query<{ definition: string }>(
       `SELECT pg_get_constraintdef(oid) AS definition
@@ -163,9 +158,8 @@ describeWithDatabase("runMigrations", () => {
   });
 
   it("applies the production campaign tables and enforces aggregate constraints", async () => {
-    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
-    await runMigrations(client, productionDirectory);
-    await runMigrations(client, productionDirectory);
+    await initializeDatabase(client);
+    await initializeDatabase(client);
 
     const tables = await client.query<{ table_name: string }>(
       `SELECT table_name
@@ -295,15 +289,11 @@ describeWithDatabase("runMigrations", () => {
       "UNIQUE (actor_id, command_kind, idempotency_key)",
     ]);
 
-    const records = await client.query<{ filename: string }>(
-      "SELECT filename FROM schema_migrations WHERE filename = '0001_current_schema.sql'",
-    );
-    expect(records.rows).toEqual([{ filename: "0001_current_schema.sql" }]);
+
   });
 
   it("preserves standalone data on repeated initialization and rolls back invalid campaign writes", async () => {
-    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
-    await runMigrations(client, productionDirectory);
+    await initializeDatabase(client);
 
     const userId = randomUUID();
     const systemId = randomUUID();
@@ -332,7 +322,7 @@ describeWithDatabase("runMigrations", () => {
       characters: (await client.query("SELECT id, owner_id, name FROM characters")).rows,
     };
 
-    await runMigrations(client, productionDirectory);
+    await initializeDatabase(client);
 
     expect((await client.query("SELECT id, display_name FROM users")).rows).toEqual(before.users);
     expect((await client.query("SELECT id, owner_id, name FROM systems")).rows).toEqual(before.systems);
@@ -405,8 +395,7 @@ describeWithDatabase("runMigrations", () => {
   });
 
   it("enforces the ownership union and rejects invalid placement", async () => {
-    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
-    await runMigrations(client, productionDirectory);
+    await initializeDatabase(client);
 
     // Standalone state, history and receipts default to standalone scope.
     const userId = randomUUID();
@@ -565,8 +554,7 @@ describeWithDatabase("runMigrations", () => {
   });
 
   it("enforces hash-only invitation storage and lifecycle guards", async () => {
-    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
-    await runMigrations(client, productionDirectory);
+    await initializeDatabase(client);
 
     const userId = randomUUID();
     const systemId = randomUUID();
@@ -647,8 +635,7 @@ describeWithDatabase("runMigrations", () => {
   });
 
   it("enforces content, grant and activity relational guards", async () => {
-    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
-    await runMigrations(client, productionDirectory);
+    await initializeDatabase(client);
 
     const userId = randomUUID();
     const systemId = randomUUID();
@@ -787,8 +774,7 @@ describeWithDatabase("runMigrations", () => {
   });
 
   it("enforces roll audiences and roll activity references", async () => {
-    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
-    await runMigrations(client, productionDirectory);
+    await initializeDatabase(client);
 
     const userId = randomUUID();
     const systemId = randomUUID();
@@ -874,9 +860,8 @@ describeWithDatabase("runMigrations", () => {
   });
 
   it("indexes campaign rolls and keeps scoped export correct", async () => {
-    const productionDirectory = fileURLToPath(new URL("../../migrations", import.meta.url));
-    await runMigrations(client, productionDirectory);
-    await runMigrations(client, productionDirectory);
+    await initializeDatabase(client);
+    await initializeDatabase(client);
 
     const indexes = await client.query<{ indexdef: string }>(
       `SELECT indexdef

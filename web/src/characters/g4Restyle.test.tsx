@@ -23,7 +23,6 @@ function readySnapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSna
     editing: { owned: true },
     error: null,
     lastRoll: null, lastNominal: null,
-    lastMigration: null,
     pendingOnlineAttempts: [],
     connected: true,
     ...overrides,
@@ -41,8 +40,6 @@ function makeSession(snapshot: CharacterSnapshot): CharacterSession {
     resolveConflict: vi.fn(async () => {}),
     archive: vi.fn(async () => {}),
     recover: vi.fn(async () => {}),
-    commitMigration: vi.fn(async (_previewId: string) => {}),
-    rollbackMigration: vi.fn(async (_migrationId: string) => {}),
     reviewExpiredAttempt: vi.fn(async () => {}),
     fetchActivityPage: vi.fn(async () => ({ events: [], nextCursor: null, stale: false, fetchedAt: "2026-09-06T00:00:00.000Z" })),
     requestEditing: vi.fn(async () => true),
@@ -62,9 +59,6 @@ function makeApi(): CharactersApi {
       throw new Error("unused");
     }),
     export: vi.fn(async () => {
-      throw new Error("unused");
-    }),
-    previewMigration: vi.fn(async () => {
       throw new Error("unused");
     }),
   } as unknown as CharactersApi;
@@ -104,7 +98,7 @@ describe("g4 character surface restyle", () => {
   it("keeps launcher and dialog button accessible names and dialog roles", async () => {
     const user = userEvent.setup();
     render(<CharacterTools characterId="char-1" api={makeApi()} session={makeSession(readySnapshot())} />);
-    for (const name of [/^activity$/i, /^archive$/i, /^recover$/i, /^export$/i, /migration/i]) {
+    for (const name of [/^activity$/i, /^archive$/i, /^recover$/i, /^export$/i]) {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     }
     await user.click(screen.getByRole("button", { name: /^archive$/i }));

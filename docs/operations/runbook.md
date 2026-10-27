@@ -162,8 +162,8 @@ docker exec i6-backend-postgres-1 psql -U sweetroll -d postgres \
 # CREATE DATABASE
 DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll_hard_runbook \
   AUTHORITATIVE_ROLL_SECRET=development-only-roll-secret-32-bytes \
-  npm run migrate
-# ... "database migrations complete"
+  npm run db:init
+# ... "database initialization complete"
 DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll_hard_runbook \
   AUTHORITATIVE_ROLL_SECRET=development-only-roll-secret-32-bytes \
   PORT=3115 nohup npm run dev:http > /tmp/opencode/runbook-backend-3115.log 2>&1 &

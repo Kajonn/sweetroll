@@ -5,7 +5,6 @@ import { createIdentityModule } from "../identity/index.js";
 import { createTestOidcClient } from "../identity/adapters/test.js";
 import { createSystemAuthoringModule } from "../systems/authoring.js";
 import { createCharactersModule } from "../characters/index.js";
-import { createAttachedMigrationCommands } from "../characters/migration.js";
 import { createCampaignPlacement } from "../characters/campaignPlacement.js";
 import { createCampaignsModule } from "../campaigns/index.js";
 import {
@@ -121,13 +120,6 @@ const campaigns = createCampaignsModule({
   pool,
   limits: placementLimits,
   charactersPlacement: placement,
-  // I7 Phase 3: attached-migration seam for campaign upgrade preview/commit.
-  // The HTTP character migration routes keep denying attached scope; only
-  // the Campaigns module drives these internals inside its transactions.
-  attachedMigration: createAttachedMigrationCommands({
-    runtime,
-    authorizeVersionUse: authoring.authorizeVersionUse,
-  }),
 });
 
 const app = buildHttpApp({

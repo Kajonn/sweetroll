@@ -30,7 +30,7 @@ export async function createI3Schema(databaseUrl: string, schema: string): Promi
   await admin.connect();
   await admin.query(`CREATE SCHEMA ${schema}`);
   await admin.query(`SET search_path TO ${schema}`);
-  await admin.query(await readFile(new URL("../../migrations/0001_current_schema.sql", import.meta.url), "utf8"));
+  await admin.query(await readFile(new URL("../../database/schema.sql", import.meta.url), "utf8"));
   await admin.end();
 }
 
@@ -182,7 +182,7 @@ function idkCookieFromSetCookieResponse(response: {
 }
 
 /** Builds a d20 document whose v2 breaks the v1 schema (the same
- * transformation used by tests/integration/character-migration.test.ts). */
+ * transformation used by character authoring tests). */
 export function buildD20V2Document(): SystemDocumentV1 {
   const document = structuredClone(d20Document);
   const fields = document.entities[0]!.fields;

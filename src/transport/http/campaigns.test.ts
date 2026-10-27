@@ -285,31 +285,6 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
     assignCampaignControllers: async () => ({ ok: true, value: placedView() }),
     claimCampaignCharacter: async () => ({ ok: true, value: placedView() }),
     adoptCampaignCharacter: async () => ({ ok: true, value: placedView() }),
-    // I7 Phase 3: preview route lands in Task 3; the stub keeps the
-    // seam total while no route calls it yet.
-    previewUpgrade: async () => ({
-      ok: true as const,
-      value: {
-        campaignId: randomUUID(),
-        campaignRevision: 1,
-        sourceVersionId: randomUUID(),
-        targetVersionId: randomUUID(),
-        targetSemanticVersion: "2.0.0",
-        characters: [],
-      },
-    }),
-    // I7 Phase 3 Task 2: commit route lands in Task 3; the stub keeps the
-    // seam total while no route calls it yet.
-    commitUpgrade: async () => ({
-      ok: true as const,
-      value: {
-        campaignId: randomUUID(),
-        campaignRevision: 2,
-        sourceVersionId: randomUUID(),
-        targetVersionId: randomUUID(),
-        migratedCharacterIds: [],
-      },
-    }),
     // I7b Task 1: image routes land in a later task; the stub keeps the
     // seam total while no route calls them yet.
     uploadImage: async () => ({ ok: true as const, value: mediaFileView() }),
@@ -490,8 +465,6 @@ describe("campaign HTTP routes", () => {
       { method: "post", url: `/content/${contentId}/recover`, payload: contentBody },
       { method: "get", url: `/campaigns/${id}/activity` },
       { method: "post", url: `/campaigns/${id}/exports`, payload: { idempotencyKey: "k" } },
-      { method: "post", url: `/campaigns/${id}/upgrade-previews`, payload: { targetVersionId: id } },
-      { method: "post", url: `/campaigns/${id}/upgrade-commits`, payload: { targetVersionId: id, expectedCampaignRevision: 1, idempotencyKey: id } },
       { method: "post", url: `/campaigns/${id}/images`, payload: { name: "cave", contentType: "image/png", dataBase64: "iVBORw0KGgo=", idempotencyKey: id } },
       { method: "delete", url: `/campaigns/${id}/images/${id}`, payload: { expectedRevision: 1, idempotencyKey: id } },
       { method: "get", url: `/campaigns/${id}/images/${id}/original` },
@@ -506,7 +479,7 @@ describe("campaign HTTP routes", () => {
       { method: "get", url: `/campaigns/${id}/display-credentials` },
       { method: "post", url: `/campaigns/${id}/displays/${id}/revoke`, payload: {} },
     ];
-    expect(routes).toHaveLength(46);
+    expect(routes).toHaveLength(44);
 
     for (const route of routes) {
       const response = await app.inject({
@@ -1090,224 +1063,6 @@ describe("campaign HTTP routes", () => {
       headers: cookie,
     });
     expect(badLimit.statusCode).toBe(400);
-  });
-
-  it("previews campaign upgrades with exact field mapping and no projection keys", async () => {
-    const campaignId = randomUUID();
-    const sourceVersionId = randomUUID();
-    const targetVersionId = randomUUID();
-    const characterId = randomUUID();
-    let received: unknown;
-    const app = await build({
-      campaigns: makeCampaigns({
-        previewUpgrade: async (_ctx, input) => {
-          received = input;
-          return {
-            ok: true,
-            value: {
-              campaignId,
-              campaignRevision: 3,
-              sourceVersionId,
-              targetVersionId,
-              targetSemanticVersion: "2.0.0",
-              characters: [
-                {
-                  characterId,
-                  name: "Mira",
-                  sourceVersionId,
-                  warnings: ["definition dropped: old-field"],
-                  requiresMapping: true,
-                },
-              ],
-            },
-          };
-        },
-      }),
-    });
-    const preview = await app.inject({
-      method: "POST",
-      url: `/campaigns/${campaignId}/upgrade-previews`,
-      headers: cookie,
-      payload: { targetVersionId, mappings: { "old-field": "new-field" }, defaults: { level: 1 } },
-    });
-    expect(preview.statusCode).toBe(200);
-    expect(received).toEqual({
-      campaignId,
-      targetVersionId,
-      mappings: { "old-field": "new-field" },
-      defaults: { level: 1 },
-    });
-    const body = preview.json();
-    expect(Object.keys(body)).toContain("characters");
-    expect(body).toMatchObject({
-      campaignId,
-      campaignRevision: 3,
-      sourceVersionId,
-      targetVersionId,
-      targetSemanticVersion: "2.0.0",
-    });
-    expect(body.characters).toHaveLength(1);
-    expect(body.characters[0]).toMatchObject({ characterId, name: "Mira", requiresMapping: true });
-    expect(JSON.stringify(body)).not.toContain("candidateState");
-    expect(JSON.stringify(body)).not.toContain("projection");
-    expect(body.requestId).toBeTypeOf("string");
-
-    const unauthenticated = await app.inject({
-      method: "POST",
-      url: `/campaigns/${campaignId}/upgrade-previews`,
-      payload: { targetVersionId },
-    });
-    expect(unauthenticated.statusCode).toBe(401);
-
-    const denied = await build({
-      campaigns: makeCampaigns({
-        previewUpgrade: async () => ({ ok: false, error: { code: "not_found", message: "nope" } }),
-      }),
-    });
-    const missing = await denied.inject({
-      method: "POST",
-      url: `/campaigns/${campaignId}/upgrade-previews`,
-      headers: cookie,
-      payload: { targetVersionId },
-    });
-    expect(missing.statusCode).toBe(404);
-
-    const empty = await app.inject({
-      method: "POST",
-      url: `/campaigns/${campaignId}/upgrade-previews`,
-      headers: cookie,
-      payload: {},
-    });
-    expect(empty.statusCode).toBe(400);
-    expect(empty.json().error.code).toBe("bad_request");
-
-    const malformed = await app.inject({
-      method: "POST",
-      url: `/campaigns/${campaignId}/upgrade-previews`,
-      headers: cookie,
-      payload: { targetVersionId: "not-a-uuid" },
-    });
-    expect(malformed.statusCode).toBe(400);
-  });
-
-  it("commits campaign upgrades with revision/key guards and 422 mapping errors", async () => {
-    const campaignId = randomUUID();
-    const sourceVersionId = randomUUID();
-    const targetVersionId = randomUUID();
-    const migratedId = randomUUID();
-    const idempotencyKey = randomUUID();
-    let received: unknown;
-    const app = await build({
-      campaigns: makeCampaigns({
-        commitUpgrade: async (_ctx, input) => {
-          received = input;
-          return {
-            ok: true,
-            value: {
-              campaignId,
-              campaignRevision: 4,
-              sourceVersionId,
-              targetVersionId,
-              migratedCharacterIds: [migratedId],
-            },
-          };
-        },
-      }),
-    });
-    const commit = await app.inject({
-      method: "POST",
-      url: `/campaigns/${campaignId}/upgrade-commits`,
-      headers: cookie,
-      payload: { targetVersionId, expectedCampaignRevision: 3, idempotencyKey },
-    });
-    expect(commit.statusCode).toBe(200);
-    expect(received).toEqual({ campaignId, targetVersionId, expectedCampaignRevision: 3, idempotencyKey });
-    expect(commit.json()).toMatchObject({
-      campaignId,
-      campaignRevision: 4,
-      sourceVersionId,
-      targetVersionId,
-      migratedCharacterIds: [migratedId],
-    });
-    expect(commit.json().requestId).toBeTypeOf("string");
-
-    const unauthenticated = await app.inject({
-      method: "POST",
-      url: `/campaigns/${campaignId}/upgrade-commits`,
-      payload: { targetVersionId, expectedCampaignRevision: 3, idempotencyKey },
-    });
-    expect(unauthenticated.statusCode).toBe(401);
-
-    const denied = await build({
-      campaigns: makeCampaigns({
-        commitUpgrade: async () => ({ ok: false, error: { code: "not_found", message: "nope" } }),
-      }),
-    });
-    const missing = await denied.inject({
-      method: "POST",
-      url: `/campaigns/${campaignId}/upgrade-commits`,
-      headers: cookie,
-      payload: { targetVersionId, expectedCampaignRevision: 3, idempotencyKey },
-    });
-    expect(missing.statusCode).toBe(404);
-
-    for (const payload of [
-      {},
-      { expectedCampaignRevision: 3, idempotencyKey },
-      { targetVersionId, expectedCampaignRevision: 3 },
-      { targetVersionId, expectedCampaignRevision: 3, idempotencyKey: "not-a-uuid" },
-      { targetVersionId, expectedCampaignRevision: 1.5, idempotencyKey },
-      { targetVersionId: "not-a-uuid", expectedCampaignRevision: 3, idempotencyKey },
-    ]) {
-      const invalid = await app.inject({
-        method: "POST",
-        url: `/campaigns/${campaignId}/upgrade-commits`,
-        headers: cookie,
-        payload,
-      });
-      expect(invalid.statusCode, JSON.stringify(payload)).toBe(400);
-      expect(invalid.json().error.code).toBe("bad_request");
-    }
-
-    const conflicted = await build({
-      campaigns: makeCampaigns({
-        commitUpgrade: async () => ({
-          ok: false,
-          error: { code: "conflict", message: "stale", latestRevision: 9 },
-        }),
-      }),
-    });
-    const conflict = await conflicted.inject({
-      method: "POST",
-      url: `/campaigns/${campaignId}/upgrade-commits`,
-      headers: cookie,
-      payload: { targetVersionId, expectedCampaignRevision: 3, idempotencyKey },
-    });
-    expect(conflict.statusCode).toBe(409);
-    expect(conflict.json().error).toMatchObject({ code: "conflict", latestRevision: 9 });
-
-    const characterId = randomUUID();
-    const unmapped = await build({
-      campaigns: makeCampaigns({
-        commitUpgrade: async () => ({
-          ok: false,
-          error: {
-            code: "invalid_value",
-            message: `Character ${characterId}: missing required mapping for definition "old-field"`,
-          },
-        }),
-      }),
-    });
-    const rejected = await unmapped.inject({
-      method: "POST",
-      url: `/campaigns/${campaignId}/upgrade-commits`,
-      headers: cookie,
-      payload: { targetVersionId, expectedCampaignRevision: 3, idempotencyKey },
-    });
-    expect(rejected.statusCode).toBe(422);
-    expect(rejected.json().error.code).toBe("invalid_value");
-    expect(rejected.json().error.message).toContain(characterId);
-    expect(rejected.json().error.message).toContain("old-field");
   });
 
   it("previews content as a member with the GM gate matrix", async () => {

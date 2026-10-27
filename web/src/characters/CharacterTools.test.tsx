@@ -6,7 +6,7 @@ import { CharacterTools } from "./CharacterTools.js";
 import type { CharactersApi } from "./api.js";
 import type { CharacterSession, CharacterSnapshot } from "./session.js";
 import { makeView } from "./testing.js";
-import type { CharacterExport, MigrationPreviewResponse } from "./types.js";
+import type { CharacterExport } from "./types.js";
 
 function readySnapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot {
   return {
@@ -17,7 +17,6 @@ function readySnapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSna
     editing: { owned: true },
     error: null,
     lastRoll: null, lastNominal: null,
-    lastMigration: null,
     pendingOnlineAttempts: [],
     connected: true,
     ...overrides,
@@ -41,8 +40,6 @@ function makeSession(snapshot: CharacterSnapshot): CharacterSession {
     resolveConflict: vi.fn(async () => {}),
     archive: vi.fn(async () => {}),
     recover: vi.fn(async () => {}),
-    commitMigration: vi.fn(async (_previewId: string) => {}),
-    rollbackMigration: vi.fn(async (_migrationId: string) => {}),
     reviewExpiredAttempt: vi.fn(async () => {}),
     fetchActivityPage: vi.fn(async () => ({ events: [], nextCursor: null, stale: false, fetchedAt: "2026-09-06T00:00:00.000Z" })),
     requestEditing: vi.fn(async () => true),
@@ -75,37 +72,17 @@ function makeApi(overrides: Partial<CharactersApi> = {}): CharactersApi {
       packageChecksum: "abc",
       revision: 3,
       state: { schemaVersion: "1.0", values: {} },
-      migrationLineage: [],
     })),
-    previewMigration: vi.fn(async () => {
-      throw new Error("unused");
-    }),
     ...overrides,
   } as unknown as CharactersApi;
 }
 
 describe("CharacterTools", () => {
-  it("offers published versions of the character's system and previews the selected version", async () => {
-    const user = userEvent.setup();
-    const target = "33333333-3333-4000-8000-000000000000";
-    const api = makeApi({
-      listCreationVersions: vi.fn(async () => ({ data: { versions: [
-        { versionId: "11111111-1111-4000-8000-000000000000", systemId: "22222222-2222-4000-8000-000000000000", systemName: "D20", semanticVersion: "1.0.0", createdAt: "2026-09-06T00:00:00Z" },
-        { versionId: target, systemId: "22222222-2222-4000-8000-000000000000", systemName: "D20", semanticVersion: "2.0.0", createdAt: "2026-09-06T00:00:00Z" },
-        { versionId: "other", systemId: "other", systemName: "Other", semanticVersion: "9.0.0", createdAt: "2026-09-06T00:00:00Z" },
-      ], nextCursor: null }, requestId: "r" })),
-      previewMigration: vi.fn(async () => migrationPreview()),
-    });
-    render(<CharacterTools characterId="char-1" api={api} session={makeSession(readySnapshot())} />);
-    await user.click(screen.getByRole("button", { name: /^migration$/i }));
-    const choice = screen.getByRole("combobox", { name: /target version/i });
-    await waitFor(() => expect(screen.getByRole("option", { name: /D20 · 2.0.0/ })).toBeInTheDocument());
-    expect(screen.queryByRole("option", { name: /D20 · 1.0.0/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /Other/ })).not.toBeInTheDocument();
-    await user.selectOptions(choice, target);
-    await user.click(screen.getByRole("button", { name: /preview migration/i }));
-    expect(api.previewMigration).toHaveBeenCalledWith("char-1", { targetVersionId: target });
+  it("does not offer character version migration or rollback", () => {
+    render(<CharacterTools characterId="char-1" api={makeApi()} session={makeSession(readySnapshot())} />);
+    expect(screen.queryByRole("button", { name: /migration|rollback|upgrade/i })).not.toBeInTheDocument();
   });
+
   let urls: string[];
   let originalCreate: typeof URL.createObjectURL | undefined;
   let originalRevoke: typeof URL.revokeObjectURL | undefined;
@@ -165,7 +142,6 @@ describe("CharacterTools", () => {
       packageChecksum: "abc",
       revision: 3,
       state: { schemaVersion: "1.0", values: { name: "Aria" } },
-      migrationLineage: [],
     } as unknown as CharacterExport;
     const api = makeApi({ export: vi.fn(async () => document) });
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {});
@@ -226,34 +202,6 @@ describe("CharacterTools", () => {
     await user.click(screen.getByRole("button", { name: /activity/i }));
     await waitFor(() => expect(screen.getByText(/Bump/)).toBeVisible());
     expect(screen.getAllByText(/stale/i).length).toBeGreaterThan(0);
-  });
-
-  it("shows migration warnings and requires re-preview when expired", async () => {
-    const user = userEvent.setup();
-    const preview = {
-      preview: {
-        previewId: "p-1",
-        characterId: "char-1",
-        sourceRevision: 3,
-        sourceVersionId: "11111111-1111-4000-8000-000000000000",
-        targetVersionId: "22222222-2222-4000-8000-000000000000",
-        candidateState: { schemaVersion: "1.0", values: {} },
-        candidateProjection: {},
-        warnings: ["Type change on health"],
-        expiresAt: "2020-01-01T00:00:00.000Z",
-      },
-      requestId: "r",
-    } as unknown as MigrationPreviewResponse;
-    const api = makeApi({ previewMigration: vi.fn(async () => preview) });
-    const session = makeSession(readySnapshot());
-    render(<CharacterTools characterId="char-1" api={api} session={session} now={() => "2026-09-06T00:00:00.000Z"} />);
-    await user.click(screen.getByRole("button", { name: /migration/i }));
-    await user.click(screen.getByText(/use a version from a direct link/i));
-    await user.type(screen.getByLabelText(/^version id$/i), "22222222-2222-4000-8000-000000000000");
-    await user.click(screen.getByRole("button", { name: /preview migration/i }));
-    await waitFor(() => expect(screen.getByText(/Type change on health/)).toBeVisible());
-    expect(screen.getByText(/expired|re-preview/i)).toBeVisible();
-    expect(session.commitMigration).not.toHaveBeenCalled();
   });
 
   it("does not start lifecycle work while edits are pending", async () => {
@@ -333,33 +281,6 @@ describe("CharacterTools", () => {
     expect(activityButton).toHaveFocus();
   });
 
-  it("summarizes candidate values in the migration preview before commit", async () => {
-    const user = userEvent.setup();
-    const preview = {
-      preview: {
-        previewId: "p-1",
-        characterId: "char-1",
-        sourceRevision: 3,
-        sourceVersionId: "11111111-1111-4000-8000-000000000000",
-        targetVersionId: "22222222-2222-4000-8000-000000000000",
-        candidateState: { schemaVersion: "1.0", values: { name: "Aria", health: 5 } },
-        candidateProjection: {},
-        warnings: [],
-        expiresAt: "2027-01-01T00:00:00.000Z",
-      },
-      requestId: "r",
-    } as unknown as MigrationPreviewResponse;
-    const api = makeApi({ previewMigration: vi.fn(async () => preview) });
-    render(<CharacterTools characterId="char-1" api={api} session={makeSession(readySnapshot())} now={() => "2026-09-06T00:00:00.000Z"} />);
-    await user.click(screen.getByRole("button", { name: /migration/i }));
-    await user.click(screen.getByText(/use a version from a direct link/i));
-    await user.type(screen.getByLabelText(/^version id$/i), "22222222-2222-4000-8000-000000000000");
-    await user.click(screen.getByRole("button", { name: /preview migration/i }));
-    const region = await screen.findByLabelText(/migration preview/i);
-    expect(within(region).getByText(/name/)).toBeVisible();
-    expect(within(region).getByText(/Aria/)).toBeVisible();
-  });
-
   it("labels the archive cancel button Cancel instead of the title", async () => {
     const user = userEvent.setup();
     render(<CharacterTools characterId="char-1" api={makeApi()} session={makeSession(readySnapshot())} />);
@@ -379,34 +300,6 @@ describe("CharacterTools", () => {
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
     await user.tab();
     expect(confirmButton).toHaveFocus();
-  });
-
-  it("disables commit when the preview source revision drifted and asks for re-preview", async () => {
-    const user = userEvent.setup();
-    const preview = {
-      preview: {
-        previewId: "p-1",
-        characterId: "char-1",
-        sourceRevision: 2,
-        sourceVersionId: "11111111-1111-4000-8000-000000000000",
-        targetVersionId: "22222222-2222-4000-8000-000000000000",
-        candidateState: { schemaVersion: "1.0", values: {} },
-        candidateProjection: {},
-        warnings: [],
-        expiresAt: "2027-01-01T00:00:00.000Z",
-      },
-      requestId: "r",
-    } as unknown as MigrationPreviewResponse;
-    const api = makeApi({ previewMigration: vi.fn(async () => preview) });
-    const session = makeSession(readySnapshot());
-    render(<CharacterTools characterId="char-1" api={api} session={session} now={() => "2026-09-06T00:00:00.000Z"} />);
-    await user.click(screen.getByRole("button", { name: /migration/i }));
-    await user.click(screen.getByText(/use a version from a direct link/i));
-    await user.type(screen.getByLabelText(/^version id$/i), "22222222-2222-4000-8000-000000000000");
-    await user.click(screen.getByRole("button", { name: /preview migration/i }));
-    await waitFor(() => expect(screen.getByRole("button", { name: /commit migration/i })).toBeDisabled());
-    expect(screen.getByText(/older revision|re-preview/i)).toBeVisible();
-    expect(session.commitMigration).not.toHaveBeenCalled();
   });
 
   it("attaches the export anchor to the document for the click", async () => {
@@ -499,109 +392,6 @@ describe("CharacterTools", () => {
     expect(screen.getByText(/Bump/)).toBeVisible();
   });
 
-  it("disables migration preview while offline, queued or blocked by an uncertain outcome", async () => {
-    const user = userEvent.setup();
-    const offline = readySnapshot({ phase: "offline", connected: false });
-    const { unmount } = render(<CharacterTools characterId="char-1" api={makeApi()} session={makeSession(offline)} />);
-    await user.click(screen.getByRole("button", { name: /migration/i }));
-    expect(screen.getByRole("button", { name: /preview migration/i })).toBeDisabled();
-    expect(screen.getByText(/offline|online|connect/i)).toBeVisible();
-    unmount();
-
-    const queued = readySnapshot({
-      tentative: { name: "Briar" },
-      entries: [
-        {
-          id: "e1",
-          actorId: "a",
-          characterId: "char-1",
-          sequence: 0,
-          baseRevision: 3,
-          packageChecksum: "abc",
-          createdAt: "2026-09-06T00:00:00.000Z",
-          intent: { kind: "setField", fieldId: "name", value: "Briar" },
-          attempt: null,
-        },
-      ],
-    });
-    const second = render(<CharacterTools characterId="char-1" api={makeApi()} session={makeSession(queued)} />);
-    await user.click(second.getByRole("button", { name: /migration/i }));
-    expect(second.getByRole("button", { name: /preview migration/i })).toBeDisabled();
-    second.unmount();
-
-    const uncertain = readySnapshot({
-      pendingOnlineAttempts: [
-        {
-          id: "online-1",
-          actorId: "a",
-          characterId: "char-1",
-          kind: "archive",
-          request: {
-            method: "PATCH",
-            path: "/characters/char-1",
-            body: { command: "archive", expectedRevision: 3, idempotencyKey: "k" },
-            firstAttemptAt: "2026-09-06T00:00:00.000Z",
-          },
-          createdAt: "2026-09-06T00:00:00.000Z",
-        },
-      ],
-    });
-    render(<CharacterTools characterId="char-1" api={makeApi()} session={makeSession(uncertain)} />);
-    await user.click(screen.getByRole("button", { name: /migration/i }));
-    expect(screen.getByRole("button", { name: /preview migration/i })).toBeDisabled();
-    expect(screen.getByText(/uncertain|earlier.*change|resolve/i)).toBeVisible();
-  });
-
-  function migrationPreview(overrides: Record<string, unknown> = {}): MigrationPreviewResponse {
-    return {
-      preview: {
-        previewId: "p-1",
-        characterId: "char-1",
-        sourceRevision: 3,
-        sourceVersionId: "11111111-1111-4000-8000-000000000000",
-        targetVersionId: "22222222-2222-4000-8000-000000000000",
-        candidateState: { schemaVersion: "1.0", values: { name: "Aria" } },
-        candidateProjection: {},
-        warnings: [],
-        expiresAt: "2027-01-01T00:00:00.000Z",
-        ...overrides,
-      },
-      requestId: "r",
-    } as unknown as MigrationPreviewResponse;
-  }
-
-  it("requires a renewed confirmation for each fresh migration preview before commit", async () => {
-    const user = userEvent.setup();
-    const api = makeApi({ previewMigration: vi.fn(async () => migrationPreview()) });
-    const session = makeSession(readySnapshot());
-    render(<CharacterTools characterId="char-1" api={api} session={session} now={() => "2026-09-06T00:00:00.000Z"} />);
-    await user.click(screen.getByRole("button", { name: /migration/i }));
-    await user.click(screen.getByText(/use a version from a direct link/i));
-    await user.type(screen.getByLabelText(/^version id$/i), "22222222-2222-4000-8000-000000000000");
-    await user.click(screen.getByRole("button", { name: /preview migration/i }));
-    const commit = await screen.findByRole("button", { name: /commit migration/i });
-    expect(commit).toBeDisabled();
-    await user.click(screen.getByLabelText(/confirm.*commit|reviewed.*preview/i));
-    expect(screen.getByRole("button", { name: /commit migration/i })).not.toBeDisabled();
-    // A new preview renews the confirmation requirement.
-    await user.click(screen.getByRole("button", { name: /preview migration/i }));
-    await waitFor(() => expect(api.previewMigration).toHaveBeenCalledTimes(2));
-    expect(screen.getByRole("button", { name: /commit migration/i })).toBeDisabled();
-  });
-
-  it("exposes the authoritative migration ID for rollback without manual guessing", async () => {
-    const user = userEvent.setup();
-    const session = makeSession(
-      readySnapshot({ lastMigration: { operation: "commit", previewId: "p-1", revision: 5 } }),
-    );
-    render(<CharacterTools characterId="char-1" api={makeApi()} session={session} now={() => "2026-09-06T00:00:00.000Z"} />);
-    await user.click(screen.getByRole("button", { name: /migration/i }));
-    expect(screen.getByText(/last migration can be rolled back/i)).toBeVisible();
-    expect(screen.queryByText(/p-1/)).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /roll back migration/i }));
-    expect(session.rollbackMigration).toHaveBeenCalledWith("p-1");
-  });
-
   it("blocks export while an uncertain online outcome is pending", async () => {
     const user = userEvent.setup();
     const uncertain = readySnapshot({
@@ -656,7 +446,6 @@ describe("CharacterTools", () => {
       packageChecksum: "abc",
       revision: 3,
       state: { schemaVersion: "1.0", values: { name: "Aria" } },
-      migrationLineage: [],
     } as unknown as CharacterExport;
     const api = makeApi({ export: vi.fn(async () => serverDocument) });
     let capturedParts: BlobPart[] | null = null;

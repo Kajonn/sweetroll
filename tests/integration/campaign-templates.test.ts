@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildI6Harness, ctxFor, type I6Harness } from "./i6-app.js";
-import { compileDocument } from "../../src/systems/implementation/rules/compile-document.js";
 import { d20Document } from "../../src/systems/implementation/package/fixtures/index.js";
 import type { CampaignResult } from "../../src/campaigns/index.js";
 import type { CampaignTemplateView } from "../../src/campaigns/templates.js";
@@ -625,114 +624,6 @@ describeDB("data-only campaign templates", () => {
     expect(edited.character.state.entries?.[entry.entryId]?.values.notes).toBe(
       "Kept after return",
     );
-  });
-  it("blocks campaign and standalone migration and rollback without discarding entries", async () => {
-    const target = randomUUID();
-    const document = structuredClone(d20Document);
-    document.slots = [
-      {
-        id: "inventory",
-        label: "Inventory",
-        accepts: ["item", "spell", "talent", "effect"],
-      },
-    ];
-    document.sheets[0]!.sections[0]!.elements.push({
-      kind: "slot",
-      id: "inventory_element",
-      slotId: "inventory",
-    });
-    const compiled = compileDocument(document, {
-      systemId: h.systemId,
-      versionId: target,
-      semanticVersion: "2.0.0",
-    });
-    if (!compiled.ok) throw new Error("fixture compile failed");
-    await h.pool.query(
-      "INSERT INTO system_versions(id,system_id,semantic_version,checksum,package_json,lifecycle) VALUES($1,$2,'2.0.0',$3,$4,'published')",
-      [target, h.systemId, compiled.value.integrity.checksum, compiled.value],
-    );
-    const id = await campaign();
-    const t = await template(id);
-    const char = await hero(id);
-    value(await h.characters.apply(ctxFor(h.users.player), add(char, t)));
-    expect(
-      await h.campaigns.previewUpgrade(ctxFor(h.users.gm), {
-        campaignId: id,
-        targetVersionId: target,
-      }),
-    ).toMatchObject({
-      ok: false,
-      error: { code: "conflict", message: expect.stringMatching(/entries/i) },
-    });
-    expect(
-      await h.campaigns.commitUpgrade(ctxFor(h.users.gm), {
-        campaignId: id,
-        targetVersionId: target,
-        expectedCampaignRevision: value(
-          await h.campaigns.open(ctxFor(h.users.gm), { campaignId: id }),
-        ).revision,
-        idempotencyKey: randomUUID(),
-      }),
-    ).toMatchObject({ ok: false, error: { code: "conflict" } });
-    const own = value(
-      await h.characters.create(ctxFor(h.users.player), {
-        systemVersionId: h.versionId,
-        entityDefinitionId: "character",
-        name: "Migration guard",
-        idempotencyKey: randomUUID(),
-      }),
-    );
-    const preview = value(
-      await h.characters.previewMigration(ctxFor(h.users.player), {
-        characterId: own.characterId,
-        targetVersionId: target,
-      }),
-    );
-    const migrated = value(
-      await h.characters.commitMigration(ctxFor(h.users.player), {
-        characterId: own.characterId,
-        previewId: preview.previewId,
-        expectedRevision: own.revision,
-        idempotencyKey: randomUUID(),
-      }),
-    );
-    const migration = (
-      await h.pool.query(
-        "SELECT id FROM character_migrations WHERE character_id=$1",
-        [own.characterId],
-      )
-    ).rows[0].id;
-    const changed = value(
-      await h.characters.apply(ctxFor(h.users.player), {
-        kind: "addEntry",
-        characterId: own.characterId,
-        entry: {
-          entryId: randomUUID(),
-          slotId: "inventory",
-          templateId: null,
-          values: { name: "Keep me" },
-        },
-        expectedRevision: migrated.character.revision,
-        idempotencyKey: randomUUID(),
-      }),
-    );
-    expect(
-      await h.characters.rollbackMigration(ctxFor(h.users.player), {
-        characterId: own.characterId,
-        migrationId: migration,
-        idempotencyKey: randomUUID(),
-      }),
-    ).toMatchObject({ ok: false, error: { code: "conflict" } });
-    expect(
-      await h.characters.previewMigration(ctxFor(h.users.player), {
-        characterId: own.characterId,
-        targetVersionId: h.versionId,
-      }),
-    ).toMatchObject({ ok: false, error: { code: "conflict" } });
-    expect(
-      value(await h.characters.open(ctxFor(h.users.player), own.characterId))
-        .state,
-    ).toEqual(changed.character.state);
   });
   it("publishes through HTTP and rejects client definitions without leaking catalog data", async () => {
     const id = await campaign();

@@ -7,7 +7,7 @@ import { test, expect, type Page } from "@playwright/test";
  * companion: editing a cloned reference system keeps advanced definitions.
  *
  * Needs a live backend per web/playwright.config.ts:17-47
- * (`npm run migrate && npm run dev:http` + `npm run web:dev`).
+ * (`npm run db:init && npm run dev:http` + `npm run web:dev`).
  */
 
 // Systems created/cloned by these tests are deleted in test.afterEach so a

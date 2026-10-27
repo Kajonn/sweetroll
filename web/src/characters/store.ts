@@ -4,7 +4,7 @@ export type OnlineAttempt = {
   id: string;
   actorId: string;
   characterId: string | null;
-  kind: "create" | "archive" | "recover" | "export" | "migration";
+  kind: "create" | "archive" | "recover" | "export";
   request: FrozenRequest;
   createdAt: string;
   /**

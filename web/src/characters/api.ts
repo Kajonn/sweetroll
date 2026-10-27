@@ -16,8 +16,6 @@ import type {
   ExecuteCharacterActionBody,
   ExecuteCharacterActionResponse,
   FrozenRequest,
-  MigrationPreviewBody,
-  MigrationPreviewResponse,
   OpenCharacterResponse,
   RemoveCharacterEntryBody,
   RemoveCharacterEntryResponse,
@@ -68,7 +66,6 @@ export type CharactersApi = {
   activity(characterId: string, cursor: string | null): Promise<ActivityResponse>;
   send(request: FrozenRequest): Promise<CommandResultResponse>;
   export(characterId: string): Promise<CharacterExport>;
-  previewMigration(characterId: string, body: MigrationPreviewBody): Promise<MigrationPreviewResponse>;
 };
 
 export function createCharactersApi(client: ApiClient): CharactersApi {
@@ -149,9 +146,5 @@ export function createCharactersApi(client: ApiClient): CharactersApi {
       ),
     export: (characterId) =>
       client.fetch<CharacterExport>("POST", `/characters/${characterId}/exports`),
-    previewMigration: (characterId, body) =>
-      client.fetch<MigrationPreviewResponse>("POST", `/characters/${characterId}/migration-previews`, {
-        body,
-      }),
   };
 }

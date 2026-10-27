@@ -1,5 +1,7 @@
 # I7 GM Phase 3 (Campaign Upgrade) Implementation Plan
 
+> Superseded 2026-10-27: the owner removed character/campaign version upgrades, previews, mappings and rollback from the app. This document is historical; see design Sections 6.7 and 12.4.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A GM previews a campaign system-version upgrade (per-character warnings, before/after pin) and commits it atomically without changing any other pinned campaign.

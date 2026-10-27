@@ -1377,7 +1377,6 @@ describeWithDatabase("Characters (apply: executeAction)", () => {
   });
 });
 
-
 describeWithDatabase("Characters (manage/activity/export)", () => {
   const schema = `characters_manage_${randomUUID().replaceAll("-", "")}`;
   let pool: Pool;
@@ -1719,7 +1718,6 @@ describeWithDatabase("Characters (manage/activity/export)", () => {
     expect(first.value.systemVersionId).toBe(versionId);
     expect(first.value.revision).toBe(2);
     expect(first.value.state.values.ability).toBe(15);
-    expect(first.value.migrationLineage).toEqual([]);
     expect(typeof first.value.packageChecksum).toBe("string");
     expect(first.value.packageChecksum.length).toBeGreaterThan(0);
 

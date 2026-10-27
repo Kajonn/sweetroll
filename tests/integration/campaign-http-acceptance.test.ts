@@ -399,7 +399,6 @@ describeWithDatabase("campaign HTTP acceptance demonstration (Task 10)", () => {
     const doc = standaloneExport.json() as any;
     expect(doc.revision).toBe(returned.revision);
     expect(doc.state).toEqual(returned.state);
-    expect(doc.migrationLineage).toEqual([]);
     expect(JSON.stringify(doc)).not.toContain("a map of the region");
     expect(JSON.stringify(doc)).not.toContain("the dragon wakes");
 

@@ -5,8 +5,7 @@
 #
 # Produces <output-dir>/sweetroll.dump (pg_dump custom format),
 # <output-dir>/media.tar.gz (data/media, skipped with a warning if absent),
-# and <output-dir>/manifest.txt (timestamp, git HEAD, applied-migration
-# high-water mark, checksums).
+# and <output-dir>/manifest.txt (timestamp, git HEAD and file checksums).
 #
 # Safety: this script ONLY backs up. It takes no restore-target argument and
 # contains no restore path, so it cannot restore over the dev database by
@@ -60,19 +59,12 @@ fi
 
 timestamp_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 git_head="$(git rev-parse HEAD)"
-# NOTE: the migrations tracking table is `schema_migrations` (see
-# src/platform/migrations.ts); it has columns (filename, checksum,
-# applied_at) and no `version` column, so the high-water mark is
-# max(filename).
-migrations_max="$(docker compose exec -T postgres psql -U sweetroll -d sweetroll -tAc "SELECT max(filename) FROM schema_migrations")"
 
 {
   echo "# sweetroll backup manifest"
   echo "timestamp_utc: $timestamp_utc"
   echo "git_head: $git_head"
   echo "database: sweetroll (compose service postgres, pg_dump -Fc)"
-  echo "migrations_table: schema_migrations"
-  echo "migrations_max: $migrations_max"
   echo "media: $media_status"
   echo "files:"
   (cd "$resolved_out" && sha256sum sweetroll.dump)

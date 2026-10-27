@@ -20,7 +20,7 @@ Sweetroll is the modular TypeScript application described in `design_v2.md`.
 1. Run `npm ci`.
 2. Run `docker compose up -d postgres`.
 3. Run `cp .env.example .env`, then `set -a; . ./.env; set +a` to export its values for the current shell.
-4. Run `npm run migrate`.
+4. Run `npm run db:init`.
 5. Run `npm run dev:http`.
 
 The HTTP process exposes liveness at `/health/live`, PostgreSQL readiness at
@@ -43,7 +43,7 @@ Run the full browser suite through the isolated runner from `web/`:
 
 The admin URL is a test-service connection with CREATE DATABASE permission,
 not a database to reset. The runner creates one run-scoped journey database
-and one visual database, migrates through the existing Playwright webServer
+and one visual database, initializes through the existing Playwright webServer
 command, runs journeys (`SWEETROLL_E2E_SUITE=journeys`, every spec except
 `visual.spec.ts`) then visuals (`SWEETROLL_E2E_SUITE=visual`, only
 `visual.spec.ts`), and drops only the databases it created. Each phase writes
@@ -76,8 +76,8 @@ deterministic test data only.
 ## Container modes
 
 Build one image with `docker build -t sweetroll .`.
-The default command runs HTTP. Run migrations from the same image with
-`docker run --rm --env-file .env sweetroll npm run start:migrate`.
+The default command runs HTTP. Initialize an empty database from the same image with
+`docker run --rm --env-file .env sweetroll npm run start:db:init`.
 
 ## Railway deployment
 
@@ -86,8 +86,8 @@ media storage, environment variables, and the outstanding application-login gate
 
 ## Unreleased database development
 
-The database contains disposable test data. `npm run migrate` initializes the
-current schema and inserts missing reference templates. After changing the schema,
-recreate your test database; databases from the previous numbered migration chain
-also need recreation. Startup never resets data automatically. See
-[development database policy](migrations/README.md).
+The app runs only in test environments and has no users. `npm run db:init` creates
+the current schema and inserts missing reference templates. After schema changes,
+recreate the test database. Startup never upgrades or resets data. Character and
+campaign rules-version upgrades, previews and rollback are not supported. See
+[development database policy](database/README.md).

@@ -1,6 +1,6 @@
 # Configurable push rolls — slice C execution plan
 
-**Owner scope decision (2026-10-27):** No release has been made and no users exist. Upgrade/migration/rollback and previous-client compatibility work is deferred and is not an acceptance or merge gate for this PR. Do not implement or extend those workflows for this slice. The current acceptance is fresh authoring/publish/play, both action sources, eligible-only pushes and limits, permissions/role changes, source/placement lifecycles, history/export and exact-request offline recovery. Existing historical checklists below retain their original scope; the decision here supersedes their upgrade/migration gates. The focused remote runner is `web/playwright.push-acceptance.config.ts` and excludes migration/rollback and historical-client suites. Physical-device/provider-authentication checks belong to a later public-release decision.
+**Owner scope decision (2026-10-27):** The app and database remain under development until the first application release Git tag (`v*.*.*`), not a preview or main deployment. No app/database migration implementation, development-format conversion, previous-client compatibility task or transition test belongs in this slice before that tag. The post-tag strategy is specified now in [the migration plan in PR #24](https://github.com/Kajonn/sweetroll/blob/refactor/pre-release-database-baseline/docs/superpowers/plans/2026-10-27-application-migration-policy.md); integrate the shared baseline when reconciling these PRs. Generic rules-system upgrades are outside this slice's acceptance scope. Current acceptance covers fresh authoring/publish/play, both action sources, eligible-only pushes and limits, permissions/role changes, source/placement lifecycles, history/export and exact-request offline recovery. The focused remote runner is `web/playwright.push-acceptance.config.ts`. Physical-device/provider-authentication checks belong to a later public-release decision.
 
 **Status (2026-10-24):** implementation is in draft [PR #23](https://github.com/Kajonn/sweetroll/pull/23), based on merged B (`759323a`). Package/evaluator, storage/API, creator controls and shared player/GM sessions are implemented. Review regressions and their repairs are recorded in the [review record](../../acceptance/configurable-push-review-2026-10-24.md). Remaining checklist items are acceptance gates, not a claim that the branch is documentation-only. Three canonical core C journeys passed live on isolated deployment `0d776788-110d-403a-8350-3e7dc0e6a4a9`, actual commit `f75cb02`; see the [live record](../../acceptance/configurable-push-rolls-2026-10-24.md). The [2026-10-25 follow-up](../../acceptance/configurable-push-rolls-2026-10-25.md) records ten passed bounded scenarios, including source/lifecycle/version/placement transitions, competing actors, worker replacement and adapter compatibility. Automatic rollback identity and early Activity-loading findings are [repaired and verified](../../acceptance/character-tools-fixes-2026-10-25.md); the unperformed wider acceptance boundary remains open.
 
@@ -49,7 +49,7 @@ These checks mean the design work exists, not that any behavior below is impleme
 
 ## C3 — Immutable storage and atomic lineage (PostgreSQL TDD)
 
-**Files:** next unused immutable SQL migration after `0023`, `src/characters/persistence.ts`, records/types; all integration/test schemas that manually define roll storage.
+**Files:** current schema definitions (consolidate the schema-only push columns/constraints into PR #24's baseline when integrating), `src/characters/persistence.ts`, records/types; all integration/test schemas that manually define roll storage.
 
 - [ ] Red with actual PostgreSQL: different keys/actors can otherwise consume one parent when character revision stays unchanged. Assert one successful child/receipt/character event/campaign event/audit; root unchanged.
 - [ ] Add nullable context/result/root/parent/attempt/audience-principal columns, coherent NULL/object constraints, same-character root/parent references and unique parent plus root/attempt. Ordinary rows remain NULL and old stored JSON is never rewritten.
@@ -61,9 +61,9 @@ These checks mean the design work exists, not that any behavior below is impleme
 **Files:** `src/characters/index.ts`, `persistence.ts`, idempotency tests; `src/transport/http/characters.ts`, openapi tests; `src/campaigns/policy.ts`, campaign persistence/index/transport; contract generator/output files.
 
 - [ ] Add authorized push-options read and push command using the existing receipt/error/reconciliation envelope. Hash parent/character/revision; strict HTTP body accepts revision/key only and rejects all forged outcomes/policy/seed/lineage/audience.
-- [ ] Recheck source/version/owner-placement generation and lifecycle under transaction locks; current value edits use the original pool, different versions block, exact rollback/restored source follows the explicit contract.
+- [ ] Recheck source/version/owner-placement generation and lifecycle under transaction locks; current value edits use the original pool, different rules-system pins block and exact source restoration follows the explicit contract.
 - [ ] Preserve executor for audit but use inherited root principal for visibility. Child audience only narrows against current default. Apply the principal to options, command/replay, character history, campaign roll/activity/export and hidden correlation IDs.
-- [ ] Red → green for controller, GM/co-GM, wrong character, outsider, revoked member/controller, hidden owner-only parent, returned/adopted sheet, archive/recover, version migration/rollback and source removal/restoration.
+- [ ] Red → green for controller, GM/co-GM, wrong character, outsider, revoked member/controller, hidden owner-only parent, returned/adopted sheet, archive/recover and source removal/restoration.
 - [ ] Regression: co-GM pushes a player's GM-only roll then is demoted; they must not inherit visibility just by being child executor. Exercise same-key replay after role/scope/default changes, not just fresh POST.
 - [ ] Regenerate HTTP/OpenAPI/client types from canonical schemas and compare unchanged legacy envelopes/receipts/export behavior. Personal state exports continue excluding history.
 
@@ -83,7 +83,7 @@ These checks mean the design work exists, not that any behavior below is impleme
 - [ ] Extend OnlineOperation/OnlineAttempt, leaving offline EditIntent unchanged. Guard actor/account/storage generations and editing ownership; persist before send and refuse fresh pushes offline or behind pending edits/uncertain work.
 - [ ] Atomically persist recoverable child result/lineage and confirmed state before retiring the frozen attempt. Handle malformed 2xx and IndexedDB acknowledgement failure as uncertain, not definite failure.
 - [ ] Reuse the coordinator for GM pushes; no weaker direct-send recovery path. Test player/GM reload, duplicate click, competing tab, lease pending, backoff, conclusive rejection and expired-window explicit review.
-- [ ] Include previous/current durable reader capability cases; unknown push attempt kinds must remain recoverable and cannot be interpreted as another operation. Preserve account purge, revocation and service-worker queue behavior.
+- [ ] Verify current-reader close/reopen and recovery of the exact pending push. Preserve account purge, revocation and current service-worker queue behavior. Do not construct an older app/store schema or test conversion between development versions before the first release tag.
 
 ## C7 — Result/history controls and canonical browser journeys (TDD)
 
@@ -99,7 +99,7 @@ These checks mean the design work exists, not that any behavior below is impleme
 - [ ] Run focused red → green at each step and record actual commands/results; finish with server, real PostgreSQL integration, frontend typecheck/tests/build, generated-contract identity, production build/Docker, every canonical browser shard, offline and unchanged visual checks. DB skips are not integration success.
 - [x] Isolated preview only: actual `f75cb02`, terminal SUCCESS, migration/readiness and all five served artifact hashes verified; see live record. `proactive-expression` was untouched.
 - [ ] Repeat authoring and both action-source pushes with multiple accounts; verify frozen original pool after field edits, competing different-key pushes, same-key lost-response recovery/reload, principal/role/default narrowing and authorized campaign export/history.
-- [x] Record exact commit/deployment/resource IDs, browser/viewport/theme, sampled outputs/rows and scoped cleanup in the live record/JSON. Existing B compatibility and wider G9/device/provider-authentication gates remain open.
+- [x] Record exact commit/deployment/resource IDs, browser/viewport/theme, sampled outputs/rows and scoped cleanup in the live record/JSON. Older app compatibility is post-tag work; wider G9/device/provider-authentication gates remain open.
 - [ ] Update design/parent plan/acceptance record only from observed evidence; make the implementation PR ready for review after the required gates. Do not claim every Year Zero variant from this fixture.
 
 ## Delivery boundary
@@ -120,7 +120,7 @@ See the [follow-up record](../../acceptance/configurable-push-rolls-2026-10-25.m
 - [x] Exercise the exact preceding version-4 store adapter, blocked-tab upgrade guidance, preserved old work, and refusal to read version 5 without losing the pending push. The whole previous UI bundle was not tested.
 - [x] Fix automatic rollback's preview-ID/execution-ID mismatch; the canonical journey now commits and automatically rolls back through UI controls, verifies the exact execution-ID path, and pushes the restored saved pool. See the repair record.
 - [x] Wait for initial reconciliation before capturing the Activity guard and show a readable refresh state for later stale responses. The canonical journey opens Activity while the initial GET is deliberately held; privacy invalidation regressions remain enforced. See the repair record.
-- [ ] Retain the unperformed live default-narrowing, broader multi-account authoring, whole-client compatibility, physical-device and provider-authentication gates. Keep PR #23 draft.
+- [ ] Retain the unperformed live default-narrowing and broader multi-account authoring checks; physical-device/provider-authentication belong to release readiness. Earlier whole-client compatibility requirements are removed before the first release tag.
 
 
 ## Scoped deployed acceptance — 2026-10-27
@@ -134,3 +134,10 @@ The [current report](../../acceptance/configurable-push-rolls-2026-10-27.md) and
 - [ ] Live mutation of the internal default-audience policy remains unclaimed: no public mutation API or database credentials are available through the connected OAuth tools. PostgreSQL default-change/narrowing/replay regressions passed in CI. Do not implement an unrelated settings API to manufacture this evidence.
 
 Upgrade/migration/rollback and historical-client compatibility are deferred by the owner and are not open merge gates. Physical-device and real-provider checks remain separate future release work. This report accepts the exercised public-interface slice and does not claim an unperformed live internal-policy transition or a public release.
+
+## First-release-tag test alignment — 2026-10-27
+
+The historical version-4/version-5 reader conversion suite and the deferred
+version-upgrade/rollback browser journey are removed from the current tests. Its earlier execution remains recorded above and in dated reports;
+it is not a task to repeat. Current-store reopen, frozen-request replay, account
+isolation and current-worker recovery remain covered by their existing suites.

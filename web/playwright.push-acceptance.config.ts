@@ -8,9 +8,6 @@ const output = resolve(process.env.PUSH_ACCEPTANCE_OUTPUT_DIR ?? "test-results/p
 export default defineConfig({
   testDir: "./tests",
   testMatch: ["**/e2e/configurablePush.spec.ts", "**/e2e/campaignPush.spec.ts", "**/e2e/pushTransitions.spec.ts", "**/offline/pushRecovery.spec.ts"],
-  // Pre-release scope: historical-client upgrades and character migrations
-  // are deliberately outside this acceptance run.
-  grepInvert: /migration|rollback/i,
   workers: 1,
   retries: 0,
   timeout: 180_000,

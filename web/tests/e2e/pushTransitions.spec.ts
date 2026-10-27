@@ -96,60 +96,6 @@ test("saved item pools follow source removal, exact restoration and archive/reco
   }
 });
 
-test("UI migration and automatic rollback use the authoritative execution ID and restore the saved pool", async ({ page }, info) => {
-  test.setTimeout(180_000);
-  await signIn(page);
-  const system = await workspace(page.request), ids: string[] = [];
-  const evidence: Record<string, unknown> = { systemId: system.id };
-  try {
-    const versionId = await publish(page.request, system.id);
-    const character = await createCharacter(page.request, versionId), id = character.characterId;
-    ids.push(id);
-    const current = async () => (await json(page.request, "GET", `/api/characters/${id}`)).character;
-    await page.goto(`/characters/${id}`);
-    const root = (await resultOf(page, () => page.getByRole("button", { name: "Test Pool", exact: true }).click(), "/actions/test_pool")).result.roll;
-    const options = async () => (await json(page.request, "GET", `/api/characters/${id}/rolls/${root.push.rollId}/push-options`)).options;
-    const opened = (await json(page.request, "GET", `/api/systems/${system.id}`)).workspace;
-    const nextVersion = (await json(page.request, "POST", `/api/systems/${system.id}/publish`, { expectedRevision: opened.draft.revision, semanticVersion: "1.0.1", releaseNotes: "Version transition acceptance", acknowledgeBreaking: true, idempotencyKey: key() })).version.versionId;
-    await page.getByRole("button", { name: "Migration", exact: true }).click();
-    let migration = page.getByRole("dialog", { name: "Migration", exact: true });
-    await migration.getByLabel("Target version", { exact: true }).selectOption(nextVersion);
-    const previewed = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/migration-previews"));
-    await migration.getByRole("button", { name: "Preview migration", exact: true }).click();
-    const preview = (await (await previewed).json()).preview;
-    await migration.getByRole("checkbox", { name: "I reviewed this preview and want to commit it" }).check();
-    const committed = await resultOf(page, () => migration.getByRole("button", { name: "Commit migration", exact: true }).click(), `/migrations/${preview.previewId}/commit`);
-    await expect(migration).toHaveCount(0);
-    const migrationId = committed.result.character.reconciliation.commandExecutionId;
-    expect(migrationId).toMatch(/[0-9a-f-]{36}/);
-    expect(await options()).toMatchObject({ canPush: false, reason: "rules_changed" });
-    const rejected = await page.request.post(`/api/characters/${id}/rolls/${root.push.rollId}/push`, { data: { expectedRevision: (await current()).revision, idempotencyKey: key() } });
-    expect(rejected.status()).toBe(422);
-    expect((await rejected.json()).error.pushReason).toBe("rules_changed");
-    await page.getByRole("button", { name: "Migration", exact: true }).click();
-    migration = page.getByRole("dialog", { name: "Migration", exact: true });
-    await expect(migration.getByText("The last migration can be rolled back.")).toBeVisible();
-    const rollbackRequest = page.waitForRequest(request => request.method() === "POST" && request.url().endsWith("/rollback"));
-    await resultOf(page, () => migration.getByRole("button", { name: "Roll back migration", exact: true }).click(), "/rollback");
-    expect(new URL((await rollbackRequest).url()).pathname).toBe(`/api/characters/${id}/migrations/${migrationId}/rollback`);
-    expect(migrationId).not.toBe(preview.previewId);
-    await expect(migration).toHaveCount(0);
-    expect((await current()).systemVersionId).toBe(versionId);
-    expect((await options()).canPush).toBe(true);
-    await page.reload();
-    await expect(page.getByRole("button", { name: "Archive", exact: true })).toBeEnabled();
-    await page.getByRole("button", { name: "Activity", exact: true }).click();
-    const panel = page.getByRole("dialog", { name: "Activity" }).getByTestId("push-result").filter({ hasText: "Original roll" }).first();
-    await expect(panel.getByRole("button", { name: "Push saved roll" })).toBeEnabled();
-    const child = (await resultOf(page, () => panel.getByRole("button", { name: "Push saved roll" }).click(), "/push")).result.roll;
-    assertChild(root, child);
-    Object.assign(evidence, { characterId: id, versionId, nextVersion, migrationId, root, child, oldPoolReason: "rules_changed" });
-  } finally {
-    evidence.cleanup = await cleanup(page.request, system.id, ids);
-    await info.attach("push-version-evidence", { body: JSON.stringify(evidence, null, 2), contentType: "application/json" });
-  }
-});
-
 test("opening Activity during initial reconciliation waits for the current cache generation", async ({ page }, info) => {
   test.setTimeout(180_000);
   await signIn(page);

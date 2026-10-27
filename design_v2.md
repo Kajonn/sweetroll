@@ -626,6 +626,15 @@ Maintain three internal reference systems as acceptance fixtures: a minimal rule
 
 # 17. Delivery plan
 
+**First-release-tag boundary (owner decision, 2026-10-27):** The application and
+database remain under development until the first application release Git tag
+(`v*.*.*`). Before that tag, use the current schema and disposable test data; do
+not add or retain app/database upgrade tasks or old-build conversion tests. The
+[post-tag migration strategy in PR #24](https://github.com/Kajonn/sweetroll/blob/refactor/pre-release-database-baseline/docs/superpowers/plans/2026-10-27-application-migration-policy.md)
+is planned now and implemented only for changes after that tag. Fresh initialization,
+current-format validation, authorization and exact-request recovery remain required.
+
+
 Delivery retains I1-I7 and adds I4a for GUI integration and I7b for simple scenes and restricted display. Each increment produces a complete, deployable capability rather than infrastructure that cannot be exercised. Backend increments are functional through the documented HTTP interface; frontend increments provide the normal user interface over capabilities completed by earlier increments.
 
 Foundational work belongs to the first increment that needs it. For example, repository setup, CI/CD, identity seams, database conventions, and baseline observability are tasks in I1 rather than a separate non-functional milestone.

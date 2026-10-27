@@ -1602,36 +1602,6 @@ export function createCampaignPersistenceRepository(pool: Pool) {
     },
 
     /**
-     * I7 Phase 3: client-threaded known-version use check (same owner or
-     * public/link predicate as loadAccessibleVersion, but running on the
-     * caller's snapshot client instead of a fresh pool connection).
-     */
-    async loadAccessibleVersionOnClient(
-      client: DbClient,
-      actorId: string,
-      versionId: string,
-    ): Promise<AccessibleVersion | null> {
-      const result = await client.query<{
-        system_id: string;
-        version_id: string;
-        checksum: string;
-      }>(
-        `SELECT s.id AS system_id, v.id AS version_id, v.checksum
-           FROM system_versions v
-           JOIN systems s ON s.id = v.system_id
-          WHERE v.id = $2
-            AND v.lifecycle = 'published'
-            AND s.lifecycle = 'active'
-            AND (s.owner_id = $1 OR s.access IN ('public', 'link'))`,
-        [actorId, versionId],
-      );
-      const row = result.rows[0];
-      return row === undefined
-        ? null
-        : { systemId: row.system_id, versionId: row.version_id, checksum: row.checksum };
-    },
-
-    /**
      * I7b Task 1: media file rows. The validated original bytes already sit
      * on disk under `storageKey` (written before this insert); the row is
      * the durability record Tasks 2-4 reference.

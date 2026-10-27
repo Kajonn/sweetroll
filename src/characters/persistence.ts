@@ -367,8 +367,6 @@ export interface CharacterPersistenceRepository {
   ): Promise<AttachedAuthorization | null>;
 
   recordAudit(input: { characterId: CharacterId; actorId: UserId; kind: string; summary: string; requestId: string }): Promise<void>;
-
-  loadVersionIdentity(versionId: VersionId): Promise<{ systemId: string; checksum: string } | null>;
 }
 
 type CharacterRow = {
@@ -1285,15 +1283,6 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       const latestActivity =
         lastRow === undefined ? null : { id: lastRow.id, occurredAtText: lastRow.occurred_at_cursor };
       return { changedDefinitionIds: [...ids], latestActivity };
-    },
-
-    async loadVersionIdentity(versionId) {
-      const result = await pool.query<{ system_id: string; checksum: string }>(
-        `SELECT system_id, checksum FROM system_versions WHERE id = $1`,
-        [versionId],
-      );
-      const row = result.rows[0];
-      return row === undefined ? null : { systemId: row.system_id, checksum: row.checksum };
     },
   };
 }

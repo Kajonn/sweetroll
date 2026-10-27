@@ -17,6 +17,8 @@ unreleased, has no users and only runs with disposable test data.
   migration tables and all five HTTP routes.
 - Remove frontend dialogs, controls, API/query methods, offline migration
   operations, retained migration results, export-lineage placeholders and strings.
+  IndexedDB creates its stores only on first creation, without requesting a
+  historical version or adding missing stores to previous schemas.
 - Regenerate the shared HTTP contract and client types. Update Docker, Railway,
   browser startup, backup metadata and the standalone acceptance script.
 - Keep published rules IDs and immutable snapshots, creation and play, authoritative
@@ -26,8 +28,9 @@ unreleased, has no users and only runs with disposable test data.
 ## Verification
 
 - TDD: the endpoint-removal test first failed with all five old paths, then passed.
-  Frontend regressions assert that character and campaign upgrade controls are absent.
-- Server: 431 tests pass, with 10 pre-existing skips. Frontend: all 1,131
+  The IndexedDB regression was also red (historical version 4) before switching
+  to default first creation. Frontend regressions assert that character and campaign upgrade controls are absent.
+- Server: 431 tests pass, with 10 pre-existing skips. Frontend: all 1,132
   tests pass. Server/client typechecks and builds pass.
 - API contract generation/check passes. Focused character HTTP/OpenAPI tests pass.
 - Embedded PostgreSQL: fresh schema contains no migration tables; first reference

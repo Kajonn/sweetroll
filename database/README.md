@@ -11,7 +11,9 @@ backfill, old-schema detection or automatic reset.
 
 After a schema change, recreate the disposable test database and initialize it
 again. Databases created by earlier development code must likewise be recreated.
-Clear obsolete browser test profiles rather than maintaining conversion code.
+Browser storage creates the current stores on first creation without requesting
+a version upgrade. Clear obsolete browser test profiles rather than maintaining
+conversion code.
 
 Character/campaign upgrades between published rules versions, field-mapping
 previews, upgrade commits and rollback are not supported. Published rules remain

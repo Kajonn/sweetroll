@@ -10,7 +10,6 @@ import type {
   CharacterCommandResult,
   CharacterError,
   CharacterExportV1,
-  CharacterMigrationPreview,
   CharacterView,
   Characters,
 } from "../../characters/index.js";
@@ -133,22 +132,6 @@ function characterExport(): CharacterExportV1 {
     packageChecksum: d20Package.integrity.checksum,
     revision: 1,
     state: { schemaVersion: "1.0", values: { ability: 10 } },
-    migrationLineage: [],
-  };
-}
-
-function migrationPreview(): CharacterMigrationPreview {
-  const targetVersionId = randomUUID();
-  return {
-    previewId: randomUUID(),
-    characterId: randomUUID(),
-    sourceRevision: 1,
-    sourceVersionId: randomUUID(),
-    targetVersionId,
-    candidateState: { schemaVersion: "1.0", values: {} },
-    candidateProjection: makeProjection(targetVersionId),
-    warnings: [],
-    expiresAt: "2026-09-06T00:00:00.000Z",
   };
 }
 
@@ -174,9 +157,6 @@ function makeCharacters(overrides: Partial<Characters> = {}): Characters {
     duplicate: async () => ({ ok: true, value: characterView() }),
     listActivity: async () => ({ ok: true, value: { events: [], nextCursor: null } }),
     exportCharacter: async () => ({ ok: true, value: characterExport() }),
-    previewMigration: async () => ({ ok: true, value: migrationPreview() }),
-    commitMigration: async () => ({ ok: true, value: commandResult() }),
-    rollbackMigration: async () => ({ ok: true, value: commandResult() }),
   };
   return { ...base, ...overrides };
 }
@@ -225,9 +205,6 @@ describe("character HTTP routes", () => {
       { method: "post", url: `/characters/${randomUUID()}/duplicate`, payload: { idempotencyKey: "key-1" } },
       { method: "get", url: `/characters/${randomUUID()}/activity` },
       { method: "post", url: `/characters/${randomUUID()}/exports` },
-      { method: "post", url: `/characters/${randomUUID()}/migration-previews`, payload: { targetVersionId: randomUUID() } },
-      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/commit`, payload: { expectedRevision: 1, idempotencyKey: "key-1" } },
-      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/rollback`, payload: { idempotencyKey: "key-1" } },
     ];
 
     for (const route of routes) {
@@ -988,86 +965,6 @@ describe("character HTTP routes", () => {
     const body = response.json() as CharacterExportV1;
     expect(body.mediaType).toBe("application/vnd.sweetroll.character+json;version=1");
     expect(body.characterId).toBeTypeOf("string");
-    expect(body.migrationLineage).toEqual([]);
-  });
-
-  it("maps migration preview to previewMigration returning 201", async () => {
-    let received: unknown;
-    const app = await build(
-      makeCharacters({
-        previewMigration: async (_ctx, input) => {
-          received = input;
-          return { ok: true, value: migrationPreview() };
-        },
-      }),
-    );
-    const id = randomUUID();
-    const targetVersionId = randomUUID();
-    const response = await app.inject({
-      method: "POST",
-      url: `/characters/${id}/migration-previews`,
-      headers: cookie,
-      payload: { targetVersionId, mappings: { ability: "strength" }, defaults: { ancestry: "human" } },
-    });
-    expect(response.statusCode).toBe(201);
-    expect(response.json().preview).toMatchObject({ sourceRevision: 1, warnings: [] });
-    expect(response.json().preview.candidateProjection).toMatchObject({ entityLabel: "Character" });
-    expect(response.json().requestId).toBeTypeOf("string");
-    expect(received).toEqual({
-      characterId: id,
-      targetVersionId,
-      mappings: { ability: "strength" },
-      defaults: { ancestry: "human" },
-    });
-  });
-
-  it("maps migration commit to commitMigration", async () => {
-    let received: unknown;
-    const app = await build(
-      makeCharacters({
-        commitMigration: async (_ctx, input) => {
-          received = input;
-          return { ok: true, value: commandResult() };
-        },
-      }),
-    );
-    const id = randomUUID();
-    const previewId = randomUUID();
-    const response = await app.inject({
-      method: "POST",
-      url: `/characters/${id}/migrations/${previewId}/commit`,
-      headers: cookie,
-      payload: { expectedRevision: 4, idempotencyKey: "key-1" },
-    });
-    expect(response.statusCode).toBe(200);
-    expect(received).toEqual({
-      characterId: id,
-      previewId,
-      expectedRevision: 4,
-      idempotencyKey: "key-1",
-    });
-  });
-
-  it("maps migration rollback to rollbackMigration", async () => {
-    let received: unknown;
-    const app = await build(
-      makeCharacters({
-        rollbackMigration: async (_ctx, input) => {
-          received = input;
-          return { ok: true, value: commandResult() };
-        },
-      }),
-    );
-    const id = randomUUID();
-    const migrationId = randomUUID();
-    const response = await app.inject({
-      method: "POST",
-      url: `/characters/${id}/migrations/${migrationId}/rollback`,
-      headers: cookie,
-      payload: { idempotencyKey: "key-1" },
-    });
-    expect(response.statusCode).toBe(200);
-    expect(received).toEqual({ characterId: id, migrationId, idempotencyKey: "key-1" });
   });
 
   it("rejects malformed payloads with 400", async () => {
@@ -1091,9 +988,9 @@ describe("character HTTP routes", () => {
 
     const badRevision = await app.inject({
       method: "POST",
-      url: `/characters/${randomUUID()}/migrations/${randomUUID()}/commit`,
+      url: `/characters/${randomUUID()}/fields/ability/set`,
       headers: cookie,
-      payload: { expectedRevision: "abc", idempotencyKey: "key-1" },
+      payload: { value: 12, expectedRevision: "abc", idempotencyKey: "key-1" },
     });
     expect(badRevision.statusCode).toBe(400);
 
@@ -1123,9 +1020,6 @@ describe("character HTTP routes", () => {
         duplicate: notFound,
         listActivity: notFound,
         exportCharacter: notFound,
-        previewMigration: notFound,
-        commitMigration: notFound,
-        rollbackMigration: notFound,
       }),
     );
     const routes: Array<{ method: "get" | "post" | "patch" | "delete"; url: string; payload?: unknown }> = [
@@ -1144,9 +1038,6 @@ describe("character HTTP routes", () => {
       { method: "post", url: `/characters/${randomUUID()}/duplicate`, payload: { idempotencyKey: "key-1" } },
       { method: "get", url: `/characters/${randomUUID()}/activity` },
       { method: "post", url: `/characters/${randomUUID()}/exports` },
-      { method: "post", url: `/characters/${randomUUID()}/migration-previews`, payload: { targetVersionId: randomUUID() } },
-      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/commit`, payload: { expectedRevision: 1, idempotencyKey: "key-1" } },
-      { method: "post", url: `/characters/${randomUUID()}/migrations/${randomUUID()}/rollback`, payload: { idempotencyKey: "key-1" } },
     ];
 
     for (const route of routes) {
@@ -1232,8 +1123,6 @@ describe("character HTTP routes", () => {
         create: async () => ({ ok: false, error: { code: "idempotency_mismatch", message: "This idempotency key was already used with different input." } }),
         apply: async () => ({ ok: false, error: conflict }),
         manage: async () => ({ ok: false, error: conflict }),
-        commitMigration: async () => ({ ok: false, error: conflict }),
-        rollbackMigration: async () => ({ ok: false, error: conflict }),
       }),
     );
     const headers = cookie;
@@ -1266,22 +1155,6 @@ describe("character HTTP routes", () => {
     });
     expect(transfer.statusCode).toBe(409);
 
-    const commit = await app.inject({
-      method: "POST",
-      url: `/characters/${randomUUID()}/migrations/${randomUUID()}/commit`,
-      headers,
-      payload: { expectedRevision: 1, idempotencyKey: "key-1" },
-    });
-    expect(commit.statusCode).toBe(409);
-    expect(commit.json().error.cacheDisposition).toBe("replace");
-
-    const rollback = await app.inject({
-      method: "POST",
-      url: `/characters/${randomUUID()}/migrations/${randomUUID()}/rollback`,
-      headers,
-      payload: { idempotencyKey: "key-1" },
-    });
-    expect(rollback.statusCode).toBe(409);
   });
 
   it("maps command_in_progress to 409", async () => {
@@ -1321,7 +1194,6 @@ describe("character HTTP routes", () => {
             ],
           },
         }),
-        previewMigration: async () => ({ ok: false, error: { code: "invalid_value", message: "Mappings conflict." } }),
       }),
     );
     const id = randomUUID();
@@ -1335,15 +1207,6 @@ describe("character HTTP routes", () => {
     expect(set.json().error.code).toBe("invalid_value");
     expect(set.json().error.diagnostics).toHaveLength(1);
 
-    const preview = await app.inject({
-      method: "POST",
-      url: `/characters/${id}/migration-previews`,
-      headers: cookie,
-      payload: { targetVersionId: randomUUID() },
-    });
-    expect(preview.statusCode).toBe(422);
-    expect(preview.json().error.code).toBe("invalid_value");
-    expect(preview.json().error).not.toHaveProperty("diagnostics");
   });
 
   it("maps genuine catch-block internal module errors to 500", async () => {

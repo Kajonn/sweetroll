@@ -4,7 +4,7 @@
 
 **Goal:** A GM uploads images, composes fog/token scenes, and pairs a restricted display that shows only revealed pixels and visible tokens.
 
-**Architecture:** Campaigns owns two new submodules (`media.ts`, `scenes.ts`) following the existing `content.ts`/`invitations.ts` command pattern, with rows in two new migrations. Originals stay private on local disk; per-revision redacted derivatives are composited server-side with `sharp`. The display polls a credential-scoped projection; pairing is a single-use short code redeemed on `/display`, which purges GM state on entry.
+**Architecture:** Campaigns owns two new submodules (`media.ts`, `scenes.ts`) following the existing `content.ts`/`invitations.ts` command pattern, with tables defined directly in the current schema baseline. Originals stay private on local disk; per-revision redacted derivatives are composited server-side with `sharp`. The display polls a credential-scoped projection; pairing is a single-use short code redeemed on `/display`, which purges GM state on entry.
 
 **Tech Stack:** PostgreSQL, Campaigns Module, Fastify/OpenAPI + TypeBox, generated TypeScript (`docs/contracts/openapi-v1.json`, `web/src/api/schema.d.ts`), React + TanStack Query, shared `web/src/ui/` controls, `sharp` for image decode/composite, Vitest, Playwright Chromium.
 
@@ -21,7 +21,7 @@
 - No `campaign`/`scene` string in `web/src/player/` — GM code in `web/src/campaigns/`, display shell in `web/src/display/`.
 - TDD red-green per task; `npm run contracts:check` stays green (contracts regenerated in Task 4).
 - New i18n keys ship in the same task as the component that uses them.
-- Migrations are immutable, lexical-order files each running in its own transaction; never edit an applied file.
+- Before the first release tag, update the current schema baseline and rebuild disposable databases. Immutable upgrade scripts and transition tests apply only to changes after that tag, following the application migration policy.
 
 ---
 
@@ -29,9 +29,9 @@
 
 | File | Responsibility |
 | --- | --- |
-| `migrations/0018_campaign_media.sql` (create) | `media_files` table (owner, campaign, media_type, size, dims, checksum, storage_key) |
-| `migrations/0019_campaign_scenes.sql` (create) | `scenes` table (background ref, revision, fog mask, token records as JSONB + revision) |
-| `migrations/0020_display_credentials.sql` (create) | `display_codes` (single-use, TTL) + `display_credentials` (campaign-scoped, revocable) |
+| `database/schema.sql` (update current baseline) | `media_files` table (owner, campaign, media_type, size, dims, checksum, storage_key) |
+| `database/schema.sql` (update current baseline) | `scenes` table (background ref, revision, fog mask, token records as JSONB + revision) |
+| `database/schema.sql` (update current baseline) | `display_codes` (single-use, TTL) + `display_credentials` (campaign-scoped, revocable) |
 | `src/campaigns/media.ts` (create) | `uploadImage`, `deleteImage`, storage helpers (disk layout, sharp validation) |
 | `src/campaigns/scenes.ts` (create) | `createScene`, `updateScene`, `applyFogEdit`, `placeToken`, `moveToken`, `removeToken` |
 | `src/campaigns/display.ts` (create) | `pairDisplay`, `redeemDisplayCode`, `revokeDisplay`, `getDisplayProjection` (+ redaction) |
@@ -59,7 +59,7 @@
 
 **Files:**
 - Modify: `package.json` (add `sharp`), `Dockerfile` + `compose.yaml` (persisted `data/media` volume), `.dockerignore`/`.gitignore` (exclude `data/media/*` bytes)
-- Create: `migrations/0018_campaign_media.sql`
+- Modify: `database/schema.sql`
 - Create: `src/campaigns/media.ts`
 - Modify: `src/campaigns/index.ts` (wire `uploadImage`/`deleteImage`)
 - Modify: `src/campaigns/persistence.ts` (media file repo)
@@ -108,14 +108,14 @@ expect(uploaded.value).toMatchObject({ width: 1, height: 1, mediaType: "image/pn
 - [ ] **Step 2: Run to verify it fails.** Run: `TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npx vitest run tests/integration/campaign-scenes.test.ts --no-file-parallelism`. Expected: FAIL with `uploadImage is not a function`.
 - [ ] **Step 3: Implement migration + module.** Write `0018` (`media_files` with `id, campaign_id REFERENCES campaigns ON DELETE CASCADE, owner_id, name, media_type, size_bytes, width, height, checksum, storage_key UNIQUE, revision, created_at`); implement `uploadImage`/`deleteImage` in `src/campaigns/media.ts` with the `sharp` metadata check; wire into `index.ts`; add the repo functions in `persistence.ts`. Disk root resolves from `SWEETROLL_MEDIA_DIR ?? <repo>/data/media`.
 - [ ] **Step 4: Run to verify it passes.** Same command as Step 2. Expected: PASS. Then `npm run typecheck`. Expected: clean.
-- [ ] **Step 5: Commit.** `git add package.json package-lock.json Dockerfile compose.yaml migrations/0018_campaign_media.sql src/campaigns/media.ts src/campaigns/index.ts src/campaigns/persistence.ts tests/integration/campaign-scenes.test.ts`; `git commit -m "feat(i7b): add campaign image upload with validated private storage"`.
+- [ ] **Step 5: Commit.** `git add package.json package-lock.json Dockerfile compose.yaml database/schema.sql src/campaigns/media.ts src/campaigns/index.ts src/campaigns/persistence.ts tests/integration/campaign-scenes.test.ts`; `git commit -m "feat(i7b): add campaign image upload with validated private storage"`.
 
 ---
 
 ### Task 2: Scene / fog / token commands
 
 **Files:**
-- Create: `migrations/0019_campaign_scenes.sql`
+- Modify: `database/schema.sql`
 - Create: `src/campaigns/scenes.ts`
 - Modify: `src/campaigns/index.ts`, `src/campaigns/persistence.ts`
 - Modify: `tests/integration/campaign-scenes.test.ts` (scene block)
@@ -162,14 +162,14 @@ expect(stale.ok).toBe(false);
 - [ ] **Step 2: Run to verify it fails.** Same vitest command as Task 1 Step 2. Expected: FAIL with `createScene is not a function`.
 - [ ] **Step 3: Implement migration + module.** Write `0019` (`scenes` with `id, campaign_id REFERENCES campaigns ON DELETE CASCADE, background_file_id, revision, fog_jsonb JSONB NOT NULL DEFAULT '[]', tokens_jsonb JSONB NOT NULL DEFAULT '[]'`); implement the six commands in `src/campaigns/scenes.ts`; wire into `index.ts`; repo reads/writes in `persistence.ts` run inside the caller's transaction.
 - [ ] **Step 4: Run to verify it passes.** Same command. Expected: PASS. Then `npm run typecheck`. Expected: clean.
-- [ ] **Step 5: Commit.** `git add migrations/0019_campaign_scenes.sql src/campaigns/scenes.ts src/campaigns/index.ts src/campaigns/persistence.ts tests/integration/campaign-scenes.test.ts`; `git commit -m "feat(i7b): add revision-guarded scene, fog and token commands"`.
+- [ ] **Step 5: Commit.** `git add database/schema.sql src/campaigns/scenes.ts src/campaigns/index.ts src/campaigns/persistence.ts tests/integration/campaign-scenes.test.ts`; `git commit -m "feat(i7b): add revision-guarded scene, fog and token commands"`.
 
 ---
 
 ### Task 3: Display pairing + redacted projection
 
 **Files:**
-- Create: `migrations/0020_display_credentials.sql`
+- Modify: `database/schema.sql`
 - Create: `src/campaigns/display.ts`
 - Modify: `src/campaigns/index.ts`, `src/campaigns/persistence.ts`
 - Modify: `tests/integration/campaign-scenes.test.ts` (display block)
@@ -203,7 +203,7 @@ expect(projection.value.tokens.find((t) => t.tokenId === hiddenId)).toBeUndefine
 - [ ] **Step 2: Run to verify it fails.** Same vitest command. Expected: FAIL with `pairDisplay is not a function`.
 - [ ] **Step 3: Implement migration + module.** Write `0020` (`display_codes` with `code_hash UNIQUE, campaign_id, expires_at`; `display_credentials` with `id, campaign_id, secret_hash, revoked_at NULL, created_at`); implement `src/campaigns/display.ts` with the `sharp` redaction composite (background minus fog mask; token positions are data, not burned pixels); wire into `index.ts`.
 - [ ] **Step 4: Run to verify it passes.** Same command. Expected: PASS. Then `npm run typecheck`. Expected: clean.
-- [ ] **Step 5: Commit.** `git add migrations/0020_display_credentials.sql src/campaigns/display.ts src/campaigns/index.ts src/campaigns/persistence.ts tests/integration/campaign-scenes.test.ts`; `git commit -m "feat(i7b): add display pairing with redacted scene projection"`.
+- [ ] **Step 5: Commit.** `git add database/schema.sql src/campaigns/display.ts src/campaigns/index.ts src/campaigns/persistence.ts tests/integration/campaign-scenes.test.ts`; `git commit -m "feat(i7b): add display pairing with redacted scene projection"`.
 
 ---
 

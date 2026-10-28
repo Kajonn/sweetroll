@@ -2,7 +2,6 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import type { CampaignsApi, CampaignListQuery, ClaimableCharactersQuery } from "./api.js";
 import type {
   ApplyFogEditBody,
-  CommitUpgradeBody,
   MoveTokenBody,
   PlaceTokenBody,
   RemoveTokenBody,
@@ -43,52 +42,6 @@ export function campaignCharactersPrefix(campaignId: string): string[] {
 
 export function campaignListKey(actorId: string | null, generation: number) {
   return ["campaigns", "list", actorId, generation];
-}
-
-export function campaignUpgradePreviewKey(
-  campaignId: string,
-  actorId: string | null,
-  generation: number,
-  targetVersionId: string | null,
-) {
-  return ["campaigns", "upgrade-preview", campaignId, actorId, generation, targetVersionId];
-}
-
-export function useUpgradePreview(
-  api: CampaignsApi,
-  campaignId: string,
-  actorId: string | null,
-  generation: number,
-  targetVersionId: string | null,
-  options: { enabled: boolean; online: boolean },
-) {
-  return useQuery({
-    queryKey: campaignUpgradePreviewKey(campaignId, actorId, generation, targetVersionId),
-    queryFn: () => {
-      if (targetVersionId === null) throw new Error("upgrade target missing");
-      return api.previewUpgrade(campaignId, { targetVersionId });
-    },
-    enabled: options.enabled && options.online && actorId !== null && targetVersionId !== null,
-    staleTime: 30_000,
-  });
-}
-
-export function useCommitUpgrade(api: CampaignsApi, campaignId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (body: CommitUpgradeBody) => api.commitUpgrade(campaignId, body),
-    onSuccess: () => {
-      // Same literal 3-element prefixes CampaignDetail uses for
-      // leave/revocation purges, so every actor/generation-scoped read under
-      // this campaign reloads. Invalidate (not purge): the campaign still
-      // exists and the view must re-read the moved pin.
-      void queryClient.invalidateQueries({ queryKey: campaignCharactersPrefix(campaignId) });
-      void queryClient.invalidateQueries({ queryKey: ["campaigns", "content", campaignId] });
-      void queryClient.invalidateQueries({ queryKey: ["campaigns", "activity", campaignId] });
-      void queryClient.invalidateQueries({ queryKey: ["campaigns", "session", campaignId] });
-      void queryClient.invalidateQueries({ queryKey: campaignDetailKey(campaignId) });
-    },
-  });
 }
 
 export function useCampaignList(
@@ -177,7 +130,7 @@ export function useDisplayProjection(
 
 /**
  * Shared scene-commit invalidation: the campaign-wide scene prefix (same
- * literal-prefix style `useCommitUpgrade` uses, so every actor/generation
+ * literal-prefix style used by campaign queries, so every actor/generation
  * scoped scene read under this campaign reloads) plus the display-scoped
  * projection entries for exactly this scene. Projection keys are
  * display-first, so the scene slice is matched with a predicate — no new

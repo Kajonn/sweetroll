@@ -74,16 +74,6 @@ export type ReviewExpiredAttemptInput = {
   attemptId: string;
   acknowledgeUnknownOutcome: boolean;
 };
-/**
- * The latest successful online lifecycle/migration result, preserved for
- * later UI consumption (e.g. offering rollback without manual guessing).
- * A committed migration is identified by the server's command execution ID.
- * Keep its preview ID for request correlation, never as a rollback fallback.
- * A missing execution ID leaves automatic rollback unavailable.
- */
-export type LastMigrationResult =
-  | { operation: "commit"; previewId: string; migrationId: string | null; revision: number }
-  | { operation: "rollback"; migrationId: string; revision: number };
 export type SessionPhase =
   | "loading"
   | "ready"
@@ -155,12 +145,6 @@ export type CommandResultResponse = operations["post_characters_characterId_fiel
 export type CommandResult = CommandResultResponse["result"];
 
 export type CharacterExport = operations["post_characters_characterId_exports"]["responses"]["200"]["content"]["application/vnd.sweetroll.character+json;version=1"];
-
-export type MigrationPreviewResponse = operations["post_characters_characterId_migration_previews"]["responses"]["201"]["content"]["application/json"];
-export type MigrationPreview = MigrationPreviewResponse["preview"];
-export type MigrationPreviewBody = NonNullable<
-  operations["post_characters_characterId_migration_previews"]["requestBody"]
->["content"]["application/json"];
 
 export type PushOptionsResponse=operations["get_characters_characterId_rolls_rollId_push_options"]["responses"]["200"]["content"]["application/json"];
 export type ReadRollResponse=operations["get_characters_characterId_rolls_rollId"]["responses"]["200"]["content"]["application/json"];

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Establish the executable, observable, and deployable TypeScript foundation required by I1, with `http` and `migrate` process modes backed by PostgreSQL.
+**Goal:** Establish the executable, observable, and deployable TypeScript foundation required by I1, with `http` and `db:init` process modes backed by PostgreSQL.
 
 **Architecture:** One npm package builds one Node.js container image. Thin bootstrap files compose platform configuration, logging, PostgreSQL, HTTP, metrics, and explicit SQL migration implementations; no business Module behavior or additional deployable is introduced. The same image runs either `http` or `migrate`, and CI publishes that image only from version tags.
 
@@ -13,9 +13,9 @@
 ## Global Constraints
 
 - Keep one modular TypeScript application, one PostgreSQL database, and one deployable artifact.
-- Provide only `http` and `migrate` process modes; do not add a worker or asynchronous infrastructure.
+- Provide only `http` and `db:init` process modes; do not add a worker or asynchronous infrastructure.
 - Keep HTTP, platform, and process composition outside the deep Modules.
-- Use a thin PostgreSQL driver and explicit, append-only SQL migrations; do not add an ORM or generic persistence seam.
+- Use a thin PostgreSQL driver and the editable current SQL schema baseline before the first release tag; do not add an ORM or generic persistence seam.
 - Add structured logs, server-generated request IDs, liveness, readiness, and baseline Prometheus-format HTTP metrics without logging request bodies, tokens, or database URLs.
 - Keep ordinary HTTP operations compatible with the p95 target below 300 ms; health and metrics handlers must perform bounded work.
 - Do not add Identity, system-package, rules, authoring, runtime, or database-domain behavior in this plan.
@@ -82,7 +82,7 @@ Create `package.json`:
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev:http": "tsx watch src/bootstrap/http.ts",
-    "migrate": "tsx src/bootstrap/migrate.ts",
+    "migrate": "tsx src/bootstrap/initialize-database.ts",
     "start:http": "node dist/bootstrap/http.js",
     "start:migrate": "node dist/bootstrap/migrate.js",
     "test": "vitest run --exclude tests/integration/**",
@@ -521,207 +521,26 @@ git commit -m "feat: add observable HTTP process"
 
 ---
 
-### Task 3: Add Explicit PostgreSQL Migration Mode
+### Task 3: Initialize the Current Test Database
 
-**Files:**
-- Create: `migrations/README.md`
-- Create: `src/platform/migrations.ts`
-- Create: `tests/fixtures/migrations/0001_create_probe.sql`
-- Create: `tests/integration/migrations.test.ts`
-- Modify: `src/bootstrap/migrate.ts`
+**Current files:** `database/schema.sql`, `database/README.md`,
+`src/platform/initialize-database.ts`, `src/bootstrap/initialize-database.ts`,
+`tests/integration/current-schema.test.ts`.
 
-**Interfaces:**
-- Consumes: a connected `pg.Client` and a directory containing immutable files named `NNNN_snake_case.sql`.
-- Produces: `runMigrations(client: Client, directory: string): Promise<void>`, checksum verification, ordered one-time application, and the `migrate` process mode.
+Before the first application release tag, define the final schema directly in
+`database/schema.sql`. Use `npm run db:init` or the built `start:db:init` entry
+point. Initialization is atomic, serializes concurrent starts and preserves current
+data on repeated startup. Insert missing real reference fixtures; never repair old
+development rows or reset an existing database automatically.
 
-- [x] **Step 1: Document the migration contract and add a fixture**
+Verify fresh initialization, repeated/concurrent initialization, failure atomicity
+and current storage constraints. Recreate disposable test databases after schema
+changes. No migration history, checksum ledger, upgrade chain or app-version
+transition tests are implemented before the first release tag.
 
-Create `migrations/README.md`:
-
-```markdown
-# SQL migrations
-
-Production migrations are immutable UTF-8 SQL files named `NNNN_snake_case.sql`.
-The migrate process applies files in lexical order and records each SHA-256 checksum in `schema_migrations`.
-Never modify an applied file; add a new migration to change the schema.
-Each file runs in its own transaction while the process holds a PostgreSQL advisory lock.
-```
-
-Create `tests/fixtures/migrations/0001_create_probe.sql`:
-
-```sql
-CREATE TABLE migration_probe (
-  id integer PRIMARY KEY
-);
-```
-
-- [x] **Step 2: Write failing real-PostgreSQL tests**
-
-Create `tests/integration/migrations.test.ts`:
-
-```typescript
-import { randomUUID } from "node:crypto";
-import { fileURLToPath } from "node:url";
-
-import { Client } from "pg";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
-import { runMigrations } from "../../src/platform/migrations.js";
-
-const databaseUrl = process.env.TEST_DATABASE_URL;
-const describeWithDatabase = databaseUrl === undefined ? describe.skip : describe;
-
-describeWithDatabase("runMigrations", () => {
-  const schema = `migration_test_${randomUUID().replaceAll("-", "")}`;
-  const directory = fileURLToPath(new URL("../fixtures/migrations", import.meta.url));
-  let client: Client;
-
-  beforeEach(async () => {
-    client = new Client({ connectionString: databaseUrl });
-    await client.connect();
-    await client.query(`CREATE SCHEMA ${schema}`);
-    await client.query(`SET search_path TO ${schema}`);
-  });
-
-  afterEach(async () => {
-    await client.query(`DROP SCHEMA ${schema} CASCADE`);
-    await client.end();
-  });
-
-  it("applies each migration once and records its checksum", async () => {
-    await runMigrations(client, directory);
-    await runMigrations(client, directory);
-
-    const tables = await client.query<{ table_name: string }>(
-      "SELECT table_name FROM information_schema.tables WHERE table_schema = $1 ORDER BY table_name",
-      [schema],
-    );
-    const records = await client.query<{ filename: string }>(
-      "SELECT filename FROM schema_migrations ORDER BY filename",
-    );
-
-    expect(tables.rows.map(({ table_name }) => table_name)).toEqual([
-      "migration_probe",
-      "schema_migrations",
-    ]);
-    expect(records.rows).toEqual([{ filename: "0001_create_probe.sql" }]);
-  });
-});
-```
-
-- [x] **Step 3: Run the integration test to verify it fails**
-
-Run: `TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run test:integration -- migrations.test.ts`
-
-Expected: FAIL because `src/platform/migrations.ts` does not exist.
-
-- [x] **Step 4: Implement the migration runner**
-
-Create `src/platform/migrations.ts`:
-
-```typescript
-import { createHash } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
-
-import type { Client } from "pg";
-
-const MIGRATION_NAME = /^\d{4}_[a-z0-9_]+\.sql$/;
-const LOCK_ID = 1_938_465_725;
-
-export async function runMigrations(client: Client, directory: string): Promise<void> {
-  const filenames = (await readdir(directory)).filter((name) => MIGRATION_NAME.test(name)).sort();
-
-  await client.query("SELECT pg_advisory_lock($1)", [LOCK_ID]);
-  try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS schema_migrations (
-        filename text PRIMARY KEY,
-        checksum text NOT NULL,
-        applied_at timestamptz NOT NULL DEFAULT now()
-      )
-    `);
-
-    for (const filename of filenames) {
-      const sql = await readFile(join(directory, filename), "utf8");
-      const checksum = createHash("sha256").update(sql).digest("hex");
-      const existing = await client.query<{ checksum: string }>(
-        "SELECT checksum FROM schema_migrations WHERE filename = $1",
-        [filename],
-      );
-
-      if (existing.rowCount === 1) {
-        if (existing.rows[0]?.checksum !== checksum) {
-          throw new Error(`Applied migration checksum changed: ${filename}`);
-        }
-        continue;
-      }
-
-      await client.query("BEGIN");
-      try {
-        await client.query(sql);
-        await client.query(
-          "INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2)",
-          [filename, checksum],
-        );
-        await client.query("COMMIT");
-      } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-      }
-    }
-  } finally {
-    await client.query("SELECT pg_advisory_unlock($1)", [LOCK_ID]);
-  }
-}
-```
-
-- [x] **Step 5: Compose the migrate process**
-
-Replace `src/bootstrap/migrate.ts` with:
-
-```typescript
-import { fileURLToPath } from "node:url";
-
-import { Client } from "pg";
-
-import { loadConfig } from "../platform/config.js";
-import { createLogger } from "../platform/logging.js";
-import { runMigrations } from "../platform/migrations.js";
-
-const config = loadConfig();
-const logger = createLogger(config.logLevel);
-const client = new Client({ connectionString: config.databaseUrl });
-const directory = fileURLToPath(new URL("../../migrations", import.meta.url));
-
-try {
-  await client.connect();
-  await runMigrations(client, directory);
-  logger.info("database migrations complete");
-} catch (error) {
-  logger.error({ err: error }, "database migrations failed");
-  process.exitCode = 1;
-} finally {
-  await client.end();
-}
-```
-
-- [x] **Step 6: Verify migration behavior**
-
-Run: `TEST_DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run test:integration -- migrations.test.ts`
-
-Expected: PASS with 1 test.
-
-Run: `npm run typecheck && npm run build`
-
-Expected: both commands exit with status 0 and `dist/bootstrap/migrate.js` exists.
-
-- [x] **Step 7: Commit migration mode**
-
-```bash
-git add migrations src/platform/migrations.ts src/bootstrap/migrate.ts tests
-git commit -m "feat: add explicit SQL migration mode"
-```
+The [post-tag migration plan](2026-10-27-application-migration-policy.md) defines
+future migration ordering, released-data preservation, compatibility and recovery
+now. Introduce its runner and transition tests only for changes after that tag.
 
 ---
 
@@ -830,7 +649,7 @@ Sweetroll is the modular TypeScript application described in `design_v2.md`.
 1. Run `npm ci`.
 2. Run `docker compose up -d postgres`.
 3. Run `cp .env.example .env`, then `set -a; . ./.env; set +a` to export its values for the current shell.
-4. Run `npm run migrate`.
+4. Run `npm run db:init`.
 5. Run `npm run dev:http`.
 
 The HTTP process exposes liveness at `/health/live`, PostgreSQL readiness at
@@ -844,7 +663,7 @@ Run `npm test`, `npm run test:integration`, `npm run typecheck`, and `npm run bu
 
 Build one image with `docker build -t sweetroll .`.
 The default command runs HTTP. Run migrations from the same image with
-`docker run --rm --env-file .env sweetroll npm run start:migrate`.
+`docker run --rm --env-file .env sweetroll npm run start:db:init`.
 ```
 
 - [x] **Step 4: Verify the complete local artifact**
@@ -861,7 +680,7 @@ Run: `docker build -t sweetroll:i1-foundation .`
 
 Expected: one image builds successfully and defaults to `npm run start:http`.
 
-Run: `docker run --rm --network host -e DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll sweetroll:i1-foundation npm run start:migrate`
+Run: `docker run --rm --network host -e DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll sweetroll:i1-foundation npm run start:db:init`
 
 Expected: exit status 0 with a structured `database migrations complete` log.
 
@@ -981,8 +800,8 @@ Expected: dependency installation succeeds, all tests pass, TypeScript compiles,
 Confirm all of the following:
 
 - One npm package and one Dockerfile exist.
-- Only `http` and `migrate` process modes exist.
-- PostgreSQL migrations are explicit SQL and tested against real PostgreSQL.
+- Only `http` and `db:init` process modes exist.
+- The current PostgreSQL schema is explicit SQL and fresh initialization is tested against real PostgreSQL. Upgrade transitions are planned only for changes after the first release tag.
 - Logs are structured and redact authorization, cookie, and database URL fields.
 - HTTP responses contain server-generated request IDs.
 - Liveness, readiness, request count, and request-duration metrics are available.

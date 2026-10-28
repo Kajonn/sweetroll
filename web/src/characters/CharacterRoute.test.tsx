@@ -17,7 +17,6 @@ import type {
   FrozenRequest,
   EntryTemplatesResponse,
   OpenCharacterResponse,
-  MigrationPreviewResponse,
 } from "./types.js";
 import { CharacterDetail } from "./CharacterRoute.js";
 import { createAppRouter } from "../router.js";
@@ -88,7 +87,6 @@ function makeApi(view = completionView()): CharactersApi & { open: ReturnType<ty
     activity: vi.fn(),
     send: vi.fn(),
     export: vi.fn(),
-    previewMigration: vi.fn(),
   } as unknown as CharactersApi & { open: ReturnType<typeof vi.fn> };
 }
 
@@ -407,7 +405,6 @@ type WorkflowApi = CharactersApi & {
   send: ReturnType<typeof vi.fn>;
   activity: ReturnType<typeof vi.fn>;
   export: ReturnType<typeof vi.fn>;
-  previewMigration: ReturnType<typeof vi.fn>;
 };
 
 function actionView(revision: number, name = "Briar"): CharacterView {
@@ -469,9 +466,6 @@ function makeWorkflowApi(handlers: {
     activity: vi.fn(async () => ({ events: [], nextCursor: null, requestId: "r" })),
     send,
     export: vi.fn(async () => {
-      throw new Error("unused");
-    }),
-    previewMigration: vi.fn(async () => {
       throw new Error("unused");
     }),
   } as unknown as WorkflowApi;
@@ -545,7 +539,6 @@ describe("CharacterRoute workflows", () => {
       packageChecksum: "abc",
       revision: 1,
       state: { schemaVersion: "1.0", values: { name: "Briar" } },
-      migrationLineage: [],
     } as unknown as CharacterExport;
     const api = makeWorkflowApi({ openView: () => actionView(1) });
     api.activity.mockResolvedValue({
@@ -630,68 +623,6 @@ describe("CharacterRoute workflows", () => {
       await user.click(screen.getByRole("button", { name: "Confirm recover" }));
       await waitFor(() => expect(api.send).toHaveBeenCalledTimes(2));
       expect(api.send.mock.calls[1]?.[0].body).toMatchObject({ command: "recover" });
-    } finally {
-      await store.close();
-    }
-  });
-
-  it("previews, commits and rolls back a migration through the routed tools", async () => {
-    const user = userEvent.setup();
-    const store = await openStore();
-    await store.confirmSnapshot(ACTOR, CHARACTER_ID, actionView(1), 0);
-    const preview = {
-      preview: {
-        previewId: "p-1",
-        characterId: CHARACTER_ID,
-        sourceRevision: 1,
-        sourceVersionId: "11111111-1111-4000-8000-000000000000",
-        targetVersionId: "v-2",
-        candidateState: { schemaVersion: "1.0", values: { name: "Briar" } },
-        candidateProjection: {},
-        warnings: ["Type change on health"],
-        expiresAt: "2027-01-01T00:00:00.000Z",
-      },
-      requestId: "r",
-    } as unknown as MigrationPreviewResponse;
-    // Stateful server double (see the archive test): later management calls
-    // reconcile against a fresh GET, which must not look older than confirmed.
-    let current = actionView(1);
-    const api = makeWorkflowApi({
-      openView: () => current,
-      onSend: () => {
-        current = actionView(current.reconciliation.revision + 1);
-        current.reconciliation.commandExecutionId = "migration-execution-9";
-        return makeEnvelope(current);
-      },
-    });
-    api.previewMigration.mockResolvedValue(preview);
-    try {
-      render(
-        <CharacterDetail
-          characterId={CHARACTER_ID} api={api} store={store}
-          identity={makeIdentity()} coordination={makeCoordination(true)} locksSupported
-        />,
-      );
-      expect(await screen.findByRole("heading", { level: 1, name: "Briar" })).toBeVisible();
-      const migrationButton = await screen.findByRole("button", { name: "Migration" });
-      await waitFor(() => expect(screen.getByText("Saved")).toBeVisible(), { timeout: 5000 });
-      await user.click(migrationButton);
-      await user.click(screen.getByText("Use a version from a direct link"));
-      await user.type(screen.getByLabelText("Version ID"), "v-2");
-      const previewButton = screen.getByRole("button", { name: "Preview migration" });
-      await waitFor(() => expect(previewButton).toBeEnabled(), { timeout: 5000 });
-      await user.click(previewButton);
-      expect(await screen.findByText("Type change on health")).toBeVisible();
-      await user.click(screen.getByLabelText(/reviewed this preview/i));
-      await user.click(screen.getByRole("button", { name: "Commit migration" }));
-      await waitFor(() => expect(api.send).toHaveBeenCalledTimes(1));
-      expect(api.send.mock.calls[0]?.[0].path).toBe(`/characters/${CHARACTER_ID}/migrations/p-1/commit`);
-      await waitFor(() => expect(screen.getByText("Saved")).toBeVisible(), { timeout: 5000 });
-      await user.click(screen.getByRole("button", { name: "Migration" }));
-      expect(await screen.findByText(/last migration can be rolled back/i)).toBeVisible();
-      await user.click(screen.getByRole("button", { name: "Roll back migration" }));
-      await waitFor(() => expect(api.send).toHaveBeenCalledTimes(2));
-      expect(api.send.mock.calls[1]?.[0].path).toBe(`/characters/${CHARACTER_ID}/migrations/migration-execution-9/rollback`);
     } finally {
       await store.close();
     }

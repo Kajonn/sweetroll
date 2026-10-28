@@ -21,7 +21,6 @@ function makeApi(): CharactersApi & { listCreationVersions: ReturnType<typeof vi
     activity: vi.fn(),
     send: vi.fn(),
     export: vi.fn(),
-    previewMigration: vi.fn(),
   } as unknown as CharactersApi & { listCreationVersions: ReturnType<typeof vi.fn> };
 }
 

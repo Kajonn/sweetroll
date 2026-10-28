@@ -15,7 +15,7 @@
 - Read the complete spec before every task; its error/privacy/queue requirements are binding.
 - Implementation has not started. Use an isolated worktree at execution time; do not commit user changes from main as part of a task.
 - Preserve the existing System Builder and visual language, React 18, TanStack Router/Query, CSS modules, and i18n conventions.
-- Offline writes are field sets and direct resource bumps only. Actions, creation, archive/recovery, migration and authoritative export require connectivity.
+- Offline writes are field sets and direct resource bumps only. Actions, creation, archive/recovery and authoritative export require connectivity.
 - No silent merge, rebasing against unrelated server changes, or advancing past rejected commands.
 - One tab per character may edit and synchronize at a time. Other tabs are read-only and can request takeover.
 - No browser rule evaluator, arbitrary resource-set endpoint, public catalogue, ownership UI, PWA install flow or general-purpose sync framework.
@@ -166,7 +166,7 @@ await expect(reopened.acknowledge(actor, character, entry.id, view, oldGeneratio
 ```
 
 - [ ] Run red: `npm run web:test -- src/characters/store.test.ts`.
-- [ ] Implement account/character composite keys, sequence indexes and atomic write transactions. Persist the whole FrozenRequest; reject attempts to change it. Implement tombstones, last-account marker, pending logout barrier and account-scoped creation attempts. Never persist credentials or erase pending data during upgrades.
+- [ ] Implement account/character composite keys, sequence indexes and atomic write transactions. Persist the whole FrozenRequest; reject attempts to change it. Implement tombstones, last-account marker, pending logout barrier and account-scoped creation attempts. Never persist credentials or erase pending current-format data during normal operation.
 
 ```ts
 // No network await inside this transaction.
@@ -283,9 +283,9 @@ expect(screen.getByRole("heading", { name: "Complete Your Character" })).toBeVis
 
 **Files:** Create `web/src/characters/ConflictReview.tsx`, `CharacterTools.tsx` and tests; extend session online-operation methods/types and tests; update i18n.
 
-**Interfaces:** Add session `archive()`, `recover()`, `commitMigration(previewId)`, `rollbackMigration(migrationId)` using typed existing HTTP commands and durable online attempts. Tools use API activity/preview/export reads, but cannot bypass session mutation sequencing. ConflictReview submits selected queue IDs to resolveConflict.
+**Interfaces:** Add session `archive()`, `recover()` using typed existing HTTP commands and durable online attempts. Tools use API activity/preview/export reads, but cannot bypass session mutation sequencing. ConflictReview submits selected queue IDs to resolveConflict.
 
-- [ ] Test server-vs-local comparison for scalar sets and bump intentions, discard/reapply confirmation, repeated conflicts, uncertain-expiry warning, invalid correction, archive read-only behavior, cursor pagination and migration warnings/expired preview. Export must wait for zero pending edits and use the server document.
+- [ ] Test server-vs-local comparison for scalar sets and bump intentions, discard/reapply confirmation, repeated conflicts, uncertain-expiry warning, invalid correction, archive read-only behavior, cursor pagination. Export must wait for zero pending edits and use the server document.
 
 ```ts
 expect(exportButton).toBeDisabled(); // pending edit exists
@@ -294,14 +294,14 @@ expect(reapplyRequest.body.idempotencyKey).not.toBe(conflictedKey);
 ```
 
 - [ ] Run red: `npm run web:test -- src/characters/ConflictReview.test.tsx src/characters/CharacterTools.test.tsx src/characters/session.test.ts`.
-- [ ] Implement secondary dialogs with focus restoration. Lifecycle/migration actions refresh confirmed state after the queue drains, freeze the attempt, then send. Export creates a browser download from the documented JSON envelope; clean up object URLs. Show last-fetched activity offline with freshness labeling. Do not add offline management intentions.
+- [ ] Implement secondary dialogs with focus restoration. Lifecycle actions refresh confirmed state after the queue drains, freeze the attempt, then send. Export creates a browser download from the documented JSON envelope; clean up object URLs. Show last-fetched activity offline with freshness labeling. Do not add offline management intentions.
 
 ```ts
 if (snapshot.entries.length > 0 || snapshot.phase !== "ready") return;
 // Refresh and freeze before initiating the online-only operation.
 ```
 
-- [ ] Run focused tests green and web tests/typecheck; include ambiguous archive/migration response replay and rollback limits.
+- [ ] Run focused tests green and web tests/typecheck; include ambiguous archive response replay.
 - [ ] Review and commit: `feat: add character recovery and management tools`.
 
 ### Task 10: Production Offline Asset Loading
@@ -409,7 +409,7 @@ DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll AUTHORITATI
 
 ## Plan Self-review
 
-Coverage: backend completion and creation metadata (1-2); sign-out/transport (3); persistence and immutable retry (4-5); identity/tab isolation (6); renderer/accessibility (7); creation/routes (8); conflict/activity/lifecycle/export/migration (9); offline assets/build lifecycle (10); real browser/privacy/worker/visual proof (11); full regression and honest status (12).
+Coverage: backend completion and creation metadata (1-2); sign-out/transport (3); persistence and immutable retry (4-5); identity/tab isolation (6); renderer/accessibility (7); creation/routes (8); conflict/activity/lifecycle/export (9); offline assets/build lifecycle (10); real browser/privacy/worker/visual proof (11); full regression and honest status (12).
 
 Dependency checks: Task 3 owns generated wire/local protocol types; Task 4 owns store transactions; Task 5 owns the observable session and browser ports; Task 6 supplies port implementations; UI tasks cannot introduce competing mutation senders. Task 10 is required before Task 11 can claim fully offline reopening. Historical receipt support cannot be deferred to frontend normalization that mutates replayed results.
 

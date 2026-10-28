@@ -4,7 +4,7 @@
 
 **Goal:** Implement the `SystemAuthoring` Module Interface and map it to revision-safe HTTP routes for create (blank/clone/import), open, list, save, preview, publish, export, and lifecycle changes.
 
-**Architecture:** One deep module facade (`src/systems/authoring.ts`) composes the existing persistence repository, package codec, and rules compiler; assessment and document-reconstruction helpers live in `src/systems/implementation/authoring/`. A new migration adds `preview_snapshots`, a `system_versions.lifecycle` column, and a database immutability trigger. A Fastify plugin maps one HTTP route to one Module call each and is registered in `bootstrap/http.ts`.
+**Architecture:** One deep module facade (`src/systems/authoring.ts`) composes the existing persistence repository, package codec, and rules compiler; assessment and document-reconstruction helpers live in `src/systems/implementation/authoring/`. The current schema baseline defines `preview_snapshots`, `system_versions.lifecycle`, and the database immutability trigger directly. A Fastify plugin maps one HTTP route to one Module call each and is registered in `bootstrap/http.ts`.
 
 **Tech Stack:** Node.js 24, TypeScript (strict, NodeNext), Fastify 5, `pg` 8, Vitest 3, PostgreSQL 17.
 
@@ -391,7 +391,7 @@ git commit -m "feat: add package assessment and reconstruction helpers"
 Add `preview_snapshots`, `system_versions.lifecycle`, and the immutability trigger (migration `0003`), then extend the repository with preview, lifecycle, pagination, and transactional publish methods. Draft saves now write their audit record atomically via a new `requestId` input.
 
 **Files:**
-- Create: `migrations/0003_create_system_authoring.sql`
+- Modify: `database/schema.sql`
 - Modify: `src/systems/implementation/persistence/repository.ts`
 - Modify: `src/systems/implementation/persistence/index.ts`
 - Modify: `tests/integration/system-persistence.test.ts`
@@ -411,7 +411,7 @@ Add `preview_snapshots`, `system_versions.lifecycle`, and the immutability trigg
 
 - [x] **Step 1: Write the migration**
 
-Create `migrations/0003_create_system_authoring.sql`:
+Update `database/schema.sql`:
 
 ```sql
 ALTER TABLE system_versions
@@ -872,7 +872,7 @@ Expected: PASS with 11 tests.
 
 - [x] **Step 6: Apply the real migration and verify**
 
-Run: `DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run migrate`
+Run: `DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run db:init`
 
 Expected: "database migrations complete". Confirm with:
 
@@ -887,7 +887,7 @@ Run: `npm test && npm run typecheck`
 Expected: PASS, exit 0.
 
 ```bash
-git add migrations/0003_create_system_authoring.sql src/systems/implementation/persistence tests/integration/system-persistence.test.ts
+git add database/schema.sql src/systems/implementation/persistence tests/integration/system-persistence.test.ts
 git commit -m "feat: add authoring persistence for previews, lifecycle, and publication"
 ```
 
@@ -2536,7 +2536,7 @@ git commit -m "feat: expose SystemAuthoring over revision-safe HTTP routes"
 
 - [x] **Step 1: Apply migrations to the local database**
 
-Run: `docker compose up -d --wait postgres && DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run migrate`
+Run: `docker compose up -d --wait postgres && DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run db:init`
 
 Expected: "database migrations complete" (migration `0003` applied exactly once).
 

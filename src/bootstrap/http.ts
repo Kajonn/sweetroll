@@ -5,7 +5,6 @@ import { createIdentityModule } from "../identity/index.js";
 import { createTestOidcClient } from "../identity/adapters/test.js";
 import { createSystemAuthoringModule } from "../systems/authoring.js";
 import { createCharactersModule } from "../characters/index.js";
-import { createAttachedMigrationCommands } from "../characters/migration.js";
 import { createCampaignPlacement } from "../characters/campaignPlacement.js";
 import { createCampaignsModule } from "../campaigns/index.js";
 import {
@@ -29,12 +28,11 @@ const logger = createLogger(config.logLevel);
 const pool = createPool(config.databaseUrl, logger);
 
 // Reference template fixtures are global rows (NULL owner, link) used by
-// CloneFromTemplate. They are inserted by migration 0008 and/or this seed call
-// (idempotent — no-op once the rows are populated).
+// CloneFromTemplate. Insert missing fixtures without rewriting published versions.
 const seeded = await seedReferenceTemplates(pool);
-if (seeded.systemsInserted > 0 || seeded.versionsReplaced > 0) {
+if (seeded.systemsInserted > 0 || seeded.versionsInserted > 0) {
   logger.info(
-    { systemsInserted: seeded.systemsInserted, versionsReplaced: seeded.versionsReplaced },
+    { systemsInserted: seeded.systemsInserted, versionsInserted: seeded.versionsInserted },
     "reference templates seeded",
   );
 }
@@ -122,13 +120,6 @@ const campaigns = createCampaignsModule({
   pool,
   limits: placementLimits,
   charactersPlacement: placement,
-  // I7 Phase 3: attached-migration seam for campaign upgrade preview/commit.
-  // The HTTP character migration routes keep denying attached scope; only
-  // the Campaigns module drives these internals inside its transactions.
-  attachedMigration: createAttachedMigrationCommands({
-    runtime,
-    authorizeVersionUse: authoring.authorizeVersionUse,
-  }),
 });
 
 const app = buildHttpApp({

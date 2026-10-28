@@ -4,7 +4,7 @@ export type OnlineAttempt = {
   id: string;
   actorId: string;
   characterId: string | null;
-  kind: "create" | "archive" | "recover" | "export" | "migration" | "push";
+  kind: "create" | "archive" | "recover" | "export" | "push";
   request: FrozenRequest;
   createdAt: string;
   /**
@@ -140,7 +140,6 @@ export type CharacterStore = {
   saveActivityPage(page: CachedActivityPage, guard?: WriteGuard): Promise<void>;
 };
 
-const DB_VERSION = 5;
 const TEMPLATES="entryTemplates";
 
 type CatalogScope = Pick<CharacterView, "ownerId" | "campaignId" | "placementGeneration" | "systemVersionId" | "entityDefinitionId">;
@@ -194,34 +193,19 @@ function toCachedActivityPage(record: ActivityRecord): CachedActivityPage {
 
 function openDatabase(name: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(name, DB_VERSION);
-    request.onupgradeneeded = (event) => {
+    const request = indexedDB.open(name);
+    // Without a requested version, this event only initializes a new database.
+    request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains(CHAR)) {
-        db.createObjectStore(CHAR, { keyPath: ["actorId", "characterId"] });
-      }
-      if (!db.objectStoreNames.contains(QUEUE)) {
-        const store = db.createObjectStore(QUEUE, { keyPath: ["actorId", "characterId", "id"] });
-        store.createIndex("by-seq", ["actorId", "characterId", "sequence"]);
-      }
-      if (!db.objectStoreNames.contains(ATTEMPTS)) {
-        db.createObjectStore(ATTEMPTS, { keyPath: ["actorId", "id"] });
-      }
-      if (!db.objectStoreNames.contains(LAST_ACCOUNT)) {
-        db.createObjectStore(LAST_ACCOUNT, { keyPath: "key" });
-      }
-      if (!db.objectStoreNames.contains(PENDING_LOGOUT)) {
-        db.createObjectStore(PENDING_LOGOUT, { keyPath: "key" });
-      }
-      if (!db.objectStoreNames.contains(TEMPLATES)) db.createObjectStore(TEMPLATES,{keyPath:["actorId","characterId"]});
-      // Old choices have no verified scope. Only this disposable cache is
-      // cleared; snapshots, queues and frozen online attempts survive.
-      else if (event.oldVersion < 4) request.transaction!.objectStore(TEMPLATES).clear();
-      if (!db.objectStoreNames.contains(ACTIVITY)) {
-        db.createObjectStore(ACTIVITY, { keyPath: ["actorId", "characterId", "cursorKey"] });
-      }
+      db.createObjectStore(CHAR, { keyPath: ["actorId", "characterId"] });
+      const queue = db.createObjectStore(QUEUE, { keyPath: ["actorId", "characterId", "id"] });
+      queue.createIndex("by-seq", ["actorId", "characterId", "sequence"]);
+      db.createObjectStore(ATTEMPTS, { keyPath: ["actorId", "id"] });
+      db.createObjectStore(LAST_ACCOUNT, { keyPath: "key" });
+      db.createObjectStore(PENDING_LOGOUT, { keyPath: "key" });
+      db.createObjectStore(TEMPLATES, { keyPath: ["actorId", "characterId"] });
+      db.createObjectStore(ACTIVITY, { keyPath: ["actorId", "characterId", "cursorKey"] });
     };
-    request.onblocked=()=>reject(new Error("Close older Sweetroll tabs to update push recovery support."));
     request.onsuccess = () => {request.result.onversionchange=()=>request.result.close();resolve(request.result);};
     request.onerror = () => reject(request.error);
   });

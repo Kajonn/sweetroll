@@ -14,8 +14,6 @@ import type {
   EntryTemplatesResponse,
   ExecuteCharacterActionResponse,
   FrozenRequest,
-  MigrationPreviewBody,
-  MigrationPreviewResponse,
   OpenCharacterResponse,
   RemoveCharacterEntryResponse,
   UpdateCharacterEntryResponse,
@@ -323,9 +321,6 @@ class FakeApi implements CharactersApi {
     throw new Error("unused");
   }
   export(): Promise<CharacterExport> {
-    throw new Error("unused");
-  }
-  previewMigration(_characterId: string, _b: MigrationPreviewBody): Promise<MigrationPreviewResponse> {
     throw new Error("unused");
   }
 }
@@ -1351,58 +1346,6 @@ describe("CharacterSession online operations", () => {
     await store.close();
   });
 
-  it("commits a migration through the preview commit command and clears the attempt", async () => {
-    const { api, store, session } = await makeHarness();
-    api.scriptOpenView(viewFor("char-1", 3));
-    await session.open();
-    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
-    api.setSendFallback(async (req) => {
-      expect(req.path).toBe("/characters/char-1/migrations/p-1/commit");
-      return successEnvelope(viewFor("char-1", 4));
-    });
-    await session.commitMigration("p-1");
-    expect(api.sent[0]?.body).toMatchObject({ expectedRevision: 3 });
-    expect(typeof api.sent[0]?.body.idempotencyKey).toBe("string");
-    expect(session.getSnapshot().confirmed?.revision).toBe(4);
-    expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
-    session.dispose();
-    await store.close();
-  });
-
-  it("replays an ambiguous migration commit verbatim", async () => {
-    const { api, store, session } = await makeHarness();
-    api.scriptOpenView(viewFor("char-1", 3));
-    await session.open();
-    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
-    api.scriptSend(async () => ({ error: new TypeError("network down") }));
-    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4)));
-    await expect(session.commitMigration("p-1")).rejects.toThrow();
-    // Observe the scheduled retry, rather than racing it with another user
-    // command after it may already have acknowledged the first migration.
-    await vi.waitFor(() => expect(api.sent).toHaveLength(2));
-    await session.whenIdle();
-    expect(api.sent).toHaveLength(2);
-    expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
-    session.dispose();
-    await store.close();
-  });
-
-  it("surfaces rollback limits without retrying a fresh key", async () => {
-    const { api, store, session } = await makeHarness();
-    api.scriptOpenView(viewFor("char-1", 5));
-    await session.open();
-    api.setOpenFallback(async () => ({ character: viewFor("char-1", 5), requestId: "req-open" }));
-    api.scriptSend(async () => ({
-      error: new ApiError({ status: 409, code: "conflict", message: "Rollback window expired.", requestId: "r", latestRevision: 5, diagnostics: [] }),
-    }));
-    await expect(session.rollbackMigration("m-1")).rejects.toThrow(/Rollback|expired|conflict/i);
-    expect(api.sent).toHaveLength(1);
-    expect(api.sent[0]?.path).toBe("/characters/char-1/migrations/m-1/rollback");
-    expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
-    session.dispose();
-    await store.close();
-  });
-
   it("reapplies selected intentions against the latest revision with fresh keys", async () => {
     const { api, store, session } = await makeHarness();
     api.scriptOpenView(viewFor("char-1", 1));
@@ -1453,37 +1396,6 @@ describe("CharacterSession online operations", () => {
     expect(api.sent).toHaveLength(1);
     expect(api.sent[0]?.body.idempotencyKey).not.toBe("old-key");
     expect(typeof api.sent[0]?.body.idempotencyKey).toBe("string");
-    session.dispose();
-    await store.close();
-  });
-
-  it("retains an unresolved migration commit when a newer preview commit is requested", async () => {
-    const { api, store, session } = await makeHarness();
-    api.scriptOpenView(viewFor("char-1", 3));
-    await session.open();
-    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
-    const original = {
-      method: "POST" as const,
-      path: "/characters/char-1/migrations/p-1/commit",
-      body: { expectedRevision: 3, idempotencyKey: "preview-old-key" },
-      firstAttemptAt: EVER,
-    };
-    await store.saveOnlineAttempt({
-      id: "stale-preview",
-      actorId: ARM,
-      characterId: "char-1",
-      kind: "migration",
-      request: original,
-      createdAt: EVER,
-    });
-    // A newer preview never deletes or replaces the unresolved commit: the
-    // newer command is blocked until the old outcome is resolved.
-    await expect(session.commitMigration("p-2")).rejects.toThrow(/uncertain|resolve/i);
-    expect(api.sent).toHaveLength(0);
-    const retained = await store.readOnlineAttempts(ARM);
-    expect(retained).toHaveLength(1);
-    expect(retained[0]?.id).toBe("stale-preview");
-    expect(retained[0]?.request).toEqual(original);
     session.dispose();
     await store.close();
   });
@@ -1752,50 +1664,6 @@ describe("CharacterSession uncertain online outcomes", () => {
     await store.close();
   });
 
-  it("replays a durable migration commit verbatim across reopen while a newer command waits", async () => {
-    const first = await makeHarness();
-    await seedConfirmed(first.store, "char-1", viewFor("char-1", 3));
-    const original: FrozenRequest = {
-      method: "POST",
-      path: "/characters/char-1/migrations/p-1/commit",
-      body: { expectedRevision: 3, idempotencyKey: "commit-key" },
-      firstAttemptAt: EVER,
-    };
-    await first.store.saveOnlineAttempt({
-      id: "commit-1",
-      actorId: ARM,
-      characterId: "char-1",
-      kind: "migration",
-      request: original,
-      createdAt: EVER,
-    });
-    let releaseReplay!: (step: SendStep) => void;
-    first.api.scriptSend(() => new Promise<SendStep>((resolve) => { releaseReplay = resolve; }));
-    first.api.setSendFallback(async () => {
-      throw new Error("a newer command must not send before the uncertain outcome resolves");
-    });
-    const openSpy = vi.spyOn(first.api, "open");
-    const opening = first.session.open();
-    await vi.waitFor(() => expect(first.api.sent).toHaveLength(1));
-    // A newer preview commit requested while the old outcome is uncertain is
-    // blocked: it must not overtake or erase the stored attempt.
-    await expect(first.session.commitMigration("p-2")).rejects.toThrow(/uncertain|resolve/i);
-    const retried = first.api.sent[0]!;
-    expect(retried.method).toBe(original.method);
-    expect(retried.path).toBe(original.path);
-    expect(retried.body).toEqual(original.body);
-    expect(retried.firstAttemptAt).toBe(original.firstAttemptAt);
-    expect(openSpy).not.toHaveBeenCalled();
-    releaseReplay(successEnvelope(viewFor("char-1", 4)));
-    await opening;
-    await first.session.whenIdle();
-    expect(first.api.sent).toHaveLength(1);
-    expect(await first.store.readOnlineAttempts(ARM)).toHaveLength(0);
-    expect(first.session.getSnapshot().confirmed?.revision).toBe(4);
-    first.session.dispose();
-    await first.store.close();
-  });
-
   it("retains a timed-out archive attempt and replays the identical body", async () => {
     const { api, store, session } = await makeHarness();
     api.scriptOpenView(viewFor("char-1", 3));
@@ -2057,42 +1925,6 @@ describe("CharacterSession uncertain online outcomes", () => {
     await store.close();
   });
 
-  it("preserves migration identifiers and authoritative action results for later UI consumption", async () => {
-    const { api, store, session } = await makeHarness();
-    await seedConfirmed(store, "char-1", viewFor("char-1", 3));
-    api.scriptOpenView(viewFor("char-1", 3));
-    await session.open();
-    const roll = {
-      actionId: "ironclad",
-      expression: "2d6",
-      dice: [{ sides: 6, value: 4, kept: true }],
-      bindings: [],
-      total: 7,
-      output: "hit",
-      audience: "owner_only" as const,
-    };
-    api.scriptSend(async () => ({ envelope: { result: { character: viewFor("char-1", 3), roll, nominal: null }, requestId: "req-1" } }));
-    await session.executeAction("ironclad", { difficulty: 10 });
-    await session.whenIdle();
-    expect(session.getSnapshot().lastRoll).toEqual(roll);
-    expect(session.getSnapshot().lastMigration).toBeNull();
-    api.scriptOpenView(viewFor("char-1", 3));
-    const migrated = viewFor("char-1", 4);
-    migrated.reconciliation.commandExecutionId = "m-9";
-    api.scriptSend(async () => successEnvelope(migrated));
-    await session.commitMigration("p-1");
-    expect(session.getSnapshot().lastMigration).toEqual({ operation: "commit", previewId: "p-1", migrationId: "m-9", revision: 4 });
-    // Authoritative action results survive later online acknowledgments.
-    expect(session.getSnapshot().lastRoll).toEqual(roll);
-    api.scriptOpenView(viewFor("char-1", 4));
-    api.scriptSend(async () => successEnvelope(viewFor("char-1", 5)));
-    await session.rollbackMigration("m-9");
-    expect(session.getSnapshot().lastMigration).toEqual({ operation: "rollback", migrationId: "m-9", revision: 5 });
-    expect(session.getSnapshot().lastRoll).toEqual(roll);
-    session.dispose();
-    await store.close();
-  });
-
   it("shows a nominal outcome only after the server acknowledges the granted action", async () => {
     const { api, store, session } = await makeHarness();
     await seedConfirmed(store, "char-1", viewFor("char-1", 3));
@@ -2169,19 +2001,19 @@ describe("CharacterSession uncertain online outcomes", () => {
       await session.open();
       api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
       api.scriptSend(async () => ({
-        error: new ApiError({ status: 404, code: "not_found", message: "Preview gone.", requestId: "r", latestRevision: null, diagnostics: [] }),
+        error: new ApiError({ status: 404, code: "not_found", message: "Character gone.", requestId: "r", latestRevision: null, diagnostics: [] }),
       }));
-      await expect(session.commitMigration("p-1")).rejects.toThrow(/gone/i);
+      await expect(session.archive()).rejects.toThrow(/gone/i);
       expect(session.getSnapshot().error?.kind).toBe("not-found");
       expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
       await session.resolveConflict({ mode: "discard", selectedIds: [] });
       expect(session.getSnapshot().error).toBeNull();
       expect(api.sent).toHaveLength(1);
       api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4)));
-      await session.commitMigration("p-1");
+      await session.archive();
       expect(api.sent).toHaveLength(2);
       expect(api.sent[1]?.body.idempotencyKey).not.toBe(api.sent[0]?.body.idempotencyKey);
-      expect(session.getSnapshot().lastMigration).toEqual({ operation: "commit", previewId: "p-1", migrationId: null, revision: 4 });
+      expect(session.getSnapshot().confirmed?.revision).toBe(4);
       session.dispose();
       await store.close();
     });
@@ -2730,7 +2562,6 @@ it('retains a campaign selection and explains stale catalog revisions during con
  identity.online=true;identity.signal();await vi.waitFor(()=>expect(session.getSnapshot().phase).toBe('conflict'));await session.whenIdle();expect(session.getSnapshot().error?.message).toContain('campaign template has changed');
  expect((await store.read(ARM,'char-1')).entries[0]?.intent).toMatchObject({entry:{source}});session.dispose();await store.close();
 });
-
 
 describe("pool error recovery", () => {
   it("retains rejected inputs and diagnostics until explicit discard, then uses a new key", async () => {

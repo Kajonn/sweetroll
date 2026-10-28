@@ -564,7 +564,6 @@ function CampaignDetailRouteView() {
       metadataApi={charactersApi}
       charactersApi={charactersApi}
       createSession={createSession}
-      versionsApi={charactersApi}
     />
   );
 }

@@ -12,14 +12,12 @@ import {
   d20Document,
   d20Package,
 } from "../../src/systems/implementation/package/fixtures/index.js";
-import { compileDocument } from "../../src/systems/implementation/rules/compile-document.js";
 import { createPostgresPublishedPackageLoader } from "../../src/systems/implementation/runtime/package-loader.js";
 import { signSystemPackage } from "../../src/systems/implementation/package/canonical.js";
 import type {
   SystemPackageV1,
   UnsignedSystemPackageV1,
 } from "../../src/systems/implementation/package/schema/index.js";
-import type { SystemDocumentV1 } from "../../src/systems/implementation/package/schema/index.js";
 import { createSystemRuntime, type SystemRuntime } from "../../src/systems/runtime.js";
 import { createSystemAuthoringModule, type SystemAuthoring } from "../../src/systems/authoring.js";
 import { createSystemPersistenceRepository } from "../../src/systems/implementation/persistence/index.js";
@@ -131,40 +129,7 @@ const DDL = `
     request_id   text NOT NULL,
     occurred_at  timestamptz NOT NULL DEFAULT now()
   );
-  CREATE TABLE character_migration_previews (
-    id                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    character_id             uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
-    owner_id                 uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    source_revision          integer NOT NULL CHECK (source_revision >= 1),
-    source_version_id        uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
-    source_checksum          text NOT NULL,
-    target_version_id        uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
-    target_checksum          text NOT NULL,
-    mapping_json             jsonb NOT NULL,
-    candidate_state_json     jsonb NOT NULL,
-    candidate_projection_json jsonb NOT NULL,
-    warnings_json            jsonb NOT NULL,
-    preview_checksum         text NOT NULL,
-    created_at               timestamptz NOT NULL DEFAULT now(),
-    expires_at               timestamptz NOT NULL,
-    consumed_at              timestamptz
-  );
-  CREATE TABLE character_migrations (
-    id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    character_id          uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
-    preview_id            uuid NOT NULL UNIQUE REFERENCES character_migration_previews(id) ON DELETE RESTRICT,
-    source_version_id     uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
-    target_version_id     uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
-    before_state_json     jsonb NOT NULL,
-    after_state_json      jsonb NOT NULL,
-    commit_revision       integer NOT NULL CHECK (commit_revision >= 2),
-    rollback_deadline     timestamptz NOT NULL,
-    actor_id              uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    request_id            text NOT NULL,
-    committed_at          timestamptz NOT NULL DEFAULT now(),
-    rollback_revision     integer CHECK (rollback_revision >= 1),
-    rolled_back_at        timestamptz
-  );
+
 `;
 
 describeWithDatabase("Character replay authorization (I6 Task 1)", () => {
@@ -207,7 +172,7 @@ describeWithDatabase("Character replay authorization (I6 Task 1)", () => {
   beforeEach(async () => {
     await pool.query(`SET search_path TO ${schema}`);
     await pool.query(
-      "TRUNCATE character_migrations, character_migration_previews, character_audit_records, character_activity_events, character_rolls, character_command_executions, characters, system_versions, systems, users RESTART IDENTITY CASCADE",
+      "TRUNCATE character_audit_records, character_activity_events, character_rolls, character_command_executions, characters, system_versions, systems, users RESTART IDENTITY CASCADE",
     );
   });
 
@@ -249,48 +214,6 @@ describeWithDatabase("Character replay authorization (I6 Task 1)", () => {
       [versionId, systemId, packageValue.integrity.checksum, JSON.stringify(packageValue)],
     );
     return { systemId, versionId };
-  }
-
-  function buildD20V2Document(): SystemDocumentV1 {
-    const document = structuredClone(d20Document);
-    const fields = document.entities[0]!.fields;
-    const abilityIndex = fields.findIndex((f) => f.id === "ability");
-    fields[abilityIndex]!.id = "ability_score";
-    fields.splice(
-      fields.findIndex((f) => f.id === "proficient"),
-      1,
-    );
-    fields.push({
-      kind: "integer",
-      id: "level",
-      label: "Level",
-      default: 1,
-      required: true,
-      min: 1,
-      max: 20,
-      step: 1,
-    });
-    const abilityElement = document.sheets[0]!.sections[1]!.elements.find(
-      (e) => e.kind === "field" && e.fieldId === "ability",
-    );
-    if (abilityElement?.kind === "field") abilityElement.fieldId = "ability_score";
-    const abilityValid = document.expressions.find((e) => e.id === "ability_valid_expr");
-    if (abilityValid) abilityValid.source = "fields.ability_score >= 3 && fields.ability_score <= 18";
-    const validation = document.validations.find((v) => v.id === "ability_valid");
-    if (validation) validation.targetId = "ability_score";
-    return document;
-  }
-
-  async function publishV2Version(ownerId: string, systemId: string): Promise<string> {
-    const versionId = randomUUID();
-    const document = buildD20V2Document();
-    const compiled = compileDocument(document, { systemId, versionId, semanticVersion: "2.0.0" });
-    if (!compiled.ok) throw new Error(`v2 did not compile: ${JSON.stringify(compiled.diagnostics)}`);
-    await pool.query(
-      "INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, lifecycle) VALUES ($1, $2, '2.0.0', $3, $4::jsonb, 'published')",
-      [versionId, systemId, compiled.value.integrity.checksum, JSON.stringify(compiled.value)],
-    );
-    return versionId;
   }
 
   async function createCharacter(ownerId: string, versionId: string): Promise<CharacterId> {
@@ -514,55 +437,6 @@ describeWithDatabase("Character replay authorization (I6 Task 1)", () => {
     expect(asNewOwner.ok).toBe(true);
   });
 
-  it("denies migration commit replay to the previous owner after transfer", async () => {
-    const ownerA = await createUser("Ada");
-    const ownerB = await createUser("Bob");
-    const { systemId, versionId } = await publishVersion(ownerA);
-    const targetVersionId = await publishV2Version(ownerA, systemId);
-    const characterId = await createCharacter(ownerA, versionId);
-
-    const preview = await characters.previewMigration(ctx(ownerA), {
-      characterId,
-      targetVersionId,
-      mappings: { ability: "ability_score" },
-    });
-    if (!preview.ok) throw new Error(`unexpected preview failure: ${JSON.stringify(preview.error)}`);
-
-    const commitKey = randomUUID();
-    const commit = await characters.commitMigration(ctx(ownerA), {
-      characterId,
-      previewId: preview.value.previewId,
-      expectedRevision: 1,
-      idempotencyKey: commitKey,
-    });
-    expect(commit.ok).toBe(true);
-    if (!commit.ok) throw new Error(`unexpected: ${JSON.stringify(commit.error)}`);
-
-    await transferOwnership(ownerA, characterId, ownerB);
-
-    const replay = await characters.commitMigration(ctx(ownerA), {
-      characterId,
-      previewId: preview.value.previewId,
-      expectedRevision: 1,
-      idempotencyKey: commitKey,
-    });
-    expect(replay.ok).toBe(false);
-    if (replay.ok) throw new Error("previous owner commit replay must be denied");
-    expect(replay.error.code).toBe("not_found");
-    expect(replay).not.toHaveProperty("value");
-
-    const asNewOwner = await characters.open(ctx(ownerB), characterId);
-    expect(asNewOwner.ok).toBe(true);
-    if (!asNewOwner.ok) throw new Error("unexpected");
-    expect(asNewOwner.value.systemVersionId).toBe(targetVersionId);
-
-    const migrations = await pool.query<{ count: string }>(
-      "SELECT count(*) AS count FROM character_migrations WHERE character_id = $1",
-      [characterId],
-    );
-    expect(migrations.rows[0]!.count).toBe("1");
-  });
-
   it("denies create replay to the previous owner after transfer", async () => {
     const ownerA = await createUser("Ada");
     const ownerB = await createUser("Bob");
@@ -607,56 +481,6 @@ describeWithDatabase("Character replay authorization (I6 Task 1)", () => {
     const replay = await characters.duplicate(ctx(ownerA), { characterId, idempotencyKey: key });
     expect(replay.ok).toBe(false);
     if (replay.ok) throw new Error("duplicate replay after copy transfer must be denied");
-    expect(replay.error.code).toBe("not_found");
-    expect(replay).not.toHaveProperty("value");
-  });
-
-  it("denies rollback replay to the previous owner after transfer", async () => {
-    const ownerA = await createUser("Ada");
-    const ownerB = await createUser("Bob");
-    const { systemId, versionId } = await publishVersion(ownerA);
-    const targetVersionId = await publishV2Version(ownerA, systemId);
-    const characterId = await createCharacter(ownerA, versionId);
-
-    const preview = await characters.previewMigration(ctx(ownerA), {
-      characterId,
-      targetVersionId,
-      mappings: { ability: "ability_score" },
-    });
-    if (!preview.ok) throw new Error(`unexpected preview failure: ${JSON.stringify(preview.error)}`);
-    const commit = await characters.commitMigration(ctx(ownerA), {
-      characterId,
-      previewId: preview.value.previewId,
-      expectedRevision: 1,
-      idempotencyKey: randomUUID(),
-    });
-    expect(commit.ok).toBe(true);
-    if (!commit.ok) throw new Error("unexpected");
-    const migrationRows = await pool.query<{ id: string }>(
-      "SELECT id FROM character_migrations WHERE character_id = $1",
-      [characterId],
-    );
-    const migrationId = migrationRows.rows[0]?.id;
-    if (migrationId === undefined) throw new Error("migration row missing");
-
-    const rollbackKey = randomUUID();
-    const rollback = await characters.rollbackMigration(ctx(ownerA), {
-      characterId,
-      migrationId,
-      idempotencyKey: rollbackKey,
-    });
-    expect(rollback.ok).toBe(true);
-    if (!rollback.ok) throw new Error("unexpected");
-
-    await transferOwnership(ownerA, characterId, ownerB);
-
-    const replay = await characters.rollbackMigration(ctx(ownerA), {
-      characterId,
-      migrationId,
-      idempotencyKey: rollbackKey,
-    });
-    expect(replay.ok).toBe(false);
-    if (replay.ok) throw new Error("previous owner rollback replay must be denied");
     expect(replay.error.code).toBe("not_found");
     expect(replay).not.toHaveProperty("value");
   });
@@ -711,7 +535,6 @@ describeWithDatabase("Character replay authorization (I6 Task 1)", () => {
     expect(Object.keys(characters).sort()).toEqual(
       [
         "apply",
-        "commitMigration",
         "create",
         "creationOptions",
         "duplicate",
@@ -722,10 +545,8 @@ describeWithDatabase("Character replay authorization (I6 Task 1)", () => {
         "listEntryTemplates",
         "manage",
         "open",
-        "previewMigration",
         "pushOptions",
         "readRoll",
-        "rollbackMigration",
       ].sort(),
     );
   });

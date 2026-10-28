@@ -36,7 +36,7 @@ After B, prioritize C, then D1, then D2. C depends on B's source/revision contra
 
 ## Data and module contracts
 
-Add `campaign_item_templates` and `campaign_item_template_revisions` in a new immutable SQL migration, `0022_campaign_item_templates.sql`.
+Add `campaign_item_templates` and `campaign_item_template_revisions` directly in `database/schema.sql`.
 
 - Template row: UUID ID, campaign ID, creator ID, immutable kind, fixed `all_players` audience, active/archived status, resource revision, current content revision, creation/update/archive timestamps.
 - Content row: template ID + content revision unique key, name/description/notes, optional item default quantity, author and timestamp. No content-row updates; append on edit. Use relational constraints for campaign/source integrity and positive revisions/quantity, plus module validation for text and body budgets.
@@ -70,29 +70,25 @@ type EntrySource =
       templateRevision: number; contentRevision: number };
 ```
 
-The character's existing pin identifies the version for system sources. Legacy `templateId: string` decodes as system; `templateId: null` as personal. Campaign entries retain `templateId: null` for compatibility with old data-only paths, but explicit source controls new rendering/validation. Reject contradictory source/legacy inputs. Do not introduce campaign IDs into system package template lookup.
+The character's existing pin identifies the version for system sources. Use explicit validated system/personal/campaign source semantics in the current contract. Do not introduce a converter for older development records. Reject contradictory source inputs. Do not introduce campaign IDs into system package template lookup.
 
 Campaign state additionally holds a server-created snapshot of kind and original bounded defaults, with character-local `values` and quantity kept separate. Never trust a client snapshot, kind, label override, action or template definition on placement. The stored snapshot is data-only; runtime projection consumes it without catalog access and grants zero actions. User-facing source is **Campaign**, including on a returned sheet; edit/remove remain character commands.
 
 All mutation effects, appended content, activity and receipt storage are atomic. Reuse transaction/advisory-lock conventions and one lock order across placement, template edits/archive, membership removal and character return. Authorization must be checked under that transaction, including successful receipt replay. A previously committed placement may replay its original result after template edit/archive if the actor still has current character access and the original campaign scope; a revoked actor receives no old payload. A new attempt requires current template revisions. Do not change frozen requests on retry.
 
-## Task 1 — Lock contracts and migration safety (TDD)
+## Task 1 — Lock current contracts (TDD)
 
-**Files:** `src/characters/migration.ts`, `src/characters/index.ts`, `src/campaigns/index.ts`, `src/transport/http/characters.ts`, `src/transport/http/campaigns.ts`, `src/transport/http/openapi.ts`; tests in `tests/integration/character-migration.test.ts`, `campaign-upgrade.test.ts`, and relevant HTTP tests.
+**Files:** `src/characters/index.ts`, `src/campaigns/index.ts`, `src/transport/http/characters.ts`, `src/transport/http/campaigns.ts`, `src/transport/http/openapi.ts`; current character/template integration and relevant HTTP tests.
 
-- [ ] Add failing migration regressions with populated system and personal entries before adding campaign state. Exercise standalone preview/commit, campaign preview/commit, and rollback with post-migration entries. Assert unchanged pin/state/revision after denial.
-- [x] Implement the conservative entry-presence guard in the shared migration path and all commit/rollback paths, including stale previews created before an entry was added. An unchanged/no-op path may only succeed if it demonstrably preserves the entire state.
-- [x] Surface an actionable conflict in existing upgrade/migration UI: entries cannot yet be safely migrated; current sheet remains usable. Do not automatically remove entries or offer destructive cleanup as recovery.
 - [ ] Add failing schema/HTTP tests for source normalization, revision requirements, bounded fields, all four kinds, unknown keys, forged actions/snapshots and contradictions. Record exact wire/error choices in OpenAPI before dependent frontend work.
-- [x] Green the guard/contracts and preserve preexisting empty-entry upgrade tests. Regenerate generated contracts using the existing script; never hand-edit `web/src/api/schema.d.ts`.
 
 **Gate:** no upgrade/rollback path silently loses entries; old command payloads remain accepted.
 
 ## Task 2 — Catalog storage and GM operations (TDD)
 
-**Files:** new migration and `src/campaigns/templates.ts`; `src/campaigns/index.ts`, `persistence.ts`, `policy.ts`; `src/platform/config.ts` if an existing budget needs a template-specific bound; HTTP/bootstrap wiring. Create `tests/integration/campaign-templates.test.ts` and focused module/HTTP tests.
+**Files:** current schema baseline and `src/campaigns/templates.ts`; `src/campaigns/index.ts`, `persistence.ts`, `policy.ts`; `src/platform/config.ts` if an existing budget needs a template-specific bound; HTTP/bootstrap wiring. Create `tests/integration/campaign-templates.test.ts` and focused module/HTTP tests.
 
-- [ ] Red: fresh DB migration and reapplication; create/publish, read/list, edit append, archive/recover and preserved historical content. Assert resource versus content revision transitions.
+- [ ] Red: fresh DB initialization and repeated initialization; create/publish, read/list, edit append, archive/recover and preserved historical content. Assert resource versus content revision transitions.
 - [ ] Red: active owner/co-GM writes; member reads; outsider, removed member, system author and cross-campaign guessed ID denial. Player cannot edit, archive, recover, or browse archived records. Test campaign lifecycle and limit/cursor validation.
 - [ ] Red: identical receipt replay produces one row/revision/activity event; changed payload with reused key conflicts; concurrent same-revision writes yield one success and one conflict; unrelated templates can be edited independently.
 - [x] Implement separate storage/resource collaborators, immutable revisions, fixed audience, bounded pagination, limits and transactional current-policy checks. Integrate template events with existing authorized campaign activity; expose no archived content through a receipt or unrelated source join.
@@ -105,13 +101,13 @@ All mutation effects, appended content, activity and receipt storage are atomic.
 
 **Files:** `src/characters/index.ts`, `export.ts`, relevant persistence/placement seams; `src/systems/runtime.ts`, `src/systems/implementation/package/schema/dynamic.ts`, `src/systems/implementation/runtime/entries.ts`, `projection.ts`; bootstrap dependency wiring. Extend `src/characters/entries.test.ts`, runtime/schema tests, `tests/integration/campaign-templates.test.ts`, `campaign-placement.test.ts`, `campaign-character-authorization.test.ts`, `character-replay-authorization.test.ts`, and duplicate/migration regressions.
 
-- [ ] Red: system/personal legacy decode and old name-only records; campaign entry schema round-trip; materialized source appears as Campaign and cannot grant an action.
+- [ ] Red: current system/personal entry decoding and campaign entry schema round-trip; materialized source appears as Campaign and cannot grant an action.
 - [ ] Red: controller and active GM/co-GM placement on compatible attached characters; denial for another controller, standalone character, wrong campaign, wrong kind, missing/full slot, stale resource/content revision, archived template and client-authored snapshot/action.
 - [x] Materialize catalog defaults server-side on first placement; retain the existing client entry UUID, character expected revision, receipt and activity flow. Editable overrides occur through existing entry updates after placement.
 - [x] Red → green: revision 1 copy survives revision 2 edit/archive/recover; new valid placement uses revision 2; update/remove/export of old copies require character access, not access to the current catalog row.
 - [ ] Add transactional concurrent placement/edit/archive and membership-removal races. Each outcome corresponds to a valid serialization; no partial snapshot, receipt or leaked body.
 - [x] Red → green: authorized exact replay after catalog change remains original and exactly once; revoked replay denies; unsent old selection conflicts. Distinguish replay reconciliation from a fresh placement.
-- [x] Prove return-on-leave/removal preserves snapshots, kind and local values while removing picker/catalog access; campaign history stays scoped. Cover duplication, export/reload and the migration guard with campaign entries.
+- [x] Prove return-on-leave/removal preserves snapshots, kind and local values while removing picker/catalog access; campaign history stays scoped. Cover duplication, export/reload with campaign entries.
 
 **Gate:** independent snapshots, current authorization and backward compatibility through the full server path.
 
@@ -120,7 +116,7 @@ All mutation effects, appended content, activity and receipt storage are atomic.
 **Files:** `web/src/characters/types.ts`, `api.ts`, `session.ts`, `store.ts` and tests; `web/src/campaigns/api.ts`, `types.ts`, `campaignQueries.ts` and tests; identity/cache integration where proven necessary. Inspect `web/src/offline/worker.ts`; API responses must remain outside service-worker asset caching.
 
 - [ ] Red: typed campaign source + both revisions persist through queue creation, IndexedDB reload, frozen request construction, retries and explicit conflict review. Existing queued personal/system requests still drain verbatim.
-- [x] Preserve a bounded actor/campaign-scoped set of fetched compatible choices for offline placement; no offline discovery of unseen templates. If store format changes, version and migrate safely. Never rewrite already frozen requests or replace the chosen revision with latest.
+- [x] Preserve a bounded actor/campaign-scoped set of fetched compatible choices for offline placement; no offline discovery of unseen templates. Before the first release tag, update the current format and recreate obsolete test profiles; add no converter. Never rewrite already frozen requests or replace the chosen revision with latest.
 - [x] Red → green: offline add/reload/reconnect commits once; template change/archive before first commit enters the existing reviewable conflict/error state with user's intent retained. Deliberately choosing a new template revision creates a new reviewed intent/key.
 - [x] Reuse current queue handling for denied commands and uncertain outcomes. Membership removal, actor switching, logout, return and 404 revalidation purge relevant catalog/selector caches and prevent delayed old-generation responses from repopulating them. **Review repairs verified:** Task 7 R1/R3 now clear the active session on catalog denial and atomically invalidate durable catalog choices on scope changes; unit and canonical browser/offline CI passed. Follow-up deployed verification also passed; see Task 7 and the acceptance record.
 - [x] State offline limitations truthfully: a disconnected device cannot know remote revocation immediately. Revalidate on reconnect/focus before granting new access; server denies stale authority at commit. Returned-sheet snapshots are the explicit allowed exception.

@@ -43,7 +43,7 @@ function packageWith(templates: unknown[], slots: unknown[] = []) {
 }
 
 describe("template/slot structural validation", () => {
-  it("accepts legacy documents without templates/slots arrays", () => {
+  it("accepts current documents with optional templates/slots arrays omitted", () => {
     expect(validateDocumentStructure(validDocument())).toEqual([]);
   });
 

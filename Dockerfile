@@ -29,6 +29,6 @@ COPY --chown=node:node --from=build /app/node_modules ./node_modules
 COPY --chown=node:node --from=build /app/dist ./dist
 COPY --chown=node:node --from=web-build /app/web/dist ./web/dist
 COPY --chown=node:node package.json ./package.json
-COPY --chown=node:node migrations ./migrations
+COPY --chown=node:node database ./database
 EXPOSE 3000
 CMD ["npm", "run", "start:http"]

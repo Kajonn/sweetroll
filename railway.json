@@ -6,7 +6,7 @@
   },
   "deploy": {
     "preDeployCommand": [
-      "npm run start:migrate"
+      "npm run start:db:init"
     ],
     "startCommand": "node dist/bootstrap/http.js",
     "healthcheckPath": "/health/ready",

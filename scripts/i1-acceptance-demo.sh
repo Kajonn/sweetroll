@@ -46,8 +46,8 @@ for i in $(seq 1 30); do
 done
 
 echo
-echo "--- Step 0: run migrations ---"
-npm run migrate
+echo "--- Step 0: initialize database ---"
+npm run db:init
 
 echo
 echo "--- Steps 1-9: walk the documented interface ---"

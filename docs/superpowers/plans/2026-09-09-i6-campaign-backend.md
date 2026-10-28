@@ -36,11 +36,11 @@ New production files:
 | `src/campaigns/content.ts` | Content/grants/activity projections and bounded export workflows |
 | `src/characters/campaignPlacement.ts` | Internal character placement/return operations on an existing `PoolClient` |
 | `src/transport/http/campaigns.ts` | TypeBox schemas, thin route handlers and exported route definitions |
-| `migrations/0012_campaigns.sql` | Campaign policy/membership base tables |
-| `migrations/0013_campaign_character_scope.sql` | Character ownership union, controllers, placement/history scope |
-| `migrations/0014_campaign_invitations.sql` | Single-use invitations and recovery receipts |
-| `migrations/0015_campaign_content_activity.sql` | Content/grants/source-scoped activity and export |
-| `migrations/0016_campaign_roll_audiences.sql` | Campaign roll audiences and atomic activity references |
+| `database/schema.sql` | Campaign policy/membership base tables |
+| `database/schema.sql` | Character ownership union, controllers, placement/history scope |
+| `database/schema.sql` | Single-use invitations and recovery receipts |
+| `database/schema.sql` | Content/grants/source-scoped activity and export |
+| `database/schema.sql` | Campaign roll audiences and atomic activity references |
 
 Existing integration points:
 
@@ -48,10 +48,10 @@ Existing integration points:
 - `src/systems/runtime.ts`: existing normalized roll audience is only `owner_only`; do not make Runtime a campaign policy engine.
 - `src/transport/http/characters.ts`, `openapi.ts`, `src/bootstrap/http.ts`: character schema updates, explicit campaign route-definition registration and dependency wiring.
 - `src/platform/config.ts`: typed configurable bounds, with validation in `src/platform/config.test.ts`.
-- `tests/integration/i3-app.ts`: existing fixture embeds `I3_SCHEMA_DDL`; keep it consistent with additive migrations while retaining historical fixture behavior.
+- `tests/integration/i3-app.ts`: initialize the shared current schema baseline instead of maintaining historical fixture schemas.
 - `scripts/generate-system-contracts.ts`, `docs/contracts/openapi-v1.json`, `web/src/api/schema.d.ts`: contract generation/check. Never manually edit generated output.
 
-Tasks execute in numeric order. Review each task's authorization and tests before starting the next. No route is registered in production until its policy/transaction path is implemented and tested. Migration numbers are reserved here against latest `0011_user_preferences.sql`; recheck at execution and renumber new files if another migration has landed, never edit an applied migration.
+Tasks execute in numeric order. Review each task's authorization and tests before starting the next. No route is registered in production until its policy/transaction path is implemented and tested. Before the first release tag, update the current schema baseline and rebuild disposable test databases; no upgrade chain or transition tests are required.
 
 ## Test Harness and Commands
 
@@ -103,12 +103,12 @@ expect(replay.ok).toBe(false);
 
 ## Task 2: Campaign Aggregate, Policy Base and Production Migration
 
-**Files:** Create `migrations/0012_campaigns.sql`, `src/campaigns/index.ts`, `policy.ts`, `persistence.ts`, `tests/integration/campaigns.test.ts`, `tests/integration/i6-app.ts`; modify `src/platform/config.ts`, its tests, `tests/integration/migrations.test.ts`, `tests/integration/i3-app.ts`.
+**Files:** Update `database/schema.sql`, `src/campaigns/index.ts`, `policy.ts`, `persistence.ts`, `tests/integration/campaigns.test.ts`, `tests/integration/i6-app.ts`; modify `src/platform/config.ts`, its tests, `tests/integration/current-schema.test.ts`, `tests/integration/i3-app.ts`.
 
 **Interfaces:** `createCampaignsModule({ pool, limits, now?, newId? })` produces `Campaigns`. Establish public `create`, `open`, `list`, `update`, `archive`, `recover`, `listMembers`, `changeRole`, `removeMember` methods with `RequestContext` and typed command inputs matching Section 8 of the spec. Task 4 adds the required `charactersPlacement` dependency before any attachment is possible; do not add an optional dependency or a silent no-op implementation.
 
 - [ ] Write tests creating a campaign from a real accessible fixture version; assert creator is immutable active owner, outsider gets `not_found`, draft/inaccessible version is rejected, list excludes other campaigns, and archive prevents joins/mutations while allowing reads/recovery/departure.
-- [ ] Run `npx vitest run tests/integration/campaigns.test.ts tests/integration/migrations.test.ts --no-file-parallelism` and record expected missing-campaign behavior.
+- [ ] Run `npx vitest run tests/integration/campaigns.test.ts tests/integration/current-schema.test.ts --no-file-parallelism` and record expected missing-campaign behavior.
 - [ ] Implement metadata, active/archived lifecycle, relational roles, membership generation, campaign revision and access revision. Check accessible known versions using the same owner/public/link predicate as Characters, without enumerating unlisted systems. Create metadata/membership/audit/receipt atomically.
 
 ```sql
@@ -118,7 +118,7 @@ CHECK (status IN ('active', 'archived'))
 ```
 
 - [ ] Add validated limits to config: page default 25/max 100; campaign members max 100; attached characters max 200; title max 200 characters; description max 10000 characters. Reject oversize inputs before transaction work; use these supported limits in final load tests rather than quietly lowering them.
-- [ ] Run migration coverage from pre-I6 schema and fresh schema. Verify rollback on invalid version/membership insert, CHECK/FK/index behavior, checksum-safe upgrade, and unchanged standalone data.
+- [ ] Verify fresh schema initialization and safe repeated initialization with existing current-format data. Check transaction rollback on invalid membership/version inserts and CHECK/FK/index behavior. Do not construct a pre-I6 schema or test an app/database upgrade.
 - [ ] Review checkpoint: creator/co-GM roles never authorize system draft read/write; no empty campaign scaffold is exposed publicly.
 
 ## Task 3: Membership Races, Owner Protection and Read Policy
@@ -141,12 +141,12 @@ expect(await Promise.all([changeAtRevision, removeAtSameRevision]))
 
 ## Task 4: Character Ownership Scope and Atomic Placement/Return
 
-**Files:** Create `migrations/0013_campaign_character_scope.sql`, `src/characters/campaignPlacement.ts`, `tests/integration/campaign-placement.test.ts`; modify `src/characters/index.ts`, `persistence.ts`, `idempotency.ts`, `export.ts`, `migration.ts`, campaign factory/persistence, fixture DDL and migration tests.
+**Files:** Update `database/schema.sql`, `src/characters/campaignPlacement.ts`, `tests/integration/campaign-placement.test.ts`; modify `src/characters/index.ts`, `persistence.ts`, `idempotency.ts`, `export.ts`, `migration.ts`, campaign factory/persistence, fixture DDL and migration tests.
 
 **Interfaces:** Internal `createCampaignPlacement({ pool, runtime })` supplies typed `createInCampaign(client, input)`, `assign(client, input)`, `claim(client, input)`, `adopt(client, input)`, `returnForMember(client, input)` operations on a supplied `PoolClient`. `input` contains validated actor, campaign ID, membership generation and character/campaign revision preconditions; no method starts/commits its own transaction. Add required `charactersPlacement` to `createCampaignsModule` construction and update every caller. Campaigns alone orders membership/placement transactions. Characters authorization receives the same policy resolver and supports ownership union DTOs without removing existing standalone response fields. Campaign character initialization is prepared through Runtime before opening the final transaction; `createInCampaign` only rechecks and persists that prepared resolution while locked.
 
-- [ ] Add migration tests backfilling standalone history/receipts and preserving original IDs/owner IDs, constraints rejecting neither/both ownership scopes, and controller membership in a different campaign. Test zero-controller campaign characters without dummy owners.
-- [ ] Run `npx vitest run tests/integration/campaign-placement.test.ts tests/integration/migrations.test.ts --no-file-parallelism`; verify missing scope/placement causes failures.
+- [ ] Add current-schema tests for standalone history/receipt scope defaults, constraints rejecting neither/both ownership scopes, and controller membership in a different campaign. Test zero-controller campaign characters without dummy owners.
+- [ ] Run `npx vitest run tests/integration/campaign-placement.test.ts tests/integration/current-schema.test.ts --no-file-parallelism`; verify missing scope/placement causes failures.
 - [ ] Add ownership union, placement generation/history, return-owner invariant and controllers/claim designations. Existing `ownerId` remains populated for standalone views; attached views explicitly represent campaign custody and controllers rather than inventing an owner user.
 
 ```sql
@@ -202,12 +202,12 @@ expect(replayedIssue).not.toHaveProperty('token');
 
 ## Task 7: Content, Grants and Source-Scoped History
 
-**Files:** Create `migrations/0015_campaign_content_activity.sql`, `src/campaigns/content.ts`, `tests/integration/campaign-content.test.ts`, `tests/integration/campaign-export.test.ts`; modify campaign factory/policy/persistence, fixture DDL and migration tests.
+**Files:** Update `database/schema.sql`, `src/campaigns/content.ts`, `tests/integration/campaign-content.test.ts`, `tests/integration/campaign-export.test.ts`; modify campaign factory/policy/persistence, fixture DDL and migration tests.
 
 **Interfaces:** `createContent`, `openContent`, `listContent`, `updateContent`, `deleteContent`, `recoverContent`, `replaceGrants`, `listActivity` use current membership and source visibility. Grant replacement takes `expectedContentRevision`; transaction increments content/access revisions together. Only minimal source references belong in campaign activity payloads.
 
 - [ ] Test `gm_only`, `all_players`, `selected_players`, `owner_only` across all roles, including owner-only creator removal and GM inability to export/read another actor's private note. Test default audiences, bounded tags/body, soft-delete/recover and atomic grant/audience changes.
-- [ ] Run `npx vitest run tests/integration/campaign-content.test.ts tests/integration/migrations.test.ts --no-file-parallelism` and confirm missing-policy failures.
+- [ ] Run `npx vitest run tests/integration/campaign-content.test.ts tests/integration/current-schema.test.ts --no-file-parallelism` and confirm missing-policy failures.
 - [ ] Implement relational content visibility and same-campaign membership grants. Body limit 100000 characters; max 20 tags of 50 characters; max 100 grants per content item. Validate before writes; plain text only. Players author/edit/delete their own owner-only notes; inaccessible notes cannot be administratively shared by guessing ID.
 - [ ] Store activity references and apply current source policy before pagination. Request IDs correlate multiple events; do not make request ID globally unique per activity event.
 

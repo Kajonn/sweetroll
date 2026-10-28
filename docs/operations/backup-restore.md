@@ -56,12 +56,6 @@ for t in users systems system_versions campaigns characters; do
     -tAc "SELECT count(*) FROM $t")
   echo "$t: sweetroll=$a drill=$b"
 done
-# Also compare the migration high-water mark:
-docker compose exec -T postgres psql -U sweetroll -d sweetroll \
-  -tAc "SELECT max(filename) FROM schema_migrations"
-docker compose exec -T postgres psql -U sweetroll -d sweetroll_drill_restore \
-  -tAc "SELECT max(filename) FROM schema_migrations"
-
 # 5. Clean up the scratch target and container temp file.
 docker compose exec -T postgres rm /tmp/drill.dump
 docker compose exec -T postgres psql -U sweetroll -d postgres \
@@ -77,19 +71,12 @@ docker compose exec -T postgres psql -U sweetroll -d postgres \
 timestamp_utc: 2026-09-15T05:08:12Z
 git_head: 8a044f2c17f4de26112baa7dbb77fe0fa0e0154a
 database: sweetroll (compose service postgres, pg_dump -Fc)
-migrations_table: schema_migrations
-migrations_max: 0020_display_credentials.sql
 media: absent (data/media not present; skipped with warning)
 files:
 <sha256>  sweetroll.dump
 [<sha256>  media.tar.gz]
 ```
 
-- `migrations_max` is `max(filename)` from `schema_migrations`
-  (`src/platform/migrations.ts`). That table has columns
-  `(filename, checksum, applied_at)` and no `version` column, so there is no
-  numeric version to report — the lexicographically greatest applied
-  migration filename is the high-water mark.
 - `files:` holds `sha256sum` lines for each artifact present
   (`media.tar.gz` line omitted when media was skipped).
 
@@ -97,7 +84,7 @@ files:
 
 Environment: worktree compose project `i7-hardening`
 (`i7-hardening-postgres-1`, postgres:17-alpine, fresh volume migrated with
-`npm run migrate`: 20 migration files through `0020_display_credentials.sql`
+`npm run db:init`: 20 migration files through `0020_display_credentials.sql`
 plus reference-template seeds). Host port 5432 on that machine belongs to an
 unrelated postgres, so the stack ran with an ephemeral port override
 (`127.0.0.1:5434:5432`, override file outside the repo); all backup/restore
@@ -152,7 +139,7 @@ Production-volume re-drill (2026-09-17, worktree compose project
 `i7-hardening-remainder`, postgres:17-alpine): seeded 20 campaigns × 50
 characters = 1000 characters with `scripts/seed-volume-fixture.ts`
 (deterministic `vol-drill-` names) into scratch `sweetroll_drill_volume`
-(created via `docker compose exec`, migrated with `npm run migrate` first so
+(created via `docker compose exec`, migrated with `npm run db:init` first so
 the schema exists). Host port 5432 belongs to an unrelated postgres
 (main-repo `sweetroll-postgres-1`), so the stack ran with an out-of-repo
 compose override publishing `127.0.0.1:5439:5432`; all SQL went through
@@ -182,7 +169,7 @@ ownership scope (`owner_id` NULL) plus required `system_version_id`,
 `entity_definition_id` (`'vol-drill'`), and `name`; `system_versions` PK is
 `id`, not `version_id`. Drill-DB setup likewise added one step the brief
 omitted: `CREATE DATABASE` yields an unmigrated DB, so the scratch DB was
-migrated with the repo's own `npm run migrate` entrypoint before seeding
+migrated with the repo's own `npm run db:init` entrypoint before seeding
 (scratch-only; dev migration state unchanged).
 
 ## RPO / RTO assessment (against design §15)

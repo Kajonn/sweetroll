@@ -97,6 +97,7 @@ export function CampaignDetail(props: {
   navigation?: { onOpenCharacter: (characterId: string) => void };
   metadataApi?: CampaignCharacterMetadataApi;
   charactersApi?: SessionBoardProps["charactersApi"];
+  createSession?: SessionBoardProps["createSession"];
   generation?: number;
   online?: boolean;
 }) {
@@ -359,6 +360,7 @@ export function CampaignDetail(props: {
                     <SessionBoard
                       campaignsApi={props.api}
                       charactersApi={props.charactersApi}
+                      createSession={props.createSession}
                       campaignId={props.campaignId}
                       actorId={props.actorId}
                       generation={generation}

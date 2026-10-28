@@ -246,6 +246,10 @@ async function runJourney(page: Page, browser: Browser, viewport: { width: numbe
     await page.getByRole("button", { name: `Open ${characterName}` }).click({ timeout: STEP_TIMEOUT });
     await expect(page.getByRole("button", { name: "Decrease Health" })).toBeVisible({ timeout: STEP_TIMEOUT });
     await expect(page.getByText("10 / 10")).toBeVisible({ timeout: STEP_TIMEOUT });
+    // The row renders before its durable push session finishes opening.
+    // Wait for editing readiness before gating GETs, or the gate can trap
+    // that initial read and leave the bump disabled instead of causing 409.
+    await expect(page.getByRole("button", { name: "Decrease Health" })).toBeEnabled({ timeout: STEP_TIMEOUT });
 
     // 11. Bump Health through a genuine cross-page conflict: a second GM page
     // advances the sheet through its UI, so the first page's next bump
@@ -280,12 +284,19 @@ async function runJourney(page: Page, browser: Browser, viewport: { width: numbe
     } finally {
       await peerContext.close();
     }
-    const firstBumpRequest = page.waitForRequest(
-      (request) => request.url().includes(bumpUrl) && request.method() === "POST",
-      { timeout: STEP_TIMEOUT },
-    );
-    await page.getByRole("button", { name: "Decrease Health" }).click({ timeout: STEP_TIMEOUT });
-    const firstBody = (await firstBumpRequest).postDataJSON() as Record<string, unknown>;
+    const [firstBumpRequest, firstBumpResponse] = await Promise.all([
+      page.waitForRequest(
+        (request) => request.url().includes(bumpUrl) && request.method() === "POST",
+        { timeout: STEP_TIMEOUT },
+      ),
+      page.waitForResponse(
+        (response) => response.url().includes(bumpUrl) && response.request().method() === "POST",
+        { timeout: STEP_TIMEOUT },
+      ),
+      page.getByRole("button", { name: "Decrease Health" }).click({ timeout: STEP_TIMEOUT }),
+    ]);
+    expect(firstBumpResponse.status()).toBe(409);
+    const firstBody = firstBumpRequest.postDataJSON() as Record<string, unknown>;
     await expect(page.getByText("Refreshing character…")).toBeVisible({ timeout: STEP_TIMEOUT });
     await expect(page.getByRole("button", { name: "Decrease Health" })).toBeDisabled();
     await expect(page.getByText("Health changed. Reloaded — retry the bump.")).toHaveCount(0);

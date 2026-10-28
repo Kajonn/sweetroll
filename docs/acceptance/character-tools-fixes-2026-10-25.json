@@ -1,0 +1,477 @@
+{
+  "date": "2026-10-25",
+  "baseCommit": "2e078add244e7875b616327d79f98aa5a8c18fdd",
+  "findings": [
+    "C-ACCEPT-01",
+    "C-ACCEPT-02"
+  ],
+  "status": "fixed and verified in source; production-build browser validation uses the live preview backend through an isolated HTTPS forwarding harness",
+  "frontendUnitTests": 1200,
+  "observedRedRegressions": 5,
+  "configuredBrowserRetries": 0,
+  "productionBuildId": "fix-rollback-activity",
+  "assets": [
+    {
+      "path": "index.html",
+      "sha256": "6a790d9c5089bb14cf89a2d7552619d2e5b06cdf26bb99d34c26c455df5c6e95"
+    },
+    {
+      "path": "sw.js",
+      "sha256": "ff6de1910a70940c45b9625084eeceddc499e5b9b8d0508acdd44d31f85520b9"
+    },
+    {
+      "path": "assets/index-CMdCiBXf.js",
+      "sha256": "7baadd768dac642995ddabfd17b63ef8e082d0bcfc4d3fe21b4fdc8169cc5fe4"
+    }
+  ],
+  "backend": "https://sweetroll-items-production.up.railway.app",
+  "cases": [
+    {
+      "title": "UI migration and automatic rollback use the authoritative execution ID and restore the saved pool",
+      "durationMs": 23183,
+      "evidence": [
+        {
+          "name": "push-version-evidence",
+          "data": {
+            "systemId": "d8b64132-9b0b-4340-9496-d3326dc18e9d",
+            "characterId": "21ef82e2-c2ca-4176-8f6d-9c4a5f24ccdd",
+            "versionId": "c05c50ff-1d7d-45da-9957-d3aeeef141a8",
+            "nextVersion": "f35c7aad-2518-46c8-9a3b-7fd6e38e5b93",
+            "migrationId": "c77ce444-2419-458a-9449-6b1f7db0b657",
+            "root": {
+              "actionId": "test_pool",
+              "expression": "countSuccesses(group(\"attribute\", \"Attribute\", dice(fields.attribute + inputs.bonus_dice, 6)), 6) + 2 * countSuccesses(group(\"skill\", \"Skill\", dice(fields.skill, 8)), 5) + group(\"gear\", \"Gear\", dice(fields.gear, 4))",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 1,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": false
+                },
+                {
+                  "sides": 8,
+                  "value": 2,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 0,
+              "output": "Successes: 0",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "93a6e47d-f5dd-45d2-93e5-222ad2e0d828",
+                "rootRollId": "93a6e47d-f5dd-45d2-93e5-222ad2e0d828",
+                "parentRollId": null,
+                "attempt": 0,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 1,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 0,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ],
+                "terms": [
+                  {
+                    "id": "root.0.0.0.0.0",
+                    "operation": "binding",
+                    "operandIds": [],
+                    "value": 1
+                  },
+                  {
+                    "id": "root.0.0.0.0.1",
+                    "operation": "binding",
+                    "operandIds": [],
+                    "value": 0
+                  },
+                  {
+                    "id": "root.0.0.0.0",
+                    "operation": "+",
+                    "operandIds": [
+                      "root.0.0.0.0.0",
+                      "root.0.0.0.0.1"
+                    ],
+                    "value": 1
+                  },
+                  {
+                    "id": "root.0.0",
+                    "operation": "successCount",
+                    "operandIds": [
+                      "root.0.0.0.0"
+                    ],
+                    "value": 0,
+                    "groupId": "attribute"
+                  },
+                  {
+                    "id": "root.0.1.0",
+                    "operation": "literal",
+                    "operandIds": [],
+                    "value": 2
+                  },
+                  {
+                    "id": "root.0.1.1.0.0",
+                    "operation": "binding",
+                    "operandIds": [],
+                    "value": 1
+                  },
+                  {
+                    "id": "root.0.1.1",
+                    "operation": "successCount",
+                    "operandIds": [
+                      "root.0.1.1.0.0"
+                    ],
+                    "value": 0,
+                    "groupId": "skill"
+                  },
+                  {
+                    "id": "root.0.1",
+                    "operation": "*",
+                    "operandIds": [
+                      "root.0.1.0",
+                      "root.0.1.1"
+                    ],
+                    "value": 0
+                  },
+                  {
+                    "id": "root.0",
+                    "operation": "+",
+                    "operandIds": [
+                      "root.0.0",
+                      "root.0.1"
+                    ],
+                    "value": 0
+                  },
+                  {
+                    "id": "root.1.0",
+                    "operation": "binding",
+                    "operandIds": [],
+                    "value": 0
+                  },
+                  {
+                    "id": "root.1",
+                    "operation": "sum",
+                    "operandIds": [
+                      "root.1.0"
+                    ],
+                    "value": 0,
+                    "groupId": "gear"
+                  },
+                  {
+                    "id": "root",
+                    "operation": "+",
+                    "operandIds": [
+                      "root.0",
+                      "root.1"
+                    ],
+                    "value": 0
+                  }
+                ]
+              }
+            },
+            "child": {
+              "actionId": "test_pool",
+              "expression": "countSuccesses(group(\"attribute\", \"Attribute\", dice(fields.attribute + inputs.bonus_dice, 6)), 6) + 2 * countSuccesses(group(\"skill\", \"Skill\", dice(fields.skill, 8)), 5) + group(\"gear\", \"Gear\", dice(fields.gear, 4))",
+              "dice": [
+                {
+                  "sides": 6,
+                  "value": 6,
+                  "kept": true,
+                  "id": "attribute:0",
+                  "groupId": "attribute",
+                  "success": true
+                },
+                {
+                  "sides": 8,
+                  "value": 2,
+                  "kept": true,
+                  "id": "skill:0",
+                  "groupId": "skill",
+                  "success": false
+                }
+              ],
+              "bindings": [
+                {
+                  "scope": "fields",
+                  "definitionId": "attribute",
+                  "value": 1
+                },
+                {
+                  "scope": "inputs",
+                  "definitionId": "bonus_dice",
+                  "value": 0
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "skill",
+                  "value": 1
+                },
+                {
+                  "scope": "fields",
+                  "definitionId": "gear",
+                  "value": 0
+                }
+              ],
+              "total": 1,
+              "output": "Successes: 1",
+              "audience": "owner_only",
+              "push": {
+                "version": "1.0",
+                "rollId": "6a670474-4018-438e-ab5f-2c28b13af478",
+                "rootRollId": "93a6e47d-f5dd-45d2-93e5-222ad2e0d828",
+                "parentRollId": "93a6e47d-f5dd-45d2-93e5-222ad2e0d828",
+                "attempt": 1,
+                "maxAttempts": 2,
+                "rerolledDiceIds": [
+                  "attribute:0"
+                ],
+                "faceOutcomes": [
+                  {
+                    "groupId": "attribute",
+                    "face": 1,
+                    "combinedCount": 0,
+                    "rerolledCount": 0
+                  }
+                ]
+              },
+              "breakdown": {
+                "version": "1.0",
+                "rootId": "root",
+                "groups": [
+                  {
+                    "id": "attribute",
+                    "label": "Attribute",
+                    "count": 1,
+                    "sides": 6,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "attribute:0"
+                    ],
+                    "total": 1,
+                    "threshold": 6
+                  },
+                  {
+                    "id": "skill",
+                    "label": "Skill",
+                    "count": 1,
+                    "sides": 8,
+                    "operation": "successCount",
+                    "diceIds": [
+                      "skill:0"
+                    ],
+                    "total": 0,
+                    "threshold": 5
+                  },
+                  {
+                    "id": "gear",
+                    "label": "Gear",
+                    "count": 0,
+                    "sides": 4,
+                    "operation": "sum",
+                    "diceIds": [],
+                    "total": 0
+                  }
+                ],
+                "terms": [
+                  {
+                    "id": "root.0.0.0.0.0",
+                    "operation": "binding",
+                    "operandIds": [],
+                    "value": 1
+                  },
+                  {
+                    "id": "root.0.0.0.0.1",
+                    "operation": "binding",
+                    "operandIds": [],
+                    "value": 0
+                  },
+                  {
+                    "id": "root.0.0.0.0",
+                    "operation": "+",
+                    "operandIds": [
+                      "root.0.0.0.0.0",
+                      "root.0.0.0.0.1"
+                    ],
+                    "value": 1
+                  },
+                  {
+                    "id": "root.0.0",
+                    "operation": "successCount",
+                    "operandIds": [
+                      "root.0.0.0.0"
+                    ],
+                    "value": 1,
+                    "groupId": "attribute"
+                  },
+                  {
+                    "id": "root.0.1.0",
+                    "operation": "literal",
+                    "operandIds": [],
+                    "value": 2
+                  },
+                  {
+                    "id": "root.0.1.1.0.0",
+                    "operation": "binding",
+                    "operandIds": [],
+                    "value": 1
+                  },
+                  {
+                    "id": "root.0.1.1",
+                    "operation": "successCount",
+                    "operandIds": [
+                      "root.0.1.1.0.0"
+                    ],
+                    "value": 0,
+                    "groupId": "skill"
+                  },
+                  {
+                    "id": "root.0.1",
+                    "operation": "*",
+                    "operandIds": [
+                      "root.0.1.0",
+                      "root.0.1.1"
+                    ],
+                    "value": 0
+                  },
+                  {
+                    "id": "root.0",
+                    "operation": "+",
+                    "operandIds": [
+                      "root.0.0",
+                      "root.0.1"
+                    ],
+                    "value": 1
+                  },
+                  {
+                    "id": "root.1.0",
+                    "operation": "binding",
+                    "operandIds": [],
+                    "value": 0
+                  },
+                  {
+                    "id": "root.1",
+                    "operation": "sum",
+                    "operandIds": [
+                      "root.1.0"
+                    ],
+                    "value": 0,
+                    "groupId": "gear"
+                  },
+                  {
+                    "id": "root",
+                    "operation": "+",
+                    "operandIds": [
+                      "root.0",
+                      "root.1"
+                    ],
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "oldPoolReason": "rules_changed",
+            "cleanup": {
+              "characters": [
+                "21ef82e2-c2ca-4176-8f6d-9c4a5f24ccdd"
+              ],
+              "system": "d8b64132-9b0b-4340-9496-d3326dc18e9d"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "title": "opening Activity during initial reconciliation waits for the current cache generation",
+      "durationMs": 13994,
+      "evidence": [
+        {
+          "name": "early-activity-evidence",
+          "data": {
+            "systemId": "d6eda855-223d-4ecb-b766-b7a85739ed79",
+            "characterId": "f0b81586-9261-43ea-a435-fc66f760afca",
+            "rootRollId": "e0192fc1-e5a2-4b6e-ab6b-a7c7f6b28e11",
+            "deferredActivityReads": 0,
+            "completedActivityReads": 1,
+            "cleanup": {
+              "characters": [
+                "f0b81586-9261-43ea-a435-fc66f760afca"
+              ],
+              "system": "d6eda855-223d-4ecb-b766-b7a85739ed79"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "This record does not claim a new Railway frontend deployment.",
+    "Wider slice C device, provider-authentication and other unperformed acceptance gates remain open."
+  ]
+}

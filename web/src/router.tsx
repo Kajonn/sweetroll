@@ -1,3 +1,4 @@
+import {createCharacterSession} from "./characters/session.js";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createRootRoute, createRoute, createRouter, Outlet, useNavigate, useParams, useRouter } from "@tanstack/react-router";
 
@@ -523,6 +524,13 @@ function CampaignDetailRouteView() {
   const api = useCampaignsApi();
   const charactersApi = useCharactersApi();
   const navigate = useNavigate();
+  const store=useSharedCharacterStore();
+  const createSession=useMemo(()=>identity&&store?((characterId:string)=>{
+    const actorId=identity.getActorId();if(!actorId)throw new Error("Sign in to manage this character.");
+    const coordination=createCoordination({actorId,characterId});
+    const session=createCharacterSession({actorId,characterId,api:charactersApi,store,identity,coordination,now:()=>new Date().toISOString(),newId:()=>crypto.randomUUID()});
+    return {...session,dispose(){session.dispose();coordination.dispose();}};
+  }):undefined,[identity,store,charactersApi]);
   if (identity === null) {
     return <p role="status">{t("character.loading")}</p>;
   }
@@ -555,6 +563,7 @@ function CampaignDetailRouteView() {
       }}
       metadataApi={charactersApi}
       charactersApi={charactersApi}
+      createSession={createSession}
     />
   );
 }

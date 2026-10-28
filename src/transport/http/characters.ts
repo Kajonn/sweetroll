@@ -1,4 +1,4 @@
-import {DieResultSchema, RollBreakdownSchema} from "../../systems/implementation/rules/result.js";
+import {DieResultSchema, RollBreakdownSchema, PushResultSchema} from "../../systems/implementation/rules/result.js";
 import { strictInputCompiler } from "./strictValidation.js";
 import {EntrySourceSchema, EntrySnapshotSchema, type EntrySource} from "../../systems/implementation/package/schema/dynamic.js";
 import { Type, type TSchema } from "@sinclair/typebox";
@@ -278,6 +278,7 @@ const RollAudienceDto = Type.Union([
   Type.Literal("campaign"),
 ]);
 const RollDto = Type.Object({
+  push:Type.Optional(PushResultSchema),
   breakdown: Type.Optional(RollBreakdownSchema),
   actionId: Type.String(),
   expression: Type.String(),
@@ -327,6 +328,7 @@ const CharacterExportDto = Type.Object({
 
 const CharacterErrorEnvelope = Type.Object({
   error: Type.Object({
+    pushReason:Type.Optional(Type.String({maxLength:120})),
     code: Type.String(),
     message: Type.String(),
     latestRevision: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
@@ -420,9 +422,13 @@ const BumpResourceBody = Type.Object({
   expectedRevision: Type.Integer(),
   idempotencyKey: Type.String({ minLength: 1 }),
 });
+const PushParams=Type.Object({characterId:Type.String({format:"uuid"}),rollId:Type.String({format:"uuid"})},{additionalProperties:false});
+const PushBody=Type.Object({expectedRevision:Type.Integer({minimum:1}),idempotencyKey:Type.String({minLength:1,maxLength:200})},{additionalProperties:false});
+const PushOptionsDto=Type.Object({canPush:Type.Boolean(),reason:Type.Union([Type.String({maxLength:120}),Type.Null()]),eligibleDiceIds:Type.Array(Type.String({maxLength:256}),{maxItems:100}),revision:Type.Integer({minimum:1}),nextAttempt:Type.Integer({minimum:1,maximum:11}),maxAttempts:Type.Integer({minimum:1,maximum:10})});
 const ExecuteActionBody = Type.Object({
   // Outcomes and randomness belong to the server; never admit replacement
   // dice/group/calculation data, even when another JSON field is tolerated.
+  push:Type.Optional(Type.Never()),pushContext:Type.Optional(Type.Never()),pushPolicy:Type.Optional(Type.Never()),
   dice: Type.Optional(Type.Never()), total: Type.Optional(Type.Never()),
   breakdown: Type.Optional(Type.Never()), groups: Type.Optional(Type.Never()), seed: Type.Optional(Type.Never()),
   inputs: Type.Optional(Type.Object({}, { additionalProperties: true })),
@@ -634,6 +640,9 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
       },
     },
   },
+  {method:"get",path:"/characters/:characterId/rolls/:rollId",operationId:"get_characters_characterId_rolls_rollId",schema:{params:PushParams,response:{"200":Type.Object({roll:RollDto,requestId:Type.String()}),...ErrorResponses}}},
+  {method:"get",path:"/characters/:characterId/rolls/:rollId/push-options",operationId:"get_characters_characterId_rolls_rollId_push_options",schema:{params:PushParams,response:{"200":Type.Object({options:PushOptionsDto,requestId:Type.String()}),...ErrorResponses}}},
+  {method:"post",path:"/characters/:characterId/rolls/:rollId/push",operationId:"post_characters_characterId_rolls_rollId_push",schema:{params:PushParams,body:PushBody,response:{"200":Type.Object({result:CharacterCommandResultDto,requestId:Type.String()}),...ErrorResponses}}},
   {
     method: "post",
     path: "/characters/:characterId/actions/:actionId",
@@ -863,6 +872,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         error: {
           code: normalized.code,
           message: normalized.message,
+          ...(normalized.pushReason?{pushReason:normalized.pushReason}:{}),
           ...(normalized.latestRevision === undefined ? {} : { latestRevision: normalized.latestRevision }),
           ...(normalized.diagnostics === undefined ? {} : { diagnostics: normalized.diagnostics }),
           ...(normalized.actionDiagnostics === undefined ? {} : { actionDiagnostics: normalized.actionDiagnostics }),
@@ -1018,6 +1028,19 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         return { result: toCommandResultDto(result.value), requestId: request.id };
       },
 
+      get_characters_characterId_rolls_rollId:async(request,reply)=>{
+        const result=await characters.readRoll(ctxOf(request),request.params as {characterId:string;rollId:string});
+        if(!result.ok)return sendError(reply,result.error,request.id);reply.header("cache-control","no-store");return {roll:result.value,requestId:request.id};
+      },
+      get_characters_characterId_rolls_rollId_push_options:async(request,reply)=>{
+        const params=request.params as {characterId:string;rollId:string};const result=await characters.pushOptions(ctxOf(request),params);
+        if(!result.ok)return sendError(reply,result.error,request.id);reply.header("cache-control","no-store");return {options:result.value,requestId:request.id};
+      },
+      post_characters_characterId_rolls_rollId_push:async(request,reply)=>{
+        const params=request.params as {characterId:string;rollId:string};const body=request.body as {expectedRevision:number;idempotencyKey:string};
+        const result=await characters.apply(ctxOf(request),{kind:"pushRoll",characterId:params.characterId,parentRollId:params.rollId,...body});
+        if(!result.ok)return sendError(reply,result.error,request.id);return {result:toCommandResultDto(result.value),requestId:request.id};
+      },
       post_characters_characterId_actions_actionId: async (request, reply) => {
         const params = request.params as { characterId: string; actionId: string };
         const body = request.body as {
@@ -1221,6 +1244,6 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
     for (const route of charactersRouteDefinitions) {
       const response = toFastifyResponses(route.schema.response);
       const schema = response === undefined ? route.schema : { ...route.schema, response };
-      app[route.method](route.path, { schema, ...(route.path.includes("/entries") ? { validatorCompiler: strictInputCompiler } : {}) }, handlers[route.operationId]!);
+      app[route.method](route.path, { schema, ...((route.path.includes("/entries") || route.path.includes("/rolls/")) ? { validatorCompiler: strictInputCompiler } : {}) }, handlers[route.operationId]!);
     }
   };

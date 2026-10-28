@@ -1,5 +1,14 @@
 import { ApiError } from "../api/client.js";
 
+export const PUSH_ROOT_ID = "30000000-0000-4000-8000-000000000001";
+export function makePushRoll(): NonNullable<CommandResultResponse["result"]["roll"]> {
+  return {
+    actionId:"roll",expression:'group("base", "Base", 2d6)',dice:[{id:"base:0",groupId:"base",sides:6,value:2,kept:true},{id:"base:1",groupId:"base",sides:6,value:5,kept:true}],bindings:[],total:7,output:"Private pool",audience:"owner_only",
+    breakdown:{version:"1.0",rootId:"root",groups:[{id:"base",label:"Base",count:2,sides:6,operation:"sum",diceIds:["base:0","base:1"],total:7}],terms:[{id:"root",operation:"dice",operandIds:[],value:7,groupId:"base"}]},
+    push:{version:"1.0",rollId:"30000000-0000-4000-8000-000000000002",rootRollId:PUSH_ROOT_ID,parentRollId:PUSH_ROOT_ID,attempt:1,maxAttempts:2,rerolledDiceIds:["base:0","base:1"],faceOutcomes:[]},
+  };
+}
+
 /** FIFO browser scheduling, including queued-lock cancellation, without lease stealing. */
 export function createTestLocks(): LockManager {
   const held = new Set<string>();

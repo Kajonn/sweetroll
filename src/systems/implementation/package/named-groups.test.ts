@@ -47,7 +47,7 @@ describe("versioned named-group package round trips", () => {
     const downgrade = structuredClone(result.value);
     downgrade.schemaVersion = "1.0";
     expect(decodeSystemPackage(signSystemPackage(downgrade)).ok).toBe(false);
-    const unknown = { ...result.value, schemaVersion: "1.2" };
+    const unknown = { ...result.value, schemaVersion: "1.3" };
     expect(decodeSystemPackage(unknown).ok).toBe(false);
     const expr = result.value.expressions.find(
       (e) => e.id === "pool_roll_expr",

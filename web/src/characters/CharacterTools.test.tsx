@@ -1,4 +1,5 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { StrictMode } from "react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
@@ -390,6 +391,50 @@ describe("CharacterTools", () => {
     await waitFor(() => expect(fetchActivityPage).toHaveBeenCalledWith("cursor-1"));
     expect(screen.getAllByText(/Field set/)).toHaveLength(1);
     expect(screen.getByText(/Bump/)).toBeVisible();
+  });
+
+  it("offers readable recovery when an Activity response loses its cache generation", async () => {
+    const user = userEvent.setup();
+    const session = makeSession(readySnapshot());
+    session.fetchActivityPage = vi.fn()
+      .mockRejectedValueOnce(new Error("stale activity save: character generation changed"))
+      .mockResolvedValueOnce({ events: [], nextCursor: null, stale: false, fetchedAt: "2026-10-25T00:00:00Z" });
+    render(<CharacterTools characterId="char-1" api={makeApi()} session={session} />);
+    await user.click(screen.getByRole("button", { name: /^Activity$/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Activity changed while loading. Refresh activity to try again.");
+    expect(screen.queryByText(/stale activity save/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /refresh activity/i }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(session.fetchActivityPage).toHaveBeenCalledTimes(2);
+  });
+
+  it("starts Activity once after opening settles, including a StrictMode effect restart", async () => {
+    const user = userEvent.setup();
+    const session = makeSession(readySnapshot());
+    let finish!: () => void;
+    const opening = new Promise<void>(resolve => { finish = resolve; });
+    session.open = vi.fn(() => opening);
+    render(<StrictMode><CharacterTools characterId="char-1" api={makeApi()} session={session} /></StrictMode>);
+    await user.click(screen.getByRole("button", { name: /^Activity$/ }));
+    expect(screen.getByRole("button", { name: /refresh activity/i })).toBeDisabled();
+    expect(session.fetchActivityPage).not.toHaveBeenCalled();
+    await act(async () => finish());
+    await waitFor(() => expect(screen.getByRole("button", { name: /refresh activity/i })).toBeEnabled());
+    expect(session.fetchActivityPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels the deferred Activity read when the dialog closes before opening settles", async () => {
+    const user = userEvent.setup();
+    const session = makeSession(readySnapshot());
+    let finish!: () => void;
+    const opening = new Promise<void>(resolve => { finish = resolve; });
+    session.open = vi.fn(() => opening);
+    render(<StrictMode><CharacterTools characterId="char-1" api={makeApi()} session={session} /></StrictMode>);
+    await user.click(screen.getByRole("button", { name: /^Activity$/ }));
+    await user.click(screen.getByRole("button", { name: /^Close$/ }));
+    await act(async () => finish());
+    expect(screen.queryByRole("dialog", { name: /^Activity$/ })).not.toBeInTheDocument();
+    expect(session.fetchActivityPage).not.toHaveBeenCalled();
   });
 
   it("blocks export while an uncertain online outcome is pending", async () => {

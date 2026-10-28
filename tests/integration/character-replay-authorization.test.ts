@@ -91,6 +91,7 @@ const DDL = `
   );
   CREATE TABLE character_rolls (
     breakdown_json jsonb,
+    parent_roll_id uuid, root_roll_id uuid, push_attempt integer, push_context_json jsonb, push_result_json jsonb, audience_actor_id uuid,
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     character_id       uuid NOT NULL REFERENCES characters(id) ON DELETE RESTRICT,
     actor_id           uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -544,6 +545,8 @@ describeWithDatabase("Character replay authorization (I6 Task 1)", () => {
         "listEntryTemplates",
         "manage",
         "open",
+        "pushOptions",
+        "readRoll",
       ].sort(),
     );
   });

@@ -23,7 +23,7 @@ export type ActionV1 = { id: string; label: string; kind: string } & Record<stri
 export type ValidationV1 = { id: string; expressionId: string; severity: string; message: string; targetId: string };
 
 export type SystemDocumentV1 = {
-  schemaVersion: "1.0" | "1.1";
+  schemaVersion: "1.0" | "1.1" | "1.2";
   metadata: SystemMetadataV1;
   entities: EntityDefinitionV1[];
   referenceData: ReferenceDataV1[];
@@ -79,7 +79,7 @@ export function blankDocument(): SystemDocumentV1 {
 export function documentReducer(state: SystemDocumentV1, action: DocumentAction): SystemDocumentV1 {
   switch (action.type) {
     case "replace":
-      return action.document;
+      return hasPolicy(action.document)?{...action.document,schemaVersion:"1.2"}:action.document;
     case "setMetadata":
       return {
         ...state,
@@ -113,7 +113,7 @@ export function documentReducer(state: SystemDocumentV1, action: DocumentAction)
     case "setReferenceData":
       return { ...state, referenceData: action.referenceData };
     case "setActions":
-      return { ...state, actions: action.actions };
+      return { ...state, actions: action.actions, ...(action.actions.some(a=>a.pushPolicy!==undefined)?{schemaVersion:"1.2" as const}:{}) };
     case "setValidations":
       return { ...state, validations: action.validations };
     case "setExpressionSource": {
@@ -129,7 +129,7 @@ export function documentReducer(state: SystemDocumentV1, action: DocumentAction)
       });
       if (!mutated) return state;
       const parsed=action.source===undefined?null:parse(action.source);
-      return { ...state, expressions, ...(parsed?.ok && hasDiceGroups(parsed.ast)?{schemaVersion:"1.1" as const}:{}) };
+      return { ...state, expressions, ...(state.schemaVersion==="1.0" && parsed?.ok && hasDiceGroups(parsed.ast)?{schemaVersion:"1.1" as const}:{}) };
     }
     case "addExpression": {
       if (state.expressions.some((entry) => entry.id === action.expression.id)) return state;
@@ -137,3 +137,5 @@ export function documentReducer(state: SystemDocumentV1, action: DocumentAction)
     }
   }
 }
+
+function hasPolicy(doc:SystemDocumentV1):boolean{return doc.actions.some(a=>a.pushPolicy!==undefined)||((doc as unknown as {templates?:{grantedActions:{pushPolicy?:unknown}[]}[]}).templates??[]).some(t=>t.grantedActions.some(a=>a.pushPolicy!==undefined));}

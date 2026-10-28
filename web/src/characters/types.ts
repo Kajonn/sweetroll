@@ -145,3 +145,6 @@ export type CommandResultResponse = operations["post_characters_characterId_fiel
 export type CommandResult = CommandResultResponse["result"];
 
 export type CharacterExport = operations["post_characters_characterId_exports"]["responses"]["200"]["content"]["application/vnd.sweetroll.character+json;version=1"];
+
+export type PushOptionsResponse=operations["get_characters_characterId_rolls_rollId_push_options"]["responses"]["200"]["content"]["application/json"];
+export type ReadRollResponse=operations["get_characters_characterId_rolls_rollId"]["responses"]["200"]["content"]["application/json"];

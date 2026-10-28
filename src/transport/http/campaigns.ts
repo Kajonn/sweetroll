@@ -1,4 +1,4 @@
-import {RollBreakdownSchema} from "../../systems/implementation/rules/result.js";
+import {RollBreakdownSchema,PushResultSchema} from "../../systems/implementation/rules/result.js";
 import { strictInputCompiler } from "./strictValidation.js";
 import {campaignTemplateRoutes,campaignTemplateHandlers,CampaignTemplateDto} from "./campaignTemplates.js";
 import { Type, type TSchema } from "@sinclair/typebox";
@@ -298,6 +298,7 @@ const CampaignExportDto = Type.Object({
       audience: Type.Union([Type.Literal("owner_only"), Type.Literal("gm_only"), Type.Literal("campaign")]),
       expression: Type.String(),
       breakdown: Type.Optional(RollBreakdownSchema),
+      push:Type.Optional(PushResultSchema),
       dice: Type.Unknown(),
       bindings: Type.Unknown(),
       total: Type.Number(),

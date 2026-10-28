@@ -438,3 +438,14 @@ it("offers guided named groups without overwriting a custom expression on openin
  expect(onSource).not.toHaveBeenCalled();
  expect(screen.getByText("Keep the custom formula, or explicitly replace it with a grouped pool.")).toBeVisible();
 });
+
+describe("push policy authoring",()=>{
+ it("enables a bounded named-group policy without rewriting the custom formula",()=>{
+  const source='countSuccesses(group("attribute","Attribute",dice(fields.attribute,6)),6)';
+  const changed=vi.fn();const v=renderEditor({expressionSource:source,fieldTypes:{attribute:"number"},onExpressionSourceChange:changed});
+  fireEvent.click(screen.getByText("Push rules"));fireEvent.click(screen.getByLabelText("Enable pushing"));v.applyChange();
+  expect(v.current().pushPolicy).toMatchObject({version:"1.0",maxAttempts:1,groups:[{groupId:"attribute"}]});expect(changed).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("Maximum pushes"),{target:{value:"2"}});v.applyChange();expect(v.current().pushPolicy?.maxAttempts).toBe(2);
+ });
+ it("explains unsupported formulas and leaves the source intact",()=>{const v=renderEditor({expressionSource:'group("base","Base",2d6) / d6'});fireEvent.click(screen.getByText("Push rules"));expect(screen.getByLabelText("Enable pushing")).toBeDisabled();expect(screen.getByText(/named dice group.*additive/i)).toBeVisible();expect(v.onChange).not.toHaveBeenCalled();});
+});

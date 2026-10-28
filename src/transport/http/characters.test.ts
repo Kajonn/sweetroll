@@ -137,6 +137,8 @@ function characterExport(): CharacterExportV1 {
 
 function makeCharacters(overrides: Partial<Characters> = {}): Characters {
   const base: Characters = {
+    readRoll:async()=>({ok:false,error:{code:"not_found",message:"Unavailable"}}),
+    pushOptions:async()=>({ok:true,value:{canPush:false,reason:"no_eligible_dice",eligibleDiceIds:[],revision:1,nextAttempt:1,maxAttempts:1}}),
     create: async () => ({ ok: true, value: characterView() }),
     creationOptions: async () => ({
       ok: true,

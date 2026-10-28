@@ -926,4 +926,30 @@ describeWithDatabase("characters HTTP acceptance", () => {
     expect(forged.statusCode).toBe(400);
   });
 
+  it("pushes exactly one child for competing keys at an unchanged character revision",async()=>{
+    const app=await makeApp();apps.push(app);const ada=app.users.ada;
+    const doc=namedDicePoolDocument();doc.schemaVersion="1.2";
+    const action=doc.actions.find(a=>a.kind==="roll")!;if(action.kind!=="roll")throw Error("action");
+    action.pushPolicy={version:"1.0",maxAttempts:2,successThreshold:1,allowOnSuccess:true,groups:[{groupId:"attribute",lockedFaces:[],reportedFaces:[1]}]};
+    const {versionId}=await publishVersion(app,ada,doc,{name:"Push races",semanticVersion:"1.0.0"});
+    const created=await createCharacter(app,ada,{systemVersionId:versionId,name:"Push Hero",idempotencyKey:randomUUID()});expect(created.statusCode,created.body).toBe(201);
+    const id=created.json().character.characterId;
+    const rootResponse=await executeAction(app,ada,id,"test_pool",{bonus_dice:1},1,randomUUID());expect(rootResponse.statusCode,rootResponse.body).toBe(200);
+    const root=rootResponse.json().result.roll;expect(root.push).toMatchObject({attempt:0,maxAttempts:2,parentRollId:null});
+    const before=await app.pool.query("SELECT * FROM character_rolls WHERE id=$1",[root.push.rollId]);
+    const url=`/characters/${id}/rolls/${root.push.rollId}/push`;
+    const body={expectedRevision:1,idempotencyKey:randomUUID()};
+    const replies=await Promise.all([app.app.inject({method:"POST",url,headers:cookieHeader(ada),payload:body}),app.app.inject({method:"POST",url,headers:cookieHeader(ada),payload:{...body,idempotencyKey:randomUUID()}})]);
+    expect(replies.map(r=>r.statusCode).sort()).toEqual([200,409]);
+    const child=replies.find(r=>r.statusCode===200)!.json().result.roll;
+    expect(child.push).toMatchObject({attempt:1,parentRollId:root.push.rollId,rootRollId:root.push.rollId});
+    expect(child.dice.map((d:{id:string})=>d.id)).toEqual(root.dice.map((d:{id:string})=>d.id));
+    expect((await app.pool.query("SELECT * FROM character_rolls WHERE id=$1",[root.push.rollId])).rows).toEqual(before.rows);
+    const counts=await app.pool.query("SELECT count(*)::int AS n FROM character_rolls WHERE parent_roll_id=$1",[root.push.rollId]);expect(counts.rows[0].n).toBe(1);
+    const winner=replies[0]!.statusCode===200;
+    if(winner){const replay=await app.app.inject({method:"POST",url,headers:cookieHeader(ada),payload:body});expect(replay.statusCode,replay.body).toBe(200);expect(replay.json().result.roll).toEqual(child);}
+    const foreign=await app.app.inject({method:"POST",url,headers:cookieHeader(app.users.bob),payload:{...body,idempotencyKey:randomUUID()}});expect(foreign.statusCode).toBe(404);
+    const forged=await app.app.inject({method:"POST",url,headers:cookieHeader(ada),payload:{...body,idempotencyKey:randomUUID(),dice:child.dice}});expect(forged.statusCode).toBe(400);
+  });
+
 });

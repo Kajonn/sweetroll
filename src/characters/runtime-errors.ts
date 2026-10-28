@@ -3,12 +3,15 @@ import type { CharacterError } from "./index.js";
 export function mapRuntimeError(error: {
   code: string;
   message: string;
+  pushReason?: string;
   definitionId?: string;
   actionDiagnostics?: import("../systems/runtime.js").ActionEvaluationDiagnostic[];
 }): CharacterError {
   switch (error.code) {
     case "not_found":
       return { code: "not_found", message: "The published version or entity definition does not exist." };
+    case "push_unavailable":
+      return { code: "invalid_value", message: error.message, ...(error.pushReason === undefined ? {} : { pushReason: error.pushReason }) };
     case "action_evaluation_failed":
       return { code: "invalid_value", message: error.message, ...(error.actionDiagnostics === undefined ? {} : { actionDiagnostics: error.actionDiagnostics }) };
     case "bad_request":
@@ -25,6 +28,7 @@ export function mapRuntimeError(error: {
 // Only these runtime error codes are stable/deterministic for the same input
 // and safe to permanently finalize on the idempotency key (standalone path).
 const STABLE_RUNTIME_ERROR_CODES = new Set([
+  "push_unavailable",
   "action_evaluation_failed",
   "not_found",
   "bad_request",

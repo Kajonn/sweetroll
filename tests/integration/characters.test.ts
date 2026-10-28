@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Client, Pool } from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createCharactersModule,
@@ -304,48 +304,6 @@ describeWithDatabase("Characters (create/list/open)", () => {
       ok: false,
       error: { code: "idempotency_mismatch", message: "This idempotency key was already used with different input." },
     });
-  });
-
-  it("replays historical create and command receipts without completion metadata or resolution", async () => {
-    const owner = await createUser("Ada");
-    const { versionId } = await publishVersion(owner);
-    const input = { systemVersionId: versionId, entityDefinitionId: "character", name: "Aria", idempotencyKey: randomUUID() };
-    const created = await characters.create(ctx(owner), input);
-    if (!created.ok) throw new Error(created.error.code);
-    const command = { kind: "setField" as const, characterId: created.value.characterId,
-      fieldId: "ability", value: 15, expectedRevision: 1, idempotencyKey: randomUUID() };
-    const applied = await characters.apply(ctx(owner), command);
-    if (!applied.ok) throw new Error(applied.error.code);
-    // Model receipts persisted before completion metadata existed, inside the replay window.
-    await pool.query(`UPDATE character_command_executions
-      SET result_json = result_json #- '{projection,completionFields}' #- '{value,character,projection,completionFields}'
-      WHERE actor_id = $1`, [owner]);
-    const before = await pool.query("SELECT result_json FROM character_command_executions ORDER BY id");
-    const resolveSpy = vi.spyOn(runtime, "resolve");
-    try {
-      const createReplay = await characters.create(ctx(owner), input);
-      const commandReplay = await characters.apply(ctx(owner), command);
-      if (!createReplay.ok || !commandReplay.ok) throw new Error("Replay failed");
-      const replayed = createReplay.value;
-      expect(replayed.projection).not.toHaveProperty("completionFields");
-      expect(commandReplay.value.character.projection).not.toHaveProperty("completionFields");
-      expect(replayed.reconciliation.replayed).toBe(true);
-      expect(commandReplay.value.character.reconciliation.replayed).toBe(true);
-      expect(resolveSpy).not.toHaveBeenCalled();
-      expect(createReplay.value).toEqual({ ...created.value, projection: replayed.projection,
-        reconciliation: { ...created.value.reconciliation, replayed: true } });
-      expect(commandReplay.value).toEqual({ ...applied.value, character: { ...applied.value.character,
-        projection: commandReplay.value.character.projection,
-        reconciliation: { ...applied.value.character.reconciliation, replayed: true } } });
-      expect((await pool.query("SELECT result_json FROM character_command_executions ORDER BY id")).rows).toEqual(before.rows);
-    } finally {
-      resolveSpy.mockRestore();
-    }
-    const fresh = await characters.open(ctx(owner), created.value.characterId);
-    if (!fresh.ok) throw new Error(fresh.error.code);
-    expect(fresh.value.projection.completionFields).toEqual([
-      expect.objectContaining({ fieldId: "proficient" }),
-    ]);
   });
 
   it("lists owned characters in (updated_at DESC, id DESC) keyset order", async () => {
@@ -1377,7 +1335,6 @@ describeWithDatabase("Characters (apply: executeAction)", () => {
   });
 });
 
-
 describeWithDatabase("Characters (manage/activity/export)", () => {
   const schema = `characters_manage_${randomUUID().replaceAll("-", "")}`;
   let pool: Pool;
@@ -1719,7 +1676,6 @@ describeWithDatabase("Characters (manage/activity/export)", () => {
     expect(first.value.systemVersionId).toBe(versionId);
     expect(first.value.revision).toBe(2);
     expect(first.value.state.values.ability).toBe(15);
-    expect(first.value.migrationLineage).toEqual([]);
     expect(typeof first.value.packageChecksum).toBe("string");
     expect(first.value.packageChecksum.length).toBeGreaterThan(0);
 

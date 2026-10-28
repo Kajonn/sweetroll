@@ -8,22 +8,15 @@ import {
   prepareCampaignCharacter,
 } from "../../src/characters/campaignPlacement.js";
 import { buildAttachedCharacterExportDocument } from "../../src/characters/export.js";
-import { denyAttachedMigrationScope } from "../../src/characters/migration.js";
 import { claimExecutionOnClient } from "../../src/characters/idempotency.js";
 import { DEFAULT_CAMPAIGN_LIMITS } from "../../src/platform/config.js";
 import { createCampaignsModule } from "../../src/campaigns/index.js";
-import { compileDocument } from "../../src/systems/implementation/rules/compile-document.js";
 import { buildI6Harness, ctxFor, type I6Harness } from "./i6-app.js";
-import { buildD20V2Document } from "./i3-app.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const describeWithDatabase = databaseUrl === undefined ? describe.skip : describe;
 
 describe("campaign placement scope helpers (no database)", () => {
-  it("denies migration scope only for attached rows", () => {
-    expect(denyAttachedMigrationScope({ ownerId: "u1", campaignId: null })).toBeNull();
-    expect(denyAttachedMigrationScope({ ownerId: null, campaignId: "c1" })).toEqual({ attached: true });
-  });
 
   it("builds attached exports from current state only, with no history or owner payload", () => {
     const document = buildAttachedCharacterExportDocument(
@@ -45,7 +38,6 @@ describe("campaign placement scope helpers (no database)", () => {
       characterId: "char-1",
       revision: 3,
       state: { schemaVersion: "1.0", values: { ability: 12 } },
-      migrationLineage: [],
     });
     expect(document).not.toHaveProperty("ownerId");
     expect(document).not.toHaveProperty("actorId");
@@ -1098,7 +1090,6 @@ describeWithDatabase("campaign character placement and atomic return (Task 4)", 
     const exported = await h.characters.exportCharacter(gm, { characterId: sheet.characterId });
     expect(exported.ok).toBe(true);
     if (!exported.ok) return;
-    expect(exported.value.migrationLineage).toEqual([]);
     const activity = await h.characters.listActivity(player, {
       characterId: sheet.characterId,
       limit: 10,
@@ -1107,104 +1098,11 @@ describeWithDatabase("campaign character placement and atomic return (Task 4)", 
     expect(activity.ok).toBe(true);
     if (!activity.ok) return;
     expect(activity.value.events.map((event) => event.kind)).toContain("character_adopted");
-    expect(
-      await h.characters.previewMigration(player, { characterId: sheet.characterId, targetVersionId: h.versionId }),
-    ).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
     // The owner-scoped list never surfaces attached sheets either.
     const listed = await h.characters.list(player, { limit: 100, cursor: null });
     expect(listed.ok).toBe(true);
     if (!listed.ok) return;
     expect(listed.value.characters.find((entry) => entry.characterId === sheet.characterId)).toBeUndefined();
-  });
-
-  it("invalidates pre-attachment migration previews and denies attached migration and duplication", async () => {
-    // A real second version on the campaign system, compiled like migration tests do.
-    const versionId = randomUUID();
-    const document = buildD20V2Document();
-    const compiled = compileDocument(document, { systemId: h.systemId, versionId, semanticVersion: "2.0.0" });
-    expect(compiled.ok).toBe(true);
-    if (!compiled.ok) return;
-    await h.pool.query(
-      `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, lifecycle)
-       VALUES ($1, $2, '2.0.0', $3, $4::jsonb, 'published')`,
-      [versionId, h.systemId, compiled.value.integrity.checksum, JSON.stringify(compiled.value)],
-    );
-
-    const campaignId = await createCampaign();
-    await seedMember(campaignId, h.users.player.actorId);
-    const sheet = await createStandalone("player");
-    const player = ctxFor(h.users.player);
-
-    // Adopt first on the v1 pin, then prove attached migration denies: the
-    // preview below is cut after attachment and must fail like the old one.
-    expect((await adopt(campaignId, sheet.characterId, "player")).ok).toBe(true);
-    const attachedPreview = await h.characters.previewMigration(player, {
-      characterId: sheet.characterId,
-      targetVersionId: versionId,
-    });
-    expect(attachedPreview).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
-
-    // A v2-pinned campaign accepts the migrated sheet; its rollback then denies.
-    const v2Campaign = await h.campaigns.create(ctxFor(h.users.gm), {
-      systemVersionId: versionId,
-      title: `Placement v2 ${randomUUID()}`,
-      description: "",
-      idempotencyKey: randomUUID(),
-    });
-    expect(v2Campaign.ok).toBe(true);
-    if (!v2Campaign.ok) return;
-    const v2CampaignId = v2Campaign.value.campaignId;
-    await seedMember(v2CampaignId, h.users.other.actorId);
-    const v2Sheet = await createStandalone("other");
-    const v2Preview = await h.characters.previewMigration(ctxFor(h.users.other), {
-      characterId: v2Sheet.characterId,
-      targetVersionId: versionId,
-    });
-    expect(v2Preview.ok).toBe(true);
-    if (!v2Preview.ok) return;
-    const v2Commit = await h.characters.commitMigration(ctxFor(h.users.other), {
-      characterId: v2Sheet.characterId,
-      previewId: v2Preview.value.previewId,
-      expectedRevision: 1,
-      idempotencyKey: randomUUID(),
-    });
-    expect(v2Commit.ok).toBe(true);
-    if (!v2Commit.ok) return;
-    const migrationId = await migrationIdOf(v2Sheet.characterId, versionId);
-    expect(migrationId).not.toBeNull();
-
-    expect(
-      (await adopt(v2CampaignId, v2Sheet.characterId, "other", { expectedCharacterRevision: 2 })).ok,
-    ).toBe(true);
-
-    // The committed-then-attached migration cannot roll back: attached rollback denies.
-    const rolledBack = await h.characters.rollbackMigration(ctxFor(h.users.other), {
-      characterId: v2Sheet.characterId,
-      migrationId: migrationId as string,
-      idempotencyKey: randomUUID(),
-    });
-    expect(rolledBack).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
-
-    // A preview cut before attachment cannot commit after it.
-    const previewBeforeAttach = await (async () => {
-      const other = await createStandalone("other");
-      const otherCampaign = await createCampaign();
-      await seedMember(otherCampaign, h.users.other.actorId);
-      const previewed = await h.characters.previewMigration(ctxFor(h.users.other), {
-        characterId: other.characterId,
-        targetVersionId: versionId,
-      });
-      expect(previewed.ok).toBe(true);
-      if (!previewed.ok) throw new Error("preview failed");
-      expect((await adopt(otherCampaign, other.characterId, "other")).ok).toBe(true);
-      return h.characters.commitMigration(ctxFor(h.users.other), {
-        characterId: other.characterId,
-        previewId: previewed.value.previewId,
-        expectedRevision: 2,
-        idempotencyKey: randomUUID(),
-      });
-    })();
-    expect(previewBeforeAttach).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
   });
 
   it("denies stored duplicate replays once the copy is adopted", async () => {
@@ -1404,14 +1302,6 @@ describeWithDatabase("campaign character placement and atomic return (Task 4)", 
       client.release();
     }
   });
-
-  async function migrationIdOf(characterId: string, targetVersionId: string): Promise<string | null> {
-    const rows = await h.pool.query<{ id: string }>(
-      `SELECT id FROM character_migrations WHERE character_id = $1 AND target_version_id = $2`,
-      [characterId, targetVersionId],
-    );
-    return rows.rows[0]?.id ?? null;
-  }
 
   it("discovers only the caller's outstanding designations with exact four-field rows", async () => {
     const campaignId = await createCampaign();

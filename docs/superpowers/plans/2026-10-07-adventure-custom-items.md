@@ -50,7 +50,7 @@ On phones, keep Add in the existing slot interaction, show scope and source in t
 - Add a campaign-owned catalog resource keyed by campaign ID and stable template ID, with revision, lifecycle, creator, kind, labels, bounded fields, source metadata and audience. Keep it distinct from `campaign_content_items` notes and from immutable system packages.
 - Add campaign Module operations and HTTP contracts for create/list/read/update/archive; all mutations require expected revision and idempotency. Pagination filters by active membership and audience before returning results. Archive is recoverable while retention permits.
 - In B, creation publishes atomically; provide explicit recover alongside archive. Create uses expected absence (revision 0), and later writes use the template resource revision. Keep immutable content revision separate from archive/recover concurrency revision. No new retention/purge worker is included.
-- Add the GM catalog view and combine authorized compatible system and campaign choices in the slot picker. Character entries store a typed source and pinned catalog revision; legacy `templateId` system references and `null` custom entries continue to decode.
+- Add the GM catalog view and combine authorized compatible system and campaign choices in the slot picker. Character entries store a typed source and pinned catalog revision; current system references and personal entries both have explicit validated source semantics.
 - Gate: GM/co-GM writes; player reads/instantiates allowed templates; revoked/outside members get no catalog or cached data; independent character cannot attach; archive blocks new placement and preserves old instances.
 
 ### C. Derived campaign templates with inherited actions

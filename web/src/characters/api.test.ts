@@ -197,20 +197,6 @@ describe("createCharactersApi", () => {
     expect(client.fetch).toHaveBeenCalledWith("POST", "/characters/c-1/exports");
   });
 
-  it("previewMigration posts the target version body", async () => {
-    const client = makeClient();
-    const envelope = { preview: { previewId: "p-1", warnings: [] }, requestId: "r-1" };
-    client.fetch.mockResolvedValueOnce(envelope);
-    const api = createCharactersApi(client);
-    const body = { targetVersionId: "v-2", mappings: { ability: "strength" } };
-    await expect(api.previewMigration("c-1", body)).resolves.toBe(envelope);
-    expect(client.fetch).toHaveBeenCalledWith(
-      "POST",
-      "/characters/c-1/migration-previews",
-      { body },
-    );
-  });
-
   it("propagates a 401 ApiError from the transport", async () => {
     const client = makeClient();
     client.fetch.mockRejectedValueOnce(rejectWith({ code: "unauthorized", status: 401, message: "Authentication is required." }));
@@ -280,39 +266,6 @@ describe("createCharactersApi", () => {
     const api = createCharactersApi(client);
     const error = await api.send(request).catch((e: unknown) => e) as ApiError;
     expect(error.diagnostics).toEqual([{ code: "required", path: "/widgets", message: "Missing widget" }]);
-  });
-
-  it("send forwards a migration commit unchanged and never mints an idempotency key", async () => {
-    const client = makeClient();
-    const envelope = { result: { character: { characterId: "c-1" }, roll: null }, requestId: "r-1" };
-    client.fetch.mockResolvedValueOnce(envelope);
-    const api = createCharactersApi(client);
-    const commit: FrozenRequest = {
-      method: "POST",
-      path: "/characters/c-1/migrations/p-1/commit",
-      body: { expectedRevision: 3, idempotencyKey: "commit-key" },
-      firstAttemptAt: "2026-09-06T00:00:00.000Z",
-    };
-    await expect(api.send(commit)).resolves.toBe(envelope);
-    expect(client.fetch).toHaveBeenCalledWith("POST", commit.path, { body: commit.body });
-    expect(commit.body.idempotencyKey).toBe("commit-key");
-    expect(Object.keys(commit.body).sort()).toEqual(["expectedRevision", "idempotencyKey"]);
-  });
-
-  it("send forwards a migration rollback unchanged", async () => {
-    const client = makeClient();
-    const envelope = { result: { character: { characterId: "c-1" }, roll: null }, requestId: "r-1" };
-    client.fetch.mockResolvedValueOnce(envelope);
-    const api = createCharactersApi(client);
-    const rollback: FrozenRequest = {
-      method: "POST",
-      path: "/characters/c-1/migrations/m-1/rollback",
-      body: { idempotencyKey: "rollback-key" },
-      firstAttemptAt: "2026-09-06T00:00:00.000Z",
-    };
-    await api.send(rollback);
-    expect(client.fetch).toHaveBeenCalledWith("POST", rollback.path, { body: rollback.body });
-    expect(rollback.body.idempotencyKey).toBe("rollback-key");
   });
 
   it.each(["command_in_progress", "temporarily_unavailable"] as const)(

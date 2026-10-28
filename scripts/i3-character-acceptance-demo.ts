@@ -3,7 +3,7 @@
 // Walks the documented character HTTP surface end-to-end over real PostgreSQL:
 // sign-in -> publish a system version -> create/read/set/bump/roll/replay ->
 // revision race -> archive/recover -> activity -> export -> breaking publish ->
-// migration preview/commit/rollback -> ownership transfer -> expired-key
+// ownership transfer -> expired-key
 // rejection. Everything goes through Fastify `inject`, so the exact same route
 // definitions, auth hook, and response envelope the production bootstrap uses
 // are exercised. Status codes are printed per step and asserted against the
@@ -252,7 +252,6 @@ async function main(): Promise<void> {
       },
     });
     assertStatus(published2, 200, "POST /systems/{id}/publish (v2.0.0 acknowledged)");
-    const v2Id = published2.json().version.versionId as string;
 
     const pinned = await app.app.inject({
       method: "GET",
@@ -261,45 +260,15 @@ async function main(): Promise<void> {
     });
     assertStatus(pinned, 200, "GET /characters/{id} (still pinned to v1)");
     if (pinned.json().character.systemVersionId !== v1Id) {
-      throw new Error("pinned: character moved off v1 before migration");
+      throw new Error("pinned: character moved off v1 after publication");
     }
     console.log("INFO: character remains pinned to v1 after v2 publish");
-
-    const preview = await app.app.inject({
-      method: "POST",
-      url: `/characters/${characterId}/migration-previews`,
-      headers: cookieHeader(ada),
-      payload: { targetVersionId: v2Id, mappings: { ability: "ability_score" } },
-    });
-    assertStatus(preview, 201, "POST .../migration-previews");
-    const previewBody = preview.json().preview;
-    console.log(
-      `INFO: preview candidate=${JSON.stringify(previewBody.candidateState.values)} warnings=${JSON.stringify(previewBody.warnings)}`,
-    );
-
-    const commit = await app.app.inject({
-      method: "POST",
-      url: `/characters/${characterId}/migrations/${previewBody.previewId}/commit`,
-      headers: cookieHeader(ada),
-      payload: { expectedRevision: 6, idempotencyKey: `d-cm-${ts}` },
-    });
-    assertStatus(commit, 200, "POST .../migrations/{id}/commit");
-
-    const migrationId = await migrationIdFor(app, characterId);
-
-    const rollback = await app.app.inject({
-      method: "POST",
-      url: `/characters/${characterId}/migrations/${migrationId}/rollback`,
-      headers: cookieHeader(ada),
-      payload: { idempotencyKey: `d-rb-${ts}` },
-    });
-    assertStatus(rollback, 200, "POST .../migrations/{id}/rollback");
 
     const transfer = await app.app.inject({
       method: "POST",
       url: `/characters/${characterId}/ownership-transfer`,
       headers: cookieHeader(ada),
-      payload: { toUserId: bob.actorId, expectedRevision: 8, idempotencyKey: `d-tr-${ts}` },
+      payload: { toUserId: bob.actorId, expectedRevision: 6, idempotencyKey: `d-tr-${ts}` },
     });
     assertStatus(transfer, 200, "POST /characters/{id}/ownership-transfer (to Bob)");
 
@@ -317,7 +286,7 @@ async function main(): Promise<void> {
       method: "POST",
       url: `/characters/${characterId}/ownership-transfer`,
       headers: cookieHeader(ada),
-      payload: { toUserId: bob.actorId, expectedRevision: 8, idempotencyKey: `d-tr-${ts}` },
+      payload: { toUserId: bob.actorId, expectedRevision: 6, idempotencyKey: `d-tr-${ts}` },
     });
     assertStatus(transferReplay, 200, "POST .../ownership-transfer (old-owner replay)");
     const replayed = transferReplay.json().result.character.reconciliation.replayed;
@@ -362,14 +331,6 @@ async function systemIdFor(app: I3AppHandle, versionId: string): Promise<string>
     [versionId],
   );
   return result.rows[0]!.system_id;
-}
-
-async function migrationIdFor(app: I3AppHandle, characterId: string): Promise<string> {
-  const result = await app.pool.query<{ id: string }>(
-    "SELECT id FROM character_migrations WHERE character_id = $1 ORDER BY committed_at DESC LIMIT 1",
-    [characterId],
-  );
-  return result.rows[0]!.id;
 }
 
 main().catch((err: unknown) => {

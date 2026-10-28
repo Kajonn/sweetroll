@@ -7,8 +7,7 @@ import type { CharacterRecord } from "./persistence.js";
  * Builds the canonical `CharacterExportV1` document for one character record.
  *
  * The document excludes owner/actor/request/execution IDs and activity/roll
- * history per the export contract (design section 10). Migration lineage is
- * always empty in I3 because migration commit/rollback ship in a later slice.
+ * history per the export contract (design section 10).
  */
 export function buildCharacterExportDocument(
   record: CharacterRecord,
@@ -27,7 +26,6 @@ export function buildCharacterExportDocument(
     packageChecksum,
     revision: record.revision,
     state: record.state,
-    migrationLineage: [],
   };
 }
 
@@ -38,8 +36,8 @@ export function canonicalizeCharacterExport(document: CharacterExportV1): string
 
 /**
  * I6 Task 4: builds the export projection for an attached character from its
- * CURRENT record only. The document carries the live sheet state and an empty
- * migration lineage: pre-adoption personal history, campaign rolls and other
+ * CURRENT record only. The document carries the live sheet state: pre-adoption
+ * personal history, campaign rolls and other
  * actors' data are never embedded. Authorization (which campaign members may
  * export) is decided by campaign policy at the call site, not here.
  */
@@ -63,6 +61,5 @@ export function buildAttachedCharacterExportDocument(
     packageChecksum,
     revision: record.revision,
     state: record.state,
-    migrationLineage: [],
   };
 }

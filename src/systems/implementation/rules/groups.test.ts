@@ -128,7 +128,7 @@ describe("grammar 0.2 named groups", () => {
       "arithmetic_failure",
     );
   });
-  it("preserves legacy result shape and draw order", () => {
+  it("preserves plain dice result shape and deterministic draw order", () => {
     const compiled = compileExpression("2d6kh1 + d4", {
       ...opts,
       languageVersion: "0.1",

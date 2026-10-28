@@ -1,5 +1,7 @@
 # GUI integration implementation plan
 
+**Release-phase policy (2026-10-27):** [Design Section 17.0](../../../design_v2.md#170-release-status-and-application-version-policy) takes precedence over historical version-transition requirements. Before the first release tag, test the current frontend/API, current-format offline persistence, exact-request recovery and account isolation. Migration of old app data/cache schemas and coexistence with previous app-client/service-worker versions are required only after the first release tag for supported released versions; they do not block current increments or merge. Existing rules-system version functionality and browser-platform support are separate concerns.
+
 **Status (updated 2026-09-24):** Most G0–G6 implementation work, the G7 player/GM feature slices, G8 scenes/display, and the app-wide Tablefolk-inspired visual refresh have landed. Source mockup capture (G0), production sign-in (G6), and the unchecked G9 release gates remain open. Historical HTTP 401 checks (last recorded 2026-09-17) explain why the source capture is absent; they do not describe the current app palette.
 **Design authority:** [design_v2.md](../../../design_v2.md), especially Sections 10 and 17.  
 **Visual reference:** [Tablefolk GUI mockup](https://tablefolk-ttrpg-mockups.humdrumrat.chatgpt.site).  
@@ -203,6 +205,12 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 **Exit demonstration:** a GM uses monster sheets on a phone while an iPad displays an image; reveal and conceal fog, place and move a token, change scene, reconnect, and revoke the display. Inspect display network responses, storage, reload, and direct requests to prove GM originals and secrets are absent. Previously revealed information cannot be made unseen; conceal/revoke prevents subsequent access, not screenshots already taken. Repeat with a remote player viewing the same permitted scene.
 
 ## G9 — Release and acceptance gates
+
+The first release tag establishes the initial supported application/data baseline.
+It does not require migration from unreleased test builds. Subsequent releases
+add migration and compatibility gates for actually supported released versions
+under design Section 17.0. Current-app recovery, privacy and offline gates below
+still apply.
 
 *Reconciled 2026-09-17 (hardening remainder, commits `3949820`–`484e282`): no G9 box closed by this plan — single-artifact serving is locally verified only (sign-in return + offline shell reopening unexercised), devices/playtests/mockup/production-auth stay open per `docs/acceptance/i7-2026-09-17-hardening-remainder.md` and `docs/acceptance/g9-2026-09-17-device-playtest.md`.*
 

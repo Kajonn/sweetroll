@@ -130,8 +130,7 @@ expect(sentRequests).toHaveLength(0);
 **Consumes:** Frozen requests, existing online-attempt storage, identity/lock ports and Task 2 recovery guards.
 **Produces:** One ordering boundary for edit/action/lifecycle/migration attempts, guarded atomic online acknowledgment and explicit expired-attempt review.
 
-- [ ] Reproduce an archive and migration commit that succeeds on the server but loses its response. Reopen a session with that durable attempt and a newer local intention. Assert exact replay occurs before a fresh-state decision or any newer command.
-- [ ] Prove the backend contract: a completed migration commit is replayable by the original key even if a newer preview exists. Use existing backend tests or add a narrowly scoped integration regression; do not infer behavior from preview expiry alone.
+- [ ] Reproduce an archive operation that succeeds on the server but loses its response. Reopen a session with that durable attempt and a newer local intention. Assert exact replay occurs before a fresh-state decision or any newer command.
 - [ ] Add tests showing that obtaining a new preview does not delete or replace an unresolved commit attempt; neither does a fresh GET, timeout, 401, unexpected 500 or elapsed 30 days.
 
 ```ts
@@ -148,7 +147,7 @@ expect(newerMutationRequests).toHaveLength(0);
 - [ ] Enforce the spec error matrix: `command_in_progress`/temporary unavailable back off with the same request; unexpected 500 pauses with retry guidance; idempotency mismatch is a protocol stop; 401 requires the same account; purge deletes all applicable private records and hides their contents.
 - [ ] For locally aged attempts and backend replay-window-expired conflicts, retain the attempt, fetch current authorized state and block ordinary recovery/new sends. If refresh fails, do not pretend a fresh review base exists. Require the explicit unknown-outcome command before retiring an expired attempt; do not automatically create a replacement mutation.
 - [ ] Test explicit expiry review cannot execute while offline, stale, under another account, after purge, or while an unexpired uncertain attempt still has a resolvable outcome. Test that an unrelated review does not remove other attempts.
-- [ ] Preserve migration IDs/results and authoritative action results for later UI consumption. Keep online operations distinct from offline-only intentions.
+- [ ] Preserve authoritative action results for later UI consumption. Keep online operations distinct from offline-only intentions.
 - [ ] Run focused/full web tests and both relevant contract/type checks. If backend schemas change, run `npm run contracts:generate`, `npm run contracts:check` and backend integration tests. Optional checkpoint: `fix: retain and resolve uncertain character operations`.
 
 ## Task 4: Close Creation Identity, Persistence and Expiry Races
@@ -182,7 +181,7 @@ expect(newerMutationRequests).toHaveLength(0);
 - [ ] Render authoritative action expression/total/audience/dice/bindings from Task 3 result state. Explain disabled action reasons persistently, not via a hover-only title. No automatic application of roll outcomes.
 - [ ] Run all web tests/typecheck and check keyboard/ARIA/live-status behavior. Optional checkpoint: `fix: render truthful character sync and ordered estimates`.
 
-## Task 6: Complete Recovery, Activity and Migration Panels
+## Task 6: Complete Recovery and Activity Panels
 
 **Files:** `web/src/characters/ConflictReview.tsx`, `ConflictReview.test.tsx`, `CharacterTools.tsx`, `CharacterTools.test.tsx`, `dialogTrap.ts`, `session.ts`, `store.ts`, their tests, `web/src/i18n/messages.ts`.
 
@@ -191,11 +190,9 @@ expect(newerMutationRequests).toHaveLength(0);
 
 - [ ] Add component/session integration tests for correction of an invalid field with a new key, partial selection retaining unselected review, explicit dependent-change explanation, repeated conflict, and unknown-outcome warning before expired-attempt review. Keep unexpired uncertain attempts out of ordinary discard/reapply.
 - [ ] Add activity tests: open/fetch page, close, go offline, reopen and see the last fetched page marked stale with useful event kind/summary/time. Paginate using server cursors without duplicates; purge/sign-out removes cached activity. Never cache it in the service worker.
-- [ ] Add migration tests: preview disabled while offline or queued/blocked; candidate values/warnings visible; stale/expired server response requires a new preview and renewed confirmation; unresolved previous commit blocks newer commit; successful commit exposes its authoritative migration ID for rollback without manual guessing.
 - [ ] Add export tests checking online/owner/queue/outcome gates and downloaded JSON equals the documented server document, not an overlay. Include pending online attempts, not just edit entries. Restore focus and clean URLs/anchors after success or failure.
 - [ ] Run focused tests red, then implement the activity cache contract with identity/purge guards. Reuse existing projected labels and safe event metadata instead of displaying raw IDs alone.
 - [ ] Implement invalid correction controls using projected supported field constraints and Task 2's atomic replacement. A disabled Reapply button without a correction path is not completion of the requirement.
-- [ ] Complete migration preview refresh, commit result retention and rollback selection. Do not invent migration IDs or bypass server rollback limits. All mutations go through the session's unified ordering; read-only APIs still honor online/account state.
 - [ ] Trap and restore dialog focus, including focus starting outside; localize failure fallbacks. Keep touch targets at least 44x44 at phone width.
 - [ ] Run focused/full web tests and typecheck. Optional checkpoint: `fix: complete character recovery and management panels`.
 
@@ -206,7 +203,7 @@ expect(newerMutationRequests).toHaveLength(0);
 **Consumes:** Reviewed Tasks 2-6; identity/store/session/coordination lifetime from existing browser adapters.
 **Produces:** Reachable creation, action, conflict/error review, takeover and management workflows through `/characters/$characterId`.
 
-- [ ] Write route tests that navigate through the actual router/provider composition rather than rendering tools alone. Assert users can invoke an authored action, see a roll result, open tools, export, archive/recover, preview/commit/rollback and resolve a simulated conflict.
+- [ ] Write route tests that navigate through the actual router/provider composition rather than rendering tools alone. Assert users can invoke an authored action, see a roll result, open tools, export, archive/recover, resolve a simulated conflict.
 - [ ] Add an explicit takeover-control test for a read-only second tab. Unsupported Web Locks must show a reason and remain read-only. Do not substitute closing the first page for requesting takeover.
 - [ ] Add null-identity/account-switch/unmount tests proving no empty-actor session opens, no private cached screen flashes and no duplicate senders/channels survive StrictMode/navigation.
 - [ ] Run route tests red. Compose the pure sheet with callbacks from the existing session, mount `CharacterTools`, and conditionally mount the review/error surfaces using the structured session state. Make all listed workflows reachable from visible controls.
@@ -246,7 +243,7 @@ await route.abort("failed");
 // A later matching request must carry the exact original body/key.
 ```
 
-- [ ] Repeat unknown-outcome proof for archive or migration across a page restart. Confirm a newer mutation cannot overtake it and a new preview does not erase its request. Test expiry/manual review separately using persisted timestamps/controlled fixtures, not by weakening backend retention policy.
+- [ ] Repeat unknown-outcome proof for archive operation across a page restart. Confirm a newer mutation cannot overtake it. Test expiry/manual review separately using persisted timestamps/controlled fixtures, not by weakening backend retention policy.
 - [ ] Test actual two-page Web Lock takeover via the visible request control while a response is uncertain. Keep the original owner open until it quiesces; assert never two owners/senders. Also preserve the owner-termination recovery test.
 - [ ] Test logout/account switch during delayed creation persistence/send/result, cached-owner revocation after offline edits, storage transaction failure during reapply, cold missing-cache visits and actual second-build worker activation with queued writes. Verify no private data in CacheStorage or after purge.
 - [ ] Capture screenshots and run axe/keyboard/no-horizontal-overflow checks for all three systems at 360 and 1280px. Store durable evidence outside Playwright's repeatedly cleared results directory, with meaningful filenames/build IDs. Do not indiscriminately rebaseline visual failures.
@@ -287,7 +284,7 @@ The integration command must have a real `TEST_DATABASE_URL` exported: skipped d
 
 All of the following must be true before reporting success:
 
-- [x] A signed-in user can create, complete, edit, bump, roll, review conflicts, request takeover, view activity, archive/recover, export and migrate/rollback using actual application controls.
+- [x] A signed-in user can create, complete, edit, bump, roll, review conflicts, request takeover, view activity, archive/recover, export using actual application controls.
 - [x] Only explicitly reviewed selections are reapplied; unselected intentions never acquire a new external base silently.
 - [x] Recovery and online acknowledgment are transactional; injected failures and restarts do not lose pending work or resurrect purged data.
 - [x] Every unresolved attempted operation retains its immutable request and blocks newer commands until replay or explicit expired-outcome review resolves the local decision.

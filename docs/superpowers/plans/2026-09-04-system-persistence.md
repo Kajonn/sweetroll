@@ -29,7 +29,7 @@
 ### Task 1: Systems Schema Migration And Repository
 
 **Files:**
-- Create: `migrations/0002_create_systems.sql`
+- Modify: `database/schema.sql`
 - Create: `src/systems/implementation/persistence/repository.ts`
 - Create: `src/systems/implementation/persistence/index.ts` (barrel)
 - Create: `tests/integration/system-persistence.test.ts`
@@ -40,7 +40,7 @@
 
 - [x] **Step 1: Write the systems schema migration**
 
-Create `migrations/0002_create_systems.sql`:
+Update `database/schema.sql`:
 
 ```sql
 CREATE TABLE systems (
@@ -194,7 +194,7 @@ Expected: PASS with the repository cases.
 
 - [x] **Step 6: Run the real migration against the compose database**
 
-Run: `docker compose up -d --wait postgres` then `DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run migrate`
+Run: `docker compose up -d --wait postgres` then `DATABASE_URL=postgres://sweetroll:sweetroll@localhost:5432/sweetroll npm run db:init`
 
 Expected: `database migrations complete`; the five new tables exist.
 
@@ -207,6 +207,6 @@ Expected: all suites green; typecheck and build exit 0.
 - [x] **Step 8: Commit**
 
 ```bash
-git add migrations/0002_create_systems.sql src/systems/implementation/persistence/ tests/integration/system-persistence.test.ts
+git add database/schema.sql src/systems/implementation/persistence/ tests/integration/system-persistence.test.ts
 git commit -m "feat: add system authoring persistence"
 ```

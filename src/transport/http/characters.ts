@@ -310,18 +310,6 @@ const ActivityEventDto = Type.Object({
   occurredAt: Type.String({ format: DATE_TIME_FORMAT }),
 });
 
-const MigrationPreviewDto = Type.Object({
-  previewId: Type.String(),
-  characterId: Type.String({ format: UUID_FORMAT }),
-  sourceRevision: Type.Integer(),
-  sourceVersionId: Type.String({ format: UUID_FORMAT }),
-  targetVersionId: Type.String({ format: UUID_FORMAT }),
-  candidateState: RuntimeStateDto,
-  candidateProjection: ProjectionDto,
-  warnings: Type.Array(Type.String()),
-  expiresAt: Type.String({ format: DATE_TIME_FORMAT }),
-});
-
 const CharacterExportDto = Type.Object({
   schemaVersion: Type.Literal("1.0"),
   mediaType: Type.Literal("application/vnd.sweetroll.character+json;version=1"),
@@ -335,13 +323,6 @@ const CharacterExportDto = Type.Object({
   packageChecksum: Type.String(),
   revision: Type.Integer(),
   state: RuntimeStateDto,
-  migrationLineage: Type.Array(
-    Type.Object({
-      fromVersionId: Type.String({ format: UUID_FORMAT }),
-      toVersionId: Type.String({ format: UUID_FORMAT }),
-      committedAt: Type.String({ format: DATE_TIME_FORMAT }),
-    }),
-  ),
 });
 
 const CharacterErrorEnvelope = Type.Object({
@@ -427,14 +408,6 @@ const ExecuteActionParams = Type.Object({
 const EntryIdParams = Type.Object({
   characterId: Type.String({ format: UUID_FORMAT }),
   entryId: Type.String({ minLength: 1 }),
-});
-const CommitMigrationParams = Type.Object({
-  characterId: Type.String({ format: UUID_FORMAT }),
-  previewId: Type.String({ minLength: 1 }),
-});
-const RollbackMigrationParams = Type.Object({
-  characterId: Type.String({ format: UUID_FORMAT }),
-  migrationId: Type.String({ minLength: 1 }),
 });
 
 const SetFieldBody = Type.Object({
@@ -538,18 +511,6 @@ const TransferOwnershipBody = Type.Object({
   idempotencyKey: Type.String({ minLength: 1 }),
 });
 const DuplicateCharacterBody = Type.Object({
-  idempotencyKey: Type.String({ minLength: 1 }),
-});
-const CreateMigrationPreviewBody = Type.Object({
-  targetVersionId: Type.String({ format: UUID_FORMAT }),
-  mappings: Type.Optional(Type.Object({}, { additionalProperties: true })),
-  defaults: Type.Optional(Type.Object({}, { additionalProperties: true })),
-});
-const CommitMigrationBody = Type.Object({
-  expectedRevision: Type.Integer(),
-  idempotencyKey: Type.String({ minLength: 1 }),
-});
-const RollbackMigrationBody = Type.Object({
   idempotencyKey: Type.String({ minLength: 1 }),
 });
 
@@ -816,45 +777,6 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
         "404": CharacterErrorEnvelope,
         "500": CharacterErrorEnvelope,
         "503": CharacterErrorEnvelope,
-      },
-    },
-  },
-  {
-    method: "post",
-    path: "/characters/:characterId/migration-previews",
-    operationId: "post_characters_characterId_migration_previews",
-    schema: {
-      params: CharacterIdParams,
-      body: CreateMigrationPreviewBody,
-      response: {
-        "201": Type.Object({ preview: MigrationPreviewDto, requestId: Type.String() }),
-        ...ErrorResponses,
-      },
-    },
-  },
-  {
-    method: "post",
-    path: "/characters/:characterId/migrations/:previewId/commit",
-    operationId: "post_characters_characterId_migrations_previewId_commit",
-    schema: {
-      params: CommitMigrationParams,
-      body: CommitMigrationBody,
-      response: {
-        "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
-        ...ErrorResponses,
-      },
-    },
-  },
-  {
-    method: "post",
-    path: "/characters/:characterId/migrations/:migrationId/rollback",
-    operationId: "post_characters_characterId_migrations_migrationId_rollback",
-    schema: {
-      params: RollbackMigrationParams,
-      body: RollbackMigrationBody,
-      response: {
-        "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
-        ...ErrorResponses,
       },
     },
   },
@@ -1293,48 +1215,6 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         // Pre-serialize as a Buffer so the vendor content-type isn't rewritten to
         // include Fastify's default `; charset=utf-8`.
         return Buffer.from(JSON.stringify(document), "utf8");
-      },
-
-      post_characters_characterId_migration_previews: async (request, reply) => {
-        const params = request.params as { characterId: string };
-        const body = request.body as {
-          targetVersionId: string;
-          mappings?: Record<string, string>;
-          defaults?: Record<string, unknown>;
-        };
-        const result = await characters.previewMigration(ctxOf(request), {
-          characterId: params.characterId,
-          targetVersionId: body.targetVersionId,
-          ...(body.mappings === undefined ? {} : { mappings: body.mappings }),
-          ...(body.defaults === undefined ? {} : { defaults: body.defaults }),
-        });
-        if (!result.ok) return sendError(reply, result.error, request.id);
-        return reply.code(201).send({ preview: result.value, requestId: request.id });
-      },
-
-      post_characters_characterId_migrations_previewId_commit: async (request, reply) => {
-        const params = request.params as { characterId: string; previewId: string };
-        const body = request.body as { expectedRevision: number; idempotencyKey: string };
-        const result = await characters.commitMigration(ctxOf(request), {
-          characterId: params.characterId,
-          previewId: params.previewId,
-          expectedRevision: body.expectedRevision,
-          idempotencyKey: body.idempotencyKey,
-        });
-        if (!result.ok) return sendError(reply, result.error, request.id);
-        return { result: toCommandResultDto(result.value), requestId: request.id };
-      },
-
-      post_characters_characterId_migrations_migrationId_rollback: async (request, reply) => {
-        const params = request.params as { characterId: string; migrationId: string };
-        const body = request.body as { idempotencyKey: string };
-        const result = await characters.rollbackMigration(ctxOf(request), {
-          characterId: params.characterId,
-          migrationId: params.migrationId,
-          idempotencyKey: body.idempotencyKey,
-        });
-        if (!result.ok) return sendError(reply, result.error, request.id);
-        return { result: toCommandResultDto(result.value), requestId: request.id };
       },
     };
 

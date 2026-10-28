@@ -114,121 +114,26 @@ describeWithDatabase("reference template seeding", () => {
     }
   });
 
-  it("repairs rows whose stored package drifted from the fixture", async () => {
-    const template = REFERENCE_TEMPLATES[0];
-    expect(template).toBeDefined();
-    await pool.query(
-      "INSERT INTO systems (id, owner_id, name, access, lifecycle, created_at, updated_at) VALUES ($1, NULL, 'Template: d20', 'link', 'active', now(), now())",
-      [template?.systemId],
-    );
-    await pool.query(
-      "INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at) VALUES ($1, $2, '1.0.0', 'pending:d20', '{}'::jsonb, 'Template seed', 'published', now())",
-      [template?.versionId, template?.systemId],
-    );
-    const result = await seedReferenceTemplates(pool);
-    expect(result.versionsReplaced).toBeGreaterThanOrEqual(1);
-    const row = (
-      await pool.query<{ package_json: { versionId: string; systemId: string } }>(
-        "SELECT package_json FROM system_versions WHERE id = $1",
-        [template?.versionId],
-      )
-    ).rows[0];
-    expect(row?.package_json.versionId).toBe(template?.versionId);
-    expect(row?.package_json.systemId).toBe(template?.systemId);
+  it("seeds once and preserves existing immutable versions on subsequent boots", async () => {
+    expect(await seedReferenceTemplates(pool)).toEqual({ systemsInserted: 3, versionsInserted: 3 });
+    const before = (await pool.query("SELECT * FROM system_versions ORDER BY id")).rows;
+    expect(await seedReferenceTemplates(pool)).toEqual({ systemsInserted: 0, versionsInserted: 0 });
+    expect((await pool.query("SELECT * FROM system_versions ORDER BY id")).rows).toEqual(before);
   });
-});
 
-/**
- * Task 11 I4 (TDD): repair-by-delete is RESTRICT-unsafe once characters or
- * migration rows reference a drifted template row. The seeder must skip the
- * repair (log + keep the old row) instead of DELETEing a referenced version.
- * Runs against a fake runner so no database is required. Probes must pass
- * the drifted row's own versionId as $1 (per-versionId arguments).
- */
-describe("reference template seeder RESTRICT guard", () => {
-  type ProbeCall = { text: string; params: unknown[] };
-
-  function makeFake(targetVersionId: string, hitOn: "characters" | "previews" | "migrations") {
-    const calls: ProbeCall[] = [];
-    const fakeRunner = {
-      async query(text: string, params?: unknown[]) {
-        calls.push({ text, params: params ?? [] });
-        if (text.startsWith("INSERT INTO systems")) return { rowCount: 0, rows: [] };
-        if (text.startsWith("SELECT id, checksum")) {
-          const versionId = params?.[0] as string;
-          const tpl = REFERENCE_TEMPLATES.find(t => t.versionId === versionId);
-          if (tpl !== undefined && versionId === targetVersionId) {
-            return { rowCount: 1, rows: [{ id: versionId, checksum: "pending:drift", package_json: {} }] };
-          }
-          if (tpl !== undefined) {
-            return {
-              rowCount: 1,
-              rows: [{
-                id: versionId,
-                checksum: tpl.package.integrity.checksum,
-                package_json: { versionId: tpl.versionId, systemId: tpl.systemId },
-              }],
-            };
-          }
-          return { rowCount: 0, rows: [] };
-        }
-        if (text.includes("FROM characters WHERE system_version_id")) {
-          const hit = hitOn === "characters" && params?.[0] === targetVersionId;
-          return { rowCount: hit ? 1 : 0, rows: hit ? [{ one: 1 }] : [] };
-        }
-        if (text.includes("FROM character_migration_previews")) {
-          const hit = hitOn === "previews" && params?.[0] === targetVersionId;
-          return { rowCount: hit ? 1 : 0, rows: hit ? [{ one: 1 }] : [] };
-        }
-        if (text.includes("FROM character_migrations")) {
-          const hit = hitOn === "migrations" && params?.[0] === targetVersionId;
-          return { rowCount: hit ? 1 : 0, rows: hit ? [{ one: 1 }] : [] };
-        }
-        throw new Error(`unexpected query: ${text}`);
-      },
-    };
-    return { calls, fakeRunner };
-  }
-
-  async function expectSkipOnReference(hitOn: "characters" | "previews" | "migrations") {
+  it("does not rewrite existing template content when the fixture changes", async () => {
     const template = REFERENCE_TEMPLATES[0]!;
-    const { calls, fakeRunner } = makeFake(template.versionId, hitOn);
-    // eslint-disable-next-line no-console
-    const warn = console.warn;
-    const warnings: unknown[][] = [];
-    // eslint-disable-next-line no-console
-    console.warn = (...args: unknown[]) => void warnings.push(args);
-    try {
-      const result = await seedReferenceTemplates(fakeRunner as never);
-      expect(result.versionsReplaced).toBe(0);
-    } finally {
-      // eslint-disable-next-line no-console
-      console.warn = warn;
-    }
-    expect(calls.some(c => c.text.startsWith("DELETE FROM system_versions"))).toBe(false);
-    const tableFragment =
-      hitOn === "characters"
-        ? "FROM characters WHERE system_version_id"
-        : hitOn === "previews"
-          ? "FROM character_migration_previews"
-          : "FROM character_migrations";
-    const probeCalls = calls.filter(c => c.text.includes(tableFragment));
-    expect(probeCalls.length).toBeGreaterThanOrEqual(1);
-    // Per-versionId probe arguments: every probe carries the drifted row's own versionId as $1.
-    for (const probe of probeCalls) expect(probe.params[0]).toBe(template.versionId);
-    expect(probeCalls.some(c => c.params[0] === template.versionId)).toBe(true);
-    expect(warnings.length).toBeGreaterThanOrEqual(1);
-  }
-
-  it("skips repair when characters reference the drifted version", async () => {
-    await expectSkipOnReference("characters");
-  });
-
-  it("skips repair when migration previews reference the drifted version", async () => {
-    await expectSkipOnReference("previews");
-  });
-
-  it("skips repair when migrations reference the drifted version", async () => {
-    await expectSkipOnReference("migrations");
+    await pool.query(
+      "INSERT INTO systems (id, name) VALUES ($1, 'Existing template')",
+      [template.systemId],
+    );
+    await pool.query(
+      `INSERT INTO system_versions (id, system_id, semantic_version, checksum, package_json)
+       VALUES ($1, $2, '1.0.0', 'existing-checksum', '{"existing":true}'::jsonb)`,
+      [template.versionId, template.systemId],
+    );
+    const before = (await pool.query("SELECT * FROM system_versions WHERE id = $1", [template.versionId])).rows;
+    await seedReferenceTemplates(pool);
+    expect((await pool.query("SELECT * FROM system_versions WHERE id = $1", [template.versionId])).rows).toEqual(before);
   });
 });

@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Dev-server E2E only (`web/playwright.config.ts`): backend `npm run migrate && npm run dev:http` + `web:dev`, Chromium, serial workers. Do not touch the manual-test app ports/DB; honor `BACKEND_PORT`/`WEB_PORT` overrides.
+- Dev-server E2E only (`web/playwright.config.ts`): backend `npm run db:init && npm run dev:http` + `web:dev`, Chromium, serial workers. Do not touch the manual-test app ports/DB; honor `BACKEND_PORT`/`WEB_PORT` overrides.
 - `SWEETROLL_TEST_AUTH` stays unset in this plan (dev-server config renders the real dev sign-in panel; no escape hatch needed).
 - Copyright: game mechanics are not copyrightable but WotC's expressive text is. Do NOT paste text from the Basic Rules PDF into the repo. Write all names/descriptions in original wording, or quote SRD 5.1 (CC-BY-4.0) with attribution. The journey fixture is test-only and is never a shipped launch template (`OD-08` stays open).
 - Grammar v0.1 only: use expression constructs proven in `src/systems/implementation/package/fixtures/d20.ts` (d20/d6 rolls, binary arithmetic, `floor`, resource-delta bumps). No reroll/explode/custom faces (`OD-04` deferred).

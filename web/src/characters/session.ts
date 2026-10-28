@@ -7,7 +7,6 @@ import type {
   CommandResultResponse,
   EditIntent,
   FrozenRequest,
-  LastMigrationResult,
   QueueEntry,
   ResolveConflictInput,
   ReviewExpiredAttemptInput,
@@ -88,10 +87,8 @@ export type CharacterSnapshot = {
   lastRoll: CommandResultResponse["result"]["roll"];
   /** The latest confirmed nominal action, returned by the server after acknowledgment. */
   lastNominal: CommandResultResponse["result"]["nominal"];
-  /** The latest successful migration commit/rollback, kept for later UI use. */
-  lastMigration: LastMigrationResult | null;
   /**
-   * Unresolved per-character online attempts (archive/recover/migration).
+   * Unresolved per-character online attempts (archive/recover).
    * They replay verbatim before any newer command; only explicit
    * unknown-outcome review retires an expired one.
    */
@@ -123,8 +120,6 @@ export type CharacterSession = {
   resolveConflict(input: ResolveConflictInput): Promise<void>;
   archive(): Promise<void>;
   recover(): Promise<void>;
-  commitMigration(previewId: string): Promise<void>;
-  rollbackMigration(migrationId: string): Promise<void>;
   /**
    * Explicit unknown-outcome review for one retained expired online attempt.
    * Never retries the stored request and never mints a replacement: it
@@ -235,7 +230,6 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   let error: BlockingError | null = null;
   let lastRoll: CommandResultResponse["result"]["roll"] = null;
   let lastNominal: CommandResultResponse["result"]["nominal"] = null;
-  let lastMigration: LastMigrationResult | null = null;
   let editing: { owned: boolean; owner: string | null } = { owned: coordination.isOwner(), owner: null };
   let disposed = false;
   /** In-flight online sends/reviews, awaited by the ownership quiesce hook. */
@@ -293,7 +287,6 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       connected: isConnected(),
       lastRoll: visible ? lastRoll : null,
       lastNominal: visible ? lastNominal : null,
-      lastMigration: visible ? lastMigration : null,
       pendingOnlineAttempts: visible ? pendingOnline.map((a) => ({ ...a, request: { ...a.request, body: { ...a.request.body } } })) : [],
     };
   }
@@ -510,7 +503,6 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     pendingOnline = [];
     lastRoll = null;
     lastNominal = null;
-    lastMigration = null;
     editing = { owned: false, owner: null };
     if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
     setBlocked("purged", "This character is no longer available.");
@@ -751,7 +743,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         await fetchLatestForConflict();
         return "blocked";
       }
-      // One ordering boundary across edit/action/lifecycle/migration
+      // One ordering boundary across edit/action/lifecycle
       // attempts: an unresolved online attempt replays verbatim before any
       // fresh-state decision can reinterpret it or any newer command sends.
       await refreshPendingOnline();
@@ -1064,20 +1056,10 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     scheduleDrain();
   }
 
-  type OnlineOperation =
-    | { kind: "archive" | "recover"; operation: "archive" | "recover" }
-    | { kind: "migration"; operation: "commit"; previewId: string }
-    | { kind: "migration"; operation: "rollback"; migrationId: string };
+  type OnlineOperation = { kind: "archive" | "recover"; operation: "archive" | "recover" };
 
   function onlineAttemptMatches(attempt: OnlineAttempt, op: OnlineOperation): boolean {
-    if (attempt.characterId !== characterId) return false;
-    if (op.operation === "commit") {
-      return attempt.kind === "migration" && attempt.request.path === `/characters/${characterId}/migrations/${op.previewId}/commit`;
-    }
-    if (op.operation === "rollback") {
-      return attempt.kind === "migration" && attempt.request.path === `/characters/${characterId}/migrations/${op.migrationId}/rollback`;
-    }
-    return attempt.kind === op.operation;
+    return attempt.characterId === characterId && attempt.kind === op.operation;
   }
 
   function isOnlineAttemptExpired(attempt: OnlineAttempt): boolean {
@@ -1086,7 +1068,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   /**
-   * One ordering boundary across edit/action/lifecycle/migration attempts:
+   * One ordering boundary across edit/action/lifecycle attempts:
    * the session keeps every unresolved per-character online attempt in
    * memory (loaded at startup and ownership acquisition, refreshed before
    * every drain pass and online operation) and replays the oldest verbatim
@@ -1162,18 +1144,6 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
   }
 
-  function migrationResultFor(attempt: OnlineAttempt, character: CharacterView): LastMigrationResult | null {
-    const commit = new RegExp(`^/characters/${characterId}/migrations/(.+)/commit$`).exec(attempt.request.path);
-    if (attempt.kind === "migration" && commit !== null) {
-      return { operation: "commit", previewId: commit[1]!, revision: character.reconciliation.revision };
-    }
-    const rollback = new RegExp(`^/characters/${characterId}/migrations/(.+)/rollback$`).exec(attempt.request.path);
-    if (attempt.kind === "migration" && rollback !== null) {
-      return { operation: "rollback", migrationId: rollback[1]!, revision: character.reconciliation.revision };
-    }
-    return null;
-  }
-
   function buildOnlineRequest(op: OnlineOperation, expectedRevision: number): FrozenRequest {
     const firstAttemptAt = now();
     const key = newId();
@@ -1182,22 +1152,6 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         method: "PATCH",
         path: `/characters/${characterId}`,
         body: { command: op.operation, expectedRevision, idempotencyKey: key },
-        firstAttemptAt,
-      };
-    }
-    if (op.operation === "commit") {
-      return {
-        method: "POST",
-        path: `/characters/${characterId}/migrations/${op.previewId}/commit`,
-        body: { expectedRevision, idempotencyKey: key },
-        firstAttemptAt,
-      };
-    }
-    if (op.operation === "rollback") {
-      return {
-        method: "POST",
-        path: `/characters/${characterId}/migrations/${op.migrationId}/rollback`,
-        body: { idempotencyKey: key },
         firstAttemptAt,
       };
     }
@@ -1211,7 +1165,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (!confirmed) throw new Error("Cannot manage until the character is loaded.");
     if (!isConnected()) {
       throw structuredError(
-        "Lifecycle, migration and export operations require connectivity and cannot be initiated offline.",
+        "Lifecycle and export operations require connectivity and cannot be initiated offline.",
         "network-unavailable",
       );
     }
@@ -1424,8 +1378,6 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     // Authoritative action results survive later online acknowledgments: only
     // a non-null roll replaces the retained one (online ops return null).
     if (response.result.roll !== null && response.result.roll !== undefined) lastRoll = response.result.roll;
-    const migration = migrationResultFor(attempt, character);
-    if (migration !== null) lastMigration = migration;
     generation += 1;
     transientFailures = 0;
     needsFresh = false;
@@ -1477,7 +1429,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (older !== null) {
       // One ordering boundary across command kinds: an unresolved attempt
       // replays verbatim before any newer command. A newer preview, lifecycle
-      // change or migration never deletes or replaces it.
+      // change never deletes or replaces it.
       if (isReviewableExpired(older)) {
         await enterExpiredAttempt(older);
         await refreshPendingOnline();
@@ -1923,14 +1875,6 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     },
     async recover(): Promise<void> {
       await runOnlineOperation({ kind: "recover", operation: "recover" });
-    },
-    async commitMigration(previewId: string): Promise<void> {
-      if (typeof previewId !== "string" || previewId.length === 0) throw new Error("A migration preview is required.");
-      await runOnlineOperation({ kind: "migration", operation: "commit", previewId });
-    },
-    async rollbackMigration(migrationId: string): Promise<void> {
-      if (typeof migrationId !== "string" || migrationId.length === 0) throw new Error("A migration ID is required.");
-      await runOnlineOperation({ kind: "migration", operation: "rollback", migrationId });
     },
     reviewExpiredAttempt(input) {
       return trackOnline(reviewExpiredAttemptInner(input));

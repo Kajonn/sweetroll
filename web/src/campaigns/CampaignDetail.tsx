@@ -97,8 +97,6 @@ export function CampaignDetail(props: {
   navigation?: { onOpenCharacter: (characterId: string) => void };
   metadataApi?: CampaignCharacterMetadataApi;
   charactersApi?: SessionBoardProps["charactersApi"];
-  /** Creation-versions catalog handle threaded to the GM Upgrade section. */
-  versionsApi?: Pick<CharactersApi, "listCreationVersions">;
   generation?: number;
   online?: boolean;
 }) {
@@ -378,7 +376,6 @@ export function CampaignDetail(props: {
                   content: (
                     <CampaignSettingsView
                       api={props.api}
-                      versionsApi={props.versionsApi}
                       campaign={campaign}
                       actorId={props.actorId}
                       generation={generation}

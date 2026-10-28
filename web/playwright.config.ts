@@ -37,7 +37,7 @@ export default defineConfig({
   use: { baseURL: `http://localhost:${webPort}`, trace: "retain-on-failure" },
   webServer: [
     {
-      command: "npm run migrate && npm run dev:http",
+      command: "npm run db:init && npm run dev:http",
       url: `http://localhost:${backendPort}/health/ready`,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,

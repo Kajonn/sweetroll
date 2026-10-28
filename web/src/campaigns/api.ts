@@ -12,8 +12,6 @@ import type {
   CampaignViewResponse,
   ChangeMemberRoleBody,
   ClaimableCharacterListResponse,
-  CommitUpgradeBody,
-  CommitUpgradeResponse,
   CreateCampaignBody,
   CreateCampaignResponse,
   CreateContentBody,
@@ -41,8 +39,6 @@ import type {
   PlaceTokenResponse,
   PreviewContentBody,
   PreviewContentResponse,
-  PreviewUpgradeBody,
-  PreviewUpgradeResponse,
   RecoverContentBody,
   RedeemDisplayBody,
   RedeemDisplayResponse,
@@ -126,8 +122,6 @@ export type CampaignsApi = {
   recoverContent(contentId: string, body: RecoverContentBody): Promise<unknown>;
   replaceContentGrants(contentId: string, body: ReplaceGrantsBody): Promise<unknown>;
   previewContent(campaignId: string, body: PreviewContentBody): Promise<PreviewContentResponse>;
-  previewUpgrade(campaignId: string, body: PreviewUpgradeBody): Promise<PreviewUpgradeResponse>;
-  commitUpgrade(campaignId: string, body: CommitUpgradeBody): Promise<CommitUpgradeResponse>;
   uploadImage(campaignId: string, body: UploadImageBody): Promise<UploadImageResponse>;
   deleteImage(campaignId: string, fileId: string, body: DeleteImageBody): Promise<DeleteImageResponse>;
   createScene(campaignId: string, body: CreateSceneBody): Promise<CreateSceneResponse>;
@@ -243,10 +237,6 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
       client.fetch("POST", `/content/${contentId}/grants`, { body }),
     previewContent: (campaignId, body) =>
       client.fetch<PreviewContentResponse>("POST", `/campaigns/${campaignId}/content-preview`, { body }),
-    previewUpgrade: (campaignId, body) =>
-      client.fetch<PreviewUpgradeResponse>("POST", `/campaigns/${campaignId}/upgrade-previews`, { body }),
-    commitUpgrade: (campaignId, body) =>
-      client.fetch<CommitUpgradeResponse>("POST", `/campaigns/${campaignId}/upgrade-commits`, { body }),
     uploadImage: (campaignId, body) =>
       client.fetch<UploadImageResponse>("POST", `/campaigns/${campaignId}/images`, { body }),
     deleteImage: (campaignId, fileId, body) =>

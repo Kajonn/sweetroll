@@ -7,6 +7,28 @@ let counter = 0;
 let dbName = "sweetroll-test-store";
 const initialGuard = { generation: 0, accountGeneration: 0 };
 
+it("creates the current offline stores without a historical version upgrade", async () => {
+  const name = crypto.randomUUID();
+  const store = await openCharacterStore(name);
+  await store.close();
+  const db = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(name);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  try {
+    expect(db.version).toBe(1);
+    expect([...db.objectStoreNames]).toEqual([
+      "activity", "characters", "entryTemplates", "lastAccount", "onlineAttempts", "pendingLogout", "queue",
+    ]);
+    expect(db.transaction("queue").objectStore("queue").index("by-seq").keyPath).toEqual([
+      "actorId", "characterId", "sequence",
+    ]);
+  } finally {
+    db.close();
+  }
+});
+
 it("rolls back identity confirmation if persisting its generation fails", async () => {
   const store = await openCharacterStore(crypto.randomUUID());
   const before = await store.readIdentity();
@@ -998,38 +1020,6 @@ it("rolls back scope invalidation when snapshot persistence fails", async () => 
   spy.mockRestore();
   expect((await store.read("actor-A", "char-1")).confirmed).toEqual(attached);
   expect(await store.readEntryTemplates("actor-A", "char-1")).toEqual(campaignChoices);
-  await store.close();
-});
-
-it("upgrades an unscoped v3 catalog without losing snapshots or frozen commands", async () => {
-  const name = crypto.randomUUID();
-  const character = { ...makeView("char-1", 1), campaignId: "campaign" };
-  const entry = makeEntry({ attempt: makeRequest() });
-  const attempt: OnlineAttempt = { id: "online", actorId: "actor-A", characterId: "char-1", kind: "archive", request: makeRequest(), createdAt: entry.createdAt };
-  await new Promise<void>((resolve, reject) => {
-    const request = indexedDB.open(name, 3);
-    request.onupgradeneeded = () => {
-      request.result.createObjectStore("characters", { keyPath: ["actorId", "characterId"] });
-      request.result.createObjectStore("entryTemplates", { keyPath: ["actorId", "characterId"] });
-      request.result.createObjectStore("onlineAttempts", { keyPath: ["actorId", "id"] });
-      request.result.createObjectStore("queue", { keyPath: ["actorId", "characterId", "id"] }).createIndex("by-seq", ["actorId", "characterId", "sequence"]);
-    };
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      const db = request.result;
-      const tx = db.transaction(["characters", "entryTemplates", "onlineAttempts", "queue"], "readwrite");
-      tx.objectStore("characters").put({ actorId: "actor-A", characterId: "char-1", generation: 1, confirmed: character });
-      tx.objectStore("entryTemplates").put({ actorId: "actor-A", characterId: "char-1", templates: campaignChoices });
-      tx.objectStore("queue").put(entry);
-      tx.objectStore("onlineAttempts").put(attempt);
-      tx.oncomplete = () => { db.close(); resolve(); };
-      tx.onerror = () => { db.close(); reject(tx.error); };
-    };
-  });
-  const store = await openCharacterStore(name);
-  expect(await store.readEntryTemplates("actor-A", "char-1")).toEqual([]);
-  expect(await store.read("actor-A", "char-1")).toMatchObject({ confirmed: character, entries: [entry], generation: 1 });
-  expect(await store.readOnlineAttempts("actor-A")).toEqual([attempt]);
   await store.close();
 });
 

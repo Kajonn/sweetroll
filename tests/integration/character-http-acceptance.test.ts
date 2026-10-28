@@ -238,7 +238,7 @@ describeWithDatabase("characters HTTP acceptance", () => {
     for (const app of apps.splice(0)) await app.cleanup();
   });
 
-  it("full d20 flow over HTTP: create → set → bump → roll → replay → race → archive/recover → activity → export → breaking publish → preview/commit/rollback", async () => {
+  it("full d20 flow over HTTP: create → set → bump → roll → replay → race → archive/recover → activity → export → breaking publish → pinned state", async () => {
     const app = await makeApp();
     apps.push(app);
     const ada = app.users.ada;
@@ -401,7 +401,6 @@ describeWithDatabase("characters HTTP acceptance", () => {
       mediaType: "application/vnd.sweetroll.character+json;version=1",
       name: "Aria",
       revision: 6,
-      migrationLineage: [],
     });
 
     const v2 = buildD20V2Document();
@@ -451,70 +450,9 @@ describeWithDatabase("characters HTTP acceptance", () => {
     });
     expect(pinned.json().character.systemVersionId).toBe(v1Id);
 
-    const preview = await app.app.inject({
-      method: "POST",
-      url: `/characters/${characterId}/migration-previews`,
-      headers: cookieHeader(ada),
-      payload: { targetVersionId: v2Id, mappings: { ability: "ability_score" } },
-    });
-    expect(preview.statusCode, preview.body).toBe(201);
-    const previewBody = preview.json().preview;
-    expect(previewBody).toMatchObject({
-      characterId,
-      sourceRevision: 6,
-      sourceVersionId: v1Id,
-      targetVersionId: v2Id,
-    });
-    expect(previewBody.candidateState.values).toEqual({
-      ability_score: 15,
-      modifier: 0,
-      ancestry: null,
-      health: { current: 8, max: 10 },
-      level: 1,
-    });
-    expect(previewBody.candidateProjection.entityLabel).toBe("Character");
-    expect(previewBody.warnings).toHaveLength(2);
-    expect(previewBody.warnings[0]).toContain(`"proficient"`);
-    expect(previewBody.warnings[1]).toContain(`"level"`);
-
-    const commit = await app.app.inject({
-      method: "POST",
-      url: `/characters/${characterId}/migrations/${previewBody.previewId}/commit`,
-      headers: cookieHeader(ada),
-      payload: { expectedRevision: 6, idempotencyKey: `cm-${randomUUID()}` },
-    });
-    expect(commit.statusCode, commit.body).toBe(200);
-    expect(commit.json().result.character).toMatchObject({ revision: 7 });
-    expect(commit.json().result.character.state.values.ability_score).toBe(15);
-    expect(commit.json().result.character.systemVersionId).toBe(v2Id);
-
-    const committed = await app.pool.query<{ id: string }>(
-      "SELECT id FROM character_migrations WHERE character_id = $1",
-      [characterId],
-    );
-    expect(committed.rows).toHaveLength(1);
-    const migrationId = committed.rows[0]!.id;
-
-    const rollback = await app.app.inject({
-      method: "POST",
-      url: `/characters/${characterId}/migrations/${migrationId}/rollback`,
-      headers: cookieHeader(ada),
-      payload: { idempotencyKey: `rb-${randomUUID()}` },
-    });
-    expect(rollback.statusCode, rollback.body).toBe(200);
-    expect(rollback.json().result.character).toMatchObject({ revision: 8, systemVersionId: v1Id });
-expect(rollback.json().result.character.state.values).toEqual({
-      ability: 15,
-      modifier: 0,
-      proficient: false,
-      ancestry: null,
-      health: { current: 8, max: 10 },
-    });
-
     const exported2 = await exportCharacter(app, ada, characterId);
     const doc2 = exported2.json();
-    expect(doc2.migrationLineage).toEqual([]);
-    expect(doc2.revision).toBe(8);
+    expect(doc2.revision).toBe(6);
     expect(doc2.systemVersionId).toBe(v1Id);
   });
 
@@ -681,9 +619,6 @@ expect(rollback.json().result.character.state.values).toEqual({
       { method: "POST" as const, url: `/characters/${characterId}/ownership-transfer`, payload: { toUserId: randomUUID(), expectedRevision: 1, idempotencyKey: "k" } },
       { method: "GET" as const, url: `/characters/${characterId}/activity` },
       { method: "POST" as const, url: `/characters/${characterId}/exports` },
-      { method: "POST" as const, url: `/characters/${characterId}/migration-previews`, payload: { targetVersionId: randomUUID() } },
-      { method: "POST" as const, url: `/characters/${characterId}/migrations/${randomUUID()}/commit`, payload: { expectedRevision: 1, idempotencyKey: "k" } },
-      { method: "POST" as const, url: `/characters/${characterId}/migrations/${randomUUID()}/rollback`, payload: { idempotencyKey: "k" } },
     ];
 
     for (const route of routes) {
@@ -989,24 +924,6 @@ expect(rollback.json().result.character.state.values).toEqual({
     const outsider=await listActivity(app,app.users.bob,id); expect(outsider.statusCode).toBe(404);
     const forged=await app.app.inject({method:"POST",url,headers:cookieHeader(ada),payload:{...payload,idempotencyKey:randomUUID(),dice:roll.dice,breakdown:roll.breakdown}});
     expect(forged.statusCode).toBe(400);
-  });
-
-  it("upgrades 1.0 to 1.1 and rolls back without rewriting historical results",async()=>{
-    const app=await makeApp();apps.push(app);const ada=app.users.ada;const headers=cookieHeader(ada);
-    const v1=await publishVersion(app,ada,structuredClone(d6SuccessPoolDocument),{name:"Versioned groups",semanticVersion:"1.0.0"});
-    const created=await createCharacter(app,ada,{systemVersionId:v1.versionId,name:"Upgrade groups",idempotencyKey:randomUUID()});expect(created.statusCode).toBe(201);const id=created.json().character.characterId;
-    const legacy=await executeAction(app,ada,id,"test_pool",{bonus_dice:0},1,randomUUID());expect(legacy.statusCode).toBe(200);expect(legacy.json().result.roll.breakdown).toBeUndefined();
-    const opened=await app.app.inject({method:"GET",url:`/systems/${v1.systemId}`,headers});expect(opened.statusCode).toBe(200);
-    const saved=await app.app.inject({method:"PUT",url:`/systems/${v1.systemId}/draft`,headers,payload:{expectedRevision:opened.json().workspace.draft.revision,document:namedDicePoolDocument()}});expect(saved.statusCode,saved.body).toBe(200);
-    const published=await app.app.inject({method:"POST",url:`/systems/${v1.systemId}/publish`,headers,payload:{expectedRevision:saved.json().workspace.draft.revision,semanticVersion:"1.1.0",releaseNotes:"Grouped",idempotencyKey:randomUUID(),acknowledgeBreaking:true}});expect(published.statusCode,published.body).toBe(200);
-    const targetVersionId=published.json().version.versionId;
-    const preview=await app.app.inject({method:"POST",url:`/characters/${id}/migration-previews`,headers,payload:{targetVersionId}});expect(preview.statusCode,preview.body).toBe(201);
-    const committed=await app.app.inject({method:"POST",url:`/characters/${id}/migrations/${preview.json().preview.previewId}/commit`,headers,payload:{expectedRevision:1,idempotencyKey:randomUUID()}});expect(committed.statusCode,committed.body).toBe(200);
-    const grouped=await executeAction(app,ada,id,"test_pool",{bonus_dice:0},2,randomUUID());expect(grouped.statusCode,grouped.body).toBe(200);const breakdown=grouped.json().result.roll.breakdown;expect(breakdown.groups).toHaveLength(3);
-    const migration=(await app.pool.query("SELECT id FROM character_migrations WHERE character_id=$1",[id])).rows[0]!.id;
-    const rolledBack=await app.app.inject({method:"POST",url:`/characters/${id}/migrations/${migration}/rollback`,headers,payload:{idempotencyKey:randomUUID()}});expect(rolledBack.statusCode,rolledBack.body).toBe(200);expect(rolledBack.json().result.character.systemVersionId).toBe(v1.versionId);
-    const rows=await app.pool.query("SELECT breakdown_json FROM character_rolls WHERE character_id=$1 ORDER BY occurred_at,id",[id]);expect(rows.rows).toEqual([{breakdown_json:null},{breakdown_json:breakdown}]);
-    const history=await listActivity(app,ada,id);expect(history.json().events.find((e:{roll?:{breakdown:unknown}})=>e.roll?.breakdown!==undefined)?.roll.breakdown).toEqual(breakdown);
   });
 
 });

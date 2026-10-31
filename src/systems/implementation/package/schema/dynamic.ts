@@ -44,8 +44,8 @@ export const EntrySourceSchema = Type.Union([
   Type.Object(
     {
       kind: Type.Literal("campaign"),
-      campaignId: Type.String({ format: "uuid" }),
-      templateId: Type.String({ format: "uuid" }),
+      campaignId: Type.String({ pattern: UUID_PATTERN }),
+      templateId: Type.String({ pattern: UUID_PATTERN }),
       templateRevision: Type.Integer({ minimum: 1 }),
       contentRevision: Type.Integer({ minimum: 1 }),
     },

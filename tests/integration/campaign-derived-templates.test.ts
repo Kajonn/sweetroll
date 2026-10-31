@@ -344,7 +344,10 @@ db("derived campaign templates", () => {
         idempotencyKey: randomUUID(),
       });
     const raced = await Promise.all([push(), push()]);
-    expect(raced.filter((r) => r.ok)).toHaveLength(1);
+    expect(
+      raced.filter((r) => r.ok),
+      JSON.stringify(raced),
+    ).toHaveLength(1);
     expect(
       (
         await h.pool.query(

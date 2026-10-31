@@ -2998,9 +2998,7 @@ export interface operations {
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
-                                            /** Format: uuid */
                                             campaignId: string;
-                                            /** Format: uuid */
                                             templateId: string;
                                             templateRevision: number;
                                             contentRevision: number;
@@ -3321,9 +3319,7 @@ export interface operations {
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
-                                                    /** Format: uuid */
                                                     campaignId: string;
-                                                    /** Format: uuid */
                                                     templateId: string;
                                                     templateRevision: number;
                                                     contentRevision: number;
@@ -3994,9 +3990,7 @@ export interface operations {
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
-                                            /** Format: uuid */
                                             campaignId: string;
-                                            /** Format: uuid */
                                             templateId: string;
                                             templateRevision: number;
                                             contentRevision: number;
@@ -4317,9 +4311,7 @@ export interface operations {
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
-                                                    /** Format: uuid */
                                                     campaignId: string;
-                                                    /** Format: uuid */
                                                     templateId: string;
                                                     templateRevision: number;
                                                     contentRevision: number;
@@ -4557,9 +4549,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -4880,9 +4870,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -5269,9 +5257,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -5592,9 +5578,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -5981,9 +5965,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -6304,9 +6286,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -7220,9 +7200,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -7543,9 +7521,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -7944,9 +7920,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -8267,9 +8241,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -8612,9 +8584,7 @@ export interface operations {
                         } | {
                             /** @constant */
                             kind: "campaign";
-                            /** Format: uuid */
                             campaignId: string;
-                            /** Format: uuid */
                             templateId: string;
                             templateRevision: number;
                             contentRevision: number;
@@ -8681,9 +8651,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -9004,9 +8972,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -9392,9 +9358,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -9715,9 +9679,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -10107,9 +10069,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -10430,9 +10390,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -10780,9 +10738,7 @@ export interface operations {
                             } | {
                                 /** @constant */
                                 kind: "campaign";
-                                /** Format: uuid */
                                 campaignId: string;
-                                /** Format: uuid */
                                 templateId: string;
                                 templateRevision: number;
                                 contentRevision: number;
@@ -11105,9 +11061,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -11428,9 +11382,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -11813,9 +11765,7 @@ export interface operations {
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
-                                            /** Format: uuid */
                                             campaignId: string;
-                                            /** Format: uuid */
                                             templateId: string;
                                             templateRevision: number;
                                             contentRevision: number;
@@ -12136,9 +12086,7 @@ export interface operations {
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
-                                                    /** Format: uuid */
                                                     campaignId: string;
-                                                    /** Format: uuid */
                                                     templateId: string;
                                                     templateRevision: number;
                                                     contentRevision: number;
@@ -12689,9 +12637,7 @@ export interface operations {
                                     } | {
                                         /** @constant */
                                         kind: "campaign";
-                                        /** Format: uuid */
                                         campaignId: string;
-                                        /** Format: uuid */
                                         templateId: string;
                                         templateRevision: number;
                                         contentRevision: number;
@@ -16446,9 +16392,7 @@ export interface operations {
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
-                                            /** Format: uuid */
                                             campaignId: string;
-                                            /** Format: uuid */
                                             templateId: string;
                                             templateRevision: number;
                                             contentRevision: number;
@@ -16769,9 +16713,7 @@ export interface operations {
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
-                                                    /** Format: uuid */
                                                     campaignId: string;
-                                                    /** Format: uuid */
                                                     templateId: string;
                                                     templateRevision: number;
                                                     contentRevision: number;
@@ -17087,9 +17029,7 @@ export interface operations {
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
-                                            /** Format: uuid */
                                             campaignId: string;
-                                            /** Format: uuid */
                                             templateId: string;
                                             templateRevision: number;
                                             contentRevision: number;
@@ -17410,9 +17350,7 @@ export interface operations {
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
-                                                    /** Format: uuid */
                                                     campaignId: string;
-                                                    /** Format: uuid */
                                                     templateId: string;
                                                     templateRevision: number;
                                                     contentRevision: number;
@@ -17632,9 +17570,7 @@ export interface operations {
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
-                                            /** Format: uuid */
                                             campaignId: string;
-                                            /** Format: uuid */
                                             templateId: string;
                                             templateRevision: number;
                                             contentRevision: number;
@@ -17955,9 +17891,7 @@ export interface operations {
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
-                                                    /** Format: uuid */
                                                     campaignId: string;
-                                                    /** Format: uuid */
                                                     templateId: string;
                                                     templateRevision: number;
                                                     contentRevision: number;
@@ -18179,9 +18113,7 @@ export interface operations {
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
-                                            /** Format: uuid */
                                             campaignId: string;
-                                            /** Format: uuid */
                                             templateId: string;
                                             templateRevision: number;
                                             contentRevision: number;
@@ -18502,9 +18434,7 @@ export interface operations {
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
-                                                    /** Format: uuid */
                                                     campaignId: string;
-                                                    /** Format: uuid */
                                                     templateId: string;
                                                     templateRevision: number;
                                                     contentRevision: number;

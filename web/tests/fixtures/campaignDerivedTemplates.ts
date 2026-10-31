@@ -230,6 +230,9 @@ export async function campaignDerivedJourney(
       )
     ).result.roll;
     expect(root.push.attempt).toBe(0);
+    await expect(
+      page.getByRole("button", { name: "Push saved roll" }),
+    ).toBeEnabled();
     if (offlineReload) {
       let committed!: () => void;
       const applied = new Promise<void>((r) => {
@@ -387,6 +390,9 @@ export async function campaignDerivedJourney(
         "/actions/sword_pool",
       )
     ).result.roll;
+    await expect(
+      page.getByRole("button", { name: "Push saved roll" }),
+    ).toBeEnabled();
     assertChild(
       fresh,
       (
@@ -440,6 +446,19 @@ export async function campaignDerivedJourney(
           .character.lifecycle,
       ).toBe("archived");
       cleanup.characterId = characterId;
+    }
+    if (campaignId && templateId) {
+      const path = `/api/campaigns/${campaignId}/item-templates/${templateId}`;
+      const current = (await json(gm.request, "GET", path)).template;
+      if (current.status !== "archived")
+        await json(gm.request, "POST", `${path}/archive`, {
+          expectedTemplateRevision: current.revision,
+          idempotencyKey: key(),
+        });
+      expect((await json(gm.request, "GET", path)).template.status).toBe(
+        "archived",
+      );
+      cleanup.templateId = templateId;
     }
     if (campaignId) {
       const c = (await json(gm.request, "GET", `/api/campaigns/${campaignId}`))

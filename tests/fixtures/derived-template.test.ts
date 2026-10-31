@@ -1,3 +1,5 @@
+import { Value } from "@sinclair/typebox/value";
+import { PushContextSchema } from "../../src/systems/implementation/runtime/push-context.js";
 import { describe, expect, it } from "vitest";
 import { derivedTemplateDocument } from "./derived-template.js";
 import { compileDocument } from "../../src/systems/implementation/rules/compile-document.js";
@@ -186,6 +188,7 @@ describe("derived fixture and runtime parity", () => {
     });
     expect(result.ok).toBe(true);
     if (!result.ok || !result.value.roll || !result.value.pushContext) return;
+    expect(Value.Check(PushContextSchema, result.value.pushContext)).toBe(true);
     const parent = {
         ...result.value.roll,
         push: {

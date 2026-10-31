@@ -1,6 +1,6 @@
 # Campaign inherited actions contract
 
-Status: local implementation for PR #25; publication, CI and deployed acceptance pending. Authority: [execution plan](../plans/2026-10-31-campaign-inherited-actions.md).
+Status: implementation in PR #25; CI and deployed acceptance in progress. Authority: [execution plan](../plans/2026-10-31-campaign-inherited-actions.md).
 
 Create keeps the existing campaign/kind/content/revision/key envelope and adds optional `baseTemplateId` (definition ID, at most 64 characters). Content contains name (1–200, nonblank), description/notes (0–2000), item defaultQuantity (positive safe integer), and optional `defaultValues` (at most 100 existing writable base fields). Values use the published field types and bounds; computed/image fields cannot be supplied. Blank templates reject defaultValues. No actions, expressions, seeds, snapshots, schema or version selectors are accepted.
 

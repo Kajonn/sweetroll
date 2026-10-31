@@ -202,6 +202,27 @@ describe("SlotListControl", () => {
     expect(handlers.onUpdateEntry).toHaveBeenCalledWith(SWORD_ENTRY_ID, { weapon_bonus: 3 }, 2);
   });
 
+  it("preserves an open value draft through sheet refreshes and starts the next edit from current values", async () => {
+    const user = userEvent.setup();
+    const handlers = callbacks();
+    const props = { slotId: "inventory", label: "Inventory", accepts: ["item"],
+      entries: [entries[0]!], templates, disabled: false, ...handlers };
+    const ui = render(<SlotListControl {...props} />);
+    await user.click(screen.getByRole("button", { name: "Edit values" }));
+    const bonus = screen.getByLabelText("Weapon bonus");
+    await user.clear(bonus);
+    await user.type(bonus, "3");
+    ui.rerender(<SlotListControl {...props} entries={structuredClone(props.entries)} />);
+    expect(bonus).toHaveValue(3);
+    expect(screen.getByRole("button", { name: "Save values" })).toBeEnabled();
+    const refreshed = [{ ...entries[0]!, values: { weapon_bonus: 9 } }];
+    ui.rerender(<SlotListControl {...props} entries={refreshed} />);
+    expect(bonus).toHaveValue(3);
+    await user.click(screen.getByRole("button", { name: /^Cancel$/ }));
+    await user.click(screen.getByRole("button", { name: "Edit values" }));
+    expect(screen.getByLabelText("Weapon bonus")).toHaveValue(9);
+  });
+
   it("disables entry controls while keeping the list readable", () => {
     renderControl({ disabled: true });
     expect(screen.getByTestId("slot-add-inventory")).toBeDisabled();

@@ -284,17 +284,18 @@ function TemplateEntryForm({ entry, template, disabled, onUpdate }: {
   const [draft, setDraft] = useState<Record<string, unknown>>(entry.values);
   const [quantity, setQuantity] = useState(entry.quantity ?? 1);
   const [commandError, setCommandError] = useState("");
-  useEffect(() => {
-    setDraft(entry.values);
-    setQuantity(entry.quantity ?? 1);
-  }, [entry.values, entry.quantity]);
   const fields = (template.fields ?? []).filter((field) =>
     field.kind !== "computed" && field.kind !== "image");
   if (fields.length === 0 && template.kind !== "item") return null;
   if (!editing) {
     return <Button type="button" variant="secondary" className={styles.slotEditButton}
       disabled={disabled} data-testid={`slot-entry-edit-${entry.entryId}`}
-      onClick={() => setEditing(true)}>{t("character.slot.editValues")}</Button>;
+      onClick={() => {
+        setDraft(entry.values);
+        setQuantity(entry.quantity ?? 1);
+        setCommandError("");
+        setEditing(true);
+      }}>{t("character.slot.editValues")}</Button>;
   }
   const validQuantity = Number.isInteger(quantity) && quantity >= 1;
   const changed = JSON.stringify(draft) !== JSON.stringify(entry.values)

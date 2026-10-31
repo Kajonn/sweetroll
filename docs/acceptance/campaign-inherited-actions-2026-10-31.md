@@ -51,3 +51,30 @@ The exact tested commit is staged for the existing isolated preview: project `sw
 The live all-environment switch was rejected by automatic review as insufficiently scoped. After independently verifying isolation, the environment-scoped staged alternative was prepared and inspected. `accept-deploy` then returned "Cancelled — the user did not approve this action. No changes were made." No further deployment attempt bypassed that cancellation. The preview still runs baseline `ba8200b`, deployment `abf9286a-17ad-45a6-a7c2-bfe30409c60d`; readiness/asset identity and hosted journeys have not been claimed for this implementation.
 
 Next: explicitly confirm applying this isolated preview patch; observe terminal SUCCESS/readiness; match served HTML/JS/CSS/worker/manifest to a rebuild of the tested application with its observed offline build ID; run both canonical derived acceptance journeys with two accounts and zero retries; read back scoped cleanup and record results. C7 and implementation readiness remain open until that evidence exists. Physical-device/provider-auth/playtest G9 gates remain separate and open.
+
+## Hosted acceptance — 2026-10-31, first deployed candidate
+
+The owner deployed `5d3bb889725bf2034819cd07411d9c520610a48c` to the existing isolated preview. Railway deployment `a24234ff-d94c-441a-9649-d02d2717c10a` reached SUCCESS at 14:21:46 UTC. That commit differs from tested application `f1fcbd7` only in four Markdown files; [CI #153](https://github.com/Kajonn/sweetroll/actions/runs/41207954049) also passed all seven verification jobs. Service readback has the expected branch, configured application pin `f1fcbd7`, no staged changes and the same preview domain. The actual deployment metadata records `5d3bb88`; these identities are deliberately distinguished. No production-project or database reset was performed.
+
+`/health/ready` returned `{"status":"ok"}`. Rebuilding the same source with observed `OFFLINE_BUILD_ID=build-mvwhogfg` matched all five served artifacts byte for byte:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `/index.html` | `c244b174a6f507f9eed21514da1eb3f43e8735732b0b5e3a9b6a5af40323d00e` |
+| `/assets/index--CkVp4P6.js` | `a82f14b2a2dfd73617513ef278a51f13c5083bbfb27db835bf87dc2f132942df` |
+| `/assets/index-CCQNROF8.css` | `26841a98ac12725838c268120d874adb89fbc9449bf3375398de02d667d1ce58` |
+| `/sw.js` | `1c6ef995393f77aa06045e9649b25e8b56aa67e36e63ce2421b84497be9d2ccd` |
+| `/offline-manifest.json` | `0a22ddc295cf884eaf742649b459a4dac782467cd79a621ab2d0173a9513c75c` |
+
+The first local hosted attempt timed out both journeys: the installed Playwright API client creates a fresh required-proxy tunnel for every request, adding several seconds per API call and exceeding existing five-second polling deadlines. A local runner-only standard HTTPS agent pool reused those same proxy tunnels (successive readiness requests: 3,424 ms, 38 ms, 45 ms). The application, canonical fixtures, assertion deadlines, 180-second test limits and zero retries remained unchanged. With that transport correction the normal hosted journey passed in 25.8 seconds.
+
+The offline journey then exposed a real UI failure after stale-placement discard and reload: a fresh sheet projection reset the open typed-value draft from 6 to persisted 4, leaving Save values disabled. `TemplateEntryForm` synchronized draft state on every `entry.values` object identity change. A new regression reproduces the loss on an equal-content sheet refresh (expected 3, observed 1) and verifies cancellation/reopening uses the current authoritative value. The fix initializes the draft when opening Edit values and preserves it while editing. This is not a timeout/assertion relaxation. Final-head CI, deployment and both hosted journeys must pass before readiness is claimed.
+
+Scoped cleanup was independently read back for all four first-candidate attempts. Interrupted offline cleanup was completed using only its run-created IDs; every character/template/campaign/system is archived and each system is private. No unrelated resource was changed.
+
+| Run | System | Campaign | Character | Template |
+| --- | --- | --- | --- | --- |
+| pooled offline before draft fix | `194f6325-3c58-4e78-ada3-a4e6aa1ad6fb` | `06ca2fa7-1776-4e85-b3aa-130f784ca16d` | `cbc4e3db-2f3c-4dba-bd00-d3ae3a9d9790` | `9133c4de-de87-428c-b0e3-7c80dc078523` |
+| initial online | `4f476f5c-f8ef-4ada-a185-802399466f73` | `e41dde42-a218-4ba1-9015-38355f941681` | `58f14b4d-5bce-4838-81d6-917df65f6141` | `22acc3ad-1363-4714-98f9-a6b7228a089f` |
+| initial offline | `cb895ede-6095-4cfa-85ed-490c63211383` | `9a818790-6996-4b80-9ad1-d32bb2aa1245` | `9bc1272b-9cfd-412f-a3f5-921fd3e6af3e` | `bb249688-31e3-4596-9ad5-e507ea4b6af8` |
+| derived campaign template authoring, independent copies, actions, pushes and returned play | `3af42f78-596a-49fb-bd88-503f1e6a106f` | `30664843-0bb0-483f-9449-4d1bbd2363ae` | `dca803bd-cc5b-4717-a469-553a876b69d7` | `fc478c1c-805f-4c32-8066-336ac568f0cf` |

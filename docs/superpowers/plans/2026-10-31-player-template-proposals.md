@@ -1,6 +1,6 @@
 # Player proposals for campaign templates — adventure slice D1
 
-**Status:** implementation in draft PR #26; final CI/hosted acceptance in progress. [Companion contract](../specs/2026-10-31-player-template-proposals.md).
+**Status:** implemented in PR #26; isolated hosted acceptance passes on `cc87c74`. [Evidence and remaining release gates](../../acceptance/player-template-proposals-2026-10-31.md). Final CI #164 passed all seven verification jobs. [Companion contract](../specs/2026-10-31-player-template-proposals.md).
 **Dependency:** inherited-actions PR #25 merged as `455f967`; implementation branch merged this exact main. Planning baseline is its head `9f11c741f7ce3cc6722c07af21fa3d1857ccae29`; application `58c71a1` passed CI #158 and hosted acceptance, and the documentation-only head passed CI #159. Retarget this planning change to main after C merges, accounting for the actual merge SHA.
 **Authority:** [design §§5.4, 17.0, 17.9b and 18.2](../../../design_v2.md), [adventure-items roadmap](2026-10-07-adventure-custom-items.md), [GUI delivery gates](2026-09-08-gui-integration.md).
 **Goal:** a player suggests bounded adventure content; a GM/co-GM approves exactly one reusable data-only catalog template or rejects the suggestion. The player's original entry stays unchanged.
@@ -34,7 +34,11 @@ The proposal contains submitted text, not an executable or placeable template. N
 
 ## TDD and delivery order
 
-Keep this work in its own implementation PR after C review/merge. Each new behavior starts with an observed meaningful red test, then the smallest implementation, green and refactoring. Generated output or retained passing suites are not substitutes for tests of proposal behavior.
+This is implemented in its own PR #26 after C merged as `455f967`. Each new behavior starts with an observed meaningful red test, then the smallest implementation, green and refactoring. Generated output or retained passing suites are not substitutes for tests of proposal behavior.
+
+### Execution record (2026-10-31)
+
+D1.0–D1.4 are implemented under the companion contract; D1.5 has passing canonical local and hosted journeys, byte-verified deployment, a hosted 500-template capacity/authority probe and independent scoped cleanup. CI #164 verifies exact application `cc87c74`; All seven verification jobs, including Docker, passed. The checklists below retain the detailed test recipe; evidence above is the current status. Optional sheet prefill is deferred and creates no acceptance claim. D2 and wider G9 work remain separate.
 
 ### D1.0 — Confirm the contract and baseline
 

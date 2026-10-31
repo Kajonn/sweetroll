@@ -1,6 +1,6 @@
 # Player proposals for campaign templates — D1 contract
 
-**Status:** implemented in draft PR #26; final CI/hosted acceptance in progress. Inherited-actions PR #25 is merged as `455f967`. [Execution plan](../plans/2026-10-31-player-template-proposals.md). These decisions define a separate follow-up; they do not change the accepted C implementation.
+**Status:** implemented in PR #26; isolated hosted acceptance passes on `cc87c74`, with exact application CI #164 passing all seven verification jobs. See [acceptance evidence](../../acceptance/player-template-proposals-2026-10-31.md). Inherited-actions PR #25 is merged as `455f967`. [Execution plan](../plans/2026-10-31-player-template-proposals.md). These decisions define a separate follow-up; they do not change the accepted C implementation.
 
 ## Outcome and boundary
 

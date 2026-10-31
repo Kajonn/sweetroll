@@ -1,6 +1,14 @@
 export type MessageTable = Record<string, string>;
 
 export const defaultMessages: MessageTable = {
+  "campaign.templates.source":"Source",
+  "campaign.templates.blank":"Start blank",
+  "campaign.templates.derived":"Based on system template",
+  "campaign.templates.base":"System template",
+  "campaign.templates.chooseBase":"Choose a system template",
+  "campaign.templates.inheritedActions":"Inherited actions",
+  "campaign.templates.newCopiesOnly":"New defaults apply to new copies only. Placed copies keep their values and source.",
+
   "roll.groups.title": "Named dice groups",
   "roll.groups.preserve": "Keep the custom formula, or explicitly replace it with a grouped pool.",
   "roll.groups.replace": "Replace with grouped pool",

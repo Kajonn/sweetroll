@@ -1,3 +1,4 @@
+import {createPostgresPublishedPackageLoader} from "../../src/systems/implementation/runtime/package-loader.js";
 import { randomUUID } from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
@@ -147,6 +148,7 @@ export async function buildI6Harness(input?: {
         pool,
         limits,
         charactersPlacement: placement,
+    loadTemplatePackage:createPostgresPublishedPackageLoader(pool),
       });
       return buildCampaignsRoutes({ campaigns, characters, runtime });
     },

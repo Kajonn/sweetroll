@@ -1,3 +1,6 @@
+import {DerivedBaseSchema,TemplateDefaultsSchema} from "../../systems/implementation/package/schema/dynamic.js";
+import {ObjectTemplateV1Schema} from "../../systems/implementation/package/schema/document.js";
+import {DefinitionIdSchema} from "../../systems/implementation/package/schema/common.js";
 import { Type } from "@sinclair/typebox";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Campaigns } from "../../campaigns/index.js";
@@ -17,6 +20,7 @@ const Kind = Type.Union([
 ]);
 const Content = Type.Object(
   {
+    defaultValues:Type.Optional(TemplateDefaultsSchema),
     name: Type.String({ minLength: 1, maxLength: 200 }),
     description: Type.Optional(Type.String({ maxLength: 2000 })),
     notes: Type.Optional(Type.String({ maxLength: 2000 })),
@@ -35,7 +39,7 @@ export const CampaignTemplateDto = Type.Object({
   status: Type.Union([Type.Literal("active"), Type.Literal("archived")]),
   revision: Type.Integer(),
   contentRevision: Type.Integer(),
-  content: Content,
+  content: Type.Object({...Content.properties,base:Type.Optional(DerivedBaseSchema)},{additionalProperties:false}),
   createdAt: Type.String(),
   updatedAt: Type.String(),
 });
@@ -66,6 +70,7 @@ const Mutation = {
   idempotencyKey: Type.String({ minLength: 1, maxLength: 200 }),
 };
 export const campaignTemplateRoutes: readonly CampaignsRouteDefinition[] = [
+  {method:"get",path:"/campaigns/:id/item-templates/bases",operationId:"get_campaigns_id_item_templates_bases",schema:{params:CampaignParams,response:{"200":Type.Object({templates:Type.Array(ObjectTemplateV1Schema),requestId:Type.String()}),...Errors}}},
   {
     method: "post",
     path: "/campaigns/:id/item-templates",
@@ -77,6 +82,7 @@ export const campaignTemplateRoutes: readonly CampaignsRouteDefinition[] = [
           ...Mutation,
           expectedTemplateRevision: Type.Literal(0),
           kind: Kind,
+          baseTemplateId:Type.Optional(DefinitionIdSchema),
           content: Content,
         },
         { additionalProperties: false },
@@ -164,7 +170,9 @@ export function campaignTemplateHandlers(
         content: TemplateContent;
       };
       const result =
-        route.operationId === "post_campaigns_id_item_templates"
+        route.operationId === "get_campaigns_id_item_templates_bases"
+          ? await campaigns.listTemplateBases(ctx,{campaignId:params.id})
+          : route.operationId === "post_campaigns_id_item_templates"
           ? await campaigns.createTemplate(ctx, {
               ...(request.body as CreateTemplate),
               campaignId: params.id,
@@ -204,6 +212,7 @@ export function campaignTemplateHandlers(
             )[result.error.code] ?? 500,
           )
           .send({ error: result.error, requestId: request.id });
+      if(route.operationId === "get_campaigns_id_item_templates_bases") return {templates:result.value,requestId:request.id};
       if (route.operationId === "get_campaigns_id_item_templates")
         return { ...result.value, requestId: request.id };
       return reply

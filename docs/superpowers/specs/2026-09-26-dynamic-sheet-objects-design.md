@@ -3,6 +3,8 @@
 Date: 2026-09-26. Status: implemented in `feat/dynamic-objects`; delivery review 2026-10-04.
 Authority: `design_v2.md` (system packages §11–13, character state, grammar v0.1, `OD-04`).
 
+**Planned extension (2026-10-31):** [Adventure slice C](../plans/2026-10-31-campaign-inherited-actions.md) will permit server-materialized campaign copies to resolve existing actions from a pinned system base. It is not implemented by this document. Personal and blank campaign entries remain data-only; derived copies require validated immutable provenance and a shared runtime resolver. The [pre-release policy](../../../design_v2.md#170-release-status-and-application-version-policy) supersedes historical migration/old-format compatibility wording below; implement current-format validation and exact-request recovery without version-conversion code or tests.
+
 ## Problem
 
 System packages define a fixed entity: every field, resource, and action is

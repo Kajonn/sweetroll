@@ -46,7 +46,7 @@ export function validateEntryForSlot(
   } else if (entry.snapshot !== undefined || (entry.source?.kind === "system" && entry.source.templateId !== entry.templateId) || (entry.source?.kind === "personal" && entry.templateId !== null)) {
     return invalid("entry_values_invalid", "Entry source contradicts its template reference.");
   }
-  if (entry.templateId === null) {
+  if (entry.templateId === null && !(entry.source?.kind === "campaign" && entry.snapshot && "base" in entry.snapshot)) {
     if (
       Object.hasOwn(entry.values, "actions")
       || Object.hasOwn(entry.values, "grantedActions")
@@ -67,7 +67,7 @@ export function validateEntryForSlot(
     }
     return { ok: true };
   }
-  const template = templates.find((candidate) => candidate.id === entry.templateId);
+  const template = templates.find((candidate) => candidate.id === effectiveTemplateId(entry));
   if (template === undefined) {
     return invalid("entry_values_invalid", "Entry template is unknown.");
   }
@@ -98,7 +98,7 @@ export function buildEntryScope(
   return { ...characterFields, ...entryValues };
 }
 
-function validEntryValue(field: FieldV1, value: unknown): boolean {
+export function validEntryValue(field: FieldV1, value: unknown): boolean {
   switch (field.kind) {
     case "text": {
       if (typeof value !== "string") return false;
@@ -121,7 +121,7 @@ function validEntryValue(field: FieldV1, value: unknown): boolean {
       return new Set(ids).size === ids.length && ids.every((id) => options.has(id));
     }
     case "resource": {
-      if (!isRecord(value)) return false;
+      if (!isRecord(value) || Object.keys(value).length!==2) return false;
       const { current, max } = value as { current: unknown; max: unknown };
       return typeof current === "number"
         && typeof max === "number"
@@ -171,4 +171,9 @@ function invalid(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Metadata never supplies executable authority; callers verify provenance against the package. */
+export function effectiveTemplateId(entry: CharacterEntryV1): string | null {
+  return entry.templateId ?? (entry.source?.kind === "campaign" && entry.snapshot && "base" in entry.snapshot ? entry.snapshot.base.templateId : null);
 }

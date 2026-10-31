@@ -1,8 +1,10 @@
 # Adventure-specific custom items — implementation plan
 
-**Status:** slice A implemented in PR #17 and merged 2026-10-08; CI and deployed acceptance evidence tracked below. Slice B is implemented in PR #19 with required CI #91 green; isolated deployed multi-account/offline acceptance passed. Slices C–D remain planned. See the [slice B execution plan](2026-10-09-campaign-data-templates.md) and [acceptance evidence](../../acceptance/campaign-data-templates-2026-10-10.md).
+**Status:** slice A implemented in PR #17 and merged 2026-10-08; CI and deployed acceptance evidence tracked below. Slice B is implemented in PR #19 with required CI #91 green; isolated deployed multi-account/offline acceptance passed. Slice C now has a [code-grounded execution plan](2026-10-31-campaign-inherited-actions.md); implementation is published in PR #25 and application `58c71a1` passes CI #158 plus both isolated hosted journeys. Exact deployment/assets and scoped cleanup are verified; C7 is complete. Wider G9 release gates remain open. After C review/merge, continue with data-only player proposals (D1), then restricted audiences (D2). See the [slice B execution plan](2026-10-09-campaign-data-templates.md) and [acceptance evidence](../../acceptance/campaign-data-templates-2026-10-10.md).
 **Authority:** [design_v2.md](../../../design_v2.md), especially §§3, 4.1, 5, 7.4, 9, 17; [dynamic sheet objects design](../specs/2026-09-26-dynamic-sheet-objects-design.md).
 **Dependency:** the delivered dynamic-object slots, system templates, character entries, granted actions, revision/idempotency and offline flows.
+
+**Current pre-release scope (2026-10-31):** [design Section 17.0](../../../design_v2.md#170-release-status-and-application-version-policy) and AGENTS.md supersede historical upgrade/compatibility wording. Use the current schema and disposable test data. No application/database migration, character/campaign rules-version upgrade, instance conversion or old-client transition is an implementation/acceptance task before the first application release tag. Published rules and placed-copy revisions remain immutable; exact-request recovery remains required.
 
 ## Goal and boundary
 
@@ -27,7 +29,7 @@ Campaign templates have an audience of **GM only**, **selected players**, or **a
 1. From a typed sheet slot, choose **Add → Custom item**. Enter name, optional description, quantity and simple notes/values appropriate to that slot. Show origin **Personal**. Save through the existing offline-capable character command.
 2. A GM opens **Campaign → Items & powers → Create** and chooses **Start blank** (data only) or **Based on system item**. The latter offers only templates from the campaign's pinned system version and compatible slots, copies the base definition into a campaign revision, and allows a new label, description and permitted default values. The inherited hit/damage/nominal buttons remain available only if their expressions are valid for the target character/slot.
 3. GM publishes the campaign template to all players. A player sees it in the slot picker with origin **Campaign**, adds it and changes that character's own values/quantity without editing the shared template.
-4. Editing a shared template creates a new revision. Existing character entries stay pinned to the revision used at placement; GM can preview and explicitly update instances later. History retains the displayed label and resolved roll details from the time of use. Archiving a template hides it from new additions, while existing entries and actions remain usable until individually removed or explicitly migrated.
+4. Editing a shared template creates a new revision. Existing character entries stay pinned to the revision used at placement. History retains the displayed label and resolved roll details from the time of use. Archiving a template hides it from new additions, while existing entries and actions remain usable until individually removed. Explicit instance conversion is outside the current pre-release scope.
 5. A player's optional **Suggest to GM** flow submits a data-only proposal. Only a GM/co-GM can approve and publish it; rejection leaves the personal entry untouched. This is a later slice, not a gate for personal and GM creation.
 
 On phones, keep Add in the existing slot interaction, show scope and source in the picker, keep advanced fields collapsed, use the existing save/conflict status and destructive confirmation, and avoid duplicating the item name in its row.
@@ -37,7 +39,7 @@ On phones, keep Add in the existing slot interaction, show scope and source in t
 ### A. Personal custom entries (first usable slice)
 
 - Extend the custom-entry command and schema with bounded, explicit data fields: name, description and notes; item quantity remains a positive integer. Define accepted kinds by the target slot rather than trusting a client-supplied kind. Keep `templateId: null` and reject granted actions on this path.
-- Reuse character revisions, idempotency, offline queue, activity and export. Preserve old name-only entries on decode and migration. Validate lengths and payload size server-side; escape displayed text.
+- Reuse character revisions, idempotency, offline queue, activity and export. Validate current-format entries, lengths and payload size server-side; escape displayed text. No development-version conversion is required.
 - Build accessible create/edit UI for a personal entry; show stored labels, not technical field IDs. Editing/removal follows existing sheet permissions.
 - Gate: player and GM add/edit/remove; compatible slot checks; stale revision and retry; offline add/reconnect once; unauthorized character access denied; previous entries still render.
 
@@ -45,7 +47,7 @@ On phones, keep Add in the existing slot interaction, show scope and source in t
 
 **Implementation status (2026-10-10):** [PR #19](https://github.com/Kajonn/sweetroll/pull/19) delivers the core slice, with required CI #91 passed; isolated deployed multi-account/offline acceptance passed. [Evidence and remaining gates](../../acceptance/campaign-data-templates-2026-10-10.md).
 
-**Execution plan:** [Campaign data-only templates — slice B](2026-10-09-campaign-data-templates.md). Deliver create-and-publish to all players, immutable content revisions distinct from resource revisions, explicit archive/recover, server-materialized copies and frozen offline references in one implementation PR. Private drafts, inherited actions and explicit instance updates remain later work. The plan also defines returned-sheet snapshots and a conservative guard against entry loss during migration/rollback.
+**Execution plan:** [Campaign data-only templates — slice B](2026-10-09-campaign-data-templates.md). Delivered create-and-publish to all players, immutable content revisions distinct from resource revisions, explicit archive/recover, server-materialized copies and frozen offline references. Private drafts and inherited actions remain later work. Returned-sheet snapshots remain supported; historical upgrade/migration safeguards are superseded by the pre-release policy above.
 
 - Add a campaign-owned catalog resource keyed by campaign ID and stable template ID, with revision, lifecycle, creator, kind, labels, bounded fields, source metadata and audience. Keep it distinct from `campaign_content_items` notes and from immutable system packages.
 - Add campaign Module operations and HTTP contracts for create/list/read/update/archive; all mutations require expected revision and idempotency. Pagination filters by active membership and audience before returning results. Archive is recoverable while retention permits.
@@ -55,20 +57,23 @@ On phones, keep Add in the existing slot interaction, show scope and source in t
 
 ### C. Derived campaign templates with inherited actions
 
+**Implemented and accepted in PR #25:** see the [2026-10-31 execution plan](2026-10-31-campaign-inherited-actions.md). It covers authoritative base/default validation, a shared effective entry resolver, placement/lifecycle, inherited pushes, typed GUI controls and current-app offline/retry verification. This is adventure-items C, distinct from the completed dice/push C.
+
 - Resolve the base against the campaign's pinned published system version. Allow only label/description/default-value overrides in the first pass; do not accept new expressions, action definitions, or field schemas. Validate compatible slot kinds and every referenced character attribute; reject missing references and budget violations at authoring and use.
 - Snapshot the validated base action definitions in an immutable campaign template revision or pin the exact base version and revision with equivalent immutable lookup. The runtime uses the same granted-action evaluator and server authorization as system entries; no client-authored executable input. Preserve result/history after removal.
-- Preview changes to existing instances before explicit migration; a campaign system upgrade must not silently reinterpret base template references. Include a compatible migration path or block upgrade with an actionable conflict until mappings are supplied.
+- Fix the base identity at creation and keep placed copies on their materialized revision. Later catalog edits affect new placements only. A character/campaign pin mismatch is rejected; no ID mapping, rebase, rules-version upgrade or instance migration is implemented.
+- Preserve inherited push policies through the existing authoritative saved-pool/lineage flow. Catalog edits/archive do not change a placed copy's source; removal and placement-scope changes follow the current push contract.
 - Gate: derived Longsword uses carrying character's Might for hit and damage; another character missing the required attribute cannot add it; nominal action, removed entry and history behave as existing system templates; a later catalog revision does not change placed entries.
 
-### D. Restricted audiences and player proposals (follow-up)
+### D. Player proposals, then restricted audiences (follow-up)
 
-- Add GM-only/selected-player draft visibility with explicit reveal and safe placement; prove direct-ID, list, projection, offline cache purge and preview-as-player behavior. Keep hidden drafts off character sheets.
-- Add player proposals with submit/approve/reject status, distinct from live campaign templates. Approval creates a campaign revision; it never rewrites the personal entry automatically.
+- D1: add data-only player proposals with submit/approve/reject status, distinct from live campaign templates. Approval creates a campaign revision; it never rewrites the personal entry automatically.
+- D2: add GM-only/selected-player draft visibility with explicit reveal and safe placement; prove direct-ID, list, projection, offline cache purge and preview-as-player behavior. Keep hidden drafts off character sheets.
 
 ## Verification and release
 
-- Unit: slot/kind, lengths/budgets, source resolution, immutable revision, action inheritance, cross-version invalidation and backward decoding.
-- Integration: actor/GM/controller permissions, cross-campaign ID isolation, list filtering, revision conflict, idempotent retry, archive, upgrade and revocation. Test that hidden drafts cannot leak through character projections or cached selectors before enabling restricted audiences.
+- Unit: slot/kind, lengths/budgets, pinned-source resolution, immutable revision, typed defaults, action/push inheritance and rejection of invalid current-format values/pins.
+- Integration: actor/GM/controller permissions, cross-campaign ID isolation, list filtering, revision conflict, idempotent retry, archive/return and revocation. Test that hidden drafts cannot leak through character projections or cached selectors before enabling restricted audiences in D2. No app/version transition fixtures.
 - Browser journey: player creates a personal key and edits quantity/notes; GM creates a campaign item derived from Longsword; player adds and rolls hit/damage; GM revises the catalog item; existing character remains on its pinned revision; new placement sees the revision; removal hides actions and preserves roll history. Repeat core write offline/reconnect and with a second editor causing a conflict.
 - Run relevant server/web tests and a deployed acceptance journey before release; record CI and findings in `docs/acceptance/`.
 

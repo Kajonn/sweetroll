@@ -548,3 +548,28 @@ describe("granted pool evaluation failures", () => {
     expect(state).toEqual(before);
   });
 });
+
+
+describe("derived campaign copies", () => {
+  it("projects and executes a pinned derived copy without catalog lookup or metadata bindings", async () => {
+    const document = entryDocument();
+    document.sheets[0]!.sections[0]!.elements.push({kind:"slot",id:"inventory_element",slotId:"inventory"});
+    document.expressions.find(e=>e.id === "longsword_attack_expr")!.source = "d20 + fields.strength_mod + fields.weapon_bonus";
+    const pkg=compileEntryPackage(document), runtime=createRuntime(pkg);
+    const state=await initializedState(runtime,pkg);
+    state.entries![SWORD_ENTRY_ID]={entryId:SWORD_ENTRY_ID,slotId:"inventory",templateId:null,
+      source:{kind:"campaign",campaignId:SWORD_ENTRY_ID,templateId:TORCH_ENTRY_ID,templateRevision:1,contentRevision:1},
+      snapshot:{kind:"item",values:{name:"Captain's sword",description:"",notes:""},base:{versionId:pkg.versionId,packageChecksum:pkg.integrity.checksum,templateId:"longsword"},defaultValues:{weapon_bonus:4}},values:{weapon_bonus:4}} as any;
+    const observed=await runtime.resolve({versionId:pkg.versionId,entityId:"character",state,intent:{kind:"observe"}});
+    expect(observed.ok).toBe(true);
+    if(!observed.ok) return;
+    const elements=observed.value.projection.sheets[0]!.sections[0]!.elements;
+    expect(elements).toContainEqual(expect.objectContaining({kind:"action",entryId:SWORD_ENTRY_ID,actionId:"longsword_attack"}));
+    expect(elements.find(e=>e.kind==="slot")).toMatchObject({entries:[{label:"Captain's sword",values:{weapon_bonus:4}}]});
+    const result=await runtime.resolve({versionId:pkg.versionId,entityId:"character",state,intent:{kind:"action",entryId:SWORD_ENTRY_ID,actionId:"longsword_attack",inputs:{},executionId:TORCH_ENTRY_ID}});
+    expect(result.ok).toBe(true);
+    if(result.ok) expect(result.value.roll?.bindings).toEqual(expect.arrayContaining([{scope:"fields",definitionId:"strength_mod",value:2},{scope:"fields",definitionId:"weapon_bonus",value:4}]));
+    (state.entries![SWORD_ENTRY_ID]!.snapshot as any).base.packageChecksum="forged";
+    expect(await runtime.resolve({versionId:pkg.versionId,entityId:"character",state,intent:{kind:"observe"}})).toMatchObject({ok:false,error:{code:"invalid_state"}});
+  });
+});

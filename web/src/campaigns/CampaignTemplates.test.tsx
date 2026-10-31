@@ -25,6 +25,7 @@ function setup(isGm = true) {
     defaultOptions: { queries: { retry: false } },
   });
   const api: CampaignTemplatesApi = {
+    bases:vi.fn().mockResolvedValue({templates:[]}),
     list: vi
       .fn()
       .mockResolvedValue({ templates: [template], nextCursor: null }),
@@ -135,6 +136,7 @@ it("discards a delayed catalog response after switching accounts", async () => {
     },
   );
   const api: CampaignTemplatesApi = {
+    bases:vi.fn().mockResolvedValue({templates:[]}),
     list: vi
       .fn()
       .mockReturnValueOnce(old)
@@ -189,4 +191,17 @@ it("discards a delayed catalog response after switching accounts", async () => {
     ]),
   ).toBeUndefined();
   expect(screen.queryByText("Tower key")).toBeNull();
+});
+
+it("derives a template using labeled base choices and typed defaults without executable inputs",async()=>{
+ const {api,user}=setup();
+ vi.mocked(api.bases).mockResolvedValue({templates:[{id:"sword",kind:"item",label:"Longsword",fields:[{id:"damage_bonus",kind:"integer",label:"Damage bonus",default:1,required:true,min:0,max:10,step:1}],grantedActions:[{id:"hit",kind:"roll",label:"Hit",inputs:[],expressionId:"hit_expr",outputTemplate:"{total}"}]}]});
+ await screen.findByText("Tower key");await user.click(screen.getByRole("button",{name:"Create template"}));
+ await user.selectOptions(await screen.findByLabelText("Source"),"system");
+ await user.selectOptions(await screen.findByLabelText("System template"),"sword");
+ const bonus=await screen.findByLabelText("Damage bonus");await user.clear(bonus);await user.type(bonus,"4");
+ expect(screen.getByText(/Inherited actions: Hit/)).toBeVisible();
+ const name=screen.getByRole("textbox",{name:"Name"});await user.clear(name);await user.type(name,"Captain's sword");
+ await user.click(screen.getByRole("button",{name:"Publish to all members"}));
+ await waitFor(()=>expect(api.create).toHaveBeenCalledWith("campaign",expect.objectContaining({baseTemplateId:"sword",content:expect.objectContaining({name:"Captain's sword",defaultValues:{damage_bonus:4}})})));
 });

@@ -468,6 +468,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns/{id}/item-templates/bases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaigns_id_item_templates_bases"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/campaigns/{id}/item-templates": {
         parameters: {
             query?: never;
@@ -2982,9 +2998,7 @@ export interface operations {
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
-                                            /** Format: uuid */
                                             campaignId: string;
-                                            /** Format: uuid */
                                             templateId: string;
                                             templateRevision: number;
                                             contentRevision: number;
@@ -2992,9 +3006,27 @@ export interface operations {
                                         snapshot?: {
                                             kind: "item" | "spell" | "talent" | "effect";
                                             values: {
-                                                [key: string]: string;
+                                                name: string;
+                                                description?: string;
+                                                notes?: string;
                                             };
                                             quantity?: number;
+                                        } | {
+                                            kind: "item" | "spell" | "talent" | "effect";
+                                            values: {
+                                                name: string;
+                                                description?: string;
+                                                notes?: string;
+                                            };
+                                            quantity?: number;
+                                            base: {
+                                                versionId: string;
+                                                packageChecksum: string;
+                                                templateId: string;
+                                            };
+                                            defaultValues: {
+                                                [key: string]: unknown;
+                                            };
                                         };
                                         values: {
                                             [key: string]: unknown;
@@ -3138,6 +3170,44 @@ export interface operations {
                                             label: string;
                                             accepts: ("item" | "spell" | "talent" | "effect")[];
                                             entries: {
+                                                definition?: {
+                                                    id: string;
+                                                    label: string;
+                                                    kind: "item" | "spell" | "talent" | "effect";
+                                                    fields: {
+                                                        required?: boolean;
+                                                        min?: number;
+                                                        max?: number;
+                                                        step?: number;
+                                                        minLength?: number;
+                                                        maxLength?: number;
+                                                        options?: {
+                                                            id: string;
+                                                            label: string;
+                                                        }[];
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                        default: unknown;
+                                                    }[];
+                                                    grantedActions: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "roll" | "resourceBump";
+                                                        inputs: {
+                                                            id: string;
+                                                            label: string;
+                                                            valueType: "integer" | "decimal" | "boolean" | "text";
+                                                            required: boolean;
+                                                            default: string | number | boolean | null;
+                                                        }[];
+                                                    }[];
+                                                };
+                                                metadata?: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
                                                 source?: {
                                                     /** @constant */
                                                     kind: "personal";
@@ -3148,9 +3218,7 @@ export interface operations {
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
-                                                    /** Format: uuid */
                                                     campaignId: string;
-                                                    /** Format: uuid */
                                                     templateId: string;
                                                     templateRevision: number;
                                                     contentRevision: number;
@@ -3821,9 +3889,7 @@ export interface operations {
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
-                                            /** Format: uuid */
                                             campaignId: string;
-                                            /** Format: uuid */
                                             templateId: string;
                                             templateRevision: number;
                                             contentRevision: number;
@@ -3831,9 +3897,27 @@ export interface operations {
                                         snapshot?: {
                                             kind: "item" | "spell" | "talent" | "effect";
                                             values: {
-                                                [key: string]: string;
+                                                name: string;
+                                                description?: string;
+                                                notes?: string;
                                             };
                                             quantity?: number;
+                                        } | {
+                                            kind: "item" | "spell" | "talent" | "effect";
+                                            values: {
+                                                name: string;
+                                                description?: string;
+                                                notes?: string;
+                                            };
+                                            quantity?: number;
+                                            base: {
+                                                versionId: string;
+                                                packageChecksum: string;
+                                                templateId: string;
+                                            };
+                                            defaultValues: {
+                                                [key: string]: unknown;
+                                            };
                                         };
                                         values: {
                                             [key: string]: unknown;
@@ -3977,6 +4061,44 @@ export interface operations {
                                             label: string;
                                             accepts: ("item" | "spell" | "talent" | "effect")[];
                                             entries: {
+                                                definition?: {
+                                                    id: string;
+                                                    label: string;
+                                                    kind: "item" | "spell" | "talent" | "effect";
+                                                    fields: {
+                                                        required?: boolean;
+                                                        min?: number;
+                                                        max?: number;
+                                                        step?: number;
+                                                        minLength?: number;
+                                                        maxLength?: number;
+                                                        options?: {
+                                                            id: string;
+                                                            label: string;
+                                                        }[];
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                        default: unknown;
+                                                    }[];
+                                                    grantedActions: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "roll" | "resourceBump";
+                                                        inputs: {
+                                                            id: string;
+                                                            label: string;
+                                                            valueType: "integer" | "decimal" | "boolean" | "text";
+                                                            required: boolean;
+                                                            default: string | number | boolean | null;
+                                                        }[];
+                                                    }[];
+                                                };
+                                                metadata?: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
                                                 source?: {
                                                     /** @constant */
                                                     kind: "personal";
@@ -3987,9 +4109,7 @@ export interface operations {
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
-                                                    /** Format: uuid */
                                                     campaignId: string;
-                                                    /** Format: uuid */
                                                     templateId: string;
                                                     templateRevision: number;
                                                     contentRevision: number;
@@ -4227,9 +4347,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -4237,9 +4355,27 @@ export interface operations {
                                             snapshot?: {
                                                 kind: "item" | "spell" | "talent" | "effect";
                                                 values: {
-                                                    [key: string]: string;
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
                                                 };
                                                 quantity?: number;
+                                            } | {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
+                                                quantity?: number;
+                                                base: {
+                                                    versionId: string;
+                                                    packageChecksum: string;
+                                                    templateId: string;
+                                                };
+                                                defaultValues: {
+                                                    [key: string]: unknown;
+                                                };
                                             };
                                             values: {
                                                 [key: string]: unknown;
@@ -4383,6 +4519,44 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    definition?: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "item" | "spell" | "talent" | "effect";
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
+                                                                id: string;
+                                                                label: string;
+                                                            }[];
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "roll" | "resourceBump";
+                                                            inputs: {
+                                                                id: string;
+                                                                label: string;
+                                                                valueType: "integer" | "decimal" | "boolean" | "text";
+                                                                required: boolean;
+                                                                default: string | number | boolean | null;
+                                                            }[];
+                                                        }[];
+                                                    };
+                                                    metadata?: {
+                                                        name: string;
+                                                        description?: string;
+                                                        notes?: string;
+                                                    };
                                                     source?: {
                                                         /** @constant */
                                                         kind: "personal";
@@ -4393,9 +4567,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -4782,9 +4954,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -4792,9 +4962,27 @@ export interface operations {
                                             snapshot?: {
                                                 kind: "item" | "spell" | "talent" | "effect";
                                                 values: {
-                                                    [key: string]: string;
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
                                                 };
                                                 quantity?: number;
+                                            } | {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
+                                                quantity?: number;
+                                                base: {
+                                                    versionId: string;
+                                                    packageChecksum: string;
+                                                    templateId: string;
+                                                };
+                                                defaultValues: {
+                                                    [key: string]: unknown;
+                                                };
                                             };
                                             values: {
                                                 [key: string]: unknown;
@@ -4938,6 +5126,44 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    definition?: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "item" | "spell" | "talent" | "effect";
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
+                                                                id: string;
+                                                                label: string;
+                                                            }[];
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "roll" | "resourceBump";
+                                                            inputs: {
+                                                                id: string;
+                                                                label: string;
+                                                                valueType: "integer" | "decimal" | "boolean" | "text";
+                                                                required: boolean;
+                                                                default: string | number | boolean | null;
+                                                            }[];
+                                                        }[];
+                                                    };
+                                                    metadata?: {
+                                                        name: string;
+                                                        description?: string;
+                                                        notes?: string;
+                                                    };
                                                     source?: {
                                                         /** @constant */
                                                         kind: "personal";
@@ -4948,9 +5174,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -5337,9 +5561,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -5347,9 +5569,27 @@ export interface operations {
                                             snapshot?: {
                                                 kind: "item" | "spell" | "talent" | "effect";
                                                 values: {
-                                                    [key: string]: string;
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
                                                 };
                                                 quantity?: number;
+                                            } | {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
+                                                quantity?: number;
+                                                base: {
+                                                    versionId: string;
+                                                    packageChecksum: string;
+                                                    templateId: string;
+                                                };
+                                                defaultValues: {
+                                                    [key: string]: unknown;
+                                                };
                                             };
                                             values: {
                                                 [key: string]: unknown;
@@ -5493,6 +5733,44 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    definition?: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "item" | "spell" | "talent" | "effect";
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
+                                                                id: string;
+                                                                label: string;
+                                                            }[];
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "roll" | "resourceBump";
+                                                            inputs: {
+                                                                id: string;
+                                                                label: string;
+                                                                valueType: "integer" | "decimal" | "boolean" | "text";
+                                                                required: boolean;
+                                                                default: string | number | boolean | null;
+                                                            }[];
+                                                        }[];
+                                                    };
+                                                    metadata?: {
+                                                        name: string;
+                                                        description?: string;
+                                                        notes?: string;
+                                                    };
                                                     source?: {
                                                         /** @constant */
                                                         kind: "personal";
@@ -5503,9 +5781,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -6419,9 +6695,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -6429,9 +6703,27 @@ export interface operations {
                                             snapshot?: {
                                                 kind: "item" | "spell" | "talent" | "effect";
                                                 values: {
-                                                    [key: string]: string;
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
                                                 };
                                                 quantity?: number;
+                                            } | {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
+                                                quantity?: number;
+                                                base: {
+                                                    versionId: string;
+                                                    packageChecksum: string;
+                                                    templateId: string;
+                                                };
+                                                defaultValues: {
+                                                    [key: string]: unknown;
+                                                };
                                             };
                                             values: {
                                                 [key: string]: unknown;
@@ -6575,6 +6867,44 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    definition?: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "item" | "spell" | "talent" | "effect";
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
+                                                                id: string;
+                                                                label: string;
+                                                            }[];
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "roll" | "resourceBump";
+                                                            inputs: {
+                                                                id: string;
+                                                                label: string;
+                                                                valueType: "integer" | "decimal" | "boolean" | "text";
+                                                                required: boolean;
+                                                                default: string | number | boolean | null;
+                                                            }[];
+                                                        }[];
+                                                    };
+                                                    metadata?: {
+                                                        name: string;
+                                                        description?: string;
+                                                        notes?: string;
+                                                    };
                                                     source?: {
                                                         /** @constant */
                                                         kind: "personal";
@@ -6585,9 +6915,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -6986,9 +7314,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -6996,9 +7322,27 @@ export interface operations {
                                             snapshot?: {
                                                 kind: "item" | "spell" | "talent" | "effect";
                                                 values: {
-                                                    [key: string]: string;
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
                                                 };
                                                 quantity?: number;
+                                            } | {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
+                                                quantity?: number;
+                                                base: {
+                                                    versionId: string;
+                                                    packageChecksum: string;
+                                                    templateId: string;
+                                                };
+                                                defaultValues: {
+                                                    [key: string]: unknown;
+                                                };
                                             };
                                             values: {
                                                 [key: string]: unknown;
@@ -7142,6 +7486,44 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    definition?: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "item" | "spell" | "talent" | "effect";
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
+                                                                id: string;
+                                                                label: string;
+                                                            }[];
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "roll" | "resourceBump";
+                                                            inputs: {
+                                                                id: string;
+                                                                label: string;
+                                                                valueType: "integer" | "decimal" | "boolean" | "text";
+                                                                required: boolean;
+                                                                default: string | number | boolean | null;
+                                                            }[];
+                                                        }[];
+                                                    };
+                                                    metadata?: {
+                                                        name: string;
+                                                        description?: string;
+                                                        notes?: string;
+                                                    };
                                                     source?: {
                                                         /** @constant */
                                                         kind: "personal";
@@ -7152,9 +7534,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -7497,9 +7877,7 @@ export interface operations {
                         } | {
                             /** @constant */
                             kind: "campaign";
-                            /** Format: uuid */
                             campaignId: string;
-                            /** Format: uuid */
                             templateId: string;
                             templateRevision: number;
                             contentRevision: number;
@@ -7566,9 +7944,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -7576,9 +7952,27 @@ export interface operations {
                                             snapshot?: {
                                                 kind: "item" | "spell" | "talent" | "effect";
                                                 values: {
-                                                    [key: string]: string;
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
                                                 };
                                                 quantity?: number;
+                                            } | {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
+                                                quantity?: number;
+                                                base: {
+                                                    versionId: string;
+                                                    packageChecksum: string;
+                                                    templateId: string;
+                                                };
+                                                defaultValues: {
+                                                    [key: string]: unknown;
+                                                };
                                             };
                                             values: {
                                                 [key: string]: unknown;
@@ -7722,6 +8116,44 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    definition?: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "item" | "spell" | "talent" | "effect";
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
+                                                                id: string;
+                                                                label: string;
+                                                            }[];
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "roll" | "resourceBump";
+                                                            inputs: {
+                                                                id: string;
+                                                                label: string;
+                                                                valueType: "integer" | "decimal" | "boolean" | "text";
+                                                                required: boolean;
+                                                                default: string | number | boolean | null;
+                                                            }[];
+                                                        }[];
+                                                    };
+                                                    metadata?: {
+                                                        name: string;
+                                                        description?: string;
+                                                        notes?: string;
+                                                    };
                                                     source?: {
                                                         /** @constant */
                                                         kind: "personal";
@@ -7732,9 +8164,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -8120,9 +8550,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -8130,9 +8558,27 @@ export interface operations {
                                             snapshot?: {
                                                 kind: "item" | "spell" | "talent" | "effect";
                                                 values: {
-                                                    [key: string]: string;
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
                                                 };
                                                 quantity?: number;
+                                            } | {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
+                                                quantity?: number;
+                                                base: {
+                                                    versionId: string;
+                                                    packageChecksum: string;
+                                                    templateId: string;
+                                                };
+                                                defaultValues: {
+                                                    [key: string]: unknown;
+                                                };
                                             };
                                             values: {
                                                 [key: string]: unknown;
@@ -8276,6 +8722,44 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    definition?: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "item" | "spell" | "talent" | "effect";
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
+                                                                id: string;
+                                                                label: string;
+                                                            }[];
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "roll" | "resourceBump";
+                                                            inputs: {
+                                                                id: string;
+                                                                label: string;
+                                                                valueType: "integer" | "decimal" | "boolean" | "text";
+                                                                required: boolean;
+                                                                default: string | number | boolean | null;
+                                                            }[];
+                                                        }[];
+                                                    };
+                                                    metadata?: {
+                                                        name: string;
+                                                        description?: string;
+                                                        notes?: string;
+                                                    };
                                                     source?: {
                                                         /** @constant */
                                                         kind: "personal";
@@ -8286,9 +8770,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -8678,9 +9160,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -8688,9 +9168,27 @@ export interface operations {
                                             snapshot?: {
                                                 kind: "item" | "spell" | "talent" | "effect";
                                                 values: {
-                                                    [key: string]: string;
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
                                                 };
                                                 quantity?: number;
+                                            } | {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
+                                                quantity?: number;
+                                                base: {
+                                                    versionId: string;
+                                                    packageChecksum: string;
+                                                    templateId: string;
+                                                };
+                                                defaultValues: {
+                                                    [key: string]: unknown;
+                                                };
                                             };
                                             values: {
                                                 [key: string]: unknown;
@@ -8834,6 +9332,44 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    definition?: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "item" | "spell" | "talent" | "effect";
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
+                                                                id: string;
+                                                                label: string;
+                                                            }[];
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "roll" | "resourceBump";
+                                                            inputs: {
+                                                                id: string;
+                                                                label: string;
+                                                                valueType: "integer" | "decimal" | "boolean" | "text";
+                                                                required: boolean;
+                                                                default: string | number | boolean | null;
+                                                            }[];
+                                                        }[];
+                                                    };
+                                                    metadata?: {
+                                                        name: string;
+                                                        description?: string;
+                                                        notes?: string;
+                                                    };
                                                     source?: {
                                                         /** @constant */
                                                         kind: "personal";
@@ -8844,9 +9380,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -9194,9 +9728,7 @@ export interface operations {
                             } | {
                                 /** @constant */
                                 kind: "campaign";
-                                /** Format: uuid */
                                 campaignId: string;
-                                /** Format: uuid */
                                 templateId: string;
                                 templateRevision: number;
                                 contentRevision: number;
@@ -9519,9 +10051,7 @@ export interface operations {
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
-                                                /** Format: uuid */
                                                 campaignId: string;
-                                                /** Format: uuid */
                                                 templateId: string;
                                                 templateRevision: number;
                                                 contentRevision: number;
@@ -9529,9 +10059,27 @@ export interface operations {
                                             snapshot?: {
                                                 kind: "item" | "spell" | "talent" | "effect";
                                                 values: {
-                                                    [key: string]: string;
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
                                                 };
                                                 quantity?: number;
+                                            } | {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
+                                                quantity?: number;
+                                                base: {
+                                                    versionId: string;
+                                                    packageChecksum: string;
+                                                    templateId: string;
+                                                };
+                                                defaultValues: {
+                                                    [key: string]: unknown;
+                                                };
                                             };
                                             values: {
                                                 [key: string]: unknown;
@@ -9675,6 +10223,44 @@ export interface operations {
                                                 label: string;
                                                 accepts: ("item" | "spell" | "talent" | "effect")[];
                                                 entries: {
+                                                    definition?: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "item" | "spell" | "talent" | "effect";
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
+                                                                id: string;
+                                                                label: string;
+                                                            }[];
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "roll" | "resourceBump";
+                                                            inputs: {
+                                                                id: string;
+                                                                label: string;
+                                                                valueType: "integer" | "decimal" | "boolean" | "text";
+                                                                required: boolean;
+                                                                default: string | number | boolean | null;
+                                                            }[];
+                                                        }[];
+                                                    };
+                                                    metadata?: {
+                                                        name: string;
+                                                        description?: string;
+                                                        notes?: string;
+                                                    };
                                                     source?: {
                                                         /** @constant */
                                                         kind: "personal";
@@ -9685,9 +10271,7 @@ export interface operations {
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
-                                                        /** Format: uuid */
                                                         campaignId: string;
-                                                        /** Format: uuid */
                                                         templateId: string;
                                                         templateRevision: number;
                                                         contentRevision: number;
@@ -10070,9 +10654,7 @@ export interface operations {
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
-                                            /** Format: uuid */
                                             campaignId: string;
-                                            /** Format: uuid */
                                             templateId: string;
                                             templateRevision: number;
                                             contentRevision: number;
@@ -10080,9 +10662,27 @@ export interface operations {
                                         snapshot?: {
                                             kind: "item" | "spell" | "talent" | "effect";
                                             values: {
-                                                [key: string]: string;
+                                                name: string;
+                                                description?: string;
+                                                notes?: string;
                                             };
                                             quantity?: number;
+                                        } | {
+                                            kind: "item" | "spell" | "talent" | "effect";
+                                            values: {
+                                                name: string;
+                                                description?: string;
+                                                notes?: string;
+                                            };
+                                            quantity?: number;
+                                            base: {
+                                                versionId: string;
+                                                packageChecksum: string;
+                                                templateId: string;
+                                            };
+                                            defaultValues: {
+                                                [key: string]: unknown;
+                                            };
                                         };
                                         values: {
                                             [key: string]: unknown;
@@ -10226,6 +10826,44 @@ export interface operations {
                                             label: string;
                                             accepts: ("item" | "spell" | "talent" | "effect")[];
                                             entries: {
+                                                definition?: {
+                                                    id: string;
+                                                    label: string;
+                                                    kind: "item" | "spell" | "talent" | "effect";
+                                                    fields: {
+                                                        required?: boolean;
+                                                        min?: number;
+                                                        max?: number;
+                                                        step?: number;
+                                                        minLength?: number;
+                                                        maxLength?: number;
+                                                        options?: {
+                                                            id: string;
+                                                            label: string;
+                                                        }[];
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                        default: unknown;
+                                                    }[];
+                                                    grantedActions: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "roll" | "resourceBump";
+                                                        inputs: {
+                                                            id: string;
+                                                            label: string;
+                                                            valueType: "integer" | "decimal" | "boolean" | "text";
+                                                            required: boolean;
+                                                            default: string | number | boolean | null;
+                                                        }[];
+                                                    }[];
+                                                };
+                                                metadata?: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
                                                 source?: {
                                                     /** @constant */
                                                     kind: "personal";
@@ -10236,9 +10874,7 @@ export interface operations {
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
-                                                    /** Format: uuid */
                                                     campaignId: string;
-                                                    /** Format: uuid */
                                                     templateId: string;
                                                     templateRevision: number;
                                                     contentRevision: number;
@@ -10789,9 +11425,7 @@ export interface operations {
                                     } | {
                                         /** @constant */
                                         kind: "campaign";
-                                        /** Format: uuid */
                                         campaignId: string;
-                                        /** Format: uuid */
                                         templateId: string;
                                         templateRevision: number;
                                         contentRevision: number;
@@ -10799,9 +11433,27 @@ export interface operations {
                                     snapshot?: {
                                         kind: "item" | "spell" | "talent" | "effect";
                                         values: {
-                                            [key: string]: string;
+                                            name: string;
+                                            description?: string;
+                                            notes?: string;
                                         };
                                         quantity?: number;
+                                    } | {
+                                        kind: "item" | "spell" | "talent" | "effect";
+                                        values: {
+                                            name: string;
+                                            description?: string;
+                                            notes?: string;
+                                        };
+                                        quantity?: number;
+                                        base: {
+                                            versionId: string;
+                                            packageChecksum: string;
+                                            templateId: string;
+                                        };
+                                        defaultValues: {
+                                            [key: string]: unknown;
+                                        };
                                     };
                                     values: {
                                         [key: string]: unknown;
@@ -10926,6 +11578,261 @@ export interface operations {
             };
         };
     };
+    get_campaigns_id_item_templates_bases: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        templates: {
+                            id: string;
+                            label: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            description?: string;
+                            fields: ({
+                                /** @constant */
+                                kind: "text";
+                                id: string;
+                                label: string;
+                                default: string;
+                                required: boolean;
+                                minLength: number;
+                                maxLength: number;
+                            } | {
+                                /** @constant */
+                                kind: "integer";
+                                id: string;
+                                label: string;
+                                default: number;
+                                required: boolean;
+                                min: number;
+                                max: number;
+                                step: number;
+                            } | {
+                                /** @constant */
+                                kind: "decimal";
+                                id: string;
+                                label: string;
+                                default: number;
+                                required: boolean;
+                                min: number;
+                                max: number;
+                                step: number;
+                            } | {
+                                /** @constant */
+                                kind: "boolean";
+                                id: string;
+                                label: string;
+                                default: boolean;
+                                required: boolean;
+                            } | {
+                                /** @constant */
+                                kind: "singleChoice";
+                                id: string;
+                                label: string;
+                                required: boolean;
+                                default: string | null;
+                                options: {
+                                    id: string;
+                                    label: string;
+                                }[];
+                            } | {
+                                /** @constant */
+                                kind: "multiChoice";
+                                id: string;
+                                label: string;
+                                required: boolean;
+                                default: string[];
+                                options: {
+                                    id: string;
+                                    label: string;
+                                }[];
+                            } | {
+                                /** @constant */
+                                kind: "resource";
+                                id: string;
+                                label: string;
+                                default: {
+                                    current: number;
+                                    max: number;
+                                };
+                                min: number;
+                                max: number;
+                                step: number;
+                                resetTo: "min" | "max";
+                            } | {
+                                /** @constant */
+                                kind: "computed";
+                                id: string;
+                                label: string;
+                                valueType: "number" | "text" | "boolean";
+                                expressionId: string;
+                            } | {
+                                /** @constant */
+                                kind: "image";
+                                id: string;
+                                label: string;
+                                required: boolean;
+                            })[];
+                            grantedActions: ({
+                                pushPolicy?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    maxAttempts: number;
+                                    successThreshold: number;
+                                    allowOnSuccess: boolean;
+                                    groups: {
+                                        groupId: string;
+                                        lockedFaces: number[];
+                                        reportedFaces: number[];
+                                    }[];
+                                };
+                                /** @constant */
+                                kind: "roll";
+                                id: string;
+                                label: string;
+                                expressionId: string;
+                                inputs: {
+                                    id: string;
+                                    label: string;
+                                    valueType: "integer" | "decimal" | "boolean" | "text";
+                                    required: boolean;
+                                    default: string | number | boolean | null;
+                                }[];
+                                outputTemplate: string;
+                                nominal?: boolean;
+                            } | {
+                                /** @constant */
+                                kind: "resourceBump";
+                                id: string;
+                                label: string;
+                                resourceId: string;
+                                operation: {
+                                    /** @constant */
+                                    kind: "delta";
+                                    amount: number;
+                                } | {
+                                    /** @constant */
+                                    kind: "reset";
+                                };
+                                nominal?: boolean;
+                            })[];
+                        }[];
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     get_campaigns_id_item_templates: {
         parameters: {
             query?: {
@@ -10959,10 +11866,18 @@ export interface operations {
                             revision: number;
                             contentRevision: number;
                             content: {
+                                defaultValues?: {
+                                    [key: string]: unknown;
+                                };
                                 name: string;
                                 description?: string;
                                 notes?: string;
                                 defaultQuantity?: number;
+                                base?: {
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    templateId: string;
+                                };
                             };
                             createdAt: string;
                             updatedAt: string;
@@ -11088,7 +12003,11 @@ export interface operations {
                     expectedTemplateRevision: 0;
                     idempotencyKey: string;
                     kind: "item" | "spell" | "talent" | "effect";
+                    baseTemplateId?: string;
                     content: {
+                        defaultValues?: {
+                            [key: string]: unknown;
+                        };
                         name: string;
                         description?: string;
                         notes?: string;
@@ -11115,10 +12034,18 @@ export interface operations {
                             revision: number;
                             contentRevision: number;
                             content: {
+                                defaultValues?: {
+                                    [key: string]: unknown;
+                                };
                                 name: string;
                                 description?: string;
                                 notes?: string;
                                 defaultQuantity?: number;
+                                base?: {
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    templateId: string;
+                                };
                             };
                             createdAt: string;
                             updatedAt: string;
@@ -11256,10 +12183,18 @@ export interface operations {
                             revision: number;
                             contentRevision: number;
                             content: {
+                                defaultValues?: {
+                                    [key: string]: unknown;
+                                };
                                 name: string;
                                 description?: string;
                                 notes?: string;
                                 defaultQuantity?: number;
+                                base?: {
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    templateId: string;
+                                };
                             };
                             createdAt: string;
                             updatedAt: string;
@@ -11384,6 +12319,9 @@ export interface operations {
                     expectedTemplateRevision: number;
                     idempotencyKey: string;
                     content: {
+                        defaultValues?: {
+                            [key: string]: unknown;
+                        };
                         name: string;
                         description?: string;
                         notes?: string;
@@ -11410,10 +12348,18 @@ export interface operations {
                             revision: number;
                             contentRevision: number;
                             content: {
+                                defaultValues?: {
+                                    [key: string]: unknown;
+                                };
                                 name: string;
                                 description?: string;
                                 notes?: string;
                                 defaultQuantity?: number;
+                                base?: {
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    templateId: string;
+                                };
                             };
                             createdAt: string;
                             updatedAt: string;
@@ -11558,10 +12504,18 @@ export interface operations {
                             revision: number;
                             contentRevision: number;
                             content: {
+                                defaultValues?: {
+                                    [key: string]: unknown;
+                                };
                                 name: string;
                                 description?: string;
                                 notes?: string;
                                 defaultQuantity?: number;
+                                base?: {
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    templateId: string;
+                                };
                             };
                             createdAt: string;
                             updatedAt: string;
@@ -11706,10 +12660,18 @@ export interface operations {
                             revision: number;
                             contentRevision: number;
                             content: {
+                                defaultValues?: {
+                                    [key: string]: unknown;
+                                };
                                 name: string;
                                 description?: string;
                                 notes?: string;
                                 defaultQuantity?: number;
+                                base?: {
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    templateId: string;
+                                };
                             };
                             createdAt: string;
                             updatedAt: string;
@@ -14218,9 +15180,7 @@ export interface operations {
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
-                                            /** Format: uuid */
                                             campaignId: string;
-                                            /** Format: uuid */
                                             templateId: string;
                                             templateRevision: number;
                                             contentRevision: number;
@@ -14228,9 +15188,27 @@ export interface operations {
                                         snapshot?: {
                                             kind: "item" | "spell" | "talent" | "effect";
                                             values: {
-                                                [key: string]: string;
+                                                name: string;
+                                                description?: string;
+                                                notes?: string;
                                             };
                                             quantity?: number;
+                                        } | {
+                                            kind: "item" | "spell" | "talent" | "effect";
+                                            values: {
+                                                name: string;
+                                                description?: string;
+                                                notes?: string;
+                                            };
+                                            quantity?: number;
+                                            base: {
+                                                versionId: string;
+                                                packageChecksum: string;
+                                                templateId: string;
+                                            };
+                                            defaultValues: {
+                                                [key: string]: unknown;
+                                            };
                                         };
                                         values: {
                                             [key: string]: unknown;
@@ -14374,6 +15352,44 @@ export interface operations {
                                             label: string;
                                             accepts: ("item" | "spell" | "talent" | "effect")[];
                                             entries: {
+                                                definition?: {
+                                                    id: string;
+                                                    label: string;
+                                                    kind: "item" | "spell" | "talent" | "effect";
+                                                    fields: {
+                                                        required?: boolean;
+                                                        min?: number;
+                                                        max?: number;
+                                                        step?: number;
+                                                        minLength?: number;
+                                                        maxLength?: number;
+                                                        options?: {
+                                                            id: string;
+                                                            label: string;
+                                                        }[];
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                        default: unknown;
+                                                    }[];
+                                                    grantedActions: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "roll" | "resourceBump";
+                                                        inputs: {
+                                                            id: string;
+                                                            label: string;
+                                                            valueType: "integer" | "decimal" | "boolean" | "text";
+                                                            required: boolean;
+                                                            default: string | number | boolean | null;
+                                                        }[];
+                                                    }[];
+                                                };
+                                                metadata?: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
                                                 source?: {
                                                     /** @constant */
                                                     kind: "personal";
@@ -14384,9 +15400,7 @@ export interface operations {
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
-                                                    /** Format: uuid */
                                                     campaignId: string;
-                                                    /** Format: uuid */
                                                     templateId: string;
                                                     templateRevision: number;
                                                     contentRevision: number;
@@ -14702,9 +15716,7 @@ export interface operations {
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
-                                            /** Format: uuid */
                                             campaignId: string;
-                                            /** Format: uuid */
                                             templateId: string;
                                             templateRevision: number;
                                             contentRevision: number;
@@ -14712,9 +15724,27 @@ export interface operations {
                                         snapshot?: {
                                             kind: "item" | "spell" | "talent" | "effect";
                                             values: {
-                                                [key: string]: string;
+                                                name: string;
+                                                description?: string;
+                                                notes?: string;
                                             };
                                             quantity?: number;
+                                        } | {
+                                            kind: "item" | "spell" | "talent" | "effect";
+                                            values: {
+                                                name: string;
+                                                description?: string;
+                                                notes?: string;
+                                            };
+                                            quantity?: number;
+                                            base: {
+                                                versionId: string;
+                                                packageChecksum: string;
+                                                templateId: string;
+                                            };
+                                            defaultValues: {
+                                                [key: string]: unknown;
+                                            };
                                         };
                                         values: {
                                             [key: string]: unknown;
@@ -14858,6 +15888,44 @@ export interface operations {
                                             label: string;
                                             accepts: ("item" | "spell" | "talent" | "effect")[];
                                             entries: {
+                                                definition?: {
+                                                    id: string;
+                                                    label: string;
+                                                    kind: "item" | "spell" | "talent" | "effect";
+                                                    fields: {
+                                                        required?: boolean;
+                                                        min?: number;
+                                                        max?: number;
+                                                        step?: number;
+                                                        minLength?: number;
+                                                        maxLength?: number;
+                                                        options?: {
+                                                            id: string;
+                                                            label: string;
+                                                        }[];
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                        default: unknown;
+                                                    }[];
+                                                    grantedActions: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "roll" | "resourceBump";
+                                                        inputs: {
+                                                            id: string;
+                                                            label: string;
+                                                            valueType: "integer" | "decimal" | "boolean" | "text";
+                                                            required: boolean;
+                                                            default: string | number | boolean | null;
+                                                        }[];
+                                                    }[];
+                                                };
+                                                metadata?: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
                                                 source?: {
                                                     /** @constant */
                                                     kind: "personal";
@@ -14868,9 +15936,7 @@ export interface operations {
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
-                                                    /** Format: uuid */
                                                     campaignId: string;
-                                                    /** Format: uuid */
                                                     templateId: string;
                                                     templateRevision: number;
                                                     contentRevision: number;
@@ -15090,9 +16156,7 @@ export interface operations {
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
-                                            /** Format: uuid */
                                             campaignId: string;
-                                            /** Format: uuid */
                                             templateId: string;
                                             templateRevision: number;
                                             contentRevision: number;
@@ -15100,9 +16164,27 @@ export interface operations {
                                         snapshot?: {
                                             kind: "item" | "spell" | "talent" | "effect";
                                             values: {
-                                                [key: string]: string;
+                                                name: string;
+                                                description?: string;
+                                                notes?: string;
                                             };
                                             quantity?: number;
+                                        } | {
+                                            kind: "item" | "spell" | "talent" | "effect";
+                                            values: {
+                                                name: string;
+                                                description?: string;
+                                                notes?: string;
+                                            };
+                                            quantity?: number;
+                                            base: {
+                                                versionId: string;
+                                                packageChecksum: string;
+                                                templateId: string;
+                                            };
+                                            defaultValues: {
+                                                [key: string]: unknown;
+                                            };
                                         };
                                         values: {
                                             [key: string]: unknown;
@@ -15246,6 +16328,44 @@ export interface operations {
                                             label: string;
                                             accepts: ("item" | "spell" | "talent" | "effect")[];
                                             entries: {
+                                                definition?: {
+                                                    id: string;
+                                                    label: string;
+                                                    kind: "item" | "spell" | "talent" | "effect";
+                                                    fields: {
+                                                        required?: boolean;
+                                                        min?: number;
+                                                        max?: number;
+                                                        step?: number;
+                                                        minLength?: number;
+                                                        maxLength?: number;
+                                                        options?: {
+                                                            id: string;
+                                                            label: string;
+                                                        }[];
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                        default: unknown;
+                                                    }[];
+                                                    grantedActions: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "roll" | "resourceBump";
+                                                        inputs: {
+                                                            id: string;
+                                                            label: string;
+                                                            valueType: "integer" | "decimal" | "boolean" | "text";
+                                                            required: boolean;
+                                                            default: string | number | boolean | null;
+                                                        }[];
+                                                    }[];
+                                                };
+                                                metadata?: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
                                                 source?: {
                                                     /** @constant */
                                                     kind: "personal";
@@ -15256,9 +16376,7 @@ export interface operations {
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
-                                                    /** Format: uuid */
                                                     campaignId: string;
-                                                    /** Format: uuid */
                                                     templateId: string;
                                                     templateRevision: number;
                                                     contentRevision: number;
@@ -15480,9 +16598,7 @@ export interface operations {
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
-                                            /** Format: uuid */
                                             campaignId: string;
-                                            /** Format: uuid */
                                             templateId: string;
                                             templateRevision: number;
                                             contentRevision: number;
@@ -15490,9 +16606,27 @@ export interface operations {
                                         snapshot?: {
                                             kind: "item" | "spell" | "talent" | "effect";
                                             values: {
-                                                [key: string]: string;
+                                                name: string;
+                                                description?: string;
+                                                notes?: string;
                                             };
                                             quantity?: number;
+                                        } | {
+                                            kind: "item" | "spell" | "talent" | "effect";
+                                            values: {
+                                                name: string;
+                                                description?: string;
+                                                notes?: string;
+                                            };
+                                            quantity?: number;
+                                            base: {
+                                                versionId: string;
+                                                packageChecksum: string;
+                                                templateId: string;
+                                            };
+                                            defaultValues: {
+                                                [key: string]: unknown;
+                                            };
                                         };
                                         values: {
                                             [key: string]: unknown;
@@ -15636,6 +16770,44 @@ export interface operations {
                                             label: string;
                                             accepts: ("item" | "spell" | "talent" | "effect")[];
                                             entries: {
+                                                definition?: {
+                                                    id: string;
+                                                    label: string;
+                                                    kind: "item" | "spell" | "talent" | "effect";
+                                                    fields: {
+                                                        required?: boolean;
+                                                        min?: number;
+                                                        max?: number;
+                                                        step?: number;
+                                                        minLength?: number;
+                                                        maxLength?: number;
+                                                        options?: {
+                                                            id: string;
+                                                            label: string;
+                                                        }[];
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                        default: unknown;
+                                                    }[];
+                                                    grantedActions: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "roll" | "resourceBump";
+                                                        inputs: {
+                                                            id: string;
+                                                            label: string;
+                                                            valueType: "integer" | "decimal" | "boolean" | "text";
+                                                            required: boolean;
+                                                            default: string | number | boolean | null;
+                                                        }[];
+                                                    }[];
+                                                };
+                                                metadata?: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
                                                 source?: {
                                                     /** @constant */
                                                     kind: "personal";
@@ -15646,9 +16818,7 @@ export interface operations {
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
-                                                    /** Format: uuid */
                                                     campaignId: string;
-                                                    /** Format: uuid */
                                                     templateId: string;
                                                     templateRevision: number;
                                                     contentRevision: number;
@@ -17114,10 +18284,18 @@ export interface operations {
                                 revision: number;
                                 contentRevision: number;
                                 content: {
+                                    defaultValues?: {
+                                        [key: string]: unknown;
+                                    };
                                     name: string;
                                     description?: string;
                                     notes?: string;
                                     defaultQuantity?: number;
+                                    base?: {
+                                        versionId: string;
+                                        packageChecksum: string;
+                                        templateId: string;
+                                    };
                                 };
                                 createdAt: string;
                                 updatedAt: string;

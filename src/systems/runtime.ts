@@ -1,3 +1,4 @@
+import {derivedEntryError} from "./implementation/runtime/effective-entry.js";
 import {findOwnedAction} from "./implementation/runtime/action-ownership.js";
 import {makePushContext,resolveRuntimePush} from "./implementation/runtime/push.js";
 import type {PushContext} from "./implementation/runtime/push-context.js";
@@ -198,6 +199,12 @@ export type CharacterProjectionElement =
 
 export type CharacterProjectionSlotEntry = {
   source?: import("./implementation/package/schema/dynamic.js").EntrySource;
+  definition?: {
+    id:string;label:string;kind:TemplateKind;
+    fields:Array<CharacterProjectionFieldConstraints & {id:string;label:string;kind:Exclude<import("./implementation/package/schema/index.js").FieldV1["kind"],"computed"|"image">;default:unknown}>;
+    grantedActions:Array<{id:string;label:string;kind:"roll"|"resourceBump";inputs:CharacterProjectionActionInput[]}>;
+  };
+  metadata?: {name:string;description?:string;notes?:string};
   entryId: string;
   templateId: DefinitionId | null;
   label: string;
@@ -434,6 +441,11 @@ export function createSystemRuntime(input: {
       }
       if (!stateResult.ok) return stateResult;
 
+      for(const entry of Object.values(stateResult.value.entries ?? {})) {
+        const siblings=Object.values(stateResult.value.entries ?? {}).filter(e=>e.slotId===entry.slotId && e.entryId!==entry.entryId).length;
+        const error=derivedEntryError(packageValue,entity,entry,siblings);
+        if(error) return {ok:false,error:{code:"invalid_state",message:error}};
+      }
       const observed = resolveObservedValues(packageValue, entity, stateResult.value);
       if (!observed.ok) return observed;
       if (pendingRoll !== null) {

@@ -127,7 +127,14 @@ const TemplateKindDto = Type.Union([
   Type.Literal("talent"),
   Type.Literal("effect"),
 ]);
+const ProjectedEntryDefinitionDto=Type.Object({
+ id:Type.String(),label:Type.String(),kind:TemplateKindDto,
+ fields:Type.Array(Type.Object({...ProjectionFieldConstraintsDto.properties,id:Type.String(),label:Type.String(),kind:Type.Union([Type.Literal("text"),Type.Literal("integer"),Type.Literal("decimal"),Type.Literal("boolean"),Type.Literal("singleChoice"),Type.Literal("multiChoice"),Type.Literal("resource")]),default:Type.Unknown()}),{maxItems:64}),
+ grantedActions:Type.Array(Type.Object({id:Type.String(),label:Type.String(),kind:Type.Union([Type.Literal("roll"),Type.Literal("resourceBump")]),inputs:Type.Array(ProjectionActionInputDto)}),{maxItems:16}),
+});
 const ProjectionSlotEntryDto = Type.Object({
+  definition:Type.Optional(ProjectedEntryDefinitionDto),
+  metadata:Type.Optional(Type.Object({name:Type.String(),description:Type.Optional(Type.String()),notes:Type.Optional(Type.String())})),
   source:Type.Optional(EntrySourceSchema),
   entryId: Type.String(),
   templateId: Type.Union([Type.String(), Type.Null()]),

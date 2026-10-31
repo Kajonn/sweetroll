@@ -202,6 +202,27 @@ describe("SlotListControl", () => {
     expect(handlers.onUpdateEntry).toHaveBeenCalledWith(SWORD_ENTRY_ID, { weapon_bonus: 3 }, 2);
   });
 
+  it("preserves an open value draft through sheet refreshes and starts the next edit from current values", async () => {
+    const user = userEvent.setup();
+    const handlers = callbacks();
+    const props = { slotId: "inventory", label: "Inventory", accepts: ["item"],
+      entries: [entries[0]!], templates, disabled: false, ...handlers };
+    const ui = render(<SlotListControl {...props} />);
+    await user.click(screen.getByRole("button", { name: "Edit values" }));
+    const bonus = screen.getByLabelText("Weapon bonus");
+    await user.clear(bonus);
+    await user.type(bonus, "3");
+    ui.rerender(<SlotListControl {...props} entries={structuredClone(props.entries)} />);
+    expect(bonus).toHaveValue(3);
+    expect(screen.getByRole("button", { name: "Save values" })).toBeEnabled();
+    const refreshed = [{ ...entries[0]!, values: { weapon_bonus: 9 } }];
+    ui.rerender(<SlotListControl {...props} entries={refreshed} />);
+    expect(bonus).toHaveValue(3);
+    await user.click(screen.getByRole("button", { name: /^Cancel$/ }));
+    await user.click(screen.getByRole("button", { name: "Edit values" }));
+    expect(screen.getByLabelText("Weapon bonus")).toHaveValue(9);
+  });
+
   it("disables entry controls while keeping the list readable", () => {
     renderControl({ disabled: true });
     expect(screen.getByTestId("slot-add-inventory")).toBeDisabled();
@@ -246,4 +267,14 @@ it("adopts a new campaign reference only after explicitly reviewing the refreshe
   await user.click(screen.getByRole("button", { name: "Use latest revision" }));
   await user.click(screen.getByTestId("slot-add-confirm-inventory"));
   expect(handlers.onAddEntry).toHaveBeenCalledWith("inventory", null, {}, undefined, revised.source);
+});
+
+it("keeps a derived copy editable and playable without any former campaign catalog",async()=>{
+ const handlers=renderControl({templates:[],entries:[{entryId:SWORD_ENTRY_ID,templateId:null,label:"Captain's sword",values:{weapon_bonus:4},source:{kind:"campaign",campaignId:"campaign",templateId:"catalog",templateRevision:1,contentRevision:1},definition:{id:"longsword",kind:"item",label:"Longsword",fields:templates[0]!.fields!,grantedActions:[{id:"longsword_attack",kind:"roll",label:"Longsword Attack",inputs:[],expressionId:"hit",outputTemplate:"{total}"}]},metadata:{name:"Captain's sword",notes:"A keepsake"}} as any]});
+ expect(screen.getByRole("button",{name:"Longsword Attack"})).toBeEnabled();
+ const user=userEvent.setup();await user.click(screen.getByRole("button",{name:"Longsword Attack"}));
+ expect(handlers.onExecuteGranted).toHaveBeenCalledWith(SWORD_ENTRY_ID,"longsword_attack",{});
+ await user.click(screen.getByRole("button",{name:"Edit values"}));
+ expect(screen.getByLabelText("Weapon bonus")).toHaveValue(4);
+ expect(screen.queryByLabelText("Name")).toBeNull();
 });

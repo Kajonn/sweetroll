@@ -524,6 +524,7 @@ export type {
 };
 
 export type CreateCampaignsModuleInput = {
+  loadTemplatePackage?: import("../systems/templates.js").PublishedPackageLoader;
   pool: Pool;
   limits: CampaignLimits;
   /**
@@ -876,7 +877,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
   // Task 7 content/grants/activity/export. Same shared dependencies; the
   // commands own audience validation, grant atomicity, source-filtered
   // reads and the bounded deterministic export projection.
-  const templates = createTemplateCommands({ pool: input.pool, now, newId });
+  const templates = createTemplateCommands({ pool: input.pool, now, newId, ...(input.loadTemplatePackage ? {loadTemplatePackage:input.loadTemplatePackage}:{}) });
   const content = createContentCommands({ pool: input.pool, repo, limits, now, newId });
 
   // I7b Task 1: validated private image storage. Same shared dependencies;

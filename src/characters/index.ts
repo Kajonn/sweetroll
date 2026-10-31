@@ -1,3 +1,4 @@
+import {materializeDefaults,templateApplicable,validDefaults} from "../systems/implementation/runtime/effective-entry.js";
 import {readPushRoll,mayReadPush,narrowerAudience,type StoredPushRoll} from "./push.js";
 import {pushEligibility} from "../systems/implementation/rules/push.js";
 import { mapRuntimeError, isFinalizableRuntimeError } from "./runtime-errors.js";
@@ -1025,6 +1026,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
 
     const packaged = await loadEntryPackage(resolveSource.systemVersionId, executionId, replayExpiresAt, resultScope);
     if (!packaged.ok) return packaged;
+    const packageValue=packaged.value;
     const slots: SlotDefinitionV1[] = packaged.value.slots ?? [];
     const templates: ObjectTemplateV1[] = packaged.value.templates ?? [];
     // RuntimeStateV1.entries is optional: legacy rows decode without it.
@@ -1083,7 +1085,15 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (template.status !== "active" || template.revision !== selectedSource.templateRevision || template.contentRevision !== selectedSource.contentRevision) return fail({code:"conflict",message:"The campaign template has changed. Refresh and explicitly review the selected revision.",cacheDisposition:"replace"});
         values = {name:template.content.name,description:template.content.description ?? "",notes:template.content.notes ?? ""};
         quantity = template.kind === "item" ? (template.content.defaultQuantity ?? 1) : undefined;
-        snapshot = {kind:template.kind,values:structuredClone(values) as Record<string,string>,...(quantity === undefined ? {} : {quantity})};
+        snapshot = {kind:template.kind,values:{name:template.content.name,description:template.content.description ?? "",notes:template.content.notes ?? ""},...(quantity === undefined ? {} : {quantity})};
+        if(template.content.base){
+          if(template.content.base.versionId!==resolveSource.systemVersionId || template.content.base.packageChecksum!==packageValue.integrity.checksum) return fail({code:"conflict",message:"Campaign and character rules pins differ.",cacheDisposition:"replace"});
+          const base=templates.find(t=>t.id===template.content.base!.templateId);
+          const entity=packageValue.entities.find(e=>e.id===resolveSource.entityDefinitionId);
+          if(!base || !entity || !validDefaults(base,template.content.defaultValues ?? {}) || !templateApplicable(packageValue,entity,base,entryInput.slotId)) return fail(errors.invalid_value("This system base cannot be used by this character and slot."));
+          values=materializeDefaults(base,template.content.defaultValues);
+          snapshot={...snapshot,base:structuredClone(template.content.base),defaultValues:structuredClone(values)};
+        }
       }
       const candidate: CharacterEntryV1 = {
         entryId: entryInput.entryId,
@@ -2036,7 +2046,19 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           let cursor: string | null = null;
           do {
             const page = await inputCampaignTemplates.page(modulePool, {campaignId:record.campaignId,limit:100,cursor});
-            for (const template of page.templates) campaignChoices.push({id:template.templateId,label:template.content.name,kind:template.kind,fields:[],grantedActions:[],source:{kind:"campaign",campaignId:template.campaignId,templateId:template.templateId,templateRevision:template.revision,contentRevision:template.contentRevision},...(template.kind === "item" ? {defaultQuantity:template.content.defaultQuantity ?? 1}: {})});
+            for (const template of page.templates) {
+              let base:ObjectTemplateV1|undefined;
+              if(template.content.base){
+                const entity=packageValue.entities.find(e=>e.id===record!.entityDefinitionId);
+                const baseRef=template.content.base;
+                base=(packageValue.templates ?? []).find(t=>t.id===baseRef.templateId);
+                if(!base || !entity || !validDefaults(base,template.content.defaultValues ?? {}) || baseRef.versionId!==record.systemVersionId || baseRef.packageChecksum!==packageValue.integrity.checksum || !templateApplicable(packageValue,entity,base)) continue;
+              }
+              campaignChoices.push({id:template.templateId,label:template.content.name,kind:template.kind,
+                fields:base?.fields.map(f=>structuredClone(f)) ?? [],
+                grantedActions:base?.grantedActions.map(a=>({id:a.id,label:a.label,actionKind:a.kind,inputs:a.kind==="roll"?a.inputs.map(i=>({...i})):[]})) ?? [],
+                source:{kind:"campaign",campaignId:template.campaignId,templateId:template.templateId,templateRevision:template.revision,contentRevision:template.contentRevision},...(template.kind === "item" ? {defaultQuantity:template.content.defaultQuantity ?? 1}: {})});
+            }
             cursor=page.nextCursor;
           } while (cursor !== null);
           // Reauthorization after catalog I/O prevents revoked/returned requests disclosing fetched choices.

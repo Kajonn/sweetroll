@@ -11,7 +11,9 @@ export type TemplateEditBody = NonNullable<
 export type TemplateLifecycleBody = NonNullable<
   operations["post_campaigns_id_item_templates_templateId_archive"]["requestBody"]
 >["content"]["application/json"];
+export type TemplateBase = operations["get_campaigns_id_item_templates_bases"]["responses"]["200"]["content"]["application/json"]["templates"][number];
 export type CampaignTemplatesApi = {
+  bases(campaignId:string):Promise<{templates:TemplateBase[]}>;
   list(
     campaignId: string,
     input?: { status?: "active" | "archived"; cursor?: string | null },
@@ -42,6 +44,7 @@ export function createCampaignTemplatesApi(
   const path = (campaignId: string) =>
     `/campaigns/${campaignId}/item-templates`;
   return {
+    bases:(campaignId)=>client.fetch("GET",`${path(campaignId)}/bases`),
     list: (campaignId, input) =>
       client.fetch("GET", path(campaignId), {
         query: {

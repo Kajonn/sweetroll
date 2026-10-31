@@ -1,3 +1,5 @@
+import {derivedEntryError} from "./effective-entry.js";
+import {effectiveTemplateId} from "./entries.js";
 import { Value } from "@sinclair/typebox/value";
 import type {
   CharacterEntryV1,
@@ -31,13 +33,13 @@ export function makePushContext(
     expressionId: action.expressionId,
     outputTemplate: action.outputTemplate,
     policy: structuredClone(action.pushPolicy),
-    ...(entry && entry.templateId
+    ...(entry && effectiveTemplateId(entry)
       ? {
           entry: {
             entryId: entry.entryId,
-            templateId: entry.templateId,
+            templateId: effectiveTemplateId(entry)!,
             slotId: entry.slotId,
-            ...(entry.source ? { source: entry.source } : {}),
+            ...(entry.source ? { source: structuredClone(entry.source) } : {}),
           },
         }
       : {}),
@@ -69,7 +71,7 @@ export function validatePushSource(
       !Value.Equal(
         {
           entryId: owned.entry.entryId,
-          templateId: owned.entry.templateId,
+          templateId: effectiveTemplateId(owned.entry)!,
           slotId: owned.entry.slotId,
           ...(owned.entry.source ? { source: owned.entry.source } : {}),
         },
@@ -82,6 +84,7 @@ export function validatePushSource(
         e.slotId === owned.entry.slotId && e.entryId !== owned.entry.entryId,
     ).length;
     if (
+      derivedEntryError(pkg,entity,owned.entry,siblings)!==null ||
       !validateEntryForSlot(
         owned.entry,
         pkg.slots ?? [],

@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 
 import type { VersionId } from "../../runtime.js";
 import { decodeSystemPackage } from "../package/codec.js";
@@ -6,6 +6,7 @@ import type { SystemPackageV1 } from "../package/schema/index.js";
 
 export type PublishedPackageLoader = (
   versionId: VersionId,
+  transaction?: PoolClient,
 ) => Promise<SystemPackageV1 | null>;
 
 export class PublishedPackageCorruptError extends Error {
@@ -22,9 +23,11 @@ type PublishedPackageRow = {
   checksum: string;
 };
 
-export function createPostgresPublishedPackageLoader(pool: Pool): PublishedPackageLoader {
-  return async (versionId) => {
-    const result = await pool.query<PublishedPackageRow>(
+export function createPostgresPublishedPackageLoader(
+  pool: Pool,
+): PublishedPackageLoader {
+  return async (versionId, transaction) => {
+    const result = await (transaction ?? pool).query<PublishedPackageRow>(
       `SELECT package_json, checksum
          FROM system_versions
         WHERE id = $1`,
@@ -41,7 +44,9 @@ export function createFixturePublishedPackageLoader(
   packages: readonly SystemPackageV1[],
 ): PublishedPackageLoader {
   return async (versionId) => {
-    const packageValue = packages.find((candidate) => candidate.versionId === versionId);
+    const packageValue = packages.find(
+      (candidate) => candidate.versionId === versionId,
+    );
     if (packageValue === undefined) return null;
 
     return decodePublishedPackage(

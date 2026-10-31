@@ -247,3 +247,13 @@ it("adopts a new campaign reference only after explicitly reviewing the refreshe
   await user.click(screen.getByTestId("slot-add-confirm-inventory"));
   expect(handlers.onAddEntry).toHaveBeenCalledWith("inventory", null, {}, undefined, revised.source);
 });
+
+it("keeps a derived copy editable and playable without any former campaign catalog",async()=>{
+ const handlers=renderControl({templates:[],entries:[{entryId:SWORD_ENTRY_ID,templateId:null,label:"Captain's sword",values:{weapon_bonus:4},source:{kind:"campaign",campaignId:"campaign",templateId:"catalog",templateRevision:1,contentRevision:1},definition:{id:"longsword",kind:"item",label:"Longsword",fields:templates[0]!.fields!,grantedActions:[{id:"longsword_attack",kind:"roll",label:"Longsword Attack",inputs:[],expressionId:"hit",outputTemplate:"{total}"}]},metadata:{name:"Captain's sword",notes:"A keepsake"}} as any]});
+ expect(screen.getByRole("button",{name:"Longsword Attack"})).toBeEnabled();
+ const user=userEvent.setup();await user.click(screen.getByRole("button",{name:"Longsword Attack"}));
+ expect(handlers.onExecuteGranted).toHaveBeenCalledWith(SWORD_ENTRY_ID,"longsword_attack",{});
+ await user.click(screen.getByRole("button",{name:"Edit values"}));
+ expect(screen.getByLabelText("Weapon bonus")).toHaveValue(4);
+ expect(screen.queryByLabelText("Name")).toBeNull();
+});

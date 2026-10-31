@@ -33,16 +33,70 @@ const UUID_PATTERN =
   "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
 
 export const EntrySourceSchema = Type.Union([
-  Type.Object({kind: Type.Literal("personal")}, {additionalProperties:false}),
-  Type.Object({kind: Type.Literal("system"), templateId: DefinitionIdSchema}, {additionalProperties:false}),
-  Type.Object({kind: Type.Literal("campaign"), campaignId: Type.String({format:"uuid"}), templateId: Type.String({format:"uuid"}), templateRevision:Type.Integer({minimum:1}), contentRevision:Type.Integer({minimum:1})}, {additionalProperties:false}),
+  Type.Object(
+    { kind: Type.Literal("personal") },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    { kind: Type.Literal("system"), templateId: DefinitionIdSchema },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    {
+      kind: Type.Literal("campaign"),
+      campaignId: Type.String({ format: "uuid" }),
+      templateId: Type.String({ format: "uuid" }),
+      templateRevision: Type.Integer({ minimum: 1 }),
+      contentRevision: Type.Integer({ minimum: 1 }),
+    },
+    { additionalProperties: false },
+  ),
 ]);
 export type EntrySource = Static<typeof EntrySourceSchema>;
-export const EntrySnapshotSchema = Type.Object({
-  kind:Type.Union([Type.Literal("item"),Type.Literal("spell"),Type.Literal("talent"),Type.Literal("effect")]),
-  values:Type.Record(Type.String(),Type.String()),
-  quantity:Type.Optional(Type.Integer({minimum:1})),
-}, {additionalProperties:false});
+export const DerivedBaseSchema = Type.Object(
+  {
+    versionId: Type.String({ pattern: UUID_PATTERN }),
+    packageChecksum: Type.String({ pattern: "^sha256:[0-9a-f]{64}$" }),
+    templateId: DefinitionIdSchema,
+  },
+  { additionalProperties: false },
+);
+export type DerivedBase = Static<typeof DerivedBaseSchema>;
+export const TemplateDefaultsSchema = Type.Record(
+  DefinitionIdSchema,
+  Type.Unknown(),
+  { maxProperties: 100 },
+);
+const SnapshotProperties = {
+  kind: Type.Union([
+    Type.Literal("item"),
+    Type.Literal("spell"),
+    Type.Literal("talent"),
+    Type.Literal("effect"),
+  ]),
+  values: Type.Object(
+    {
+      name: Type.String({ minLength: 1, maxLength: 200 }),
+      description: Type.Optional(Type.String({ maxLength: 2000 })),
+      notes: Type.Optional(Type.String({ maxLength: 2000 })),
+    },
+    { additionalProperties: false },
+  ),
+  quantity: Type.Optional(
+    Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
+  ),
+};
+export const EntrySnapshotSchema = Type.Union([
+  Type.Object(SnapshotProperties, { additionalProperties: false }),
+  Type.Object(
+    {
+      ...SnapshotProperties,
+      base: DerivedBaseSchema,
+      defaultValues: TemplateDefaultsSchema,
+    },
+    { additionalProperties: false },
+  ),
+]);
 export type EntrySnapshot = Static<typeof EntrySnapshotSchema>;
 
 export const CharacterEntryV1Schema = Type.Object(

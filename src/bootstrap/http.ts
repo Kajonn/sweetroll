@@ -120,6 +120,7 @@ const campaigns = createCampaignsModule({
   pool,
   limits: placementLimits,
   charactersPlacement: placement,
+    loadTemplatePackage:createPostgresPublishedPackageLoader(pool),
 });
 
 const app = buildHttpApp({

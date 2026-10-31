@@ -1,7 +1,12 @@
+import { TypedEntryFields } from "../characters/TypedEntryFields.js";
 import { campaignDetailKey } from "./campaignQueries.js";
 import { t } from "../i18n/index.js";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQueryClient,
+  useQuery,
+} from "@tanstack/react-query";
 import {
   Button,
   Dialog,
@@ -48,7 +53,7 @@ export function CampaignTemplates(props: {
   ];
   const lifetime = useMemo(
     () => ({ active: true }),
-    [props.campaignId, props.actorId, props.generation],
+    [props.campaignId, props.actorId, props.generation, props.isGm],
   );
   const [editing, setEditing] = useState<CampaignTemplate | null>(null);
   const [open, setOpen] = useState(false);
@@ -57,6 +62,28 @@ export function CampaignTemplates(props: {
   const [description, setDescription] = useState("");
   const [notes, setNotes] = useState("");
   const [quantity, setQuantity] = useState(1);
+  const [sourceMode, setSourceMode] = useState("blank");
+  const [baseId, setBaseId] = useState("");
+  const [defaults, setDefaults] = useState<Record<string, unknown>>({});
+  const bases = useQuery({
+    queryKey: [
+      "campaigns",
+      "templates",
+      props.campaignId,
+      props.actorId,
+      props.generation,
+      "bases",
+    ],
+    enabled: open && props.isGm && props.online,
+    queryFn: async ({ signal }) => {
+      const result = await props.api.bases(props.campaignId);
+      if (signal.aborted || !lifetime.active)
+        throw new Error("Discarded base response");
+      return result;
+    },
+  });
+  const base = bases.data?.templates.find((t) => t.id === baseId);
+
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
@@ -113,13 +140,23 @@ export function CampaignTemplates(props: {
           props.campaignId,
           props.actorId,
           props.generation,
+          "bases",
+        ],
+      });
+      client.removeQueries({
+        queryKey: [
+          "campaigns",
+          "templates",
+          props.campaignId,
+          props.actorId,
+          props.generation,
           "archived",
         ],
       });
     }
   }, [props.isGm, client, props.campaignId, props.actorId, props.generation]);
   useEffect(() => {
-    if (status(list.error) === 404) {
+    if (status(list.error) === 404 || status(bases.error) === 404) {
       client.removeQueries({
         queryKey: ["campaigns", "templates", props.campaignId],
       });
@@ -127,7 +164,13 @@ export function CampaignTemplates(props: {
       setConfirmArchive(null);
       props.onAccessRevoked();
     }
-  }, [list.error, client, props.campaignId, props.onAccessRevoked]);
+  }, [
+    list.error,
+    bases.error,
+    client,
+    props.campaignId,
+    props.onAccessRevoked,
+  ]);
   const rows = list.data?.pages.flatMap((p) => p.templates) ?? [];
   const blocked = !props.online || props.readOnly || pending || !props.isGm;
   function begin(value: CampaignTemplate | null) {
@@ -137,6 +180,9 @@ export function CampaignTemplates(props: {
     setDescription(value?.content.description ?? "");
     setNotes(value?.content.notes ?? "");
     setQuantity(value?.content.defaultQuantity ?? 1);
+    setSourceMode(value?.content.base ? "system" : "blank");
+    setBaseId(value?.content.base?.templateId ?? "");
+    setDefaults(structuredClone(value?.content.defaultValues ?? {}));
     setError(null);
     setStale(false);
     attempt.current = null;
@@ -212,7 +258,8 @@ export function CampaignTemplates(props: {
     name.length <= 200 &&
     description.length <= 2000 &&
     notes.length <= 2000 &&
-    (kind !== "item" || (Number.isSafeInteger(quantity) && quantity >= 1));
+    (kind !== "item" || (Number.isSafeInteger(quantity) && quantity >= 1)) &&
+    (sourceMode !== "system" || !!base);
   const frozen = attempt.current !== null;
   const feedback = (
     <>
@@ -394,6 +441,9 @@ export function CampaignTemplates(props: {
                 name: name.trim(),
                 description,
                 notes,
+                ...(sourceMode === "system"
+                  ? { defaultValues: structuredClone(defaults) }
+                  : {}),
                 ...(kind === "item" ? { defaultQuantity: quantity } : {}),
               };
               void send(
@@ -411,6 +461,9 @@ export function CampaignTemplates(props: {
                       operation: "create",
                       body: {
                         kind,
+                        ...(sourceMode === "system"
+                          ? { baseTemplateId: baseId }
+                          : {}),
                         expectedTemplateRevision: 0,
                         content,
                         idempotencyKey: randomUUID(),
@@ -427,9 +480,77 @@ export function CampaignTemplates(props: {
       >
         <div className={styles.form}>
           <Select
+            label={t("campaign.templates.source")}
+            value={sourceMode}
+            disabled={blocked || !!editing || frozen}
+            options={[
+              { value: "blank", label: t("campaign.templates.blank") },
+              { value: "system", label: t("campaign.templates.derived") },
+            ]}
+            onChange={(e) => {
+              setSourceMode(e.target.value);
+              setBaseId("");
+              setDefaults({});
+            }}
+          />
+          {sourceMode === "system" ? (
+            <>
+              {bases.isPending ? (
+                <p role="status">{t("campaign.templates.loading")}</p>
+              ) : null}
+              {bases.isError ? (
+                <p role="alert">{t("campaign.templates.unavailable")}</p>
+              ) : null}
+              <Select
+                label={t("campaign.templates.base")}
+                value={baseId}
+                disabled={blocked || !!editing || frozen}
+                options={[
+                  { value: "", label: t("campaign.templates.chooseBase") },
+                  ...(bases.data?.templates ?? []).map((t) => ({
+                    value: t.id,
+                    label: t.label,
+                  })),
+                ]}
+                onChange={(e) => {
+                  const b = bases.data?.templates.find(
+                    (t) => t.id === e.target.value,
+                  );
+                  setBaseId(e.target.value);
+                  setDefaults({});
+                  if (b) {
+                    setKind(b.kind);
+                    setName(b.label);
+                  }
+                }}
+              />
+              {base ? (
+                <>
+                  <p>
+                    {t("campaign.templates.inheritedActions")}:{" "}
+                    {base.grantedActions.map((a) => a.label).join(", ") || "—"}
+                  </p>
+                  <TypedEntryFields
+                    fields={base.fields.filter(
+                      (f) => f.kind !== "computed" && f.kind !== "image",
+                    )}
+                    values={defaults}
+                    onChange={setDefaults}
+                    disabled={blocked || frozen}
+                  />
+                  {editing ? (
+                    <p>{t("campaign.templates.newCopiesOnly")}</p>
+                  ) : null}
+                </>
+              ) : null}
+            </>
+          ) : null}
+          <Select
             label={t("campaign.templates.kind")}
             value={kind}
-            disabled={blocked || editing !== null || frozen}
+            disabled={
+              blocked || editing !== null || frozen || sourceMode === "system"
+            }
             onChange={(e) =>
               setKind(e.target.value as CampaignTemplate["kind"])
             }

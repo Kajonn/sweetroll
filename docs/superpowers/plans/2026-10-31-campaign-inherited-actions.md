@@ -1,6 +1,6 @@
 # Campaign templates with inherited actions — adventure slice C
 
-**Status:** implementation plan; no feature code or acceptance claimed.
+**Status:** implementation in PR #25. Companion contract, source/catalog validation, shared runtime, placement, push provenance and typed GUI are implemented; publication, final PostgreSQL CI, canonical browser and deployed acceptance are blocked pending authorization of the GitHub push. Local unit evidence is recorded below; unverified gates remain open.
 **Baseline:** `ba8200b3a6dff4a22e3865a7f7db1aeeab59058e` (`main`, PRs #24 and #23 merged).
 **Goal:** a GM derives a campaign item from a published system template; a player adds a pinned copy and uses its existing validated actions.
 **Sequence:** after [data-only campaign catalogs (B)](2026-10-09-campaign-data-templates.md), before player proposals (D1) and restricted audiences (D2). This is adventure-items C, separate from the completed dice/push slice C.
@@ -56,15 +56,17 @@ No new dice grammar or modification of published packages is required. If the co
 | `web/src/campaigns/CampaignTemplates.tsx`, `campaignTemplateApi.ts` | Extend the existing online editor with a base selector, inherited-action summary and typed default controls; preserve frozen retries and stale revision review. |
 | `web/src/characters/SlotListControl.tsx`, `CharacterRoute.tsx`, session/store | Derived campaign entries need typed controls and action projections, including after return and reload when catalog choices are absent. Preserve selected-reference freezing and current revocation/cache protections. |
 
+Companion [implementation contract](../specs/2026-10-31-campaign-inherited-actions.md).
+
 ## Delivery and TDD sequence
 
 One feature PR after this planning change. Work in the dependency order below; each behavior needs an observed meaningful red test, the smallest implementation, green, then refactoring. Existing passing tests or unchecked historical bundles are not substitutes for new evidence.
 
 ### C0 — Fix the contract before implementation
 
-- [ ] Specify exact create/edit/base-choice DTOs, immutable revision and snapshot shapes, effective resolver result, error mapping, payload limits and export boundaries in the companion spec.
-- [ ] Define both blank and derived cases, default-field collision handling, target-entity applicability, returned-copy rights, push source identity and cache scope. Keep source fixed on catalog edit.
-- [ ] Cross-link the spec from this plan/design. All implementation boxes below remain unchecked at this stage.
+- [x] Specify exact create/edit/base-choice DTOs, immutable revision and snapshot shapes, effective resolver result, error mapping, payload limits and export boundaries in the companion spec.
+- [x] Define both blank and derived cases, default-field collision handling, target-entity applicability, returned-copy rights, push source identity and cache scope. Keep source fixed on catalog edit.
+- [x] Cross-link the spec from this plan/design. Verification status below distinguishes code from completed evidence.
 
 **Gate:** every producer/consumer and lifecycle case has one unambiguous current-format contract; no migration or broader sharing work is introduced.
 
@@ -152,3 +154,17 @@ One feature PR after this planning change. Work in the dependency order below; e
 Slice C is done when a GM-derived template can be placed, independently edited and played with all of its existing supported actions and push rules, while immutable source/revision, permissions, exact-request recovery and returned-copy behavior pass real integration/CI/deployed verification. No application feature is marked implemented by this planning PR.
 
 Then proceed to **D1: data-only player proposals** and **D2: restricted drafts/audiences with explicit reveal and safe placement**, each with its own contract and secrecy/recovery acceptance. Keep public-release G9 work visible alongside feature development.
+
+## Implementation evidence (2026-10-31, in progress)
+
+- Observed red → green: a placed derived copy had no projected action; shared resolution now projects/executes its inherited roll with current carrying-character and independent entry bindings, and rejects a forged checksum.
+- Observed red → green: pinned base selection/default validation; GUI base selection and publication; returned-copy editing/actions without a catalog. The editor test also exposed and fixed clearing a typed default restoring its original value before the next keystroke.
+- Node 24 local server run: 458 passed, 10 database-backed tests skipped. Frontend: 1,164 passed. Backend/frontend typechecks, production builds and canonical contract identity pass. Skipped DB tests are not acceptance evidence.
+- Added real PostgreSQL integration coverage for source authorization/default denial, immutable content/lifecycle, exact replay, hit/damage/nominal/entry-resource parity, independent revised copies, target applicability, returned/duplicated actions, old-scope denial and competing pushes. Added the same canonical derived journey to browser and production-worker suites, with offline placement/value edits and lost committed-push recovery. These suites require actual successful execution before completion is claimed.
+- No schema change, historical migration, new expression interpreter or offline push queue is introduced.
+
+### Local review and publication boundary
+
+The exact shared integration/browser fixture also passes strict package compilation and runtime parity tests: metadata is separate from a base field named `name`, hit/damage bind independent typed values, nominal/resource effects agree, and inherited pushes preserve original bindings while removal or changed placed provenance is denied. An observed red → green test exposed source-object aliasing; push context now clones placed provenance. Another observed red → green test rejects base actions that need computed template fields the current entry runtime cannot supply. Source reads reuse the caller's transaction client, with a regression test, avoiding a second pool checkout while holding a campaign lock.
+
+Automatic approval review rejected `git push` because publication was not explicitly authorized. No alternative publication path was used. The remote PR still contains its planning commit; CI and deployed acceptance of this code have not run. The isolated preview was inspected read-only: it still runs main `ba8200b`, deployment `abf9286a-17ad-45a6-a7c2-bfe30409c60d`, so it is not feature acceptance evidence. See the [verification record](../../acceptance/campaign-inherited-actions-2026-10-31.md).

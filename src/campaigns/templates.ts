@@ -1,3 +1,9 @@
+import {
+  resolveTemplateBase,
+  type PublishedPackageLoader,
+} from "../systems/templates.js";
+import type { DerivedBase } from "../systems/implementation/package/schema/dynamic.js";
+import type { ObjectTemplateV1 } from "../systems/implementation/package/schema/index.js";
 import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import type { RequestContext } from "../systems/authoring.js";
@@ -9,6 +15,8 @@ import { isActiveMember, isGameMaster } from "./policy.js";
 import { createTemplateRepository } from "./templatePersistence.js";
 
 export type TemplateContent = {
+  base?: DerivedBase;
+  defaultValues?: Record<string, unknown>;
   name: string;
   description?: string;
   notes?: string;
@@ -33,6 +41,7 @@ export type TemplateMutation = TemplateLocation & {
   idempotencyKey: string;
 };
 export type CreateTemplate = {
+  baseTemplateId?: string;
   campaignId: string;
   kind: TemplateKind;
   content: TemplateContent;
@@ -61,7 +70,15 @@ export function validateTemplateContent(
     return "Template content must be an object.";
   const values = content as Record<string, unknown>;
   for (const [key, value] of Object.entries(values)) {
-    if (key === "defaultQuantity") {
+    if (key === "defaultValues") {
+      if (
+        typeof value !== "object" ||
+        value === null ||
+        Array.isArray(value) ||
+        Object.keys(value).length > 100
+      )
+        return "Invalid typed defaults.";
+    } else if (key === "defaultQuantity") {
       if (
         kind !== "item" ||
         typeof value !== "number" ||
@@ -94,6 +111,7 @@ function fail(code: CampaignError["code"], message: string): never {
 /** Campaign-owned commands. Campaign lock serializes authority and catalog/placement races. */
 export function createTemplateCommands(input: {
   pool: Pool;
+  loadTemplatePackage?: PublishedPackageLoader;
   now?: () => Date;
   newId?: () => string;
 }) {
@@ -145,7 +163,7 @@ export function createTemplateCommands(input: {
       );
     if (write && campaign.status !== "active")
       fail("conflict", "Recover the campaign before editing its templates.");
-    return member;
+    return { member, campaign };
   }
   async function mutate(
     ctx: RequestContext,
@@ -153,7 +171,13 @@ export function createTemplateCommands(input: {
     body: CreateTemplate | (TemplateMutation & { content?: TemplateContent }),
   ) {
     return transaction(async (client) => {
-      await authorize(client, ctx, body.campaignId, true, true);
+      const { campaign } = await authorize(
+        client,
+        ctx,
+        body.campaignId,
+        true,
+        true,
+      );
       const key = {
         actorId: ctx.actorId,
         commandKind: `campaign_template_${operation}`,
@@ -186,6 +210,47 @@ export function createTemplateCommands(input: {
         body.expectedTemplateRevision < 0
       )
         fail("bad_request", "An expected template revision is required.");
+      async function contentWithBase(
+        kind: TemplateKind,
+        content: TemplateContent,
+        baseId?: string,
+      ): Promise<TemplateContent> {
+        if (baseId !== undefined && !/^[a-z][a-z0-9_]{0,63}$/.test(baseId))
+          fail("bad_request", "Invalid base template ID.");
+        if (baseId === undefined) {
+          if (content.defaultValues !== undefined)
+            fail(
+              "bad_request",
+              "Blank templates cannot contain typed defaults.",
+            );
+          return content;
+        }
+        const pkg = await input.loadTemplatePackage?.(
+          campaign.systemVersionId,
+          client,
+        );
+        if (!pkg || pkg.versionId !== campaign.systemVersionId)
+          fail("bad_request", "The pinned system template is unavailable.");
+        const base = resolveTemplateBase(
+          pkg,
+          baseId,
+          kind,
+          content.defaultValues ?? {},
+        );
+        if (!base)
+          fail(
+            "bad_request",
+            "The base is unknown, has unsupported field dependencies, or has invalid writable defaults. Choose a pinned base whose actions use carrying-character and writable entry fields.",
+          );
+        return {
+          ...content,
+          base: {
+            versionId: pkg.versionId,
+            packageChecksum: pkg.integrity.checksum,
+            templateId: base.id,
+          },
+        };
+      }
       let value: CampaignTemplateView;
       if (operation === "create" && "kind" in body) {
         if (body.expectedTemplateRevision !== 0)
@@ -199,7 +264,11 @@ export function createTemplateCommands(input: {
           campaignId: body.campaignId,
           creatorId: ctx.actorId,
           kind: body.kind,
-          content: body.content,
+          content: await contentWithBase(
+            body.kind,
+            body.content,
+            body.baseTemplateId,
+          ),
         });
       } else {
         if (!("templateId" in body))
@@ -222,7 +291,11 @@ export function createTemplateCommands(input: {
           value = await catalog.update(
             client,
             current,
-            body.content! as TemplateContent,
+            await contentWithBase(
+              current.kind,
+              body.content!,
+              current.content.base?.templateId,
+            ),
             ctx.actorId,
           );
         } else
@@ -264,6 +337,29 @@ export function createTemplateCommands(input: {
     });
   }
   return {
+    listTemplateBases: (
+      ctx: RequestContext,
+      body: { campaignId: string },
+    ): Promise<CampaignResult<ObjectTemplateV1[]>> =>
+      transaction(async (client) => {
+        const { campaign } = await authorize(
+          client,
+          ctx,
+          body.campaignId,
+          true,
+          false,
+        );
+        const pkg = await input.loadTemplatePackage?.(
+          campaign.systemVersionId,
+          client,
+        );
+        if (!pkg || pkg.versionId !== campaign.systemVersionId) return [];
+        return (pkg.templates ?? [])
+          .filter(
+            (t) => resolveTemplateBase(pkg, t.id, t.kind, {}) !== undefined,
+          )
+          .map((t) => structuredClone(t));
+      }),
     createTemplate: (ctx: RequestContext, body: CreateTemplate) =>
       mutate(ctx, "create", body),
     updateTemplate: (
@@ -276,7 +372,7 @@ export function createTemplateCommands(input: {
       mutate(ctx, "recover", body),
     openTemplate: (ctx: RequestContext, body: TemplateLocation) =>
       transaction(async (client) => {
-        const member = await authorize(
+        const { member } = await authorize(
           client,
           ctx,
           body.campaignId,

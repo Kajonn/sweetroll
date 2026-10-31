@@ -166,7 +166,7 @@ async function join(
     idempotencyKey: uid(),
   });
 }
-async function createCatalogCampaign(gm: APIRequestContext, co: APIRequestContext, player: APIRequestContext) {
+export async function createCatalogCampaign(gm: APIRequestContext, co: APIRequestContext, player: APIRequestContext, configure?: (document: Record<string,unknown>)=>void) {
   await signIn(gm, "code-test-a");
   await signIn(co, "code-test-b");
   const playerId = await signIn(player, "code-journey-p1");
@@ -196,6 +196,7 @@ async function createCatalogCampaign(gm: APIRequestContext, co: APIRequestContex
     id: "inventory_element",
     slotId: "inventory",
   });
+  configure?.(document);
   const save = await gm.put(`/api/systems/${systemId}/draft`, {
     data: { expectedRevision: clone.workspace.draft.revision, document },
   });
@@ -227,7 +228,7 @@ async function createCatalogCampaign(gm: APIRequestContext, co: APIRequestContex
   await join(gm, player, campaignId, "player");
   const sharing = await gm.patch(`/api/systems/${systemId}`, { data: { access: "link" } });
   expect(sharing.status()).toBe(200);
-  return { campaignId, playerId, versionId: published.version.versionId as string };
+  return { systemId, campaignId, playerId, versionId: published.version.versionId as string };
 }
 
 export async function campaignTemplateJourney(

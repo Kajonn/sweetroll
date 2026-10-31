@@ -1,3 +1,4 @@
+import {TypedEntryFields} from "./TypedEntryFields.js";
 import { useEffect, useState } from "react";
 
 import { t } from "../i18n/index.js";
@@ -48,6 +49,8 @@ export type SlotTemplateField = {
 };
 
 export type SlotListEntry = {
+  definition?: {id:string;label:string;kind:string;fields:SlotTemplateField[];grantedActions:Array<{id:string;label:string;kind:"roll"|"resourceBump";inputs?:SlotGrantedActionInput[]}>};
+  metadata?: {name:string;description?:string;notes?:string};
   source?: import("./types.js").EntrySource;
   entryId: string;
   templateId: string | null;
@@ -288,7 +291,6 @@ function TemplateEntryForm({ entry, template, disabled, onUpdate }: {
   const fields = (template.fields ?? []).filter((field) =>
     field.kind !== "computed" && field.kind !== "image");
   if (fields.length === 0 && template.kind !== "item") return null;
-  const setValue = (id: string, value: unknown) => setDraft((current) => ({ ...current, [id]: value }));
   if (!editing) {
     return <Button type="button" variant="secondary" className={styles.slotEditButton}
       disabled={disabled} data-testid={`slot-entry-edit-${entry.entryId}`}
@@ -309,52 +311,7 @@ function TemplateEntryForm({ entry, template, disabled, onUpdate }: {
         (error: unknown) => setCommandError(describeCommandError(error)),
       ).finally(() => setPending(false));
     }}>
-    {fields.map((field) => {
-      const value = draft[field.id] ?? field.default;
-      if (field.kind === "boolean") return <label key={field.id}>
-        <input type="checkbox" checked={value === true} disabled={disabled || pending}
-          onChange={(event) => setValue(field.id, event.target.checked)} /> {field.label}
-      </label>;
-      if (field.kind === "singleChoice") return <Select key={field.id} label={field.label}
-        value={typeof value === "string" ? value : ""} disabled={disabled || pending}
-        onChange={(event) => setValue(field.id, event.target.value || null)}
-        options={[{ value: "", label: "—" }, ...(field.options ?? []).map((o) => ({ value: o.id, label: o.label }))]} />;
-      if (field.kind === "multiChoice") return <fieldset key={field.id}>
-        <legend>{field.label}</legend>
-        {(field.options ?? []).map((option) => <label key={option.id}>
-          <input type="checkbox" checked={Array.isArray(value) && value.includes(option.id)}
-            disabled={disabled || pending} onChange={(event) => {
-              const selected = Array.isArray(value) ? value as string[] : [];
-              setValue(field.id, event.target.checked
-                ? [...selected, option.id] : selected.filter((id) => id !== option.id));
-            }} /> {option.label}
-        </label>)}
-      </fieldset>;
-      if (field.kind === "resource") return <fieldset key={field.id}>
-        <legend>{field.label}</legend>
-        {(["current", "max"] as const).map((part) => {
-          const resource = value && typeof value === "object" ? value as Record<string, unknown> : {};
-          return <label key={part}>{part}
-            <input type="number" min={field.min} max={field.max} step={field.step ?? 1}
-              value={typeof resource[part] === "number" ? resource[part] as number : ""}
-              disabled={disabled || pending} required
-              onChange={(event) => setValue(field.id, { ...resource,
-                [part]: event.target.value === "" ? null : Number(event.target.value) })} />
-          </label>;
-        })}
-      </fieldset>;
-      return <label key={field.id}>{field.label}
-        <input type={field.kind === "integer" || field.kind === "decimal" ? "number" : "text"}
-          min={field.min} max={field.max} step={field.kind === "integer" ? field.step ?? 1 : field.step ?? "any"}
-          minLength={field.minLength} maxLength={field.maxLength} required={field.required}
-          value={typeof value === "string" || typeof value === "number" ? value : ""}
-          disabled={disabled || pending} data-testid={`slot-entry-field-${entry.entryId}-${field.id}`}
-          onChange={(event) => setValue(field.id,
-            field.kind === "integer" || field.kind === "decimal"
-              ? event.target.value === "" ? null : Number(event.target.value)
-              : event.target.value)} />
-      </label>;
-    })}
+    <TypedEntryFields fields={fields} values={draft} onChange={setDraft} disabled={disabled || pending} testIdPrefix={`slot-entry-field-${entry.entryId}`} />
     {template.kind === "item" ? <label>{t("character.slot.quantity")}
       <input type="number" min={1} step={1} required value={quantity} disabled={disabled || pending}
         data-testid={`slot-entry-quantity-${entry.entryId}`}
@@ -504,8 +461,8 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
         ) : (
           <ul className={styles.slotList}>
             {entries.map((entry) => {
-              const template = entry.templateId === null ? undefined : byId.get(entry.templateId);
-              const summary = entry.templateId === null ? null : scalarSummary(entry.values, entry.label);
+              const template:SlotTemplate|undefined = entry.definition ? {...entry.definition,grantedActions:entry.definition.grantedActions.map(a=>({id:a.id,label:a.label,actionKind:a.kind,inputs:a.inputs ?? []}))} : entry.templateId === null ? undefined : byId.get(entry.templateId);
+              const summary = entry.templateId === null && !entry.definition ? null : scalarSummary(entry.values, entry.label);
               return (
                 <li key={entry.entryId} data-testid={`slot-entry-${entry.entryId}`} className={styles.slotEntry}>
                   <span className={styles.slotEntryLabel}>{entry.label}</span>
@@ -513,8 +470,8 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
                     ? <span className={styles.meta}>×{entry.quantity}</span> : null}
                   {entry.templateId === null ? <>
                     <span className={styles.meta}>{t(entry.source?.kind === "campaign" ? "character.slot.campaign" : "character.slot.personal")}</span>
-                    {(["description", "notes"] as const).map((key) => typeof entry.values[key] === "string" && entry.values[key] !== ""
-                      ? <p className={styles.personalText} key={key}><strong>{t(key === "description" ? "character.slot.description" : "character.slot.notes")}: </strong>{String(entry.values[key])}</p> : null)}
+                    {(["description", "notes"] as const).map((key) => typeof (entry.metadata ?? entry.values)[key] === "string" && (entry.metadata ?? entry.values)[key] !== ""
+                      ? <p className={styles.personalText} key={key}><strong>{t(key === "description" ? "character.slot.description" : "character.slot.notes")}: </strong>{String((entry.metadata ?? entry.values)[key])}</p> : null)}
                   </> : null}
                   {summary !== null ? <span className={styles.meta}>{summary}</span> : null}
                   {template?.grantedActions.map((action) => (
@@ -526,7 +483,7 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
                       onExecute={onExecuteGranted}
                     />
                   ))}
-                  {entry.templateId === null ? (
+                  {entry.templateId === null && !entry.definition ? (
                     <PersonalEntryForm entry={entry} disabled={disabled} onUpdate={onUpdateEntry} />
                   ) : template ? <TemplateEntryForm entry={entry} template={template}
                     disabled={disabled} onUpdate={onUpdateEntry} /> : null}

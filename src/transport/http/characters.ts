@@ -3,7 +3,7 @@ import { strictInputCompiler } from "./strictValidation.js";
 import {EntrySourceSchema, EntrySnapshotSchema, type EntrySource} from "../../systems/implementation/package/schema/dynamic.js";
 import { Type, type TSchema } from "@sinclair/typebox";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
-import { FieldV1Schema } from "../../systems/implementation/package/schema/document.js";
+import { ObjectTemplateV1Schema, FieldV1Schema } from "../../systems/implementation/package/schema/document.js";
 
 import type {
   CharacterCommand,
@@ -128,6 +128,8 @@ const TemplateKindDto = Type.Union([
   Type.Literal("effect"),
 ]);
 const ProjectionSlotEntryDto = Type.Object({
+  definition:Type.Optional(ObjectTemplateV1Schema),
+  metadata:Type.Optional(Type.Object({name:Type.String(),description:Type.Optional(Type.String()),notes:Type.Optional(Type.String())})),
   source:Type.Optional(EntrySourceSchema),
   entryId: Type.String(),
   templateId: Type.Union([Type.String(), Type.Null()]),

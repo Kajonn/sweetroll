@@ -1,3 +1,4 @@
+import {derivedEntryError,effectiveEntryDefinition} from "./effective-entry.js";
 import {makePushContext} from "./push.js";
 import type {PushContext} from "./push-context.js";
 import type {
@@ -64,8 +65,8 @@ export function findGrantedAction(
   actionId: string,
 ): GrantedActionOwnership | undefined {
   const entry = (state.entries ?? {})[entryId];
-  if (entry === undefined || entry.templateId === null) return undefined;
-  const template = (packageValue.templates ?? []).find((candidate) => candidate.id === entry.templateId);
+  if (entry === undefined) return undefined;
+  const template = effectiveEntryDefinition(packageValue, entry);
   if (template === undefined) return undefined;
   const action = template.grantedActions.find((candidate) => candidate.id === actionId);
   if (action === undefined) return undefined;
@@ -97,6 +98,8 @@ export function resolveGrantedAction(request: GrantedActionRequest): RuntimeResu
   const siblings = Object.values(request.state.entries ?? {}).filter(
     (candidate) => candidate.slotId === entry.slotId && candidate.entryId !== entry.entryId,
   ).length;
+  const invalidDerived=derivedEntryError(request.packageValue,request.entity,entry,siblings);
+  if(invalidDerived) return badRequest(invalidDerived,entry.entryId);
   const validation = validateEntryForSlot(
     entry,
     request.packageValue.slots ?? [],

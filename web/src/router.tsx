@@ -38,11 +38,11 @@ function useCampaignsApi(): CampaignsApi {
 }
 
 /** Re-render route views when the shared identity gate publishes a new snapshot. */
-function useIdentityTick(identity: IdentityGate | null): number {
+function useIdentityTick(identity: IdentityGate | null) {
   return useSyncExternalStore(
     onChange => (identity === null ? () => {} : identity.subscribe(onChange)),
-    () => identity?.getSnapshot().generation ?? 0,
-    () => 0,
+    () => identity?.getSnapshot() ?? null,
+    () => null,
   );
 }
 

@@ -471,6 +471,7 @@ describeWithDatabase("campaign HTTP acceptance demonstration (Task 10)", () => {
       "content",
       "exportVersion",
       "members",
+      "proposals",
       "rolls",
       "templates",
     ]);

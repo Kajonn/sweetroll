@@ -1,3 +1,5 @@
+import {createProposalRepository} from "./proposalPersistence.js";
+import {proposalView} from "./proposals.js";
 import type {RollBreakdown, PushResult} from "../systems/implementation/rules/result.js";
 import {createTemplateRepository} from "./templatePersistence.js";
 import { randomUUID } from "node:crypto";
@@ -159,6 +161,7 @@ export type ListActivityResult = {
 };
 
 export type CampaignExportSnapshot = {
+  proposals?:import("./proposals.js").ProposalView[];
   templates?:import("./templates.js").CampaignTemplateView[];
   exportVersion: 1;
   campaign: {
@@ -438,7 +441,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
   async function withClient<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
     const client = await input.pool.connect();
     try {
-      await client.query("BEGIN READ ONLY");
+      await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
       try {
         const value = await work(client);
         await client.query("COMMIT");
@@ -1749,12 +1752,13 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           const catalog=createTemplateRepository(input.pool);
           let cursor:string|null=null;
           do { const page=await catalog.page(client,{campaignId:campaign.campaignId,limit:100,cursor});templates.push(...page.templates);cursor=page.nextCursor; } while(cursor!==null && templates.length<=limits.exportMaxRecords);
-          return { authorized: true as const, campaign, members, content, activity, rolls, grants, templates };
+          const proposals=(await createProposalRepository().list(client,{campaignId:campaign.campaignId,submitterId:null,generation:0,status:null,anchor:null,limit:bound})).map(proposalView);
+          return { authorized: true as const, campaign, members, content, activity, rolls, grants, templates, proposals };
         });
         if (!snapshot.authorized) return { ok: false, error: errors.campaign_not_found() };
 
         const recordCount =
-          1 + snapshot.templates.length + snapshot.members.length + snapshot.content.length + snapshot.activity.length + snapshot.rolls.length;
+          1 + snapshot.proposals.length + snapshot.templates.length + snapshot.members.length + snapshot.content.length + snapshot.activity.length + snapshot.rolls.length;
         if (
           snapshot.content.length > limits.exportMaxRecords ||
           snapshot.activity.length > limits.exportMaxRecords ||
@@ -1778,7 +1782,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
         // Canonicalized so the bytes survive the jsonb receipt round-trip
         // unchanged: same key plus same input always replays byte-identical.
         const value = canonicalizeJson({
-          exportVersion: 1, templates:snapshot.templates, campaign: {
+          exportVersion: 1, proposals:snapshot.proposals, templates:snapshot.templates, campaign: {
             campaignId: snapshot.campaign.campaignId,
             ownerId: snapshot.campaign.ownerId,
             systemVersionId: snapshot.campaign.systemVersionId,

@@ -1,3 +1,4 @@
+import { createProposalCommands, type ProposalCommands } from "./proposals.js";
 import { createTemplateCommands, type TemplateCommands } from "./templates.js";
 import { randomUUID } from "node:crypto";
 
@@ -308,7 +309,7 @@ export type AssignCampaignControllersInput = Omit<AssignControllersInput, "membe
 export type ClaimCampaignCharacterInput = Omit<ClaimCharacterInput, "membershipGeneration">;
 export type AdoptCampaignCharacterInput = Omit<AdoptCharacterInput, "membershipGeneration">;
 
-export interface Campaigns extends TemplateCommands {
+export interface Campaigns extends TemplateCommands, ProposalCommands {
   create(ctx: RequestContext, input: CreateCampaignInput): Promise<CampaignResult<CampaignView>>;
   open(ctx: RequestContext, input: OpenCampaignInput): Promise<CampaignResult<CampaignView>>;
   list(ctx: RequestContext, input: ListCampaignsInput): Promise<CampaignResult<ListCampaignsResult>>;
@@ -935,6 +936,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
 
   return {
     ...templates,
+    ...createProposalCommands({ pool: input.pool, now, newId }),
     issueInvitation: invitations.issueInvitation,
     listInvitations: invitations.listInvitations,
     reviewInvitation: invitations.reviewInvitation,

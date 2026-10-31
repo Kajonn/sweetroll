@@ -53,6 +53,40 @@ it("does not purge a newer placement when catalog revocation races confirmation"
   session.dispose(); await store.close();
 });
 
+it("does not restore an older sheet when clearing a revoked roll races a fresh scope", async () => {
+  const { session, api, store } = await makeHarness();
+  api.scriptOpenView(viewFor("char-1", 1, { campaignId: "campaign-a" }));
+  await session.open();
+  const read = store.read.bind(store);
+  let release!: () => void;
+  let captured!: () => void;
+  const capturedRead = new Promise<void>(resolve => { captured = resolve; });
+  vi.spyOn(store, "read").mockImplementationOnce(async (...args) => {
+    const stale = await read(...args);
+    captured();
+    await new Promise<void>(resolve => { release = resolve; });
+    return stale;
+  });
+  const forgetting = session.forgetRoll(PUSH_ROOT_ID);
+  await capturedRead;
+  const returned = viewFor("char-1", 2, { campaignId: null, placementGeneration: 2 });
+  api.setOpenFallback(async () => ({ character: returned, requestId: "returned" }));
+  // First adopt the generation changed by clearing the saved roll, then
+  // confirm the authorized returned sheet while its earlier read is held.
+  await session.refresh();
+  await session.refresh();
+  expect(session.getSnapshot().confirmed?.revision).toBe(2);
+  release();
+  await forgetting;
+  expect(session.getSnapshot().confirmed?.revision).toBe(2);
+  expect(session.getSnapshot().confirmed?.campaignId).toBeNull();
+  api.setSendFallback(async () => successEnvelope(returned));
+  await session.executeGrantedAction("sword-copy", "sword_pool");
+  await session.whenIdle();
+  expect(api.sent[0]?.body.expectedRevision).toBe(2);
+  session.dispose(); await store.close();
+});
+
 it("ignores catalog revocation after the session account has changed", async () => {
   const { session, api, identity, store } = await makeHarness();
   api.scriptOpenView(viewFor("char-1", 1)); await session.open();

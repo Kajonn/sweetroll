@@ -1848,6 +1848,10 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         if (!identityMatches()) return;
         const fresh = await store.read(actorId, characterId);
         if (!identityMatches()) return;
+        // A concurrent refresh can confirm a newer placement while this
+        // read is in flight. Clearing a roll must never restore its old sheet.
+        if (fresh.accountGeneration < accountGeneration ||
+            (fresh.accountGeneration === accountGeneration && fresh.generation < generation)) return;
         confirmed = fresh.confirmed;
         lastRoll = fresh.lastRoll ?? null;
         entries = fresh.entries;

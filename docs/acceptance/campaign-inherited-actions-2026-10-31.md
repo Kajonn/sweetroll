@@ -1,6 +1,6 @@
 # Campaign inherited actions — verification record
 
-Date: 2026-10-31. Status: hosted normal journey passed on `5d3bb88`; offline acceptance exposed a draft-reset defect. Fix `f11e7b9` passes all CI #154 checks and is staged for isolated redeployment; final hosted acceptance remains open.
+Date: 2026-10-31. Status: draft-preservation fix `f11e7b9` is deployed as `9f00c6b` and the normal hosted journey passes. The offline journey found a saved-roll clearing race after return; a further stale-read repair is in verification. Final hosted acceptance remains open.
 
 Scope: [execution plan](../superpowers/plans/2026-10-31-campaign-inherited-actions.md) and [contract](../superpowers/specs/2026-10-31-campaign-inherited-actions.md). The owner approved publication and implementation tree `56e70044` was published as `d720fc3` in PR #25. CI #149 exposed a saved-source schema defect and a load-test threshold failure; deployment has not started.
 
@@ -99,3 +99,26 @@ Supplemental real HTTP acceptance passed against that live candidate. Its backen
 Supplemental run resources: system `bee57369-943c-4bc4-92be-8b7f68674f92`, campaign `7b756f0c-57fb-4a6f-bafc-8c1db8e1d74d`, template `43ea89db-c9b3-45c0-8e92-4ffd7da30463`, characters `8aad0558-0530-4750-af58-73e9fb1dc6b7`, `5efc9e58-7d08-49ec-b9eb-4a32d2f6d8c2`. Each was archived and independently read back; the system is private. All earlier run cleanup is also recorded above.
 
 Next: apply the staged `f11e7b9` update in the isolated preview, verify terminal success/readiness and the new build identity, rerun both canonical hosted journeys with the same limits and zero retries, and read back scoped cleanup. C7 remains open until the repaired GUI passes hosted acceptance. Wider G9 device/provider-auth/playtest gates remain open.
+
+## Second hosted candidate — saved-roll clearing race
+
+The owner applied the preview update. Deployment `7264aa8c-2ba0-468e-8561-02bc13ff3341` reached SUCCESS at 14:43:29 UTC with metadata commit `9f00c6bf8f6d5529044ff74d18a84955448ccc5c`; its application matches `f11e7b9`, configured source pin `f11e7b9`, and no changes remain staged. [CI #155](https://github.com/Kajonn/sweetroll/actions/runs/41211258976) passed all seven jobs on that documentation-only head. Readiness is healthy. A direct Vite rebuild with observed `OFFLINE_BUILD_ID=build-mvwigib5` matched every served artifact byte for byte:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `/index.html` | `3cd5967ba61e10f14126782b21b506a5bfe00b43f1a45c09167f85fb841c5612` |
+| `/assets/index-CCQNROF8.css` | `26841a98ac12725838c268120d874adb89fbc9449bf3375398de02d667d1ce58` |
+| `/assets/index-pehCr_EM.js` | `695638030b75b75a07d21bae151ccfea25da429ac51687029a7ebcc9005b10eb` |
+| `/sw.js` | `e7d8de256e96ef3ac4728bf11af945b02a69e63dd08b8de6ee0f30df51220c3d` |
+| `/offline-manifest.json` | `a1f1e4e48e7d6320a6c4f04126fcfea6d50908fe83d1d7221f5bcb0be8fe78e9` |
+
+The unchanged canonical runners (Chromium 130, one worker, zero retries, 180-second limit) ran against the new deployment. The normal multi-account journey passed in 31.8 seconds. Offline placement, stale-reference review/discard, value editing, reconnect and committed-push replay now pass the former draft-reset point. That journey then found a saved-roll clearing race after membership removal/character return: reading an inaccessible former-scope roll triggers `forgetRoll`; its delayed store read can replace a newer confirmed returned sheet with an older cached revision. The next fresh action used revision 6 against authoritative 7 and correctly received 409. This is a client snapshot regression, not an assertion/timeout issue.
+
+A deterministic session test holds the old read, confirms the newer returned scope, then releases the old read. It failed with expected revision 2 versus observed 1. The repair rejects reads older than the in-memory account/character generation before adopting the post-clear snapshot. The test also verifies a fresh granted action uses the current revision. All 114 session tests, all 1,166 frontend tests, typecheck and production build pass. CI and deployed verification of this further repair remain pending; no final hosted acceptance is claimed.
+
+Both second-candidate runs completed scoped cleanup, independently read back through fresh authenticated API requests: all run-created resources are archived and systems private.
+
+| Run | System | Campaign | Character | Template |
+| --- | --- | --- | --- | --- |
+| normal | `5c418cf8-529c-4038-8a6c-e917c2be09af` | `9b0f3c9c-4086-43c9-b24d-38883e7a1215` | `c9b96837-0563-44cf-b36a-01e9e466fdfa` | `7edc0167-1620-4935-a649-7fa09550cff4` |
+| offline | `dc99398b-0e2e-49d4-a5e2-11aa75c4eee8` | `39e8cb86-4559-478e-a677-90d65d9c04f1` | `e834476c-0229-4ce8-958e-8aad28d07cdb` | `6a8988e3-43a5-41bd-9fd3-a561dfc389bc` |

@@ -12,6 +12,7 @@ export type DialogProps = {
   children: ReactNode;
   actions?: ReactNode;
   closeLabel?: string;
+  onCloseAutoFocus?: (event: Event) => void;
   /** Sheet slides in from the side; dialog centers. Both use the same Radix focus management. */
   variant?: "dialog" | "sheet";
 };
@@ -29,6 +30,7 @@ export function Dialog({
   children,
   actions,
   closeLabel = "Close",
+  onCloseAutoFocus,
   variant = "dialog",
 }: DialogProps) {
   return (
@@ -36,6 +38,7 @@ export function Dialog({
       <RadixDialog.Portal>
         <RadixDialog.Overlay className={styles.overlay} />
         <RadixDialog.Content
+          onCloseAutoFocus={onCloseAutoFocus}
           className={variant === "sheet" ? styles.sheet : styles.content}
         >
           <RadixDialog.Title className={styles.title}>{title}</RadixDialog.Title>

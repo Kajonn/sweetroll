@@ -57,6 +57,17 @@ function ProposalScope(props: Props) {
     props.isGm ? "review" : "self",
   ] as const;
   const active = useRef(true);
+  const opener = useRef<HTMLElement | null>(null);
+  const heading = useRef<HTMLSpanElement | null>(null);
+  const restoreFocus = (event: Event) => {
+    const target = opener.current?.isConnected
+      ? opener.current
+      : heading.current;
+    if (target) {
+      event.preventDefault();
+      target.focus();
+    }
+  };
   const [open, setOpen] = useState(false);
   const [review, setReview] = useState<CampaignProposal | null>(null);
   const [kind, setKind] = useState<CampaignProposal["kind"]>("item");
@@ -133,6 +144,7 @@ function ProposalScope(props: Props) {
           next.body,
         );
       if (!active.current) return;
+      opener.current = heading.current;
       setPending(false);
       setOpen(false);
       setReview(null);
@@ -206,11 +218,15 @@ function ProposalScope(props: Props) {
   );
   return (
     <Panel
-      title={t(
-        props.isGm
-          ? "campaign.proposals.reviewTitle"
-          : "campaign.proposals.selfTitle",
-      )}
+      title={
+        <span ref={heading} tabIndex={-1}>
+          {t(
+            props.isGm
+              ? "campaign.proposals.reviewTitle"
+              : "campaign.proposals.selfTitle",
+          )}
+        </span>
+      }
     >
       <p>{t("campaign.proposals.private")}</p>
       {!props.online ? (
@@ -219,7 +235,8 @@ function ProposalScope(props: Props) {
       {!props.isGm ? (
         <Button
           disabled={!props.online || props.readOnly}
-          onClick={() => {
+          onClick={(event) => {
+            opener.current = event.currentTarget;
             reset();
             setName("");
             setDescription("");
@@ -272,7 +289,8 @@ function ProposalScope(props: Props) {
               {props.isGm && p.status === "pending" ? (
                 <Button
                   disabled={!props.online || props.readOnly}
-                  onClick={() => {
+                  onClick={(event) => {
+                    opener.current = event.currentTarget;
                     reset();
                     setReason("");
                     setReview(p);
@@ -296,6 +314,7 @@ function ProposalScope(props: Props) {
         </Button>
       ) : null}
       <Dialog
+        onCloseAutoFocus={restoreFocus}
         open={open}
         onOpenChange={(v) => {
           if (!v) close();
@@ -380,6 +399,7 @@ function ProposalScope(props: Props) {
         </form>
       </Dialog>
       <Dialog
+        onCloseAutoFocus={restoreFocus}
         open={review !== null}
         onOpenChange={(v) => {
           if (!v) close();

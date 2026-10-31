@@ -1,3 +1,4 @@
+import type { SubmitProposal } from "../../src/campaigns/proposals.js";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildI6Harness, ctxFor, type I6Harness } from "./i6-app.js";
@@ -117,6 +118,12 @@ describeDB("private campaign template proposals", () => {
     ]) {
       const b = body();
       Object.assign(b.content, extra);
+      expect(
+        await h.campaigns.submitProposal(ctxFor(h.users.player), {
+          ...b,
+          campaignId: id,
+        } as SubmitProposal),
+      ).toMatchObject({ ok: false, error: { code: "bad_request" } });
       expect((await request(id, "player", "POST", "", b)).statusCode).toBe(400);
     }
     for (const b of [

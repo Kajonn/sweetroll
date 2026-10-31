@@ -114,6 +114,14 @@ export async function campaignProposalJourney(
     await page.goto(`/campaigns/${campaignId}`);
     await page.getByRole("tab", { name: "Items & powers" }).click();
     await page.getByRole("button", { name: "Suggest a template" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Suggest a template" }),
+    ).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("dialog")).toBeVisible();
     await page
       .getByRole("textbox", { name: "Name", exact: true })
       .fill("Original key");
@@ -135,6 +143,11 @@ export async function campaignProposalJourney(
         ).toBe(true);
       }
     }
+    await page.setViewportSize({ width: 360, height: 900 });
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.screenshot({
+      path: test.info().outputPath("proposal-form.png"),
+    });
     const submittedRequests: unknown[] = [];
     let dropped = false;
     await page.route("**/api/campaigns/*/item-proposals", async (route) => {
@@ -208,6 +221,9 @@ export async function campaignProposalJourney(
         .getByRole("dialog")
         .getByText("Personal unchanged", { exact: true }),
     ).toBeVisible();
+    await gmPage.screenshot({
+      path: test.info().outputPath("proposal-review.png"),
+    });
     const a11y = await new AxeBuilder({ page: gmPage }).analyze();
     expect(a11y.violations).toEqual([]);
     let approveDropped = false;
@@ -376,7 +392,9 @@ export async function campaignProposalJourney(
       await page.reload();
       await page.getByRole("tab", { name: "Items & powers" }).click();
       await expectOfflineAvailable(sheet);
-      await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+      await page.waitForFunction(
+        () => navigator.serviceWorker.controller !== null,
+      );
       await player.setOffline(true);
       await expect(
         page.getByRole("button", { name: "Suggest a template" }),
@@ -488,12 +506,10 @@ export async function campaignProposalJourney(
       ).toBe("archived");
       cleanup.systemId = systemId;
     }
-    await test
-      .info()
-      .attach("proposal-cleanup", {
-        body: JSON.stringify({ ...cleanup, templateIds }),
-        contentType: "application/json",
-      });
+    await test.info().attach("proposal-cleanup", {
+      body: JSON.stringify({ ...cleanup, templateIds }),
+      contentType: "application/json",
+    });
     await Promise.all([gm.close(), co.close(), player.close(), other.close()]);
   }
 }

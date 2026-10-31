@@ -25,19 +25,15 @@ function setup(isGm = false) {
     defaultOptions: { queries: { retry: false } },
   });
   const api: CampaignProposalsApi = {
-    list: vi
-      .fn()
-      .mockResolvedValue({
-        proposals: [
-          {
-            ...proposal,
-            ...(isGm
-              ? { eligibility: { canApprove: true, reason: null } }
-              : {}),
-          },
-        ],
-        nextCursor: null,
-      }),
+    list: vi.fn().mockResolvedValue({
+      proposals: [
+        {
+          ...proposal,
+          ...(isGm ? { eligibility: { canApprove: true, reason: null } } : {}),
+        },
+      ],
+      nextCursor: null,
+    }),
     submit: vi.fn().mockResolvedValue({ proposal }),
     approve: vi
       .fn()
@@ -152,4 +148,15 @@ it("requires explicit refresh after conflicts and never posts on reload or offli
     screen.getByRole("button", { name: "Submit suggestion" }),
   ).toBeDisabled();
   expect(api.submit).toHaveBeenCalledTimes(1);
+});
+
+it("returns focus to the suggestion opener after Escape", async () => {
+  const { user } = setup();
+  const opener = await screen.findByRole("button", {
+    name: "Suggest a template",
+  });
+  await user.click(opener);
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(opener).toHaveFocus();
 });

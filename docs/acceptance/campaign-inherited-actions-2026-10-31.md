@@ -1,6 +1,6 @@
 # Campaign inherited actions — verification record
 
-Date: 2026-10-31. Status: application CI complete on `f1fcbd7`; isolated deployment and hosted acceptance await confirmation.
+Date: 2026-10-31. Status: hosted normal journey passed on `5d3bb88`; offline acceptance exposed a draft-reset defect. Fix `f11e7b9` passes all CI #154 checks and is staged for isolated redeployment; final hosted acceptance remains open.
 
 Scope: [execution plan](../superpowers/plans/2026-10-31-campaign-inherited-actions.md) and [contract](../superpowers/specs/2026-10-31-campaign-inherited-actions.md). The owner approved publication and implementation tree `56e70044` was published as `d720fc3` in PR #25. CI #149 exposed a saved-source schema defect and a load-test threshold failure; deployment has not started.
 
@@ -10,7 +10,7 @@ Node 24: 458 server/unit tests passed; ten database-backed tests in that command
 
 Observed red → green regressions cover missing derived action projection/execution; pinned base/default validation; GM source selection/publication; typed defaults clearing; returned-copy controls without catalog data; immutable push provenance (cloned source); unsupported template-computed action dependencies; and using the caller transaction for source reads. Shared fixture tests compile the actual integration/browser fixture and exercise metadata/name-field separation, independent copies, hit/damage/nominal/resource parity, saved-pool binding preservation, removal, restoration and changed placed source.
 
-## Not yet executed
+## Initial local verification limitations (superseded by CI and hosted evidence below)
 
 - Real PostgreSQL integration and the ten DB-backed root tests, including immutable catalog revisions, permissions, transaction rollback and concurrent pushes.
 - Canonical browser shards, production-worker recovery, retained visual suite and Docker build.
@@ -78,3 +78,24 @@ Scoped cleanup was independently read back for all four first-candidate attempts
 | initial online | `4f476f5c-f8ef-4ada-a185-802399466f73` | `e41dde42-a218-4ba1-9015-38355f941681` | `58f14b4d-5bce-4838-81d6-917df65f6141` | `22acc3ad-1363-4714-98f9-a6b7228a089f` |
 | initial offline | `cb895ede-6095-4cfa-85ed-490c63211383` | `9a818790-6996-4b80-9ad1-d32bb2aa1245` | `9bc1272b-9cfd-412f-a3f5-921fd3e6af3e` | `bb249688-31e3-4596-9ad5-e507ea4b6af8` |
 | derived campaign template authoring, independent copies, actions, pushes and returned play | `3af42f78-596a-49fb-bd88-503f1e6a106f` | `30664843-0bb0-483f-9449-4d1bbd2363ae` | `dca803bd-cc5b-4717-a469-553a876b69d7` | `fc478c1c-805f-4c32-8066-336ac568f0cf` |
+
+## CI #154 — hosted finding repaired, redeployment blocked
+
+Application fix `f11e7b917c5c495dc4dcd42ddbfcb00556e9eb29`, tree `79fd2efccd3b61f0c990e6fc652da088e24df1d1`, passed all seven verification jobs in [CI #154](https://github.com/Kajonn/sweetroll/actions/runs/41210765171): 468 root, 333 real PostgreSQL integration, 1,165 frontend, 60 browser, 28 production-worker offline and 10 retained visual checks, plus typechecks, contract identity, production builds and Docker. The new draft-preservation test was observed red before the fix and green afterward. Original load limits pass: create/read/bump/roll p95 278.9/19.4/30.3/32.3 ms. No test or workload was weakened.
+
+After this successful CI, only the preview service's commit pin was staged from `f1fcbd7` to `f11e7b9` in patch `61be70ec-b7f7-49ef-b859-98442bbf003b`. Inspection confirmed exactly one non-destructive source field change, no shared variables, database, volume or other service changes. The deployment action again returned "Cancelled — the user did not approve this action. No changes were made." Live deployment readback remains `a24234ff-d94c-441a-9649-d02d2717c10a` / `5d3bb88`. No alternate path bypassed this gate.
+
+Supplemental real HTTP acceptance passed against that live candidate. Its backend is byte-identical in Git to `f11e7b9` (the repair changes only the sheet value editor, its frontend test and this record). These results verify the deployed backend; they do not substitute for redeploying and testing the repaired GUI:
+
+| Boundary | Observed result |
+| --- | --- |
+| NPC without a compatible target slot/fields | Derived catalog choice absent; direct placement 422; no entry |
+| Removed derived copy | Action 422, push 422; original saved roll remains readable (200) |
+| Concurrent GM/co-GM catalog edits | Exactly one 200 and one 409 |
+| Frozen stale catalog reference | Placement 409; no entry |
+| Placement racing archive | Archive 200, placement 409; no entry |
+| Revoked campaign member | Former controlled sheet and campaign catalog both 404 |
+
+Supplemental run resources: system `bee57369-943c-4bc4-92be-8b7f68674f92`, campaign `7b756f0c-57fb-4a6f-bafc-8c1db8e1d74d`, template `43ea89db-c9b3-45c0-8e92-4ffd7da30463`, characters `8aad0558-0530-4750-af58-73e9fb1dc6b7`, `5efc9e58-7d08-49ec-b9eb-4a32d2f6d8c2`. Each was archived and independently read back; the system is private. All earlier run cleanup is also recorded above.
+
+Next: apply the staged `f11e7b9` update in the isolated preview, verify terminal success/readiness and the new build identity, rerun both canonical hosted journeys with the same limits and zero retries, and read back scoped cleanup. C7 remains open until the repaired GUI passes hosted acceptance. Wider G9 device/provider-auth/playtest gates remain open.

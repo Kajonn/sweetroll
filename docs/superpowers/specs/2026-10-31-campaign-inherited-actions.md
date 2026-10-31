@@ -1,6 +1,6 @@
 # Campaign inherited actions contract
 
-Status: implemented in PR #25; application `f1fcbd7` passes CI #152. Isolated deployed acceptance awaits Railway confirmation. Authority: [execution plan](../plans/2026-10-31-campaign-inherited-actions.md).
+Status: implemented in PR #25; draft-preservation fix `f11e7b9` passes all CI #154 checks. Normal hosted and backend boundary acceptance passed on `5d3bb88`; final offline GUI acceptance awaits redeployment of the repair. Authority: [execution plan](../plans/2026-10-31-campaign-inherited-actions.md).
 
 Create keeps the existing campaign/kind/content/revision/key envelope and adds optional `baseTemplateId` (definition ID, at most 64 characters). Content contains name (1–200, nonblank), description/notes (0–2000), item defaultQuantity (positive safe integer), and optional `defaultValues` (at most 100 existing writable base fields). Values use the published field types and bounds; computed/image fields cannot be supplied. Blank templates reject defaultValues. No actions, expressions, seeds, snapshots, schema or version selectors are accepted.
 

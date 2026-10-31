@@ -1,6 +1,6 @@
 # Campaign inherited actions — verification record
 
-Date: 2026-10-31. Status: deployed `b766b9a` passes normal hosted acceptance; offline return still exposed incomplete reconciliation. A complete read/reconciliation repair passes local verification and awaits CI/deployment. Final hosted acceptance remains open.
+Date: 2026-10-31. Status: CI #158 and isolated hosted acceptance pass on deployed application `58c71a1`; both normal and production-worker recovery journeys pass with zero retries. Cleanup is independently verified. C7 is complete; wider G9 release gates remain open.
 
 Scope: [execution plan](../superpowers/plans/2026-10-31-campaign-inherited-actions.md) and [contract](../superpowers/specs/2026-10-31-campaign-inherited-actions.md). The owner approved publication and implementation tree `56e70044` was published as `d720fc3` in PR #25. CI #149 exposed a saved-source schema defect and a load-test threshold failure; deployment has not started.
 
@@ -155,3 +155,32 @@ Fresh authenticated API contexts independently read back cleanup for both runs: 
 | --- | --- | --- | --- | --- |
 | normal | `492e8ec7-f0b3-456e-96c4-85e32cae045a` | `b4bc7fb9-9f91-4b61-b2d0-291856e8f54b` | `dcbc1cf0-f190-4109-8d72-2e7b67384fc2` | `bde61082-f988-4413-9a06-3a2dba6eefbe` |
 | offline | `ca1f4b23-1222-44b5-85ac-a5fead65901c` | `78e922b5-f0ff-43b0-96ec-161ce2fcaa97` | `7b384f26-aac6-4d6a-ad40-193c58a61cf8` | `7c1dcd2a-b00e-4898-b4ed-b207befaa2da` |
+
+## Final acceptance — CI #158 and deployed `58c71a1`
+
+[CI #158](https://github.com/Kajonn/sweetroll/actions/runs/41239762895) passed all seven verification jobs on application `58c71a173e8e7cc24291ecfda9d2cecc3319363f`, tree `56b6c50d23d126f84ec1c5d93bceb67c200db5a1`: 468 root, 333 real PostgreSQL integration, 1,170 frontend, 60 browser, 28 production-worker offline and 10 retained visual checks, plus typechecks, generated-contract identity, production builds and Docker. Session tests total 118. Original create/read/bump/roll p95 gates pass at 223.1/14.9/32/35.1 ms. No test, workload, assertion, timeout, retry setting or baseline was weakened.
+
+The scoped preview patch was accepted and deployed. Deployment `5a090554-1e7d-4a06-98e2-3a6e1f0a886d` reached SUCCESS at 21:53:05 CET, 2026-10-31. Its commit metadata and configured source pin both identify exactly `58c71a1`, branch `docs/campaign-inherited-actions-plan`; no changes remain staged. Project `sweetroll-items-preview`, environment `8016a027-c65d-4991-a7e8-7f38ff54dbf7`, service `sweetroll-items` (`f75d2a0b-66a6-49b7-95cc-a24ff99ac6f8`), URL https://sweetroll-items-production.up.railway.app. The actual production project `proactive-expression` was untouched, and no database was reset.
+
+Readiness returned `{"status":"ok"}`. A direct Vite rebuild of the exact source with observed `OFFLINE_BUILD_ID=build-mvwvnly0` matched all five served artifacts byte for byte:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `/index.html` | `ab0f6052869878ad7bcf556f3e126001b06869aa09598d8f5b25691a236153d2` |
+| `/assets/index-CCQNROF8.css` | `26841a98ac12725838c268120d874adb89fbc9449bf3375398de02d667d1ce58` |
+| `/assets/index-Dbye9YK4.js` | `f4fccfe0254e922128d3ad6fca7155499b0e1da11e4a6b3352bd030db0b9126e` |
+| `/sw.js` | `938b6033fcd21b5ec9e29ec75cb0590b0423af46d21e254b32eded33d3fca6b5` |
+| `/offline-manifest.json` | `faefca0d365a3d2c44f7df350ae2fe70657f17a61f15ac6f1a998c52c10f2aa8` |
+
+Both unchanged canonical hosted journeys passed in Chromium 130.0.6723.31, one worker, zero retries, with the existing 180-second limit: normal GM/co-GM/player journey 30.2 seconds; production-worker offline recovery 26.8 seconds; total 57.9 seconds. The GM editor and returned player sheet were checked at 320/360/768/1280 widths in light/dark. Normal coverage includes labeled base authoring, typed defaults, independent copies and values, inherited hit/damage/nominal/entry-resource actions, named-pool pushes, co-GM stale-edit rejection, revised placement defaults, archive, member removal and fresh inherited roll/push without catalog transport. Offline coverage includes frozen placement, reload/reconnect, stale archive/recover reference review and discard, independent value editing, committed-but-unseen push replay with identical frozen bodies and a single child, then returned-sheet roll/push. The former draft reset and incomplete return reconciliation now pass on the deployed build.
+
+The supplemental deployed HTTP boundary checks recorded above remain valid for this identical backend (changes since those checks are frontend/tests/documentation): incompatible target rejection without an entry, removed-action/push denial while saved history remains readable, concurrent edits, stale placement, placement/archive race and revoked-access denial. Real PostgreSQL integration also covers derived return/duplication and competing pushes.
+
+Fresh authenticated API contexts independently read back both final runs after fixture cleanup. Every run-created character, template, campaign and system is archived; systems are private:
+
+| Run | System | Campaign | Character | Template |
+| --- | --- | --- | --- | --- |
+| normal | `4d52225e-52d7-470e-b531-de7dcddc045f` | `c80f138c-33f4-4b0f-b116-f493852a7a18` | `82e321eb-56a9-4ec3-9dcb-056b4f6c0daa` | `e3c8c91d-8680-4ff5-8da3-590b417799f5` |
+| offline | `080c3d0b-cf85-4aed-97f1-91f96c128187` | `ad234915-1afd-41b9-a172-830f2a65ebf0` | `e01b8c8b-9421-4334-a88e-a2c3401364fe` | `572ef32e-7e59-408f-9da9-ba8228fe1c6e` |
+
+C7 CI/deployed acceptance is complete. The implementation can proceed to review/merge. D1 player proposals and D2 restricted audiences remain follow-up slices. Unperformed physical Android/iPad, real-provider sign-in and physical-table/remote playtest G9 gates remain open; this is not a public-release claim. No application/database migration or older-version transition work is introduced before the first application release tag.

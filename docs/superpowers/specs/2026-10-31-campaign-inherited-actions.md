@@ -1,6 +1,6 @@
 # Campaign inherited actions contract
 
-Status: implemented in PR #25; returned-sheet stale-read repair `1b85c75` passes all CI #156 checks. The normal hosted journey passes on live `9f00c6b`; final offline/returned GUI acceptance awaits deployment of this further repair. Authority: [execution plan](../plans/2026-10-31-campaign-inherited-actions.md).
+Status: implemented in PR #25; application `58c71a1` passes all CI #158 checks and both isolated hosted journeys. Exact deployment/assets, returned-sheet recovery and cleanup are verified. Wider G9 release gates remain open. Authority: [execution plan](../plans/2026-10-31-campaign-inherited-actions.md).
 
 Create keeps the existing campaign/kind/content/revision/key envelope and adds optional `baseTemplateId` (definition ID, at most 64 characters). Content contains name (1–200, nonblank), description/notes (0–2000), item defaultQuantity (positive safe integer), and optional `defaultValues` (at most 100 existing writable base fields). Values use the published field types and bounds; computed/image fields cannot be supplied. Blank templates reject defaultValues. No actions, expressions, seeds, snapshots, schema or version selectors are accepted.
 

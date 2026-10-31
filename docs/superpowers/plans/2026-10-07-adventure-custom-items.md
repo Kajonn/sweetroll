@@ -68,7 +68,7 @@ On phones, keep Add in the existing slot interaction, show scope and source in t
 ### D. Player proposals, then restricted audiences (follow-up)
 
 - D1: add data-only player proposals with submit/approve/reject status, distinct from live campaign templates. Approval creates an independent ordinary campaign template at resource/content revision 1; it never rewrites the personal entry automatically. [D1 execution plan](2026-10-31-player-template-proposals.md) and [contract](../specs/2026-10-31-player-template-proposals.md) define the implemented PR #26 contract; [acceptance evidence](../../acceptance/player-template-proposals-2026-10-31.md) records exact application/deployment and cleanup.
-- D2: add GM-only/selected-player draft visibility with explicit reveal and safe placement; prove direct-ID, list, projection, offline cache purge and preview-as-player behavior. Keep hidden drafts off character sheets.
+- D2: [execution plan](2026-10-31-restricted-template-audiences.md) and [contract](../specs/2026-10-31-restricted-template-audiences.md) are planned against merged D1 `90b053d`; application implementation remains pending. Add GM-only/selected-player draft visibility with explicit reveal and safe placement; prove direct-ID, list, projection, offline cache purge and preview-as-player behavior. Keep hidden drafts off character sheets.
 
 ## Verification and release
 

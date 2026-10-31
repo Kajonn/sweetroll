@@ -1,4 +1,4 @@
-import { d20Document } from "../../src/systems/implementation/package/fixtures/index.js";
+import { d20Document } from "./d20.js";
 export function derivedTemplateDocument() {
   const d = structuredClone(d20Document);
   d.schemaVersion = "1.2";

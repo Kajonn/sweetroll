@@ -1,7 +1,7 @@
 import { Value } from "@sinclair/typebox/value";
 import { PushContextSchema } from "../../src/systems/implementation/runtime/push-context.js";
 import { describe, expect, it } from "vitest";
-import { derivedTemplateDocument } from "./derived-template.js";
+import { derivedTemplateDocument } from "../../src/systems/implementation/package/fixtures/campaign-derived.js";
 import { compileDocument } from "../../src/systems/implementation/rules/compile-document.js";
 import { decodeSystemPackage } from "../../src/systems/implementation/package/codec.js";
 import { createSystemRuntime } from "../../src/systems/runtime.js";

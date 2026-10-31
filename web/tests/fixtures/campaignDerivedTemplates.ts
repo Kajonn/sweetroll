@@ -5,7 +5,7 @@ import {
   type APIRequestContext,
 } from "@playwright/test";
 import { createCatalogCampaign } from "./campaignTemplates.js";
-import { derivedTemplateDocument } from "../../../tests/fixtures/derived-template.js";
+import { derivedTemplateDocument } from "../../../src/systems/implementation/package/fixtures/campaign-derived.js";
 import {
   json,
   key,

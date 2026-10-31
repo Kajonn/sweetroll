@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildI6Harness, ctxFor, type I6Harness } from "./i6-app.js";
-import { derivedTemplateDocument } from "../fixtures/derived-template.js";
+import { derivedTemplateDocument } from "../../src/systems/implementation/package/fixtures/campaign-derived.js";
 import type { CampaignResult } from "../../src/campaigns/index.js";
 import type {
   CharacterResult,

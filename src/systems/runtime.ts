@@ -199,7 +199,11 @@ export type CharacterProjectionElement =
 
 export type CharacterProjectionSlotEntry = {
   source?: import("./implementation/package/schema/dynamic.js").EntrySource;
-  definition?: import("./implementation/package/schema/index.js").ObjectTemplateV1;
+  definition?: {
+    id:string;label:string;kind:TemplateKind;
+    fields:Array<CharacterProjectionFieldConstraints & {id:string;label:string;kind:Exclude<import("./implementation/package/schema/index.js").FieldV1["kind"],"computed"|"image">;default:unknown}>;
+    grantedActions:Array<{id:string;label:string;kind:"roll"|"resourceBump";inputs:CharacterProjectionActionInput[]}>;
+  };
   metadata?: {name:string;description?:string;notes?:string};
   entryId: string;
   templateId: DefinitionId | null;

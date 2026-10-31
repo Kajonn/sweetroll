@@ -3174,110 +3174,26 @@ export interface operations {
                                                     id: string;
                                                     label: string;
                                                     kind: "item" | "spell" | "talent" | "effect";
-                                                    description?: string;
-                                                    fields: ({
-                                                        /** @constant */
-                                                        kind: "text";
-                                                        id: string;
-                                                        label: string;
-                                                        default: string;
-                                                        required: boolean;
-                                                        minLength: number;
-                                                        maxLength: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "integer";
-                                                        id: string;
-                                                        label: string;
-                                                        default: number;
-                                                        required: boolean;
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "decimal";
-                                                        id: string;
-                                                        label: string;
-                                                        default: number;
-                                                        required: boolean;
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "boolean";
-                                                        id: string;
-                                                        label: string;
-                                                        default: boolean;
-                                                        required: boolean;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "singleChoice";
-                                                        id: string;
-                                                        label: string;
-                                                        required: boolean;
-                                                        default: string | null;
-                                                        options: {
+                                                    fields: {
+                                                        required?: boolean;
+                                                        min?: number;
+                                                        max?: number;
+                                                        step?: number;
+                                                        minLength?: number;
+                                                        maxLength?: number;
+                                                        options?: {
                                                             id: string;
                                                             label: string;
                                                         }[];
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "multiChoice";
                                                         id: string;
                                                         label: string;
-                                                        required: boolean;
-                                                        default: string[];
-                                                        options: {
-                                                            id: string;
-                                                            label: string;
-                                                        }[];
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "resource";
+                                                        kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                        default: unknown;
+                                                    }[];
+                                                    grantedActions: {
                                                         id: string;
                                                         label: string;
-                                                        default: {
-                                                            current: number;
-                                                            max: number;
-                                                        };
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                        resetTo: "min" | "max";
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "computed";
-                                                        id: string;
-                                                        label: string;
-                                                        valueType: "number" | "text" | "boolean";
-                                                        expressionId: string;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "image";
-                                                        id: string;
-                                                        label: string;
-                                                        required: boolean;
-                                                    })[];
-                                                    grantedActions: ({
-                                                        pushPolicy?: {
-                                                            /** @constant */
-                                                            version: "1.0";
-                                                            maxAttempts: number;
-                                                            successThreshold: number;
-                                                            allowOnSuccess: boolean;
-                                                            groups: {
-                                                                groupId: string;
-                                                                lockedFaces: number[];
-                                                                reportedFaces: number[];
-                                                            }[];
-                                                        };
-                                                        /** @constant */
-                                                        kind: "roll";
-                                                        id: string;
-                                                        label: string;
-                                                        expressionId: string;
+                                                        kind: "roll" | "resourceBump";
                                                         inputs: {
                                                             id: string;
                                                             label: string;
@@ -3285,24 +3201,7 @@ export interface operations {
                                                             required: boolean;
                                                             default: string | number | boolean | null;
                                                         }[];
-                                                        outputTemplate: string;
-                                                        nominal?: boolean;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "resourceBump";
-                                                        id: string;
-                                                        label: string;
-                                                        resourceId: string;
-                                                        operation: {
-                                                            /** @constant */
-                                                            kind: "delta";
-                                                            amount: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "reset";
-                                                        };
-                                                        nominal?: boolean;
-                                                    })[];
+                                                    }[];
                                                 };
                                                 metadata?: {
                                                     name: string;
@@ -4166,110 +4065,26 @@ export interface operations {
                                                     id: string;
                                                     label: string;
                                                     kind: "item" | "spell" | "talent" | "effect";
-                                                    description?: string;
-                                                    fields: ({
-                                                        /** @constant */
-                                                        kind: "text";
-                                                        id: string;
-                                                        label: string;
-                                                        default: string;
-                                                        required: boolean;
-                                                        minLength: number;
-                                                        maxLength: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "integer";
-                                                        id: string;
-                                                        label: string;
-                                                        default: number;
-                                                        required: boolean;
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "decimal";
-                                                        id: string;
-                                                        label: string;
-                                                        default: number;
-                                                        required: boolean;
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "boolean";
-                                                        id: string;
-                                                        label: string;
-                                                        default: boolean;
-                                                        required: boolean;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "singleChoice";
-                                                        id: string;
-                                                        label: string;
-                                                        required: boolean;
-                                                        default: string | null;
-                                                        options: {
+                                                    fields: {
+                                                        required?: boolean;
+                                                        min?: number;
+                                                        max?: number;
+                                                        step?: number;
+                                                        minLength?: number;
+                                                        maxLength?: number;
+                                                        options?: {
                                                             id: string;
                                                             label: string;
                                                         }[];
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "multiChoice";
                                                         id: string;
                                                         label: string;
-                                                        required: boolean;
-                                                        default: string[];
-                                                        options: {
-                                                            id: string;
-                                                            label: string;
-                                                        }[];
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "resource";
+                                                        kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                        default: unknown;
+                                                    }[];
+                                                    grantedActions: {
                                                         id: string;
                                                         label: string;
-                                                        default: {
-                                                            current: number;
-                                                            max: number;
-                                                        };
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                        resetTo: "min" | "max";
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "computed";
-                                                        id: string;
-                                                        label: string;
-                                                        valueType: "number" | "text" | "boolean";
-                                                        expressionId: string;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "image";
-                                                        id: string;
-                                                        label: string;
-                                                        required: boolean;
-                                                    })[];
-                                                    grantedActions: ({
-                                                        pushPolicy?: {
-                                                            /** @constant */
-                                                            version: "1.0";
-                                                            maxAttempts: number;
-                                                            successThreshold: number;
-                                                            allowOnSuccess: boolean;
-                                                            groups: {
-                                                                groupId: string;
-                                                                lockedFaces: number[];
-                                                                reportedFaces: number[];
-                                                            }[];
-                                                        };
-                                                        /** @constant */
-                                                        kind: "roll";
-                                                        id: string;
-                                                        label: string;
-                                                        expressionId: string;
+                                                        kind: "roll" | "resourceBump";
                                                         inputs: {
                                                             id: string;
                                                             label: string;
@@ -4277,24 +4092,7 @@ export interface operations {
                                                             required: boolean;
                                                             default: string | number | boolean | null;
                                                         }[];
-                                                        outputTemplate: string;
-                                                        nominal?: boolean;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "resourceBump";
-                                                        id: string;
-                                                        label: string;
-                                                        resourceId: string;
-                                                        operation: {
-                                                            /** @constant */
-                                                            kind: "delta";
-                                                            amount: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "reset";
-                                                        };
-                                                        nominal?: boolean;
-                                                    })[];
+                                                    }[];
                                                 };
                                                 metadata?: {
                                                     name: string;
@@ -4725,110 +4523,26 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "item" | "spell" | "talent" | "effect";
-                                                        description?: string;
-                                                        fields: ({
-                                                            /** @constant */
-                                                            kind: "text";
-                                                            id: string;
-                                                            label: string;
-                                                            default: string;
-                                                            required: boolean;
-                                                            minLength: number;
-                                                            maxLength: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "integer";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "decimal";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "boolean";
-                                                            id: string;
-                                                            label: string;
-                                                            default: boolean;
-                                                            required: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "singleChoice";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                            default: string | null;
-                                                            options: {
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
                                                                 id: string;
                                                                 label: string;
                                                             }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "multiChoice";
                                                             id: string;
                                                             label: string;
-                                                            required: boolean;
-                                                            default: string[];
-                                                            options: {
-                                                                id: string;
-                                                                label: string;
-                                                            }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resource";
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
                                                             id: string;
                                                             label: string;
-                                                            default: {
-                                                                current: number;
-                                                                max: number;
-                                                            };
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                            resetTo: "min" | "max";
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "computed";
-                                                            id: string;
-                                                            label: string;
-                                                            valueType: "number" | "text" | "boolean";
-                                                            expressionId: string;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "image";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                        })[];
-                                                        grantedActions: ({
-                                                            pushPolicy?: {
-                                                                /** @constant */
-                                                                version: "1.0";
-                                                                maxAttempts: number;
-                                                                successThreshold: number;
-                                                                allowOnSuccess: boolean;
-                                                                groups: {
-                                                                    groupId: string;
-                                                                    lockedFaces: number[];
-                                                                    reportedFaces: number[];
-                                                                }[];
-                                                            };
-                                                            /** @constant */
-                                                            kind: "roll";
-                                                            id: string;
-                                                            label: string;
-                                                            expressionId: string;
+                                                            kind: "roll" | "resourceBump";
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -4836,24 +4550,7 @@ export interface operations {
                                                                 required: boolean;
                                                                 default: string | number | boolean | null;
                                                             }[];
-                                                            outputTemplate: string;
-                                                            nominal?: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resourceBump";
-                                                            id: string;
-                                                            label: string;
-                                                            resourceId: string;
-                                                            operation: {
-                                                                /** @constant */
-                                                                kind: "delta";
-                                                                amount: number;
-                                                            } | {
-                                                                /** @constant */
-                                                                kind: "reset";
-                                                            };
-                                                            nominal?: boolean;
-                                                        })[];
+                                                        }[];
                                                     };
                                                     metadata?: {
                                                         name: string;
@@ -5433,110 +5130,26 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "item" | "spell" | "talent" | "effect";
-                                                        description?: string;
-                                                        fields: ({
-                                                            /** @constant */
-                                                            kind: "text";
-                                                            id: string;
-                                                            label: string;
-                                                            default: string;
-                                                            required: boolean;
-                                                            minLength: number;
-                                                            maxLength: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "integer";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "decimal";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "boolean";
-                                                            id: string;
-                                                            label: string;
-                                                            default: boolean;
-                                                            required: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "singleChoice";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                            default: string | null;
-                                                            options: {
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
                                                                 id: string;
                                                                 label: string;
                                                             }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "multiChoice";
                                                             id: string;
                                                             label: string;
-                                                            required: boolean;
-                                                            default: string[];
-                                                            options: {
-                                                                id: string;
-                                                                label: string;
-                                                            }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resource";
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
                                                             id: string;
                                                             label: string;
-                                                            default: {
-                                                                current: number;
-                                                                max: number;
-                                                            };
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                            resetTo: "min" | "max";
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "computed";
-                                                            id: string;
-                                                            label: string;
-                                                            valueType: "number" | "text" | "boolean";
-                                                            expressionId: string;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "image";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                        })[];
-                                                        grantedActions: ({
-                                                            pushPolicy?: {
-                                                                /** @constant */
-                                                                version: "1.0";
-                                                                maxAttempts: number;
-                                                                successThreshold: number;
-                                                                allowOnSuccess: boolean;
-                                                                groups: {
-                                                                    groupId: string;
-                                                                    lockedFaces: number[];
-                                                                    reportedFaces: number[];
-                                                                }[];
-                                                            };
-                                                            /** @constant */
-                                                            kind: "roll";
-                                                            id: string;
-                                                            label: string;
-                                                            expressionId: string;
+                                                            kind: "roll" | "resourceBump";
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -5544,24 +5157,7 @@ export interface operations {
                                                                 required: boolean;
                                                                 default: string | number | boolean | null;
                                                             }[];
-                                                            outputTemplate: string;
-                                                            nominal?: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resourceBump";
-                                                            id: string;
-                                                            label: string;
-                                                            resourceId: string;
-                                                            operation: {
-                                                                /** @constant */
-                                                                kind: "delta";
-                                                                amount: number;
-                                                            } | {
-                                                                /** @constant */
-                                                                kind: "reset";
-                                                            };
-                                                            nominal?: boolean;
-                                                        })[];
+                                                        }[];
                                                     };
                                                     metadata?: {
                                                         name: string;
@@ -6141,110 +5737,26 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "item" | "spell" | "talent" | "effect";
-                                                        description?: string;
-                                                        fields: ({
-                                                            /** @constant */
-                                                            kind: "text";
-                                                            id: string;
-                                                            label: string;
-                                                            default: string;
-                                                            required: boolean;
-                                                            minLength: number;
-                                                            maxLength: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "integer";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "decimal";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "boolean";
-                                                            id: string;
-                                                            label: string;
-                                                            default: boolean;
-                                                            required: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "singleChoice";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                            default: string | null;
-                                                            options: {
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
                                                                 id: string;
                                                                 label: string;
                                                             }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "multiChoice";
                                                             id: string;
                                                             label: string;
-                                                            required: boolean;
-                                                            default: string[];
-                                                            options: {
-                                                                id: string;
-                                                                label: string;
-                                                            }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resource";
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
                                                             id: string;
                                                             label: string;
-                                                            default: {
-                                                                current: number;
-                                                                max: number;
-                                                            };
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                            resetTo: "min" | "max";
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "computed";
-                                                            id: string;
-                                                            label: string;
-                                                            valueType: "number" | "text" | "boolean";
-                                                            expressionId: string;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "image";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                        })[];
-                                                        grantedActions: ({
-                                                            pushPolicy?: {
-                                                                /** @constant */
-                                                                version: "1.0";
-                                                                maxAttempts: number;
-                                                                successThreshold: number;
-                                                                allowOnSuccess: boolean;
-                                                                groups: {
-                                                                    groupId: string;
-                                                                    lockedFaces: number[];
-                                                                    reportedFaces: number[];
-                                                                }[];
-                                                            };
-                                                            /** @constant */
-                                                            kind: "roll";
-                                                            id: string;
-                                                            label: string;
-                                                            expressionId: string;
+                                                            kind: "roll" | "resourceBump";
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -6252,24 +5764,7 @@ export interface operations {
                                                                 required: boolean;
                                                                 default: string | number | boolean | null;
                                                             }[];
-                                                            outputTemplate: string;
-                                                            nominal?: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resourceBump";
-                                                            id: string;
-                                                            label: string;
-                                                            resourceId: string;
-                                                            operation: {
-                                                                /** @constant */
-                                                                kind: "delta";
-                                                                amount: number;
-                                                            } | {
-                                                                /** @constant */
-                                                                kind: "reset";
-                                                            };
-                                                            nominal?: boolean;
-                                                        })[];
+                                                        }[];
                                                     };
                                                     metadata?: {
                                                         name: string;
@@ -7376,110 +6871,26 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "item" | "spell" | "talent" | "effect";
-                                                        description?: string;
-                                                        fields: ({
-                                                            /** @constant */
-                                                            kind: "text";
-                                                            id: string;
-                                                            label: string;
-                                                            default: string;
-                                                            required: boolean;
-                                                            minLength: number;
-                                                            maxLength: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "integer";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "decimal";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "boolean";
-                                                            id: string;
-                                                            label: string;
-                                                            default: boolean;
-                                                            required: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "singleChoice";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                            default: string | null;
-                                                            options: {
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
                                                                 id: string;
                                                                 label: string;
                                                             }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "multiChoice";
                                                             id: string;
                                                             label: string;
-                                                            required: boolean;
-                                                            default: string[];
-                                                            options: {
-                                                                id: string;
-                                                                label: string;
-                                                            }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resource";
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
                                                             id: string;
                                                             label: string;
-                                                            default: {
-                                                                current: number;
-                                                                max: number;
-                                                            };
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                            resetTo: "min" | "max";
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "computed";
-                                                            id: string;
-                                                            label: string;
-                                                            valueType: "number" | "text" | "boolean";
-                                                            expressionId: string;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "image";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                        })[];
-                                                        grantedActions: ({
-                                                            pushPolicy?: {
-                                                                /** @constant */
-                                                                version: "1.0";
-                                                                maxAttempts: number;
-                                                                successThreshold: number;
-                                                                allowOnSuccess: boolean;
-                                                                groups: {
-                                                                    groupId: string;
-                                                                    lockedFaces: number[];
-                                                                    reportedFaces: number[];
-                                                                }[];
-                                                            };
-                                                            /** @constant */
-                                                            kind: "roll";
-                                                            id: string;
-                                                            label: string;
-                                                            expressionId: string;
+                                                            kind: "roll" | "resourceBump";
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -7487,24 +6898,7 @@ export interface operations {
                                                                 required: boolean;
                                                                 default: string | number | boolean | null;
                                                             }[];
-                                                            outputTemplate: string;
-                                                            nominal?: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resourceBump";
-                                                            id: string;
-                                                            label: string;
-                                                            resourceId: string;
-                                                            operation: {
-                                                                /** @constant */
-                                                                kind: "delta";
-                                                                amount: number;
-                                                            } | {
-                                                                /** @constant */
-                                                                kind: "reset";
-                                                            };
-                                                            nominal?: boolean;
-                                                        })[];
+                                                        }[];
                                                     };
                                                     metadata?: {
                                                         name: string;
@@ -8096,110 +7490,26 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "item" | "spell" | "talent" | "effect";
-                                                        description?: string;
-                                                        fields: ({
-                                                            /** @constant */
-                                                            kind: "text";
-                                                            id: string;
-                                                            label: string;
-                                                            default: string;
-                                                            required: boolean;
-                                                            minLength: number;
-                                                            maxLength: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "integer";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "decimal";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "boolean";
-                                                            id: string;
-                                                            label: string;
-                                                            default: boolean;
-                                                            required: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "singleChoice";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                            default: string | null;
-                                                            options: {
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
                                                                 id: string;
                                                                 label: string;
                                                             }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "multiChoice";
                                                             id: string;
                                                             label: string;
-                                                            required: boolean;
-                                                            default: string[];
-                                                            options: {
-                                                                id: string;
-                                                                label: string;
-                                                            }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resource";
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
                                                             id: string;
                                                             label: string;
-                                                            default: {
-                                                                current: number;
-                                                                max: number;
-                                                            };
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                            resetTo: "min" | "max";
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "computed";
-                                                            id: string;
-                                                            label: string;
-                                                            valueType: "number" | "text" | "boolean";
-                                                            expressionId: string;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "image";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                        })[];
-                                                        grantedActions: ({
-                                                            pushPolicy?: {
-                                                                /** @constant */
-                                                                version: "1.0";
-                                                                maxAttempts: number;
-                                                                successThreshold: number;
-                                                                allowOnSuccess: boolean;
-                                                                groups: {
-                                                                    groupId: string;
-                                                                    lockedFaces: number[];
-                                                                    reportedFaces: number[];
-                                                                }[];
-                                                            };
-                                                            /** @constant */
-                                                            kind: "roll";
-                                                            id: string;
-                                                            label: string;
-                                                            expressionId: string;
+                                                            kind: "roll" | "resourceBump";
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -8207,24 +7517,7 @@ export interface operations {
                                                                 required: boolean;
                                                                 default: string | number | boolean | null;
                                                             }[];
-                                                            outputTemplate: string;
-                                                            nominal?: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resourceBump";
-                                                            id: string;
-                                                            label: string;
-                                                            resourceId: string;
-                                                            operation: {
-                                                                /** @constant */
-                                                                kind: "delta";
-                                                                amount: number;
-                                                            } | {
-                                                                /** @constant */
-                                                                kind: "reset";
-                                                            };
-                                                            nominal?: boolean;
-                                                        })[];
+                                                        }[];
                                                     };
                                                     metadata?: {
                                                         name: string;
@@ -8827,110 +8120,26 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "item" | "spell" | "talent" | "effect";
-                                                        description?: string;
-                                                        fields: ({
-                                                            /** @constant */
-                                                            kind: "text";
-                                                            id: string;
-                                                            label: string;
-                                                            default: string;
-                                                            required: boolean;
-                                                            minLength: number;
-                                                            maxLength: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "integer";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "decimal";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "boolean";
-                                                            id: string;
-                                                            label: string;
-                                                            default: boolean;
-                                                            required: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "singleChoice";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                            default: string | null;
-                                                            options: {
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
                                                                 id: string;
                                                                 label: string;
                                                             }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "multiChoice";
                                                             id: string;
                                                             label: string;
-                                                            required: boolean;
-                                                            default: string[];
-                                                            options: {
-                                                                id: string;
-                                                                label: string;
-                                                            }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resource";
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
                                                             id: string;
                                                             label: string;
-                                                            default: {
-                                                                current: number;
-                                                                max: number;
-                                                            };
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                            resetTo: "min" | "max";
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "computed";
-                                                            id: string;
-                                                            label: string;
-                                                            valueType: "number" | "text" | "boolean";
-                                                            expressionId: string;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "image";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                        })[];
-                                                        grantedActions: ({
-                                                            pushPolicy?: {
-                                                                /** @constant */
-                                                                version: "1.0";
-                                                                maxAttempts: number;
-                                                                successThreshold: number;
-                                                                allowOnSuccess: boolean;
-                                                                groups: {
-                                                                    groupId: string;
-                                                                    lockedFaces: number[];
-                                                                    reportedFaces: number[];
-                                                                }[];
-                                                            };
-                                                            /** @constant */
-                                                            kind: "roll";
-                                                            id: string;
-                                                            label: string;
-                                                            expressionId: string;
+                                                            kind: "roll" | "resourceBump";
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -8938,24 +8147,7 @@ export interface operations {
                                                                 required: boolean;
                                                                 default: string | number | boolean | null;
                                                             }[];
-                                                            outputTemplate: string;
-                                                            nominal?: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resourceBump";
-                                                            id: string;
-                                                            label: string;
-                                                            resourceId: string;
-                                                            operation: {
-                                                                /** @constant */
-                                                                kind: "delta";
-                                                                amount: number;
-                                                            } | {
-                                                                /** @constant */
-                                                                kind: "reset";
-                                                            };
-                                                            nominal?: boolean;
-                                                        })[];
+                                                        }[];
                                                     };
                                                     metadata?: {
                                                         name: string;
@@ -9534,110 +8726,26 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "item" | "spell" | "talent" | "effect";
-                                                        description?: string;
-                                                        fields: ({
-                                                            /** @constant */
-                                                            kind: "text";
-                                                            id: string;
-                                                            label: string;
-                                                            default: string;
-                                                            required: boolean;
-                                                            minLength: number;
-                                                            maxLength: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "integer";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "decimal";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "boolean";
-                                                            id: string;
-                                                            label: string;
-                                                            default: boolean;
-                                                            required: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "singleChoice";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                            default: string | null;
-                                                            options: {
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
                                                                 id: string;
                                                                 label: string;
                                                             }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "multiChoice";
                                                             id: string;
                                                             label: string;
-                                                            required: boolean;
-                                                            default: string[];
-                                                            options: {
-                                                                id: string;
-                                                                label: string;
-                                                            }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resource";
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
                                                             id: string;
                                                             label: string;
-                                                            default: {
-                                                                current: number;
-                                                                max: number;
-                                                            };
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                            resetTo: "min" | "max";
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "computed";
-                                                            id: string;
-                                                            label: string;
-                                                            valueType: "number" | "text" | "boolean";
-                                                            expressionId: string;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "image";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                        })[];
-                                                        grantedActions: ({
-                                                            pushPolicy?: {
-                                                                /** @constant */
-                                                                version: "1.0";
-                                                                maxAttempts: number;
-                                                                successThreshold: number;
-                                                                allowOnSuccess: boolean;
-                                                                groups: {
-                                                                    groupId: string;
-                                                                    lockedFaces: number[];
-                                                                    reportedFaces: number[];
-                                                                }[];
-                                                            };
-                                                            /** @constant */
-                                                            kind: "roll";
-                                                            id: string;
-                                                            label: string;
-                                                            expressionId: string;
+                                                            kind: "roll" | "resourceBump";
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -9645,24 +8753,7 @@ export interface operations {
                                                                 required: boolean;
                                                                 default: string | number | boolean | null;
                                                             }[];
-                                                            outputTemplate: string;
-                                                            nominal?: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resourceBump";
-                                                            id: string;
-                                                            label: string;
-                                                            resourceId: string;
-                                                            operation: {
-                                                                /** @constant */
-                                                                kind: "delta";
-                                                                amount: number;
-                                                            } | {
-                                                                /** @constant */
-                                                                kind: "reset";
-                                                            };
-                                                            nominal?: boolean;
-                                                        })[];
+                                                        }[];
                                                     };
                                                     metadata?: {
                                                         name: string;
@@ -10245,110 +9336,26 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "item" | "spell" | "talent" | "effect";
-                                                        description?: string;
-                                                        fields: ({
-                                                            /** @constant */
-                                                            kind: "text";
-                                                            id: string;
-                                                            label: string;
-                                                            default: string;
-                                                            required: boolean;
-                                                            minLength: number;
-                                                            maxLength: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "integer";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "decimal";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "boolean";
-                                                            id: string;
-                                                            label: string;
-                                                            default: boolean;
-                                                            required: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "singleChoice";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                            default: string | null;
-                                                            options: {
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
                                                                 id: string;
                                                                 label: string;
                                                             }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "multiChoice";
                                                             id: string;
                                                             label: string;
-                                                            required: boolean;
-                                                            default: string[];
-                                                            options: {
-                                                                id: string;
-                                                                label: string;
-                                                            }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resource";
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
                                                             id: string;
                                                             label: string;
-                                                            default: {
-                                                                current: number;
-                                                                max: number;
-                                                            };
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                            resetTo: "min" | "max";
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "computed";
-                                                            id: string;
-                                                            label: string;
-                                                            valueType: "number" | "text" | "boolean";
-                                                            expressionId: string;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "image";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                        })[];
-                                                        grantedActions: ({
-                                                            pushPolicy?: {
-                                                                /** @constant */
-                                                                version: "1.0";
-                                                                maxAttempts: number;
-                                                                successThreshold: number;
-                                                                allowOnSuccess: boolean;
-                                                                groups: {
-                                                                    groupId: string;
-                                                                    lockedFaces: number[];
-                                                                    reportedFaces: number[];
-                                                                }[];
-                                                            };
-                                                            /** @constant */
-                                                            kind: "roll";
-                                                            id: string;
-                                                            label: string;
-                                                            expressionId: string;
+                                                            kind: "roll" | "resourceBump";
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -10356,24 +9363,7 @@ export interface operations {
                                                                 required: boolean;
                                                                 default: string | number | boolean | null;
                                                             }[];
-                                                            outputTemplate: string;
-                                                            nominal?: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resourceBump";
-                                                            id: string;
-                                                            label: string;
-                                                            resourceId: string;
-                                                            operation: {
-                                                                /** @constant */
-                                                                kind: "delta";
-                                                                amount: number;
-                                                            } | {
-                                                                /** @constant */
-                                                                kind: "reset";
-                                                            };
-                                                            nominal?: boolean;
-                                                        })[];
+                                                        }[];
                                                     };
                                                     metadata?: {
                                                         name: string;
@@ -11237,110 +10227,26 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "item" | "spell" | "talent" | "effect";
-                                                        description?: string;
-                                                        fields: ({
-                                                            /** @constant */
-                                                            kind: "text";
-                                                            id: string;
-                                                            label: string;
-                                                            default: string;
-                                                            required: boolean;
-                                                            minLength: number;
-                                                            maxLength: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "integer";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "decimal";
-                                                            id: string;
-                                                            label: string;
-                                                            default: number;
-                                                            required: boolean;
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "boolean";
-                                                            id: string;
-                                                            label: string;
-                                                            default: boolean;
-                                                            required: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "singleChoice";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                            default: string | null;
-                                                            options: {
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
                                                                 id: string;
                                                                 label: string;
                                                             }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "multiChoice";
                                                             id: string;
                                                             label: string;
-                                                            required: boolean;
-                                                            default: string[];
-                                                            options: {
-                                                                id: string;
-                                                                label: string;
-                                                            }[];
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resource";
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
                                                             id: string;
                                                             label: string;
-                                                            default: {
-                                                                current: number;
-                                                                max: number;
-                                                            };
-                                                            min: number;
-                                                            max: number;
-                                                            step: number;
-                                                            resetTo: "min" | "max";
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "computed";
-                                                            id: string;
-                                                            label: string;
-                                                            valueType: "number" | "text" | "boolean";
-                                                            expressionId: string;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "image";
-                                                            id: string;
-                                                            label: string;
-                                                            required: boolean;
-                                                        })[];
-                                                        grantedActions: ({
-                                                            pushPolicy?: {
-                                                                /** @constant */
-                                                                version: "1.0";
-                                                                maxAttempts: number;
-                                                                successThreshold: number;
-                                                                allowOnSuccess: boolean;
-                                                                groups: {
-                                                                    groupId: string;
-                                                                    lockedFaces: number[];
-                                                                    reportedFaces: number[];
-                                                                }[];
-                                                            };
-                                                            /** @constant */
-                                                            kind: "roll";
-                                                            id: string;
-                                                            label: string;
-                                                            expressionId: string;
+                                                            kind: "roll" | "resourceBump";
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -11348,24 +10254,7 @@ export interface operations {
                                                                 required: boolean;
                                                                 default: string | number | boolean | null;
                                                             }[];
-                                                            outputTemplate: string;
-                                                            nominal?: boolean;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "resourceBump";
-                                                            id: string;
-                                                            label: string;
-                                                            resourceId: string;
-                                                            operation: {
-                                                                /** @constant */
-                                                                kind: "delta";
-                                                                amount: number;
-                                                            } | {
-                                                                /** @constant */
-                                                                kind: "reset";
-                                                            };
-                                                            nominal?: boolean;
-                                                        })[];
+                                                        }[];
                                                     };
                                                     metadata?: {
                                                         name: string;
@@ -11941,110 +10830,26 @@ export interface operations {
                                                     id: string;
                                                     label: string;
                                                     kind: "item" | "spell" | "talent" | "effect";
-                                                    description?: string;
-                                                    fields: ({
-                                                        /** @constant */
-                                                        kind: "text";
-                                                        id: string;
-                                                        label: string;
-                                                        default: string;
-                                                        required: boolean;
-                                                        minLength: number;
-                                                        maxLength: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "integer";
-                                                        id: string;
-                                                        label: string;
-                                                        default: number;
-                                                        required: boolean;
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "decimal";
-                                                        id: string;
-                                                        label: string;
-                                                        default: number;
-                                                        required: boolean;
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "boolean";
-                                                        id: string;
-                                                        label: string;
-                                                        default: boolean;
-                                                        required: boolean;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "singleChoice";
-                                                        id: string;
-                                                        label: string;
-                                                        required: boolean;
-                                                        default: string | null;
-                                                        options: {
+                                                    fields: {
+                                                        required?: boolean;
+                                                        min?: number;
+                                                        max?: number;
+                                                        step?: number;
+                                                        minLength?: number;
+                                                        maxLength?: number;
+                                                        options?: {
                                                             id: string;
                                                             label: string;
                                                         }[];
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "multiChoice";
                                                         id: string;
                                                         label: string;
-                                                        required: boolean;
-                                                        default: string[];
-                                                        options: {
-                                                            id: string;
-                                                            label: string;
-                                                        }[];
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "resource";
+                                                        kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                        default: unknown;
+                                                    }[];
+                                                    grantedActions: {
                                                         id: string;
                                                         label: string;
-                                                        default: {
-                                                            current: number;
-                                                            max: number;
-                                                        };
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                        resetTo: "min" | "max";
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "computed";
-                                                        id: string;
-                                                        label: string;
-                                                        valueType: "number" | "text" | "boolean";
-                                                        expressionId: string;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "image";
-                                                        id: string;
-                                                        label: string;
-                                                        required: boolean;
-                                                    })[];
-                                                    grantedActions: ({
-                                                        pushPolicy?: {
-                                                            /** @constant */
-                                                            version: "1.0";
-                                                            maxAttempts: number;
-                                                            successThreshold: number;
-                                                            allowOnSuccess: boolean;
-                                                            groups: {
-                                                                groupId: string;
-                                                                lockedFaces: number[];
-                                                                reportedFaces: number[];
-                                                            }[];
-                                                        };
-                                                        /** @constant */
-                                                        kind: "roll";
-                                                        id: string;
-                                                        label: string;
-                                                        expressionId: string;
+                                                        kind: "roll" | "resourceBump";
                                                         inputs: {
                                                             id: string;
                                                             label: string;
@@ -12052,24 +10857,7 @@ export interface operations {
                                                             required: boolean;
                                                             default: string | number | boolean | null;
                                                         }[];
-                                                        outputTemplate: string;
-                                                        nominal?: boolean;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "resourceBump";
-                                                        id: string;
-                                                        label: string;
-                                                        resourceId: string;
-                                                        operation: {
-                                                            /** @constant */
-                                                            kind: "delta";
-                                                            amount: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "reset";
-                                                        };
-                                                        nominal?: boolean;
-                                                    })[];
+                                                    }[];
                                                 };
                                                 metadata?: {
                                                     name: string;
@@ -16568,110 +15356,26 @@ export interface operations {
                                                     id: string;
                                                     label: string;
                                                     kind: "item" | "spell" | "talent" | "effect";
-                                                    description?: string;
-                                                    fields: ({
-                                                        /** @constant */
-                                                        kind: "text";
-                                                        id: string;
-                                                        label: string;
-                                                        default: string;
-                                                        required: boolean;
-                                                        minLength: number;
-                                                        maxLength: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "integer";
-                                                        id: string;
-                                                        label: string;
-                                                        default: number;
-                                                        required: boolean;
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "decimal";
-                                                        id: string;
-                                                        label: string;
-                                                        default: number;
-                                                        required: boolean;
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "boolean";
-                                                        id: string;
-                                                        label: string;
-                                                        default: boolean;
-                                                        required: boolean;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "singleChoice";
-                                                        id: string;
-                                                        label: string;
-                                                        required: boolean;
-                                                        default: string | null;
-                                                        options: {
+                                                    fields: {
+                                                        required?: boolean;
+                                                        min?: number;
+                                                        max?: number;
+                                                        step?: number;
+                                                        minLength?: number;
+                                                        maxLength?: number;
+                                                        options?: {
                                                             id: string;
                                                             label: string;
                                                         }[];
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "multiChoice";
                                                         id: string;
                                                         label: string;
-                                                        required: boolean;
-                                                        default: string[];
-                                                        options: {
-                                                            id: string;
-                                                            label: string;
-                                                        }[];
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "resource";
+                                                        kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                        default: unknown;
+                                                    }[];
+                                                    grantedActions: {
                                                         id: string;
                                                         label: string;
-                                                        default: {
-                                                            current: number;
-                                                            max: number;
-                                                        };
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                        resetTo: "min" | "max";
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "computed";
-                                                        id: string;
-                                                        label: string;
-                                                        valueType: "number" | "text" | "boolean";
-                                                        expressionId: string;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "image";
-                                                        id: string;
-                                                        label: string;
-                                                        required: boolean;
-                                                    })[];
-                                                    grantedActions: ({
-                                                        pushPolicy?: {
-                                                            /** @constant */
-                                                            version: "1.0";
-                                                            maxAttempts: number;
-                                                            successThreshold: number;
-                                                            allowOnSuccess: boolean;
-                                                            groups: {
-                                                                groupId: string;
-                                                                lockedFaces: number[];
-                                                                reportedFaces: number[];
-                                                            }[];
-                                                        };
-                                                        /** @constant */
-                                                        kind: "roll";
-                                                        id: string;
-                                                        label: string;
-                                                        expressionId: string;
+                                                        kind: "roll" | "resourceBump";
                                                         inputs: {
                                                             id: string;
                                                             label: string;
@@ -16679,24 +15383,7 @@ export interface operations {
                                                             required: boolean;
                                                             default: string | number | boolean | null;
                                                         }[];
-                                                        outputTemplate: string;
-                                                        nominal?: boolean;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "resourceBump";
-                                                        id: string;
-                                                        label: string;
-                                                        resourceId: string;
-                                                        operation: {
-                                                            /** @constant */
-                                                            kind: "delta";
-                                                            amount: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "reset";
-                                                        };
-                                                        nominal?: boolean;
-                                                    })[];
+                                                    }[];
                                                 };
                                                 metadata?: {
                                                     name: string;
@@ -17205,110 +15892,26 @@ export interface operations {
                                                     id: string;
                                                     label: string;
                                                     kind: "item" | "spell" | "talent" | "effect";
-                                                    description?: string;
-                                                    fields: ({
-                                                        /** @constant */
-                                                        kind: "text";
-                                                        id: string;
-                                                        label: string;
-                                                        default: string;
-                                                        required: boolean;
-                                                        minLength: number;
-                                                        maxLength: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "integer";
-                                                        id: string;
-                                                        label: string;
-                                                        default: number;
-                                                        required: boolean;
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "decimal";
-                                                        id: string;
-                                                        label: string;
-                                                        default: number;
-                                                        required: boolean;
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "boolean";
-                                                        id: string;
-                                                        label: string;
-                                                        default: boolean;
-                                                        required: boolean;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "singleChoice";
-                                                        id: string;
-                                                        label: string;
-                                                        required: boolean;
-                                                        default: string | null;
-                                                        options: {
+                                                    fields: {
+                                                        required?: boolean;
+                                                        min?: number;
+                                                        max?: number;
+                                                        step?: number;
+                                                        minLength?: number;
+                                                        maxLength?: number;
+                                                        options?: {
                                                             id: string;
                                                             label: string;
                                                         }[];
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "multiChoice";
                                                         id: string;
                                                         label: string;
-                                                        required: boolean;
-                                                        default: string[];
-                                                        options: {
-                                                            id: string;
-                                                            label: string;
-                                                        }[];
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "resource";
+                                                        kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                        default: unknown;
+                                                    }[];
+                                                    grantedActions: {
                                                         id: string;
                                                         label: string;
-                                                        default: {
-                                                            current: number;
-                                                            max: number;
-                                                        };
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                        resetTo: "min" | "max";
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "computed";
-                                                        id: string;
-                                                        label: string;
-                                                        valueType: "number" | "text" | "boolean";
-                                                        expressionId: string;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "image";
-                                                        id: string;
-                                                        label: string;
-                                                        required: boolean;
-                                                    })[];
-                                                    grantedActions: ({
-                                                        pushPolicy?: {
-                                                            /** @constant */
-                                                            version: "1.0";
-                                                            maxAttempts: number;
-                                                            successThreshold: number;
-                                                            allowOnSuccess: boolean;
-                                                            groups: {
-                                                                groupId: string;
-                                                                lockedFaces: number[];
-                                                                reportedFaces: number[];
-                                                            }[];
-                                                        };
-                                                        /** @constant */
-                                                        kind: "roll";
-                                                        id: string;
-                                                        label: string;
-                                                        expressionId: string;
+                                                        kind: "roll" | "resourceBump";
                                                         inputs: {
                                                             id: string;
                                                             label: string;
@@ -17316,24 +15919,7 @@ export interface operations {
                                                             required: boolean;
                                                             default: string | number | boolean | null;
                                                         }[];
-                                                        outputTemplate: string;
-                                                        nominal?: boolean;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "resourceBump";
-                                                        id: string;
-                                                        label: string;
-                                                        resourceId: string;
-                                                        operation: {
-                                                            /** @constant */
-                                                            kind: "delta";
-                                                            amount: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "reset";
-                                                        };
-                                                        nominal?: boolean;
-                                                    })[];
+                                                    }[];
                                                 };
                                                 metadata?: {
                                                     name: string;
@@ -17746,110 +16332,26 @@ export interface operations {
                                                     id: string;
                                                     label: string;
                                                     kind: "item" | "spell" | "talent" | "effect";
-                                                    description?: string;
-                                                    fields: ({
-                                                        /** @constant */
-                                                        kind: "text";
-                                                        id: string;
-                                                        label: string;
-                                                        default: string;
-                                                        required: boolean;
-                                                        minLength: number;
-                                                        maxLength: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "integer";
-                                                        id: string;
-                                                        label: string;
-                                                        default: number;
-                                                        required: boolean;
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "decimal";
-                                                        id: string;
-                                                        label: string;
-                                                        default: number;
-                                                        required: boolean;
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "boolean";
-                                                        id: string;
-                                                        label: string;
-                                                        default: boolean;
-                                                        required: boolean;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "singleChoice";
-                                                        id: string;
-                                                        label: string;
-                                                        required: boolean;
-                                                        default: string | null;
-                                                        options: {
+                                                    fields: {
+                                                        required?: boolean;
+                                                        min?: number;
+                                                        max?: number;
+                                                        step?: number;
+                                                        minLength?: number;
+                                                        maxLength?: number;
+                                                        options?: {
                                                             id: string;
                                                             label: string;
                                                         }[];
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "multiChoice";
                                                         id: string;
                                                         label: string;
-                                                        required: boolean;
-                                                        default: string[];
-                                                        options: {
-                                                            id: string;
-                                                            label: string;
-                                                        }[];
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "resource";
+                                                        kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                        default: unknown;
+                                                    }[];
+                                                    grantedActions: {
                                                         id: string;
                                                         label: string;
-                                                        default: {
-                                                            current: number;
-                                                            max: number;
-                                                        };
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                        resetTo: "min" | "max";
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "computed";
-                                                        id: string;
-                                                        label: string;
-                                                        valueType: "number" | "text" | "boolean";
-                                                        expressionId: string;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "image";
-                                                        id: string;
-                                                        label: string;
-                                                        required: boolean;
-                                                    })[];
-                                                    grantedActions: ({
-                                                        pushPolicy?: {
-                                                            /** @constant */
-                                                            version: "1.0";
-                                                            maxAttempts: number;
-                                                            successThreshold: number;
-                                                            allowOnSuccess: boolean;
-                                                            groups: {
-                                                                groupId: string;
-                                                                lockedFaces: number[];
-                                                                reportedFaces: number[];
-                                                            }[];
-                                                        };
-                                                        /** @constant */
-                                                        kind: "roll";
-                                                        id: string;
-                                                        label: string;
-                                                        expressionId: string;
+                                                        kind: "roll" | "resourceBump";
                                                         inputs: {
                                                             id: string;
                                                             label: string;
@@ -17857,24 +16359,7 @@ export interface operations {
                                                             required: boolean;
                                                             default: string | number | boolean | null;
                                                         }[];
-                                                        outputTemplate: string;
-                                                        nominal?: boolean;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "resourceBump";
-                                                        id: string;
-                                                        label: string;
-                                                        resourceId: string;
-                                                        operation: {
-                                                            /** @constant */
-                                                            kind: "delta";
-                                                            amount: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "reset";
-                                                        };
-                                                        nominal?: boolean;
-                                                    })[];
+                                                    }[];
                                                 };
                                                 metadata?: {
                                                     name: string;
@@ -18289,110 +16774,26 @@ export interface operations {
                                                     id: string;
                                                     label: string;
                                                     kind: "item" | "spell" | "talent" | "effect";
-                                                    description?: string;
-                                                    fields: ({
-                                                        /** @constant */
-                                                        kind: "text";
-                                                        id: string;
-                                                        label: string;
-                                                        default: string;
-                                                        required: boolean;
-                                                        minLength: number;
-                                                        maxLength: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "integer";
-                                                        id: string;
-                                                        label: string;
-                                                        default: number;
-                                                        required: boolean;
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "decimal";
-                                                        id: string;
-                                                        label: string;
-                                                        default: number;
-                                                        required: boolean;
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "boolean";
-                                                        id: string;
-                                                        label: string;
-                                                        default: boolean;
-                                                        required: boolean;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "singleChoice";
-                                                        id: string;
-                                                        label: string;
-                                                        required: boolean;
-                                                        default: string | null;
-                                                        options: {
+                                                    fields: {
+                                                        required?: boolean;
+                                                        min?: number;
+                                                        max?: number;
+                                                        step?: number;
+                                                        minLength?: number;
+                                                        maxLength?: number;
+                                                        options?: {
                                                             id: string;
                                                             label: string;
                                                         }[];
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "multiChoice";
                                                         id: string;
                                                         label: string;
-                                                        required: boolean;
-                                                        default: string[];
-                                                        options: {
-                                                            id: string;
-                                                            label: string;
-                                                        }[];
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "resource";
+                                                        kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                        default: unknown;
+                                                    }[];
+                                                    grantedActions: {
                                                         id: string;
                                                         label: string;
-                                                        default: {
-                                                            current: number;
-                                                            max: number;
-                                                        };
-                                                        min: number;
-                                                        max: number;
-                                                        step: number;
-                                                        resetTo: "min" | "max";
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "computed";
-                                                        id: string;
-                                                        label: string;
-                                                        valueType: "number" | "text" | "boolean";
-                                                        expressionId: string;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "image";
-                                                        id: string;
-                                                        label: string;
-                                                        required: boolean;
-                                                    })[];
-                                                    grantedActions: ({
-                                                        pushPolicy?: {
-                                                            /** @constant */
-                                                            version: "1.0";
-                                                            maxAttempts: number;
-                                                            successThreshold: number;
-                                                            allowOnSuccess: boolean;
-                                                            groups: {
-                                                                groupId: string;
-                                                                lockedFaces: number[];
-                                                                reportedFaces: number[];
-                                                            }[];
-                                                        };
-                                                        /** @constant */
-                                                        kind: "roll";
-                                                        id: string;
-                                                        label: string;
-                                                        expressionId: string;
+                                                        kind: "roll" | "resourceBump";
                                                         inputs: {
                                                             id: string;
                                                             label: string;
@@ -18400,24 +16801,7 @@ export interface operations {
                                                             required: boolean;
                                                             default: string | number | boolean | null;
                                                         }[];
-                                                        outputTemplate: string;
-                                                        nominal?: boolean;
-                                                    } | {
-                                                        /** @constant */
-                                                        kind: "resourceBump";
-                                                        id: string;
-                                                        label: string;
-                                                        resourceId: string;
-                                                        operation: {
-                                                            /** @constant */
-                                                            kind: "delta";
-                                                            amount: number;
-                                                        } | {
-                                                            /** @constant */
-                                                            kind: "reset";
-                                                        };
-                                                        nominal?: boolean;
-                                                    })[];
+                                                    }[];
                                                 };
                                                 metadata?: {
                                                     name: string;

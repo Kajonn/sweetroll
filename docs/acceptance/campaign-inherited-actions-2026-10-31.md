@@ -31,3 +31,11 @@ Await all seven verification jobs on the repaired implementation head, deploy th
 On `e8e1d2b`, all 468 root tests (including the ten database-backed tests skipped locally) and all 333 real PostgreSQL integration tests pass. Create p95 is 197.1 ms; reads 12.3 ms, bumps 28.3 ms and rolls 22 ms, with the original assertions unchanged. The derived browser journey and all 28 production-worker offline tests pass, including stale reference review and lost committed-push replay. Frontend and retained visual jobs pass.
 
 Docker then exposed the shared browser fixture importing a root `tests/` file absent from the existing image build context. The fixture is moved into the established Systems package-fixture directory, which the Dockerfile already copies, and all consumers import the same fixture. No Dockerfile scope expansion or test exclusion is used. Final-head CI and isolated deployed acceptance remain open.
+
+## Final-head load investigation
+
+All six frontend/browser/offline/visual jobs on application `e25fb62` passed: 1,164 frontend tests, 60 browser journeys, 28 production-offline checks and 10 retained visual checks. Root tests passed (468), and 332/333 integration assertions passed; create p95 measured 317.4 ms and then 336.3 ms on a single server-job rerun against the unchanged 300 ms limit. No further blind retry was used.
+
+The new slot projection unnecessarily embedded full ObjectTemplate mechanics, contrary to the planned UI-summary boundary. A meaningful red test now asserts inherited action projections omit expression IDs and push policies while preserving typed defaults/constraints. Projection and its HTTP DTO now carry the compact field/action summary; mechanics continue resolving from the pinned package. This removes roughly 680 KB and thousands of lines from the generated HTTP contract and reduces the response serializer graph. The latency improvement remains a hypothesis until the repaired-head integration run passes; no workload, threshold, assertion or timeout is weakened.
+
+The isolated preview source is staged only (patch `314b6694-f876-431c-a364-ab82f6872d2f`). The live all-environment update was rejected by automatic review; a scoped non-destructive patch was prepared and inspected. Railway’s deployment confirmation then returned cancellation, so no new deployment or hosted journey has run.

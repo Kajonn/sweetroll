@@ -147,7 +147,7 @@ function projectSlot(
       templateId: entry.templateId,
       ...(entry.source === undefined ? {} : {source:structuredClone(entry.source)}),
       label: entry.snapshot && "base" in entry.snapshot ? entry.snapshot.values.name : template?.label ?? customEntryLabel(entry.values),
-      ...(entry.snapshot && "base" in entry.snapshot && template ? {definition:structuredClone(template), metadata:structuredClone(entry.snapshot.values)} : {}),
+      ...(entry.snapshot && "base" in entry.snapshot && template ? {definition:projectEntryDefinition(template), metadata:structuredClone(entry.snapshot.values)} : {}),
       values: structuredClone(entry.values),
       ...(entry.quantity === undefined ? {} : { quantity: entry.quantity }),
     };
@@ -234,4 +234,11 @@ function fieldConstraints(
     case "image":
       return { required: field.required };
   }
+}
+
+/** UI data only. Execution and policy remain owned by the pinned package resolver. */
+function projectEntryDefinition(template:ObjectTemplateV1):NonNullable<CharacterProjectionSlotEntry["definition"]>{
+ return {id:template.id,label:template.label,kind:template.kind,
+  fields:template.fields.filter((f):f is Exclude<FieldV1,{kind:"computed"}|{kind:"image"}>=>f.kind!=="computed" && f.kind!=="image").map(f=>({id:f.id,label:f.label,kind:f.kind,default:structuredClone(f.default),...(f.kind==="resource"?{min:f.min,max:f.max,step:f.step}:fieldConstraints(f))})),
+  grantedActions:template.grantedActions.map(a=>({id:a.id,label:a.label,kind:a.kind,inputs:a.kind==="roll"?a.inputs.map(i=>({...i})):[]}))};
 }

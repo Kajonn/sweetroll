@@ -106,6 +106,12 @@ describe("derived fixture and runtime parity", () => {
         { label: "Captain's sword", values: { name: "Binding name" } },
       ],
     });
+    const slot=observed.value.projection.sheets[0]!.sections[0]!.elements.find(e=>e.kind==="slot");
+    if(slot?.kind!=="slot")throw Error("Missing projected inventory");
+    const definition=slot.entries[0]!.definition!;
+    expect(definition.fields.find(f=>f.id==="damage_bonus")).toMatchObject({kind:"integer",min:0,max:10,step:1,default:1});
+    expect(definition.grantedActions.find(a=>a.id==="sword_pool")).not.toHaveProperty("expressionId");
+    expect(definition.grantedActions.find(a=>a.id==="sword_pool")).not.toHaveProperty("pushPolicy");
     for (const id of ["sword_hit", "sword_damage"]) {
       const rolled = await action(id);
       expect(rolled.ok).toBe(true);

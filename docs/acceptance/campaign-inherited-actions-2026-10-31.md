@@ -1,6 +1,6 @@
 # Campaign inherited actions — verification record
 
-Date: 2026-10-31. Status: draft-preservation fix `f11e7b9` is deployed as `9f00c6b` and the normal hosted journey passes. The offline journey found a saved-roll clearing race after return; a further stale-read repair is in verification. Final hosted acceptance remains open.
+Date: 2026-10-31. Status: live `9f00c6b` passes the normal hosted journey; offline recovery found a returned-sheet stale-read race. Repair `1b85c75` passes all CI #156 jobs and is staged for isolated deployment. Final hosted acceptance remains open.
 
 Scope: [execution plan](../superpowers/plans/2026-10-31-campaign-inherited-actions.md) and [contract](../superpowers/specs/2026-10-31-campaign-inherited-actions.md). The owner approved publication and implementation tree `56e70044` was published as `d720fc3` in PR #25. CI #149 exposed a saved-source schema defect and a load-test threshold failure; deployment has not started.
 
@@ -122,3 +122,11 @@ Both second-candidate runs completed scoped cleanup, independently read back thr
 | --- | --- | --- | --- | --- |
 | normal | `5c418cf8-529c-4038-8a6c-e917c2be09af` | `9b0f3c9c-4086-43c9-b24d-38883e7a1215` | `c9b96837-0563-44cf-b36a-01e9e466fdfa` | `7edc0167-1620-4935-a649-7fa09550cff4` |
 | offline | `dc99398b-0e2e-49d4-a5e2-11aa75c4eee8` | `39e8cb86-4559-478e-a677-90d65d9c04f1` | `e834476c-0229-4ce8-958e-8aad28d07cdb` | `6a8988e3-43a5-41bd-9fd3-a561dfc389bc` |
+
+## CI #156 — returned-sheet race repaired, deployment staged
+
+Repair `1b85c7507217abb753f9b413a77a2000e0bb3946`, tree `a1ef78fba11a8b213881e887a2e468e2c77fd8c6`, passed every verification job in [CI #156](https://github.com/Kajonn/sweetroll/actions/runs/41212002706). Results: 468 root tests, 333 real PostgreSQL integration tests, 1,166 frontend tests, 60 browser journeys, 28 production-worker offline checks and 10 retained visual checks, plus typechecks, contract identity, production builds and Docker. The deterministic saved-roll clearing regression was observed red → green. Original create/read/bump/roll p95 gates pass at 189/14.3/123.1/99.9 ms, with no threshold, workload, timeout or retry changes.
+
+Only the existing isolated preview service's commit pin is staged from `f11e7b9` to `1b85c75`, patch `bb95d6fe-2d9d-4f76-8926-f534e7369579`. Review confirmed one non-destructive source-field change and no shared-variable, database, volume or other service change. Applying it after green CI again returned "Cancelled — the user did not approve this action. No changes were made." Readback confirms live deployment is still `7264aa8c-2ba0-468e-8561-02bc13ff3341`, commit `9f00c6b`. No alternative bypassed the gate.
+
+The next concrete step is to apply this staged preview update, verify terminal SUCCESS, readiness and exact served assets, then run both canonical hosted journeys and independently read back cleanup. C7 stays open until the repaired return/recovery flow passes on the deployed build. This further repair changes no backend/schema, migration policy, mechanics or product scope; `proactive-expression` remains untouched. Physical-device, provider-authentication and playtest G9 gates remain open.

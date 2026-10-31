@@ -1,3 +1,4 @@
+import {CampaignProposals} from "./CampaignProposals.js";
 import {CampaignTemplates} from "./CampaignTemplates.js";
 // Campaign detail shell: openCampaign on mount, tabbed Characters /
 // Content / Activity bodies, and the self-leave flow. The Characters tab
@@ -338,7 +339,7 @@ export function CampaignDetail(props: {
               />
             ),
           },
-          ...(props.api.templates === undefined ? [] : [{id:"templates",label:t("campaign.templates.title"),content:<CampaignTemplates api={props.api.templates} campaignId={props.campaignId} actorId={props.actorId} generation={generation} isGm={isGm} online={online} readOnly={campaign.status !== "active"} onAccessRevoked={handleAccessRevoked}/>}]),
+          ...(props.api.templates === undefined ? [] : [{id:"templates",label:t("campaign.templates.title"),content:<><CampaignTemplates api={props.api.templates} campaignId={props.campaignId} actorId={props.actorId} generation={generation} isGm={isGm} online={online} readOnly={campaign.status !== "active"} onAccessRevoked={handleAccessRevoked}/>{props.api.proposals ? <CampaignProposals api={props.api.proposals} campaignId={props.campaignId} actorId={props.actorId} generation={generation} isGm={isGm} online={online} readOnly={campaign.status !== "active"} onAccessRevoked={handleAccessRevoked}/> : null}</>}]),
           {
             id: "activity",
             label: t("campaign.detail.tabs.activity"),

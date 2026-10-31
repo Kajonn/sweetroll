@@ -1,7 +1,7 @@
 # Player proposals for campaign templates — adventure slice D1
 
-**Status:** code-grounded execution draft; no D1 implementation or acceptance claim. [Companion contract](../specs/2026-10-31-player-template-proposals.md).
-**Dependency:** review/merge inherited-actions PR #25. Planning baseline is its head `9f11c741f7ce3cc6722c07af21fa3d1857ccae29`; application `58c71a1` passed CI #158 and hosted acceptance, and the documentation-only head passed CI #159. Retarget this planning change to main after C merges, accounting for the actual merge SHA.
+**Status:** implementation in draft PR #26; final CI/hosted acceptance in progress. [Companion contract](../specs/2026-10-31-player-template-proposals.md).
+**Dependency:** inherited-actions PR #25 merged as `455f967`; implementation branch merged this exact main. Planning baseline is its head `9f11c741f7ce3cc6722c07af21fa3d1857ccae29`; application `58c71a1` passed CI #158 and hosted acceptance, and the documentation-only head passed CI #159. Retarget this planning change to main after C merges, accounting for the actual merge SHA.
 **Authority:** [design §§5.4, 17.0, 17.9b and 18.2](../../../design_v2.md), [adventure-items roadmap](2026-10-07-adventure-custom-items.md), [GUI delivery gates](2026-09-08-gui-integration.md).
 **Goal:** a player suggests bounded adventure content; a GM/co-GM approves exactly one reusable data-only catalog template or rejects the suggestion. The player's original entry stays unchanged.
 

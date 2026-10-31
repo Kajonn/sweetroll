@@ -3,6 +3,18 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiError, createApiClient } from "./client.js";
 
 describe("createApiClient", () => {
+  it("aborts a scope-bound request when its caller is removed", async () => {
+    const controller = new AbortController();
+    let observed: AbortSignal | undefined;
+    const client = createApiClient({baseUrl:"http://api",fetch:async (_url, init) => {
+      observed=init?.signal as AbortSignal;
+      return new Promise<Response>((_resolve,reject) => observed!.addEventListener("abort",()=>reject(new DOMException("Aborted","AbortError"))));
+    }});
+    const pending=client.fetch("GET","/private",{signal:controller.signal});
+    controller.abort();
+    expect(observed?.aborted).toBe(true);
+    await expect(pending).rejects.toThrow("Aborted");
+  });
   it.each(["fetch", "body"])("bounds a hanging %s with an abort without changing the request body", async stage => {
     vi.useFakeTimers();
     try {

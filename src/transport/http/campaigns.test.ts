@@ -218,6 +218,7 @@ function displayProjection(overrides: Partial<DisplayProjection> = {}): DisplayP
 function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
   const unavailable = async () => ({ok:false as const,error:{code:"not_found" as const,message:"Unknown template"}});
   const base: Campaigns = {
+    submitProposal:unavailable, openProposal:unavailable, listProposals:unavailable, approveProposal:unavailable, rejectProposal:unavailable,
     listTemplateBases: async()=>({ok:true,value:[]}),
     createTemplate:unavailable, updateTemplate:unavailable, archiveTemplate:unavailable, recoverTemplate:unavailable, openTemplate:unavailable, listTemplates:unavailable,
     create: async () => ({ ok: true, value: campaignView() }),

@@ -536,3 +536,40 @@ CREATE TABLE campaign_item_template_revisions (
 ALTER TABLE campaign_item_templates ADD CONSTRAINT campaign_template_current_content_fk
   FOREIGN KEY(id,content_revision) REFERENCES campaign_item_template_revisions(template_id,content_revision)
   DEFERRABLE INITIALLY DEFERRED;
+
+-- Private immutable player suggestions. Publication is a terminal atomic decision.
+CREATE TABLE campaign_item_proposals (
+  id uuid PRIMARY KEY,
+  campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  submitter_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  membership_generation integer NOT NULL CHECK (membership_generation >= 1),
+  kind text NOT NULL CHECK (kind IN ('item','spell','talent','effect')),
+  content_json jsonb NOT NULL CHECK (jsonb_typeof(content_json)='object' AND octet_length(content_json::text)<=32768),
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+  revision integer NOT NULL DEFAULT 1,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  decision_actor_id uuid REFERENCES users(id) ON DELETE RESTRICT,
+  decided_at timestamptz,
+  decision_reason text CHECK (length(decision_reason)<=2000),
+  approved_template_id uuid UNIQUE REFERENCES campaign_item_templates(id) ON DELETE RESTRICT,
+  CHECK (
+    (status='pending' AND revision=1 AND decision_actor_id IS NULL AND decided_at IS NULL AND decision_reason IS NULL AND approved_template_id IS NULL)
+    OR (status='approved' AND revision=2 AND decision_actor_id IS NOT NULL AND decided_at IS NOT NULL AND decision_reason IS NULL AND approved_template_id IS NOT NULL)
+    OR (status='rejected' AND revision=2 AND decision_actor_id IS NOT NULL AND decided_at IS NOT NULL AND approved_template_id IS NULL)
+  )
+);
+CREATE INDEX campaign_proposals_page_idx ON campaign_item_proposals(campaign_id,status,id);
+CREATE INDEX campaign_proposals_self_idx ON campaign_item_proposals(campaign_id,submitter_id,membership_generation,status,id);
+CREATE FUNCTION guard_campaign_proposal() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.status <> 'pending' OR NEW.id IS DISTINCT FROM OLD.id OR NEW.campaign_id IS DISTINCT FROM OLD.campaign_id
+    OR NEW.submitter_id IS DISTINCT FROM OLD.submitter_id OR NEW.membership_generation IS DISTINCT FROM OLD.membership_generation
+    OR NEW.kind IS DISTINCT FROM OLD.kind OR NEW.content_json IS DISTINCT FROM OLD.content_json
+    OR NEW.created_at IS DISTINCT FROM OLD.created_at OR NEW.status = 'pending' THEN
+    RAISE EXCEPTION 'Campaign suggestion content and terminal decisions are immutable';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER campaign_proposal_immutable BEFORE UPDATE ON campaign_item_proposals FOR EACH ROW EXECUTE FUNCTION guard_campaign_proposal();

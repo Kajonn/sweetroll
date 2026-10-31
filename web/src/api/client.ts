@@ -64,6 +64,7 @@ export type ApiClient = {
     path: string,
     init?: {
       body?: TBody;
+      signal?: AbortSignal;
       headers?: Record<string, string>;
       query?: Record<string, string | number | null | undefined>;
     },
@@ -114,6 +115,9 @@ export function createApiClient(input: CreateApiClientInput): ApiClient {
       const requestId = randomUUID();
       headers["x-request-id"] = requestId;
       const controller = new AbortController();
+      const abort = () => controller.abort(init?.signal?.reason);
+      if (init?.signal?.aborted) abort();
+      else init?.signal?.addEventListener("abort", abort, { once: true });
       let timer: ReturnType<typeof setTimeout>;
       const timeout = new Promise<never>((_resolve, reject) => {
         timer = setTimeout(() => {
@@ -186,6 +190,7 @@ export function createApiClient(input: CreateApiClientInput): ApiClient {
         return parsed as never;
       } finally {
         clearTimeout(timer!);
+        init?.signal?.removeEventListener("abort", abort);
       }
     },
   };

@@ -331,6 +331,7 @@ describeWithDatabase("campaign export projection (Task 7)", () => {
       "content",
       "exportVersion",
       "members",
+      "proposals",
       "rolls",
       "templates",
     ]);
@@ -700,6 +701,7 @@ describeWithDatabase("campaign export projection (Task 7)", () => {
       "content",
       "exportVersion",
       "members",
+      "proposals",
       "rolls",
       "templates",
     ]);

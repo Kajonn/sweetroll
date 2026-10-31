@@ -99,6 +99,27 @@ export function validateTemplateContent(
     : "Template name is required.";
 }
 
+/** Strict data-only input shared by direct blank creation and proposal approval. */
+export function validateBlankTemplateContent(kind: string, content: unknown): string | null {
+  const invalid = validateTemplateContent(kind, content);
+  if (invalid) return invalid;
+  return Object.keys(content as object).some(key => !["name", "description", "notes", "defaultQuantity"].includes(key))
+    ? "Blank templates accept presentation text and item quantity only." : null;
+}
+/** Caller must hold the campaign lock; every write uses the caller's transaction. */
+export async function publishBlankTemplate(
+  client: PoolClient,
+  catalog: ReturnType<typeof createTemplateRepository>,
+  body: Parameters<ReturnType<typeof createTemplateRepository>["create"]>[1],
+  reject: (code: CampaignError["code"], message: string) => never,
+): Promise<CampaignTemplateView> {
+  const invalid = validateBlankTemplateContent(body.kind, body.content);
+  if (invalid) reject("bad_request", invalid);
+  if (await catalog.count(client, body.campaignId) >= 500)
+    reject("too_large", "Campaign template limit reached (500).");
+  return catalog.create(client, body);
+}
+
 class TemplateFailure extends Error {
   constructor(readonly error: CampaignError) {
     super(error.message);
@@ -257,19 +278,16 @@ export function createTemplateCommands(input: {
           fail("conflict", "A new template must expect revision zero.");
         const invalid = validateTemplateContent(body.kind, body.content);
         if (invalid !== null) fail("bad_request", invalid);
-        if ((await catalog.count(client, body.campaignId)) >= 500)
-          fail("too_large", "Campaign template limit reached (500).");
-        value = await catalog.create(client, {
-          templateId: newId(),
-          campaignId: body.campaignId,
-          creatorId: ctx.actorId,
+        const creation = {
+          templateId: newId(), campaignId: body.campaignId, creatorId: ctx.actorId,
           kind: body.kind,
-          content: await contentWithBase(
-            body.kind,
-            body.content,
-            body.baseTemplateId,
-          ),
-        });
+          content: await contentWithBase(body.kind, body.content, body.baseTemplateId),
+        };
+        if (body.baseTemplateId === undefined) value = await publishBlankTemplate(client, catalog, creation, fail);
+        else {
+          if (await catalog.count(client, body.campaignId) >= 500) fail("too_large", "Campaign template limit reached (500).");
+          value = await catalog.create(client, creation);
+        }
       } else {
         if (!("templateId" in body))
           fail("bad_request", "Template ID required.");

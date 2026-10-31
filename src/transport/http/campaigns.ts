@@ -1,3 +1,4 @@
+import {campaignProposalRoutes,campaignProposalHandlers,CampaignProposalDto} from "./campaignProposals.js";
 import {RollBreakdownSchema,PushResultSchema} from "../../systems/implementation/rules/result.js";
 import { strictInputCompiler } from "./strictValidation.js";
 import {campaignTemplateRoutes,campaignTemplateHandlers,CampaignTemplateDto} from "./campaignTemplates.js";
@@ -251,6 +252,7 @@ const ActivityEventDto = Type.Object({
 });
 
 const CampaignExportDto = Type.Object({
+  proposals:Type.Optional(Type.Array(CampaignProposalDto)),
   templates:Type.Optional(Type.Array(CampaignTemplateDto)),
   exportVersion: Type.Literal(1),
   campaign: Type.Object({
@@ -731,6 +733,7 @@ export type CampaignsRouteDefinition = {
 
 export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
   ...campaignTemplateRoutes,
+  ...campaignProposalRoutes,
   {
     method: "post",
     path: "/campaigns",
@@ -1644,6 +1647,7 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
     type Handler = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown> | unknown;
     const handlers: Record<string, Handler> = {
       ...campaignTemplateHandlers(campaigns),
+      ...campaignProposalHandlers(campaigns),
       post_campaigns: async (request, reply) => {
         const body = request.body as {
           systemVersionId: string;
@@ -2542,6 +2546,6 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
     for (const route of campaignsRouteDefinitions) {
       const response = toFastifyResponses(route.schema.response);
       const schema = response === undefined ? route.schema : { ...route.schema, response };
-      app[route.method](route.path, { schema, ...(route.path.includes("/item-templates") ? { validatorCompiler: strictInputCompiler } : {}) }, handlers[route.operationId]!);
+      app[route.method](route.path, { schema, ...((route.path.includes("/item-templates") || route.path.includes("/item-proposals")) ? { validatorCompiler: strictInputCompiler, ...(route.path.includes("/item-proposals") ? {bodyLimit:32768}: {}) } : {}) }, handlers[route.operationId]!);
     }
   };

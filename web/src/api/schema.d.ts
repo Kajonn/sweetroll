@@ -548,6 +548,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns/{id}/item-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaigns_id_item_proposals"];
+        put?: never;
+        post: operations["post_campaigns_id_item_proposals"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/item-proposals/{proposalId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaigns_id_item_proposals_proposalId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/item-proposals/{proposalId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_campaigns_id_item_proposals_proposalId_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/item-proposals/{proposalId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_campaigns_id_item_proposals_proposalId_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/campaigns": {
         parameters: {
             query?: never;
@@ -12780,6 +12844,806 @@ export interface operations {
             };
         };
     };
+    get_campaigns_id_item_proposals: {
+        parameters: {
+            query?: {
+                status?: "pending" | "approved" | "rejected";
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        proposals: {
+                            proposalId: string;
+                            campaignId: string;
+                            submitterId: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            content: {
+                                name: string;
+                                description?: string;
+                                notes?: string;
+                                defaultQuantity?: number;
+                            };
+                            status: "pending" | "approved" | "rejected";
+                            revision: number;
+                            createdAt: string;
+                            updatedAt: string;
+                            decision: null | {
+                                actorId: string;
+                                decidedAt: string;
+                                reason: string | null;
+                            };
+                            approvedTemplateId: string | null;
+                            eligibility?: {
+                                canApprove: boolean;
+                                reason: null | "already_decided" | "campaign_archived" | "submitter_inactive" | "catalog_full";
+                            };
+                        }[];
+                        nextCursor: string | null;
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_campaigns_id_item_proposals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @constant */
+                    expectedProposalRevision: 0;
+                    idempotencyKey: string;
+                    kind: "item" | "spell" | "talent" | "effect";
+                    content: {
+                        name: string;
+                        description?: string;
+                        notes?: string;
+                        defaultQuantity?: number;
+                    };
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        proposal: {
+                            proposalId: string;
+                            campaignId: string;
+                            submitterId: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            content: {
+                                name: string;
+                                description?: string;
+                                notes?: string;
+                                defaultQuantity?: number;
+                            };
+                            status: "pending" | "approved" | "rejected";
+                            revision: number;
+                            createdAt: string;
+                            updatedAt: string;
+                            decision: null | {
+                                actorId: string;
+                                decidedAt: string;
+                                reason: string | null;
+                            };
+                            approvedTemplateId: string | null;
+                            eligibility?: {
+                                canApprove: boolean;
+                                reason: null | "already_decided" | "campaign_archived" | "submitter_inactive" | "catalog_full";
+                            };
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_campaigns_id_item_proposals_proposalId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                proposalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        proposal: {
+                            proposalId: string;
+                            campaignId: string;
+                            submitterId: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            content: {
+                                name: string;
+                                description?: string;
+                                notes?: string;
+                                defaultQuantity?: number;
+                            };
+                            status: "pending" | "approved" | "rejected";
+                            revision: number;
+                            createdAt: string;
+                            updatedAt: string;
+                            decision: null | {
+                                actorId: string;
+                                decidedAt: string;
+                                reason: string | null;
+                            };
+                            approvedTemplateId: string | null;
+                            eligibility?: {
+                                canApprove: boolean;
+                                reason: null | "already_decided" | "campaign_archived" | "submitter_inactive" | "catalog_full";
+                            };
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_campaigns_id_item_proposals_proposalId_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                proposalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    expectedProposalRevision: number;
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        proposal: {
+                            proposalId: string;
+                            campaignId: string;
+                            submitterId: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            content: {
+                                name: string;
+                                description?: string;
+                                notes?: string;
+                                defaultQuantity?: number;
+                            };
+                            status: "pending" | "approved" | "rejected";
+                            revision: number;
+                            createdAt: string;
+                            updatedAt: string;
+                            decision: null | {
+                                actorId: string;
+                                decidedAt: string;
+                                reason: string | null;
+                            };
+                            approvedTemplateId: string | null;
+                            eligibility?: {
+                                canApprove: boolean;
+                                reason: null | "already_decided" | "campaign_archived" | "submitter_inactive" | "catalog_full";
+                            };
+                        };
+                        requestId: string;
+                        template: {
+                            templateId: string;
+                            campaignId: string;
+                            creatorId: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            /** @constant */
+                            audience: "all_players";
+                            status: "active" | "archived";
+                            revision: number;
+                            contentRevision: number;
+                            content: {
+                                defaultValues?: {
+                                    [key: string]: unknown;
+                                };
+                                name: string;
+                                description?: string;
+                                notes?: string;
+                                defaultQuantity?: number;
+                                base?: {
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    templateId: string;
+                                };
+                            };
+                            createdAt: string;
+                            updatedAt: string;
+                        };
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_campaigns_id_item_proposals_proposalId_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                proposalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    expectedProposalRevision: number;
+                    idempotencyKey: string;
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        proposal: {
+                            proposalId: string;
+                            campaignId: string;
+                            submitterId: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            content: {
+                                name: string;
+                                description?: string;
+                                notes?: string;
+                                defaultQuantity?: number;
+                            };
+                            status: "pending" | "approved" | "rejected";
+                            revision: number;
+                            createdAt: string;
+                            updatedAt: string;
+                            decision: null | {
+                                actorId: string;
+                                decidedAt: string;
+                                reason: string | null;
+                            };
+                            approvedTemplateId: string | null;
+                            eligibility?: {
+                                canApprove: boolean;
+                                reason: null | "already_decided" | "campaign_archived" | "submitter_inactive" | "catalog_full";
+                            };
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     get_campaigns: {
         parameters: {
             query?: {
@@ -18273,6 +19137,32 @@ export interface operations {
                 content: {
                     "application/json": {
                         export: {
+                            proposals?: {
+                                proposalId: string;
+                                campaignId: string;
+                                submitterId: string;
+                                kind: "item" | "spell" | "talent" | "effect";
+                                content: {
+                                    name: string;
+                                    description?: string;
+                                    notes?: string;
+                                    defaultQuantity?: number;
+                                };
+                                status: "pending" | "approved" | "rejected";
+                                revision: number;
+                                createdAt: string;
+                                updatedAt: string;
+                                decision: null | {
+                                    actorId: string;
+                                    decidedAt: string;
+                                    reason: string | null;
+                                };
+                                approvedTemplateId: string | null;
+                                eligibility?: {
+                                    canApprove: boolean;
+                                    reason: null | "already_decided" | "campaign_archived" | "submitter_inactive" | "catalog_full";
+                                };
+                            }[];
                             templates?: {
                                 templateId: string;
                                 campaignId: string;

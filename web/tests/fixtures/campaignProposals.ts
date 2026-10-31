@@ -375,7 +375,8 @@ export async function campaignProposalJourney(
     if (offline) {
       await page.reload();
       await page.getByRole("tab", { name: "Items & powers" }).click();
-      await expectOfflineAvailable(page);
+      await expectOfflineAvailable(sheet);
+      await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
       await player.setOffline(true);
       await expect(
         page.getByRole("button", { name: "Suggest a template" }),

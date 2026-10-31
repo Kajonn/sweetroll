@@ -153,7 +153,7 @@ One feature PR after this planning change. Work in the dependency order below; e
 
 Slice C is done when a GM-derived template can be placed, independently edited and played with all of its existing supported actions and push rules, while immutable source/revision, permissions, exact-request recovery and returned-copy behavior pass real integration/CI/deployed verification. This acceptance gate passed on deployed `58c71a1`; see the final evidence record.
 
-Then proceed to **D1: data-only player proposals** and **D2: restricted drafts/audiences with explicit reveal and safe placement**, each with its own contract and secrecy/recovery acceptance. Keep public-release G9 work visible alongside feature development.
+After C review/merge, proceed using the separate [D1 execution draft](2026-10-31-player-template-proposals.md) and [contract](../specs/2026-10-31-player-template-proposals.md): **D1: data-only player proposals** and **D2: restricted drafts/audiences with explicit reveal and safe placement**, each with its own contract and secrecy/recovery acceptance. Keep public-release G9 work visible alongside feature development.
 
 ## Implementation evidence (2026-10-31; initial local record, followed by completed CI/deployed acceptance)
 

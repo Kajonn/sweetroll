@@ -1,6 +1,6 @@
 # Campaign inherited actions — verification record
 
-Date: 2026-10-31. Status: live `9f00c6b` passes the normal hosted journey; offline recovery found a returned-sheet stale-read race. Repair `1b85c75` passes all CI #156 jobs and is staged for isolated deployment. Final hosted acceptance remains open.
+Date: 2026-10-31. Status: deployed `b766b9a` passes normal hosted acceptance; offline return still exposed incomplete reconciliation. A complete read/reconciliation repair passes local verification and awaits CI/deployment. Final hosted acceptance remains open.
 
 Scope: [execution plan](../superpowers/plans/2026-10-31-campaign-inherited-actions.md) and [contract](../superpowers/specs/2026-10-31-campaign-inherited-actions.md). The owner approved publication and implementation tree `56e70044` was published as `d720fc3` in PR #25. CI #149 exposed a saved-source schema defect and a load-test threshold failure; deployment has not started.
 
@@ -130,3 +130,28 @@ Repair `1b85c7507217abb753f9b413a77a2000e0bb3946`, tree `a1ef78fba11a8b213881e88
 Only the existing isolated preview service's commit pin is staged from `f11e7b9` to `1b85c75`, patch `bb95d6fe-2d9d-4f76-8926-f534e7369579`. Review confirmed one non-destructive source-field change and no shared-variable, database, volume or other service change. Applying it after green CI again returned "Cancelled — the user did not approve this action. No changes were made." Readback confirms live deployment is still `7264aa8c-2ba0-468e-8561-02bc13ff3341`, commit `9f00c6b`. No alternative bypassed the gate.
 
 The next concrete step is to apply this staged preview update, verify terminal SUCCESS, readiness and exact served assets, then run both canonical hosted journeys and independently read back cleanup. C7 stays open until the repaired return/recovery flow passes on the deployed build. This further repair changes no backend/schema, migration policy, mechanics or product scope; `proactive-expression` remains untouched. Physical-device, provider-authentication and playtest G9 gates remain open.
+
+## Third hosted candidate — incomplete reconciliation exposed
+
+The owner deployed `b766b9acf9c1fabe8a2a5db55fa0c071908bcd66` (application `1b85c75`) to the same isolated preview. Deployment `d9624c09-5faa-42cb-bd59-4d5a037dbeff` reached SUCCESS at 18:16:45 CET on 2026-10-31; source readback shows pin `1b85c75` and no staged changes. [CI #157](https://github.com/Kajonn/sweetroll/actions/runs/41212405310) passed all seven verification jobs on that documentation-only head. Readiness is healthy. A direct rebuild with observed offline build ID `build-mvwnx69u` matched all five served artifacts byte for byte:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `/index.html` | `d3be4b084c7a0f6201ce9bb726919a098d6c43d7331ffdef0071cee821a603d6` |
+| `/assets/index-C3Ia8aNu.js` | `25dbb7d8d8aa6bb99a24c1f24204dc5df5e9bc594e3d487e19247833b98d77f4` |
+| `/assets/index-CCQNROF8.css` | `26841a98ac12725838c268120d874adb89fbc9449bf3375398de02d667d1ce58` |
+| `/sw.js` | `499be359c25198cd8511f6c276447a937c858013f44da2b48fec01df6c791147` |
+| `/offline-manifest.json` | `ccbe633426afb457495aca5dcbfc993012e0c83d791e4303fe2cda49d3e6127a` |
+
+At 21:26 CET, the canonical runners again used Chromium 130, one worker, zero retries and the existing 180-second limit. Normal hosted acceptance passed in 30.8 seconds. The offline run failed in 27.5 seconds with the same fresh-action revision conflict after return. The previous `1b85c75` repair was incomplete: it prevents a late read from overwriting an already newer in-memory snapshot, but clearing a saved roll can also advance the store generation before the initial GET reconciles. Reconciliation adopted the cached winner and marked the session ready while discarding the newer server sheet.
+
+The prior late-read regression had required two explicit refreshes; strengthening it to one refresh correctly exposed the missing behavior. A new deterministic startup regression holds the GET and post-clear read and asserts that the older revision is never exposed as ready. Both failed with expected revision 2 versus observed 1. Another test changes the generation between reading and persisting a GET result; clearing a roll incorrectly entered conflict. Its paired access-purge case remains terminal and must never repopulate the character.
+
+The complete repair re-fetches authorized state when an adopted cache winner still trails the server view; a read-only confirmation that loses its guard re-evaluates current cache state. It retains the earlier protection against a late old read, respects account/ownership/blocking gates, preserves pending-intent conflicts, and keeps purges terminal. This only repeats read/reconciliation work; frozen mutation attempts, keys and manual conflict review remain unchanged. All 118 session tests and all 1,170 frontend tests, typecheck and production build pass. A lagging re-fetch also remains blocked behind the highest observed revision. The shared reconciliation path covers startup, manual refresh and existing review reads; frozen writes are unchanged. CI and hosted verification of this complete repair remain open until observed.
+
+Fresh authenticated API contexts independently read back cleanup for both runs: every character/template/campaign/system is archived and both systems are private.
+
+| Run | System | Campaign | Character | Template |
+| --- | --- | --- | --- | --- |
+| normal | `492e8ec7-f0b3-456e-96c4-85e32cae045a` | `b4bc7fb9-9f91-4b61-b2d0-291856e8f54b` | `dcbc1cf0-f190-4109-8d72-2e7b67384fc2` | `bde61082-f988-4413-9a06-3a2dba6eefbe` |
+| offline | `ca1f4b23-1222-44b5-85ac-a5fead65901c` | `78e922b5-f0ff-43b0-96ec-161ce2fcaa97` | `7b384f26-aac6-4d6a-ad40-193c58a61cf8` | `7c1dcd2a-b00e-4898-b4ed-b207befaa2da` |

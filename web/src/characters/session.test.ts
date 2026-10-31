@@ -71,9 +71,8 @@ it("does not restore an older sheet when clearing a revoked roll races a fresh s
   await capturedRead;
   const returned = viewFor("char-1", 2, { campaignId: null, placementGeneration: 2 });
   api.setOpenFallback(async () => ({ character: returned, requestId: "returned" }));
-  // First adopt the generation changed by clearing the saved roll, then
-  // confirm the authorized returned sheet while its earlier read is held.
-  await session.refresh();
+  // One refresh must finish reconciliation even if clearing the roll
+  // advanced the cache generation while its earlier read is held.
   await session.refresh();
   expect(session.getSnapshot().confirmed?.revision).toBe(2);
   release();
@@ -85,6 +84,100 @@ it("does not restore an older sheet when clearing a revoked roll races a fresh s
   await session.whenIdle();
   expect(api.sent[0]?.body.expectedRevision).toBe(2);
   session.dispose(); await store.close();
+});
+
+it("finishes startup reconciliation when clearing an old roll changes the cache generation", async () => {
+  const { session, api, store } = await makeHarness();
+  const attached = viewFor("char-1", 1, { campaignId: "campaign-a" });
+  const returned = viewFor("char-1", 2, { campaignId: null, placementGeneration: 2 });
+  await seedConfirmed(store, "char-1", attached);
+  let opened!: () => void;
+  let releaseOpen!: () => void;
+  const observedOpen = new Promise<void>(resolve => { opened = resolve; });
+  const heldOpen = new Promise<void>(resolve => { releaseOpen = resolve; });
+  let first = true;
+  api.setOpenFallback(async () => {
+    if (first) { first = false; opened(); await heldOpen; }
+    return { character: returned, requestId: "returned" };
+  });
+  const opening = session.open();
+  await observedOpen;
+  const read = store.read.bind(store);
+  let captured!: () => void;
+  let releaseRead!: () => void;
+  const observedRead = new Promise<void>(resolve => { captured = resolve; });
+  vi.spyOn(store, "read").mockImplementationOnce(async (...args) => {
+    const old = await read(...args);
+    captured();
+    await new Promise<void>(resolve => { releaseRead = resolve; });
+    return old;
+  });
+  const clearing = session.forgetRoll(PUSH_ROOT_ID);
+  await observedRead;
+  const readyRevisions: number[] = [];
+  const unsubscribe = session.subscribe(snapshot => {
+    if (snapshot.phase === "ready" && snapshot.confirmed) readyRevisions.push(snapshot.confirmed.revision);
+  });
+  try {
+    releaseOpen();
+    await opening;
+    expect(session.getSnapshot().confirmed?.revision).toBe(2);
+    expect(readyRevisions).not.toContain(1);
+    releaseRead();
+    await clearing;
+    api.setSendFallback(async () => successEnvelope(returned));
+    await session.executeGrantedAction("sword-copy", "sword_pool");
+    await session.whenIdle();
+    expect(api.sent[0]?.body.expectedRevision).toBe(2);
+  } finally {
+    releaseRead(); await clearing; unsubscribe(); session.dispose(); await store.close();
+  }
+});
+
+it.each(["roll clear", "access purge"] as const)("handles a %s between reading and confirming a refreshed sheet", async change => {
+  const { session, api, store } = await makeHarness();
+  await seedConfirmed(store, "char-1", viewFor("char-1", 1, { campaignId: "campaign-a" }));
+  const returned = viewFor("char-1", 2, { campaignId: null, placementGeneration: 2 });
+  api.setOpenFallback(async () => ({ character: returned, requestId: "returned" }));
+  const confirm = store.confirmSnapshot.bind(store);
+  vi.spyOn(store, "confirmSnapshot").mockImplementationOnce(async (...args) => {
+    if (change === "roll clear") await store.forgetRoll(ARM, "char-1", PUSH_ROOT_ID);
+    else await store.purgeCharacter(ARM, "char-1");
+    return confirm(...args);
+  });
+  try {
+    await session.open();
+    if (change === "roll clear") {
+      expect(session.getSnapshot().phase).toBe("ready");
+      expect(session.getSnapshot().confirmed?.revision).toBe(2);
+      expect((await store.read(ARM, "char-1")).confirmed?.revision).toBe(2);
+    } else {
+      expect(session.getSnapshot().phase).toBe("purged");
+      expect(session.getSnapshot().confirmed).toBeNull();
+      expect((await store.read(ARM, "char-1")).confirmed).toBeNull();
+    }
+    expect(api.sent).toEqual([]);
+  } finally { session.dispose(); await store.close(); }
+});
+
+it("keeps actions blocked when reconciliation re-fetches a revision behind one already observed", async () => {
+  const { session, api, store } = await makeHarness();
+  const attached = viewFor("char-1", 1, { campaignId: "campaign-a" });
+  await seedConfirmed(store, "char-1", attached);
+  api.scriptOpenView(viewFor("char-1", 2, { campaignId: null, placementGeneration: 2 }));
+  api.scriptOpenView(attached);
+  const confirm = store.confirmSnapshot.bind(store);
+  vi.spyOn(store, "confirmSnapshot").mockImplementationOnce(async (...args) => {
+    await store.forgetRoll(ARM, "char-1", PUSH_ROOT_ID);
+    return confirm(...args);
+  });
+  try {
+    await session.open();
+    expect(session.getSnapshot().phase).toBe("offline");
+    expect(session.getSnapshot().error?.kind).toBe("network-unavailable");
+    expect(session.getSnapshot().confirmed?.revision).toBe(1);
+    expect(api.sent).toEqual([]);
+  } finally { session.dispose(); await store.close(); }
 });
 
 it("ignores catalog revocation after the session account has changed", async () => {

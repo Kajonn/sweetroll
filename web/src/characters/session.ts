@@ -848,7 +848,26 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
   }
 
-  async function reconcile(server: CharacterView) {
+  async function reconcile(server: CharacterView): Promise<void> {
+    let minimumRevision = server.reconciliation.revision;
+    while (await reconcileSnapshot(server) === "retry") {
+      if (!await identityIsCurrent() || !isConnected() || disposed || !coordination.isOwner() || error?.kind === "purged") return;
+      try {
+        server = (await api.open(characterId)).character;
+        if (!await identityIsCurrent()) return;
+      } catch (err) {
+        if (await identityIsCurrent()) await handleOpenError(err);
+        return;
+      }
+      if (server.reconciliation.revision < minimumRevision) {
+        setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.");
+        return;
+      }
+      minimumRevision = server.reconciliation.revision;
+    }
+  }
+
+  async function reconcileSnapshot(server: CharacterView): Promise<"retry" | void> {
     if (!identityMatches()) return;
     // The GET that produced `server` may have raced a purge, account clear
     // or cross-tab write: never confirm a server view over a store
@@ -882,6 +901,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         setBlocked("purged", "This character is no longer available.");
       }
       emit();
+      // A local metadata write (for example clearing an inaccessible roll)
+      // can win the generation race while retaining an older sheet. Re-read
+      // under the adopted guard before enabling actions on that cached view.
+      if (confirmed !== null && server.reconciliation.revision >= confirmed.reconciliation.revision &&
+          (server.reconciliation.revision !== confirmed.reconciliation.revision ||
+           !sameRollScope(confirmed, server) || !projectionsEqual(server.projection, confirmed.projection))) return "retry";
       return;
     }
     const local = confirmed;
@@ -902,6 +927,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         generation += 1;
       } catch (err) {
         if (!await identityIsCurrent()) return;
+        // This only persists a GET result. Re-read a changed cache guard so
+        // metadata changes can finish reconciling and purges stay terminal.
+        if (isStaleAck(err)) return reconcileSnapshot(server);
         await handleAckError(err);
         return;
       }

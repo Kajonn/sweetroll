@@ -9,6 +9,9 @@ function value(r: any): any {
 }
 db("restricted campaign template audiences", () => {
   let h: I6Harness;
+  let pausePlacement = false;
+  let observedPlacement: () => void;
+  let resumePlacement: () => void;
   beforeAll(async () => {
     const document = structuredClone(d20Document);
     document.slots = [
@@ -23,7 +26,28 @@ db("restricted campaign template audiences", () => {
       id: "inventory_element",
       slotId: "inventory",
     });
-    h = await buildI6Harness({ document });
+    h = await buildI6Harness({
+      document,
+      wrapRuntime: (runtime) => ({
+        ...runtime,
+        resolve: async (request) => {
+          if (
+            pausePlacement &&
+            request.intent.kind === "observe" &&
+            Object.values(request.state?.entries ?? {}).some(
+              (e) => e.source?.kind === "campaign",
+            )
+          ) {
+            pausePlacement = false;
+            observedPlacement();
+            await new Promise<void>((resolve) => {
+              resumePlacement = resolve;
+            });
+          }
+          return runtime.resolve(request);
+        },
+      }),
+    });
   });
   afterAll(async () => {
     await h?.close();
@@ -395,5 +419,92 @@ db("restricted campaign template audiences", () => {
       ).statusCode,
     ).toBe(403);
     expect((await page(id, "other")).templates).toEqual([]);
+  });
+  it("rejects a placement if the catalog is narrowed before its locked character commit", async () => {
+    const id = await setup();
+    const t = await create(id, "all_players");
+    const created = await request(id, "gm", "POST", "characters", {
+      name: "Racing bearer",
+      entityDefinitionId: "character",
+      controllerUserIds: [h.users.player.actorId],
+      expectedCampaignRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    const characterId = created.json().character.characterId;
+    const observed = new Promise<void>((resolve) => {
+      observedPlacement = resolve;
+    });
+    pausePlacement = true;
+    const placement = h.characters.apply(ctxFor(h.users.player), {
+      kind: "addEntry",
+      characterId,
+      entry: {
+        entryId: randomUUID(),
+        slotId: "inventory",
+        templateId: null,
+        values: {},
+        source: {
+          kind: "campaign",
+          campaignId: id,
+          templateId: t.templateId,
+          templateRevision: t.revision,
+          contentRevision: t.contentRevision,
+        },
+      },
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+    });
+    await observed;
+    try {
+      const changed = await request(
+        id,
+        "gm",
+        "POST",
+        `item-templates/${t.templateId}/sharing`,
+        sharing(t, "gm_only"),
+      );
+      expect(changed.statusCode, changed.body).toBe(200);
+    } finally {
+      resumePlacement();
+    }
+    expect(await placement).toMatchObject({
+      ok: false,
+      error: { code: "not_found" },
+    });
+    const character = value(
+      await h.characters.open(ctxFor(h.users.player), characterId),
+    );
+    expect(character.revision).toBe(1);
+    expect(character.state.entries).toEqual({});
+  });
+  it("exports private catalog grants only to current managers and denies saved export replay after demotion", async () => {
+    const id = await setup();
+    const t = await create(id, "selected_players", [
+      { userId: h.users.player.actorId, generation: 1 },
+    ]);
+    for (const who of ["player", "other", "outsider"] as const)
+      expect(
+        await h.campaigns.exportCampaign(ctxFor(h.users[who]), {
+          campaignId: id,
+          idempotencyKey: randomUUID(),
+        }),
+      ).toMatchObject({ ok: false });
+    await h.pool.query(
+      "UPDATE campaign_members SET role='co_gm' WHERE campaign_id=$1 AND user_id=$2",
+      [id, h.users.other.actorId],
+    );
+    const body = { campaignId: id, idempotencyKey: randomUUID() };
+    const exported = value(
+      await h.campaigns.exportCampaign(ctxFor(h.users.other), body),
+    );
+    expect(exported.templates).toEqual([t]);
+    await h.pool.query(
+      "UPDATE campaign_members SET role='player' WHERE campaign_id=$1 AND user_id=$2",
+      [id, h.users.other.actorId],
+    );
+    expect(
+      await h.campaigns.exportCampaign(ctxFor(h.users.other), body),
+    ).toMatchObject({ ok: false });
   });
 });

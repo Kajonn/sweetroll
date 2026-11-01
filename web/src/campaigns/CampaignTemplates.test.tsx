@@ -213,3 +213,9 @@ it('uses a separate read-only preview scope and purges it on exit',async()=>{
  const ui=render(<QueryClientProvider client={client}><CampaignTemplates api={api} campaignId="campaign" actorId="gm" generation={1} isGm={true} online={true} readOnly={false} members={[{userId:'player',role:'player',status:'active',generation:1}]} onAccessRevoked={vi.fn()}/></QueryClientProvider>);
  await screen.findByText('GM secret');await user.selectOptions(screen.getByLabelText('Preview as player'),'player');expect(screen.queryByText('GM secret')).toBeNull();await screen.findByText('Player draft');expect(screen.queryByRole('button',{name:'Sharing'})).toBeNull();await user.selectOptions(screen.getByLabelText('Preview as player'),'');expect(screen.queryByText('Player draft')).toBeNull();await screen.findByText('GM secret');ui.unmount();await waitFor(()=>expect(client.getQueryCache().findAll({queryKey:['campaigns','templates','campaign','gm',1]})).toHaveLength(0));
 });
+
+it('blocks grant replacement until the complete paginated roster is available',async()=>{
+ const api:CampaignTemplatesApi={bases:vi.fn(),list:vi.fn().mockResolvedValue({templates:[{...template,audience:'selected_players',grants:[{userId:'not-loaded-yet',generation:1}]}],nextCursor:null}),share:vi.fn(),preview:vi.fn(),create:vi.fn(),edit:vi.fn(),archive:vi.fn(),recover:vi.fn()};
+ render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><CampaignTemplates api={api} campaignId="campaign" actorId="gm" generation={1} isGm={true} online={true} readOnly={false} members={[]} membersComplete={false} onAccessRevoked={vi.fn()}/></QueryClientProvider>);
+ expect(await screen.findByRole('button',{name:'Sharing'})).toBeDisabled();expect(api.share).not.toHaveBeenCalled();
+});

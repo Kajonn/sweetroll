@@ -33,6 +33,7 @@ function status(error: unknown): number | undefined {
 }
 type Props = {
   members?:SharingMember[];
+  membersComplete?:boolean;
   loadMoreMembers?:(()=>void)|undefined;
   api: CampaignTemplatesApi;
   campaignId: string;
@@ -386,7 +387,7 @@ function CampaignTemplateScope(props:Props) {
               <div className={styles.actions}>
                 {row.status === "active" ? (
                   <>
-                    <TemplateSharing template={row} members={props.members??[]} disabled={blocked} share={body=>props.api.share(props.campaignId,row.templateId,body)} onDone={()=>{void client.invalidateQueries({queryKey:['campaigns','templates',props.campaignId]})}}/>
+                    <TemplateSharing template={row} members={props.members??[]} disabled={blocked || props.membersComplete===false} share={body=>props.api.share(props.campaignId,row.templateId,body)} onDone={()=>{void client.invalidateQueries({queryKey:['campaigns','templates',props.campaignId]})}}/>
                     <Button
                       variant="secondary"
                       disabled={blocked}

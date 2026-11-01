@@ -279,8 +279,8 @@ db("restricted campaign template audiences", () => {
     const original = value(placed);
     expect(replay.character.state).toEqual(original.character.state);
     expect(replay.character.revision).toBe(original.character.revision);
-    expect(replay.character.sync).toEqual({
-      ...original.character.sync,
+    expect(replay.character.reconciliation).toEqual({
+      ...original.character.reconciliation,
       replayed: true,
     });
     expect(

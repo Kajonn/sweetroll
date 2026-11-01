@@ -53,7 +53,7 @@ function CampaignTemplateScope(props:Props) {
   const [grants,setGrants]=useState<SharingMember[]>([]);
   const [archived, setArchived] = useState(false);
   const listStatus = archived && props.isGm ? "archived" : "active";
-  const key = [
+  const key = useMemo(()=>[
     "campaigns",
     "templates",
     props.campaignId,
@@ -63,7 +63,7 @@ function CampaignTemplateScope(props:Props) {
     props.online,
     previewTarget,
     listStatus,
-  ];
+  ],[props.campaignId,props.actorId,props.generation,props.isGm,props.online,previewTarget,listStatus]);
   const lifetime = useMemo(
     () => ({ active: true }),
     [props.campaignId, props.actorId, props.generation, props.isGm,previewTarget],
@@ -78,15 +78,13 @@ function CampaignTemplateScope(props:Props) {
   const [sourceMode, setSourceMode] = useState("blank");
   const [baseId, setBaseId] = useState("");
   const [defaults, setDefaults] = useState<Record<string, unknown>>({});
+  const baseKey=useMemo(()=>['campaigns','templates',props.campaignId,props.actorId,props.generation,props.isGm,props.online,'bases'],[props.campaignId,props.actorId,props.generation,props.isGm,props.online]);
+  useEffect(()=>()=>{
+    void client.cancelQueries({queryKey:baseKey,exact:true});
+    client.removeQueries({queryKey:baseKey,exact:true});
+  },[client,baseKey]);
   const bases = useQuery({
-    queryKey: [
-      "campaigns",
-      "templates",
-      props.campaignId,
-      props.actorId,
-      props.generation,
-      "bases",
-    ],
+    queryKey: baseKey,
     enabled: open && props.isGm && props.online,
     queryFn: async ({ signal }) => {
       const result = await props.api.bases(props.campaignId);
@@ -129,10 +127,12 @@ function CampaignTemplateScope(props:Props) {
     lifetime.active = true;
     return () => {
       lifetime.active = false;
-      void client.cancelQueries({queryKey:key,exact:true});
-      client.removeQueries({queryKey:key,exact:true});
     };
   }, [lifetime,client,props.campaignId,props.actorId,props.generation]);
+  useEffect(()=>()=>{
+    void client.cancelQueries({queryKey:key,exact:true});
+    client.removeQueries({queryKey:key,exact:true});
+  },[client,key]);
   useEffect(() => {
     setOpen(false);
     setEditing(null);

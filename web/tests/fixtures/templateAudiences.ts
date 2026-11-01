@@ -193,7 +193,8 @@ export async function templateAudienceJourney(
       catalog.getByRole("heading", { name: "Secret D2 key", exact: true }),
     ).toBeVisible();
     if (offline) {
-      await expectOfflineAvailable(catalog);
+      await expectOfflineAvailable(reader);
+      await expect.poll(()=>catalog.evaluate(()=>Boolean(navigator.serviceWorker.controller))).toBe(true);
       await player.setOffline(true);
       await expect(
         catalog.getByRole("heading", { name: "Secret D2 key", exact: true }),

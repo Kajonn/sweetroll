@@ -62,7 +62,7 @@
   color: var(--text-muted);
   font-weight: 600;
   text-decoration: none;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  /* Theme foreground and background must change together for contrast. */
 }
 
 .navLink:hover,

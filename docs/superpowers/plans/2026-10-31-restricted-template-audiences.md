@@ -1,6 +1,6 @@
 # Restricted campaign-template audiences — D2 execution plan
 
-**Status:** planned, application implementation not started.
+**Status:** implemented in draft PR #27; CI and isolated hosted acceptance are in progress. D2 completion is not claimed.
 **Baseline:** merged D1 main `90b053d`; C PR #25 and D1 PR #26 are merged.
 **Contract:** [D2 audiences, reveal and offline boundary](../specs/2026-10-31-restricted-template-audiences.md).
 **Goal:** prepare GM-only/selected-player catalog drafts, preview the actual player's
@@ -35,6 +35,34 @@ client-transition tests. Do not close gates from documents or retained old evide
 - `CampaignTemplates.tsx` owns catalog authoring and frozen online retries;
   `campaignTemplates.ts` owns strict HTTP schemas and generated API contracts. Extend
   these seams and shared/i18n controls rather than introducing a second catalog.
+
+## Execution record (2026-11-01)
+
+Implementation preserves the B/C/D1 Module seams, fresh schema baseline and independent
+character copies. The grant budget is bounded by 100 and the configured membership
+limit. Campaign catalog queries carry current actor/generation/role/read-mode scopes;
+restricted reads stay outside durable character caches. Recipient/preview labels reuse
+the existing roster user labels (user IDs); no recipient IDs are manually entered.
+
+TDD CI #168 on `0176b37` observed four failing PostgreSQL/HTTP requirements before code.
+CI #169/#170 identified archive/conflict and new-fixture/schema expectation issues;
+those are repaired without relaxing existing assertions, timeouts, retry policies,
+workloads or visual baselines. CI #170 independently passes 472 root tests and 346
+PostgreSQL cases, with two new fixture/schema assertions still requiring correction.
+The original assertion checks were retained and corrected to use current reconciliation
+metadata and include the new grant primary-key index. A new cache-unmount regression
+was observed red and repaired; nine targeted frontend tests pass locally.
+
+A browser contrast finding during theme changes is repaired by synchronizing foreground
+and background palette changes, preserving final colors. The new offline journey uses
+the sheet's actual durable-offline badge and additionally verifies control of the
+catalog page by the production worker; a campaign catalog has no sheet badge.
+
+Hosted resources are confined to new project `sweetroll-d2-acceptance`, environment
+`preview`; existing preview and production projects remain unchanged. First deployment
+failed private database connectivity across regions. The app is being colocated with
+the database volume; no egress/endpoint security settings were changed. Exact final
+CI/deployment, asset identity, hosted results and cleanup remain to be recorded.
 
 ## D2.0 — Pin contract and fixtures
 

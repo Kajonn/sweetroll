@@ -206,3 +206,10 @@ it('purges private catalog data immediately on offline entry and role demotion',
  const ui=render(component(true,true));await screen.findByText('Secret preparation');ui.rerender(component(false,true));expect(screen.queryByText('Secret preparation')).toBeNull();await waitFor(()=>expect(client.getQueryCache().findAll({queryKey:['campaigns','templates','campaign','gm',1]}).every(q=>q.state.data===undefined)).toBe(true));
  vi.mocked(api.list).mockResolvedValue({templates:[],nextCursor:null});ui.rerender(component(true,false));expect(screen.queryByText('Secret preparation')).toBeNull();await waitFor(()=>expect(api.list).toHaveBeenCalledTimes(2));
 });
+
+it('uses a separate read-only preview scope and purges it on exit',async()=>{
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});const user=userEvent.setup();
+ const api:CampaignTemplatesApi={bases:vi.fn().mockResolvedValue({templates:[]}),list:vi.fn().mockResolvedValue({templates:[{...template,content:{name:'GM secret'}}],nextCursor:null}),share:vi.fn(),preview:vi.fn().mockResolvedValue({templates:[{...template,content:{name:'Player draft'}}],nextCursor:null}),create:vi.fn(),edit:vi.fn(),archive:vi.fn(),recover:vi.fn()};
+ const ui=render(<QueryClientProvider client={client}><CampaignTemplates api={api} campaignId="campaign" actorId="gm" generation={1} isGm={true} online={true} readOnly={false} members={[{userId:'player',role:'player',status:'active',generation:1}]} onAccessRevoked={vi.fn()}/></QueryClientProvider>);
+ await screen.findByText('GM secret');await user.selectOptions(screen.getByLabelText('Preview as player'),'player');expect(screen.queryByText('GM secret')).toBeNull();await screen.findByText('Player draft');expect(screen.queryByRole('button',{name:'Sharing'})).toBeNull();await user.selectOptions(screen.getByLabelText('Preview as player'),'');expect(screen.queryByText('Player draft')).toBeNull();await screen.findByText('GM secret');ui.unmount();await waitFor(()=>expect(client.getQueryCache().findAll({queryKey:['campaigns','templates','campaign','gm',1]})).toHaveLength(0));
+});

@@ -34,6 +34,7 @@ export interface IdentityRepository {
   createSession(input: CreateSessionInput): Promise<{ sessionId: SessionId }>;
   findSessionByTokenHash(tokenHash: string): Promise<SessionRecord | null>;
   revokeSessionByTokenHash(tokenHash: string): Promise<void>;
+  getDisplayNames(userIds: readonly UserId[]): Promise<Array<{ userId: UserId; displayName: string | null }>>;
   getThemeDefault(userId: UserId): Promise<ThemeDefault | null>;
   setThemeDefault(userId: UserId, value: ThemeDefault | null): Promise<ThemeDefault | null>;
 }
@@ -85,6 +86,14 @@ export function createIdentityRepository(pool: Pool): IdentityRepository {
         "UPDATE sessions SET revoked_at = now() WHERE token_hash = $1 AND revoked_at IS NULL",
         [tokenHash],
       );
+    },
+
+    async getDisplayNames(userIds) {
+      if (userIds.length === 0) return [];
+      const result = await pool.query<{ id: string; display_name: string | null }>(
+        "SELECT id, display_name FROM users WHERE id = ANY($1::uuid[])", [userIds],
+      );
+      return result.rows.map((row) => ({ userId: row.id, displayName: row.display_name?.trim() || null }));
     },
 
     async getThemeDefault(userId) {

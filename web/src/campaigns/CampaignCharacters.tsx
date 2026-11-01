@@ -3,6 +3,8 @@
 // Task 3's minimal list moved here (enriched); CampaignDetail imports the
 // tab from this module. Sheet opens reuse the shared character renderer
 // through onOpenCharacter: this file never renders a character sheet.
+import { AdoptPersonalCharacter } from "./AdoptPersonalCharacter.js";
+import type { CharactersApi } from "../characters/api.js";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -20,6 +22,7 @@ import { randomUUID } from "../utils/uuid";
 
 /** Minimal creation-options metadata loader (reuses the characters seam). */
 export type CampaignCharacterMetadataApi = {
+  listCharacters?: CharactersApi["listCharacters"];
   creationOptions(versionId: string): Promise<CreationOptions>;
 };
 
@@ -531,6 +534,13 @@ export function CampaignCharactersTab(props: {
     props.onCampaignStale?.();
   };
   return (
+    <>
+    {props.metadataApi?.listCharacters && props.actorId && props.pinnedVersionId ? <AdoptPersonalCharacter
+      key={`${props.campaignId}:${props.actorId}:${generation}`}
+      api={props.api} charactersApi={{ listCharacters: props.metadataApi.listCharacters }}
+      campaignId={props.campaignId} campaignRevision={props.campaignRevision}
+      pinnedVersionId={props.pinnedVersionId} actorId={props.actorId} generation={generation}
+      online={online} onChanged={refresh} /> : null}
     <CampaignCharactersView
       api={props.api}
       campaignId={props.campaignId}
@@ -551,5 +561,6 @@ export function CampaignCharactersTab(props: {
       metadataApi={props.metadataApi}
       npcEntityIds={entityKinds.data}
     />
+    </>
   );
 }

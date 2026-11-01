@@ -393,6 +393,7 @@ function makeRuntime(): SystemRuntime {
 }
 
 async function build(input?: {
+  identity?: Identity;
   campaigns?: Campaigns;
   characters?: Characters;
   runtime?: SystemRuntime;
@@ -412,6 +413,7 @@ async function build(input?: {
   );
   await app.register(
     buildCampaignsRoutes({
+      identity: input?.identity ?? { getDisplayNames: async () => ({ ok: true, value: [] }) },
       campaigns: input?.campaigns ?? makeCampaigns(),
       characters: input?.characters ?? ({ open: async () => ({ ok: true, value: fakeCharacterView() }) } as unknown as Characters),
       runtime: input?.runtime ?? makeRuntime(),
@@ -1915,4 +1917,34 @@ describe("campaign media/scene/display HTTP routes (I7b Task 4)", () => {
     expect(missing.statusCode).toBe(404);
   });
 
+});
+
+it("enriches only authorized current roster rows with Identity display names and never emails", async () => {
+  const current = memberView(), removed = memberView({ userId: randomUUID(), status: "removed" });
+  const displayNames = async (ids: readonly string[]) => {
+    expect(ids).toEqual([current.userId]);
+    return { ok: true as const, value: [{ userId: current.userId, displayName: "Journey Player One" }] };
+  };
+  const app = await build({
+    campaigns: makeCampaigns({ listMembers: async () => ({ ok: true, value: { members: [current, removed], nextCursor: "next-page" } }) }),
+    identity: { getDisplayNames: displayNames } as never,
+  });
+  const response = await app.inject({ method: "GET", url: `/campaigns/${current.campaignId}/members`, headers: cookie });
+  expect(response.statusCode).toBe(200);
+  expect(response.json().members[0]).toMatchObject({ userId: current.userId, displayName: "Journey Player One" });
+  expect(response.json().members[1].displayName).toBeNull();
+  expect(response.json().nextCursor).toBe("next-page");
+  expect(response.body).not.toContain("email");
+});
+
+
+it("does not resolve identity labels when the campaign roster is unauthorized", async () => {
+  let lookups = 0;
+  const app = await build({
+    campaigns: makeCampaigns({ listMembers: async () => ({ ok: false, error: { code: "not_found", message: "Not found" } }) }),
+    identity: { getDisplayNames: async () => { ++lookups; return { ok: true, value: [] }; } } as never,
+  });
+  const response = await app.inject({ method: "GET", url: `/campaigns/${randomUUID()}/members`, headers: cookie });
+  expect(response.statusCode).toBe(404);
+  expect(lookups).toBe(0);
 });

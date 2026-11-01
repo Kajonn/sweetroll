@@ -118,7 +118,7 @@ export async function templateAudienceJourney(
     await page.getByRole("button", { name: "Sharing", exact: true }).click();
     await page.getByLabel("Audience").selectOption("selected_players");
     await page
-      .getByRole("checkbox", { name: made.playerId, exact: true })
+      .getByRole("checkbox", { name: new RegExp(`\\(${made.playerId}\\)$`) })
       .check();
     await page
       .getByRole("button", { name: "Save sharing", exact: true })

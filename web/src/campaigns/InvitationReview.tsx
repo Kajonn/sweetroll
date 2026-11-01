@@ -1,7 +1,7 @@
 // Presentational core for the invitation journey; the router supplies
 // api/actorId/token. Tokens travel in POST bodies only and are never
 // rendered back to the page.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { t } from "../i18n/index.js";
 import { AppLink } from "../ui/AppLink.js";
@@ -40,56 +40,54 @@ export function InvitationReviewView(props: { api: CampaignsApi; actorId: string
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<"accept" | "decline" | null>(null);
 
-  // Never echo the token: server messages are rendered only after the
-  // active token (when present) is redacted out of them.
-  const sanitize = useCallback(
-    (message: string): string =>
-      activeToken === "" ? message : message.split(activeToken).join("…"),
-    [activeToken],
-  );
-
-  const describeError = useCallback(
-    (cause: unknown): string => {
-      if (typeof cause === "object" && cause !== null && "message" in cause && typeof cause.message === "string") {
-        return sanitize(cause.message);
-      }
-      return t("campaign.invitations.error.generic");
-    },
-    [sanitize],
-  );
+  const epoch = useRef(0);
+  const describeError = (cause: unknown, token: string): string => {
+    if (cause instanceof Error || (typeof cause === "object" && cause !== null && "message" in cause && typeof cause.message === "string")) {
+      const message = String(cause.message);
+      return token === "" ? message : message.split(token).join("…");
+    }
+    return t("campaign.invitations.error.generic");
+  };
 
   const runReview = useCallback(
     async (token: string): Promise<void> => {
+      const requestEpoch = ++epoch.current;
+      setReview(null);
       setPhase("reviewing");
       setError(null);
       try {
         const response = await props.api.reviewInvitation({ token });
+        if (requestEpoch !== epoch.current) return;
         setReview(response.review);
         setPhase("reviewed");
       } catch (cause) {
+        if (requestEpoch !== epoch.current) return;
         if (isNotFound(cause)) {
           setReview(null);
           setPhase("unavailable");
         } else {
-          setError(describeError(cause));
+          setError(describeError(cause, token));
           setPhase("error");
         }
       }
     },
-    [props.api, describeError],
+    [props.api],
   );
 
   useEffect(() => {
+    ++epoch.current;
+    setPending(null);
     setActiveToken(props.token);
     setDraftToken("");
     if (props.token === "") {
       setReview(null);
       setError(null);
       setPhase("entering");
-      return;
+    } else if (props.actorId !== null) {
+      void runReview(props.token);
     }
-    void runReview(props.token);
-  }, [props.token, runReview]);
+    return () => { ++epoch.current; };
+  }, [props.token, props.actorId, runReview]);
 
   const submitToken = (): void => {
     const next = draftToken.trim();
@@ -100,6 +98,7 @@ export function InvitationReviewView(props: { api: CampaignsApi; actorId: string
 
   const mutate = async (kind: "accept" | "decline"): Promise<void> => {
     if (review === null || pending !== null) return;
+    const requestEpoch = epoch.current;
     setPending(kind);
     setError(null);
     // Caller-minted idempotency key, fresh on every attempt: a 409 re-reads
@@ -114,6 +113,7 @@ export function InvitationReviewView(props: { api: CampaignsApi; actorId: string
           reviewedAccessRevision: review.accessRevision,
           idempotencyKey,
         });
+        if (requestEpoch !== epoch.current) return;
         setPhase("accepted");
       } else {
         await props.api.declineInvitation({
@@ -123,20 +123,22 @@ export function InvitationReviewView(props: { api: CampaignsApi; actorId: string
           reviewedAccessRevision: review.accessRevision,
           idempotencyKey,
         });
+        if (requestEpoch !== epoch.current) return;
         setPhase("declined");
       }
     } catch (cause) {
+      if (requestEpoch !== epoch.current) return;
       if (isNotFound(cause)) {
         setReview(null);
         setPhase("unavailable");
       } else if (isConflict(cause)) {
         setPhase("conflict");
       } else {
-        setError(describeError(cause));
+        setError(describeError(cause, activeToken));
         setPhase("reviewed");
       }
     } finally {
-      setPending(null);
+      if (requestEpoch === epoch.current) setPending(null);
     }
   };
 
@@ -187,6 +189,7 @@ export function InvitationReviewView(props: { api: CampaignsApi; actorId: string
         <EmptyState
           title={t("campaign.invitations.unavailable.title")}
           description={t("campaign.invitations.unavailable.description")}
+          action={<Button onClick={() => { setActiveToken(""); setDraftToken(""); setPhase("entering"); }}>{t("campaign.invitations.enterToken.change")}</Button>}
         />
       </section>
     );

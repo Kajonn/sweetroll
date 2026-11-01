@@ -35,6 +35,8 @@ export interface Identity {
   }): Promise<Result<SessionHandle>>;
   resolveSession(token: string): Promise<AuthContext>;
   signOut(token: string): Promise<Result<void>>;
+  /** Internal bounded projection. Callers must authorize the resource roster first. */
+  getDisplayNames(userIds: readonly UserId[]): Promise<Result<Array<{ userId: UserId; displayName: string | null }>>>;
   getThemeDefault(actorId: UserId): Promise<Result<ThemeDefault | null>>;
   setThemeDefault(actorId: UserId, value: ThemeDefault | null): Promise<Result<ThemeDefault | null>>;
 }
@@ -115,6 +117,15 @@ export function createIdentityModule(input: CreateIdentityModuleInput): Identity
       try {
         await repo.revokeSessionByTokenHash(hashToken(token));
         return { ok: true, value: undefined };
+      } catch {
+        return { ok: false, error: { code: "internal", message: "An internal error occurred." } };
+      }
+    },
+
+    async getDisplayNames(userIds) {
+      if (userIds.length > 100) return { ok: false, error: { code: "internal", message: "Display-name projection exceeds the page bound." } };
+      try {
+        return { ok: true, value: await repo.getDisplayNames(userIds) };
       } catch {
         return { ok: false, error: { code: "internal", message: "An internal error occurred." } };
       }

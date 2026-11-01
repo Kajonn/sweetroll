@@ -81,6 +81,22 @@ describeWithDatabase("Identity module", () => {
     });
   }
 
+  it("projects bounded identity labels without email and normalizes missing names", async () => {
+    const identity = module();
+    const signed = await identity.completeSignIn({ code: "code-ada", redirectUri: "http://localhost/cb", previousToken: undefined });
+    if (!signed.ok) throw new Error(signed.error.message);
+    const nameless = randomUUID();
+    await pool.query("INSERT INTO users (id, display_name) VALUES ($1, $2)", [nameless, "   "]);
+    const labels = await identity.getDisplayNames([signed.value.userId, nameless, randomUUID()]);
+    expect(labels.ok).toBe(true);
+    if (!labels.ok) throw new Error(labels.error.message);
+    expect(labels.value).toHaveLength(2);
+    expect(labels.value).toContainEqual({ userId: signed.value.userId, displayName: "Ada" });
+    expect(labels.value).toContainEqual({ userId: nameless, displayName: null });
+    expect(await identity.getDisplayNames([])).toEqual({ ok: true, value: [] });
+    expect((await identity.getDisplayNames(Array.from({ length: 101 }, () => randomUUID()))).ok).toBe(false);
+  });
+
   it("signs in, resolves, rotates, and signs out", async () => {
     const identity = module();
 

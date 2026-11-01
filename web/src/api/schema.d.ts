@@ -14851,6 +14851,7 @@ export interface operations {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            displayName: string | null;
                         }[];
                         nextCursor: string | null;
                         requestId: string;

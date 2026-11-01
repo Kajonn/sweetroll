@@ -1,4 +1,4 @@
-import {AudienceFields,TemplateSharing,type SharingMember} from "./TemplateSharing.js";
+import {AudienceFields,memberLabel,TemplateSharing,type SharingMember} from "./TemplateSharing.js";
 import { TypedEntryFields } from "../characters/TypedEntryFields.js";
 import { campaignDetailKey } from "./campaignQueries.js";
 import { t } from "../i18n/index.js";
@@ -314,7 +314,7 @@ function CampaignTemplateScope(props:Props) {
   );
   return (
     <Panel title={t("campaign.templates.title")}>
-      {props.isGm && props.online?<><Select label={t('campaign.sharing.preview')} value={previewTarget} onChange={e=>{setOpen(false);setPreviewTarget(e.target.value)}} options={[{value:'',label:t('campaign.sharing.actual')},...(props.members??[]).filter(m=>m.status==='active'&&m.role==='player').map(m=>({value:m.userId,label:m.userId}))]}/>{props.loadMoreMembers?<Button variant="secondary" onClick={props.loadMoreMembers}>{t('campaign.sharing.moreMembers')}</Button>:null}</>:null}
+      {props.isGm && props.online?<><Select label={t('campaign.sharing.preview')} value={previewTarget} onChange={e=>{setOpen(false);setPreviewTarget(e.target.value)}} options={[{value:'',label:t('campaign.sharing.actual')},...(props.members??[]).filter(m=>m.status==='active'&&m.role==='player').map(m=>({value:m.userId,label:memberLabel(m)}))]}/>{props.loadMoreMembers?<Button variant="secondary" onClick={props.loadMoreMembers}>{t('campaign.sharing.moreMembers')}</Button>:null}</>:null}
       {previewTarget?<p role="status">{t('campaign.sharing.banner')}</p>:null}
       <p>{t("campaign.templates.description")}</p>
       {!props.online ? (

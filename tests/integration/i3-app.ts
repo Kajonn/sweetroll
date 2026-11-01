@@ -78,6 +78,7 @@ export type BuildI3AppInput = {
    * here, before ready(), instead of after buildI3App returns.
    */
   extraRoutes?: (modules: {
+    identity: Identity;
     authoring: SystemAuthoring;
     characters: Characters;
     runtime: SystemRuntime;
@@ -145,7 +146,7 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
   );
 
   if (input.extraRoutes !== undefined) {
-    const routes = input.extraRoutes({ authoring, characters, runtime });
+    const routes = input.extraRoutes({ authoring, characters, runtime, identity });
     for (const plugin of Array.isArray(routes) ? routes : [routes]) {
       void app.register(plugin);
     }

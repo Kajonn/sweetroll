@@ -219,3 +219,17 @@ it('blocks grant replacement until the complete paginated roster is available',a
  render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><CampaignTemplates api={api} campaignId="campaign" actorId="gm" generation={1} isGm={true} online={true} readOnly={false} members={[]} membersComplete={false} onAccessRevoked={vi.fn()}/></QueryClientProvider>);
  expect(await screen.findByRole('button',{name:'Sharing'})).toBeDisabled();expect(api.share).not.toHaveBeenCalled();
 });
+
+it("previews the selected named player using the stable ID even with a long duplicate name", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const api = { list: vi.fn().mockResolvedValue({ templates: [], nextCursor: null }), bases: vi.fn().mockResolvedValue({ templates: [] }), preview: vi.fn().mockResolvedValue({ templates: [], nextCursor: null }) };
+  const name = "Alex " + "Long player name ".repeat(12);
+  render(<QueryClientProvider client={client}><CampaignTemplates api={api as never} campaignId="c1" actorId="gm" generation={0} isGm online readOnly={false} onAccessRevoked={() => {}} members={[
+    { userId: "p1", role: "player", status: "active", generation: 1, displayName: name },
+    { userId: "p2", role: "player", status: "active", generation: 2, displayName: name },
+  ]} /></QueryClientProvider>);
+  const select = screen.getByLabelText("Preview as player");
+  expect(screen.getByRole("option", { name: `${name.trim()} (p2)` })).toBeVisible();
+  await userEvent.setup().selectOptions(select, "p2");
+  await waitFor(() => expect(api.preview).toHaveBeenCalledWith("c1", { targetUserId: "p2" }));
+});

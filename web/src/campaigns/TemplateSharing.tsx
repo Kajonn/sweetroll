@@ -7,11 +7,18 @@ import type {
   TemplateSharingBody,
 } from "./campaignTemplateApi.js";
 export type SharingMember = {
+  displayName?: string | null;
   userId: string;
   role: string;
   status: string;
   generation: number;
 };
+/** Always include the full stable ID: duplicate names on another roster page
+ * remain unambiguous and labels never change when more members are loaded. */
+export function memberLabel(member: Pick<SharingMember, "userId" | "displayName">): string {
+  const name = member.displayName?.trim() || t("campaign.member.unnamed");
+  return `${name} (${member.userId})`;
+}
 export function AudienceFields(props: {
   audience: CampaignTemplate["audience"];
   setAudience: (v: CampaignTemplate["audience"]) => void;
@@ -55,7 +62,7 @@ export function AudienceFields(props: {
                     )
                   }
                 />
-                {m.userId}
+                {memberLabel(m)}
               </label>
             ))
         : null}

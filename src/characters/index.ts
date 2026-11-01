@@ -1082,7 +1082,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (attachedCampaignId === null || selectedSource.campaignId !== attachedCampaignId || input.campaignTemplates === undefined) return fail(errors.not_found());
         if (!Number.isSafeInteger(selectedSource.templateRevision) || selectedSource.templateRevision < 1 || !Number.isSafeInteger(selectedSource.contentRevision) || selectedSource.contentRevision < 1 || !ENTRY_ID_PATTERN.test(selectedSource.templateId)) return fail(errors.bad_request("Invalid campaign template reference."));
         const template = await input.campaignTemplates.read(input.pool, selectedSource);
-        if (template === null || !canPlaceTemplate(template)) return fail(errors.not_found());
+        if (template === null || template.audience !== "all_players") return fail(errors.not_found());
         if (template.status !== "active" || template.revision !== selectedSource.templateRevision || template.contentRevision !== selectedSource.contentRevision) return fail({code:"conflict",message:"The campaign template has changed. Refresh and explicitly review the selected revision.",cacheDisposition:"replace"});
         values = {name:template.content.name,description:template.content.description ?? "",notes:template.content.notes ?? ""};
         quantity = template.kind === "item" ? (template.content.defaultQuantity ?? 1) : undefined;
@@ -1196,8 +1196,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       stateChanged,
       ...(selectedSource === undefined ? {} : { precondition: async (client: import("pg").PoolClient): Promise<CharacterError | null> => {
         const current = await input.campaignTemplates!.read(client, selectedSource!);
-        if (current === null || !canPlaceTemplate(current)) return errors.not_found();
-        return current.status === "active" && current.revision === selectedSource!.templateRevision && current.contentRevision === selectedSource!.contentRevision ? null : {code:"conflict",message:"The campaign template has changed. Refresh and explicitly review the selected revision.",cacheDisposition:"replace"};
+        if (current === null || current.audience !== "all_players") return errors.not_found();
+        return canPlaceTemplate(current) && current.revision === selectedSource!.templateRevision && current.contentRevision === selectedSource!.contentRevision ? null : {code:"conflict",message:"The campaign template has changed. Refresh and explicitly review the selected revision.",cacheDisposition:"replace"};
       } }),
       roll: null,
       activity: {

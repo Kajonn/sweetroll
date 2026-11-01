@@ -273,9 +273,16 @@ db("restricted campaign template audiences", () => {
       sharing(t, "gm_only"),
     );
     expect(narrowed.statusCode, narrowed.body).toBe(200);
-    expect(await h.characters.apply(ctxFor(h.users.player), command)).toEqual(
-      placed,
+    const replay = value(
+      await h.characters.apply(ctxFor(h.users.player), command),
     );
+    const original = value(placed);
+    expect(replay.character.state).toEqual(original.character.state);
+    expect(replay.character.revision).toBe(original.character.revision);
+    expect(replay.character.sync).toEqual({
+      ...original.character.sync,
+      replayed: true,
+    });
     expect(
       (
         await h.characters.apply(ctxFor(h.users.gm), {
@@ -284,5 +291,109 @@ db("restricted campaign template audiences", () => {
         })
       ).ok,
     ).toBe(false);
+  });
+  it("serializes competing sharing changes and rolls back grants with failed audit writes", async () => {
+    const id = await setup();
+    let t = await create(id);
+    const suffix = `item-templates/${t.templateId}/sharing`;
+    const outcomes = await Promise.all([
+      request(id, "gm", "POST", suffix, sharing(t, "all_players")),
+      request(
+        id,
+        "gm",
+        "POST",
+        suffix,
+        sharing(t, "selected_players", [
+          { userId: h.users.player.actorId, generation: 1 },
+        ]),
+      ),
+    ]);
+    expect(outcomes.map((x) => x.statusCode).sort()).toEqual([200, 409]);
+    t = (
+      await request(id, "gm", "GET", `item-templates/${t.templateId}`)
+    ).json().template;
+    const receipts = (
+      await h.pool.query(
+        "SELECT count(*)::int AS n FROM campaign_command_executions WHERE campaign_id=$1",
+        [id],
+      )
+    ).rows[0].n;
+    await h.pool.query(
+      `CREATE FUNCTION reject_d2_sharing() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.campaign_id='${id}'::uuid AND NEW.kind='template_sharing' THEN RAISE EXCEPTION 'D2 rollback probe'; END IF; RETURN NEW; END $$`,
+    );
+    await h.pool.query(
+      "CREATE TRIGGER reject_d2_sharing BEFORE INSERT ON campaign_audit_records FOR EACH ROW EXECUTE FUNCTION reject_d2_sharing()",
+    );
+    try {
+      expect(
+        (
+          await request(
+            id,
+            "gm",
+            "POST",
+            suffix,
+            sharing(t, "selected_players", [
+              { userId: h.users.other.actorId, generation: 1 },
+            ]),
+          )
+        ).statusCode,
+      ).toBe(500);
+    } finally {
+      await h.pool.query(
+        "DROP TRIGGER reject_d2_sharing ON campaign_audit_records",
+      );
+      await h.pool.query("DROP FUNCTION reject_d2_sharing()");
+    }
+    expect(
+      (await request(id, "gm", "GET", `item-templates/${t.templateId}`)).json()
+        .template,
+    ).toEqual(t);
+    expect(
+      (
+        await h.pool.query(
+          "SELECT count(*)::int AS n FROM campaign_command_executions WHERE campaign_id=$1",
+          [id],
+        )
+      ).rows[0].n,
+    ).toBe(receipts);
+  });
+  it("keeps all four draft kinds private and reauthorizes manager receipts after demotion", async () => {
+    const id = await setup();
+    for (const kind of ["item", "spell", "talent", "effect"])
+      await create(id, "gm_only", [], kind);
+    expect((await page(id, "player")).templates).toEqual([]);
+    const t = (await page(id, "gm")).templates[0];
+    await h.pool.query(
+      "UPDATE campaign_members SET role='co_gm' WHERE campaign_id=$1 AND user_id=$2",
+      [id, h.users.other.actorId],
+    );
+    const body = sharing(t, "gm_only");
+    expect(
+      (
+        await request(
+          id,
+          "other",
+          "POST",
+          `item-templates/${t.templateId}/sharing`,
+          body,
+        )
+      ).statusCode,
+    ).toBe(200);
+    await h.pool.query(
+      "UPDATE campaign_members SET role='player' WHERE campaign_id=$1 AND user_id=$2",
+      [id, h.users.other.actorId],
+    );
+    expect(
+      (
+        await request(
+          id,
+          "other",
+          "POST",
+          `item-templates/${t.templateId}/sharing`,
+          body,
+        )
+      ).statusCode,
+    ).toBe(403);
+    expect((await page(id, "other")).templates).toEqual([]);
   });
 });

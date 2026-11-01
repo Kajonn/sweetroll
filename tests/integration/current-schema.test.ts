@@ -177,6 +177,7 @@ describeWithDatabase("current database schema", () => {
       "campaign_content_items",
       "campaign_invitations",
       "campaign_item_proposals",
+      "campaign_item_template_grants",
       "campaign_item_template_revisions",
       "campaign_item_templates",
       "campaign_members",

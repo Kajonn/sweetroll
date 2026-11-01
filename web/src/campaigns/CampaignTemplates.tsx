@@ -129,8 +129,8 @@ function CampaignTemplateScope(props:Props) {
     lifetime.active = true;
     return () => {
       lifetime.active = false;
-      void client.cancelQueries({queryKey:['campaigns','templates',props.campaignId,props.actorId,props.generation]});
-      client.removeQueries({queryKey:['campaigns','templates',props.campaignId,props.actorId,props.generation]});
+      void client.cancelQueries({queryKey:key,exact:true});
+      client.removeQueries({queryKey:key,exact:true});
     };
   }, [lifetime,client,props.campaignId,props.actorId,props.generation]);
   useEffect(() => {
@@ -495,7 +495,7 @@ function CampaignTemplateScope(props:Props) {
           >
             {editing
               ? t("campaign.templates.save")
-              : t("campaign.templates.publish")}
+              : t(audience === "all_players" ? "campaign.templates.publish" : "campaign.sharing.draft")}
           </Button>
         }
       >

@@ -2,6 +2,7 @@ export type MessageTable = Record<string, string>;
 
 export const defaultMessages: MessageTable = {
   'campaign.sharing.audience':'Audience',
+  'campaign.sharing.draft':'Save draft',
   'campaign.sharing.gm_only':'GM only',
   'campaign.sharing.selected_players':'Selected players',
   'campaign.sharing.all_players':'All players',

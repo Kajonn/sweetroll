@@ -42,6 +42,10 @@ export type TemplateMutation = TemplateLocation & {
   expectedTemplateRevision: number;
   idempotencyKey: string;
 };
+/** Duplicate recipients cannot grant the same membership twice. */
+export function hasDuplicateTemplateGrants(grants:readonly TemplateGrant[]):boolean {
+  return new Set(grants.map(grant=>grant.userId.toLowerCase())).size!==grants.length;
+}
 export type TemplateSharing={audience:TemplateAudience;grants:TemplateGrant[]};
 export type CreateTemplate = {
   audience?:TemplateAudience;
@@ -287,6 +291,7 @@ export function createTemplateCommands(input: {
           const member=await repo.loadMembership(client,body.campaignId,grant.userId);
           if(!isActiveMember(member)||member.role!=='player'||member.generation!==grant.generation) fail('bad_request','Choose current active players.');
         }
+        if(hasDuplicateTemplateGrants(grants as TemplateGrant[])) fail('bad_request','Invalid template recipient.');
         return {audience:audience as TemplateAudience,grants:grants as TemplateGrant[]};
       }
       let value: CampaignTemplateView;

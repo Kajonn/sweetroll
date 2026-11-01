@@ -507,4 +507,39 @@ db("restricted campaign template audiences", () => {
       await h.campaigns.exportCampaign(ctxFor(h.users.other), body),
     ).toMatchObject({ ok: false });
   });
+  it("rejects case-aliased duplicate UUID recipients without a write, while accepting one uppercase recipient", async () => {
+    const id = await setup();
+    const t = await create(id);
+    const path = `item-templates/${t.templateId}/sharing`;
+    const player = h.users.player.actorId;
+    const duplicate = await request(
+      id,
+      "gm",
+      "POST",
+      path,
+      sharing(t, "selected_players", [
+        { userId: player, generation: 1 },
+        { userId: player.toUpperCase(), generation: 1 },
+      ]),
+    );
+    expect(duplicate.statusCode, duplicate.body).toBe(400);
+    expect(
+      (await request(id, "gm", "GET", `item-templates/${t.templateId}`)).json()
+        .template,
+    ).toEqual(t);
+    const valid = await request(
+      id,
+      "gm",
+      "POST",
+      path,
+      sharing(t, "selected_players", [
+        { userId: player.toUpperCase(), generation: 1 },
+      ]),
+    );
+    expect(valid.statusCode, valid.body).toBe(200);
+    expect(valid.json().template.grants).toEqual([
+      { userId: player, generation: 1 },
+    ]);
+    expect((await page(id, "player")).templates).toHaveLength(1);
+  });
 });

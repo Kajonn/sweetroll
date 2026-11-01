@@ -1,6 +1,6 @@
 # Restricted campaign-template audiences — D2 execution plan
 
-**Status:** implemented in draft PR #27; CI and isolated hosted acceptance are in progress. D2 completion is not claimed.
+**Status:** implemented in PR #27; final CI #174 and both isolated hosted journeys pass. [Acceptance, screenshots, asset identity and cleanup](../../acceptance/restricted-template-audiences-2026-11-01.md). Wider G9 release gates remain open.
 **Baseline:** merged D1 main `90b053d`; C PR #25 and D1 PR #26 are merged.
 **Contract:** [D2 audiences, reveal and offline boundary](../specs/2026-10-31-restricted-template-audiences.md).
 **Goal:** prepare GM-only/selected-player catalog drafts, preview the actual player's
@@ -38,6 +38,18 @@ client-transition tests. Do not close gates from documents or retained old evide
 
 ## Execution record (2026-11-01)
 
+Final application `5f445aa` is pinned to successful deployment
+`f23a7773-3492-4917-851e-25f92071bf20`. CI #174 (`34309f9`, application-identical
+plus tests/docs) passes all seven jobs on its first attempt: 472 root, 350 real
+PostgreSQL, 1,180 frontend, 62 browser, 30 offline and ten visual checks, types,
+contracts, builds and Docker. Hosted Chromium normal/offline journeys pass in
+33.298/37.252 seconds, zero retries; six served assets match byte for byte. Cleanup
+readback verifies all seven run manifests. Campaign roll p95 is 143.6 ms against
+500 ms, with unchanged workload and limits. The detailed checkboxes below retain
+the implementation/verification recipe; this execution record and linked acceptance
+are the delivered evidence. Physical-device/provider-auth/playtest gates stay open.
+
+
 Implementation preserves the B/C/D1 Module seams, fresh schema baseline and independent
 character copies. The grant budget is bounded by 100 and the configured membership
 limit. Campaign catalog queries carry current actor/generation/role/read-mode scopes;
@@ -65,8 +77,9 @@ are inspected independently. No offline campaign navigation is introduced.
 Hosted resources are confined to new project `sweetroll-d2-acceptance`, environment
 `preview`; existing preview and production projects remain unchanged. First deployment
 failed private database connectivity across regions. The app is being colocated with
-the database volume; no egress/endpoint security settings were changed. Exact final
-CI/deployment, asset identity, hosted results and cleanup remain to be recorded.
+the database volume; no egress/endpoint security settings were changed. Final
+CI/deployment, asset identity, hosted results and independent cleanup are recorded in
+the linked acceptance report.
 
 ## D2.0 — Pin contract and fixtures
 

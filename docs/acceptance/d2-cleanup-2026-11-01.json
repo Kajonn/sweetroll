@@ -1,0 +1,88 @@
+{
+  "verifiedAt": "2026-11-01T07:54:03.609Z",
+  "runs": [
+    {
+      "campaignId": "b1a1f8e3-39f0-4a02-8e00-1d1178e14f65",
+      "systemId": "e268d4ef-bb5d-4123-a92a-01c20568ef90",
+      "characterId": "f0b4cece-d039-467c-a293-4ce31a966478",
+      "templateIds": [],
+      "campaignStatus": "archived",
+      "systemLifecycle": "archived",
+      "systemAccess": "private",
+      "characterLifecycle": "archived",
+      "templatesArchived": true
+    },
+    {
+      "campaignId": "9d92f292-1cb5-4da5-bb38-c0fc9315606e",
+      "systemId": "36c14695-eff3-412e-9b90-ffb047260779",
+      "characterId": "12eb7294-0686-4d3d-87b5-44801cfddcea",
+      "templateIds": [],
+      "campaignStatus": "archived",
+      "systemLifecycle": "archived",
+      "systemAccess": "private",
+      "characterLifecycle": "archived",
+      "templatesArchived": true
+    },
+    {
+      "campaignId": "dfd595de-0e2e-4ecd-831e-6b9adbea9566",
+      "systemId": "21e007d9-7325-4618-b2ed-82da61b48513",
+      "characterId": "31fd71bb-5c55-4e58-8ca4-6261064e9e55",
+      "templateIds": [],
+      "campaignStatus": "archived",
+      "systemLifecycle": "archived",
+      "systemAccess": "private",
+      "characterLifecycle": "archived",
+      "templatesArchived": true
+    },
+    {
+      "campaignId": "beccc888-2cb8-4488-ba30-00c63bceb80f",
+      "systemId": "a2f1b0a5-4aa4-4e79-824b-14bc47ebcba1",
+      "characterId": "f68509e9-f25d-4d98-a2d3-98e954a396fa",
+      "templateIds": [],
+      "campaignStatus": "archived",
+      "systemLifecycle": "archived",
+      "systemAccess": "private",
+      "characterLifecycle": "archived",
+      "templatesArchived": true
+    },
+    {
+      "campaignId": "5c6ab109-670e-499d-8561-bb64a0dc23e7",
+      "systemId": "ebd8474a-2241-4321-9199-2505077d1b69",
+      "characterId": "841d0b8a-4eb6-499a-93af-c909710da9ec",
+      "templateIds": [
+        "89d5ee3a-71c7-4908-9281-ba8870430d4c"
+      ],
+      "campaignStatus": "archived",
+      "systemLifecycle": "archived",
+      "systemAccess": "private",
+      "characterLifecycle": "archived",
+      "templatesArchived": true
+    },
+    {
+      "campaignId": "4caa7174-ae8e-4b89-9f5f-5647aa0d2a03",
+      "systemId": "143a4c26-44c8-41e5-9ba8-b1ac0571fc87",
+      "characterId": "7b15d7f9-1b67-4bcd-9911-d934cae72171",
+      "templateIds": [
+        "318877f3-9298-4624-9149-0b085641ebc7"
+      ],
+      "campaignStatus": "archived",
+      "systemLifecycle": "archived",
+      "systemAccess": "private",
+      "characterLifecycle": "archived",
+      "templatesArchived": true
+    },
+    {
+      "campaignId": "6ded368f-8415-47cd-b9d3-22ce44f1af66",
+      "systemId": "c8d1e12b-40e8-4f8e-8a71-dbfe0966bc8c",
+      "characterId": "1eeae763-08d0-470c-983b-921c630f5a6a",
+      "templateIds": [
+        "660c5ad0-82e1-4da6-985a-c8b9c3100375"
+      ],
+      "campaignStatus": "archived",
+      "systemLifecycle": "archived",
+      "systemAccess": "private",
+      "characterLifecycle": "archived",
+      "templatesArchived": true
+    }
+  ]
+}

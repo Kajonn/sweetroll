@@ -1,6 +1,6 @@
 # Restricted campaign-template audiences — adventure slice D2
 
-**Status:** implementation contract; no D2 application code or acceptance claim.
+**Status:** implemented in PR #27; CI #174 and isolated hosted acceptance pass. [Evidence and remaining G9 gates](../../acceptance/restricted-template-audiences-2026-11-01.md).
 **Baseline:** main `90b053d069a58a63a53724f068585da28c50ae8e`, merged D1 PR #26.
 **Authority:** design §§4.1, 5.4, 17.0, 17.9b; adventure-items roadmap slice D2.
 **Execution:** [D2 plan](../plans/2026-10-31-restricted-template-audiences.md).

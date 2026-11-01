@@ -6,6 +6,8 @@
 
 **Current pre-release scope (2026-10-31):** [design Section 17.0](../../../design_v2.md#170-release-status-and-application-version-policy) and AGENTS.md supersede historical upgrade/compatibility wording. Use the current schema and disposable test data. No application/database migration, character/campaign rules-version upgrade, instance conversion or old-client transition is an implementation/acceptance task before the first application release tag. Published rules and placed-copy revisions remain immutable; exact-request recovery remains required.
 
+**Next work (owner decision 2026-11-01):** C/D1/D2 feature delivery is followed by [multi-user journey remediation](2026-11-01-multi-user-journey-remediation.md), not a new feature. The [historical combined journey](../../acceptance/multi-user-journey-2026-11-01.md) found manual invitation failure, missing GUI adoption and UUID-only recipient labels. Fix F1–F3 and repeat the same [MU-00–MU-12 sequence](../../acceptance/multi-user-journey-protocol.md) with one GM, three players and 24 successful rolls without the historical GUI bypasses. This gate remains open.
+
 ## Goal and boundary
 
 Players and GMs can create items specific to a character or adventure without editing or publishing the underlying system. A campaign can offer reusable adventure items to its members. The same scoped mechanism should support spell, ability (stored kind `talent`), and effect entries where the system slot accepts the kind. The first release does not implement automatic conditions or stat modifications.

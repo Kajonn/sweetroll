@@ -1,0 +1,897 @@
+{
+  "recordType": "historical-exploratory-journey",
+  "date": "2026-11-01",
+  "overallResult": "qualified: F1 manual invitation acceptance failed; F2 API adoption workaround; F3 UUID recipient labels",
+  "fixStatus": {
+    "F1": "OPEN",
+    "F2": "OPEN",
+    "F3": "OPEN",
+    "E1": "OPEN at historical preflight; existing application-identical preview used"
+  },
+  "baseline": {
+    "main": "af2b076dfd44460501fed8002990f92f4b373efb",
+    "testedApplication": "78dad8c9620ce700ffe9f6b8c55225e237b11d90",
+    "differenceFromMain": [
+      "docs/acceptance/d2-uuid-case-2026-11-01.json",
+      "docs/acceptance/restricted-template-audiences-2026-11-01.md"
+    ],
+    "deploymentId": "fc6d8088-68f9-42ef-9768-2f3677e4f2e8",
+    "deploymentStatus": "SUCCESS",
+    "url": "https://sweetroll-d2-preview.up.railway.app"
+  },
+  "intendedTarget": {
+    "service": "sweetroll-acceptance",
+    "deploymentId": "93bcdd8f-efd1-4628-bbfa-c0dc8625f3cb",
+    "commit": "af2b076dfd44460501fed8002990f92f4b373efb",
+    "healthReadyStatus": 200,
+    "authMode": "locked"
+  },
+  "fixtures": {
+    "actors": "one GM/owner plus three players, separate browser contexts; test-only fixture sign-in",
+    "stamp": "mvyc3939",
+    "gmId": "dafd0175-8d2c-4123-b8bb-f857b7844b3e",
+    "characters": [
+      {
+        "id": "3e639775-7a1d-4bbb-b0a9-373e3d1cdf30",
+        "name": "Aldric the fighter mvyc3939",
+        "userId": "6d803bc0-21ab-48d1-9457-4e9ac3030534",
+        "adopted": true,
+        "entryCount": 6
+      },
+      {
+        "id": "c102678a-df7f-48ca-843c-1529947ab4a8",
+        "name": "Bryn the mage mvyc3939",
+        "userId": "c115d74b-058a-4135-9f22-ab27f8f42783",
+        "adopted": true,
+        "entryCount": 6
+      },
+      {
+        "id": "6131cdf7-991f-4afb-94a5-3fe1a339bf82",
+        "name": "Cora the scout mvyc3939",
+        "userId": "e0e2a372-b9fb-400c-8ec6-62222068e570",
+        "adopted": true,
+        "entryCount": 6
+      }
+    ],
+    "viewports": [
+      {
+        "actor": "GM",
+        "width": 1280,
+        "height": 900
+      },
+      {
+        "actor": "P1",
+        "width": 360,
+        "height": 900
+      },
+      {
+        "actor": "P2",
+        "width": 768,
+        "height": 900
+      },
+      {
+        "actor": "P3",
+        "width": 1280,
+        "height": 900
+      }
+    ],
+    "systemId": "caf28878-25fa-4351-9ccc-9a864fa336c6",
+    "versionId": "961e9666-a1f7-4451-8926-82d76abd67dc",
+    "campaignId": "8525d1d8-086f-4803-9819-cae6db31dbad",
+    "systemTemplates": [
+      {
+        "id": "template_1",
+        "label": "Longsword",
+        "kind": "item"
+      },
+      {
+        "id": "template_2",
+        "label": "Firebolt",
+        "kind": "spell"
+      },
+      {
+        "id": "template_3",
+        "label": "Rope",
+        "kind": "item"
+      }
+    ],
+    "campaignTemplatesAtCreation": [
+      {
+        "id": "5db7760f-484c-45d3-836d-610315f3fe4c",
+        "name": "Ashguard blade",
+        "kind": "item",
+        "audience": "all_players"
+      },
+      {
+        "id": "e9d973ad-b954-4018-ac61-e66e682b6d3f",
+        "name": "Ember spell",
+        "kind": "spell",
+        "audience": "all_players"
+      },
+      {
+        "id": "c862e6a3-7d6f-4112-b5ed-19909b80b4c9",
+        "name": "Caravan supplies",
+        "kind": "item",
+        "audience": "all_players"
+      },
+      {
+        "id": "9e1a881a-2edf-4a78-b0f1-d92cf80f5751",
+        "name": "Secret vault key",
+        "kind": "item",
+        "audience": "gm_only"
+      }
+    ],
+    "slots": [
+      {
+        "id": "slot_1",
+        "label": "Equipment",
+        "accept": "item"
+      },
+      {
+        "id": "slot_2",
+        "label": "Spells",
+        "accept": "spell"
+      }
+    ]
+  },
+  "observedCounters": {
+    "initialEntries": 18,
+    "initialEntriesPerCharacter": 6,
+    "initialSuccessfulRolls": 18,
+    "concurrentSuccessfulRolls": 6,
+    "totalSuccessfulRolls": 24,
+    "manualInvitationFailures": 3,
+    "pageErrors": 0
+  },
+  "initialRollChecks": [
+    {
+      "phase": "equip",
+      "label": "Player 1 executed Longsword / Sword attack",
+      "at": "2026-11-01T21:30:15.573Z",
+      "total": 18,
+      "bonus": 2,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 executed Longsword / Sword damage",
+      "at": "2026-11-01T21:30:16.024Z",
+      "total": 10,
+      "bonus": 2,
+      "sides": 8
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 executed Firebolt / Cast Firebolt",
+      "at": "2026-11-01T21:30:16.271Z",
+      "total": 10,
+      "bonus": 4,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 executed Firebolt / Firebolt damage",
+      "at": "2026-11-01T21:30:16.524Z",
+      "total": 9,
+      "bonus": 4,
+      "sides": 6
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 executed Ashguard blade / Sword attack",
+      "at": "2026-11-01T21:30:16.801Z",
+      "total": 8,
+      "bonus": 2,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 executed Ember spell / Cast Firebolt",
+      "at": "2026-11-01T21:30:17.071Z",
+      "total": 24,
+      "bonus": 4,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 executed Longsword / Sword attack",
+      "at": "2026-11-01T21:31:10.944Z",
+      "total": 12,
+      "bonus": 3,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 executed Longsword / Sword damage",
+      "at": "2026-11-01T21:31:11.515Z",
+      "total": 9,
+      "bonus": 3,
+      "sides": 8
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 executed Firebolt / Cast Firebolt",
+      "at": "2026-11-01T21:31:11.763Z",
+      "total": 4,
+      "bonus": 3,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 executed Firebolt / Firebolt damage",
+      "at": "2026-11-01T21:31:12.018Z",
+      "total": 4,
+      "bonus": 3,
+      "sides": 6
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 executed Ashguard blade / Sword attack",
+      "at": "2026-11-01T21:31:12.266Z",
+      "total": 4,
+      "bonus": 3,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 executed Ember spell / Cast Firebolt",
+      "at": "2026-11-01T21:31:12.515Z",
+      "total": 12,
+      "bonus": 3,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 executed Longsword / Sword attack",
+      "at": "2026-11-01T21:32:03.270Z",
+      "total": 13,
+      "bonus": 4,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 executed Longsword / Sword damage",
+      "at": "2026-11-01T21:32:03.826Z",
+      "total": 6,
+      "bonus": 4,
+      "sides": 8
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 executed Firebolt / Cast Firebolt",
+      "at": "2026-11-01T21:32:04.078Z",
+      "total": 16,
+      "bonus": 2,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 executed Firebolt / Firebolt damage",
+      "at": "2026-11-01T21:32:04.354Z",
+      "total": 3,
+      "bonus": 2,
+      "sides": 6
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 executed Ashguard blade / Sword attack",
+      "at": "2026-11-01T21:32:04.605Z",
+      "total": 20,
+      "bonus": 4,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 executed Ember spell / Cast Firebolt",
+      "at": "2026-11-01T21:32:04.888Z",
+      "total": 18,
+      "bonus": 2,
+      "sides": 20
+    }
+  ],
+  "concurrentRollChecks": [
+    {
+      "player": 2,
+      "action": "Sword attack",
+      "roll": {
+        "actionId": "action_1",
+        "expression": "d20 + fields.field",
+        "dice": [
+          {
+            "sides": 20,
+            "value": 8,
+            "kept": true
+          }
+        ],
+        "bindings": [
+          {
+            "scope": "fields",
+            "definitionId": "field",
+            "value": 3
+          }
+        ],
+        "total": 11,
+        "output": "Result: 11",
+        "audience": "campaign"
+      }
+    },
+    {
+      "player": 3,
+      "action": "Sword attack",
+      "roll": {
+        "actionId": "action_1",
+        "expression": "d20 + fields.field",
+        "dice": [
+          {
+            "sides": 20,
+            "value": 18,
+            "kept": true
+          }
+        ],
+        "bindings": [
+          {
+            "scope": "fields",
+            "definitionId": "field",
+            "value": 4
+          }
+        ],
+        "total": 22,
+        "output": "Result: 22",
+        "audience": "campaign"
+      }
+    },
+    {
+      "player": 1,
+      "action": "Sword attack",
+      "roll": {
+        "actionId": "action_1",
+        "expression": "d20 + fields.field",
+        "dice": [
+          {
+            "sides": 20,
+            "value": 5,
+            "kept": true
+          }
+        ],
+        "bindings": [
+          {
+            "scope": "fields",
+            "definitionId": "field",
+            "value": 2
+          }
+        ],
+        "total": 7,
+        "output": "Result: 7",
+        "audience": "campaign"
+      }
+    },
+    {
+      "player": 2,
+      "action": "Cast Firebolt",
+      "roll": {
+        "actionId": "action_3",
+        "expression": "d20 + fields.field_2",
+        "dice": [
+          {
+            "sides": 20,
+            "value": 7,
+            "kept": true
+          }
+        ],
+        "bindings": [
+          {
+            "scope": "fields",
+            "definitionId": "field_2",
+            "value": 3
+          }
+        ],
+        "total": 10,
+        "output": "Result: 10",
+        "audience": "campaign"
+      }
+    },
+    {
+      "player": 3,
+      "action": "Cast Firebolt",
+      "roll": {
+        "actionId": "action_3",
+        "expression": "d20 + fields.field_2",
+        "dice": [
+          {
+            "sides": 20,
+            "value": 15,
+            "kept": true
+          }
+        ],
+        "bindings": [
+          {
+            "scope": "fields",
+            "definitionId": "field_2",
+            "value": 2
+          }
+        ],
+        "total": 17,
+        "output": "Result: 17",
+        "audience": "campaign"
+      }
+    },
+    {
+      "player": 1,
+      "action": "Cast Firebolt",
+      "roll": {
+        "actionId": "action_3",
+        "expression": "d20 + fields.field_2",
+        "dice": [
+          {
+            "sides": 20,
+            "value": 9,
+            "kept": true
+          }
+        ],
+        "bindings": [
+          {
+            "scope": "fields",
+            "definitionId": "field_2",
+            "value": 4
+          }
+        ],
+        "total": 13,
+        "output": "Result: 13",
+        "audience": "campaign"
+      }
+    }
+  ],
+  "historicalCheckpoints": [
+    {
+      "phase": "system",
+      "label": "Blank system and three attributes authored in GUI",
+      "at": "2026-11-01T21:21:01.037Z"
+    },
+    {
+      "phase": "system-finish",
+      "label": "Published GUI-built system with weapon, spell, equipment and compatible sheet slots",
+      "at": "2026-11-01T21:21:47.007Z",
+      "versionId": "961e9666-a1f7-4451-8926-82d76abd67dc"
+    },
+    {
+      "phase": "campaign",
+      "label": "Campaign/adventure created with public briefing and GM-only secret through GUI",
+      "at": "2026-11-01T21:24:54.245Z"
+    },
+    {
+      "phase": "campaign",
+      "label": "Campaign/adventure created with public briefing and GM-only secret through GUI",
+      "at": "2026-11-01T21:26:01.920Z"
+    },
+    {
+      "phase": "campaign",
+      "label": "Player 1 joined through invitation GUI; secret/settings absent",
+      "at": "2026-11-01T21:26:26.886Z"
+    },
+    {
+      "phase": "campaign",
+      "label": "Player 2 joined through invitation GUI; secret/settings absent",
+      "at": "2026-11-01T21:26:52.180Z"
+    },
+    {
+      "phase": "campaign",
+      "label": "Player 3 joined through invitation GUI; secret/settings absent",
+      "at": "2026-11-01T21:27:17.317Z"
+    },
+    {
+      "phase": "players",
+      "label": "Player 1 created own character through GUI",
+      "at": "2026-11-01T21:27:56.751Z",
+      "characterId": "3e639775-7a1d-4bbb-b0a9-373e3d1cdf30"
+    },
+    {
+      "phase": "players",
+      "label": "Player 2 created own character through GUI",
+      "at": "2026-11-01T21:28:20.718Z",
+      "characterId": "c102678a-df7f-48ca-843c-1529947ab4a8"
+    },
+    {
+      "phase": "players",
+      "label": "Player 3 created own character through GUI",
+      "at": "2026-11-01T21:28:33.466Z",
+      "characterId": "6131cdf7-991f-4afb-94a5-3fe1a339bf82"
+    },
+    {
+      "phase": "items",
+      "label": "GM created campaign Ashguard blade through GUI",
+      "at": "2026-11-01T21:29:08.269Z"
+    },
+    {
+      "phase": "items",
+      "label": "GM created campaign Ember spell through GUI",
+      "at": "2026-11-01T21:29:09.290Z"
+    },
+    {
+      "phase": "items",
+      "label": "GM created campaign Caravan supplies through GUI",
+      "at": "2026-11-01T21:29:09.827Z"
+    },
+    {
+      "phase": "items",
+      "label": "GM created campaign Secret vault key through GUI",
+      "at": "2026-11-01T21:29:10.343Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 placed Longsword through GUI",
+      "at": "2026-11-01T21:29:50.191Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 placed Firebolt through GUI",
+      "at": "2026-11-01T21:29:54.389Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 placed Ashguard blade through GUI",
+      "at": "2026-11-01T21:29:59.247Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 placed Ember spell through GUI",
+      "at": "2026-11-01T21:30:03.496Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 placed Caravan supplies through GUI",
+      "at": "2026-11-01T21:30:08.894Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 executed Longsword / Sword attack",
+      "at": "2026-11-01T21:30:15.573Z",
+      "total": 18,
+      "bonus": 2,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 executed Longsword / Sword damage",
+      "at": "2026-11-01T21:30:16.024Z",
+      "total": 10,
+      "bonus": 2,
+      "sides": 8
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 executed Firebolt / Cast Firebolt",
+      "at": "2026-11-01T21:30:16.271Z",
+      "total": 10,
+      "bonus": 4,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 executed Firebolt / Firebolt damage",
+      "at": "2026-11-01T21:30:16.524Z",
+      "total": 9,
+      "bonus": 4,
+      "sides": 6
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 executed Ashguard blade / Sword attack",
+      "at": "2026-11-01T21:30:16.801Z",
+      "total": 8,
+      "bonus": 2,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 executed Ember spell / Cast Firebolt",
+      "at": "2026-11-01T21:30:17.071Z",
+      "total": 24,
+      "bonus": 4,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 1 saved/reloaded six independent entries without horizontal overflow",
+      "at": "2026-11-01T21:30:17.620Z",
+      "width": 360
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 placed Longsword through GUI",
+      "at": "2026-11-01T21:30:43.875Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 placed Firebolt through GUI",
+      "at": "2026-11-01T21:30:48.557Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 placed Ashguard blade through GUI",
+      "at": "2026-11-01T21:30:53.349Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 placed Ember spell through GUI",
+      "at": "2026-11-01T21:30:58.398Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 placed Caravan supplies through GUI",
+      "at": "2026-11-01T21:31:04.019Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 executed Longsword / Sword attack",
+      "at": "2026-11-01T21:31:10.944Z",
+      "total": 12,
+      "bonus": 3,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 executed Longsword / Sword damage",
+      "at": "2026-11-01T21:31:11.515Z",
+      "total": 9,
+      "bonus": 3,
+      "sides": 8
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 executed Firebolt / Cast Firebolt",
+      "at": "2026-11-01T21:31:11.763Z",
+      "total": 4,
+      "bonus": 3,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 executed Firebolt / Firebolt damage",
+      "at": "2026-11-01T21:31:12.018Z",
+      "total": 4,
+      "bonus": 3,
+      "sides": 6
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 executed Ashguard blade / Sword attack",
+      "at": "2026-11-01T21:31:12.266Z",
+      "total": 4,
+      "bonus": 3,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 executed Ember spell / Cast Firebolt",
+      "at": "2026-11-01T21:31:12.515Z",
+      "total": 12,
+      "bonus": 3,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 2 saved/reloaded six independent entries without horizontal overflow",
+      "at": "2026-11-01T21:31:13.107Z",
+      "width": 768
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 placed Longsword through GUI",
+      "at": "2026-11-01T21:31:34.036Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 placed Firebolt through GUI",
+      "at": "2026-11-01T21:31:38.945Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 placed Ashguard blade through GUI",
+      "at": "2026-11-01T21:31:44.161Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 placed Ember spell through GUI",
+      "at": "2026-11-01T21:31:49.103Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 placed Caravan supplies through GUI",
+      "at": "2026-11-01T21:31:56.231Z"
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 executed Longsword / Sword attack",
+      "at": "2026-11-01T21:32:03.270Z",
+      "total": 13,
+      "bonus": 4,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 executed Longsword / Sword damage",
+      "at": "2026-11-01T21:32:03.826Z",
+      "total": 6,
+      "bonus": 4,
+      "sides": 8
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 executed Firebolt / Cast Firebolt",
+      "at": "2026-11-01T21:32:04.078Z",
+      "total": 16,
+      "bonus": 2,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 executed Firebolt / Firebolt damage",
+      "at": "2026-11-01T21:32:04.354Z",
+      "total": 3,
+      "bonus": 2,
+      "sides": 6
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 executed Ashguard blade / Sword attack",
+      "at": "2026-11-01T21:32:04.605Z",
+      "total": 20,
+      "bonus": 4,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 executed Ember spell / Cast Firebolt",
+      "at": "2026-11-01T21:32:04.888Z",
+      "total": 18,
+      "bonus": 2,
+      "sides": 20
+    },
+    {
+      "phase": "equip",
+      "label": "Player 3 saved/reloaded six independent entries without horizontal overflow",
+      "at": "2026-11-01T21:32:05.593Z",
+      "width": 1280
+    },
+    {
+      "phase": "permissions",
+      "label": "Player 1 cannot open another player sheet, secret template or manage campaign templates",
+      "at": "2026-11-01T21:33:31.950Z"
+    },
+    {
+      "phase": "permissions",
+      "label": "Player 2 cannot open another player sheet, secret template or manage campaign templates",
+      "at": "2026-11-01T21:33:56.056Z"
+    },
+    {
+      "phase": "permissions",
+      "label": "Player 3 cannot open another player sheet, secret template or manage campaign templates",
+      "at": "2026-11-01T21:34:45.574Z"
+    },
+    {
+      "phase": "permissions",
+      "label": "GM can open all three campaign character sheets",
+      "at": "2026-11-01T21:34:53.140Z"
+    },
+    {
+      "phase": "scope",
+      "label": "Concurrent Sword attack from player 2 succeeds with exact dice + attribute in its own session",
+      "at": "2026-11-01T21:38:02.565Z",
+      "total": 11,
+      "bonus": 3,
+      "sides": 20
+    },
+    {
+      "phase": "scope",
+      "label": "Concurrent Sword attack from player 3 succeeds with exact dice + attribute in its own session",
+      "at": "2026-11-01T21:38:02.588Z",
+      "total": 22,
+      "bonus": 4,
+      "sides": 20
+    },
+    {
+      "phase": "scope",
+      "label": "Concurrent Sword attack from player 1 succeeds with exact dice + attribute in its own session",
+      "at": "2026-11-01T21:38:02.598Z",
+      "total": 7,
+      "bonus": 2,
+      "sides": 20
+    },
+    {
+      "phase": "scope",
+      "label": "Concurrent Cast Firebolt from player 2 succeeds with exact dice + attribute in its own session",
+      "at": "2026-11-01T21:38:03.031Z",
+      "total": 10,
+      "bonus": 3,
+      "sides": 20
+    },
+    {
+      "phase": "scope",
+      "label": "Concurrent Cast Firebolt from player 3 succeeds with exact dice + attribute in its own session",
+      "at": "2026-11-01T21:38:03.074Z",
+      "total": 17,
+      "bonus": 2,
+      "sides": 20
+    },
+    {
+      "phase": "scope",
+      "label": "Concurrent Cast Firebolt from player 1 succeeds with exact dice + attribute in its own session",
+      "at": "2026-11-01T21:38:03.153Z",
+      "total": 13,
+      "bonus": 4,
+      "sides": 20
+    },
+    {
+      "phase": "scope",
+      "label": "Selected-player privacy, actual-player preview, blocked placement, explicit reveal and independent existing copy all pass",
+      "at": "2026-11-01T21:38:34.512Z"
+    },
+    {
+      "phase": "offline",
+      "label": "Offline custom equipment survives reload and syncs exactly once",
+      "at": "2026-11-01T21:39:13.278Z"
+    },
+    {
+      "phase": "independence",
+      "label": "Editing one player equipment quantity leaves another player copy and campaign template unchanged",
+      "at": "2026-11-01T21:40:10.376Z"
+    },
+    {
+      "phase": "cleanup",
+      "label": "Only run-created resources archived with independent readback; no deletion",
+      "at": "2026-11-01T21:43:03.170Z"
+    }
+  ],
+  "checkpointNote": "Chronological observations include resumed exploratory phases; these are not 64 independent test cases or a canonical-suite pass count.",
+  "exceptions": [
+    "All three manual invitation accepts failed with HTTP 400; pending invitations accepted through the URL to continue.",
+    "P1 personal-character adoption used the existing API.",
+    "F3 recipient targeting used synthetic user IDs.",
+    "Scratch harness selector/save-wait and ordinary-roll versus push-read mistakes were corrected; they are not product defects."
+  ],
+  "cleanup": {
+    "characters": [
+      {
+        "id": "3e639775-7a1d-4bbb-b0a9-373e3d1cdf30",
+        "lifecycle": "archived"
+      },
+      {
+        "id": "c102678a-df7f-48ca-843c-1529947ab4a8",
+        "lifecycle": "archived"
+      },
+      {
+        "id": "6131cdf7-991f-4afb-94a5-3fe1a339bf82",
+        "lifecycle": "archived"
+      }
+    ],
+    "templates": [
+      {
+        "id": "5db7760f-484c-45d3-836d-610315f3fe4c",
+        "status": "archived"
+      },
+      {
+        "id": "e9d973ad-b954-4018-ac61-e66e682b6d3f",
+        "status": "archived"
+      },
+      {
+        "id": "c862e6a3-7d6f-4112-b5ed-19909b80b4c9",
+        "status": "archived"
+      },
+      {
+        "id": "9e1a881a-2edf-4a78-b0f1-d92cf80f5751",
+        "status": "archived"
+      }
+    ],
+    "campaign": "archived",
+    "system": "archived",
+    "systemAccess": "private"
+  },
+  "protocol": "multi-user-journey-protocol.md",
+  "limitations": [
+    "No provider-auth acceptance",
+    "No physical Android/iPad checks",
+    "No real table or remote playtest",
+    "No new post-fix execution claimed",
+    "No complete CI rerun as part of this exploratory journey"
+  ]
+}

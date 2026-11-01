@@ -8,6 +8,13 @@ Update design document if any changes is made to the design.
 
 The GUI delivery checklist is [GUI integration plan](docs/superpowers/plans/2026-09-08-gui-integration.md), linked from design Sections 10 and 17. Follow its dependencies and acceptance gates for frontend work.
 
+Current owner priority (2026-11-01): the next work is the
+[multi-user journey remediation](docs/superpowers/plans/2026-11-01-multi-user-journey-remediation.md).
+Fix F1-F3 with observed red-green tests, then pass the same ordered
+[one-GM/three-player protocol](docs/acceptance/multi-user-journey-protocol.md)
+on the deployed fixed commit. Historical invitation-link/API-adoption workarounds
+do not pass this gate. Do not start a new feature until fixes and this rerun pass.
+
 The app is unreleased and databases contain only disposable test data. Follow the
 [development database policy](database/README.md): update the current schema
 baseline instead of adding migrations or repair code for obsolete app versions.

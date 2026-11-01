@@ -13,6 +13,7 @@ const template: CampaignTemplate = {
   creatorId: "gm",
   kind: "item",
   audience: "all_players",
+  grants: [],
   status: "active",
   revision: 1,
   contentRevision: 1,
@@ -25,6 +26,7 @@ function setup(isGm = true) {
     defaultOptions: { queries: { retry: false } },
   });
   const api: CampaignTemplatesApi = {
+    share:vi.fn(),preview:vi.fn(),
     bases:vi.fn().mockResolvedValue({templates:[]}),
     list: vi
       .fn()
@@ -136,6 +138,7 @@ it("discards a delayed catalog response after switching accounts", async () => {
     },
   );
   const api: CampaignTemplatesApi = {
+    share:vi.fn(),preview:vi.fn(),
     bases:vi.fn().mockResolvedValue({templates:[]}),
     list: vi
       .fn()
@@ -168,18 +171,7 @@ it("discards a delayed catalog response after switching accounts", async () => {
   ui.rerender(component("second", 2));
   await screen.findByText("Second account");
   resolveOld({ templates: [template], nextCursor: null });
-  await waitFor(() =>
-    expect(
-      client.getQueryState([
-        "campaigns",
-        "templates",
-        "campaign",
-        "first",
-        1,
-        "active",
-      ])?.fetchStatus,
-    ).toBe("idle"),
-  );
+  await waitFor(()=>expect(client.getQueryCache().findAll({queryKey:['campaigns','templates','campaign','first',1]})).toHaveLength(0));
   expect(
     client.getQueryData([
       "campaigns",
@@ -204,4 +196,13 @@ it("derives a template using labeled base choices and typed defaults without exe
  const name=screen.getByRole("textbox",{name:"Name"});await user.clear(name);await user.type(name,"Captain's sword");
  await user.click(screen.getByRole("button",{name:"Publish to all members"}));
  await waitFor(()=>expect(api.create).toHaveBeenCalledWith("campaign",expect.objectContaining({baseTemplateId:"sword",content:expect.objectContaining({name:"Captain's sword",defaultValues:{damage_bonus:4}})})));
+});
+
+it('purges private catalog data immediately on offline entry and role demotion',async()=>{
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ const secret={...template,audience:'gm_only' as const,content:{name:'Secret preparation'}};
+ const api:CampaignTemplatesApi={bases:vi.fn().mockResolvedValue({templates:[]}),list:vi.fn().mockResolvedValue({templates:[secret],nextCursor:null}),share:vi.fn(),preview:vi.fn(),create:vi.fn(),edit:vi.fn(),archive:vi.fn(),recover:vi.fn()};
+ const component=(online:boolean,isGm:boolean)=><QueryClientProvider client={client}><CampaignTemplates api={api} campaignId="campaign" actorId="gm" generation={1} isGm={isGm} online={online} readOnly={false} onAccessRevoked={vi.fn()}/></QueryClientProvider>;
+ const ui=render(component(true,true));await screen.findByText('Secret preparation');ui.rerender(component(false,true));expect(screen.queryByText('Secret preparation')).toBeNull();await waitFor(()=>expect(client.getQueryCache().findAll({queryKey:['campaigns','templates','campaign','gm',1]}).every(q=>q.state.data===undefined)).toBe(true));
+ vi.mocked(api.list).mockResolvedValue({templates:[],nextCursor:null});ui.rerender(component(true,false));expect(screen.queryByText('Secret preparation')).toBeNull();await waitFor(()=>expect(api.list).toHaveBeenCalledTimes(2));
 });

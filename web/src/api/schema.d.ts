@@ -516,6 +516,38 @@ export interface paths {
         patch: operations["patch_campaigns_id_item_templates_templateId"];
         trace?: never;
     };
+    "/campaigns/{id}/item-templates/{templateId}/sharing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_campaigns_id_item_templates_templateId_sharing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/item-template-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_campaigns_id_item_template_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/campaigns/{id}/item-templates/{templateId}/archive": {
         parameters: {
             query?: never;
@@ -11924,8 +11956,12 @@ export interface operations {
                             campaignId: string;
                             creatorId: string;
                             kind: "item" | "spell" | "talent" | "effect";
-                            /** @constant */
-                            audience: "all_players";
+                            audience: "all_players" | "gm_only" | "selected_players";
+                            grants: {
+                                /** Format: uuid */
+                                userId: string;
+                                generation: number;
+                            }[];
                             status: "active" | "archived";
                             revision: number;
                             contentRevision: number;
@@ -12067,6 +12103,12 @@ export interface operations {
                     expectedTemplateRevision: 0;
                     idempotencyKey: string;
                     kind: "item" | "spell" | "talent" | "effect";
+                    audience?: "all_players" | "gm_only" | "selected_players";
+                    grants?: {
+                        /** Format: uuid */
+                        userId: string;
+                        generation: number;
+                    }[];
                     baseTemplateId?: string;
                     content: {
                         defaultValues?: {
@@ -12092,8 +12134,12 @@ export interface operations {
                             campaignId: string;
                             creatorId: string;
                             kind: "item" | "spell" | "talent" | "effect";
-                            /** @constant */
-                            audience: "all_players";
+                            audience: "all_players" | "gm_only" | "selected_players";
+                            grants: {
+                                /** Format: uuid */
+                                userId: string;
+                                generation: number;
+                            }[];
                             status: "active" | "archived";
                             revision: number;
                             contentRevision: number;
@@ -12241,8 +12287,12 @@ export interface operations {
                             campaignId: string;
                             creatorId: string;
                             kind: "item" | "spell" | "talent" | "effect";
-                            /** @constant */
-                            audience: "all_players";
+                            audience: "all_players" | "gm_only" | "selected_players";
+                            grants: {
+                                /** Format: uuid */
+                                userId: string;
+                                generation: number;
+                            }[];
                             status: "active" | "archived";
                             revision: number;
                             contentRevision: number;
@@ -12406,8 +12456,12 @@ export interface operations {
                             campaignId: string;
                             creatorId: string;
                             kind: "item" | "spell" | "talent" | "effect";
-                            /** @constant */
-                            audience: "all_players";
+                            audience: "all_players" | "gm_only" | "selected_players";
+                            grants: {
+                                /** Format: uuid */
+                                userId: string;
+                                generation: number;
+                            }[];
                             status: "active" | "archived";
                             revision: number;
                             contentRevision: number;
@@ -12428,6 +12482,334 @@ export interface operations {
                             createdAt: string;
                             updatedAt: string;
                         };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_campaigns_id_item_templates_templateId_sharing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                templateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    expectedTemplateRevision: number;
+                    idempotencyKey: string;
+                    audience: "all_players" | "gm_only" | "selected_players";
+                    grants: {
+                        /** Format: uuid */
+                        userId: string;
+                        generation: number;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        template: {
+                            templateId: string;
+                            campaignId: string;
+                            creatorId: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            audience: "all_players" | "gm_only" | "selected_players";
+                            grants: {
+                                /** Format: uuid */
+                                userId: string;
+                                generation: number;
+                            }[];
+                            status: "active" | "archived";
+                            revision: number;
+                            contentRevision: number;
+                            content: {
+                                defaultValues?: {
+                                    [key: string]: unknown;
+                                };
+                                name: string;
+                                description?: string;
+                                notes?: string;
+                                defaultQuantity?: number;
+                                base?: {
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    templateId: string;
+                                };
+                            };
+                            createdAt: string;
+                            updatedAt: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_campaigns_id_item_template_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    targetUserId: string;
+                    limit?: number;
+                    cursor?: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        templates: {
+                            templateId: string;
+                            campaignId: string;
+                            creatorId: string;
+                            kind: "item" | "spell" | "talent" | "effect";
+                            audience: "all_players" | "gm_only" | "selected_players";
+                            grants: {
+                                /** Format: uuid */
+                                userId: string;
+                                generation: number;
+                            }[];
+                            status: "active" | "archived";
+                            revision: number;
+                            contentRevision: number;
+                            content: {
+                                defaultValues?: {
+                                    [key: string]: unknown;
+                                };
+                                name: string;
+                                description?: string;
+                                notes?: string;
+                                defaultQuantity?: number;
+                                base?: {
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    templateId: string;
+                                };
+                            };
+                            createdAt: string;
+                            updatedAt: string;
+                        }[];
+                        nextCursor: string | null;
                         requestId: string;
                     };
                 };
@@ -12562,8 +12944,12 @@ export interface operations {
                             campaignId: string;
                             creatorId: string;
                             kind: "item" | "spell" | "talent" | "effect";
-                            /** @constant */
-                            audience: "all_players";
+                            audience: "all_players" | "gm_only" | "selected_players";
+                            grants: {
+                                /** Format: uuid */
+                                userId: string;
+                                generation: number;
+                            }[];
                             status: "active" | "archived";
                             revision: number;
                             contentRevision: number;
@@ -12718,8 +13104,12 @@ export interface operations {
                             campaignId: string;
                             creatorId: string;
                             kind: "item" | "spell" | "talent" | "effect";
-                            /** @constant */
-                            audience: "all_players";
+                            audience: "all_players" | "gm_only" | "selected_players";
+                            grants: {
+                                /** Format: uuid */
+                                userId: string;
+                                generation: number;
+                            }[];
                             status: "active" | "archived";
                             revision: number;
                             contentRevision: number;
@@ -13363,8 +13753,12 @@ export interface operations {
                             campaignId: string;
                             creatorId: string;
                             kind: "item" | "spell" | "talent" | "effect";
-                            /** @constant */
-                            audience: "all_players";
+                            audience: "all_players" | "gm_only" | "selected_players";
+                            grants: {
+                                /** Format: uuid */
+                                userId: string;
+                                generation: number;
+                            }[];
                             status: "active" | "archived";
                             revision: number;
                             contentRevision: number;
@@ -19168,8 +19562,12 @@ export interface operations {
                                 campaignId: string;
                                 creatorId: string;
                                 kind: "item" | "spell" | "talent" | "effect";
-                                /** @constant */
-                                audience: "all_players";
+                                audience: "all_players" | "gm_only" | "selected_players";
+                                grants: {
+                                    /** Format: uuid */
+                                    userId: string;
+                                    generation: number;
+                                }[];
                                 status: "active" | "archived";
                                 revision: number;
                                 contentRevision: number;

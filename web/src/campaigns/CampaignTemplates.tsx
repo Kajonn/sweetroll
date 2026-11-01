@@ -1,3 +1,4 @@
+import {AudienceFields,TemplateSharing,type SharingMember} from "./TemplateSharing.js";
 import { TypedEntryFields } from "../characters/TypedEntryFields.js";
 import { campaignDetailKey } from "./campaignQueries.js";
 import { t } from "../i18n/index.js";
@@ -30,7 +31,9 @@ function status(error: unknown): number | undefined {
     ? Number(error.status)
     : undefined;
 }
-export function CampaignTemplates(props: {
+type Props = {
+  members?:SharingMember[];
+  loadMoreMembers?:(()=>void)|undefined;
   api: CampaignTemplatesApi;
   campaignId: string;
   actorId: string;
@@ -39,8 +42,15 @@ export function CampaignTemplates(props: {
   online: boolean;
   readOnly: boolean;
   onAccessRevoked: () => void;
-}) {
+};
+export function CampaignTemplates(props:Props) {
+ return <CampaignTemplateScope key={JSON.stringify([props.actorId,props.campaignId,props.generation,props.isGm,props.online])} {...props}/>;
+}
+function CampaignTemplateScope(props:Props) {
   const client = useQueryClient();
+  const [previewTarget,setPreviewTarget]=useState('');
+  const [audience,setAudience]=useState<CampaignTemplate['audience']>('all_players');
+  const [grants,setGrants]=useState<SharingMember[]>([]);
   const [archived, setArchived] = useState(false);
   const listStatus = archived && props.isGm ? "archived" : "active";
   const key = [
@@ -49,11 +59,14 @@ export function CampaignTemplates(props: {
     props.campaignId,
     props.actorId,
     props.generation,
+    props.isGm,
+    props.online,
+    previewTarget,
     listStatus,
   ];
   const lifetime = useMemo(
     () => ({ active: true }),
-    [props.campaignId, props.actorId, props.generation, props.isGm],
+    [props.campaignId, props.actorId, props.generation, props.isGm,previewTarget],
   );
   const [editing, setEditing] = useState<CampaignTemplate | null>(null);
   const [open, setOpen] = useState(false);
@@ -101,7 +114,7 @@ export function CampaignTemplates(props: {
     initialPageParam: null as string | null,
     enabled: props.online,
     queryFn: async ({ pageParam, signal }) => {
-      const page = await props.api.list(props.campaignId, {
+      const page = previewTarget ? await props.api.preview(props.campaignId,{targetUserId:previewTarget,...(pageParam?{cursor:pageParam}:{})}) : await props.api.list(props.campaignId, {
         status: listStatus,
         cursor: pageParam,
       });
@@ -116,8 +129,10 @@ export function CampaignTemplates(props: {
     lifetime.active = true;
     return () => {
       lifetime.active = false;
+      void client.cancelQueries({queryKey:['campaigns','templates',props.campaignId,props.actorId,props.generation]});
+      client.removeQueries({queryKey:['campaigns','templates',props.campaignId,props.actorId,props.generation]});
     };
-  }, [lifetime]);
+  }, [lifetime,client,props.campaignId,props.actorId,props.generation]);
   useEffect(() => {
     setOpen(false);
     setEditing(null);
@@ -156,7 +171,7 @@ export function CampaignTemplates(props: {
     }
   }, [props.isGm, client, props.campaignId, props.actorId, props.generation]);
   useEffect(() => {
-    if (status(list.error) === 404 || status(bases.error) === 404) {
+    if ((!previewTarget && status(list.error) === 404) || status(bases.error) === 404) {
       client.removeQueries({
         queryKey: ["campaigns", "templates", props.campaignId],
       });
@@ -171,10 +186,11 @@ export function CampaignTemplates(props: {
     props.campaignId,
     props.onAccessRevoked,
   ]);
-  const rows = list.data?.pages.flatMap((p) => p.templates) ?? [];
-  const blocked = !props.online || props.readOnly || pending || !props.isGm;
+  const rows = (!props.online || list.error) ? [] : list.data?.pages.flatMap((p) => p.templates) ?? [];
+  const blocked = !props.online || props.readOnly || pending || !props.isGm || !!previewTarget;
   function begin(value: CampaignTemplate | null) {
     setEditing(value);
+    setAudience("all_players");setGrants([]);
     setKind(value?.kind ?? "item");
     setName(value?.content.name ?? "");
     setDescription(value?.content.description ?? "");
@@ -297,11 +313,13 @@ export function CampaignTemplates(props: {
   );
   return (
     <Panel title={t("campaign.templates.title")}>
+      {props.isGm && props.online?<><Select label={t('campaign.sharing.preview')} value={previewTarget} onChange={e=>{setOpen(false);setPreviewTarget(e.target.value)}} options={[{value:'',label:t('campaign.sharing.actual')},...(props.members??[]).filter(m=>m.status==='active'&&m.role==='player').map(m=>({value:m.userId,label:m.userId}))]}/>{props.loadMoreMembers?<Button variant="secondary" onClick={props.loadMoreMembers}>{t('campaign.sharing.moreMembers')}</Button>:null}</>:null}
+      {previewTarget?<p role="status">{t('campaign.sharing.banner')}</p>:null}
       <p>{t("campaign.templates.description")}</p>
       {!props.online ? (
         <p role="status">{t("campaign.templates.offline")}</p>
       ) : null}
-      {props.isGm ? (
+      {props.isGm && !previewTarget ? (
         <div className={styles.actions}>
           <Button disabled={blocked} onClick={() => begin(null)}>
             {t("campaign.templates.create")}
@@ -341,6 +359,7 @@ export function CampaignTemplates(props: {
         {rows.map((row) => (
           <li key={row.templateId} className={styles.row}>
             <h3>{row.content.name}</h3>
+            <p>{t("campaign.sharing."+row.audience)}</p>
             <span>
               {t("campaign.templates." + row.kind)} ·{" "}
               {t("campaign.templates.originRevision", {
@@ -363,10 +382,11 @@ export function CampaignTemplates(props: {
                 })}
               </p>
             ) : null}
-            {props.isGm ? (
+            {props.isGm && !previewTarget ? (
               <div className={styles.actions}>
                 {row.status === "active" ? (
                   <>
+                    <TemplateSharing template={row} members={props.members??[]} disabled={blocked} share={body=>props.api.share(props.campaignId,row.templateId,body)} onDone={()=>{void client.invalidateQueries({queryKey:['campaigns','templates',props.campaignId]})}}/>
                     <Button
                       variant="secondary"
                       disabled={blocked}
@@ -435,7 +455,7 @@ export function CampaignTemplates(props: {
         actions={
           <Button
             pending={pending}
-            disabled={blocked || !valid || stale || frozen}
+            disabled={blocked || !valid || stale || frozen || (!editing&&audience==='selected_players'&&grants.length===0)}
             onClick={() => {
               const content = {
                 name: name.trim(),
@@ -464,6 +484,7 @@ export function CampaignTemplates(props: {
                         ...(sourceMode === "system"
                           ? { baseTemplateId: baseId }
                           : {}),
+                        ...(audience==='all_players'?{}:{audience,grants:grants.map(({userId,generation})=>({userId,generation}))}),
                         expectedTemplateRevision: 0,
                         content,
                         idempotencyKey: randomUUID(),
@@ -479,6 +500,7 @@ export function CampaignTemplates(props: {
         }
       >
         <div className={styles.form}>
+          {!editing?<><AudienceFields audience={audience} setAudience={setAudience} grants={grants} setGrants={setGrants} members={props.members??[]} disabled={pending||frozen}/><p>{t('campaign.sharing.disclosure')}</p></>:null}
           <Select
             label={t("campaign.templates.source")}
             value={sourceMode}

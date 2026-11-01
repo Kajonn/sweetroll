@@ -1,3 +1,4 @@
+import {canReadTemplate,templateReadScope,type TemplateAudience,type TemplateGrant} from "./templatePolicy.js";
 import {
   resolveTemplateBase,
   type PublishedPackageLoader,
@@ -27,7 +28,8 @@ export type CampaignTemplateView = {
   campaignId: string;
   creatorId: string;
   kind: TemplateKind;
-  audience: "all_players";
+  audience: TemplateAudience;
+  grants:TemplateGrant[];
   status: "active" | "archived";
   revision: number;
   contentRevision: number;
@@ -40,7 +42,10 @@ export type TemplateMutation = TemplateLocation & {
   expectedTemplateRevision: number;
   idempotencyKey: string;
 };
+export type TemplateSharing={audience:TemplateAudience;grants:TemplateGrant[]};
 export type CreateTemplate = {
+  audience?:TemplateAudience;
+  grants?:TemplateGrant[];
   baseTemplateId?: string;
   campaignId: string;
   kind: TemplateKind;
@@ -132,6 +137,7 @@ function fail(code: CampaignError["code"], message: string): never {
 /** Campaign-owned commands. Campaign lock serializes authority and catalog/placement races. */
 export function createTemplateCommands(input: {
   pool: Pool;
+  maxGrants?:number;
   loadTemplatePackage?: PublishedPackageLoader;
   now?: () => Date;
   newId?: () => string;
@@ -188,8 +194,8 @@ export function createTemplateCommands(input: {
   }
   async function mutate(
     ctx: RequestContext,
-    operation: "create" | "update" | "archive" | "recover",
-    body: CreateTemplate | (TemplateMutation & { content?: TemplateContent }),
+    operation: "create" | "update" | "archive" | "recover" | "sharing",
+    body: CreateTemplate | (TemplateMutation & { content?: TemplateContent;audience?:TemplateAudience;grants?:TemplateGrant[] }),
   ) {
     return transaction(async (client) => {
       const { campaign } = await authorize(
@@ -272,12 +278,24 @@ export function createTemplateCommands(input: {
           },
         };
       }
+      async function validateSharing(audience:unknown, grants:unknown):Promise<TemplateSharing> {
+        if(!['all_players','gm_only','selected_players'].includes(audience as string) || !Array.isArray(grants) || grants.length>Math.min(100,input.maxGrants ?? 100) || (audience==='selected_players'?grants.length===0:grants.length!==0)) fail('bad_request','Invalid template audience or recipients.');
+        const ids=new Set<string>();
+        for(const grant of grants as TemplateGrant[]) {
+          if(!grant || Object.keys(grant).some(k=>!['userId','generation'].includes(k)) || typeof grant.userId!=='string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(grant.userId) || !Number.isSafeInteger(grant.generation) || grant.generation<1 || ids.has(grant.userId)) fail('bad_request','Invalid template recipient.');
+          ids.add(grant.userId);
+          const member=await repo.loadMembership(client,body.campaignId,grant.userId);
+          if(!isActiveMember(member)||member.role!=='player'||member.generation!==grant.generation) fail('bad_request','Choose current active players.');
+        }
+        return {audience:audience as TemplateAudience,grants:grants as TemplateGrant[]};
+      }
       let value: CampaignTemplateView;
       if (operation === "create" && "kind" in body) {
         if (body.expectedTemplateRevision !== 0)
           fail("conflict", "A new template must expect revision zero.");
         const invalid = validateTemplateContent(body.kind, body.content);
         if (invalid !== null) fail("bad_request", invalid);
+        const sharing=await validateSharing(body.audience ?? "all_players",body.grants ?? []);
         const creation = {
           templateId: newId(), campaignId: body.campaignId, creatorId: ctx.actorId,
           kind: body.kind,
@@ -288,6 +306,7 @@ export function createTemplateCommands(input: {
           if (await catalog.count(client, body.campaignId) >= 500) fail("too_large", "Campaign template limit reached (500).");
           value = await catalog.create(client, creation);
         }
+        if(sharing.audience!=='all_players') value=await catalog.setSharing(client,value,sharing.audience,sharing.grants,false);
       } else {
         if (!("templateId" in body))
           fail("bad_request", "Template ID required.");
@@ -303,7 +322,10 @@ export function createTemplateCommands(input: {
           current.status !== (operation === "recover" ? "archived" : "active")
         )
           fail("conflict", "The template lifecycle has changed.");
-        if (operation === "update") {
+        if(operation==='sharing') {
+          const sharing=await validateSharing(body.audience,body.grants ?? []);
+          value=await catalog.setSharing(client,current,sharing.audience,sharing.grants);
+        } else if (operation === "update") {
           const invalid = validateTemplateContent(current.kind, body.content);
           if (invalid !== null) fail("bad_request", invalid);
           value = await catalog.update(
@@ -330,7 +352,7 @@ export function createTemplateCommands(input: {
         summary: "Campaign template changed",
         requestId: ctx.requestId,
       });
-      await repo.appendActivity(client, {
+      if(value.audience === "all_players" && operation !== "sharing") await repo.appendActivity(client, {
         eventId: newId(),
         campaignId: body.campaignId,
         actorId: ctx.actorId,
@@ -378,6 +400,15 @@ export function createTemplateCommands(input: {
           )
           .map((t) => structuredClone(t));
       }),
+    shareTemplate: (ctx:RequestContext,body:TemplateMutation & TemplateSharing)=>mutate(ctx,'sharing',body),
+    previewTemplates: (ctx:RequestContext,body:ListTemplates & {targetUserId:string}):Promise<CampaignResult<TemplatePage>>=>transaction(async client=>{
+      const {member:caller}=await authorize(client,ctx,body.campaignId,true,false);
+      const member=await repo.loadMembership(client,body.campaignId,body.targetUserId);
+      if(!isActiveMember(member)||member.role!=='player')fail('not_found','The requested player does not exist.');
+      if(body.status==='archived')return {templates:[],nextCursor:null};
+      try {const page=await catalog.page(client,{...body,scope:templateReadScope(member,JSON.stringify(['preview',ctx.actorId,caller.generation,member.userId]))});return {...page,templates:page.templates.map(t=>({...t,grants:[]}))};}
+      catch(error){if(error instanceof Error && 'code' in error && error.code==='bad_request')fail('bad_request',error.message);throw error;}
+    }),
     createTemplate: (ctx: RequestContext, body: CreateTemplate) =>
       mutate(ctx, "create", body),
     updateTemplate: (
@@ -400,17 +431,17 @@ export function createTemplateCommands(input: {
         const view = await catalog.read(client, body);
         if (
           view === null ||
-          (view.status === "archived" && !isGameMaster(member))
+          !canReadTemplate(view,member)
         )
           fail("not_found", "The requested template does not exist.");
-        return view;
+        return isGameMaster(member)?view:{...view,grants:[]};
       }),
     listTemplates: (
       ctx: RequestContext,
       body: ListTemplates,
     ): Promise<CampaignResult<TemplatePage>> =>
       transaction(async (client) => {
-        await authorize(
+        const {member}=await authorize(
           client,
           ctx,
           body.campaignId,
@@ -418,7 +449,8 @@ export function createTemplateCommands(input: {
           false,
         );
         try {
-          return await catalog.page(client, body);
+          const page=await catalog.page(client,{...body,scope:templateReadScope(member,JSON.stringify(['actual',ctx.actorId]))});
+          return isGameMaster(member)?page:{...page,templates:page.templates.map(t=>({...t,grants:[]}))};
         } catch (error) {
           if (
             error instanceof Error &&

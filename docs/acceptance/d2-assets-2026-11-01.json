@@ -1,0 +1,39 @@
+{
+  "application": "5f445aa57f3f6966b7fbe8daa01219d22d8f4818",
+  "deployment": "f23a7773-3492-4917-851e-25f92071bf20",
+  "ready": {
+    "status": "ok"
+  },
+  "assets": [
+    {
+      "path": "/",
+      "bytes": 2338,
+      "sha256": "145eb71702a877a2dac464ec2209adab57d056ffdc09b8d94ffeb2d662ed3765"
+    },
+    {
+      "path": "/assets/index-CySm8o7l.js",
+      "bytes": 888582,
+      "sha256": "aa295f58d11f4ffb49fd1c0c30ade9984dc0ba1bfa1422a045b5ddcecfaa6a82"
+    },
+    {
+      "path": "/assets/index-BqgVLvNO.css",
+      "bytes": 77826,
+      "sha256": "6b4ad545fac218e2f65fc230d1cc3393f44f66a8464a47b198e8282200631104"
+    },
+    {
+      "path": "/sw.js",
+      "bytes": 3545,
+      "sha256": "8327d704eb0b5f6a55bb9eca1ec79b7bafec4f7a818660ff836a5a03f96f8544"
+    },
+    {
+      "path": "/offline-manifest.json",
+      "bytes": 137,
+      "sha256": "b7389bb95f997607100add3049dc9b4212cee8290a1e582e1edbaf182008a58a"
+    },
+    {
+      "path": "/manifest.webmanifest",
+      "bytes": 346,
+      "sha256": "b0272894bce12b4e60fc4a323de2a01245f6d9adc9c8a0fa7758566bac4f9810"
+    }
+  ]
+}

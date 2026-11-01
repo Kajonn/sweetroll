@@ -48030,6 +48030,44 @@
                       }
                     ]
                   },
+                  "audience": {
+                    "anyOf": [
+                      {
+                        "const": "all_players",
+                        "type": "string"
+                      },
+                      {
+                        "const": "gm_only",
+                        "type": "string"
+                      },
+                      {
+                        "const": "selected_players",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "grants": {
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "userId",
+                        "generation"
+                      ],
+                      "properties": {
+                        "userId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "generation": {
+                          "minimum": 1,
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  },
                   "baseTemplateId": {
                     "pattern": "^[a-z][a-z0-9_]{0,63}$",
                     "type": "string"
@@ -48103,6 +48141,7 @@
                         "creatorId",
                         "kind",
                         "audience",
+                        "grants",
                         "status",
                         "revision",
                         "contentRevision",
@@ -48141,8 +48180,42 @@
                           ]
                         },
                         "audience": {
-                          "const": "all_players",
-                          "type": "string"
+                          "anyOf": [
+                            {
+                              "const": "all_players",
+                              "type": "string"
+                            },
+                            {
+                              "const": "gm_only",
+                              "type": "string"
+                            },
+                            {
+                              "const": "selected_players",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "grants": {
+                          "maxItems": 100,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "userId",
+                              "generation"
+                            ],
+                            "properties": {
+                              "userId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "generation": {
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            }
+                          }
                         },
                         "status": {
                           "anyOf": [
@@ -48563,6 +48636,7 @@
                           "creatorId",
                           "kind",
                           "audience",
+                          "grants",
                           "status",
                           "revision",
                           "contentRevision",
@@ -48601,8 +48675,42 @@
                             ]
                           },
                           "audience": {
-                            "const": "all_players",
-                            "type": "string"
+                            "anyOf": [
+                              {
+                                "const": "all_players",
+                                "type": "string"
+                              },
+                              {
+                                "const": "gm_only",
+                                "type": "string"
+                              },
+                              {
+                                "const": "selected_players",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "grants": {
+                            "maxItems": 100,
+                            "type": "array",
+                            "items": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "userId",
+                                "generation"
+                              ],
+                              "properties": {
+                                "userId": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
+                                "generation": {
+                                  "minimum": 1,
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           },
                           "status": {
                             "anyOf": [
@@ -48982,6 +49090,7 @@
                         "creatorId",
                         "kind",
                         "audience",
+                        "grants",
                         "status",
                         "revision",
                         "contentRevision",
@@ -49020,8 +49129,42 @@
                           ]
                         },
                         "audience": {
-                          "const": "all_players",
-                          "type": "string"
+                          "anyOf": [
+                            {
+                              "const": "all_players",
+                              "type": "string"
+                            },
+                            {
+                              "const": "gm_only",
+                              "type": "string"
+                            },
+                            {
+                              "const": "selected_players",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "grants": {
+                          "maxItems": 100,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "userId",
+                              "generation"
+                            ],
+                            "properties": {
+                              "userId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "generation": {
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            }
+                          }
                         },
                         "status": {
                           "anyOf": [
@@ -49448,6 +49591,7 @@
                         "creatorId",
                         "kind",
                         "audience",
+                        "grants",
                         "status",
                         "revision",
                         "contentRevision",
@@ -49486,8 +49630,42 @@
                           ]
                         },
                         "audience": {
-                          "const": "all_players",
-                          "type": "string"
+                          "anyOf": [
+                            {
+                              "const": "all_players",
+                              "type": "string"
+                            },
+                            {
+                              "const": "gm_only",
+                              "type": "string"
+                            },
+                            {
+                              "const": "selected_players",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "grants": {
+                          "maxItems": 100,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "userId",
+                              "generation"
+                            ],
+                            "properties": {
+                              "userId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "generation": {
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            }
+                          }
                         },
                         "status": {
                           "anyOf": [
@@ -49814,6 +49992,989 @@
         }
       }
     },
+    "/campaigns/{id}/item-templates/{templateId}/sharing": {
+      "post": {
+        "operationId": "post_campaigns_id_item_templates_templateId_sharing",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "expectedTemplateRevision",
+                  "idempotencyKey",
+                  "audience",
+                  "grants"
+                ],
+                "properties": {
+                  "expectedTemplateRevision": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "idempotencyKey": {
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  "audience": {
+                    "anyOf": [
+                      {
+                        "const": "all_players",
+                        "type": "string"
+                      },
+                      {
+                        "const": "gm_only",
+                        "type": "string"
+                      },
+                      {
+                        "const": "selected_players",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "grants": {
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "userId",
+                        "generation"
+                      ],
+                      "properties": {
+                        "userId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "generation": {
+                          "minimum": 1,
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "templateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "template",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "template": {
+                      "type": "object",
+                      "required": [
+                        "templateId",
+                        "campaignId",
+                        "creatorId",
+                        "kind",
+                        "audience",
+                        "grants",
+                        "status",
+                        "revision",
+                        "contentRevision",
+                        "content",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "properties": {
+                        "templateId": {
+                          "type": "string"
+                        },
+                        "campaignId": {
+                          "type": "string"
+                        },
+                        "creatorId": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "anyOf": [
+                            {
+                              "const": "item",
+                              "type": "string"
+                            },
+                            {
+                              "const": "spell",
+                              "type": "string"
+                            },
+                            {
+                              "const": "talent",
+                              "type": "string"
+                            },
+                            {
+                              "const": "effect",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "audience": {
+                          "anyOf": [
+                            {
+                              "const": "all_players",
+                              "type": "string"
+                            },
+                            {
+                              "const": "gm_only",
+                              "type": "string"
+                            },
+                            {
+                              "const": "selected_players",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "grants": {
+                          "maxItems": 100,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "userId",
+                              "generation"
+                            ],
+                            "properties": {
+                              "userId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "generation": {
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        },
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "active",
+                              "type": "string"
+                            },
+                            {
+                              "const": "archived",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "revision": {
+                          "type": "integer"
+                        },
+                        "contentRevision": {
+                          "type": "integer"
+                        },
+                        "content": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "name"
+                          ],
+                          "properties": {
+                            "defaultValues": {
+                              "maxProperties": 100,
+                              "type": "object",
+                              "patternProperties": {
+                                "^[a-z][a-z0-9_]{0,63}$": {}
+                              }
+                            },
+                            "name": {
+                              "minLength": 1,
+                              "maxLength": 200,
+                              "type": "string"
+                            },
+                            "description": {
+                              "maxLength": 2000,
+                              "type": "string"
+                            },
+                            "notes": {
+                              "maxLength": 2000,
+                              "type": "string"
+                            },
+                            "defaultQuantity": {
+                              "minimum": 1,
+                              "maximum": 9007199254740991,
+                              "type": "integer"
+                            },
+                            "base": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "versionId",
+                                "packageChecksum",
+                                "templateId"
+                              ],
+                              "properties": {
+                                "versionId": {
+                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                  "type": "string"
+                                },
+                                "packageChecksum": {
+                                  "pattern": "^sha256:[0-9a-f]{64}$",
+                                  "type": "string"
+                                },
+                                "templateId": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/campaigns/{id}/item-template-preview": {
+      "post": {
+        "operationId": "post_campaigns_id_item_template_preview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "targetUserId"
+                ],
+                "properties": {
+                  "targetUserId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "limit": {
+                    "minimum": 1,
+                    "maximum": 100,
+                    "type": "integer"
+                  },
+                  "cursor": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "templates",
+                    "nextCursor",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "templates": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "templateId",
+                          "campaignId",
+                          "creatorId",
+                          "kind",
+                          "audience",
+                          "grants",
+                          "status",
+                          "revision",
+                          "contentRevision",
+                          "content",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "properties": {
+                          "templateId": {
+                            "type": "string"
+                          },
+                          "campaignId": {
+                            "type": "string"
+                          },
+                          "creatorId": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "anyOf": [
+                              {
+                                "const": "item",
+                                "type": "string"
+                              },
+                              {
+                                "const": "spell",
+                                "type": "string"
+                              },
+                              {
+                                "const": "talent",
+                                "type": "string"
+                              },
+                              {
+                                "const": "effect",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "audience": {
+                            "anyOf": [
+                              {
+                                "const": "all_players",
+                                "type": "string"
+                              },
+                              {
+                                "const": "gm_only",
+                                "type": "string"
+                              },
+                              {
+                                "const": "selected_players",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "grants": {
+                            "maxItems": 100,
+                            "type": "array",
+                            "items": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "userId",
+                                "generation"
+                              ],
+                              "properties": {
+                                "userId": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
+                                "generation": {
+                                  "minimum": 1,
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "const": "active",
+                                "type": "string"
+                              },
+                              {
+                                "const": "archived",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "revision": {
+                            "type": "integer"
+                          },
+                          "contentRevision": {
+                            "type": "integer"
+                          },
+                          "content": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "name"
+                            ],
+                            "properties": {
+                              "defaultValues": {
+                                "maxProperties": 100,
+                                "type": "object",
+                                "patternProperties": {
+                                  "^[a-z][a-z0-9_]{0,63}$": {}
+                                }
+                              },
+                              "name": {
+                                "minLength": 1,
+                                "maxLength": 200,
+                                "type": "string"
+                              },
+                              "description": {
+                                "maxLength": 2000,
+                                "type": "string"
+                              },
+                              "notes": {
+                                "maxLength": 2000,
+                                "type": "string"
+                              },
+                              "defaultQuantity": {
+                                "minimum": 1,
+                                "maximum": 9007199254740991,
+                                "type": "integer"
+                              },
+                              "base": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "versionId",
+                                  "packageChecksum",
+                                  "templateId"
+                                ],
+                                "properties": {
+                                  "versionId": {
+                                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                    "type": "string"
+                                  },
+                                  "packageChecksum": {
+                                    "pattern": "^sha256:[0-9a-f]{64}$",
+                                    "type": "string"
+                                  },
+                                  "templateId": {
+                                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "nextCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/campaigns/{id}/item-templates/{templateId}/archive": {
       "post": {
         "operationId": "post_campaigns_id_item_templates_templateId_archive",
@@ -49881,6 +51042,7 @@
                         "creatorId",
                         "kind",
                         "audience",
+                        "grants",
                         "status",
                         "revision",
                         "contentRevision",
@@ -49919,8 +51081,42 @@
                           ]
                         },
                         "audience": {
-                          "const": "all_players",
-                          "type": "string"
+                          "anyOf": [
+                            {
+                              "const": "all_players",
+                              "type": "string"
+                            },
+                            {
+                              "const": "gm_only",
+                              "type": "string"
+                            },
+                            {
+                              "const": "selected_players",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "grants": {
+                          "maxItems": 100,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "userId",
+                              "generation"
+                            ],
+                            "properties": {
+                              "userId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "generation": {
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            }
+                          }
                         },
                         "status": {
                           "anyOf": [
@@ -50314,6 +51510,7 @@
                         "creatorId",
                         "kind",
                         "audience",
+                        "grants",
                         "status",
                         "revision",
                         "contentRevision",
@@ -50352,8 +51549,42 @@
                           ]
                         },
                         "audience": {
-                          "const": "all_players",
-                          "type": "string"
+                          "anyOf": [
+                            {
+                              "const": "all_players",
+                              "type": "string"
+                            },
+                            {
+                              "const": "gm_only",
+                              "type": "string"
+                            },
+                            {
+                              "const": "selected_players",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "grants": {
+                          "maxItems": 100,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "userId",
+                              "generation"
+                            ],
+                            "properties": {
+                              "userId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "generation": {
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            }
+                          }
                         },
                         "status": {
                           "anyOf": [
@@ -52395,6 +53626,7 @@
                         "creatorId",
                         "kind",
                         "audience",
+                        "grants",
                         "status",
                         "revision",
                         "contentRevision",
@@ -52433,8 +53665,42 @@
                           ]
                         },
                         "audience": {
-                          "const": "all_players",
-                          "type": "string"
+                          "anyOf": [
+                            {
+                              "const": "all_players",
+                              "type": "string"
+                            },
+                            {
+                              "const": "gm_only",
+                              "type": "string"
+                            },
+                            {
+                              "const": "selected_players",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "grants": {
+                          "maxItems": 100,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "userId",
+                              "generation"
+                            ],
+                            "properties": {
+                              "userId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "generation": {
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            }
+                          }
                         },
                         "status": {
                           "anyOf": [
@@ -72370,6 +73636,7 @@
                               "creatorId",
                               "kind",
                               "audience",
+                              "grants",
                               "status",
                               "revision",
                               "contentRevision",
@@ -72408,8 +73675,42 @@
                                 ]
                               },
                               "audience": {
-                                "const": "all_players",
-                                "type": "string"
+                                "anyOf": [
+                                  {
+                                    "const": "all_players",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "gm_only",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "selected_players",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "grants": {
+                                "maxItems": 100,
+                                "type": "array",
+                                "items": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "userId",
+                                    "generation"
+                                  ],
+                                  "properties": {
+                                    "userId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
+                                    "generation": {
+                                      "minimum": 1,
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
                               },
                               "status": {
                                 "anyOf": [

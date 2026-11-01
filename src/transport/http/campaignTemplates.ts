@@ -12,6 +12,8 @@ import type {
 } from "../../campaigns/templates.js";
 import type { CampaignsRouteDefinition } from "./campaigns.js";
 
+const Audience=Type.Union([Type.Literal('all_players'),Type.Literal('gm_only'),Type.Literal('selected_players')]);
+const Grants=Type.Array(Type.Object({userId:Type.String({format:'uuid'}),generation:Type.Integer({minimum:1})},{additionalProperties:false}),{maxItems:100});
 const Kind = Type.Union([
   Type.Literal("item"),
   Type.Literal("spell"),
@@ -35,7 +37,8 @@ export const CampaignTemplateDto = Type.Object({
   campaignId: Type.String(),
   creatorId: Type.String(),
   kind: Kind,
-  audience: Type.Literal("all_players"),
+  audience: Audience,
+  grants:Grants,
   status: Type.Union([Type.Literal("active"), Type.Literal("archived")]),
   revision: Type.Integer(),
   contentRevision: Type.Integer(),
@@ -82,6 +85,8 @@ export const campaignTemplateRoutes: readonly CampaignsRouteDefinition[] = [
           ...Mutation,
           expectedTemplateRevision: Type.Literal(0),
           kind: Kind,
+          audience:Type.Optional(Audience),
+          grants:Type.Optional(Grants),
           baseTemplateId:Type.Optional(DefinitionIdSchema),
           content: Content,
         },
@@ -133,6 +138,8 @@ export const campaignTemplateRoutes: readonly CampaignsRouteDefinition[] = [
       response: { "200": Result, ...Errors },
     },
   },
+  {method:'post',path:'/campaigns/:id/item-templates/:templateId/sharing',operationId:'post_campaigns_id_item_templates_templateId_sharing',schema:{params:Params,body:Type.Object({...Mutation,audience:Audience,grants:Grants},{additionalProperties:false}),response:{'200':Result,...Errors}}},
+  {method:'post',path:'/campaigns/:id/item-template-preview',operationId:'post_campaigns_id_item_template_preview',schema:{params:CampaignParams,body:Type.Object({targetUserId:Type.String({format:'uuid'}),limit:Type.Optional(Type.Integer({minimum:1,maximum:100})),cursor:Type.Optional(Type.String())},{additionalProperties:false}),response:{'200':Type.Object({templates:Type.Array(CampaignTemplateDto),nextCursor:Type.Union([Type.String(),Type.Null()]),requestId:Type.String()}),...Errors}}},
   ...(["archive", "recover"] as const).map((operation) => ({
     method: "post" as const,
     path: `/campaigns/:id/item-templates/:templateId/${operation}`,
@@ -170,7 +177,11 @@ export function campaignTemplateHandlers(
         content: TemplateContent;
       };
       const result =
-        route.operationId === "get_campaigns_id_item_templates_bases"
+        route.operationId === 'post_campaigns_id_item_templates_templateId_sharing'
+          ? await campaigns.shareTemplate(ctx,{...(request.body as import('../../campaigns/templates.js').TemplateSharing & TemplateMutation),...location})
+          : route.operationId === 'post_campaigns_id_item_template_preview'
+          ? await campaigns.previewTemplates(ctx,{...(request.body as {targetUserId:string;limit?:number;cursor?:string}),campaignId:params.id})
+          : route.operationId === "get_campaigns_id_item_templates_bases"
           ? await campaigns.listTemplateBases(ctx,{campaignId:params.id})
           : route.operationId === "post_campaigns_id_item_templates"
           ? await campaigns.createTemplate(ctx, {
@@ -213,7 +224,7 @@ export function campaignTemplateHandlers(
           )
           .send({ error: result.error, requestId: request.id });
       if(route.operationId === "get_campaigns_id_item_templates_bases") return {templates:result.value,requestId:request.id};
-      if (route.operationId === "get_campaigns_id_item_templates")
+      if (route.operationId === "get_campaigns_id_item_templates" || route.operationId === "post_campaigns_id_item_template_preview")
         return { ...result.value, requestId: request.id };
       return reply
         .code(

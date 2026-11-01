@@ -1751,14 +1751,14 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           const templates:import("./templates.js").CampaignTemplateView[]=[];
           const catalog=createTemplateRepository(input.pool);
           let cursor:string|null=null;
-          do { const page=await catalog.page(client,{campaignId:campaign.campaignId,limit:100,cursor});templates.push(...page.templates);cursor=page.nextCursor; } while(cursor!==null && templates.length<=limits.exportMaxRecords);
+          do { const page=await catalog.page(client,{campaignId:campaign.campaignId,limit:100,cursor,scope:{mode:"gm",readerKey:"export"}});templates.push(...page.templates);cursor=page.nextCursor; } while(cursor!==null && templates.length<=limits.exportMaxRecords);
           const proposals=(await createProposalRepository().list(client,{campaignId:campaign.campaignId,submitterId:null,generation:0,status:null,anchor:null,limit:bound})).map(proposalView);
           return { authorized: true as const, campaign, members, content, activity, rolls, grants, templates, proposals };
         });
         if (!snapshot.authorized) return { ok: false, error: errors.campaign_not_found() };
 
         const recordCount =
-          1 + snapshot.proposals.length + snapshot.templates.length + snapshot.members.length + snapshot.content.length + snapshot.activity.length + snapshot.rolls.length;
+          1 + snapshot.proposals.length + snapshot.templates.length + snapshot.templates.reduce((n,t)=>n+t.grants.length,0) + snapshot.members.length + snapshot.content.length + snapshot.activity.length + snapshot.rolls.length;
         if (
           snapshot.content.length > limits.exportMaxRecords ||
           snapshot.activity.length > limits.exportMaxRecords ||

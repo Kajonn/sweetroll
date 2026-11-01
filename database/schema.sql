@@ -515,13 +515,19 @@ CREATE TABLE campaign_item_templates (
   campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
   creator_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   kind text NOT NULL CHECK (kind IN ('item','spell','talent','effect')),
-  audience text NOT NULL DEFAULT 'all_players' CHECK (audience='all_players'),
+  audience text NOT NULL DEFAULT 'all_players' CHECK (audience IN ('all_players','gm_only','selected_players')),
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')),
   revision integer NOT NULL DEFAULT 1 CHECK (revision>=1),
   content_revision integer NOT NULL DEFAULT 1 CHECK (content_revision>=1),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   archived_at timestamptz
+);
+CREATE TABLE campaign_item_template_grants (
+  template_id uuid NOT NULL REFERENCES campaign_item_templates(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  membership_generation integer NOT NULL CHECK (membership_generation>=1),
+  PRIMARY KEY(template_id,user_id)
 );
 CREATE INDEX campaign_item_templates_page_idx ON campaign_item_templates(campaign_id,status,id);
 CREATE TABLE campaign_item_template_revisions (

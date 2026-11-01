@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { validateTemplateContent } from "./templates.js";
+import {
+  hasDuplicateTemplateGrants,
+  validateTemplateContent,
+} from "./templates.js";
 
 describe("campaign template data budget", () => {
   it.each(["item", "spell", "talent", "effect"])(
@@ -39,5 +42,23 @@ describe("campaign template data budget", () => {
     expect(
       validateTemplateContent("item", { name: "Key", defaultQuantity: 3 }),
     ).toBeNull();
+  });
+});
+
+describe("template sharing recipients", () => {
+  it("treats UUID case variants as the same recipient, even with different generation claims", () => {
+    const id = "a1234567-abcd-4000-8000-abcdef123456";
+    expect(
+      hasDuplicateTemplateGrants([
+        { userId: id, generation: 1 },
+        { userId: id.toUpperCase(), generation: 2 },
+      ]),
+    ).toBe(true);
+    expect(
+      hasDuplicateTemplateGrants([
+        { userId: id, generation: 1 },
+        { userId: "b1234567-abcd-4000-8000-abcdef123456", generation: 1 },
+      ]),
+    ).toBe(false);
   });
 });

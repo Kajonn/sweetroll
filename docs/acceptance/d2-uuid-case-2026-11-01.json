@@ -1,0 +1,21 @@
+{
+  "source": "78dad8c9620ce700ffe9f6b8c55225e237b11d90",
+  "passed": true,
+  "duplicateStatus": 400,
+  "unchangedOnReject": true,
+  "uppercaseRecipientAccepted": true,
+  "canonicalGrant": true,
+  "playerVisibility": true,
+  "templateArchived": true,
+  "campaignArchived": true,
+  "campaignId": "49079d23-e275-439e-845c-76ec9a9d058d",
+  "templateId": "0183424b-414d-4db2-b832-053fd4e92d35",
+  "verifiedAt": "2026-11-01T20:05:18.589Z",
+  "deployment": "fc6d8088-68f9-42ef-9768-2f3677e4f2e8",
+  "setupCleanup": {
+    "source": "78dad8c9620ce700ffe9f6b8c55225e237b11d90",
+    "campaignArchived": true,
+    "campaignId": "f4b4f666-b06a-4635-b24c-e0f83f1d0e63",
+    "verifiedAt": "2026-11-01T20:04:16.221Z"
+  }
+}

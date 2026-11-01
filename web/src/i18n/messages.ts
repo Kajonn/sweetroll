@@ -1,6 +1,23 @@
 export type MessageTable = Record<string, string>;
 
 export const defaultMessages: MessageTable = {
+  'campaign.sharing.audience':'Audience',
+  'campaign.sharing.draft':'Save draft',
+  'campaign.sharing.gm_only':'GM only',
+  'campaign.sharing.selected_players':'Selected players',
+  'campaign.sharing.all_players':'All players',
+  'campaign.sharing.title':'Sharing',
+  'campaign.sharing.reveal':'Reveal to all players',
+  'campaign.sharing.save':'Save sharing',
+  'campaign.sharing.retry':'Retry exact request',
+  'campaign.sharing.refresh':'Sharing changed or access is unavailable. Refresh and review before trying again.',
+  'campaign.sharing.uncertain':'The result is uncertain. Retry the exact request.',
+  'campaign.sharing.disclosure':'Restricted drafts cannot be placed on sheets. Reveal to all players before placement. Existing sheet copies cannot be recalled by changing sharing.',
+  'campaign.sharing.preview':'Preview as player',
+  'campaign.sharing.actual':'My actual view',
+  'campaign.sharing.banner':'Read-only player preview',
+  'campaign.sharing.moreMembers':'Load more players',
+
   "campaign.proposals.reviewTitle": "Review suggestions",
   "campaign.proposals.selfTitle": "My suggestions",
   "campaign.proposals.private": "Suggestions are visible only to their submitter and campaign GMs.",
@@ -75,7 +92,7 @@ export const defaultMessages: MessageTable = {
   "campaign.templates.fields": "Check the template fields before saving.",
   "campaign.templates.uncertain": "The save could not be confirmed. Retry the same request to recover its result.",
   "campaign.templates.roleChanged": "Your campaign role changed. Refresh the campaign to review your current access.",
-  "campaign.templates.description": "Published templates are visible to all campaign members. Copies on character sheets keep their original revision.",
+  "campaign.templates.description": "Template audiences control who can review drafts. Only templates shared with all players can be placed on sheets; existing copies keep their original revision.",
   "campaign.templates.offline": "Connect to browse or manage the campaign catalog.",
   "campaign.templates.create": "Create template",
   "campaign.templates.active": "Active templates",

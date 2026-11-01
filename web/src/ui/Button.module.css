@@ -16,7 +16,8 @@
   cursor: pointer;
   font-weight: 600;
   box-shadow: var(--shadow-control);
-  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  /* Theme colors change together; cross-fading backgrounds breaks text contrast. */
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .button:not(:disabled):hover { transform: translateY(-1px); box-shadow: var(--shadow-control-hover); }
@@ -69,7 +70,7 @@
   font-size: 1rem;
   line-height: 1;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  /* Keep foreground and background synchronized during theme changes. */
 }
 
 .iconButton:not(:disabled):hover { background: var(--surface-highlight); }

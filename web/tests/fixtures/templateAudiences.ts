@@ -199,7 +199,11 @@ export async function templateAudienceJourney(
       await expect(
         catalog.getByRole("heading", { name: "Secret D2 key", exact: true }),
       ).toHaveCount(0);
-      await catalog.reload();
+      const privateCacheKeys=await catalog.evaluate(async()=>{const urls:string[]=[];for(const name of await caches.keys()){const cache=await caches.open(name);for(const request of await cache.keys())if(/item-template/.test(request.url))urls.push(request.url);}return urls;});
+      expect(privateCacheKeys).toEqual([]);
+      // Campaign routes intentionally are not in the character-only offline shell allowlist.
+      // An offline direct reload must fail closed rather than restore private catalog HTML.
+      await expect(catalog.reload()).rejects.toThrow('ERR_INTERNET_DISCONNECTED');
       await expect(
         catalog.getByRole("heading", { name: "Secret D2 key", exact: true }),
       ).toHaveCount(0);

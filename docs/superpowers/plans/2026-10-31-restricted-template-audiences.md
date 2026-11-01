@@ -57,6 +57,10 @@ A browser contrast finding during theme changes is repaired by synchronizing for
 and background palette changes, preserving final colors. The new offline journey uses
 the sheet's actual durable-offline badge and additionally verifies control of the
 catalog page by the production worker; a campaign catalog has no sheet badge.
+The worker deliberately excludes campaign navigation from the offline shell allowlist:
+the new offline direct-reload check asserts an explicit network denial and no secret
+content, while disclosed character copies must reopen successfully. API cache keys
+are inspected independently. No offline campaign navigation is introduced.
 
 Hosted resources are confined to new project `sweetroll-d2-acceptance`, environment
 `preview`; existing preview and production projects remain unchanged. First deployment

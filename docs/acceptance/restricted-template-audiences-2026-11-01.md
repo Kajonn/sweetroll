@@ -1,11 +1,12 @@
 # D2 restricted campaign-template audiences — acceptance
 
-Application: `5f445aa57f3f6966b7fbe8daa01219d22d8f4818`.
+Original full-journey application: `5f445aa57f3f6966b7fbe8daa01219d22d8f4818`.
 PR: [#27](https://github.com/Kajonn/sweetroll/pull/27).
 Contract: [restricted audiences](../superpowers/specs/2026-10-31-restricted-template-audiences.md).
 Plan: [D2 execution](../superpowers/plans/2026-10-31-restricted-template-audiences.md).
-Subsequent commits add tests/documentation only; application source and served assets
-remain identical. No migrations or old-client/version transition adapters were added.
+Delivery commits through `41c74c3` add tests/documentation only. The later backend UUID
+validation follow-up is recorded below. No migrations or old-client/version transition
+adapters were added.
 
 ## Verification
 
@@ -65,7 +66,7 @@ App `sweetroll-d2` (`b2c4d538-67a7-4533-8707-8a5eccab1870`), PostgreSQL
 `3b957322-c433-4c4c-9525-74ec16853110` with a new disposable database.
 
 URL: https://sweetroll-d2-preview.up.railway.app
-Deployment: `f23a7773-3492-4917-851e-25f92071bf20`, terminal **SUCCESS**, source
+Original full-journey deployment: `f23a7773-3492-4917-851e-25f92071bf20`, terminal **SUCCESS**, source
 pinned to the application above. `/health/ready` returned `{"status":"ok"}`.
 
 The first isolated deployment failed database connectivity with the app in sfo and
@@ -126,3 +127,27 @@ no upgrade path for an older unreleased test database. Catalog narrowing cannot 
 information already disclosed or recall materialized sheet copies. Physical Android/
 iPad, production identity-provider sign-in and physical-table/remote playtests remain
 separate G9 release gates. No public-release claim follows from D2 acceptance.
+
+## UUID recipient validation follow-up (2026-11-01)
+
+Backend follow-up `78dad8c` rejects duplicate recipient UUIDs regardless of letter case.
+Previously the string-level duplicate check could miss a case alias and fall through
+to PostgreSQL's unique constraint, returning 500 rather than the intended 400. The
+new unit regression was observed red before case normalization, then green; the HTTP
+integration test proves no mutation on rejection and accepts one uppercase recipient.
+No frontend, HTTP schema, rule evaluation or migration behavior changed.
+
+[Hosted probe and cleanup](d2-uuid-case-2026-11-01.json) verifies this on successful
+isolated deployment `fc6d8088-68f9-42ef-9768-2f3677e4f2e8`, pinned to `78dad8c`:
+case-aliased duplicates return 400, the complete original template is unchanged,
+the uppercase-only recipient is canonicalized by persistence, and authorized player
+discovery works. Only the probe-created template/campaign were archived, with
+independent readback. An initial probe setup was corrected to read membership
+generation from the member endpoint; its campaign cleanup is also recorded.
+
+[CI #177](https://github.com/Kajonn/sweetroll/actions/runs/41344807801) passes all seven verification jobs on this follow-up: 473 root, 351 PostgreSQL and 1,180 frontend tests, plus the unchanged browser/offline/visual suites, typechecks, contract identity, builds and Docker.
+Local Node 24 verification: 463 root tests passed with ten DB-dependent cases skipped;
+17 targeted content/policy tests passed, plus typecheck/build and contract identity.
+The original complete hosted browser journeys above remain historical evidence;
+the deployed follow-up was verified with the focused HTTP/DB probe and canonical CI
+browser/offline suites, since it only changes backend validation of invalid input.

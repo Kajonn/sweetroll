@@ -2,6 +2,7 @@ import { expect, test, type Page, type Browser, type BrowserContext } from "@pla
 import AxeBuilder from "@axe-core/playwright";
 import { json, key } from "./configurablePush.js";
 import { expectOfflineAvailable } from "../offline/test-auth.js";
+import type { QueueEntry } from "../../src/characters/types.js";
 
 /** MU-00–MU-12: user operations are GUI-only. HTTP is restricted to fixture
  * authentication, independent observations/denial probes and scoped archiving.
@@ -60,7 +61,6 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
     await page.getByLabel("Quantity", { exact: true }).fill("2");
     await page.getByRole("button", { name: "Add entry", exact: true }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(page.getByText(label, { exact: true })).toBeVisible();
   }
   async function roll(i: number, entryName: string, actionName: string, sides: number, field: string, bonus: number) {
     const page = pages[i + 1]!;
@@ -312,6 +312,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
         const page = pages[i + 1]!; await page.goto(`/characters/${characters[i]!.characterId}`);
         for (const [slot, label] of [["slot_1","Longsword"],["slot_2","Firebolt"],["slot_1","Ashguard blade · Campaign"],["slot_2","Ember spell · Campaign"],["slot_1","Caravan supplies · Campaign"]]) await addEntry(page, slot!, label!);
         await customEntry(page, `Lucky token ${i + 1}`, `Player ${i + 1} personal notes`);
+        await expect(page.getByText(`Lucky token ${i + 1}`, { exact: true })).toBeVisible();
         await expect.poll(async () => Object.keys((await character(i)).state.entries).length).toBe(6);
         expect(Object.values((await character(i)).state.entries).filter((e: any) => e.values.name === `Lucky token ${i + 1}` && e.templateId !== null)).toHaveLength(0);
         for (const [entryName, actionName, sides, field, bonus] of [["Longsword","Sword attack",20,"field",i+2],["Longsword","Sword damage",8,"field",i+2],["Firebolt","Cast Firebolt",20,"field_2",4-i],["Firebolt","Firebolt damage",6,"field_2",4-i],["Ashguard blade","Sword attack",20,"field",i+2],["Ember spell","Cast Firebolt",20,"field_2",4-i]] as const) await roll(i, entryName, actionName, sides, field, bonus);
@@ -395,11 +396,42 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
     });
     await step("MU-10 production-worker offline pending/reload/replay", async () => {
       const page = pages[1]!; await page.goto(`/characters/${characters[0]!.characterId}`); await expectOfflineAvailable(page);
+      await expect(page.getByText("Editing in this tab.", { exact: true })).toBeVisible();
+      await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+      const pendingEntries = () => page.evaluate(({ actorId, characterId }) => new Promise<QueueEntry[]>((resolve, reject) => {
+        const request = indexedDB.open("sweetroll-characters");
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          const get = db.transaction("queue", "readonly").objectStore("queue").getAll();
+          get.onsuccess = () => { resolve((get.result as QueueEntry[]).filter(e => e.actorId === actorId && e.characterId === characterId)); db.close(); };
+          get.onerror = () => { reject(get.error); db.close(); };
+        };
+      }), { actorId: actorIds[1]!, characterId: characters[0]!.characterId });
+      expect(await pendingEntries()).toEqual([]);
       await contexts[1]!.setOffline(true); await customEntry(page,"Offline trail ration","Pending offline");
       await expect(page.getByText("Changes pending", { exact: true })).toBeVisible();
-      await page.reload(); await expect(page.getByText("Offline trail ration", { exact: true })).toBeVisible();
-      await expect(page.getByText("Changes pending", { exact: true })).toBeVisible(); await contexts[1]!.setOffline(false);
+      // Slot rows use the last server projection. Observe the durable intent
+      // while offline, then the confirmed row after the worker-backed reload
+      // and reconnect, as in the established offline entry journeys.
+      const queued = await pendingEntries();
+      expect(queued).toHaveLength(1);
+      expect(queued[0]!.intent).toMatchObject({ kind: "addEntry", entry: { slotId: "slot_1", templateId: null, values: { name: "Offline trail ration", description: "Personal adventure equipment", notes: "Pending offline" }, quantity: 2 } });
+      const intent = queued[0]!.intent;
+      if (intent.kind !== "addEntry") throw Error("Expected an offline add-entry intent");
+      await page.reload();
+      await expect(page.getByText("Changes pending", { exact: true })).toBeVisible();
+      expect((await pendingEntries()).map(e => ({ id: e.id, intent: e.intent }))).toEqual(queued.map(e => ({ id: e.id, intent: e.intent })));
+      const replay = page.waitForResponse(r => r.request().method() === "POST" && r.url().endsWith(`/characters/${characters[0]!.characterId}/entries`) && r.request().postDataJSON().entry.entryId === intent.entry.entryId);
+      await contexts[1]!.setOffline(false);
+      const response = await replay;
+      expect(response.status()).toBe(200);
+      expect(response.request().postDataJSON().entry).toEqual(intent.entry);
       await expect.poll(async () => Object.values((await character(0)).state.entries).filter((e: any) => e.values.name === "Offline trail ration").length).toBe(1);
+      expect((await character(0)).state.entries[intent.entry.entryId]).toMatchObject(intent.entry);
+      await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+      await expect(page.getByText("Offline trail ration", { exact: true })).toBeVisible();
+      expect(await pendingEntries()).toEqual([]);
       await expectOfflineAvailable(page);
     });
     await step("MU-11 independent placed-copy quantities", async () => {

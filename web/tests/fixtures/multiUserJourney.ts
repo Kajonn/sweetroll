@@ -67,7 +67,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
     const entry = page.locator('li[data-testid^="slot-entry-"]').filter({ has: page.getByText(entryName, { exact: true }) });
     const entryId = (await entry.getAttribute("data-testid"))!.slice("slot-entry-".length);
     const action = entry.getByRole("button", { name: actionName, exact: true });
-    const actionId = (await entry.locator("form").filter({ has: action }).getAttribute("data-testid"))!.slice(`slot-granted-${entryId}-`.length);
+    const actionId = (await entry.locator("form").filter({ has: page.getByRole("button", { name: actionName, exact: true }) }).getAttribute("data-testid"))!.slice(`slot-granted-${entryId}-`.length);
     const response = page.waitForResponse(r => r.request().method() === "POST" && r.url().endsWith(`/characters/${characters[i]!.characterId}/actions/${actionId}`));
     await action.click();
     const res = await response;

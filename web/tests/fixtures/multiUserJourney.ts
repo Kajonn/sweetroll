@@ -23,9 +23,10 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
   const pageErrors: string[] = [];
   const cleanup: Record<string, unknown> = {};
   let systemId = "", versionId = "", campaignId = "";
+  let journeyFailed = false;
   async function step(id: string, run: () => Promise<void>) {
     await test.step(id, async () => {
-      try { await run(); steps.push({ step: id, status: "PASS" }); }
+      try { await run(); steps.push({ step: id, status: "PASS" }); console.log(`${id}: PASS`); }
       catch (cause) { steps.push({ step: id, status: "FAIL" }); throw cause; }
     });
   }
@@ -43,6 +44,8 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
   }
   async function addEntry(page: Page, slot: string, label: string) {
     await page.getByTestId(`slot-add-${slot}`).click();
+    const picker = page.getByTestId(`slot-template-picker-${slot}`);
+    await expect(picker.locator("option", { hasText: slot === "slot_1" ? "Firebolt" : "Longsword" })).toHaveCount(0);
     await page.getByTestId(`slot-template-picker-${slot}`).selectOption({ label });
     await page.getByTestId(`slot-add-confirm-${slot}`).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -109,6 +112,8 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
     await step("MU-00 deployment/fixture preflight", async () => {
       for (let i = 0; i < 4; i++) {
         const context = await browser.newContext({ baseURL, viewport: { width: widths[i]!, height: 900 } });
+        // An unavailable control is a failed step, not a six-minute navigation wait.
+        context.setDefaultTimeout(15_000);
         contexts.push(context);
         const signed = await json(context.request, "POST", "/dev/signin", { code: i === 0 ? "code-journey-gm" : `code-journey-p${i}`, redirectUri: new URL("/cb", baseURL).href });
         actorIds.push(signed.userId);
@@ -122,7 +127,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
     });
     const gm = pages[0]!;
     await step("MU-01 GUI blank-system authoring/save/reopen/publish", async () => {
-      await gm.goto("/systems");
+      await gm.goto("/");
       await gm.getByTestId("library-new-system").click();
       await gm.getByTestId("create-draft-name").fill(`Tower of Ash ${stamp}`);
       await gm.getByTestId("create-draft-submit").click();
@@ -140,6 +145,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
         await gm.locator('[data-testid^="scalar-field-label-"]').last().fill(label);
       }
       await gm.getByTestId("document-editor-tab-templates").click();
+      const modifiers: Array<{ actionId: string; fieldId: string }> = [];
       for (const [index, label, kind] of [[1,"Longsword","item"],[2,"Firebolt","spell"],[3,"Rope","item"]] as const) {
         await gm.getByTestId("templates-add-button").click();
         await gm.getByTestId(`template-label-template_${index}`).fill(label);
@@ -151,7 +157,9 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
             const id = (await section.getAttribute("data-testid"))!.slice("roll-action-".length);
             await gm.getByTestId(`roll-action-label-${id}`).fill(action!);
             await gm.getByTestId(`dice-kind-${id}`).selectOption(die!);
-            await gm.getByTestId(`roll-field-modifier-${id}`).selectOption(index === 1 ? "field" : "field_2");
+            // Character fields become eligible only after a compatible slot is
+            // bound to the character's sheet. Author the roll now, bind it below.
+            modifiers.push({ actionId: id, fieldId: index === 1 ? "field" : "field_2" });
           }
         }
       }
@@ -165,6 +173,10 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
       await gm.getByTestId("sheet-add-section").click();
       await gm.getByTestId("section-label-section_1").fill("Adventurer");
       for (const id of ["field","field_1","field_2","slot_1","slot_2"]) await gm.getByTestId(`sheet-place-definition-${id}`).click();
+      await gm.getByTestId("document-editor-tab-templates").click();
+      for (const { actionId, fieldId } of modifiers) {
+        await gm.getByTestId(`roll-field-modifier-${actionId}`).selectOption(fieldId);
+      }
       await saveDraft(gm);
       await gm.reload();
       await expect(gm.getByTestId("document-editor-header")).toBeVisible();
@@ -177,14 +189,15 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
       await gm.getByTestId("publish-dialog-submit").click();
       const cta = gm.getByTestId("publish-dialog-create-character"); await expect(cta).toBeVisible();
       versionId = new URL((await cta.getAttribute("href"))!, baseURL).searchParams.get("systemVersionId")!;
-      await gm.goto("/systems");
+      await gm.goto("/");
       await gm.getByTestId(`system-sharing-${systemId}`).selectOption("link");
       await gm.getByRole("button", { name: "Share with link", exact: true }).click();
       await expect(gm.getByRole("dialog")).toHaveCount(0);
     });
     await step("MU-02 GUI adventure and public/GM-only notes", async () => {
       await gm.goto("/campaigns/new");
-      await gm.getByRole("button", { name: `Tower of Ash ${stamp} 1.0.0`, exact: true }).click();
+      // The picker also includes the publish date and short version ID.
+      await gm.getByRole("button", { name: new RegExp(`^Tower of Ash ${stamp} 1\\.0\\.0 ·`) }).click();
       await gm.getByLabel("Campaign title").fill(`The Missing Caravan ${stamp}`);
       await gm.getByRole("button", { name: "Create campaign", exact: true }).click();
       await expect(gm).toHaveURL(/\/campaigns\/[0-9a-f-]{36}/);
@@ -218,7 +231,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
         await page.getByRole("link", { name: "Open campaign", exact: true }).click();
         await expect(page.getByRole("tab", { name: "Settings", exact: true })).toHaveCount(0);
         await page.getByRole("tab", { name: "Content", exact: true }).click();
-        await page.getByRole("button", { name: "Village briefing", exact: true }).click();
+        await page.getByRole("button", { name: "Open Village briefing", exact: true }).click();
         await expect(page.getByText("Find the caravan near the ruined tower", { exact: true })).toBeVisible();
         await expect(page.getByText("GM secret: ambush", { exact: true })).toHaveCount(0);
         await gm.getByRole("button", { name: "Done", exact: true }).click();
@@ -246,7 +259,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
         } else {
           await page.goto(`/campaigns/${campaignId}`);
           await page.getByLabel("Character name").fill(name);
-          await page.getByLabel("Entity", { exact: true }).selectOption({ label: "Hero" });
+          await page.getByLabel("Entity definition", { exact: true }).selectOption({ label: "Hero" });
           const created = page.waitForResponse(r => r.request().method() === "POST" && r.url().endsWith(`/campaigns/${campaignId}/characters`));
           await page.getByRole("button", { name: "New campaign character", exact: true }).click();
           const res = await created; expect(res.status()).toBe(201);
@@ -292,6 +305,10 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
         const page = pages[i + 1]!; await page.reload();
         await expect(page.getByText(`Lucky token ${i + 1}`, { exact: true })).toBeVisible(); await noOverflow(page);
         expect((await contexts[i + 1]!.request.get(`/api/characters/${characters[(i + 1) % 3]!.characterId}`)).status()).toBe(404);
+        await page.goto(`/characters/${characters[(i + 1) % 3]!.characterId}`);
+        await expect(page.getByText("This character is unavailable.", { exact: true })).toBeVisible();
+        await expect(page.getByRole("heading", { name: characters[(i + 1) % 3]!.name, exact: true })).toHaveCount(0);
+        await page.goto(`/characters/${characters[i]!.characterId}`);
         expect((await contexts[i + 1]!.request.get(`/api/campaigns/${campaignId}/item-templates/${templates[3]!.templateId}`)).status()).toBe(404);
         expect((await contexts[i + 1]!.request.post(`/api/campaigns/${campaignId}/item-templates`, { data: { kind: "item", audience: "all_players", grants: [], content: { name: "Forbidden" }, expectedTemplateRevision: 0, idempotencyKey: key() } })).status()).toBe(404);
         await page.getByTestId("slot-add-slot_1").click(); await expect(page.getByRole("option", { name: /Secret vault key/ })).toHaveCount(0); await page.getByRole("button", { name: "Cancel", exact: true }).click();
@@ -318,9 +335,18 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
       const roster = (await json(contexts[0]!.request,"GET",`/api/campaigns/${campaignId}/members`)).members;
       const p1 = roster.find((m: any) => m.userId === actorIds[1]);
       expect((await json(contexts[0]!.request,"GET",path)).template.grants).toEqual([{ userId: actorIds[1], generation: p1.generation }]);
-      for (let i = 1; i < 4; i++) expect((await contexts[i]!.request.get(path)).status()).toBe(i === 1 ? 200 : 404);
+      for (let i = 1; i < 4; i++) {
+        expect((await contexts[i]!.request.get(path)).status()).toBe(i === 1 ? 200 : 404);
+        await pages[i]!.goto(`/campaigns/${campaignId}`);
+        await pages[i]!.getByRole("tab", { name: "Items & powers", exact: true }).click();
+        await expect(pages[i]!.getByRole("heading", { name: "Ashguard blade", exact: true })).toBeVisible();
+        await expect(pages[i]!.getByRole("heading", { name: "Secret vault key", exact: true })).toHaveCount(i === 1 ? 1 : 0);
+      }
       for (const i of [1,2]) {
+        const renderedPreview = gm.waitForResponse(r => r.request().method() === "POST" && r.url().endsWith("/item-template-preview") && r.request().postDataJSON().targetUserId === actorIds[i]);
         await gm.getByLabel("Preview as player", { exact: true }).selectOption({ label: `${names[i]} (${actorIds[i]})` });
+        expect((await renderedPreview).status()).toBe(200);
+        await expect(gm.getByRole("heading", { name: "Ashguard blade", exact: true })).toBeVisible();
         const actual = (await json(contexts[i]!.request,"GET",`/api/campaigns/${campaignId}/item-templates`)).templates;
         const preview = (await json(contexts[0]!.request,"POST",`/api/campaigns/${campaignId}/item-template-preview`,{targetUserId:actorIds[i]})).templates;
         expect(preview).toEqual(actual);
@@ -328,6 +354,10 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
       }
       await gm.getByLabel("Preview as player", { exact: true }).selectOption("");
       // Authorized catalog visibility does not permit placement of a restricted draft.
+      await pages[1]!.goto(`/characters/${characters[0]!.characterId}`);
+      await pages[1]!.getByTestId("slot-add-slot_1").click();
+      await expect(pages[1]!.getByRole("option", { name: /Secret vault key/ })).toHaveCount(0);
+      await pages[1]!.getByRole("button", { name: "Cancel", exact: true }).click();
       const ch = await character(0);
       const restricted = (await json(contexts[1]!.request,"GET",path)).template;
       const blocked = await contexts[1]!.request.post(`/api/characters/${ch.characterId}/entries`, { data: { entry: { entryId: key(), slotId: "slot_1", templateId: null, values: {}, source: { kind: "campaign", campaignId, templateId: restricted.templateId, templateRevision: restricted.revision, contentRevision: restricted.contentRevision } }, expectedRevision: ch.revision, idempotencyKey: key() } });
@@ -353,7 +383,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
     await step("MU-11 independent placed-copy quantities", async () => {
       const page = pages[1]!;
       const entry = page.locator('li[data-testid^="slot-entry-"]').filter({ has: page.getByText("Caravan supplies",{exact:true}) });
-      await entry.getByRole("button",{name:"Edit values",exact:true}).click(); await entry.getByLabel("Quantity",{exact:true}).fill("2"); await entry.getByRole("button",{name:"Save values",exact:true}).click();
+      await entry.getByRole("button",{name:"Edit entry",exact:true}).click(); await entry.getByLabel("Quantity",{exact:true}).fill("2"); await entry.getByRole("button",{name:"Save entry",exact:true}).click();
       await expect.poll(async () => (Object.values((await character(0)).state.entries).find((e:any)=>e.values.name==="Caravan supplies") as any)?.quantity).toBe(2);
       await page.reload(); await expect(page.getByText("Caravan supplies",{exact:true})).toBeVisible();
       expect((Object.values((await character(1)).state.entries).find((e:any)=>e.values.name==="Caravan supplies") as any)?.quantity).toBe(3);
@@ -362,11 +392,20 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
       expect(pageErrors).toEqual([]);
     });
     await step("MU-12 scoped archive and independent readback", archive);
+  } catch (error) {
+    journeyFailed = true;
+    throw error;
   } finally {
     if (!steps.some(s => s.step.startsWith("MU-12") && s.status === "PASS")) {
       try { await archive(); } catch (error) { cleanup.error = String(error); }
     }
     await test.info().attach("multi-user-sanitized-evidence", { body: JSON.stringify({ stamp, baseURL, systemId, versionId, campaignId, actorIds, viewports:widths, characters, templates, steps, rolls, totalSuccessfulRolls: rolls.length, pageErrors, cleanup },null,2), contentType:"application/json" });
-    await Promise.all(contexts.map(c => c.close()));
+    const closed = await Promise.allSettled(contexts.map(c => c.close()));
+    // A timeout already disposes contexts. Do not replace the primary failed
+    // step with Target.disposeBrowserContext from best-effort cleanup.
+    if (!journeyFailed) {
+      const failures = closed.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+      if (failures.length) throw new AggregateError(failures.map(result => result.reason), "Journey context cleanup failed");
+    }
   }
 }

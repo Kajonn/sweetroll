@@ -137,7 +137,7 @@ export async function buildI6Harness(input?: {
   const handle = await buildI3App({
     pool,
     wrapRuntime: input?.wrapRuntime,
-    extraRoutes: ({ authoring, characters, runtime }) => {
+    extraRoutes: ({ authoring, characters, runtime, identity }) => {
       const limits = input?.limits ?? DEFAULT_CAMPAIGN_LIMITS;
       placement = createCampaignPlacement({
         pool,
@@ -150,7 +150,7 @@ export async function buildI6Harness(input?: {
         charactersPlacement: placement,
     loadTemplatePackage:createPostgresPublishedPackageLoader(pool),
       });
-      return buildCampaignsRoutes({ campaigns, characters, runtime });
+      return buildCampaignsRoutes({ campaigns, characters, runtime, identity });
     },
   });
 

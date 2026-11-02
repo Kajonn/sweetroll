@@ -1,0 +1,1364 @@
+{
+  "recordType": "post-fix-hosted-multi-user-acceptance",
+  "date": "2026-11-02",
+  "result": "PASS",
+  "applicationCommit": "a1fc29907c6462784caf99f81ed24c6489d45e81",
+  "implementationCommit": "bfddc9565ff9a6f4dd816640c05d00841cac86f2",
+  "runnerFixtureBlob": "de9b268fcdbd3bba8fd1b144acc6bc7265a8b450",
+  "applicationDiff": "Runtime application/database unchanged after the deployed CI commit. Follow-up changes cover runner transport/readback synchronization, Vite local health forwarding, membership-race regression expectations and evidence/documentation.",
+  "deployment": {
+    "projectId": "f1770b85-8e58-4b99-b981-dc76e106a2c9",
+    "environmentId": "0382c61c-327d-4336-be1b-ec4d81a6d5e7",
+    "serviceId": "b2c4d538-67a7-4533-8707-8a5eccab1870",
+    "id": "affa05b3-c796-42b0-8e63-7df0faf21771",
+    "status": "SUCCESS",
+    "url": "https://sweetroll-d2-preview.up.railway.app",
+    "authMode": "test-auth",
+    "imageDigest": "sha256:d815302ddf6c243b6520e64316e3f47920f2dee2282426f6b31218130100867a"
+  },
+  "assets": {
+    "commit": "a1fc29907c6462784caf99f81ed24c6489d45e81",
+    "deploymentId": "affa05b3-c796-42b0-8e63-7df0faf21771",
+    "buildId": "build-mvz6rlb5",
+    "checkedAt": "2026-11-02T11:41:04.560Z",
+    "assets": [
+      {
+        "path": "/index.html",
+        "status": 200,
+        "bytes": 2338,
+        "sha256": "c9ab030fc6e3205494b4e28aecabba5b1296952790dc82d8757f3e01fe5ea7d2",
+        "localSha256": "c9ab030fc6e3205494b4e28aecabba5b1296952790dc82d8757f3e01fe5ea7d2",
+        "match": true
+      },
+      {
+        "path": "/assets/index-BqgVLvNO.css",
+        "status": 200,
+        "bytes": 77826,
+        "sha256": "6b4ad545fac218e2f65fc230d1cc3393f44f66a8464a47b198e8282200631104",
+        "localSha256": "6b4ad545fac218e2f65fc230d1cc3393f44f66a8464a47b198e8282200631104",
+        "match": true
+      },
+      {
+        "path": "/assets/index-xSPsGoE_.js",
+        "status": 200,
+        "bytes": 893790,
+        "sha256": "393ecf13103a381acb22ee7ea12a8661c614225a8a0cafb7ffe9a62610616a59",
+        "localSha256": "393ecf13103a381acb22ee7ea12a8661c614225a8a0cafb7ffe9a62610616a59",
+        "match": true
+      },
+      {
+        "path": "/sw.js",
+        "status": 200,
+        "bytes": 3545,
+        "sha256": "ce72f066d7bb861665b66a2ba11a173c0d6cd2f83c59de363779f19fa8e4fd91",
+        "localSha256": "ce72f066d7bb861665b66a2ba11a173c0d6cd2f83c59de363779f19fa8e4fd91",
+        "match": true
+      },
+      {
+        "path": "/offline-manifest.json",
+        "status": 200,
+        "bytes": 137,
+        "sha256": "1828eef06196b7062203d8ccaa37457ba96deb7b27726b97a0a5506502fd2215",
+        "localSha256": "1828eef06196b7062203d8ccaa37457ba96deb7b27726b97a0a5506502fd2215",
+        "match": true
+      },
+      {
+        "path": "/manifest.webmanifest",
+        "status": 200,
+        "bytes": 346,
+        "sha256": "b0272894bce12b4e60fc4a323de2a01245f6d9adc9c8a0fa7758566bac4f9810",
+        "localSha256": "b0272894bce12b4e60fc4a323de2a01245f6d9adc9c8a0fa7758566bac4f9810",
+        "match": true
+      }
+    ]
+  },
+  "ci": {
+    "url": "https://github.com/Kajonn/sweetroll/actions/runs/41437546639",
+    "number": 187,
+    "commit": "a1fc29907c6462784caf99f81ed24c6489d45e81",
+    "result": "all seven verification jobs PASS; 31 offline tests PASS"
+  },
+  "focusedTests": {
+    "result": "PASS",
+    "count": 31,
+    "files": {
+      "InvitationReview": 8,
+      "AdoptPersonalCharacter": 4,
+      "TemplateSharing": 2,
+      "CampaignTemplates": 10,
+      "FieldControl": 7
+    }
+  },
+  "attempts": [
+    {
+      "result": "failed",
+      "durationMs": 134186,
+      "startedAt": "2026-11-02T11:40:24.565Z",
+      "reason": "FAIL at MU-04: APIRequestContext observation exceeded the default 5-second poll budget; independent reads confirmed Might=2.",
+      "stamp": "472145eb",
+      "steps": [
+        {
+          "step": "MU-00 deployment/fixture preflight",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-01 GUI blank-system authoring/save/reopen/publish",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-02 GUI adventure and public/GM-only notes",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-03 three manual token reviews and accepts",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-04 personal creation/GUI adoption and two direct campaign creations",
+          "status": "FAIL"
+        }
+      ],
+      "cleanup": {
+        "characterCount": 1,
+        "templateCount": 0,
+        "campaign": "archived",
+        "system": "private, archived"
+      }
+    },
+    {
+      "result": "timedOut",
+      "durationMs": 360168,
+      "startedAt": "2026-11-02T11:46:04.185Z",
+      "reason": "FAIL at MU-12: all functional steps passed; six-minute total expired on the final system readback. Independent later readback confirmed all scoped cleanup.",
+      "stamp": "d962d7e8",
+      "steps": [
+        {
+          "step": "MU-00 deployment/fixture preflight",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-01 GUI blank-system authoring/save/reopen/publish",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-02 GUI adventure and public/GM-only notes",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-03 three manual token reviews and accepts",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-04 personal creation/GUI adoption and two direct campaign creations",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-05 inherited and blank adventure templates",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-06 six entries and six actions for each player",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-07 reopen/responsiveness and authorization",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-08 six concurrent actor-bound rolls",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-09 named restricted recipients/actual preview/reveal/narrow",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-10 production-worker offline pending/reload/replay",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-11 independent placed-copy quantities",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-12 scoped archive and independent readback",
+          "status": "FAIL"
+        }
+      ],
+      "cleanup": {
+        "characterCount": 3,
+        "templateCount": 4,
+        "campaign": "archived"
+      }
+    },
+    {
+      "result": "passed",
+      "durationMs": 144743,
+      "startedAt": "2026-11-02T11:55:04.429Z",
+      "reason": "PASS: all MU-00–MU-12 steps completed in order.",
+      "stamp": "12283e8e",
+      "steps": [
+        {
+          "step": "MU-00 deployment/fixture preflight",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-01 GUI blank-system authoring/save/reopen/publish",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-02 GUI adventure and public/GM-only notes",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-03 three manual token reviews and accepts",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-04 personal creation/GUI adoption and two direct campaign creations",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-05 inherited and blank adventure templates",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-06 six entries and six actions for each player",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-07 reopen/responsiveness and authorization",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-08 six concurrent actor-bound rolls",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-09 named restricted recipients/actual preview/reveal/narrow",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-10 production-worker offline pending/reload/replay",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-11 independent placed-copy quantities",
+          "status": "PASS"
+        },
+        {
+          "step": "MU-12 scoped archive and independent readback",
+          "status": "PASS"
+        }
+      ],
+      "cleanup": {
+        "characterCount": 3,
+        "templateCount": 4,
+        "campaign": "archived",
+        "system": "private, archived"
+      }
+    }
+  ],
+  "secondAttemptCleanupReadback": {
+    "checkedAt": "2026-11-02T11:55:14.821Z",
+    "rows": [
+      {
+        "path": "/api/characters/197bdd22-4413-4ed8-9260-a0635550a27a",
+        "status": 200,
+        "lifecycle": "archived"
+      },
+      {
+        "path": "/api/characters/36cf1ce9-2937-47d7-9130-7851aa1d5612",
+        "status": 200,
+        "lifecycle": "archived"
+      },
+      {
+        "path": "/api/characters/4dd62992-c360-440d-b485-bfcc9b47ee68",
+        "status": 200,
+        "lifecycle": "archived"
+      },
+      {
+        "path": "/api/campaigns/3743dbd7-623a-4920-af39-8582e67217d8/item-templates/4aec4505-d4ac-42ab-b6e6-2f17cdf2cf0a",
+        "status": 200,
+        "lifecycle": "archived"
+      },
+      {
+        "path": "/api/campaigns/3743dbd7-623a-4920-af39-8582e67217d8/item-templates/66e9a576-caad-482b-8126-192db468be5a",
+        "status": 200,
+        "lifecycle": "archived"
+      },
+      {
+        "path": "/api/campaigns/3743dbd7-623a-4920-af39-8582e67217d8/item-templates/a284dae3-79d8-436d-a7ae-3e2ddd8f06d5",
+        "status": 200,
+        "lifecycle": "archived"
+      },
+      {
+        "path": "/api/campaigns/3743dbd7-623a-4920-af39-8582e67217d8/item-templates/54b83def-82bd-4ce2-a965-d681bb951419",
+        "status": 200,
+        "lifecycle": "archived"
+      },
+      {
+        "path": "/api/campaigns/3743dbd7-623a-4920-af39-8582e67217d8",
+        "status": 200,
+        "lifecycle": "archived"
+      },
+      {
+        "path": "/api/systems/76ce5a9e-79d4-4e96-9579-4fcb0421490c",
+        "status": 200,
+        "lifecycle": "archived",
+        "access": "private"
+      }
+    ]
+  },
+  "journey": {
+    "stamp": "12283e8e",
+    "baseURL": "https://sweetroll-d2-preview.up.railway.app",
+    "systemId": "737e258a-192a-4f1e-9933-7393cf3a219c",
+    "versionId": "a4e85fa9-25e0-4c35-a340-986c394489b5",
+    "campaignId": "451060c9-0cfd-412a-8181-b1fd3ea3432a",
+    "actorIds": [
+      "dafd0175-8d2c-4123-b8bb-f857b7844b3e",
+      "6d803bc0-21ab-48d1-9457-4e9ac3030534",
+      "c115d74b-058a-4135-9f22-ab27f8f42783",
+      "e0e2a372-b9fb-400c-8ec6-62222068e570"
+    ],
+    "viewports": [
+      1280,
+      360,
+      768,
+      1280
+    ],
+    "characters": [
+      {
+        "characterId": "c9835eca-f067-403f-aca9-56612d601ae8",
+        "name": "Aldric the fighter 12283e8e",
+        "revision": 1
+      },
+      {
+        "characterId": "d95d9d50-ddd2-426d-920f-49097f9328d8",
+        "ownerId": null,
+        "campaignId": "451060c9-0cfd-412a-8181-b1fd3ea3432a",
+        "controllers": [
+          "c115d74b-058a-4135-9f22-ab27f8f42783"
+        ],
+        "placementGeneration": 1,
+        "returnOwnerId": null,
+        "name": "Bryn the mage 12283e8e",
+        "systemVersionId": "a4e85fa9-25e0-4c35-a340-986c394489b5",
+        "entityDefinitionId": "entity_1",
+        "revision": 1,
+        "lifecycle": "active",
+        "archivedAt": null,
+        "createdAt": "2026-11-02T11:56:32.083Z",
+        "updatedAt": "2026-11-02T11:56:32.083Z",
+        "state": {
+          "schemaVersion": "1.0",
+          "values": {
+            "field": 0,
+            "field_1": 0,
+            "field_2": 0
+          },
+          "entries": {}
+        },
+        "derivedValues": {},
+        "validations": [],
+        "projection": {
+          "projectionVersion": "1.0",
+          "systemId": "737e258a-192a-4f1e-9933-7393cf3a219c",
+          "versionId": "a4e85fa9-25e0-4c35-a340-986c394489b5",
+          "packageChecksum": "sha256:8fbda421bf034f20f73553b17a059fbd3ae0593a95514e68a11ef9a64a2dfe2c",
+          "entityId": "entity_1",
+          "entityLabel": "Hero",
+          "sheets": [
+            {
+              "id": "sheet_1",
+              "label": "Sheet name",
+              "sections": [
+                {
+                  "id": "section_1",
+                  "label": "Adventurer",
+                  "elements": [
+                    {
+                      "kind": "field",
+                      "id": "element_1",
+                      "fieldId": "field",
+                      "label": "Might",
+                      "fieldKind": "integer",
+                      "value": 0,
+                      "editable": true,
+                      "constraints": {
+                        "required": false,
+                        "min": 0,
+                        "max": 20,
+                        "step": 1
+                      },
+                      "validations": []
+                    },
+                    {
+                      "kind": "field",
+                      "id": "element_2",
+                      "fieldId": "field_1",
+                      "label": "Agility",
+                      "fieldKind": "integer",
+                      "value": 0,
+                      "editable": true,
+                      "constraints": {
+                        "required": false,
+                        "min": 0,
+                        "max": 20,
+                        "step": 1
+                      },
+                      "validations": []
+                    },
+                    {
+                      "kind": "field",
+                      "id": "element_3",
+                      "fieldId": "field_2",
+                      "label": "Will",
+                      "fieldKind": "integer",
+                      "value": 0,
+                      "editable": true,
+                      "constraints": {
+                        "required": false,
+                        "min": 0,
+                        "max": 20,
+                        "step": 1
+                      },
+                      "validations": []
+                    },
+                    {
+                      "kind": "slot",
+                      "id": "element_4",
+                      "slotId": "slot_1",
+                      "label": "Equipment",
+                      "accepts": [
+                        "item"
+                      ],
+                      "entries": []
+                    },
+                    {
+                      "kind": "slot",
+                      "id": "element_5",
+                      "slotId": "slot_2",
+                      "label": "Spells",
+                      "accepts": [
+                        "spell"
+                      ],
+                      "entries": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "derivedValues": {},
+          "validations": [],
+          "completionFields": []
+        },
+        "reconciliation": {
+          "characterId": "d95d9d50-ddd2-426d-920f-49097f9328d8",
+          "baseRevision": 1,
+          "revision": 1,
+          "packageChecksum": "sha256:8fbda421bf034f20f73553b17a059fbd3ae0593a95514e68a11ef9a64a2dfe2c",
+          "projectionVersion": "1.0",
+          "commandExecutionId": "f43c4a72-3dab-429c-b843-d84074be4235",
+          "replayExpiresAt": "2026-12-02T11:56:32.095Z",
+          "replayed": false,
+          "changedDefinitionIds": [],
+          "activityCursor": null,
+          "cacheDisposition": "retain"
+        }
+      },
+      {
+        "characterId": "380138f8-ff7f-44e5-9c57-0602ecf97801",
+        "ownerId": null,
+        "campaignId": "451060c9-0cfd-412a-8181-b1fd3ea3432a",
+        "controllers": [
+          "e0e2a372-b9fb-400c-8ec6-62222068e570"
+        ],
+        "placementGeneration": 1,
+        "returnOwnerId": null,
+        "name": "Cora the scout 12283e8e",
+        "systemVersionId": "a4e85fa9-25e0-4c35-a340-986c394489b5",
+        "entityDefinitionId": "entity_1",
+        "revision": 1,
+        "lifecycle": "active",
+        "archivedAt": null,
+        "createdAt": "2026-11-02T11:56:35.498Z",
+        "updatedAt": "2026-11-02T11:56:35.498Z",
+        "state": {
+          "schemaVersion": "1.0",
+          "values": {
+            "field": 0,
+            "field_1": 0,
+            "field_2": 0
+          },
+          "entries": {}
+        },
+        "derivedValues": {},
+        "validations": [],
+        "projection": {
+          "projectionVersion": "1.0",
+          "systemId": "737e258a-192a-4f1e-9933-7393cf3a219c",
+          "versionId": "a4e85fa9-25e0-4c35-a340-986c394489b5",
+          "packageChecksum": "sha256:8fbda421bf034f20f73553b17a059fbd3ae0593a95514e68a11ef9a64a2dfe2c",
+          "entityId": "entity_1",
+          "entityLabel": "Hero",
+          "sheets": [
+            {
+              "id": "sheet_1",
+              "label": "Sheet name",
+              "sections": [
+                {
+                  "id": "section_1",
+                  "label": "Adventurer",
+                  "elements": [
+                    {
+                      "kind": "field",
+                      "id": "element_1",
+                      "fieldId": "field",
+                      "label": "Might",
+                      "fieldKind": "integer",
+                      "value": 0,
+                      "editable": true,
+                      "constraints": {
+                        "required": false,
+                        "min": 0,
+                        "max": 20,
+                        "step": 1
+                      },
+                      "validations": []
+                    },
+                    {
+                      "kind": "field",
+                      "id": "element_2",
+                      "fieldId": "field_1",
+                      "label": "Agility",
+                      "fieldKind": "integer",
+                      "value": 0,
+                      "editable": true,
+                      "constraints": {
+                        "required": false,
+                        "min": 0,
+                        "max": 20,
+                        "step": 1
+                      },
+                      "validations": []
+                    },
+                    {
+                      "kind": "field",
+                      "id": "element_3",
+                      "fieldId": "field_2",
+                      "label": "Will",
+                      "fieldKind": "integer",
+                      "value": 0,
+                      "editable": true,
+                      "constraints": {
+                        "required": false,
+                        "min": 0,
+                        "max": 20,
+                        "step": 1
+                      },
+                      "validations": []
+                    },
+                    {
+                      "kind": "slot",
+                      "id": "element_4",
+                      "slotId": "slot_1",
+                      "label": "Equipment",
+                      "accepts": [
+                        "item"
+                      ],
+                      "entries": []
+                    },
+                    {
+                      "kind": "slot",
+                      "id": "element_5",
+                      "slotId": "slot_2",
+                      "label": "Spells",
+                      "accepts": [
+                        "spell"
+                      ],
+                      "entries": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "derivedValues": {},
+          "validations": [],
+          "completionFields": []
+        },
+        "reconciliation": {
+          "characterId": "380138f8-ff7f-44e5-9c57-0602ecf97801",
+          "baseRevision": 1,
+          "revision": 1,
+          "packageChecksum": "sha256:8fbda421bf034f20f73553b17a059fbd3ae0593a95514e68a11ef9a64a2dfe2c",
+          "projectionVersion": "1.0",
+          "commandExecutionId": "732aaba3-afa3-486d-8b39-8cbb740afafb",
+          "replayExpiresAt": "2026-12-02T11:56:35.510Z",
+          "replayed": false,
+          "changedDefinitionIds": [],
+          "activityCursor": null,
+          "cacheDisposition": "retain"
+        }
+      }
+    ],
+    "templates": [
+      {
+        "templateId": "3065111f-d7ea-4877-a505-25b46e4fdc02",
+        "name": "Ashguard blade"
+      },
+      {
+        "templateId": "b18aad1a-0155-45af-a105-2c8ab91cde86",
+        "name": "Ember spell"
+      },
+      {
+        "templateId": "3f00d35b-0561-42a1-8d02-93463dfcf638",
+        "name": "Caravan supplies"
+      },
+      {
+        "templateId": "d42c1ab7-5403-4536-9e7b-4813201edf0e",
+        "name": "Secret vault key"
+      }
+    ],
+    "steps": [
+      {
+        "step": "MU-00 deployment/fixture preflight",
+        "status": "PASS"
+      },
+      {
+        "step": "MU-01 GUI blank-system authoring/save/reopen/publish",
+        "status": "PASS"
+      },
+      {
+        "step": "MU-02 GUI adventure and public/GM-only notes",
+        "status": "PASS"
+      },
+      {
+        "step": "MU-03 three manual token reviews and accepts",
+        "status": "PASS"
+      },
+      {
+        "step": "MU-04 personal creation/GUI adoption and two direct campaign creations",
+        "status": "PASS"
+      },
+      {
+        "step": "MU-05 inherited and blank adventure templates",
+        "status": "PASS"
+      },
+      {
+        "step": "MU-06 six entries and six actions for each player",
+        "status": "PASS"
+      },
+      {
+        "step": "MU-07 reopen/responsiveness and authorization",
+        "status": "PASS"
+      },
+      {
+        "step": "MU-08 six concurrent actor-bound rolls",
+        "status": "PASS"
+      },
+      {
+        "step": "MU-09 named restricted recipients/actual preview/reveal/narrow",
+        "status": "PASS"
+      },
+      {
+        "step": "MU-10 production-worker offline pending/reload/replay",
+        "status": "PASS"
+      },
+      {
+        "step": "MU-11 independent placed-copy quantities",
+        "status": "PASS"
+      },
+      {
+        "step": "MU-12 scoped archive and independent readback",
+        "status": "PASS"
+      }
+    ],
+    "rolls": [
+      {
+        "player": 1,
+        "entryName": "Longsword",
+        "actionName": "Sword attack",
+        "roll": {
+          "actionId": "action_1",
+          "expression": "d20 + fields.field",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 9,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field",
+              "value": 2
+            }
+          ],
+          "total": 11,
+          "output": "Result: 11",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 1,
+        "entryName": "Longsword",
+        "actionName": "Sword damage",
+        "roll": {
+          "actionId": "action_2",
+          "expression": "d8 + fields.field",
+          "dice": [
+            {
+              "sides": 8,
+              "value": 8,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field",
+              "value": 2
+            }
+          ],
+          "total": 10,
+          "output": "Result: 10",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 1,
+        "entryName": "Firebolt",
+        "actionName": "Cast Firebolt",
+        "roll": {
+          "actionId": "action_3",
+          "expression": "d20 + fields.field_2",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 14,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field_2",
+              "value": 4
+            }
+          ],
+          "total": 18,
+          "output": "Result: 18",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 1,
+        "entryName": "Firebolt",
+        "actionName": "Firebolt damage",
+        "roll": {
+          "actionId": "action_4",
+          "expression": "d6 + fields.field_2",
+          "dice": [
+            {
+              "sides": 6,
+              "value": 6,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field_2",
+              "value": 4
+            }
+          ],
+          "total": 10,
+          "output": "Result: 10",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 1,
+        "entryName": "Ashguard blade",
+        "actionName": "Sword attack",
+        "roll": {
+          "actionId": "action_1",
+          "expression": "d20 + fields.field",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 4,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field",
+              "value": 2
+            }
+          ],
+          "total": 6,
+          "output": "Result: 6",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 1,
+        "entryName": "Ember spell",
+        "actionName": "Cast Firebolt",
+        "roll": {
+          "actionId": "action_3",
+          "expression": "d20 + fields.field_2",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 16,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field_2",
+              "value": 4
+            }
+          ],
+          "total": 20,
+          "output": "Result: 20",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 2,
+        "entryName": "Longsword",
+        "actionName": "Sword attack",
+        "roll": {
+          "actionId": "action_1",
+          "expression": "d20 + fields.field",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 11,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field",
+              "value": 3
+            }
+          ],
+          "total": 14,
+          "output": "Result: 14",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 2,
+        "entryName": "Longsword",
+        "actionName": "Sword damage",
+        "roll": {
+          "actionId": "action_2",
+          "expression": "d8 + fields.field",
+          "dice": [
+            {
+              "sides": 8,
+              "value": 7,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field",
+              "value": 3
+            }
+          ],
+          "total": 10,
+          "output": "Result: 10",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 2,
+        "entryName": "Firebolt",
+        "actionName": "Cast Firebolt",
+        "roll": {
+          "actionId": "action_3",
+          "expression": "d20 + fields.field_2",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 6,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field_2",
+              "value": 3
+            }
+          ],
+          "total": 9,
+          "output": "Result: 9",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 2,
+        "entryName": "Firebolt",
+        "actionName": "Firebolt damage",
+        "roll": {
+          "actionId": "action_4",
+          "expression": "d6 + fields.field_2",
+          "dice": [
+            {
+              "sides": 6,
+              "value": 2,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field_2",
+              "value": 3
+            }
+          ],
+          "total": 5,
+          "output": "Result: 5",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 2,
+        "entryName": "Ashguard blade",
+        "actionName": "Sword attack",
+        "roll": {
+          "actionId": "action_1",
+          "expression": "d20 + fields.field",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 8,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field",
+              "value": 3
+            }
+          ],
+          "total": 11,
+          "output": "Result: 11",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 2,
+        "entryName": "Ember spell",
+        "actionName": "Cast Firebolt",
+        "roll": {
+          "actionId": "action_3",
+          "expression": "d20 + fields.field_2",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 7,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field_2",
+              "value": 3
+            }
+          ],
+          "total": 10,
+          "output": "Result: 10",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 3,
+        "entryName": "Longsword",
+        "actionName": "Sword attack",
+        "roll": {
+          "actionId": "action_1",
+          "expression": "d20 + fields.field",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 8,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field",
+              "value": 4
+            }
+          ],
+          "total": 12,
+          "output": "Result: 12",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 3,
+        "entryName": "Longsword",
+        "actionName": "Sword damage",
+        "roll": {
+          "actionId": "action_2",
+          "expression": "d8 + fields.field",
+          "dice": [
+            {
+              "sides": 8,
+              "value": 3,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field",
+              "value": 4
+            }
+          ],
+          "total": 7,
+          "output": "Result: 7",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 3,
+        "entryName": "Firebolt",
+        "actionName": "Cast Firebolt",
+        "roll": {
+          "actionId": "action_3",
+          "expression": "d20 + fields.field_2",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 10,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field_2",
+              "value": 2
+            }
+          ],
+          "total": 12,
+          "output": "Result: 12",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 3,
+        "entryName": "Firebolt",
+        "actionName": "Firebolt damage",
+        "roll": {
+          "actionId": "action_4",
+          "expression": "d6 + fields.field_2",
+          "dice": [
+            {
+              "sides": 6,
+              "value": 5,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field_2",
+              "value": 2
+            }
+          ],
+          "total": 7,
+          "output": "Result: 7",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 3,
+        "entryName": "Ashguard blade",
+        "actionName": "Sword attack",
+        "roll": {
+          "actionId": "action_1",
+          "expression": "d20 + fields.field",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 9,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field",
+              "value": 4
+            }
+          ],
+          "total": 13,
+          "output": "Result: 13",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 3,
+        "entryName": "Ember spell",
+        "actionName": "Cast Firebolt",
+        "roll": {
+          "actionId": "action_3",
+          "expression": "d20 + fields.field_2",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 19,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field_2",
+              "value": 2
+            }
+          ],
+          "total": 21,
+          "output": "Result: 21",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 1,
+        "entryName": "Longsword",
+        "actionName": "Sword attack",
+        "roll": {
+          "actionId": "action_1",
+          "expression": "d20 + fields.field",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 11,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field",
+              "value": 2
+            }
+          ],
+          "total": 13,
+          "output": "Result: 13",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 3,
+        "entryName": "Longsword",
+        "actionName": "Sword attack",
+        "roll": {
+          "actionId": "action_1",
+          "expression": "d20 + fields.field",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 2,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field",
+              "value": 4
+            }
+          ],
+          "total": 6,
+          "output": "Result: 6",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 2,
+        "entryName": "Longsword",
+        "actionName": "Sword attack",
+        "roll": {
+          "actionId": "action_1",
+          "expression": "d20 + fields.field",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 1,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field",
+              "value": 3
+            }
+          ],
+          "total": 4,
+          "output": "Result: 4",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 3,
+        "entryName": "Firebolt",
+        "actionName": "Cast Firebolt",
+        "roll": {
+          "actionId": "action_3",
+          "expression": "d20 + fields.field_2",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 18,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field_2",
+              "value": 2
+            }
+          ],
+          "total": 20,
+          "output": "Result: 20",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 1,
+        "entryName": "Firebolt",
+        "actionName": "Cast Firebolt",
+        "roll": {
+          "actionId": "action_3",
+          "expression": "d20 + fields.field_2",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 20,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field_2",
+              "value": 4
+            }
+          ],
+          "total": 24,
+          "output": "Result: 24",
+          "audience": "campaign"
+        }
+      },
+      {
+        "player": 2,
+        "entryName": "Firebolt",
+        "actionName": "Cast Firebolt",
+        "roll": {
+          "actionId": "action_3",
+          "expression": "d20 + fields.field_2",
+          "dice": [
+            {
+              "sides": 20,
+              "value": 17,
+              "kept": true
+            }
+          ],
+          "bindings": [
+            {
+              "scope": "fields",
+              "definitionId": "field_2",
+              "value": 3
+            }
+          ],
+          "total": 20,
+          "output": "Result: 20",
+          "audience": "campaign"
+        }
+      }
+    ],
+    "totalSuccessfulRolls": 24,
+    "pageErrors": [],
+    "cleanup": {
+      "characterCount": 3,
+      "templateCount": 4,
+      "campaign": "archived",
+      "system": "private, archived"
+    }
+  },
+  "screenshots": [
+    "images/multi-user-2026-11-02/MU-04-personal-adoption-phone.png",
+    "images/multi-user-2026-11-02/MU-07-equipped-phone.png",
+    "images/multi-user-2026-11-02/MU-09-named-preview-desktop.png"
+  ],
+  "limits": [
+    "Synthetic fixture authentication, not provider login.",
+    "Chromium 130 with emulated viewport widths, not physical Android/iPad.",
+    "Physical-table/remote playtests and wider G9 public-release gates remain open."
+  ],
+  "credentials": "No cookies or invitation tokens included. A temporary fixture session present in failed-run transport diagnostics was revoked; diagnostic copies were redacted.",
+  "supplementalScreenshots": [
+    {
+      "path": "images/multi-user-2026-11-02/post-cleanup-named-preview.png",
+      "scope": "Read-only named-player preview after archive/cleanup; settled result, no resource mutation."
+    },
+    {
+      "path": "images/multi-user-2026-11-02/post-cleanup-sheet-top-phone.png",
+      "scope": "Read-only archived sheet at top of page; retained Might=2."
+    }
+  ],
+  "screenshotLimit": "Original full-page captures preserve the current scroll position of fixed/sticky UI; supplementary viewport captures start at the top. Visual G9 acceptance remains separate.",
+  "redRegressionRecheck": {
+    "baseComponentCommit": "c2a134123e30fe332bf20d814b63e54848597219",
+    "testAndOtherSourceCommit": "a1fc29907c6462784caf99f81ed24c6489d45e81",
+    "method": "Detached worktree: replace only InvitationReview.tsx, TemplateSharing.tsx and CampaignTemplates.tsx with their pre-fix versions; run current focused tests. No hosted or current application changes.",
+    "total": 20,
+    "failed": 6,
+    "passed": 14,
+    "failedCases": [
+      "previews the selected named player using the stable ID even with a long duplicate name",
+      "retains a manually reviewed token through accept",
+      "retains a manually reviewed token through decline",
+      "allows correcting an invalid manually entered token without echoing it",
+      "does not apply a late mutation to another invitation and safely unmounts pending review",
+      "labels recipients by name with stable disambiguation and submits only IDs and generations"
+    ],
+    "green": "The same current component tests passed in the 31-test focused run."
+  },
+  "ciFollowUp": {
+    "number": 188,
+    "url": "https://github.com/Kajonn/sweetroll/actions/runs/41442129810",
+    "result": "FAIL; existing membership race assertion and local Vite readiness routing exposed",
+    "fixes": [
+      "Vite development/preview now forwards /health to the backend; readiness assertion verifies JSON status=ok rather than accepting the SPA HTML 200.",
+      "Membership test covers the real race and both serialization orders: role-first means exact conflict/latestRevision=2; removal-first means exact not_found with no revision disclosure; exact one success, revision/accessRevision=2, matching single audit and roster state remain required."
+    ],
+    "runtimeApplicationChange": false
+  }
+}

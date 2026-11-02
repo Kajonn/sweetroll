@@ -21,6 +21,7 @@ function wrapperWith(client: QueryClient) {
 
 function member(userId: string, role: CampaignMember["role"], status: CampaignMember["status"]): CampaignMember {
   return {
+    displayName: null,
     campaignId: "c1",
     userId,
     role,

@@ -79,7 +79,7 @@ export function offlineAssetsPlugin(options: OfflineAssetsPluginOptions = {}): P
     },
     configurePreviewServer(server) {
       // Production SPA fallback: known shell paths and character deep links
-      // serve index.html; API/dev, files, and the worker pass through.
+      // serve index.html; API/dev/health, files, and the worker pass through.
       server.middlewares.use((req, _res, next) => {
         const rawUrl = req.url ?? "/";
         const path = rawUrl.split("?")[0] ?? "/";
@@ -92,6 +92,10 @@ export function offlineAssetsPlugin(options: OfflineAssetsPluginOptions = {}): P
           return;
         }
         if (path === "/dev" || path.startsWith("/dev/")) {
+          next();
+          return;
+        }
+        if (path === "/health" || path.startsWith("/health/")) {
           next();
           return;
         }

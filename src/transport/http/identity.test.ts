@@ -28,6 +28,7 @@ function makeStatefulIdentity() {
       revoked.add(token);
       return { ok: true, value: undefined };
     },
+    getDisplayNames: async () => ({ ok: true, value: [] }),
     getThemeDefault: async () => ({ ok: true, value: themeDefault }),
     setThemeDefault: async (_actorId, value) => {
       themeDefault = value;
@@ -44,6 +45,7 @@ function makeAnonymousIdentity() {
     },
     resolveSession: async () => ({ state: "anonymous" }),
     signOut: async () => ({ ok: true, value: undefined }),
+    getDisplayNames: async () => ({ ok: true, value: [] }),
     getThemeDefault: async () => ({ ok: true, value: null }),
     setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
   };
@@ -97,7 +99,8 @@ describe("identity HTTP routes", () => {
       },
       resolveSession: async () => ({ state: "session_expired" }),
       signOut: async () => ({ ok: true, value: undefined }),
-      getThemeDefault: async () => ({ ok: true, value: null }),
+      getDisplayNames: async () => ({ ok: true, value: [] }),
+    getThemeDefault: async () => ({ ok: true, value: null }),
       setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
     };
     const app = await build(expired);

@@ -460,30 +460,37 @@ describeWithDatabase("campaign membership races and owner protection (Task 3)", 
     expect(recovered.value).toMatchObject({ status: "active", revision: 5, accessRevision: 5 });
   });
 
-  it("serializes concurrent role change and removal at one revision: exactly one wins", async () => {
+  it.each(["concurrent", "role-first", "removal-first"] as const)("serializes role change and removal at one revision (%s): exactly one wins", async (order) => {
     const created = await createCampaign();
     expect(created.ok).toBe(true);
     if (!created.ok) return;
     const campaignId = created.value.campaignId;
     await seedMember(campaignId, h.users.player.actorId);
 
-    // Both commands are admitted together and synchronize on the campaign
-    // row lock (no sleeps): the winner bumps revision 1 -> 2 and the loser
-    // fails its post-authorization revision check.
-    const changeAtRevision = h.campaigns.changeRole(ctxFor(h.users.gm), {
+    // Exercise the real race and both serializations without timing sleeps.
+    // Authorization precedes revision checks: removal first makes the target
+    // unavailable; role change first leaves an authorized stale removal.
+    const changeAtRevision = () => h.campaigns.changeRole(ctxFor(h.users.gm), {
       campaignId,
       userId: h.users.player.actorId,
       role: "co_gm",
       expectedCampaignRevision: 1,
       idempotencyKey: randomUUID(),
     });
-    const removeAtSameRevision = h.campaigns.removeMember(ctxFor(h.users.gm), {
+    const removeAtSameRevision = () => h.campaigns.removeMember(ctxFor(h.users.gm), {
       campaignId,
       userId: h.users.player.actorId,
       expectedCampaignRevision: 1,
       idempotencyKey: randomUUID(),
     });
-    const outcomes = await Promise.all([changeAtRevision, removeAtSameRevision]);
+    const outcomes = order === "concurrent"
+      ? await Promise.all([changeAtRevision(), removeAtSameRevision()])
+      : order === "role-first"
+        ? [await changeAtRevision(), await removeAtSameRevision()]
+        : await (async () => {
+          const removed = await removeAtSameRevision();
+          return [await changeAtRevision(), removed];
+        })();
     expect(outcomes).toEqual(
       expect.arrayContaining([expect.objectContaining({ ok: false })]),
     );
@@ -495,14 +502,17 @@ describeWithDatabase("campaign membership races and owner protection (Task 3)", 
     const failure = failures[0];
     expect(failure?.ok).toBe(false);
     if (failure === undefined || failure.ok) return;
-    expect(failure.error.code).toBe("conflict");
-    expect(failure.error.latestRevision).toBe(2);
+    const roleWon = outcomes[0]?.ok === true;
+    expect(failure.error.code).toBe(roleWon ? "conflict" : "not_found");
+    expect(failure.error.latestRevision).toBe(roleWon ? 2 : undefined);
 
     // Exactly one membership write committed: nonzero counts prove the
     // winner applied once and the loser applied nothing.
     expect(await openRevision(campaignId)).toEqual({ revision: 2, accessRevision: 2 });
     const roleAudits = await auditCount(campaignId, "campaign_role_changed");
     const removalAudits = await auditCount(campaignId, "campaign_member_removed");
+    expect(roleAudits).toBe(roleWon ? 1 : 0);
+    expect(removalAudits).toBe(roleWon ? 0 : 1);
     expect(roleAudits + removalAudits).toBe(1);
 
     const roster = await h.campaigns.listMembers(ctxFor(h.users.gm), { campaignId });

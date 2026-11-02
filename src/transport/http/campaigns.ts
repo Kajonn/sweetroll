@@ -22,7 +22,10 @@ import { prepareCampaignCharacter } from "../../characters/campaignPlacement.js"
 import type { SystemRuntime } from "../../systems/runtime.js";
 import { CharacterViewDto, toCharacterViewDto } from "./characters.js";
 
+import type { Identity } from "../../identity/index.js";
+
 export type BuildCampaignsRoutesInput = {
+  identity: Pick<Identity, "getDisplayNames">;
   campaigns: Campaigns;
   /** Full-sheet composer for post-commit placement reads (same projection as standalone reads). */
   characters: Characters;
@@ -826,7 +829,7 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
       querystring: PageQuery,
       response: {
         "200": Type.Object({
-          members: Type.Array(MemberViewDto),
+          members: Type.Array(Type.Object({ ...MemberViewDto.properties, displayName: Type.Union([Type.String(), Type.Null()]) })),
           nextCursor: Type.Union([Type.String(), Type.Null()]),
           requestId: Type.String(),
         }),
@@ -1453,7 +1456,7 @@ function toFastifyResponses(response: Record<string, RouteResponse> | undefined)
 }
 
 export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => FastifyPluginCallback =
-  ({ campaigns, characters, runtime }) =>
+  ({ campaigns, characters, runtime, identity }) =>
   async (app) => {
     app.addHook("onSend", async (request, reply) => {
       reply.header("x-request-id", request.id);
@@ -1745,8 +1748,15 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
           cursor: page.cursor,
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
+        // Authorize and page through Campaigns before requesting Identity labels.
+        const labels = await identity.getDisplayNames(result.value.members
+          .filter((member) => member.status === "active").map((member) => member.userId));
+        if (!labels.ok) throw new Error("Member names unavailable");
+        const byId = new Map(labels.value.map((label) => [label.userId, label.displayName]));
         return {
-          members: result.value.members.map(toMemberDto),
+          members: result.value.members.map((member) => ({
+            ...(toMemberDto(member) as object), displayName: byId.get(member.userId) ?? null,
+          })),
           nextCursor: result.value.nextCursor,
           requestId: request.id,
         };

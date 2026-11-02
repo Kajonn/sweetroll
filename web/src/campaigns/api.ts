@@ -75,6 +75,9 @@ export type ClaimCharacterBody = {
   expectedCharacterRevision: number;
   idempotencyKey: string;
 };
+export type AdoptCharacterBody = NonNullable<
+  operations["post_campaigns_id_characters_characterId_adopt"]["requestBody"]
+>["content"]["application/json"];
 export type CreateCampaignCharacterBody = NonNullable<
   operations["post_campaigns_id_characters"]["requestBody"]
 >["content"]["application/json"];
@@ -101,6 +104,7 @@ export type CampaignsApi = {
   leaveCampaign(campaignId: string, memberUserId: string, body: { expectedCampaignRevision: number; idempotencyKey: string }): Promise<unknown>;
   listCampaignCharacters(campaignId: string, input?: CampaignListQuery): Promise<CampaignCharacterListResponse>;
   listClaimableCharacters(campaignId: string, input?: ClaimableCharactersQuery): Promise<ClaimableCharacterListResponse>;
+  adoptCharacter(campaignId: string, characterId: string, body: AdoptCharacterBody): Promise<unknown>;
   claimCharacter(campaignId: string, characterId: string, body: ClaimCharacterBody): Promise<unknown>;
   createCampaignCharacter(campaignId: string, body: CreateCampaignCharacterBody): Promise<CreateCampaignCharacterResponse>;
   listContent(campaignId: string, input?: ContentListQuery): Promise<CampaignContentListResponse>;
@@ -168,6 +172,13 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
         : client.fetch<CampaignCharacterListResponse>("GET", `/campaigns/${campaignId}/characters`, {
           query: { cursor: input.cursor ?? undefined, limit: input.limit ?? undefined },
         }),
+    adoptCharacter: async (campaignId, characterId, body) => {
+      const result = await client.fetch("POST", `/campaigns/${campaignId}/characters/${characterId}/adopt`, { body });
+      if (!result || typeof result !== "object" || !("character" in result)) {
+        throw new Error("Adoption response was not confirmed.");
+      }
+      return result;
+    },
     claimCharacter: (campaignId, characterId, body) =>
       client.fetch("POST", `/campaigns/${campaignId}/characters/${characterId}/claim`, { body }),
     createCampaignCharacter: (campaignId, body) =>

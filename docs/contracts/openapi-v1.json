@@ -56708,7 +56708,8 @@
                           "status",
                           "generation",
                           "createdAt",
-                          "updatedAt"
+                          "updatedAt",
+                          "displayName"
                         ],
                         "properties": {
                           "campaignId": {
@@ -56757,6 +56758,16 @@
                           "updatedAt": {
                             "format": "date-time",
                             "type": "string"
+                          },
+                          "displayName": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         }
                       }

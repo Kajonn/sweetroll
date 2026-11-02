@@ -150,7 +150,7 @@ registerApiRoutes(app, [
   }),
   buildSystemsRoutes({ authoring }),
   buildCharactersRoutes({ characters }),
-  buildCampaignsRoutes({ campaigns, characters, runtime }),
+  buildCampaignsRoutes({ campaigns, characters, runtime, identity }),
 ], serveStatic);
 void app.register(
   buildDevSignInRoutes({

@@ -266,9 +266,22 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
           characters.push((await res.json()).character);
         }
         await page.goto(`/characters/${characters[i]!.characterId}`);
+        await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+        await expect(page.getByText("Editing in this tab.", { exact: true })).toBeVisible();
+        await expect(page.getByText("Saved", { exact: true })).toBeVisible();
         for (const [field, value] of [["Might", i + 2],["Agility",3],["Will",4 - i]] as const) {
-          await page.getByLabel(field, { exact: true }).fill(String(value)); await page.getByLabel(field, { exact: true }).press("Tab");
-          await expect.poll(async () => (await character(i)).state.values[{ Might: "field", Agility: "field_1", Will: "field_2" }[field]]).toBe(value);
+          const fieldId = { Might: "field", Agility: "field_1", Will: "field_2" }[field];
+          const committed = page.waitForResponse(r => r.request().method() === "POST" && r.url().endsWith(`/fields/${fieldId}/set`));
+          const input = page.getByLabel(field, { exact: true });
+          await input.fill(String(value));
+          // Enter is the sheet's explicit commit gesture; do not rely on focus
+          // advancing away while a newly opened sheet acquires its writer.
+          await input.press("Enter");
+          const response = await committed;
+          expect(response.status(), `Player ${i + 1} ${field} save status`).toBe(200);
+          expect(response.request().postDataJSON().value).toBe(value);
+          await expect.poll(async () => (await character(i)).state.values[fieldId]).toBe(value);
+          await expect(page.getByText("Saved", { exact: true })).toBeVisible();
         }
       }
     });

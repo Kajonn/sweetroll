@@ -5,7 +5,7 @@
   "applicationCommit": "a1fc29907c6462784caf99f81ed24c6489d45e81",
   "implementationCommit": "bfddc9565ff9a6f4dd816640c05d00841cac86f2",
   "runnerFixtureBlob": "de9b268fcdbd3bba8fd1b144acc6bc7265a8b450",
-  "applicationDiff": "Runner transport/readback synchronization only; no application, database or published-package changes after the tested CI commit.",
+  "applicationDiff": "Runtime application/database unchanged after the deployed CI commit. Follow-up changes cover runner transport/readback synchronization, Vite local health forwarding, membership-race regression expectations and evidence/documentation.",
   "deployment": {
     "projectId": "f1770b85-8e58-4b99-b981-dc76e106a2c9",
     "environmentId": "0382c61c-327d-4336-be1b-ec4d81a6d5e7",
@@ -1350,5 +1350,15 @@
       "labels recipients by name with stable disambiguation and submits only IDs and generations"
     ],
     "green": "The same current component tests passed in the 31-test focused run."
+  },
+  "ciFollowUp": {
+    "number": 188,
+    "url": "https://github.com/Kajonn/sweetroll/actions/runs/41442129810",
+    "result": "FAIL; existing membership race assertion and local Vite readiness routing exposed",
+    "fixes": [
+      "Vite development/preview now forwards /health to the backend; readiness assertion verifies JSON status=ok rather than accepting the SPA HTML 200.",
+      "Membership test covers the real race and both serialization orders: role-first means exact conflict/latestRevision=2; removal-first means exact not_found with no revision disclosure; exact one success, revision/accessRevision=2, matching single audit and roster state remain required."
+    ],
+    "runtimeApplicationChange": false
   }
 }

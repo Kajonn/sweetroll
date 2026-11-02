@@ -26,6 +26,7 @@ export default defineConfig({
       // would reject legitimate same-origin requests.
       "/api": { target: backendTarget, rewrite: (p) => p.replace(/^\/api/, "") },
       "/dev": { target: backendTarget },
+      "/health": { target: backendTarget },
     },
   },
   preview: {
@@ -34,6 +35,7 @@ export default defineConfig({
     proxy: {
       "/api": { target: backendTarget, rewrite: (p) => p.replace(/^\/api/, "") },
       "/dev": { target: backendTarget },
+      "/health": { target: backendTarget },
     },
   },
   build: { outDir: "dist", sourcemap: true },

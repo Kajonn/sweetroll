@@ -23,7 +23,7 @@
 
 Tjänsten uppdaterades från `bfddc95` till den CI-godkända commiten ovan. Projektet har endast previewmiljön. Övriga projekt och tjänsters källor ändrades inte. Testet använder den riktiga driftsatta frontend/API:n och PostgreSQL. API-kontroller gör riktiga, ej cachade anrop med respektive aktörs session; de ersätter inga användaroperationer eller serversvar. Fixtureinloggning och avgränsad API-arkivering följer protokollet.
 
-Applikationen är oförändrad efter `a1fc299`: denna verifieringsändring rör runnerns HTTP-transport/sparsynkronisering och dokumentation. Testmiljön är fortsatt låst till den testade applikationscommiten. Testet använder miljöns proxy; certifikattoleransen i den befintliga hosted-konfigurationen är en runnerinställning.
+Applikationen är oförändrad efter `a1fc299`: denna verifieringsändring rör runnerns HTTP-transport/sparsynkronisering, Vites lokala hälsoproxy, förväntningarna i ett befintligt racetest och dokumentation. Testmiljön är fortsatt låst till den testade applikationscommiten. Testet använder miljöns proxy; certifikattoleransen i den befintliga hosted-konfigurationen är en runnerinställning.
 
 ## Resultat per protokollsteg
 
@@ -69,6 +69,10 @@ Attribut kontrolleras efter lyckat sparsvar; antaländringen har ett explicit PA
 [CI #187](https://github.com/Kajonn/sweetroll/actions/runs/41437546639) på den driftsatta applikationscommiten är grön i samtliga sju verifieringsjobb: backend/unit/integration/contracts/build/Docker, frontend, tre browserjourneys, visual och production-worker offline. Alla 31 offlinetester passerade där. Den slutliga runnern och denna evidens levereras i [PR #28](https://github.com/Kajonn/sweetroll/pull/28).
 
 En isolerad red-kontroll körde de nuvarande testerna mot enbart de tre gamla komponentfilerna InvitationReview/TemplateSharing/CampaignTemplates från `c2a1341`; övrig källa och tester var från `a1fc299`. Då misslyckades **6 av 20** fall: de manuella accept/decline-flödena, korrigering av ogiltig manuell token, sen mutation/navigation samt namngivna mottagare och preview. Med de rättade komponenterna är motsvarande tester gröna. F2:s historiska red-evidens är den saknade GUI-vägen i rapporten den 1 november; den nya vägen verifieras av fyra fokuserade tester och den fullständiga hosted-journeyn.
+
+CI #188 för evidensändringen hittade två ytterligare testmiljöproblem. Vites lokala preview vidarebefordrade inte `/health/ready`, så en strikt JSON-kontroll fick SPA-sidans HTML trots HTTP 200. Dev/preview vidarebefordrar nu `/health` till backend och previewns SPA-fallback lämnar health-sökvägen orörd. Ett separat lokalt smoketest med en HTTP-upstream och unik svarshuvudmarkör verifierade vidarebefordringen; det testet är separat från den riktiga hosted-journeyn. Produktionsbyggda filer är fortfarande byte-identiska med den accepterade deploymenten.
+
+Ett befintligt medlemskapsracetest antog att förloraren alltid får `conflict`. Om borttagningen vinner är målmedlemmen redan otillgänglig när rolländringen auktoriseras och svaret är i stället exakt `not_found`, utan revisionsutlämning. Testet kör nu det riktiga racet och båda ordnade interleaving-varianterna. Förväntat fel kopplas till vinnaren; exakt en lyckad ändring, revision/accessRevision=2, en matchande audit och korrekt roster krävs fortfarande. Auktoriserings- och databaslogiken ändrades inte. Slutlig CI-status finns i PR #28:s checks.
 
 Följande fokuserade tester kördes också lokalt den 2 november och passerade: InvitationReview 8, AdoptPersonalCharacter 4, TemplateSharing 2, CampaignTemplates 10 och FieldControl 7, totalt **31**. Frontendens typkontroll passerade.
 

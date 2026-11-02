@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Browser, type BrowserContext } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { json, key } from "./configurablePush.js";
+import { json as requestJSON, key } from "./configurablePush.js";
 import { expectOfflineAvailable } from "../offline/test-auth.js";
 import type { QueueEntry } from "../../src/characters/types.js";
 
@@ -31,6 +31,25 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
       catch (cause) { steps.push({ step: id, status: "FAIL" }); throw cause; }
     });
   }
+  // Independent real HTTP observations and scoped cleanup use each actor's
+  // browser connection. APIRequestContext opens slow proxy CONNECT tunnels in
+  // the hosted runner; no-store fetch retains the same actor and API policy.
+  const actorHTTP = (i: number, method: string, path: string, data?: unknown) => pages[i]!.evaluate(async ({ method, path, data }) => {
+    const response = await fetch(path, { method, cache: "no-store", ...(data === undefined ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify(data) }) });
+    return { status: response.status, ok: response.ok, body: await response.json() };
+  }, { method, path, data });
+  const json: typeof requestJSON = async (request, method, path, data) => {
+    const i = contexts.findIndex(context => context.request === request);
+    if (i < 0 || !pages[i]?.url().startsWith(baseURL)) {
+      // Authentication happens before the actor opens the application shell.
+      // Keep request errors from dumping session-cookie headers into evidence.
+      try { return await requestJSON(request, method, path, data); }
+      catch (error) { throw Error(`${method} ${path}: ${String(error).split("\n")[0]}`); }
+    }
+    const response = await actorHTTP(i, method, path, data);
+    expect(response.ok, `${method} ${path}: ${response.status}`).toBe(true);
+    return response.body;
+  };
   const campaign = async () => (await json(contexts[0]!.request, "GET", `/api/campaigns/${campaignId}`)).campaign;
   const character = async (i: number) => (await json(contexts[i + 1]!.request, "GET", `/api/characters/${characters[i]!.characterId}`)).character;
   async function shot(page: Page, label: string) {
@@ -128,7 +147,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
         page.on("pageerror", e => pageErrors.push(e.message));
       }
       expect(new Set(actorIds).size).toBe(4);
-      expect((await contexts[0]!.request.get("/health/ready")).status()).toBe(200);
+      expect(await json(contexts[0]!.request, "GET", "/health/ready")).toMatchObject({ status: "ok" });
     });
     const gm = pages[0]!;
     await step("MU-01 GUI blank-system authoring/save/reopen/publish", async () => {
@@ -285,7 +304,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
           const response = await committed;
           expect(response.status(), `Player ${i + 1} ${field} save status`).toBe(200);
           expect(response.request().postDataJSON().value).toBe(value);
-          await expect.poll(async () => (await character(i)).state.values[fieldId]).toBe(value);
+          expect((await character(i)).state.values[fieldId]).toBe(value);
           await expect(page.getByText("Saved", { exact: true })).toBeVisible();
         }
       }
@@ -313,7 +332,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
         for (const [slot, label] of [["slot_1","Longsword"],["slot_2","Firebolt"],["slot_1","Ashguard blade · Campaign"],["slot_2","Ember spell · Campaign"],["slot_1","Caravan supplies · Campaign"]]) await addEntry(page, slot!, label!);
         await customEntry(page, `Lucky token ${i + 1}`, `Player ${i + 1} personal notes`);
         await expect(page.getByText(`Lucky token ${i + 1}`, { exact: true })).toBeVisible();
-        await expect.poll(async () => Object.keys((await character(i)).state.entries).length).toBe(6);
+        expect(Object.keys((await character(i)).state.entries)).toHaveLength(6);
         expect(Object.values((await character(i)).state.entries).filter((e: any) => e.values.name === `Lucky token ${i + 1}` && e.templateId !== null)).toHaveLength(0);
         for (const [entryName, actionName, sides, field, bonus] of [["Longsword","Sword attack",20,"field",i+2],["Longsword","Sword damage",8,"field",i+2],["Firebolt","Cast Firebolt",20,"field_2",4-i],["Firebolt","Firebolt damage",6,"field_2",4-i],["Ashguard blade","Sword attack",20,"field",i+2],["Ember spell","Cast Firebolt",20,"field_2",4-i]] as const) await roll(i, entryName, actionName, sides, field, bonus);
       }
@@ -323,22 +342,22 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
       for (let i = 0; i < 3; i++) {
         const page = pages[i + 1]!; await page.reload();
         await expect(page.getByText(`Lucky token ${i + 1}`, { exact: true })).toBeVisible(); await noOverflow(page);
-        expect((await contexts[i + 1]!.request.get(`/api/characters/${characters[(i + 1) % 3]!.characterId}`)).status()).toBe(404);
+        expect((await actorHTTP(i + 1, "GET", `/api/characters/${characters[(i + 1) % 3]!.characterId}`)).status).toBe(404);
         await page.goto(`/characters/${characters[(i + 1) % 3]!.characterId}`);
         await expect(page.getByText("This character is unavailable.", { exact: true })).toBeVisible();
         await expect(page.getByRole("heading", { name: characters[(i + 1) % 3]!.name, exact: true })).toHaveCount(0);
         await page.goto(`/characters/${characters[i]!.characterId}`);
-        expect((await contexts[i + 1]!.request.get(`/api/campaigns/${campaignId}/item-templates/${templates[3]!.templateId}`)).status()).toBe(404);
-        const deniedManagement = await contexts[i + 1]!.request.post(`/api/campaigns/${campaignId}/item-templates`, { data: { kind: "item", audience: "all_players", grants: [], content: { name: "Forbidden" }, expectedTemplateRevision: 0, idempotencyKey: key() } });
+        expect((await actorHTTP(i + 1, "GET", `/api/campaigns/${campaignId}/item-templates/${templates[3]!.templateId}`)).status).toBe(404);
+        const deniedManagement = await actorHTTP(i + 1, "POST", `/api/campaigns/${campaignId}/item-templates`, { kind: "item", audience: "all_players", grants: [], content: { name: "Forbidden" }, expectedTemplateRevision: 0, idempotencyKey: key() });
         // Current campaign members receive forbidden for GM administration;
         // hidden templates and other players' sheets remain collapsed to 404.
-        expect(deniedManagement.status()).toBe(403);
-        expect((await deniedManagement.json()).error.code).toBe("forbidden");
+        expect(deniedManagement.status).toBe(403);
+        expect(deniedManagement.body.error.code).toBe("forbidden");
         await page.getByTestId("slot-add-slot_1").click(); await expect(page.getByRole("option", { name: /Secret vault key/ })).toHaveCount(0); await page.getByRole("button", { name: "Cancel", exact: true }).click();
       }
       await gm.goto(`/campaigns/${campaignId}`);
       for (const ch of characters) await expect(gm.getByRole("button", { name: `Open ${ch.name}`, exact: true })).toBeVisible();
-      for (const ch of characters) { expect((await contexts[0]!.request.get(`/api/characters/${ch.characterId}`)).status()).toBe(200); }
+      for (const ch of characters) { expect((await actorHTTP(0, "GET", `/api/characters/${ch.characterId}`)).status).toBe(200); }
       await shot(pages[1]!, "MU-07-equipped-phone");
     });
     await step("MU-08 six concurrent actor-bound rolls", async () => {
@@ -359,7 +378,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
       const p1 = roster.find((m: any) => m.userId === actorIds[1]);
       expect((await json(contexts[0]!.request,"GET",path)).template.grants).toEqual([{ userId: actorIds[1], generation: p1.generation }]);
       for (let i = 1; i < 4; i++) {
-        expect((await contexts[i]!.request.get(path)).status()).toBe(i === 1 ? 200 : 404);
+        expect((await actorHTTP(i, "GET", path)).status).toBe(i === 1 ? 200 : 404);
         await pages[i]!.goto(`/campaigns/${campaignId}`);
         await pages[i]!.getByRole("tab", { name: "Items & powers", exact: true }).click();
         await expect(pages[i]!.getByRole("heading", { name: "Ashguard blade", exact: true })).toBeVisible();
@@ -383,8 +402,8 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
       await pages[1]!.getByRole("button", { name: "Cancel", exact: true }).click();
       const ch = await character(0);
       const restricted = (await json(contexts[1]!.request,"GET",path)).template;
-      const blocked = await contexts[1]!.request.post(`/api/characters/${ch.characterId}/entries`, { data: { entry: { entryId: key(), slotId: "slot_1", templateId: null, values: {}, source: { kind: "campaign", campaignId, templateId: restricted.templateId, templateRevision: restricted.revision, contentRevision: restricted.contentRevision } }, expectedRevision: ch.revision, idempotencyKey: key() } });
-      expect(blocked.status()).toBe(404);
+      const blocked = await actorHTTP(1, "POST", `/api/characters/${ch.characterId}/entries`, { entry: { entryId: key(), slotId: "slot_1", templateId: null, values: {}, source: { kind: "campaign", campaignId, templateId: restricted.templateId, templateRevision: restricted.revision, contentRevision: restricted.contentRevision } }, expectedRevision: ch.revision, idempotencyKey: key() });
+      expect(blocked.status).toBe(404);
       await sharing("all_players");
       await pages[2]!.goto(`/characters/${characters[1]!.characterId}`); await addEntry(pages[2]!, "slot_1", "Secret vault key · Campaign");
       await sharing("gm_only");
@@ -427,7 +446,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
       const response = await replay;
       expect(response.status()).toBe(200);
       expect(response.request().postDataJSON().entry).toEqual(intent.entry);
-      await expect.poll(async () => Object.values((await character(0)).state.entries).filter((e: any) => e.values.name === "Offline trail ration").length).toBe(1);
+      expect(Object.values((await character(0)).state.entries).filter((e: any) => e.values.name === "Offline trail ration")).toHaveLength(1);
       expect((await character(0)).state.entries[intent.entry.entryId]).toMatchObject(intent.entry);
       await expect(page.getByText("Saved", { exact: true })).toBeVisible();
       await expect(page.getByText("Offline trail ration", { exact: true })).toBeVisible();
@@ -437,8 +456,12 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
     await step("MU-11 independent placed-copy quantities", async () => {
       const page = pages[1]!;
       const entry = page.locator('li[data-testid^="slot-entry-"]').filter({ has: page.getByText("Caravan supplies",{exact:true}) });
-      await entry.getByRole("button",{name:"Edit entry",exact:true}).click(); await entry.getByLabel("Quantity",{exact:true}).fill("2"); await entry.getByRole("button",{name:"Save entry",exact:true}).click();
-      await expect.poll(async () => (Object.values((await character(0)).state.entries).find((e:any)=>e.values.name==="Caravan supplies") as any)?.quantity).toBe(2);
+      await entry.getByRole("button",{name:"Edit entry",exact:true}).click(); await entry.getByLabel("Quantity",{exact:true}).fill("2");
+      const entryId = (await entry.getAttribute("data-testid"))!.slice("slot-entry-".length);
+      const saved = page.waitForResponse(r => r.request().method() === "PATCH" && r.url().endsWith(`/characters/${characters[0]!.characterId}/entries/${entryId}`));
+      await entry.getByRole("button",{name:"Save entry",exact:true}).click();
+      expect((await saved).status()).toBe(200);
+      expect((await character(0)).state.entries[entryId].quantity).toBe(2);
       await page.reload(); await expect(page.getByText("Caravan supplies",{exact:true})).toBeVisible();
       expect((Object.values((await character(1)).state.entries).find((e:any)=>e.values.name==="Caravan supplies") as any)?.quantity).toBe(3);
       const path = `/api/campaigns/${campaignId}/item-templates/${templates[2]!.templateId}`;

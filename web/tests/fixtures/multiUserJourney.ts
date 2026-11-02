@@ -328,7 +328,11 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
         await expect(page.getByRole("heading", { name: characters[(i + 1) % 3]!.name, exact: true })).toHaveCount(0);
         await page.goto(`/characters/${characters[i]!.characterId}`);
         expect((await contexts[i + 1]!.request.get(`/api/campaigns/${campaignId}/item-templates/${templates[3]!.templateId}`)).status()).toBe(404);
-        expect((await contexts[i + 1]!.request.post(`/api/campaigns/${campaignId}/item-templates`, { data: { kind: "item", audience: "all_players", grants: [], content: { name: "Forbidden" }, expectedTemplateRevision: 0, idempotencyKey: key() } })).status()).toBe(404);
+        const deniedManagement = await contexts[i + 1]!.request.post(`/api/campaigns/${campaignId}/item-templates`, { data: { kind: "item", audience: "all_players", grants: [], content: { name: "Forbidden" }, expectedTemplateRevision: 0, idempotencyKey: key() } });
+        // Current campaign members receive forbidden for GM administration;
+        // hidden templates and other players' sheets remain collapsed to 404.
+        expect(deniedManagement.status()).toBe(403);
+        expect((await deniedManagement.json()).error.code).toBe("forbidden");
         await page.getByTestId("slot-add-slot_1").click(); await expect(page.getByRole("option", { name: /Secret vault key/ })).toHaveCount(0); await page.getByRole("button", { name: "Cancel", exact: true }).click();
       }
       await gm.goto(`/campaigns/${campaignId}`);

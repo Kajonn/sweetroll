@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { test, expect, type Page, type BrowserContext } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { writeFile } from "node:fs/promises";
 
 const key = () => randomUUID();
 const D20 = "a0000000-0000-5000-8000-000000000002";
@@ -67,6 +68,7 @@ for (const width of [360, 768, 1280]) for (const theme of ["light", "dark"] as c
     const errors: string[] = [];
     page.on("pageerror", e => errors.push(e.message));
     async function inspect(name: string, url: string, tab?: string, enlarge = false) {
+      console.log("G9_CHECK",width,theme,name);
       await test.step(name, async () => {
         const isolated = url === "/display" ? await browser.newContext({baseURL:baseURL!,viewport:{width,height:900},colorScheme:theme}) : null;
         const page = isolated ? await isolated.newPage() : gmPage;
@@ -104,6 +106,7 @@ for (const width of [360, 768, 1280]) for (const theme of ["light", "dark"] as c
         }
         await isolated?.close();
       });
+      if (!enlarge) await inspect(`${name}-enlarged`, url, tab, true);
     }
     try {
       for (const [name, url] of [["library", "/"], ["characters", "/characters"], ["new-character", `/characters/new?systemVersionId=${f.versionId}`], ["character", `/characters/${f.characterId}`], ["campaigns", "/campaigns"], ["new-campaign", "/campaigns/new"], ["activity", "/activity"], ["account", "/account"], ["invitations", "/invitations"], ["display-entry", "/display"]]) {
@@ -115,9 +118,6 @@ for (const width of [360, 768, 1280]) for (const theme of ["light", "dark"] as c
       for (const tab of ["basics", "attributes", "templates", "sections", "dice", "advanced"]) {
         await inspect(`creator-${tab}`, `/systems/${f.systemId}?tab=${tab}`);
       }
-      await inspect("character-enlarged", `/characters/${f.characterId}`, undefined, true);
-      await inspect("campaign-enlarged", `/campaigns/${f.campaignId}`, "Content", true);
-      await inspect("creator-enlarged", `/systems/${f.systemId}?tab=sections`, undefined, true);
       // Deep-link refresh and keyboard-driven tab activation.
       await page.goto(`/campaigns/${f.campaignId}`); await page.reload();
       const content = page.getByRole("tab", { name: "Content", exact: true });
@@ -130,6 +130,7 @@ for (const width of [360, 768, 1280]) for (const theme of ["light", "dark"] as c
     } finally {
       await page.goto("/");
       await cleanup(page, f);
+      await writeFile(test.info().outputPath("route-evidence.json"),JSON.stringify({fixture:f,records,errors},null,2));
       await test.info().attach("g9-route-evidence", { body: JSON.stringify({ fixture: f, records, errors, cleanup: "independently verified archived/private" }, null, 2), contentType: "application/json" });
     }
   });

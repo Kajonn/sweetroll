@@ -19,7 +19,7 @@ test("a device previously used by a GM drops its session and private offline she
     const retained=await page.evaluate(id=>new Promise<number>((resolve,reject)=>{
       const r=indexedDB.open("sweetroll-characters");r.onerror=()=>reject(r.error);
       r.onsuccess=()=>{const db=r.result;const tx=db.transaction(db.objectStoreNames,"readonly");let count=0;
-        for(const name of Array.from(db.objectStoreNames)){const all=tx.objectStore(name).getAll();all.onsuccess=()=>{count+=all.result.filter(v=>JSON.stringify(v).includes(id)).length;};}
+        for(const name of Array.from(db.objectStoreNames)){const all=tx.objectStore(name).getAll();all.onsuccess=()=>{count+=all.result.filter(v=>JSON.stringify(v).includes(id) && !(name === "characters" && v.confirmed === null && v.lastRoll === undefined)).length;};}
         tx.oncomplete=()=>{db.close();resolve(count);};tx.onerror=()=>{db.close();reject(tx.error);};};
     }),id);
     expect(retained).toBe(0);

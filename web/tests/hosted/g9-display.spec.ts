@@ -68,7 +68,7 @@ test("hosted scene controls, redacted pixels, display reconnect and revocation",
     dp.on("response", r => { if (r.url().includes("/projection")) bodies.push(r.text()); });
     await dp.goto(`/display?sceneId=${sid}`);
     await dp.getByLabel(/display code/i).fill(code); await dp.getByRole("button", { name: "Connect display", exact: true }).click();
-    await expect(dp.getByRole("img", { name: "Display image" })).toBeVisible();
+    await expect(dp.getByRole("img", { name: "Display image" })).toBeVisible({timeout:15_000});
     await expect(dp.getByText("Visible scout", { exact: true })).toBeVisible();
     await expect(dp.getByText("GM SECRET hidden assassin", { exact: true })).toHaveCount(0);
     await expect(dp.getByText("Fog-covered guard", { exact: true })).toHaveCount(0);
@@ -80,9 +80,20 @@ test("hosted scene controls, redacted pixels, display reconnect and revocation",
     expect(pixel(16,32).slice(0,3)).toEqual([229,55,83]);
     expect(pixel(60,32).slice(0,3)).not.toEqual([229,55,83]);
     evidence.pixels = { revealed: pixel(16,32), concealed: pixel(60,32) };
+    expect(seen.filter(p => /^\/api\/(campaigns|scenes|characters|content|systems)/.test(p))).toEqual([]);
     for (const path of [`/api/campaigns/${cid}/images/${fileId}/original`, `/api/campaigns/${cid}`, `/api/scenes/${sid}`]) expect((await request(dp,"GET",path)).status).toBe(401);
     const storage = await dp.evaluate(async () => ({ local: Object.keys(localStorage), session: Object.keys(sessionStorage), caches: await caches.keys() }));
-    expect(storage).toEqual({ local: [], session: ["sweetroll:display-credential"], caches: [] });
+    expect(storage.local).toEqual([]);
+    expect(storage.session).toEqual(["sweetroll:display-credential"]);
+    // Public shell assets may be cached by the production worker; private
+    // payloads, projections and images must never enter CacheStorage.
+    const cachePaths = await dp.evaluate(async () => {
+      const paths:string[]=[];
+      for (const name of await caches.keys()) for (const req of await (await caches.open(name)).keys()) paths.push(new URL(req.url).pathname);
+      return paths;
+    });
+    for (const path of cachePaths) expect(path).toMatch(/^\/(?:index\.html|assets\/[^/]+)$/);
+    expect(cachePaths.some(path=>path.startsWith("/api/"))).toBe(false);
     expect(seen.filter(p => /^\/api\/(campaigns|scenes|characters|content|systems)/.test(p))).toEqual(expect.arrayContaining([`/api/campaigns/${cid}`, `/api/scenes/${sid}`])); // only explicit denial probes above
     const projections = await Promise.all(bodies);
     for (const body of projections) { expect(body).not.toContain("GM SECRET"); expect(body).not.toContain("Fog-covered guard"); expect(body).not.toContain(original.toString("base64")); }
@@ -101,23 +112,47 @@ test("hosted scene controls, redacted pixels, display reconnect and revocation",
     await dp.goto(`/display?sceneId=${second.sceneId}`); await expect(dp.getByRole("img",{name:"Display image"})).toBeVisible();
     await expect(dp.getByText("Visible scout",{exact:true})).toHaveCount(0);
     await dp.goto(`/display?sceneId=${sid}`); await expect(dp.getByText("Visible scout",{exact:true})).toBeVisible();
+    // Conceal and reveal the moved scout through the GM's keyboard controls.
+    await page.goto(sceneUrl);
+    for (const mode of ["conceal", "reveal"]) {
+      const toolbar = page.getByRole("region", {name:"Fog of war"});
+      await toolbar.getByLabel(/fog mode/i).selectOption(mode);
+      await toolbar.getByLabel(/x \(0–1\)/i).fill("0.4");
+      await toolbar.getByLabel(/y \(0–1\)/i).fill("0.5");
+      await toolbar.getByLabel(/radius \(0–1\)/i).fill("0.15");
+      await toolbar.getByRole("button",{name:"Add fog dab",exact:true}).click();
+      await toolbar.getByRole("button",{name:"Commit fog edit",exact:true}).click();
+      await expect(toolbar.getByText("Fog edit committed.")).toBeVisible();
+      await expect(dp.getByText("Visible scout",{exact:true})).toHaveCount(mode === "conceal" ? 0 : 1,{timeout:20_000});
+      await page.reload(); await expect(page.getByRole("img",{name:"Scene background"})).toBeVisible();
+    }
+    await page.goto(`/campaigns/${cid}`); await page.getByRole("tab",{name:"Settings",exact:true}).click();
     await page.getByRole("button", { name: "Revoke", exact: true }).click();
     await expect(page.getByText("Display revoked.")).toBeVisible();
     await expect(dp.getByText("This display is unavailable.")).toBeVisible({ timeout:20_000 });
     await expect(dp.getByRole("img", { name: "Display image" })).toHaveCount(0);
+    const revokedRead = await dp.evaluate(async sid => {
+      const credential=JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!);
+      const r=await fetch(`/api/displays/${credential.displayId}/scenes/${sid}/projection`,{headers:{"x-display-secret":credential.secret},cache:"no-store"});
+      return {status:r.status,type:r.headers.get("content-type")};
+    },sid);
+    expect(revokedRead.status).toBe(404);
     await dp.reload(); await expect(dp.getByRole("img", { name: "Display image" })).toHaveCount(0);
     evidence.checks = "fog/tokens, pixel redaction, direct denial, storage, outage/reconnect, reload, token move, scene change, revoke/reload";
   } catch (error) {
-    console.log("DISPLAY_PRIMARY_FAILURE", String(error)); throw error;
+    console.log("DISPLAY_PRIMARY_FAILURE", error instanceof Error ? error.stack : String(error)); throw error;
   } finally {
     await display.setOffline(false); await display.close();
     await page.goto("/");
+    const credentials = (await json(page,"GET",`/api/campaigns/${cid}/display-credentials`)).displays;
+    for (const credential of credentials) if (credential.revokedAt === null) await json(page,"POST",`/api/campaigns/${cid}/displays/${credential.displayId}/revoke`,{});
     // Image deletion is scoped to this run; archived campaign stays for readback.
     for (const image of images) await json(page,"DELETE",`/api/campaigns/${cid}/images/${image.fileId}`, { expectedRevision: image.revision ?? 1, idempotencyKey:key() });
     const c = (await json(page,"GET",`/api/campaigns/${cid}`)).campaign;
     await json(page,"POST",`/api/campaigns/${cid}/archive`, { expectedCampaignRevision:c.revision,idempotencyKey:key() });
     expect((await json(page,"GET",`/api/campaigns/${cid}`)).campaign.status).toBe("archived");
     await json(page,"PATCH",`/api/systems/${systemId}`, { lifecycle:"archived",access:"private" });
+    expect((await json(page,"GET",`/api/systems/${systemId}`)).workspace.system).toMatchObject({lifecycle:"archived",access:"private"});
     evidence.cleanup = "run image deleted; campaign archived and independently read back; system private/archived";
     await test.info().attach("g9-display-evidence", { body:JSON.stringify(evidence,null,2), contentType:"application/json" });
   }

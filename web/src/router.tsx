@@ -20,6 +20,9 @@ import { Account } from "./player/Account.js";
 import { Onboarding } from "./player/Onboarding.js";
 import { PersonalActivity } from "./player/PersonalActivity.js";
 import { DisplayView } from "./display/DisplayView.js";
+import { prepareDisplayContext } from "./display/prepareDisplay.js";
+import { useQueryClient } from "@tanstack/react-query";
+import { Button } from "./ui/index.js";
 import { t } from "./i18n/index.js";
 import { DocumentEditor } from "./editor/DocumentEditor.js";
 import { CloneFromTemplate } from "./library/CloneFromTemplate.js";
@@ -617,6 +620,26 @@ function CampaignSceneRouteView() {
 function DisplayRouteView() {
   const search = displayRoute.useSearch();
   const api = useMemo(() => createCampaignsApi(createApiClient({ baseUrl: "/api" })), []);
+  const queryClient = useQueryClient();
+  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setReady(false); setFailed(false);
+    void (async () => {
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      await prepareDisplayContext();
+      if (active) setReady(true);
+    })().catch(() => { if (active) setFailed(true); });
+    return () => { active = false; };
+  }, [queryClient, attempt]);
+  if (!ready) return <section aria-label={t("display.title")}>
+    <h1>{t("display.title")}</h1>
+    <p role="status">{t(failed ? "display.reconnecting.title" : "display.connecting")}</p>
+    {failed ? <Button onClick={() => setAttempt(value => value + 1)}>{t("display.retry")}</Button> : null}
+  </section>;
   return <DisplayView api={api} sceneId={search.sceneId} />;
 }
 

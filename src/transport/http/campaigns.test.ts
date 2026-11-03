@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import cookiePlugin from "@fastify/cookie";
-import Fastify from "fastify";
+import Fastify, { type FastifyBaseLogger } from "fastify";
 import pino from "pino";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -27,6 +27,7 @@ import type { SystemRuntime } from "../../systems/runtime.js";
 import type { AuthContext, Identity } from "../../identity/index.js";
 import { buildAuthHook } from "./auth-hook.js";
 import { buildCampaignsRoutes } from "./campaigns.js";
+import { registerApiRoutes } from "./static.js";
 
 const actorId = randomUUID();
 
@@ -398,8 +399,9 @@ async function build(input?: {
   characters?: Characters;
   runtime?: SystemRuntime;
   anonymous?: boolean;
+  serveStatic?: boolean;
 }): Promise<ReturnType<typeof Fastify>> {
-  const app = Fastify({ genReqId: () => randomUUID(), loggerInstance: pino({ enabled: false }) });
+  const app = Fastify({ genReqId: () => randomUUID(), loggerInstance: pino({ enabled: false }) as FastifyBaseLogger });
   await app.register(cookiePlugin);
   await app.register(
     buildAuthHook({
@@ -411,14 +413,14 @@ async function build(input?: {
       maxAgeSeconds: 3600,
     }),
   );
-  await app.register(
+  registerApiRoutes(app, [
     buildCampaignsRoutes({
       identity: input?.identity ?? { getDisplayNames: async () => ({ ok: true, value: [] }) },
       campaigns: input?.campaigns ?? makeCampaigns(),
       characters: input?.characters ?? ({ open: async () => ({ ok: true, value: fakeCharacterView() }) } as unknown as Characters),
       runtime: input?.runtime ?? makeRuntime(),
     }),
-  );
+  ], input?.serveStatic ?? false);
   await app.ready();
   apps.push(app);
   return app;
@@ -1947,4 +1949,36 @@ it("does not resolve identity labels when the campaign roster is unauthorized", 
   const response = await app.inject({ method: "GET", url: `/campaigns/${randomUUID()}/members`, headers: cookie });
   expect(response.statusCode).toBe(404);
   expect(lookups).toBe(0);
+});
+
+
+describe("display credential authentication in combined deployments", () => {
+  it.each([false, true])("allows credential routes and denies GM routes with static serving %s", async (serveStatic) => {
+    const displayId = randomUUID(), sceneId = randomUUID(), campaignId = randomUUID(), tokenId = randomUUID();
+    const secret = "scoped-display-secret";
+    const denied = { ok: false as const, error: { code: "not_found" as const, message: "Unavailable" } };
+    const image = { ok: true as const, value: { bytes: Buffer.from([1,2,3]), contentType: "image/png" as const, revision: 1 } };
+    const app = await build({ anonymous: true, serveStatic, campaigns: makeCampaigns({
+      redeemDisplayCode: async input => input.code === "ABC123" ? { ok: true, value: { displayId, secret } } : denied,
+      getDisplayProjection: async input => input.secret === secret ? { ok: true, value: displayProjection({sceneId}) } : denied,
+      getDisplaySceneImage: async input => input.secret === secret ? image : denied,
+      getDisplayTokenImage: async input => input.secret === secret ? image : denied,
+    }) });
+    const prefix = serveStatic ? "/api" : "";
+    const redeemed = await app.inject({ method:"POST", url:prefix+"/displays/redeem", payload:{code:"ABC123"} });
+    expect(redeemed.statusCode).toBe(200);
+    expect(redeemed.json().display).toEqual({displayId,secret});
+    const invalid = await app.inject({method:"POST",url:prefix+"/displays/redeem",payload:{code:"WRONG1"}});
+    expect(invalid.statusCode).toBe(404);
+    for (const suffix of ["projection", "image?rev=1", `tokens/${tokenId}/image?rev=1`]) {
+      const url = `${prefix}/displays/${displayId}/scenes/${sceneId}/${suffix}`;
+      expect((await app.inject({url,headers:displayHeaders(secret)})).statusCode).toBe(200);
+      expect((await app.inject({url})).statusCode).toBe(404);
+      expect((await app.inject({url,headers:displayHeaders("wrong")})).statusCode).toBe(404);
+    }
+    for (const url of [`/campaigns/${campaignId}`, `/scenes/${sceneId}`, `/campaigns/${campaignId}/display-credentials`, `/campaigns/${campaignId}/images/${randomUUID()}/original`]) {
+      expect((await app.inject({url:prefix+url,headers:displayHeaders(secret)})).statusCode).toBe(401);
+    }
+    expect((await app.inject({method:"POST",url:`${prefix}/campaigns/${campaignId}/displays/${displayId}/revoke`,payload:{},headers:displayHeaders(secret)})).statusCode).toBe(401);
+  });
 });

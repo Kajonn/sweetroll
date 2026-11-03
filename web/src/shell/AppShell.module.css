@@ -206,6 +206,7 @@
   }
   .bottomNav {
     display: flex;
+    overflow-x: auto;
     align-items: stretch;
     position: sticky;
     bottom: 0;
@@ -218,7 +219,8 @@
   }
   .bottomNavLink {
     flex: 1 1 0;
-    min-width: 0;
+    /* Text-sized floor: enlarged labels scroll in the nav instead of overlapping. */
+    min-width: 6.5em;
     display: flex;
     align-items: center;
     justify-content: center;

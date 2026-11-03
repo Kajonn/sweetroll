@@ -133,3 +133,6 @@
     transition: none;
   }
 }
+
+.field { min-width: 0; }
+.field > input, .field > select, .field > textarea { min-width: 0; max-width: 100%; }

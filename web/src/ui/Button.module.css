@@ -87,3 +87,6 @@
     transition: none;
   }
 }
+
+/* Long translated/authored labels must fit their containing column at 200%. */
+.button { max-inline-size: 100%; overflow-wrap: anywhere; }

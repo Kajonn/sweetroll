@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { t } from "../i18n/index.js";
+import { DisplayImage } from "./DisplayImage.js";
 import { Button, EmptyState, FormField } from "../ui/index.js";
 import type { CampaignsApi } from "../campaigns/api.js";
 import { useDisplayProjection } from "../campaigns/campaignQueries.js";
@@ -117,8 +118,9 @@ export function DisplayView(props: {
   // Keep the last good frame across revision-key changes and poll failures:
   // a fresh credential with no frame yet renders connecting/blank instead.
   useEffect(() => {
-    if (projection.data !== undefined) setShown(projection.data.projection);
-  }, [projection.data]);
+    if (!online) { setShown(null); return; }
+    if (projection.data !== undefined && !projection.isFetching) setShown(projection.data.projection);
+  }, [projection.data, projection.isFetching, online]);
 
   const refetchRef = useRef((): void => {});
   refetchRef.current = () => {
@@ -219,7 +221,7 @@ export function DisplayView(props: {
     );
   }
 
-  if (shown === null) {
+  if (shown === null || !online || shown.sceneId !== props.sceneId) {
     if (!online) {
       return (
         <section aria-label={t("display.title")}>
@@ -288,7 +290,7 @@ export function DisplayView(props: {
     <section aria-label={t("display.title")}>
       <h1>{t("display.title")}</h1>
       <div style={{ position: "relative" }}>
-        <img src={`/api${shown.imageUrl}`} alt={t("display.imageAlt")} style={{ display: "block", width: "100%" }} />
+        <DisplayImage key={`${credential.displayId}:${shown.imageUrl}`} path={shown.imageUrl} secret={credential.secret} alt={t("display.imageAlt")} />
         <ul aria-label={t("display.tokensLabel")} style={{ listStyle: "none", margin: 0, padding: 0 }}>
           {shown.tokens.map((token) => (
             <li

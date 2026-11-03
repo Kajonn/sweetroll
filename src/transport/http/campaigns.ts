@@ -1478,7 +1478,7 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
       // key). Each handler collapses every credential failure to generic
       // not_found without distinguishing cases.
       const routeUrl = request.routeOptions?.url ?? "";
-      if (routeUrl.startsWith("/displays/")) return;
+      if (routeUrl.startsWith(`${app.prefix}/displays/`)) return;
       if (request.auth.state !== "authenticated") {
         return reply.code(401).send({
           error: { code: "unauthorized", message: "Authentication is required." },

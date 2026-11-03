@@ -474,3 +474,11 @@
     transition: none;
   }
 }
+
+/* Grid's automatic min-content track must not widen a phone sheet when
+   labels or text are enlarged. Controls keep their natural wrapping. */
+.layout, .header, .unplaced, .sectionsList, .sectionCard, .elementBody {
+  grid-template-columns: minmax(0, 1fr);
+}
+.headerRow, .sectionsHeader, .headerMeta, .sectionMeta, .elementMeta { min-width: 0; flex-wrap: wrap; }
+.elementField select { min-width: 0; max-width: 100%; }

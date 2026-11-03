@@ -129,6 +129,12 @@ test("I5 exit: sign in on phone, select system, create+play two characters, find
   await recent.getByRole("link", { name: nameA }).click();
   await expect(page).toHaveURL(`/characters/${characterA}`);
 
+  // The URL changes before session hydration and writer acquisition finish.
+  // Establish a confirmed editable sheet before taking its network away.
+  await expect(page.getByRole("heading", { name: nameA, exact: true })).toBeVisible();
+  await expect(page.getByText("Editing in this tab.", { exact: true })).toBeVisible();
+  await expectSaved(page);
+
   // 6. Offline edit -> reconnect with no dupes: exactly one more bump event.
   await page.context().setOffline(true);
   try {

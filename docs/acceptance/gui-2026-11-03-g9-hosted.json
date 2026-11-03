@@ -1,0 +1,4481 @@
+{
+  "application": "ee88435116ed64bb5dd3aa1b2b6afd200a19b853",
+  "deployment": "bcc9c614-d2ba-4390-8e2e-6b2e4e7967e0",
+  "url": "https://sweetroll-d2-preview.up.railway.app",
+  "browser": "Playwright 1.48 / Chromium 130 / Linux headless",
+  "runs": [
+    {
+      "name": "g9-release-candidate",
+      "stats": {
+        "startTime": "2026-11-03T18:17:33.863Z",
+        "duration": 356578.872,
+        "expected": 12,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "tests": [
+        {
+          "title": "combined deployed artifact: readiness, routing, exact assets and manifests",
+          "status": "passed",
+          "durationMs": 9679,
+          "retry": 0,
+          "evidence": [
+            {
+              "name": "g9-artifact-evidence",
+              "data": {
+                "buildId": "build-mw10dugf",
+                "rows": [
+                  {
+                    "path": "/health/live",
+                    "status": 200,
+                    "type": "application/json; charset=utf-8"
+                  },
+                  {
+                    "path": "/health/ready",
+                    "status": 200,
+                    "type": "application/json; charset=utf-8"
+                  },
+                  {
+                    "path": "/api/me",
+                    "status": 200,
+                    "type": "application/json; charset=utf-8"
+                  },
+                  {
+                    "path": "/api/g9-unknown-route",
+                    "status": 404,
+                    "type": "application/json; charset=utf-8"
+                  },
+                  {
+                    "path": "/characters/new",
+                    "status": 200,
+                    "type": "text/html"
+                  },
+                  {
+                    "path": "/cb",
+                    "status": 200,
+                    "type": "text/html"
+                  },
+                  {
+                    "path": "/index.html",
+                    "sha256": "fb6936de011fdc91ceab84ca55e865cdc038acf5f93ce85cfdc0a779d384afe0",
+                    "bytes": 2338
+                  },
+                  {
+                    "path": "/assets/index-_rinorZM.js",
+                    "sha256": "8e13cb88842d80de38e0ebe5fe564e8480bbf04c92ae3a16d5995763cb4d2d99",
+                    "bytes": 895567
+                  },
+                  {
+                    "path": "/assets/index-hvbLIJfA.css",
+                    "sha256": "22cb5484ca86c77c4851d0bbbe28b30702def1fca8f4701609a411da4fb598b9",
+                    "bytes": 78934
+                  },
+                  {
+                    "path": "/sw.js",
+                    "sha256": "af955c1726789aad787aa32646ffbee18e6013f52aaf81bb585e89a365d4dfd1",
+                    "bytes": 3545
+                  },
+                  {
+                    "path": "/offline-manifest.json",
+                    "sha256": "cf9a3cf4cc072966e6215daa1414cef407551c67234232f6adfa519e51444ae4",
+                    "bytes": 137
+                  },
+                  {
+                    "path": "/manifest.webmanifest",
+                    "sha256": "b0272894bce12b4e60fc4a323de2a01245f6d9adc9c8a0fa7758566bac4f9810",
+                    "bytes": 346
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "title": "hosted scene controls, redacted pixels, display reconnect and revocation",
+          "status": "passed",
+          "durationMs": 49910,
+          "retry": 0,
+          "evidence": [
+            {
+              "name": "g9-display-evidence",
+              "data": {
+                "systemId": "a879820f-0967-404a-8e00-65b347167700",
+                "campaignId": "1780d45a-86c4-44a0-94ff-35b8e8f0c172",
+                "sceneId": "c6ac8131-a416-4465-a2fb-46842a626d9d",
+                "pixels": {
+                  "revealed": [
+                    229,
+                    55,
+                    83,
+                    255
+                  ],
+                  "concealed": [
+                    0,
+                    0,
+                    0,
+                    255
+                  ]
+                },
+                "checks": "fog/tokens, pixel redaction, direct denial, storage, outage/reconnect, reload, token move, scene change, revoke/reload",
+                "cleanup": "run image deleted; campaign archived and independently read back; system private/archived"
+              }
+            }
+          ],
+          "screenshots": [
+            "images/g9-2026-11-03/gm-scene-phone.png",
+            "images/g9-2026-11-03/restricted-display-tablet.png"
+          ]
+        },
+        {
+          "title": "a device previously used by a GM drops its session and private offline sheets before pairing",
+          "status": "passed",
+          "durationMs": 7800,
+          "retry": 0,
+          "evidence": []
+        },
+        {
+          "title": "d20: durable offline conflict review, export and account isolation",
+          "status": "passed",
+          "durationMs": 12650,
+          "retry": 0,
+          "evidence": [
+            {
+              "name": "recovery-evidence",
+              "data": {
+                "system": "d20",
+                "characterId": "653127ac-9acb-4af1-bcce-36d782c8d353",
+                "inputId": "field-ability_element-:r5:",
+                "initialRevision": 1,
+                "finalRevision": 3,
+                "checks": [
+                  "durable offline reload",
+                  "explicit conflict reapply",
+                  "independent writer preserved",
+                  "exact export",
+                  "UI signout",
+                  "same-profile B denial",
+                  "offline B no private sheet"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "title": "pbta: durable offline conflict review, export and account isolation",
+          "status": "passed",
+          "durationMs": 16027,
+          "retry": 0,
+          "evidence": [
+            {
+              "name": "recovery-evidence",
+              "data": {
+                "system": "pbta",
+                "characterId": "f1737133-a46c-416b-827a-d5605fc53ead",
+                "inputId": "field-move_stat_element-:r4:",
+                "initialRevision": 1,
+                "finalRevision": 3,
+                "checks": [
+                  "durable offline reload",
+                  "explicit conflict reapply",
+                  "independent writer preserved",
+                  "exact export",
+                  "UI signout",
+                  "same-profile B denial",
+                  "offline B no private sheet"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "title": "pool: durable offline conflict review, export and account isolation",
+          "status": "passed",
+          "durationMs": 15518,
+          "retry": 0,
+          "evidence": [
+            {
+              "name": "recovery-evidence",
+              "data": {
+                "system": "pool",
+                "characterId": "de14d40e-7cc2-4dfa-845f-b32d48dabb28",
+                "inputId": "field-attribute_element-:r4:",
+                "initialRevision": 1,
+                "finalRevision": 3,
+                "checks": [
+                  "durable offline reload",
+                  "explicit conflict reapply",
+                  "independent writer preserved",
+                  "exact export",
+                  "UI signout",
+                  "same-profile B denial",
+                  "offline B no private sheet"
+                ]
+              }
+            }
+          ],
+          "screenshots": [
+            "images/g9-2026-11-03/recovered-pool-phone.png"
+          ]
+        },
+        {
+          "title": "routes, keyboard and accessibility 360px light",
+          "status": "passed",
+          "durationMs": 96375,
+          "retry": 0,
+          "evidence": [
+            {
+              "name": "g9-route-evidence",
+              "data": {
+                "fixture": {
+                  "systemId": "cb8ed772-727f-4ddc-8833-0e1413f839c4",
+                  "versionId": "8ea58b8b-c4bd-42fc-8aa0-5b883acea210",
+                  "campaignId": "4bc0027c-e9dd-4ca9-8c9d-71cb5e37aa8e",
+                  "characterId": "d3a41982-5727-42c1-8682-7461bf1e7bac"
+                },
+                "records": [
+                  {
+                    "name": "library",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "library-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "characters",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "characters-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-character",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-character-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "character",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "character-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaigns",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaigns-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-campaign",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-campaign-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "activity",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "activity-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "account",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "account-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "invitations",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "invitations-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "display-entry",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "display-entry-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Characters",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Characters-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Content",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Content-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Items & powers",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Items & powers-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Members",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Members-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Session",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Session-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Settings",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Settings-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Activity",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Activity-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-basics",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-basics-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-attributes",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-attributes-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-templates",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-templates-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-sections",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-sections-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-dice",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-dice-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-advanced",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-advanced-enlarged",
+                    "width": 360,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  }
+                ],
+                "errors": [],
+                "cleanup": "independently verified archived/private"
+              }
+            }
+          ],
+          "screenshots": [
+            "images/g9-2026-11-03/character-360-light.png"
+          ]
+        },
+        {
+          "title": "routes, keyboard and accessibility 360px dark",
+          "status": "passed",
+          "durationMs": 100360,
+          "retry": 0,
+          "evidence": [
+            {
+              "name": "g9-route-evidence",
+              "data": {
+                "fixture": {
+                  "systemId": "e5fcdeba-5cc8-4244-bfeb-ed82af9ab4ee",
+                  "versionId": "0ee56c0e-2bd5-4d5d-8c2f-cba937e18da7",
+                  "campaignId": "e0be36c0-47e3-4932-a271-15e52c514872",
+                  "characterId": "8e962c24-118b-46d7-bd0a-c5b0e8ebd389"
+                },
+                "records": [
+                  {
+                    "name": "library",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "library-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "characters",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "characters-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-character",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-character-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "character",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "character-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaigns",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaigns-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-campaign",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-campaign-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "activity",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "activity-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "account",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "account-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "invitations",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "invitations-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "display-entry",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "display-entry-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Characters",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Characters-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Content",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Content-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Items & powers",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Items & powers-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Members",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Members-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Session",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Session-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Settings",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Settings-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Activity",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Activity-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-basics",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-basics-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-attributes",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-attributes-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-templates",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-templates-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-sections",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-sections-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-dice",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-dice-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-advanced",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-advanced-enlarged",
+                    "width": 360,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 360,
+                      "viewport": 360
+                    },
+                    "violations": []
+                  }
+                ],
+                "errors": [],
+                "cleanup": "independently verified archived/private"
+              }
+            }
+          ],
+          "screenshots": [
+            "images/g9-2026-11-03/character-360-dark.png"
+          ]
+        },
+        {
+          "title": "routes, keyboard and accessibility 768px light",
+          "status": "passed",
+          "durationMs": 99660,
+          "retry": 0,
+          "evidence": [
+            {
+              "name": "g9-route-evidence",
+              "data": {
+                "fixture": {
+                  "systemId": "9315dfd9-efef-4cc4-ad18-28261fee7062",
+                  "versionId": "183a360e-9a49-410d-a13f-47f761858af0",
+                  "campaignId": "e82ba088-3df7-46ab-a49f-158e5ad523d1",
+                  "characterId": "11cddfbf-cbfa-4cce-8be1-23201d9e0298"
+                },
+                "records": [
+                  {
+                    "name": "library",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "library-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "characters",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "characters-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-character",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-character-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "character",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "character-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaigns",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaigns-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-campaign",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-campaign-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "activity",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "activity-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "account",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "account-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "invitations",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "invitations-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "display-entry",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "display-entry-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Characters",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Characters-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Content",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Content-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Items & powers",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Items & powers-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Members",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Members-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Session",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Session-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Settings",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Settings-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Activity",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Activity-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-basics",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-basics-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-attributes",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-attributes-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-templates",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-templates-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-sections",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-sections-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-dice",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-dice-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-advanced",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-advanced-enlarged",
+                    "width": 768,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  }
+                ],
+                "errors": [],
+                "cleanup": "independently verified archived/private"
+              }
+            }
+          ],
+          "screenshots": [
+            "images/g9-2026-11-03/campaign-Content-768-light.png"
+          ]
+        },
+        {
+          "title": "routes, keyboard and accessibility 768px dark",
+          "status": "passed",
+          "durationMs": 96134,
+          "retry": 0,
+          "evidence": [
+            {
+              "name": "g9-route-evidence",
+              "data": {
+                "fixture": {
+                  "systemId": "f8fd7517-d4af-4e2d-a697-5c8cf694d360",
+                  "versionId": "cbc5385c-c427-4680-9aba-42c86beec83b",
+                  "campaignId": "206f1035-caa2-4244-9e54-8031fe0f283f",
+                  "characterId": "2dd92a25-ab47-4417-82f5-db56489da851"
+                },
+                "records": [
+                  {
+                    "name": "library",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "library-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "characters",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "characters-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-character",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-character-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "character",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "character-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaigns",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaigns-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-campaign",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-campaign-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "activity",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "activity-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "account",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "account-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "invitations",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "invitations-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "display-entry",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "display-entry-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Characters",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Characters-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Content",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Content-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Items & powers",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Items & powers-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Members",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Members-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Session",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Session-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Settings",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Settings-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Activity",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Activity-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-basics",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-basics-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-attributes",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-attributes-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-templates",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-templates-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-sections",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-sections-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-dice",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-dice-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-advanced",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-advanced-enlarged",
+                    "width": 768,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 768,
+                      "viewport": 768
+                    },
+                    "violations": []
+                  }
+                ],
+                "errors": [],
+                "cleanup": "independently verified archived/private"
+              }
+            }
+          ]
+        },
+        {
+          "title": "routes, keyboard and accessibility 1280px light",
+          "status": "passed",
+          "durationMs": 93508,
+          "retry": 0,
+          "evidence": [
+            {
+              "name": "g9-route-evidence",
+              "data": {
+                "fixture": {
+                  "systemId": "26d2233e-c736-4ff9-9924-00b07b982be7",
+                  "versionId": "501f9877-7e53-4ac8-a304-c4b175024520",
+                  "campaignId": "20249d97-5625-4665-a0bd-f406d13744b7",
+                  "characterId": "38b669be-2328-491f-a3a7-4d8d4da59258"
+                },
+                "records": [
+                  {
+                    "name": "library",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "library-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "characters",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "characters-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-character",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-character-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "character",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "character-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaigns",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaigns-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-campaign",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-campaign-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "activity",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "activity-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "account",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "account-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "invitations",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "invitations-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "display-entry",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "display-entry-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Characters",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Characters-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Content",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Content-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Items & powers",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Items & powers-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Members",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Members-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Session",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Session-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Settings",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Settings-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Activity",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Activity-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-basics",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-basics-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-attributes",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-attributes-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-templates",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-templates-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-sections",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-sections-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-dice",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-dice-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-advanced",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-advanced-enlarged",
+                    "width": 1280,
+                    "theme": "light",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  }
+                ],
+                "errors": [],
+                "cleanup": "independently verified archived/private"
+              }
+            }
+          ]
+        },
+        {
+          "title": "routes, keyboard and accessibility 1280px dark",
+          "status": "passed",
+          "durationMs": 97274,
+          "retry": 0,
+          "evidence": [
+            {
+              "name": "g9-route-evidence",
+              "data": {
+                "fixture": {
+                  "systemId": "b2388164-3370-4288-8dce-a616a687698a",
+                  "versionId": "dc222bd8-24d8-4102-8920-d2af64fb10c9",
+                  "campaignId": "138afec4-bbd4-467c-b5e0-00c6a3d296c3",
+                  "characterId": "21449538-dbc1-4a9e-b0d5-64a3e66b0ab2"
+                },
+                "records": [
+                  {
+                    "name": "library",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "library-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "characters",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "characters-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-character",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-character-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "character",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "character-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaigns",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaigns-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-campaign",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "new-campaign-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "activity",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "activity-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "account",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "account-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "invitations",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "invitations-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "display-entry",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "display-entry-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Characters",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Characters-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Content",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Content-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Items & powers",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Items & powers-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Members",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Members-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Session",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Session-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Settings",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Settings-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Activity",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "campaign-Activity-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-basics",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-basics-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-attributes",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-attributes-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-templates",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-templates-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-sections",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-sections-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-dice",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-dice-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-advanced",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "normal",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  },
+                  {
+                    "name": "creator-advanced-enlarged",
+                    "width": 1280,
+                    "theme": "dark",
+                    "enlargement": "computed fonts/line heights 200% (CSS text-size emulation)",
+                    "dimensions": {
+                      "scroll": 1280,
+                      "viewport": 1280
+                    },
+                    "violations": []
+                  }
+                ],
+                "errors": [],
+                "cleanup": "independently verified archived/private"
+              }
+            }
+          ],
+          "screenshots": [
+            "images/g9-2026-11-03/creator-sections-1280-dark.png"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "g9-candidate-multi-user",
+      "stats": {
+        "startTime": "2026-11-03T18:17:15.885Z",
+        "duration": 137637.888,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "tests": [
+        {
+          "title": "MU-00–MU-12 one GM and three players without GUI bypasses",
+          "status": "passed",
+          "durationMs": 136823,
+          "retry": 0,
+          "evidence": [
+            {
+              "name": "multi-user-sanitized-evidence",
+              "data": {
+                "stamp": "a5cdecde",
+                "baseURL": "https://sweetroll-d2-preview.up.railway.app",
+                "systemId": "27cfe6eb-90e5-443c-b26c-120c6f8fd521",
+                "versionId": "5b8b1f2e-ae1b-4da5-8d0e-34cb7ffef2e3",
+                "campaignId": "a0cfef0a-a29d-4cfa-980f-5ac770d7d37a",
+                "actorIds": [
+                  "dafd0175-8d2c-4123-b8bb-f857b7844b3e",
+                  "6d803bc0-21ab-48d1-9457-4e9ac3030534",
+                  "c115d74b-058a-4135-9f22-ab27f8f42783",
+                  "e0e2a372-b9fb-400c-8ec6-62222068e570"
+                ],
+                "viewports": [
+                  1280,
+                  360,
+                  768,
+                  1280
+                ],
+                "characters": [
+                  {
+                    "characterId": "cda0dc2b-b621-4134-b3d1-8d28f69ef3a7",
+                    "name": "Aldric the fighter a5cdecde",
+                    "revision": 1
+                  },
+                  {
+                    "characterId": "0d5c0bdb-9534-47f1-b8e4-50a16eababeb",
+                    "ownerId": null,
+                    "campaignId": "a0cfef0a-a29d-4cfa-980f-5ac770d7d37a",
+                    "controllers": [
+                      "c115d74b-058a-4135-9f22-ab27f8f42783"
+                    ],
+                    "placementGeneration": 1,
+                    "returnOwnerId": null,
+                    "name": "Bryn the mage a5cdecde",
+                    "systemVersionId": "5b8b1f2e-ae1b-4da5-8d0e-34cb7ffef2e3",
+                    "entityDefinitionId": "entity_1",
+                    "revision": 1,
+                    "lifecycle": "active",
+                    "archivedAt": null,
+                    "createdAt": "2026-11-03T18:18:43.651Z",
+                    "updatedAt": "2026-11-03T18:18:43.651Z",
+                    "state": {
+                      "schemaVersion": "1.0",
+                      "values": {
+                        "field": 0,
+                        "field_1": 0,
+                        "field_2": 0
+                      },
+                      "entries": {}
+                    },
+                    "derivedValues": {},
+                    "validations": [],
+                    "projection": {
+                      "projectionVersion": "1.0",
+                      "systemId": "27cfe6eb-90e5-443c-b26c-120c6f8fd521",
+                      "versionId": "5b8b1f2e-ae1b-4da5-8d0e-34cb7ffef2e3",
+                      "packageChecksum": "sha256:86ab643dea4a58f6fcdda2272a8d5843f1e6e49877ca76d412890d71c37ab578",
+                      "entityId": "entity_1",
+                      "entityLabel": "Hero",
+                      "sheets": [
+                        {
+                          "id": "sheet_1",
+                          "label": "Sheet name",
+                          "sections": [
+                            {
+                              "id": "section_1",
+                              "label": "Adventurer",
+                              "elements": [
+                                {
+                                  "kind": "field",
+                                  "id": "element_1",
+                                  "fieldId": "field",
+                                  "label": "Might",
+                                  "fieldKind": "integer",
+                                  "value": 0,
+                                  "editable": true,
+                                  "constraints": {
+                                    "required": false,
+                                    "min": 0,
+                                    "max": 20,
+                                    "step": 1
+                                  },
+                                  "validations": []
+                                },
+                                {
+                                  "kind": "field",
+                                  "id": "element_2",
+                                  "fieldId": "field_1",
+                                  "label": "Agility",
+                                  "fieldKind": "integer",
+                                  "value": 0,
+                                  "editable": true,
+                                  "constraints": {
+                                    "required": false,
+                                    "min": 0,
+                                    "max": 20,
+                                    "step": 1
+                                  },
+                                  "validations": []
+                                },
+                                {
+                                  "kind": "field",
+                                  "id": "element_3",
+                                  "fieldId": "field_2",
+                                  "label": "Will",
+                                  "fieldKind": "integer",
+                                  "value": 0,
+                                  "editable": true,
+                                  "constraints": {
+                                    "required": false,
+                                    "min": 0,
+                                    "max": 20,
+                                    "step": 1
+                                  },
+                                  "validations": []
+                                },
+                                {
+                                  "kind": "slot",
+                                  "id": "element_4",
+                                  "slotId": "slot_1",
+                                  "label": "Equipment",
+                                  "accepts": [
+                                    "item"
+                                  ],
+                                  "entries": []
+                                },
+                                {
+                                  "kind": "slot",
+                                  "id": "element_5",
+                                  "slotId": "slot_2",
+                                  "label": "Spells",
+                                  "accepts": [
+                                    "spell"
+                                  ],
+                                  "entries": []
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ],
+                      "derivedValues": {},
+                      "validations": [],
+                      "completionFields": []
+                    },
+                    "reconciliation": {
+                      "characterId": "0d5c0bdb-9534-47f1-b8e4-50a16eababeb",
+                      "baseRevision": 1,
+                      "revision": 1,
+                      "packageChecksum": "sha256:86ab643dea4a58f6fcdda2272a8d5843f1e6e49877ca76d412890d71c37ab578",
+                      "projectionVersion": "1.0",
+                      "commandExecutionId": "43b0b28f-e92c-4d9e-ad3a-f3755bd2a9f9",
+                      "replayExpiresAt": "2026-12-03T18:18:43.661Z",
+                      "replayed": false,
+                      "changedDefinitionIds": [],
+                      "activityCursor": null,
+                      "cacheDisposition": "retain"
+                    }
+                  },
+                  {
+                    "characterId": "361ff73d-c48f-4693-986a-d069d6fa6eef",
+                    "ownerId": null,
+                    "campaignId": "a0cfef0a-a29d-4cfa-980f-5ac770d7d37a",
+                    "controllers": [
+                      "e0e2a372-b9fb-400c-8ec6-62222068e570"
+                    ],
+                    "placementGeneration": 1,
+                    "returnOwnerId": null,
+                    "name": "Cora the scout a5cdecde",
+                    "systemVersionId": "5b8b1f2e-ae1b-4da5-8d0e-34cb7ffef2e3",
+                    "entityDefinitionId": "entity_1",
+                    "revision": 1,
+                    "lifecycle": "active",
+                    "archivedAt": null,
+                    "createdAt": "2026-11-03T18:18:46.661Z",
+                    "updatedAt": "2026-11-03T18:18:46.661Z",
+                    "state": {
+                      "schemaVersion": "1.0",
+                      "values": {
+                        "field": 0,
+                        "field_1": 0,
+                        "field_2": 0
+                      },
+                      "entries": {}
+                    },
+                    "derivedValues": {},
+                    "validations": [],
+                    "projection": {
+                      "projectionVersion": "1.0",
+                      "systemId": "27cfe6eb-90e5-443c-b26c-120c6f8fd521",
+                      "versionId": "5b8b1f2e-ae1b-4da5-8d0e-34cb7ffef2e3",
+                      "packageChecksum": "sha256:86ab643dea4a58f6fcdda2272a8d5843f1e6e49877ca76d412890d71c37ab578",
+                      "entityId": "entity_1",
+                      "entityLabel": "Hero",
+                      "sheets": [
+                        {
+                          "id": "sheet_1",
+                          "label": "Sheet name",
+                          "sections": [
+                            {
+                              "id": "section_1",
+                              "label": "Adventurer",
+                              "elements": [
+                                {
+                                  "kind": "field",
+                                  "id": "element_1",
+                                  "fieldId": "field",
+                                  "label": "Might",
+                                  "fieldKind": "integer",
+                                  "value": 0,
+                                  "editable": true,
+                                  "constraints": {
+                                    "required": false,
+                                    "min": 0,
+                                    "max": 20,
+                                    "step": 1
+                                  },
+                                  "validations": []
+                                },
+                                {
+                                  "kind": "field",
+                                  "id": "element_2",
+                                  "fieldId": "field_1",
+                                  "label": "Agility",
+                                  "fieldKind": "integer",
+                                  "value": 0,
+                                  "editable": true,
+                                  "constraints": {
+                                    "required": false,
+                                    "min": 0,
+                                    "max": 20,
+                                    "step": 1
+                                  },
+                                  "validations": []
+                                },
+                                {
+                                  "kind": "field",
+                                  "id": "element_3",
+                                  "fieldId": "field_2",
+                                  "label": "Will",
+                                  "fieldKind": "integer",
+                                  "value": 0,
+                                  "editable": true,
+                                  "constraints": {
+                                    "required": false,
+                                    "min": 0,
+                                    "max": 20,
+                                    "step": 1
+                                  },
+                                  "validations": []
+                                },
+                                {
+                                  "kind": "slot",
+                                  "id": "element_4",
+                                  "slotId": "slot_1",
+                                  "label": "Equipment",
+                                  "accepts": [
+                                    "item"
+                                  ],
+                                  "entries": []
+                                },
+                                {
+                                  "kind": "slot",
+                                  "id": "element_5",
+                                  "slotId": "slot_2",
+                                  "label": "Spells",
+                                  "accepts": [
+                                    "spell"
+                                  ],
+                                  "entries": []
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ],
+                      "derivedValues": {},
+                      "validations": [],
+                      "completionFields": []
+                    },
+                    "reconciliation": {
+                      "characterId": "361ff73d-c48f-4693-986a-d069d6fa6eef",
+                      "baseRevision": 1,
+                      "revision": 1,
+                      "packageChecksum": "sha256:86ab643dea4a58f6fcdda2272a8d5843f1e6e49877ca76d412890d71c37ab578",
+                      "projectionVersion": "1.0",
+                      "commandExecutionId": "f472c665-9e1f-42b8-8641-90abe9d9f168",
+                      "replayExpiresAt": "2026-12-03T18:18:46.673Z",
+                      "replayed": false,
+                      "changedDefinitionIds": [],
+                      "activityCursor": null,
+                      "cacheDisposition": "retain"
+                    }
+                  }
+                ],
+                "templates": [
+                  {
+                    "templateId": "5ae47292-4763-438b-bcb0-fd8f8ef04404",
+                    "name": "Ashguard blade"
+                  },
+                  {
+                    "templateId": "fe5cf21b-774a-41c0-8ebc-446bece5994c",
+                    "name": "Ember spell"
+                  },
+                  {
+                    "templateId": "c9e6120b-2f0b-48a8-b360-8f9014f04e77",
+                    "name": "Caravan supplies"
+                  },
+                  {
+                    "templateId": "ccad5a0e-0ce4-43f4-9527-12768db0c0ba",
+                    "name": "Secret vault key"
+                  }
+                ],
+                "steps": [
+                  {
+                    "step": "MU-00 deployment/fixture preflight",
+                    "status": "PASS"
+                  },
+                  {
+                    "step": "MU-01 GUI blank-system authoring/save/reopen/publish",
+                    "status": "PASS"
+                  },
+                  {
+                    "step": "MU-02 GUI adventure and public/GM-only notes",
+                    "status": "PASS"
+                  },
+                  {
+                    "step": "MU-03 three manual token reviews and accepts",
+                    "status": "PASS"
+                  },
+                  {
+                    "step": "MU-04 personal creation/GUI adoption and two direct campaign creations",
+                    "status": "PASS"
+                  },
+                  {
+                    "step": "MU-05 inherited and blank adventure templates",
+                    "status": "PASS"
+                  },
+                  {
+                    "step": "MU-06 six entries and six actions for each player",
+                    "status": "PASS"
+                  },
+                  {
+                    "step": "MU-07 reopen/responsiveness and authorization",
+                    "status": "PASS"
+                  },
+                  {
+                    "step": "MU-08 six concurrent actor-bound rolls",
+                    "status": "PASS"
+                  },
+                  {
+                    "step": "MU-09 named restricted recipients/actual preview/reveal/narrow",
+                    "status": "PASS"
+                  },
+                  {
+                    "step": "MU-10 production-worker offline pending/reload/replay",
+                    "status": "PASS"
+                  },
+                  {
+                    "step": "MU-11 independent placed-copy quantities",
+                    "status": "PASS"
+                  },
+                  {
+                    "step": "MU-12 scoped archive and independent readback",
+                    "status": "PASS"
+                  }
+                ],
+                "rolls": [
+                  {
+                    "player": 1,
+                    "entryName": "Longsword",
+                    "actionName": "Sword attack",
+                    "roll": {
+                      "actionId": "action_1",
+                      "expression": "d20 + fields.field",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 4,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field",
+                          "value": 2
+                        }
+                      ],
+                      "total": 6,
+                      "output": "Result: 6",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 1,
+                    "entryName": "Longsword",
+                    "actionName": "Sword damage",
+                    "roll": {
+                      "actionId": "action_2",
+                      "expression": "d8 + fields.field",
+                      "dice": [
+                        {
+                          "sides": 8,
+                          "value": 8,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field",
+                          "value": 2
+                        }
+                      ],
+                      "total": 10,
+                      "output": "Result: 10",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 1,
+                    "entryName": "Firebolt",
+                    "actionName": "Cast Firebolt",
+                    "roll": {
+                      "actionId": "action_3",
+                      "expression": "d20 + fields.field_2",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 17,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field_2",
+                          "value": 4
+                        }
+                      ],
+                      "total": 21,
+                      "output": "Result: 21",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 1,
+                    "entryName": "Firebolt",
+                    "actionName": "Firebolt damage",
+                    "roll": {
+                      "actionId": "action_4",
+                      "expression": "d6 + fields.field_2",
+                      "dice": [
+                        {
+                          "sides": 6,
+                          "value": 2,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field_2",
+                          "value": 4
+                        }
+                      ],
+                      "total": 6,
+                      "output": "Result: 6",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 1,
+                    "entryName": "Ashguard blade",
+                    "actionName": "Sword attack",
+                    "roll": {
+                      "actionId": "action_1",
+                      "expression": "d20 + fields.field",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 4,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field",
+                          "value": 2
+                        }
+                      ],
+                      "total": 6,
+                      "output": "Result: 6",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 1,
+                    "entryName": "Ember spell",
+                    "actionName": "Cast Firebolt",
+                    "roll": {
+                      "actionId": "action_3",
+                      "expression": "d20 + fields.field_2",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 1,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field_2",
+                          "value": 4
+                        }
+                      ],
+                      "total": 5,
+                      "output": "Result: 5",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 2,
+                    "entryName": "Longsword",
+                    "actionName": "Sword attack",
+                    "roll": {
+                      "actionId": "action_1",
+                      "expression": "d20 + fields.field",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 19,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field",
+                          "value": 3
+                        }
+                      ],
+                      "total": 22,
+                      "output": "Result: 22",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 2,
+                    "entryName": "Longsword",
+                    "actionName": "Sword damage",
+                    "roll": {
+                      "actionId": "action_2",
+                      "expression": "d8 + fields.field",
+                      "dice": [
+                        {
+                          "sides": 8,
+                          "value": 6,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field",
+                          "value": 3
+                        }
+                      ],
+                      "total": 9,
+                      "output": "Result: 9",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 2,
+                    "entryName": "Firebolt",
+                    "actionName": "Cast Firebolt",
+                    "roll": {
+                      "actionId": "action_3",
+                      "expression": "d20 + fields.field_2",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 15,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field_2",
+                          "value": 3
+                        }
+                      ],
+                      "total": 18,
+                      "output": "Result: 18",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 2,
+                    "entryName": "Firebolt",
+                    "actionName": "Firebolt damage",
+                    "roll": {
+                      "actionId": "action_4",
+                      "expression": "d6 + fields.field_2",
+                      "dice": [
+                        {
+                          "sides": 6,
+                          "value": 4,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field_2",
+                          "value": 3
+                        }
+                      ],
+                      "total": 7,
+                      "output": "Result: 7",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 2,
+                    "entryName": "Ashguard blade",
+                    "actionName": "Sword attack",
+                    "roll": {
+                      "actionId": "action_1",
+                      "expression": "d20 + fields.field",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 9,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field",
+                          "value": 3
+                        }
+                      ],
+                      "total": 12,
+                      "output": "Result: 12",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 2,
+                    "entryName": "Ember spell",
+                    "actionName": "Cast Firebolt",
+                    "roll": {
+                      "actionId": "action_3",
+                      "expression": "d20 + fields.field_2",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 8,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field_2",
+                          "value": 3
+                        }
+                      ],
+                      "total": 11,
+                      "output": "Result: 11",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 3,
+                    "entryName": "Longsword",
+                    "actionName": "Sword attack",
+                    "roll": {
+                      "actionId": "action_1",
+                      "expression": "d20 + fields.field",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 13,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field",
+                          "value": 4
+                        }
+                      ],
+                      "total": 17,
+                      "output": "Result: 17",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 3,
+                    "entryName": "Longsword",
+                    "actionName": "Sword damage",
+                    "roll": {
+                      "actionId": "action_2",
+                      "expression": "d8 + fields.field",
+                      "dice": [
+                        {
+                          "sides": 8,
+                          "value": 6,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field",
+                          "value": 4
+                        }
+                      ],
+                      "total": 10,
+                      "output": "Result: 10",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 3,
+                    "entryName": "Firebolt",
+                    "actionName": "Cast Firebolt",
+                    "roll": {
+                      "actionId": "action_3",
+                      "expression": "d20 + fields.field_2",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 7,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field_2",
+                          "value": 2
+                        }
+                      ],
+                      "total": 9,
+                      "output": "Result: 9",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 3,
+                    "entryName": "Firebolt",
+                    "actionName": "Firebolt damage",
+                    "roll": {
+                      "actionId": "action_4",
+                      "expression": "d6 + fields.field_2",
+                      "dice": [
+                        {
+                          "sides": 6,
+                          "value": 1,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field_2",
+                          "value": 2
+                        }
+                      ],
+                      "total": 3,
+                      "output": "Result: 3",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 3,
+                    "entryName": "Ashguard blade",
+                    "actionName": "Sword attack",
+                    "roll": {
+                      "actionId": "action_1",
+                      "expression": "d20 + fields.field",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 6,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field",
+                          "value": 4
+                        }
+                      ],
+                      "total": 10,
+                      "output": "Result: 10",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 3,
+                    "entryName": "Ember spell",
+                    "actionName": "Cast Firebolt",
+                    "roll": {
+                      "actionId": "action_3",
+                      "expression": "d20 + fields.field_2",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 17,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field_2",
+                          "value": 2
+                        }
+                      ],
+                      "total": 19,
+                      "output": "Result: 19",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 1,
+                    "entryName": "Longsword",
+                    "actionName": "Sword attack",
+                    "roll": {
+                      "actionId": "action_1",
+                      "expression": "d20 + fields.field",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 5,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field",
+                          "value": 2
+                        }
+                      ],
+                      "total": 7,
+                      "output": "Result: 7",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 2,
+                    "entryName": "Longsword",
+                    "actionName": "Sword attack",
+                    "roll": {
+                      "actionId": "action_1",
+                      "expression": "d20 + fields.field",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 10,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field",
+                          "value": 3
+                        }
+                      ],
+                      "total": 13,
+                      "output": "Result: 13",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 3,
+                    "entryName": "Longsword",
+                    "actionName": "Sword attack",
+                    "roll": {
+                      "actionId": "action_1",
+                      "expression": "d20 + fields.field",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 13,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field",
+                          "value": 4
+                        }
+                      ],
+                      "total": 17,
+                      "output": "Result: 17",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 1,
+                    "entryName": "Firebolt",
+                    "actionName": "Cast Firebolt",
+                    "roll": {
+                      "actionId": "action_3",
+                      "expression": "d20 + fields.field_2",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 20,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field_2",
+                          "value": 4
+                        }
+                      ],
+                      "total": 24,
+                      "output": "Result: 24",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 2,
+                    "entryName": "Firebolt",
+                    "actionName": "Cast Firebolt",
+                    "roll": {
+                      "actionId": "action_3",
+                      "expression": "d20 + fields.field_2",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 17,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field_2",
+                          "value": 3
+                        }
+                      ],
+                      "total": 20,
+                      "output": "Result: 20",
+                      "audience": "campaign"
+                    }
+                  },
+                  {
+                    "player": 3,
+                    "entryName": "Firebolt",
+                    "actionName": "Cast Firebolt",
+                    "roll": {
+                      "actionId": "action_3",
+                      "expression": "d20 + fields.field_2",
+                      "dice": [
+                        {
+                          "sides": 20,
+                          "value": 4,
+                          "kept": true
+                        }
+                      ],
+                      "bindings": [
+                        {
+                          "scope": "fields",
+                          "definitionId": "field_2",
+                          "value": 2
+                        }
+                      ],
+                      "total": 6,
+                      "output": "Result: 6",
+                      "audience": "campaign"
+                    }
+                  }
+                ],
+                "totalSuccessfulRolls": 24,
+                "pageErrors": [],
+                "cleanup": {
+                  "characterCount": 3,
+                  "templateCount": 4,
+                  "campaign": "archived",
+                  "system": "private, archived"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "diagnosticCleanup": [
+    {
+      "actor": "code-test-a",
+      "campaigns": [
+        {
+          "id": "a3d6909f-c2ce-4b49-9b74-9c9f11b290e4",
+          "title": "G9 Räddningsexpeditionen – Überlieferungen från den förlorade handelskaravanen"
+        }
+      ],
+      "systems": [
+        "df7ad3e6-3d6f-4c6b-b795-3f6e16fc942b"
+      ],
+      "applied": true
+    },
+    {
+      "actor": "code-test-b",
+      "campaigns": [
+        {
+          "id": "d52290db-9b08-40aa-83aa-040789d5d0d1",
+          "title": "G9 Display c9dc99a5"
+        },
+        {
+          "id": "655ba640-2499-44aa-a336-c621d824a008",
+          "title": "G9 Display 7b891964"
+        }
+      ],
+      "systems": [
+        "2f61bf46-90b5-4dcb-8eb9-8c3917f6a9d8",
+        "1e1526e5-20e0-47a2-bacc-a2f199a14387"
+      ],
+      "applied": true
+    }
+  ],
+  "ci": {
+    "run": 198,
+    "id": 41692007857,
+    "commit": "ee88435116ed64bb5dd3aa1b2b6afd200a19b853",
+    "verificationJobs": "7/7 passed; production deployment skipped",
+    "rootTests": 477,
+    "postgresIntegrationTests": 354,
+    "frontendTests": 1195,
+    "browserJourneys": 62,
+    "offlineChecks": 31,
+    "visualBaselines": 10
+  }
+}

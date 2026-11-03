@@ -307,7 +307,9 @@ test("I7b exit: restricted scene display shows only revealed areas and visible t
       await expect(displayPage.getByRole("img", { name: "Display image" })).toBeVisible({ timeout: STEP_TIMEOUT });
       await expect(displayPage.getByText("Alpha")).toHaveCount(0);
       const imageSrcB = (await displayPage.getByRole("img", { name: "Display image" }).getAttribute("src")) ?? "";
-      expect(imageSrcB).toContain(sceneIdB);
+      expect(imageSrcB).toMatch(/^blob:/);
+      expect(seenRequests.some(url => url.includes(`/scenes/${sceneIdB}/image?`))).toBe(true);
+      await expect.poll(() => displayPage.getByRole("img", { name: "Display image" }).evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
 
       // Back on scene A the moved token is where the poll left it.
       await displayPage.goto(`/display?sceneId=${encodeURIComponent(sceneId)}`);

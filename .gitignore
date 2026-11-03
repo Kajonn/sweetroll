@@ -14,3 +14,5 @@ web/tests/offline/evidence/
 data/media/*
 # I7b Task 4: redacted display derivatives are a lazily-regenerated cache, never committed.
 data/display/*
+
+/test-results/

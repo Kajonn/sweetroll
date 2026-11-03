@@ -208,6 +208,8 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 
 ## G9 — Release and acceptance gates
 
+*Hosted automation update, 2026-11-03 (PR #29):* [Protocol, findings and evidence](../../acceptance/gui-2026-11-03-g9-hosted.md) cover repeatable hosted routed accessibility/text/theme checks, exact combined artifacts, offline recovery and restricted-display security. Consult the dated result table for actual passes and runner limitations. Display authentication/image/purge/offline and phone overflow findings are repaired in this PR. No retained screenshot baseline is regenerated. The broad boxes below stay open for their unperformed human, physical-device, provider and playtest portions; durable test-service media also needs an app volume.
+
 The first release tag establishes the initial supported application/data baseline.
 It does not require migration from unreleased test builds. Subsequent releases
 add migration and compatibility gates for actually supported released versions

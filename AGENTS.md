@@ -19,6 +19,8 @@ Changes are in PR #28. This closes that journey gate; the broader G9 device,
 provider-login and table/remote-playtest gates remain open under design Section 18.2.
 No new feature is selected or authorized by this acceptance record.
 
+PR #29 adds the [2026-11-03 hosted G9 protocol and evidence](docs/acceptance/gui-2026-11-03-g9-hosted.md), including prefixed display authentication, redacted-image loading, private-device handoff and enlarged-text layout fixes. Consult its final result table and tested application/deployment before repeating work. Physical devices, real provider login, human visual sign-off, table/remote playtests and durable hosted media remain separate open release gates. Do not mark the complete G9 checklist accepted from browser automation alone.
+
 The app is unreleased and databases contain only disposable test data. Follow the
 [development database policy](database/README.md): update the current schema
 baseline instead of adding migrations or repair code for obsolete app versions.

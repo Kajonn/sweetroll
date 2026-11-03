@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-test("a device previously used by a GM drops its session and private offline sheets before pairing", async ({page}) => {
+test("a previously authenticated device drops its session and private offline sheets before pairing", async ({page}) => {
   test.setTimeout(90_000);
   await page.goto("/");
   const api = async (method:string,path:string,data?:unknown) => page.evaluate(async ({method,path,data})=>{

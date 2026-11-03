@@ -34,7 +34,6 @@ for (const system of REFERENCE_SYSTEMS) test(`${system.key}: durable offline con
     await expect(page.getByText("Editing in this tab.",{exact:true})).toBeVisible();
     await expect(page.getByText("Saved",{exact:true})).toBeVisible();
     const before = (await json(wp,"GET",`/api/characters/${cid}`)).character;
-    const fieldId = {d20:"ability_score",pbta:"move_stat",pool:"attribute"}[system.key];
     const editable = page.getByLabel(system.editFieldLabel,{exact:true});
     // Resolve the actual definition ID from the owned fixture's bound input.
     const inputId = await editable.getAttribute("id");
@@ -80,7 +79,7 @@ for (const system of REFERENCE_SYSTEMS) test(`${system.key}: durable offline con
     await owner.setOffline(true); await page.reload();
     await expect(page.getByRole("heading",{name,exact:true})).toHaveCount(0);
     await expect(page.getByLabel(system.editFieldLabel,{exact:true})).toHaveCount(0);
-    await test.info().attach("recovery-evidence",{body:JSON.stringify({system:system.key,characterId:cid,inputId,fieldId,initialRevision:before.revision,finalRevision:final.revision,checks:["durable offline reload","explicit conflict reapply","independent writer preserved","exact export","UI signout","same-profile B denial","offline B no private sheet"]},null,2),contentType:"application/json"});
+    await test.info().attach("recovery-evidence",{body:JSON.stringify({system:system.key,characterId:cid,inputId,initialRevision:before.revision,finalRevision:final.revision,checks:["durable offline reload","explicit conflict reapply","independent writer preserved","exact export","UI signout","same-profile B denial","offline B no private sheet"]},null,2),contentType:"application/json"});
   } finally {
     await owner.setOffline(false);
     if (cid) {

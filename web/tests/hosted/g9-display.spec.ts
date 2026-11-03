@@ -65,7 +65,8 @@ test("hosted scene controls, redacted pixels, display reconnect and revocation",
     await dialog.getByRole("button", { name: "Done", exact: true }).click();
     const seen: string[] = [], bodies: Promise<string>[] = [];
     dp.on("request", r => { if (r.url().startsWith(baseURL!)) seen.push(new URL(r.url()).pathname); });
-    dp.on("response", r => { if (r.url().includes("/projection")) bodies.push(r.text()); });
+    const recordProjection = (r: import("@playwright/test").Response) => { if (r.url().includes("/projection")) bodies.push(r.text()); };
+    dp.on("response", recordProjection);
     await dp.goto(`/display?sceneId=${sid}`);
     await dp.getByLabel(/display code/i).fill(code); await dp.getByRole("button", { name: "Connect display", exact: true }).click();
     await expect(dp.getByRole("img", { name: "Display image" })).toBeVisible({timeout:15_000});
@@ -95,7 +96,9 @@ test("hosted scene controls, redacted pixels, display reconnect and revocation",
     for (const path of cachePaths) expect(path).toMatch(/^\/(?:index\.html|assets\/[^/]+)$/);
     expect(cachePaths.some(path=>path.startsWith("/api/"))).toBe(false);
     expect(seen.filter(p => /^\/api\/(campaigns|scenes|characters|content|systems)/.test(p))).toEqual(expect.arrayContaining([`/api/campaigns/${cid}`, `/api/scenes/${sid}`])); // only explicit denial probes above
+    dp.off("response", recordProjection);
     const projections = await Promise.all(bodies);
+    expect(projections.length).toBeGreaterThan(0);
     for (const body of projections) { expect(body).not.toContain("GM SECRET"); expect(body).not.toContain("Fog-covered guard"); expect(body).not.toContain(original.toString("base64")); }
     await test.info().attach("restricted-display-tablet", { body: await dp.screenshot({ fullPage: true }), contentType: "image/png" });
     // Real network outage: safe blank state, then authorized reconnect.

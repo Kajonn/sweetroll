@@ -3,5 +3,5 @@
 .indicator { width: 8px; height: 8px; border-radius: 50%; background: var(--color-success); }
 .offline { background: var(--color-warning); }
 /* Keep diagnostic text and shortcut help in flow at enlarged text sizes. */
-.bar { flex-wrap: wrap; min-width: 0; }
+.bar { min-width: 0; }
 .bar [data-testid="request-id"] { min-width: 0; overflow-wrap: anywhere; flex: 0 1 auto; }

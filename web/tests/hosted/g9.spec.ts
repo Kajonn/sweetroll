@@ -78,6 +78,7 @@ for (const width of [360, 768, 1280]) for (const theme of ["light", "dark"] as c
         if (tab) await page.getByRole("tab", { name: tab, exact: true }).click();
         if (url.includes("/systems/")) await expect(page.getByTestId("document-editor-header")).toBeVisible();
         if (url === `/characters/${f.characterId}`) await expect(page.getByLabel(longLabel, { exact: true })).toBeVisible();
+        await page.waitForLoadState("networkidle");
         if (enlarge) await page.evaluate(() => {
           // Snapshot first: doubling ancestors must not compound child sizes.
           const sizes = Array.from(document.querySelectorAll<HTMLElement>("body, body *")).map(el => {

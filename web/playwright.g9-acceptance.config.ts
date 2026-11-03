@@ -6,7 +6,7 @@ if (!baseURL || !["https://sweetroll-d2-preview.up.railway.app", "https://sweetr
 }
 const output = resolve(process.env.G9_OUTPUT_DIR ?? "test-results/g9-hosted");
 export default defineConfig({
-  testDir: "./tests/hosted", workers: 1, retries: 0, timeout: 480_000,
+  testDir: "./tests/hosted", fullyParallel: true, workers: 2, retries: 0, timeout: 480_000,
   outputDir: resolve(output, "artifacts"),
   reporter: [["list"], ["json", { outputFile: resolve(output, "results.json") }]],
   use: { baseURL, browserName: "chromium", headless: true,

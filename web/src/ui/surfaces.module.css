@@ -97,3 +97,4 @@
 .pageIntro, .pageTitle, .pageDescription { max-width: 100%; overflow-wrap: anywhere; }
 /* Bound the grid track to the available column rather than input min-content. */
 .panel { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.panel a { overflow-wrap: anywhere; }

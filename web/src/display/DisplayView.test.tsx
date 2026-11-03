@@ -3,10 +3,10 @@
 // ["campaigns", ...] GM state before the first projection fetch; revoked
 // credentials blank with no GM chrome or GM endpoint calls.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   DISPLAY_CREDENTIAL_STORAGE_KEY,
@@ -64,6 +64,14 @@ function seedCredential() {
 }
 
 describe("DisplayView", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ok:true,blob:async()=>new Blob(["redacted"],{type:"image/png"})}));
+    vi.stubGlobal("URL", class extends URL {
+      static createObjectURL = vi.fn(() => "blob:redacted");
+      static revokeObjectURL = vi.fn();
+    });
+  });
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
   it("redeems the entered code and renders the image with visible tokens", async () => {
     const user = userEvent.setup();
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -94,7 +102,8 @@ describe("DisplayView", () => {
     expect(api.redeemDisplay).toHaveBeenCalledWith({ code: "AB12CD" });
 
     const image = await screen.findByRole("img", { name: /display image/i });
-    expect(image).toHaveAttribute("src", "/api/displays/d1/scenes/s1/image?rev=3");
+    expect(image).toHaveAttribute("src", "blob:redacted");
+    expect(fetch).toHaveBeenCalledWith("/api/displays/d1/scenes/s1/image?rev=3",expect.objectContaining({headers:{"x-display-secret":"s3cr3t"},credentials:"omit"}));
     const alpha = await screen.findByText("Alpha");
     expect(alpha.style.left).toBe("25%");
     expect(alpha.style.top).toBe("50%");
@@ -179,10 +188,9 @@ describe("DisplayView", () => {
     const user = userEvent.setup();
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const api = failingApi();
-    api.getDisplayProjection.mockResolvedValueOnce(projectionPayload());
+    api.getDisplayProjection.mockResolvedValue(projectionPayload());
     // Revocation surfaces strictly as 404/not_found (backend Task 5
     // contract: every credential failure collapses to generic not_found).
-    api.getDisplayProjection.mockRejectedValue({ code: "not_found", status: 404, message: "gone" });
     const storage = memoryStorage(seedCredential());
 
     const { container } = renderDisplay(
@@ -191,7 +199,8 @@ describe("DisplayView", () => {
     );
 
     expect(await screen.findByRole("img", { name: /display image/i })).toBeVisible();
-    // The poll (or revision-adopted refetch) picks up the revocation: the
+    api.getDisplayProjection.mockRejectedValue({ code: "not_found", status: 404, message: "gone" });
+    // The poll picks up revocation after an actually rendered frame: the
     // frozen frame must blank per §7.7, not linger behind a notice.
     expect(await screen.findByText(/this display is unavailable/i)).toBeVisible();
     expect(screen.queryByRole("img")).toBeNull();
@@ -319,4 +328,20 @@ describe("DisplayView", () => {
     expect(await screen.findByText(/no target selected/i)).toBeVisible();
     expect(api.getDisplayProjection).not.toHaveBeenCalled();
   });
+});
+
+
+it("hides an already rendered frame while offline", async () => {
+  const qc = new QueryClient({defaultOptions:{queries:{retry:false}}});
+  const api = failingApi(); api.getDisplayProjection.mockResolvedValue(projectionPayload());
+  vi.stubGlobal("fetch",vi.fn().mockResolvedValue({ok:true,blob:async()=>new Blob(["redacted"])}));
+  vi.stubGlobal("URL",class extends URL { static createObjectURL=vi.fn(()=>"blob:offline-test"); static revokeObjectURL=vi.fn(); });
+  try {
+    const storage=memoryStorage(seedCredential());
+    const {rerender}=renderDisplay(<DisplayView api={api as never} sceneId="s1" online storage={storage}/>,qc);
+    expect(await screen.findByRole("img")).toBeVisible();
+    rerender(<QueryClientProvider client={qc}><DisplayView api={api as never} sceneId="s1" online={false} storage={storage}/></QueryClientProvider>);
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(await screen.findByText(/you are offline/i)).toBeVisible();
+  } finally {cleanup(); vi.unstubAllGlobals();}
 });

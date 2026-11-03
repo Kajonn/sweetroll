@@ -51,3 +51,4 @@
 
 /* Intrinsic input widths grow with text enlargement; keep them in the sheet. */
 .detail input, .sheet input, .sheet select { min-width: 0; max-width: 100%; }
+.header h1, .field label, .action label, .resourceLabel { overflow-wrap: anywhere; }

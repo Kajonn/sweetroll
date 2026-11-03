@@ -23,7 +23,7 @@ ENV NODE_ENV=production
 WORKDIR /app
 # Railway mounts persistent media storage at runtime. Keep the mount point in
 # the image so the service also starts cleanly when no volume is attached.
-RUN mkdir -p /app/data/media && chown node:node /app/data/media
+RUN mkdir -p /app/data/media /app/data/display && chown node:node /app/data/media /app/data/display
 USER node
 COPY --chown=node:node --from=build /app/node_modules ./node_modules
 COPY --chown=node:node --from=build /app/dist ./dist

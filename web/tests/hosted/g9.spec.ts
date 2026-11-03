@@ -56,7 +56,8 @@ async function cleanup(page: Page, f: Awaited<ReturnType<typeof fixture>>) {
 }
 
 for (const width of [360, 768, 1280]) for (const theme of ["light", "dark"] as const) {
-  test(`routes, keyboard and accessibility ${width}px ${theme}`, async ({ page }) => {
+  test(`routes, keyboard and accessibility ${width}px ${theme}`, async ({ page: gmPage, browser, baseURL }) => {
+    const page = gmPage;
     page.setDefaultTimeout(15_000);
     await page.setViewportSize({ width, height: 900 });
     await page.emulateMedia({ colorScheme: theme });
@@ -67,6 +68,8 @@ for (const width of [360, 768, 1280]) for (const theme of ["light", "dark"] as c
     page.on("pageerror", e => errors.push(e.message));
     async function inspect(name: string, url: string, tab?: string, enlarge = false) {
       await test.step(name, async () => {
+        const isolated = url === "/display" ? await browser.newContext({baseURL:baseURL!,viewport:{width,height:900},colorScheme:theme}) : null;
+        const page = isolated ? await isolated.newPage() : gmPage;
         await page.goto(url);
         if (url === "/display") await expect(page.getByRole("heading", {name:"Connect this display"})).toBeVisible();
         else await expect(page.locator("main")).toBeVisible();
@@ -99,6 +102,7 @@ for (const width of [360, 768, 1280]) for (const theme of ["light", "dark"] as c
         if (["character", "campaign-Content", "creator-sections", "account", "character-enlarged", "campaign-enlarged", "creator-enlarged"].includes(name)) {
           await test.info().attach(`${name}-${width}-${theme}`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
         }
+        await isolated?.close();
       });
     }
     try {

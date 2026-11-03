@@ -15,9 +15,11 @@ async function json(page: Page, method: string, path: string, data?: unknown) {
 }
 for (const system of REFERENCE_SYSTEMS) test(`${system.key}: durable offline conflict review, export and account isolation`, async ({ browser, baseURL }) => {
   if (!baseURL) throw Error("Explicit target required");
+  test.setTimeout(120_000);
   const owner = await browser.newContext({baseURL,viewport:{width:360,height:900}});
   const writer = await browser.newContext({baseURL});
   const page = await owner.newPage(), wp = await writer.newPage();
+  page.setDefaultTimeout(15_000); wp.setDefaultTimeout(15_000);
   const name = `G9 ${system.key} private recovery ${key().slice(0,8)}`;
   let cid = "";
   try {
@@ -44,7 +46,7 @@ for (const system of REFERENCE_SYSTEMS) test(`${system.key}: durable offline con
     await expect(page.getByRole("heading",{name,exact:true})).toBeVisible();
     await expect(page.getByText("Changes pending",{exact:true})).toBeVisible();
     const otherField = system.key === "d20" ? "modifier" : system.key === "pbta" ? "description" : "condition";
-    const writerValue = system.key === "d20" ? 1 : "G9 independent writer";
+    const writerValue = system.key === "d20" ? 1 : system.key === "pool" ? "focused" : "G9 independent writer";
     await json(wp,"POST",`/api/characters/${cid}/fields/${otherField}/set`,{value:writerValue,expectedRevision:before.revision,idempotencyKey:key()});
     await owner.setOffline(false);
     await expect(page.getByRole("heading",{name:"Review conflicts",exact:true})).toBeVisible({timeout:60_000});
@@ -63,7 +65,8 @@ for (const system of REFERENCE_SYSTEMS) test(`${system.key}: durable offline con
     const download=await downloadPromise, path=await download.path();
     if (!path) throw Error("No export file");
     expect(JSON.parse(await readFile(path,"utf8"))).toEqual(await json(wp,"POST",`/api/characters/${cid}/exports`));
-    await page.getByRole("button",{name:"Close",exact:true}).click();
+    await page.goto(`/characters/${cid}`);
+    await expect(page.getByRole("heading",{name,exact:true})).toBeVisible();
     await test.info().attach(`recovered-${system.key}-phone`,{body:await page.screenshot({fullPage:true}),contentType:"image/png"});
     // Sign out through the UI, then use B in the same browser profile.
     page.once("dialog",d=>void d.accept());

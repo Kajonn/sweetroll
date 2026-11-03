@@ -63,6 +63,7 @@ for (const width of [360, 768, 1280]) for (const theme of ["light", "dark"] as c
     await page.setViewportSize({ width, height: 900 });
     await page.emulateMedia({ colorScheme: theme });
     await signIn(page);
+    await page.getByLabel("Theme",{exact:true}).first().selectOption(theme);
     const f = await fixture(page);
     const records: unknown[] = [];
     const errors: string[] = [];
@@ -79,6 +80,7 @@ for (const width of [360, 768, 1280]) for (const theme of ["light", "dark"] as c
         if (url.includes("/systems/")) await expect(page.getByTestId("document-editor-header")).toBeVisible();
         if (url === `/characters/${f.characterId}`) await expect(page.getByLabel(longLabel, { exact: true })).toBeVisible();
         await page.waitForLoadState("networkidle");
+        expect(await page.locator("html").getAttribute("data-theme")).toBe(theme);
         if (enlarge) await page.evaluate(() => {
           // Snapshot first: doubling ancestors must not compound child sizes.
           const sizes = Array.from(document.querySelectorAll<HTMLElement>("body, body *")).map(el => {

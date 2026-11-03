@@ -224,7 +224,9 @@
     justify-content: center;
     min-height: 44px;
     padding: 10px 2px;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
     font-size: clamp(12px, 3.5vw, 14px);
     font-weight: 600;
     color: var(--text-muted);

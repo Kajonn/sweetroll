@@ -93,3 +93,5 @@
 .emptyAction {
   margin-top: 8px;
 }
+
+.pageIntro, .pageTitle, .pageDescription { max-width: 100%; overflow-wrap: anywhere; }

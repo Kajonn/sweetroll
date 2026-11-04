@@ -47,7 +47,7 @@ describe("CampaignDetail section-4 navigation", () => {
     render(<CampaignDetail api={apiAs("owner", "u1") as never} campaignId="c1" actorId="u1" onLeft={() => {}} />, {
       wrapper: wrapper(),
     });
-    expect(await screen.findByRole("button", { name: "Scene", exact: true })).toBeVisible();
+    expect(await screen.findByRole("button", { name: "Scene" })).toBeVisible();
     for (const name of ["Characters", "Content", "Members", "Activity", "Session", "Settings"]) {
       expect(await screen.findByRole("tab", { name })).toBeVisible();
     }
@@ -60,7 +60,7 @@ describe("CampaignDetail section-4 navigation", () => {
     for (const name of ["Characters", "Content", "Members", "Activity"]) {
       expect(await screen.findByRole("tab", { name })).toBeVisible();
     }
-    expect(screen.queryByRole("button", { name: "Scene", exact: true })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Scene" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Session" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Settings" })).toBeNull();
   });

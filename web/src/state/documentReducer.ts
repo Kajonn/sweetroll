@@ -4,6 +4,7 @@ export type SystemMetadataV1 = {
   description: string;
   language: string;
   defaultDice: string;
+  presentation?: import("../theme/SystemPresentation.js").SystemPresentation;
 };
 
 export type SystemMetadataPatch = Partial<SystemMetadataV1>;

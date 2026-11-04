@@ -453,12 +453,18 @@ export const ValidationV1Schema = Type.Object(
 );
 export type ValidationV1 = Static<typeof ValidationV1Schema>;
 
+export const SystemPresentationSchema = Type.Object({
+  colorPreset: Type.Union([Type.Literal("default"), Type.Literal("blue"), Type.Literal("ochre")]),
+}, { additionalProperties: false });
+export type SystemPresentation = Static<typeof SystemPresentationSchema>;
+
 export const SystemMetadataV1Schema = Type.Object(
   {
     name: LabelSchema,
     description: Type.String({ maxLength: LONG_TEXT_MAX_LENGTH }),
     language: TextSchema,
     defaultDice: TextSchema,
+    presentation: Type.Optional(SystemPresentationSchema),
   },
   { additionalProperties: false },
 );

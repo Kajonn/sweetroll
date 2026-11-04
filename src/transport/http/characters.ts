@@ -184,6 +184,7 @@ const ProjectionElementDto = Type.Union([
   }),
 ]);
 const ProjectionDto = Type.Object({
+  presentation: Type.Optional(Type.Object({ colorPreset: Type.Union([Type.Literal("default"), Type.Literal("blue"), Type.Literal("ochre")]) })),
   projectionVersion: Type.Literal("1.0"),
   systemId: Type.String({ format: UUID_FORMAT }),
   versionId: Type.String({ format: UUID_FORMAT }),

@@ -1,7 +1,7 @@
 # System themes and image uploads — staged feature plan
 
 **Date:** 2026-11-03
-**Status:** Planned; no feature implementation or acceptance claimed.
+**Status:** T1 implementation in progress (2026-11-04); hosted acceptance pending. T2 and M0–M3 remain planned.
 **Baseline:** `main` `01c9fba` (merged PR #29).
 **Scope authority:** Owner request for system color themes, then themed GUI elements; image uploads for characters, items, then adventure backgrounds.
 **Design:** [Sections 10.5, 17.9c and 18.2](../../../design_v2.md). Reuse the [GUI foundation and G9 gates](2026-09-08-gui-integration.md) and [I7b scene/display contract](../specs/2026-09-14-i7b-scenes-display-design.md).

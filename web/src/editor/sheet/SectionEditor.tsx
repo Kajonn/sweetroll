@@ -1,3 +1,4 @@
+import { SystemDialogContent, SystemDialogOverlay } from "../../theme/SystemPresentation.js";
 import * as Dialog from "@radix-ui/react-dialog";
 
 import { t } from "../../i18n/index.js";
@@ -342,8 +343,8 @@ function RemoveSectionButton({
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className={styles.dialogOverlay} />
-        <Dialog.Content
+        <SystemDialogOverlay className={styles.dialogOverlay} />
+        <SystemDialogContent
           className={styles.dialogContent}
           aria-describedby={undefined}
           onOpenAutoFocus={(e) => e.preventDefault()}
@@ -374,7 +375,7 @@ function RemoveSectionButton({
               </Button>
             </Dialog.Close>
           </div>
-        </Dialog.Content>
+        </SystemDialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );
@@ -404,8 +405,8 @@ function RemoveElementButton({
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className={styles.dialogOverlay} />
-        <Dialog.Content
+        <SystemDialogOverlay className={styles.dialogOverlay} />
+        <SystemDialogContent
           className={styles.dialogContent}
           aria-describedby={undefined}
           onOpenAutoFocus={(e) => e.preventDefault()}
@@ -438,7 +439,7 @@ function RemoveElementButton({
               </Button>
             </Dialog.Close>
           </div>
-        </Dialog.Content>
+        </SystemDialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

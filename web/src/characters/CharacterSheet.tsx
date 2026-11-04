@@ -1,3 +1,4 @@
+import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import {PushPanel,type PushApi} from "../rolls/PushPanel.js";
 import {RollBreakdown} from "../rolls/RollBreakdown.js";
 import { useState } from "react";
@@ -242,7 +243,7 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, 
     }
   };
 
-  return <main className={styles.sheet} aria-busy={pending}>
+  return <SystemPresentationScope as="main" presentation={character.projection.presentation} className={styles.sheet} aria-busy={pending}>
     <header className={styles.header}><h1>{character.name}</h1><span>{projection.entityLabel}</span><p className={styles.meta}>{t("character.header.version", { version: character.systemVersionId })} · {t(character.lifecycle === "archived" ? "character.lifecycle.archived" : "character.lifecycle.active")}</p><output role="status" aria-live="polite">{syncStatusText(snapshot, pending)}</output>{commandError !== null ? <p role="alert" className={styles.commandError}>{commandError}</p> : null}{offlineAvailable === undefined ? null : <p role="status">{t(offlineAvailable ? "character.offline.available" : "character.offline.unavailable")}</p>}</header>
     {stale ? <p className={styles.stale}>{t("character.validation.stale")}</p> : null}
     {showEstimateNote ? <p className={styles.estimateNote}>{t("character.estimate.note")}</p> : null}
@@ -252,5 +253,5 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, 
     {projection.completionFields === undefined ? <p className={styles.completionUnavailable}>{t("character.completion.unavailable")}</p> : projection.completionFields.length > 0 ? <section className={styles.completion} aria-labelledby="character-completion"><h2 id="character-completion" tabIndex={-1}>{t("character.completion.title")}</h2>{projection.completionFields.map(field => <FieldControl key={field.id} field={field} tentativeValue={tentativeValue(snapshot, field.fieldId)} disabled={!editable} pending={pending} onCommit={onSetField} />)}</section> : null}
     {nominal !== null ? <section className={styles.nominalResult} role="status" aria-live="polite"><strong>{nominalLabel === null ? t("character.nominal.recorded") : t("character.nominal.recordedNamed", { label: nominalLabel })}</strong>{nominal.output.includes("{total}") || nominal.output === nominalLabel ? null : <p>{nominal.output}</p>}</section> : null}
     {snapshot.lastRoll !== null ? snapshot.lastRoll.push&&pushApi?<PushPanel roll={snapshot.lastRoll} characterId={character.characterId} api={pushApi} online={snapshot.connected} revision={character.revision} disabled={!editable||snapshot.phase!=="ready"||pending||snapshot.pendingOnlineAttempts.length>0} onPush={onPushRoll} onRefresh={onRefreshRoll} onDenied={onDeniedRoll}/>:<RollResult roll={snapshot.lastRoll} fieldLabels={fieldLabels} /> : null}
-  </main>;
+  </SystemPresentationScope>;
 }

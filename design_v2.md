@@ -915,7 +915,7 @@ The completed dynamic-object work added system templates and data-only character
 
 ## 17.9c Planned system themes and image uploads (2026-11-03)
 
-**Status:** Planned in the [staged feature plan](docs/superpowers/plans/2026-11-03-system-themes-and-images.md); no implementation or acceptance claimed. This records the owner's requested additions without closing or reprioritizing unperformed G9 release gates.
+**Status:** T1 color selection is being implemented (2026-11-04); acceptance is pending. T2 and M0–M3 remain planned in the [staged feature plan](docs/superpowers/plans/2026-11-03-system-themes-and-images.md); no implementation or acceptance claimed. This records the owner's requested additions without closing or reprioritizing unperformed G9 release gates.
 
 | Track | Ordered stages | Required result |
 | --- | --- | --- |

@@ -1,3 +1,4 @@
+import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import {CampaignProposals} from "./CampaignProposals.js";
 import {CampaignTemplates} from "./CampaignTemplates.js";
 // Campaign detail shell: openCampaign on mount, tabbed Characters /
@@ -261,7 +262,7 @@ export function CampaignDetail(props: {
       window.location.href = `/characters/${characterId}`;
     });
   return (
-    <section aria-label={campaign.title}>
+    <SystemPresentationScope as="section" aria-label={campaign.title} presentation={campaign.presentation}>
       <PageHeader
         title={campaign.title}
         actions={
@@ -414,6 +415,6 @@ export function CampaignDetail(props: {
           <p>{t("campaign.detail.leave.confirm.hint")}</p>
         </Panel>
       </Dialog>
-    </section>
+    </SystemPresentationScope>
   );
 }

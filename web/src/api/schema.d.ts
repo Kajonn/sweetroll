@@ -3141,6 +3141,9 @@ export interface operations {
                                 targetDefinitionId: string;
                             }[];
                             projection: {
+                                presentation?: {
+                                    colorPreset: "default" | "blue" | "ochre";
+                                };
                                 /** @constant */
                                 projectionVersion: "1.0";
                                 /** Format: uuid */
@@ -4032,6 +4035,9 @@ export interface operations {
                                 targetDefinitionId: string;
                             }[];
                             projection: {
+                                presentation?: {
+                                    colorPreset: "default" | "blue" | "ochre";
+                                };
                                 /** @constant */
                                 projectionVersion: "1.0";
                                 /** Format: uuid */
@@ -4490,6 +4496,9 @@ export interface operations {
                                     targetDefinitionId: string;
                                 }[];
                                 projection: {
+                                    presentation?: {
+                                        colorPreset: "default" | "blue" | "ochre";
+                                    };
                                     /** @constant */
                                     projectionVersion: "1.0";
                                     /** Format: uuid */
@@ -5097,6 +5106,9 @@ export interface operations {
                                     targetDefinitionId: string;
                                 }[];
                                 projection: {
+                                    presentation?: {
+                                        colorPreset: "default" | "blue" | "ochre";
+                                    };
                                     /** @constant */
                                     projectionVersion: "1.0";
                                     /** Format: uuid */
@@ -5704,6 +5716,9 @@ export interface operations {
                                     targetDefinitionId: string;
                                 }[];
                                 projection: {
+                                    presentation?: {
+                                        colorPreset: "default" | "blue" | "ochre";
+                                    };
                                     /** @constant */
                                     projectionVersion: "1.0";
                                     /** Format: uuid */
@@ -6838,6 +6853,9 @@ export interface operations {
                                     targetDefinitionId: string;
                                 }[];
                                 projection: {
+                                    presentation?: {
+                                        colorPreset: "default" | "blue" | "ochre";
+                                    };
                                     /** @constant */
                                     projectionVersion: "1.0";
                                     /** Format: uuid */
@@ -7457,6 +7475,9 @@ export interface operations {
                                     targetDefinitionId: string;
                                 }[];
                                 projection: {
+                                    presentation?: {
+                                        colorPreset: "default" | "blue" | "ochre";
+                                    };
                                     /** @constant */
                                     projectionVersion: "1.0";
                                     /** Format: uuid */
@@ -8087,6 +8108,9 @@ export interface operations {
                                     targetDefinitionId: string;
                                 }[];
                                 projection: {
+                                    presentation?: {
+                                        colorPreset: "default" | "blue" | "ochre";
+                                    };
                                     /** @constant */
                                     projectionVersion: "1.0";
                                     /** Format: uuid */
@@ -8693,6 +8717,9 @@ export interface operations {
                                     targetDefinitionId: string;
                                 }[];
                                 projection: {
+                                    presentation?: {
+                                        colorPreset: "default" | "blue" | "ochre";
+                                    };
                                     /** @constant */
                                     projectionVersion: "1.0";
                                     /** Format: uuid */
@@ -9303,6 +9330,9 @@ export interface operations {
                                     targetDefinitionId: string;
                                 }[];
                                 projection: {
+                                    presentation?: {
+                                        colorPreset: "default" | "blue" | "ochre";
+                                    };
                                     /** @constant */
                                     projectionVersion: "1.0";
                                     /** Format: uuid */
@@ -10194,6 +10224,9 @@ export interface operations {
                                     targetDefinitionId: string;
                                 }[];
                                 projection: {
+                                    presentation?: {
+                                        colorPreset: "default" | "blue" | "ochre";
+                                    };
                                     /** @constant */
                                     projectionVersion: "1.0";
                                     /** Format: uuid */
@@ -10797,6 +10830,9 @@ export interface operations {
                                 targetDefinitionId: string;
                             }[];
                             projection: {
+                                presentation?: {
+                                    colorPreset: "default" | "blue" | "ochre";
+                                };
                                 /** @constant */
                                 projectionVersion: "1.0";
                                 /** Format: uuid */
@@ -14144,6 +14180,9 @@ export interface operations {
                 content: {
                     "application/json": {
                         campaign: {
+                            presentation?: {
+                                colorPreset: "default" | "blue" | "ochre";
+                            };
                             /** Format: uuid */
                             campaignId: string;
                             /** Format: uuid */
@@ -14290,6 +14329,9 @@ export interface operations {
                 content: {
                     "application/json": {
                         campaign: {
+                            presentation?: {
+                                colorPreset: "default" | "blue" | "ochre";
+                            };
                             /** Format: uuid */
                             campaignId: string;
                             /** Format: uuid */
@@ -14385,6 +14427,9 @@ export interface operations {
                 content: {
                     "application/json": {
                         campaign: {
+                            presentation?: {
+                                colorPreset: "default" | "blue" | "ochre";
+                            };
                             /** Format: uuid */
                             campaignId: string;
                             /** Format: uuid */
@@ -14538,6 +14583,9 @@ export interface operations {
                 content: {
                     "application/json": {
                         campaign: {
+                            presentation?: {
+                                colorPreset: "default" | "blue" | "ochre";
+                            };
                             /** Format: uuid */
                             campaignId: string;
                             /** Format: uuid */
@@ -14691,6 +14739,9 @@ export interface operations {
                 content: {
                     "application/json": {
                         campaign: {
+                            presentation?: {
+                                colorPreset: "default" | "blue" | "ochre";
+                            };
                             /** Format: uuid */
                             campaignId: string;
                             /** Format: uuid */
@@ -16486,6 +16537,9 @@ export interface operations {
                                 targetDefinitionId: string;
                             }[];
                             projection: {
+                                presentation?: {
+                                    colorPreset: "default" | "blue" | "ochre";
+                                };
                                 /** @constant */
                                 projectionVersion: "1.0";
                                 /** Format: uuid */
@@ -17022,6 +17076,9 @@ export interface operations {
                                 targetDefinitionId: string;
                             }[];
                             projection: {
+                                presentation?: {
+                                    colorPreset: "default" | "blue" | "ochre";
+                                };
                                 /** @constant */
                                 projectionVersion: "1.0";
                                 /** Format: uuid */
@@ -17462,6 +17519,9 @@ export interface operations {
                                 targetDefinitionId: string;
                             }[];
                             projection: {
+                                presentation?: {
+                                    colorPreset: "default" | "blue" | "ochre";
+                                };
                                 /** @constant */
                                 projectionVersion: "1.0";
                                 /** Format: uuid */
@@ -17904,6 +17964,9 @@ export interface operations {
                                 targetDefinitionId: string;
                             }[];
                             projection: {
+                                presentation?: {
+                                    colorPreset: "default" | "blue" | "ochre";
+                                };
                                 /** @constant */
                                 projectionVersion: "1.0";
                                 /** Format: uuid */

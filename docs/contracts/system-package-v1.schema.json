@@ -64,6 +64,31 @@
       "maxLength": 10000,
       "type": "string"
     },
+    "presentation": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "colorPreset"
+      ],
+      "properties": {
+        "colorPreset": {
+          "anyOf": [
+            {
+              "const": "default",
+              "type": "string"
+            },
+            {
+              "const": "blue",
+              "type": "string"
+            },
+            {
+              "const": "ochre",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
     "entities": {
       "maxItems": 32,
       "type": "array",

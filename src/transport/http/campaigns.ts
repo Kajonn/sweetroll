@@ -66,6 +66,7 @@ const UUID_FORMAT = "uuid";
 const DATE_TIME_FORMAT = "date-time";
 
 const CampaignViewDto = Type.Object({
+  presentation: Type.Optional(Type.Object({ colorPreset: Type.Union([Type.Literal("default"), Type.Literal("blue"), Type.Literal("ochre")]) })),
   campaignId: Type.String({ format: UUID_FORMAT }),
   ownerId: Type.String({ format: UUID_FORMAT }),
   systemVersionId: Type.String({ format: UUID_FORMAT }),

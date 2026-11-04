@@ -225,6 +225,7 @@ export type CharacterProjectionSheet = {
 };
 
 export type CharacterProjectionV1 = {
+  presentation?: import("./implementation/package/schema/index.js").SystemPresentation;
   projectionVersion: "1.0";
   systemId: string;
   versionId: VersionId;

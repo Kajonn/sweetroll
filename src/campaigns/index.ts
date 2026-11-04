@@ -144,6 +144,7 @@ export type CampaignError = {
 export type CampaignResult<T> = { ok: true; value: T } | { ok: false; error: CampaignError };
 
 export type CampaignView = {
+  presentation?: import("../systems/implementation/package/schema/index.js").SystemPresentation;
   campaignId: CampaignId;
   ownerId: UserId;
   systemVersionId: string;
@@ -1088,7 +1089,10 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
         if (outcome.campaign === null || !canReadCampaign(outcome.campaign, outcome.membership)) {
           return { ok: false, error: errors.not_found() };
         }
-        return { ok: true, value: toView(outcome.campaign) };
+        const packageValue = await input.loadTemplatePackage?.(outcome.campaign.systemVersionId);
+        return { ok: true, value: { ...toView(outcome.campaign),
+          ...(packageValue?.presentation === undefined ? {} : { presentation: packageValue.presentation }),
+        } };
       } catch {
         return { ok: false, error: errors.internal() };
       }

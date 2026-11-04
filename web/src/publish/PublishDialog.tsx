@@ -1,3 +1,4 @@
+import { SystemDialogContent, SystemDialogOverlay } from "../theme/SystemPresentation.js";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useState } from "react";
 
@@ -132,8 +133,8 @@ export function PublishDialog({
     return (
       <Dialog.Root open={open} onOpenChange={onOpenChange}>
         <Dialog.Portal>
-          <Dialog.Overlay className={styles.overlay} />
-          <Dialog.Content
+          <SystemDialogOverlay className={styles.overlay} />
+          <SystemDialogContent
             className={styles.content}
             aria-describedby={undefined}
             data-testid="publish-dialog-success"
@@ -166,7 +167,7 @@ export function PublishDialog({
                 {t("publish.close")}
               </Button>
             </div>
-          </Dialog.Content>
+          </SystemDialogContent>
         </Dialog.Portal>
       </Dialog.Root>
     );
@@ -175,8 +176,8 @@ export function PublishDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className={styles.overlay} />
-        <Dialog.Content
+        <SystemDialogOverlay className={styles.overlay} />
+        <SystemDialogContent
           className={styles.content}
           aria-describedby={undefined}
           data-testid="publish-dialog"
@@ -294,7 +295,7 @@ export function PublishDialog({
               {mutation.isPending ? t("publish.submitting") : t("publish.submit")}
             </Button>
           </div>
-        </Dialog.Content>
+        </SystemDialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

@@ -6,6 +6,8 @@ import {
   type SystemDocumentV1,
   type SystemMetadataV1,
 } from "../state/documentReducer.js";
+import { COLOR_PRESETS, SystemPresentationScope, type SystemPresentation } from "../theme/SystemPresentation.js";
+import { Button } from "../ui/Button.js";
 import { FormField } from "../ui/index.js";
 import styles from "./MetadataEditor.module.css";
 
@@ -42,6 +44,12 @@ export function MetadataEditor({
     onChange?.(state);
   }, [onChange, state]);
 
+  const selectColors = (colorPreset: SystemPresentation["colorPreset"]) => {
+    const next = { ...state, metadata: { ...state.metadata, presentation: { colorPreset } } };
+    dirtyRef.current = false;
+    dispatch({ type: "replace", document: next });
+    onChange?.(next);
+  };
   const meta = state.metadata;
 
   return (
@@ -54,7 +62,20 @@ export function MetadataEditor({
       onBlur={flush}
       data-testid="metadata-editor"
     >
+      <FormField id="metadata-system-colors" label={t("editor.metadata.systemColors")}>
+        <select id="metadata-system-colors" className={styles.input}
+          value={meta.presentation?.colorPreset ?? "default"}
+          onChange={event => selectColors(event.target.value as SystemPresentation["colorPreset"])}>
+          {COLOR_PRESETS.map(preset => <option key={preset} value={preset}>{t(`editor.metadata.color.${preset}`)}</option>)}
+        </select>
+        <p>{t("editor.metadata.systemColorsHint")}</p>
+        <Button variant="secondary" type="button" onClick={() => selectColors("default")}>{t("editor.metadata.resetColors")}</Button>
+      </FormField>
+      <div className={styles.colorSamples} aria-hidden="true">
+        {COLOR_PRESETS.map(colorPreset => <SystemPresentationScope key={colorPreset} presentation={{ colorPreset }}><span className={styles.colorSample}>{t(`editor.metadata.color.${colorPreset}`)}</span></SystemPresentationScope>)}
+      </div>
       <FormField label={t("editor.metadata.name")}>
+
         <input
           id="metadata-name"
           type="text"

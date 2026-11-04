@@ -6,6 +6,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { ApiClient } from "../api/client.js";
 import { openSystemKey, useOpenSystem } from "../api/openSystem.js";
 import type { DocumentAssessment, PublishedVersion, SystemWorkspace } from "../api/server.js";
+import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import { t } from "../i18n/index.js";
 import type { ScalarValue, ValueType } from "../ports/evaluateExpression.js";
 import { ResourceBumpEditor, type ResourceBumpActionV1 } from "./actions/ResourceBumpEditor.js";
@@ -338,7 +339,7 @@ export function DocumentEditorBody({
   const previewVisible = previewOpen && previewPackage !== null && previewSample !== null;
 
   return (
-    <section className={styles.container}>
+    <SystemPresentationScope as="section" className={styles.container} presentation={document.metadata.presentation}>
       <header className={styles.header} data-testid="document-editor-header">
         <h1
           className={styles.name}
@@ -632,7 +633,7 @@ export function DocumentEditorBody({
           onClose={() => setVersionHistoryOpen(false)}
         />
       ) : null}
-    </section>
+    </SystemPresentationScope>
   );
 }
 
@@ -1496,6 +1497,7 @@ export function buildPreviewPackage(document: SystemDocumentV1): import("../prev
     | { kind: "resourceBump"; id: string; label: string; resourceId: string; operation: { kind: "delta"; amount: number } | { kind: "reset" } }
   >) ?? [];
   return {
+    presentation: document.metadata.presentation,
     entities,
     expressions: compilePreviewExpressions(document),
     sheets: sheets as unknown as never,

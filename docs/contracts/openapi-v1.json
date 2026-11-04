@@ -5009,6 +5009,30 @@
                             "validations"
                           ],
                           "properties": {
+                            "presentation": {
+                              "type": "object",
+                              "required": [
+                                "colorPreset"
+                              ],
+                              "properties": {
+                                "colorPreset": {
+                                  "anyOf": [
+                                    {
+                                      "const": "default",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "blue",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "ochre",
+                                      "type": "string"
+                                    }
+                                  ]
+                                }
+                              }
+                            },
                             "projectionVersion": {
                               "const": "1.0",
                               "type": "string"
@@ -9592,6 +9616,30 @@
                             "validations"
                           ],
                           "properties": {
+                            "presentation": {
+                              "type": "object",
+                              "required": [
+                                "colorPreset"
+                              ],
+                              "properties": {
+                                "colorPreset": {
+                                  "anyOf": [
+                                    {
+                                      "const": "default",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "blue",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "ochre",
+                                      "type": "string"
+                                    }
+                                  ]
+                                }
+                              }
+                            },
                             "projectionVersion": {
                               "const": "1.0",
                               "type": "string"
@@ -11848,6 +11896,30 @@
                                 "validations"
                               ],
                               "properties": {
+                                "presentation": {
+                                  "type": "object",
+                                  "required": [
+                                    "colorPreset"
+                                  ],
+                                  "properties": {
+                                    "colorPreset": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "blue",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "ochre",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
                                 "projectionVersion": {
                                   "const": "1.0",
                                   "type": "string"
@@ -14896,6 +14968,30 @@
                                 "validations"
                               ],
                               "properties": {
+                                "presentation": {
+                                  "type": "object",
+                                  "required": [
+                                    "colorPreset"
+                                  ],
+                                  "properties": {
+                                    "colorPreset": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "blue",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "ochre",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
                                 "projectionVersion": {
                                   "const": "1.0",
                                   "type": "string"
@@ -17955,6 +18051,30 @@
                                 "validations"
                               ],
                               "properties": {
+                                "presentation": {
+                                  "type": "object",
+                                  "required": [
+                                    "colorPreset"
+                                  ],
+                                  "properties": {
+                                    "colorPreset": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "blue",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "ochre",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
                                 "projectionVersion": {
                                   "const": "1.0",
                                   "type": "string"
@@ -23298,6 +23418,30 @@
                                 "validations"
                               ],
                               "properties": {
+                                "presentation": {
+                                  "type": "object",
+                                  "required": [
+                                    "colorPreset"
+                                  ],
+                                  "properties": {
+                                    "colorPreset": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "blue",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "ochre",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
                                 "projectionVersion": {
                                   "const": "1.0",
                                   "type": "string"
@@ -26393,6 +26537,30 @@
                                 "validations"
                               ],
                               "properties": {
+                                "presentation": {
+                                  "type": "object",
+                                  "required": [
+                                    "colorPreset"
+                                  ],
+                                  "properties": {
+                                    "colorPreset": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "blue",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "ochre",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
                                 "projectionVersion": {
                                   "const": "1.0",
                                   "type": "string"
@@ -29539,6 +29707,30 @@
                                 "validations"
                               ],
                               "properties": {
+                                "presentation": {
+                                  "type": "object",
+                                  "required": [
+                                    "colorPreset"
+                                  ],
+                                  "properties": {
+                                    "colorPreset": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "blue",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "ochre",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
                                 "projectionVersion": {
                                   "const": "1.0",
                                   "type": "string"
@@ -32585,6 +32777,30 @@
                                 "validations"
                               ],
                               "properties": {
+                                "presentation": {
+                                  "type": "object",
+                                  "required": [
+                                    "colorPreset"
+                                  ],
+                                  "properties": {
+                                    "colorPreset": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "blue",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "ochre",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
                                 "projectionVersion": {
                                   "const": "1.0",
                                   "type": "string"
@@ -35639,6 +35855,30 @@
                                 "validations"
                               ],
                               "properties": {
+                                "presentation": {
+                                  "type": "object",
+                                  "required": [
+                                    "colorPreset"
+                                  ],
+                                  "properties": {
+                                    "colorPreset": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "blue",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "ochre",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
                                 "projectionVersion": {
                                   "const": "1.0",
                                   "type": "string"
@@ -39946,6 +40186,30 @@
                                 "validations"
                               ],
                               "properties": {
+                                "presentation": {
+                                  "type": "object",
+                                  "required": [
+                                    "colorPreset"
+                                  ],
+                                  "properties": {
+                                    "colorPreset": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "blue",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "ochre",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
                                 "projectionVersion": {
                                   "const": "1.0",
                                   "type": "string"
@@ -42971,6 +43235,30 @@
                             "validations"
                           ],
                           "properties": {
+                            "presentation": {
+                              "type": "object",
+                              "required": [
+                                "colorPreset"
+                              ],
+                              "properties": {
+                                "colorPreset": {
+                                  "anyOf": [
+                                    {
+                                      "const": "default",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "blue",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "ochre",
+                                      "type": "string"
+                                    }
+                                  ]
+                                }
+                              }
+                            },
                             "projectionVersion": {
                               "const": "1.0",
                               "type": "string"
@@ -54568,6 +54856,30 @@
                         "updatedAt"
                       ],
                       "properties": {
+                        "presentation": {
+                          "type": "object",
+                          "required": [
+                            "colorPreset"
+                          ],
+                          "properties": {
+                            "colorPreset": {
+                              "anyOf": [
+                                {
+                                  "const": "default",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "blue",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "ochre",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        },
                         "campaignId": {
                           "format": "uuid",
                           "type": "string"
@@ -55188,6 +55500,30 @@
                         "updatedAt"
                       ],
                       "properties": {
+                        "presentation": {
+                          "type": "object",
+                          "required": [
+                            "colorPreset"
+                          ],
+                          "properties": {
+                            "colorPreset": {
+                              "anyOf": [
+                                {
+                                  "const": "default",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "blue",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "ochre",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        },
                         "campaignId": {
                           "format": "uuid",
                           "type": "string"
@@ -55445,6 +55781,30 @@
                         "updatedAt"
                       ],
                       "properties": {
+                        "presentation": {
+                          "type": "object",
+                          "required": [
+                            "colorPreset"
+                          ],
+                          "properties": {
+                            "colorPreset": {
+                              "anyOf": [
+                                {
+                                  "const": "default",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "blue",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "ochre",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        },
                         "campaignId": {
                           "format": "uuid",
                           "type": "string"
@@ -55869,6 +56229,30 @@
                         "updatedAt"
                       ],
                       "properties": {
+                        "presentation": {
+                          "type": "object",
+                          "required": [
+                            "colorPreset"
+                          ],
+                          "properties": {
+                            "colorPreset": {
+                              "anyOf": [
+                                {
+                                  "const": "default",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "blue",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "ochre",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        },
                         "campaignId": {
                           "format": "uuid",
                           "type": "string"
@@ -56293,6 +56677,30 @@
                         "updatedAt"
                       ],
                       "properties": {
+                        "presentation": {
+                          "type": "object",
+                          "required": [
+                            "colorPreset"
+                          ],
+                          "properties": {
+                            "colorPreset": {
+                              "anyOf": [
+                                {
+                                  "const": "default",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "blue",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "ochre",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        },
                         "campaignId": {
                           "format": "uuid",
                           "type": "string"
@@ -61598,6 +62006,30 @@
                             "validations"
                           ],
                           "properties": {
+                            "presentation": {
+                              "type": "object",
+                              "required": [
+                                "colorPreset"
+                              ],
+                              "properties": {
+                                "colorPreset": {
+                                  "anyOf": [
+                                    {
+                                      "const": "default",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "blue",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "ochre",
+                                      "type": "string"
+                                    }
+                                  ]
+                                }
+                              }
+                            },
                             "projectionVersion": {
                               "const": "1.0",
                               "type": "string"
@@ -63915,6 +64347,30 @@
                             "validations"
                           ],
                           "properties": {
+                            "presentation": {
+                              "type": "object",
+                              "required": [
+                                "colorPreset"
+                              ],
+                              "properties": {
+                                "colorPreset": {
+                                  "anyOf": [
+                                    {
+                                      "const": "default",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "blue",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "ochre",
+                                      "type": "string"
+                                    }
+                                  ]
+                                }
+                              }
+                            },
                             "projectionVersion": {
                               "const": "1.0",
                               "type": "string"
@@ -65953,6 +66409,30 @@
                             "validations"
                           ],
                           "properties": {
+                            "presentation": {
+                              "type": "object",
+                              "required": [
+                                "colorPreset"
+                              ],
+                              "properties": {
+                                "colorPreset": {
+                                  "anyOf": [
+                                    {
+                                      "const": "default",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "blue",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "ochre",
+                                      "type": "string"
+                                    }
+                                  ]
+                                }
+                              }
+                            },
                             "projectionVersion": {
                               "const": "1.0",
                               "type": "string"
@@ -67996,6 +68476,30 @@
                             "validations"
                           ],
                           "properties": {
+                            "presentation": {
+                              "type": "object",
+                              "required": [
+                                "colorPreset"
+                              ],
+                              "properties": {
+                                "colorPreset": {
+                                  "anyOf": [
+                                    {
+                                      "const": "default",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "blue",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "ochre",
+                                      "type": "string"
+                                    }
+                                  ]
+                                }
+                              }
+                            },
                             "projectionVersion": {
                               "const": "1.0",
                               "type": "string"

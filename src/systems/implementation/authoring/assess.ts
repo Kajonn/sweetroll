@@ -69,6 +69,7 @@ export function documentFromPackage(pkg: SystemPackageV1): SystemDocumentV1 {
       description: pkg.description,
       language: pkg.language,
       defaultDice: pkg.defaultDice,
+      ...(pkg.presentation === undefined ? {} : { presentation: structuredClone(pkg.presentation) }),
     },
     entities: structuredClone(pkg.entities),
     referenceData: structuredClone(pkg.referenceData),

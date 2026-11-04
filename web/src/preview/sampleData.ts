@@ -134,6 +134,7 @@ export type CompiledExpressionSummary = {
 };
 
 export type SystemPackageV1 = {
+  presentation?: import("../theme/SystemPresentation.js").SystemPresentation;
   entities: EntityDefinitionV1[];
   expressions: CompiledExpressionSummary[];
 };

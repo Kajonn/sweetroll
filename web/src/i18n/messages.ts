@@ -1,6 +1,25 @@
 export type MessageTable = Record<string, string>;
 
 export const defaultMessages: MessageTable = {
+  "scene.library.title": "Scene backgrounds",
+  "scene.library.error": "The scene background could not be saved. Try again.",
+  "scene.library.unavailable": "This scene library is unavailable.",
+  "scene.library.refresh": "Refresh scene",
+  "scene.library.upload": "Upload background",
+  "scene.library.view": "View {name}",
+  "scene.library.use": "Use as background",
+  "scene.library.create": "Create scene",
+  "scene.library.delete": "Delete image",
+  "scene.library.moreImages": "More images",
+  "scene.library.moreScenes": "More scenes",
+  "scene.library.open": "Open scene: {name}",
+  "scene.library.number": "Scene {number}",
+  "scene.library.replace": "Replace background",
+  "scene.library.replaceNotice": "Replacing this background conceals the whole image and removes all tokens. Review the new scene before revealing it.",
+  "scene.library.deleteNotice": "Delete this image? Images used by a scene or token must be replaced first.",
+  "scene.library.confirm": "Replace and conceal",
+  "scene.library.preview": "Background preview",
+
   "artwork.close": "Close artwork editor",
   "artwork.title": "Item artwork",
   "artwork.file": "Image file",

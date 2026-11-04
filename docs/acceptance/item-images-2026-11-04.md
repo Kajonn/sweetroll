@@ -27,10 +27,9 @@ Local validation:
 
 The dedicated hosted runner uses one GM and three player sessions. Setup and
 cleanup use normal application APIs; artwork upload/edit, reviewed approval and
-sheet play use the routed GUI. It will exercise three published template images,
+sheet play use the routed GUI. It exercises three published template images,
 clone/import/export, personal overrides, private catalog audiences/previews,
-proposal privacy, retained copies, offline edits and return. Actual deployment,
-results and screenshots will be recorded after it runs.
+proposal privacy, retained copies, offline edits and return. The deployment, results and screenshot are recorded below.
 
 Only the isolated branch preview is used. A new disposable database preserves
 all earlier preview databases. Production sources and migration policy are unchanged.

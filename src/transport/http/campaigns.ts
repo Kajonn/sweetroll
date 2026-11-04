@@ -1208,6 +1208,11 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
       },
     },
   },
+  ...(["images", "scenes"] as const).map(kind => ({
+    method: "get" as const, path: `/campaigns/:id/${kind}`, operationId: `get_campaigns_id_${kind}`,
+    schema: { params: CampaignIdParams, querystring: Type.Object({ limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 50 })), cursor: Type.Optional(Type.String({ format: "uuid" })) }, { additionalProperties: false }), response: { "200": Type.Object({ [kind]: Type.Array(kind === "images" ? MediaFileViewDto : Type.Pick(SceneViewDto, ["sceneId", "backgroundFileId", "revision"])), nextCursor: Type.Union([Type.String(), Type.Null()]), requestId: Type.String() }), ...ErrorResponses } },
+  })),
+  { method: "get", path: "/campaigns/:id/images/:fileId/thumbnail", operationId: "get_campaigns_id_images_fileId_thumbnail", schema: { params: CampaignImageParams, response: { "200": { schema: BinaryBodyDto, mediaType: "image/webp" }, ...ErrorResponses } } },
   {
     method: "post",
     path: "/campaigns/:id/images",
@@ -2276,6 +2281,23 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         return { export: result.value, requestId: request.id };
       },
 
+      get_campaigns_id_images: async (request, reply) => {
+        const query = request.query as { limit?: number; cursor?: string }, params = request.params as { id: string };
+        const result = await campaigns.listSceneImages(ctxOf(request), { campaignId: params.id, ...query });
+        return result.ok ? { ...result.value, requestId: request.id } : sendError(reply, result.error, request.id);
+      },
+      get_campaigns_id_scenes: async (request, reply) => {
+        const query = request.query as { limit?: number; cursor?: string }, params = request.params as { id: string };
+        const result = await campaigns.listScenes(ctxOf(request), { campaignId: params.id, ...query });
+        return result.ok ? { ...result.value, requestId: request.id } : sendError(reply, result.error, request.id);
+      },
+      get_campaigns_id_images_fileId_thumbnail: async (request, reply) => {
+        const params = request.params as { id: string; fileId: string };
+        const result = await campaigns.openImage(ctxOf(request), { fileId: params.fileId, thumbnail: true });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        if (result.value.file.campaignId !== params.id) return sendError(reply, { code: "not_found", message: "The requested campaign does not exist." }, request.id);
+        return reply.type("image/webp").header("x-content-type-options", "nosniff").send(result.value.bytes);
+      },
       post_campaigns_id_images: async (request, reply) => {
         const params = request.params as { id: string };
         const body = request.body as {

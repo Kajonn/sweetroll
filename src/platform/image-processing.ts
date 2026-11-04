@@ -48,12 +48,18 @@ export async function processImage(input: { dataBase64: string; contentType: Ima
     // Re-encoding without keepMetadata/withMetadata drops EXIF, profiles and comments.
     const safe = await decoder.rotate().toFormat(formats[input.contentType]).toBuffer({ resolveWithObject: true });
     if (safe.data.length > MAX_IMAGE_BYTES) throw new ImageProcessingError("too_large", "The decoded image is too large to store safely.");
-    const thumbnail = await sharp(safe.data).resize({ width: 256, height: 256, fit: "inside", withoutEnlargement: true }).webp({ quality: 78 }).toBuffer();
-    if (thumbnail.length > 64 * 1024) throw new ImageProcessingError("too_large", "The image thumbnail is too complex. Choose a simpler image.");
+    const thumbnail = await createImageThumbnail(safe.data);
     return { bytes: safe.data, thumbnail, contentType: input.contentType, width: safe.info.width, height: safe.info.height,
       checksum: createHash("sha256").update(safe.data).digest("hex"), inputChecksum: createHash("sha256").update(bytes).digest("hex") };
   } catch (error) {
     if (error instanceof ImageProcessingError) throw error;
     throw new ImageProcessingError("unprocessable", "The image is corrupt, animated or exceeds 4096 px per dimension.");
   }
+}
+
+/** Bounded safe derivative shared by uploads and authorized scene thumbnail reads. */
+export async function createImageThumbnail(bytes: Buffer): Promise<Buffer> {
+  const thumbnail = await sharp(bytes, { limitInputPixels: MAX_IMAGE_DIMENSION ** 2, failOn: "warning" }).resize({ width: 256, height: 256, fit: "inside", withoutEnlargement: true }).webp({ quality: 78 }).toBuffer();
+  if (thumbnail.length > 64 * 1024) throw new ImageProcessingError("too_large", "The image thumbnail is too complex. Choose a simpler image.");
+  return thumbnail;
 }

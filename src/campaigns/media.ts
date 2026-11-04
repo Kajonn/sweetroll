@@ -5,7 +5,7 @@ import { resolveMediaRoot } from "../platform/image-storage.js";
 export { resolveMediaRoot } from "../platform/image-storage.js";
 
 import type { Pool, PoolClient } from "pg";
-import { processImage, decodeImageBase64, ImageProcessingError, type ImageScanner } from "../platform/image-processing.js";
+import { createImageThumbnail, processImage, decodeImageBase64, ImageProcessingError, type ImageScanner } from "../platform/image-processing.js";
 import { createClamScanner } from "../platform/image-scanner.js";
 
 import type { RequestContext } from "../systems/authoring.js";
@@ -29,6 +29,7 @@ export type DeleteImageInput = {
 };
 
 export type OpenImageInput = {
+  thumbnail?: boolean;
   fileId: string;
 };
 
@@ -304,7 +305,11 @@ export function createMediaCommands(input: CreateMediaCommandsInput): MediaComma
           // collapse as the display projection's orphaned-background read.
           return { ok: false, error: errors.not_found() };
         }
-        const mediaType = outcome.file.mediaType;
+        if (createHash("sha256").update(bytes).digest("hex") !== outcome.file.checksum) return { ok: false, error: errors.not_found() };
+        if (openInput.thumbnail) bytes = await createImageThumbnail(bytes);
+        const denial = await reauthorizeUpload(ctx, outcome.file.campaignId, outcome.file.fileId);
+        if (denial) return { ok: false, error: denial };
+        const mediaType = openInput.thumbnail ? "image/webp" : outcome.file.mediaType;
         if (mediaType !== "image/png" && mediaType !== "image/jpeg" && mediaType !== "image/webp") {
           return { ok: false, error: errors.internal() };
         }

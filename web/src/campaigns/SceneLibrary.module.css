@@ -1,0 +1,6 @@
+.images { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 1rem; padding: 0; list-style: none; }
+.images li { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: .75rem; min-width: 0; overflow-wrap: anywhere; }
+.thumbnail { width: 128px; height: 96px; object-fit: contain; max-width: 100%; }
+.preview { border: 0; padding: 0; background: transparent; cursor: pointer; min-width: 44px; min-height: 44px; }
+.actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.full { display: block; max-width: 100%; max-height: 65dvh; object-fit: contain; }

@@ -59,6 +59,7 @@ describe("buildOpenApiDocument", () => {
       "/campaigns/{id}/images",
       "/campaigns/{id}/images/{fileId}",
       "/campaigns/{id}/images/{fileId}/original",
+      "/campaigns/{id}/images/{fileId}/thumbnail",
       "/campaigns/{id}/invitations",
       "/campaigns/{id}/invitations/{inviteId}/revoke",
       "/campaigns/{id}/invitations/{inviteId}/rotate",

@@ -265,11 +265,12 @@ export function CampaignDetail(props: {
     <SystemPresentationScope as="section" aria-label={campaign.title} presentation={campaign.presentation}>
       <PageHeader
         title={campaign.title}
-        actions={
+        actions={<>
+          {isGm ? <Button variant="secondary" onClick={() => { window.location.assign(`/campaigns/${encodeURIComponent(props.campaignId)}/scenes`); }}>{t("campaign.detail.scenes.title")}</Button> : null}
           <Button variant="secondary" onClick={() => setLeavePhase("confirming")}>
             {t("campaign.detail.leave.button")}
           </Button>
-        }
+        </>}
       />
       {leavePhase === "conflict" ? (
         <EmptyState

@@ -1,3 +1,5 @@
+export type { SceneLibraryQuery, SceneSummary } from "./scene-library.js";
+import { createSceneLibraryCommands, type SceneLibraryCommands } from "./scene-library.js";
 import { createProposalCommands, type ProposalCommands } from "./proposals.js";
 import { createCampaignItemImages, type CampaignItemImages } from "./item-images.js";
 import { createTemplateCommands, type TemplateCommands } from "./templates.js";
@@ -312,7 +314,7 @@ export type AssignCampaignControllersInput = Omit<AssignControllersInput, "membe
 export type ClaimCampaignCharacterInput = Omit<ClaimCharacterInput, "membershipGeneration">;
 export type AdoptCampaignCharacterInput = Omit<AdoptCharacterInput, "membershipGeneration">;
 
-export interface Campaigns extends TemplateCommands, ProposalCommands, CampaignItemImages {
+export interface Campaigns extends TemplateCommands, ProposalCommands, CampaignItemImages, SceneLibraryCommands {
   create(ctx: RequestContext, input: CreateCampaignInput): Promise<CampaignResult<CampaignView>>;
   open(ctx: RequestContext, input: OpenCampaignInput): Promise<CampaignResult<CampaignView>>;
   list(ctx: RequestContext, input: ListCampaignsInput): Promise<CampaignResult<ListCampaignsResult>>;
@@ -959,6 +961,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     replaceGrants: content.replaceGrants,
     listActivity: content.listActivity,
     exportCampaign: content.exportCampaign,
+    ...createSceneLibraryCommands(input.pool, repo),
     uploadImage: media.uploadImage,
     deleteImage: media.deleteImage,
     openImage: media.openImage,

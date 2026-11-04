@@ -93,7 +93,12 @@ export type ContentListQuery = { cursor?: string | null; limit?: number; status?
 export type ClaimableCharactersQuery = { cursor?: string | null; limit?: number };
 export type ActivityListQuery = { cursor?: string | null; limit?: number };
 
+export type SceneLibraryApi = Pick<CampaignsApi, "uploadImage" | "deleteImage" | "createScene" | "updateScene"> & {
+  listImages(campaignId: string, input?: { cursor?: string | null }): Promise<Omit<operations["get_campaigns_id_images"]["responses"][200]["content"]["application/json"], "requestId">>;
+  listScenes(campaignId: string, input?: { cursor?: string | null }): Promise<Omit<operations["get_campaigns_id_scenes"]["responses"][200]["content"]["application/json"], "requestId">>;
+};
 export type CampaignsApi = {
+  sceneLibrary?: SceneLibraryApi;
   templates?:CampaignTemplatesApi;
   proposals?:CampaignProposalsApi;
   listCampaigns(input?: CampaignListQuery): Promise<CampaignListResponse>;
@@ -145,7 +150,23 @@ export type CampaignsApi = {
 };
 
 export function createCampaignsApi(client: ApiClient): CampaignsApi {
+  const sceneOperations: Pick<CampaignsApi, "uploadImage" | "deleteImage" | "createScene" | "updateScene"> = {
+    uploadImage: (campaignId, body) =>
+      client.fetch<UploadImageResponse>("POST", `/campaigns/${campaignId}/images`, { body }),
+    deleteImage: (campaignId, fileId, body) =>
+      client.fetch<DeleteImageResponse>("DELETE", `/campaigns/${campaignId}/images/${fileId}`, { body }),
+    createScene: (campaignId, body) =>
+      client.fetch<CreateSceneResponse>("POST", `/campaigns/${campaignId}/scenes`, { body }),
+    updateScene: (sceneId, body) =>
+      client.fetch<UpdateSceneResponse>("PATCH", `/scenes/${sceneId}`, { body }),
+  };
   return {
+    ...sceneOperations,
+    sceneLibrary: {
+      ...sceneOperations,
+      listImages: (id, input) => client.fetch("GET", `/campaigns/${id}/images`, { query: { cursor: input?.cursor ?? undefined, limit: 25 } }),
+      listScenes: (id, input) => client.fetch("GET", `/campaigns/${id}/scenes`, { query: { cursor: input?.cursor ?? undefined, limit: 25 } }),
+    },
     templates:createCampaignTemplatesApi(client),
     proposals:createCampaignProposalsApi(client),
     listCampaigns: (input) =>
@@ -251,16 +272,9 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
       client.fetch("POST", `/content/${contentId}/grants`, { body }),
     previewContent: (campaignId, body) =>
       client.fetch<PreviewContentResponse>("POST", `/campaigns/${campaignId}/content-preview`, { body }),
-    uploadImage: (campaignId, body) =>
-      client.fetch<UploadImageResponse>("POST", `/campaigns/${campaignId}/images`, { body }),
-    deleteImage: (campaignId, fileId, body) =>
-      client.fetch<DeleteImageResponse>("DELETE", `/campaigns/${campaignId}/images/${fileId}`, { body }),
-    createScene: (campaignId, body) =>
-      client.fetch<CreateSceneResponse>("POST", `/campaigns/${campaignId}/scenes`, { body }),
     openScene: (sceneId) =>
       client.fetch<SceneDetailResponse>("GET", `/scenes/${sceneId}`),
-    updateScene: (sceneId, body) =>
-      client.fetch<UpdateSceneResponse>("PATCH", `/scenes/${sceneId}`, { body }),
+
     applyFogEdit: (sceneId, body) =>
       client.fetch<ApplyFogEditResponse>("POST", `/scenes/${sceneId}/fog-edits`, { body }),
     placeToken: (sceneId, body) =>

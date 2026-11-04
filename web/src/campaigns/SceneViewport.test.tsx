@@ -1,5 +1,5 @@
 // web/src/campaigns/SceneViewport.test.tsx
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -87,6 +87,16 @@ describe("CampaignSceneView", () => {
     expect(props.api.openScene).toHaveBeenCalledWith("s1");
   });
 
+  it("discards uncommitted fog coordinates after background replacement", async () => {
+    const props = routeProps(), client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<CampaignSceneView {...props} />, { wrapper: wrapper(client) });
+    await screen.findByRole("img", { name: /scene background/i });
+    fireEvent.click(screen.getByRole("button", { name: "Add fog dab" }));
+    expect(screen.getByRole("button", { name: "Commit fog edit" })).toBeEnabled();
+    props.api.openScene.mockResolvedValue({ scene: scene({ backgroundFileId: "new-image", revision: 4, tokens: [] }), requestId: "next" });
+    await client.invalidateQueries({ queryKey: ["campaigns", "scene"] });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Commit fog edit" })).toBeDisabled());
+  });
   it("shows unavailable content with no scene tools when the server reports 404", async () => {
     const props = routeProps({
       api: {

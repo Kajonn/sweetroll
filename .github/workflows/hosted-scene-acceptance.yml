@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/hosted-scene-acceptance.yml
+      - web/tests/hosted/sceneBackgrounds.spec.ts
   workflow_dispatch:
 permissions:
   contents: read

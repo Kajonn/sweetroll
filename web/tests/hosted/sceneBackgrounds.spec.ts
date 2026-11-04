@@ -54,7 +54,7 @@ test("M3 GUI background upload, confirmed safe replacement and restricted displa
     };
     await upload("Cave", "#e53753");
     const row = (name: string) => gm.locator("li").filter({ has: gm.getByRole("img", { name, exact: true }) });
-    await row("Cave").getByRole("button", { name: "Create scene", exact: true }).click(); await expect(gm).toHaveURL(/sceneId=/);
+    await row("Cave").getByRole("button", { name: "Create scene", exact: true }).click(); await expect(gm).toHaveURL(/sceneId=[0-9a-f-]{36}(?:&|$)/);
     const sceneId = new URL(gm.url()).searchParams.get("sceneId")!; await expect(gm.getByRole("img", { name: "Scene background", exact: true })).toBeVisible();
     await fog(gm);
     for (const [label, visible] of [["Visible explorer", true], ["Hidden GM marker", false]] as const) {

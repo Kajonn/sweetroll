@@ -1,0 +1,92 @@
+{
+  "applicationCommit": "d62a9f8a91126b81ee5fcd0652994a97fef9d2a1",
+  "deployment": "676dad75-acdf-4498-8388-0b134102844a",
+  "workflowRun": 41932479903,
+  "runnerCommit": "8b590219e510d3110a6e351a23a56980e59d9ade",
+  "stats": {
+    "startTime": "2026-11-04T23:17:47.390Z",
+    "duration": 26768.097,
+    "expected": 1,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "fixture": {
+    "campaignId": "7534585e-e6bb-4a00-80c3-6d257cd99f86",
+    "sceneId": "91dac657-67fa-4e21-b6a2-86d3b9542ef4",
+    "fileId": "f55e5397-31e8-412f-a582-9615d7d55f5a",
+    "checksum": "0aca948b375f3c627bce5879c7a8e8f4677b9f8efd20df2bce33e463a1ee9e81"
+  },
+  "assets": {
+    "commit": "d62a9f8a91126b81ee5fcd0652994a97fef9d2a1",
+    "buildId": "build-mw2qjof1",
+    "rows": [
+      {
+        "path": "/index.html",
+        "sha256": "11b0198da1a9c2e0024d8ebc7c017e662a8fdf741dc35ed25c2bf87a6dd33a6f",
+        "bytes": 2338
+      },
+      {
+        "path": "/assets/index-0S1ITkUb.css",
+        "sha256": "96fb63af0427eb888dc4ddaba8896228b60f0df5ffa7cd7e63263661727a36cb",
+        "bytes": 84709
+      },
+      {
+        "path": "/assets/index-CjGazBTO.js",
+        "sha256": "0d7b2304eaaecf923f60201423eba127e8057a600eef1a66f1847ec1d9c072a8",
+        "bytes": 922693
+      },
+      {
+        "path": "/sw.js",
+        "sha256": "7a5fca8bfaebceb5e3c3602540171a815190843225776289eb1d764b85bc5395",
+        "bytes": 3545
+      },
+      {
+        "path": "/offline-manifest.json",
+        "sha256": "2eb9f6f94cda31a22ddcef747c38d021384f6d6d89584e4b9aeac1e34f31cd77",
+        "bytes": 137
+      },
+      {
+        "path": "/manifest.webmanifest",
+        "sha256": "b0272894bce12b4e60fc4a323de2a01245f6d9adc9c8a0fa7758566bac4f9810",
+        "bytes": 346
+      }
+    ]
+  },
+  "postRedeploy": {
+    "deployment": "05d56016-005c-4970-af4e-eda79e37947e",
+    "workflowRun": 41932851479,
+    "stats": {
+      "startTime": "2026-11-04T23:20:30.881Z",
+      "duration": 3863.471,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "cleanup": {
+      "campaignId": "7534585e-e6bb-4a00-80c3-6d257cd99f86",
+      "status": "archived",
+      "verifiedByIndependentRead": true
+    },
+    "observations": {
+      "campaignId": "7534585e-e6bb-4a00-80c3-6d257cd99f86",
+      "sceneId": "91dac657-67fa-4e21-b6a2-86d3b9542ef4",
+      "checksum": "0aca948b375f3c627bce5879c7a8e8f4677b9f8efd20df2bce33e463a1ee9e81",
+      "pixels": {
+        "revealed": [
+          35,
+          84,
+          119,
+          255
+        ],
+        "concealed": [
+          0,
+          0,
+          0,
+          255
+        ]
+      }
+    }
+  }
+}

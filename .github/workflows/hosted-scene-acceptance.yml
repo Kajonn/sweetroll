@@ -1,9 +1,5 @@
 name: Hosted scene acceptance
 on:
-  pull_request:
-    paths:
-      - .github/workflows/hosted-scene-acceptance.yml
-      - web/tests/hosted/sceneBackgrounds.spec.ts
   workflow_dispatch:
     inputs:
       phase:
@@ -23,12 +19,11 @@ concurrency:
   cancel-in-progress: false
 jobs:
   scenes:
-    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'docs/system-themes-and-images'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
-      SCENE_BACKGROUND_PHASE: ${{ inputs.phase || 'verify' }}
-      FIXTURE_RUN_ID: ${{ inputs.fixture_run_id || '41932479903' }}
+      SCENE_BACKGROUND_PHASE: ${{ inputs.phase }}
+      FIXTURE_RUN_ID: ${{ inputs.fixture_run_id }}
       G9_ACCEPTANCE_URL: https://sweetroll-d2-preview.up.railway.app
       SCENE_BACKGROUND_FIXTURE: ${{ github.workspace }}/scene-evidence/scene-background-fixture.json
       G9_OUTPUT_DIR: ${{ github.workspace }}/scene-evidence/results

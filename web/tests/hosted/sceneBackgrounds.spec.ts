@@ -87,7 +87,10 @@ test("M3 GUI background upload, confirmed safe replacement and restricted displa
     for (const path of [`/api/campaigns/${campaignId}/images/${forest.fileId}/original`, `/api/campaigns/${campaignId}/images/${forest.fileId}/thumbnail`, `/api/characters/${key()}/portrait`, `/api/campaigns/${campaignId}/item-templates/${key()}/image`]) {
       const denied = await dp.evaluate(async path => { const credential = JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!); return (await fetch(path, { credentials: "omit", headers: { "x-display-secret": credential.secret } })).status; }, path); expect(denied).toBe(401);
     }
-    expect((await new AxeBuilder({ page: gm }).analyze()).violations).toEqual([]); expect(await gm.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    expect((await new AxeBuilder({ page: gm }).analyze()).violations).toEqual([]);
+    const layout = await gm.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: innerWidth, overflowing: Array.from(document.querySelectorAll<HTMLElement>("body *")).map(el => ({ tag: el.tagName, className: el.className, right: el.getBoundingClientRect().right, width: el.getBoundingClientRect().width })).filter(el => el.right > innerWidth + 1) }));
+    await gm.screenshot({ path: info.outputPath("scene-layout-360.png"), fullPage: true });
+    expect(layout.width, JSON.stringify(layout)).toBeLessThanOrEqual(layout.viewport + 1);
     await gm.screenshot({ path: info.outputPath("scene-gm-360.png"), fullPage: true }); await dp.screenshot({ path: info.outputPath("scene-display-768.png"), fullPage: true });
     await displayContext.setOffline(true); await expect(dp.getByRole("img", { name: "Display image", exact: true })).toHaveCount(0, { timeout: 20_000 }); await displayContext.setOffline(false); await expect(dp.getByRole("img", { name: "Display image", exact: true })).toBeVisible({ timeout: 20_000 });
     await dp.reload(); expect(await pixels(dp)).toEqual({ revealed: [35, 84, 119, 255], concealed: [0, 0, 0, 255] });

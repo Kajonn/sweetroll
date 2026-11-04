@@ -5,6 +5,16 @@ on:
       - .github/workflows/hosted-scene-acceptance.yml
       - web/tests/hosted/sceneBackgrounds.spec.ts
   workflow_dispatch:
+    inputs:
+      phase:
+        type: choice
+        options: [create, verify]
+        default: create
+        required: true
+      fixture_run_id:
+        description: Successful create-phase workflow run (required for verify)
+        type: string
+        required: false
 permissions:
   contents: read
   actions: read
@@ -17,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
+      SCENE_BACKGROUND_PHASE: ${{ inputs.phase || 'verify' }}
+      FIXTURE_RUN_ID: ${{ inputs.fixture_run_id || '41932479903' }}
       G9_ACCEPTANCE_URL: https://sweetroll-d2-preview.up.railway.app
       SCENE_BACKGROUND_FIXTURE: ${{ github.workspace }}/scene-evidence/scene-background-fixture.json
       G9_OUTPUT_DIR: ${{ github.workspace }}/scene-evidence/results
@@ -34,6 +46,13 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - run: mkdir -p scene-evidence
+      - uses: actions/download-artifact@v4
+        if: env.SCENE_BACKGROUND_PHASE == 'verify'
+        with:
+          name: scene-background-evidence
+          path: scene-evidence/
+          run-id: ${{ env.FIXTURE_RUN_ID }}
+          github-token: ${{ github.token }}
       - name: Wait for the tested frontend artifact
         run: |
           npm run web:build

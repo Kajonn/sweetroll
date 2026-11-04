@@ -62,5 +62,38 @@ was relaxed. The transaction regression and both reviewed visual baselines pass.
 The hosted build `build-mw1ul18f` was separately compared byte-for-byte against
 its rebuilt HTML, CSS, JavaScript, worker and manifests; the artifact check passed.
 T1 automated feature acceptance is complete.
-T2 and M0–M3 remain separate unimplemented stages. Human visual approval, physical
-devices and the remaining G9 release gates are not closed by this automation.
+T2 and M0 acceptance follow below and in the separate image-foundation record.
+M1–M3 remain incomplete. Human visual approval, physical devices and the remaining
+G9 release gates are not closed by this automation.
+
+## T2 component styles
+
+Application `0d51195d6e8a1bb2d3b800e7d688fe0e36791acc`, isolated preview deployment
+`1cb4b860-cd1c-4150-9d16-ca2724212089`, reached SUCCESS. CI
+[#205](https://github.com/Kajonn/sweetroll/actions/runs/41805791817) passed all jobs.
+
+Default and Classic component styles compose with Default, Blue and Ochre
+colors. Classic uses platform typography and scoped CSS for headings, dividers,
+panels, actions, item cards and resource controls. Selection travels through the
+same draft, immutable package, clone/export and runtime projection as T1.
+Portaled dialogs inherit both color and style.
+
+The focused red–green selection/preservation tests passed: 8 backend cases and
+53 web cases. The extended deployed `systemThemes.spec.ts` journey passed in
+2.3 minutes on this application:
+
+| Check | Result |
+| --- | --- |
+| GUI save/reload, publication, clone and export retain color and style | PASS |
+| Later draft changes preserve pinned character/campaign presentation | PASS |
+| 3 colors × 2 styles × 2 modes × 2 widths (360/1280 px) | PASS, 24 screenshot combinations, no axe violations |
+| Originating dialogs inherit Classic typography | PASS |
+| 200% text expansion, keyboard focus and phone page overflow | PASS |
+| Character edit/roll and authorized offline reopening | PASS |
+| Global navigation/account isolation and switching systems | PASS |
+| Scoped journey fixture cleanup | PASS |
+
+The Classic Blue dark phone, Classic Ochre light desktop and enlarged-text
+phone screenshots were inspected. Browser automation and these inspections
+complete T2 automated feature acceptance; they do not supply human sign-off or
+physical-device evidence.

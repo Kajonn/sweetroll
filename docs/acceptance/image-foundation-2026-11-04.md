@@ -1,6 +1,7 @@
 # M0 image foundation — 2026-11-04
 
-Implementation in progress; hosted durability acceptance is pending.
+M0 foundation storage acceptance passed. Resource-specific portrait/item controls
+and scene replacement remain in M1–M3.
 
 Red: the new five-case database suite failed four cases against the prior
 implementation: metadata remained, scanner outcomes were ignored, quotas were
@@ -22,9 +23,9 @@ official `clamav/clamav:1.4`, a signature volume and no public domain/TCP proxy.
 Deployment `2d4cbb8a-0c42-4ae7-a9b2-0ba214559e19` reached SUCCESS and logs confirmed
 ClamD started. Image uploads fail closed when its configured adapter is absent.
 
-Before accepting M0, record the application commit/deployment, mounted media
-volume, actual clean/infected upload results, scoped unauthorized reads, exact
-retry, post-redeploy byte identity and the restoration result. M1–M3 cannot be
+The records below cover the application commit/deployment, mounted volume,
+clean/infected upload results, unauthorized reads, exact retry and post-redeploy
+byte identity. The local restoration result is recorded above. M1–M3 cannot be
 marked complete from this foundation work. Existing human/device G9 gates remain.
 
 
@@ -39,5 +40,17 @@ returns the same image, and a harmless EICAR test archive appended to a PNG is
 blocked by the real ClamAV engine with 422. A bare appended EICAR string was an
 unsuitable detection fixture; the standard archive supplies a recognized child
 file. It was normalized out of stored pixels, and is not treated as AV evidence.
-CI #204 passed all jobs. Post-redeploy byte identity and final scoped cleanup
-are still pending; test resource identifiers are saved in the runner fixture.
+CI #204 passed all jobs.
+
+## Redeployment durability verification
+
+After the T2 deployment `1cb4b860-cd1c-4150-9d16-ca2724212089` of
+`0d51195d6e8a1bb2d3b800e7d688fe0e36791acc` reached SUCCESS, the separate hosted
+verification phase passed. The previously uploaded image retained the same
+checksum and exact bytes; repeating the original upload request returned the
+same image. The verified fixture campaign was archived.
+
+This proves persistence across an application redeployment on the mounted media
+volume. The metadata-plus-byte backup/restore drill above was local, not a hosted
+disaster-recovery exercise. Earlier failed detection-fixture campaigns may still
+need scoped cleanup; they are not included in the successful fixture cleanup claim.

@@ -1,7 +1,7 @@
 # System themes and image uploads — staged feature plan
 
 **Date:** 2026-11-03
-**Status (2026-11-04):** T1 implemented and accepted by CI #203 and the [hosted journey](../../acceptance/system-themes-2026-11-04.md). T2 implementation and M0 hosted storage verification are in progress; M1–M3 remain planned.
+**Status (2026-11-04):** T1 and T2 implemented with passing hosted journeys and CI #205. M0 durable storage/scanning foundation passed hosted upload and post-redeploy verification plus a local metadata/bytes restoration drill. See [themes](../../acceptance/system-themes-2026-11-04.md) and [media](../../acceptance/image-foundation-2026-11-04.md). M1 is in progress; M2–M3 remain planned. The full requested implementation is incomplete.
 **Baseline:** `main` `01c9fba` (merged PR #29).
 **Scope authority:** Owner request for system color themes, then themed GUI elements; image uploads for characters, items, then adventure backgrounds.
 **Design:** [Sections 10.5, 17.9c and 18.2](../../../design_v2.md). Reuse the [GUI foundation and G9 gates](2026-09-08-gui-integration.md) and [I7b scene/display contract](../specs/2026-09-14-i7b-scenes-display-design.md).
@@ -40,14 +40,18 @@ Themes and images are independent tracks. Preserve T1 → T2 and M0 → M1 → M
 
 ## T2 — Themed GUI elements
 
-- [ ] Extend the platform preset definition with a bounded component style variant: headings/dividers, panels, action buttons, item cards and resource bars. Offer named, platform-authored styles with preview; final visual assets are selected during this stage.
-- [ ] Keep the T1 color choice and component style composable. Validate their supported combinations, provide a Default style, and persist style selection using the same draft/package/projection workflow.
-- [ ] Implement variants through existing shared components and CSS tokens/classes. Keep one renderer and the current linear sheet; preserve accessible names, DOM semantics, focus, validation, loading/conflict/offline states and 44px targets.
-- [ ] Keep decoration separate from meaning: damage/errors, disabled actions and resource values remain readable. Do not recolor uploaded artwork or alter fog, tokens, actions, permissions or dice behavior.
+- [x] Extend the platform preset definition with a bounded component style variant: headings/dividers, panels, action buttons, item cards and resource bars. Offer named, platform-authored styles with preview; final visual assets are selected during this stage.
+- [x] Keep the T1 color choice and component style composable. Validate their supported combinations, provide a Default style, and persist style selection using the same draft/package/projection workflow.
+- [x] Implement variants through existing shared components and CSS tokens/classes. Keep one renderer and the current linear sheet; preserve accessible names, DOM semantics, focus, validation, loading/conflict/offline states and 44px targets.
+- [x] Keep decoration separate from meaning: damage/errors, disabled actions and resource values remain readable. Do not recolor uploaded artwork or alter fog, tokens, actions, permissions or dice behavior.
 
 **Red → green and acceptance:** Write failing variant-selection/preservation and shared-control tests before implementation. Exercise the approved color/style combinations in creator preview, player sheets and GM character views, including portaled controls. Compare routed screenshots in light/dark, long labels and enlarged text; prove keyboard/touch alternatives and repeat an edit/roll flow. Theme artwork must be bundled/approved platform assets, not remote executable styling.
 
 ## M0 — Image foundation and persistence
+
+The shared scanning/storage capability and durability gate are accepted. Parent-specific
+controls and workflows below are completed with their consuming stages; this does
+not claim character or item attachment APIs exist yet.
 
 - [ ] Define attachment ownership/read/edit/delete rules for character, system-item, campaign-template, personal-item and scene resources before adding endpoints. Reuse validated image-processing/storage internals from I7b where useful; keep authorization in the owning Module. Do not grant players the existing GM-only campaign image API.
 - [ ] Keep initial limits aligned with I7b: PNG/JPEG/WebP, 5 MiB decoded and 4096 px per dimension. Bound encoded request size and decoded pixel work, verify actual decode/type, reject malformed/unsupported images, strip metadata from safe display derivatives, and enforce per-owner/campaign quotas with clear messages. Meet the design's upload scanning requirement before serving accepted assets.
@@ -97,3 +101,24 @@ Themes and images are independent tracks. Preserve T1 → T2 and M0 → M1 → M
 Before each stage, read the current code, resolve its attachment/package contract details in a short spec, and write failing behavior tests. Record the failing command/result, implement the smallest change, rerun to green, and run affected integration/contract/web/browser checks. Keep the existing Module boundaries and shared components. Do not add generic media services, infrastructure or version-transition support without a demonstrated requirement.
 
 For hosted acceptance, verify the test service's branch and latest successful deployment first. Use the acceptance service for main or a separate preview for a branch; never change the production source for a test. Record tested commit, deployed artifact, relevant journeys, screenshots, remaining manual checks and scoped cleanup in `docs/acceptance/`. Mark a stage complete only with its own evidence. This planning PR leaves every new stage unchecked and existing release gates unchanged.
+
+## Continuation checkpoint (2026-11-04)
+
+The execution environment became unavailable during M1. The pushed branch through
+`0d51195` contains T1, T2 and M0, with CI #205 passing. The portrait work is still
+uncommitted in the existing checkout and must be recovered before rebuilding it.
+
+The working tree contains a character-portrait specification, current-schema
+portrait asset/link/receipt tables, `src/characters/images.ts`, a shared private
+storage-root helper, module composition and test-harness wiring, plus
+`tests/integration/character-portraits.test.ts`. Its three initial real-database
+tests were red for missing operations and then green for upload/replay/revision,
+private access and ownership-transfer behavior. Root type checking still reports
+the HTTP test fake missing the four new portrait methods.
+
+Resume by fixing that fake, then add failing duplication and HTTP cases before
+implementation. Character duplication must retain a safe immutable portrait link.
+Add the bounded private API and online-only controls, generated contracts,
+authorization/lifecycle/concurrency tests and hosted player/GM acceptance. Portrait
+revisions remain independent of rules revisions and offline sheet commands.
+M1 has not passed complete validation or been deployed. M2 and M3 have not begun.

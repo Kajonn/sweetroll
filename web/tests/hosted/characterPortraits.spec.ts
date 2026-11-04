@@ -52,14 +52,17 @@ test("M1 player portraits, GM disclosure, return and offline sheet play", async 
   const ownerContext = await browser.newContext({
     baseURL,
     ignoreHTTPSErrors: true,
+    ...(process.env.HTTPS_PROXY ? { proxy: { server: process.env.HTTPS_PROXY } } : {}),
   });
   const gmContext = await browser.newContext({
     baseURL,
     ignoreHTTPSErrors: true,
+    ...(process.env.HTTPS_PROXY ? { proxy: { server: process.env.HTTPS_PROXY } } : {}),
   });
   const otherContext = await browser.newContext({
     baseURL,
     ignoreHTTPSErrors: true,
+    ...(process.env.HTTPS_PROXY ? { proxy: { server: process.env.HTTPS_PROXY } } : {}),
   });
   const owner = await ownerContext.newPage(),
     gm = await gmContext.newPage(),
@@ -100,21 +103,23 @@ test("M1 player portraits, GM disclosure, return and offline sheet play", async 
       .getByLabel("Portrait description", { exact: true })
       .fill("Explorer wearing a blue cloak");
     const uploadBodies: string[] = [];
+    let interceptedStatus = 0;
     const uploadRoute = `**/api/characters/${characterId}/portrait`;
     await owner.route(uploadRoute, async route => {
       if (route.request().method() !== "PUT") return route.continue();
       uploadBodies.push(route.request().postData()!);
       if (uploadBodies.length === 1) {
-        const response = await route.fetch();
-        expect(response.status()).toBe(200);
+        try { interceptedStatus = (await route.fetch({ timeout: 30_000 })).status(); }
+        catch { interceptedStatus = -1; }
         // The server committed, but the browser never receives the result.
-        await route.abort("failed");
+        await route.abort("failed").catch(() => {});
       } else await route.continue();
     });
     await owner
       .getByRole("button", { name: "Upload portrait", exact: true })
       .click();
-    await expect(owner.getByRole("button", { name: "Retry exact request" })).toBeEnabled();
+    await expect(owner.getByRole("button", { name: "Retry exact request" })).toBeEnabled({ timeout: 60_000 });
+    expect(interceptedStatus, "The intercepted server upload must commit before dropping its response").toBe(200);
     await owner.getByRole("button", { name: "Retry exact request" }).click();
     await expect(
       owner.getByAltText("Explorer wearing a blue cloak", { exact: true }),
@@ -268,6 +273,7 @@ test("M1 player portraits, GM disclosure, return and offline sheet play", async 
       await owner.locator('img[src*="/portrait/"]').count(),
     ).toBeLessThanOrEqual(20);
   } finally {
+    await owner.unrouteAll({ behavior: "ignoreErrors" });
     await ownerContext.setOffline(false);
     if (characterId) {
       const ch = (await json(owner, "GET", `/api/characters/${characterId}`))

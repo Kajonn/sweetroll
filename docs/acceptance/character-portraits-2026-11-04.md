@@ -1,6 +1,6 @@
 # M1 character portraits — 2026-11-04
 
-Implementation complete; CI and hosted acceptance are pending. M2/M3 and wider
+Implementation and hosted journey complete; final CI follow-up is pending. M2/M3 and wider
 human/device G9 gates remain open.
 
 ## Red → green
@@ -35,3 +35,45 @@ The isolated preview uses fresh database `sweetroll_pr30_m1`, created on its own
 Postgres service by a private temporary setup service. The prior database is
 preserved. Record the tested commit, successful deployment and actual journey
 outcome here before accepting M1.
+
+## Deployed result
+
+Application `17206059358689538f184f976204e3bd0443400b`, isolated preview
+deployment `028161dd-e889-4f04-a416-afa46afe6d06`, reached SUCCESS. The hosted
+journey passed in 40.7 seconds with three independently authenticated contexts:
+
+| Check | Result |
+| --- | --- |
+| Player GUI upload, reload, larger view, replace and remove | PASS |
+| Real scanner/normalization path and stripped EXIF | PASS |
+| Server commits, response is deliberately dropped, exact body/key retry | PASS |
+| GM and unrelated player denied before adoption, including byte reads | PASS |
+| GM sheet and roster can show the adopted portrait; unrelated player still denied | PASS |
+| Return retains player art and removes former GM access | PASS |
+| 360 px routed screenshot and axe | PASS, no violations |
+| Offline placeholder, queued sheet edit, reconnect and authoritative roll | PASS |
+| Created character and campaign archived | PASS |
+
+The [phone screenshot](assets/character-portrait-360-2026-11-04.png) was inspected.
+It shows the character heading before the portrait and controls, followed by the
+existing linear sheet. Images are no-store; no image bytes enter the sheet queue.
+The failed lost-response interception run ended with a request still in flight;
+the runner now sets its context proxy explicitly and waits for the bounded upload
+before retry. This changes no application network or authentication policy.
+
+## Follow-up and CI
+
+The first deployed run found duplicate/nested main landmarks. CI #207 also caught
+an unlabeled-role placeholder in the NPC roster. Both gained failing regression
+tests, then passed with a named sheet section and a valid image placeholder role.
+The portrait now lives after the sheet heading inside its system presentation
+scope. All 55 focused UI cases pass. The full current-schema integration rerun
+passes 370/370 cases with the normal test/hook budgets.
+
+CI #207's only backend failure was a creation p95 of 300.004943 ms against the
+unchanged 300 ms budget. CI #208 passes backend verification, web, all three
+journey shards and visual checks. Its offline suite caught an ambiguous old
+section selector after the landmark correction; it now targets the named
+Roll result region and keeps the existing detail assertions. Final CI on that
+selector/runner follow-up is pending. No performance budget or accessibility
+check was relaxed. M1 remains pending that final CI result; M2/M3 remain open.

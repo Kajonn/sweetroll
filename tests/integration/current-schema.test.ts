@@ -80,6 +80,7 @@ describeWithDatabase("current database schema", () => {
       "character_claim_designations",
       "character_command_executions",
       "character_controllers",
+      "character_entry_images",
       "character_image_assets",
       "character_image_receipts",
       "character_placements",
@@ -184,6 +185,7 @@ describeWithDatabase("current database schema", () => {
       "campaign_item_template_revisions",
       "campaign_item_templates",
       "campaign_members",
+      "campaign_proposal_images",
       "campaigns",
     ]);
 
@@ -277,6 +279,7 @@ describeWithDatabase("current database schema", () => {
       "campaign_item_templates_pkey",
       "campaign_members_pkey",
       "campaign_members_user_idx",
+      "campaign_proposal_images_pkey",
       "campaign_proposals_page_idx",
       "campaign_proposals_self_idx",
       "campaigns_owner_page_idx",

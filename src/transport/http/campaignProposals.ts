@@ -1,4 +1,5 @@
 import { Type } from "@sinclair/typebox";
+import { ImageDescriptorSchema } from "../../platform/image-attachment.js";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Campaigns } from "../../campaigns/index.js";
 import type {
@@ -31,6 +32,8 @@ const Content = Type.Object(
   { additionalProperties: false },
 );
 export const CampaignProposalDto = Type.Object({
+  image: Type.Optional(Type.Union([ImageDescriptorSchema, Type.Null()])),
+  imageRevision: Type.Optional(Type.Integer({ minimum: 1 })),
   proposalId: Type.String(),
   campaignId: Type.String(),
   submitterId: Type.String(),
@@ -150,6 +153,7 @@ export const campaignProposalRoutes: readonly CampaignsRouteDefinition[] = [
       body: Type.Object(
         {
           ...Key,
+          expectedImageRevision: Type.Optional(Type.Integer({ minimum: 0 })),
           ...(operation === "reject"
             ? { reason: Type.Optional(Type.String({ maxLength: 2000 })) }
             : {}),

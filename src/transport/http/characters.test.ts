@@ -137,6 +137,10 @@ function characterExport(): CharacterExportV1 {
 
 function makeCharacters(overrides: Partial<Characters> = {}): Characters {
   const base: Characters = {
+    openEntryImage: async () => ({ ok: true, value: { revision: 0, image: null } }),
+    setEntryImage: async () => ({ ok: true, value: { revision: 1, image: null } }),
+    removeEntryImage: async () => ({ ok: true, value: { revision: 1, image: null } }),
+    openEntryImageBytes: async () => ({ ok: false, error: { code: "not_found", message: "Unavailable" } }),
     openPortrait: async () => ({ ok: true, value: { revision: 0, portrait: null } }),
     setPortrait: async () => ({ ok: true, value: { revision: 1, portrait: null } }),
     removePortrait: async () => ({ ok: true, value: { revision: 1, portrait: null } }),

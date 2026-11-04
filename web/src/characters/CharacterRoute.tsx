@@ -310,6 +310,7 @@ function CharacterDetailLoaded({
       ) : null}
       {snapshot.error !== null && !reviewOpen ? <p role="alert">{snapshot.error.message}</p> : null}
       <CharacterSheet
+        entryImages={api.entryImages}
         portrait={api.images ? <PortraitEditor key={`${actorId}:${identity.getGeneration()}:${characterId}`} api={api.images} characterId={characterId} characterRevision={snapshot.confirmed.revision}
           online={online} canEdit={snapshot.editing.owned && snapshot.confirmed.lifecycle === "active" && snapshot.entries.length === 0 && !snapshot.error} onRefresh={session.refresh} /> : null}
         snapshot={snapshot}

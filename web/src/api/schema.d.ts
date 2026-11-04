@@ -4,6 +4,86 @@
  */
 
 export interface paths {
+    "/systems/{systemId}/templates/{templateId}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_system_item_image"];
+        put: operations["put_system_item_image"];
+        post?: never;
+        delete: operations["delete_system_item_image"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/systems/{systemId}/templates/{templateId}/image/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_draft_item_image_bytes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/systems/{systemId}/templates/{templateId}/image/{fileId}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_draft_item_image_bytes_thumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system-versions/{versionId}/templates/{templateId}/image/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_version_item_image_bytes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system-versions/{versionId}/templates/{templateId}/image/{fileId}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_version_item_image_bytes_thumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/templates": {
         parameters: {
             query?: never;
@@ -252,6 +332,70 @@ export interface paths {
             cookie?: never;
         };
         get: operations["get_character_portrait_image_thumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/entries/{entryId}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_character_entry_image"];
+        put: operations["put_character_entry_image"];
+        post?: never;
+        delete: operations["delete_character_entry_image"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/entries/{entryId}/image/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_character_entry_image_thumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/entries/{entryId}/image/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_character_entry_image_bytes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/entries/{entryId}/image/{fileId}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_character_entry_image_bytes_thumbnail"];
         put?: never;
         post?: never;
         delete?: never;
@@ -526,6 +670,102 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["post_characters_characterId_exports"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/item-templates/{templateId}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaign_template_image"];
+        put: operations["put_campaign_template_image"];
+        post?: never;
+        delete: operations["delete_campaign_template_image"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/item-templates/{templateId}/image/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaign_template_image_bytes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/item-templates/{templateId}/image/{fileId}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaign_template_image_bytes_thumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/item-proposals/{proposalId}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaign_proposal_image"];
+        put: operations["put_campaign_proposal_image"];
+        post?: never;
+        delete: operations["delete_campaign_proposal_image"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/item-proposals/{proposalId}/image/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaign_proposal_image_bytes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/item-proposals/{proposalId}/image/{fileId}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaign_proposal_image_bytes_thumbnail"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1344,6 +1584,1057 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_system_item_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                systemId: string;
+                templateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        image: null | {
+                            fileId: string;
+                            description: string;
+                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                            width: number;
+                            height: number;
+                            sizeBytes: number;
+                            checksum: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    put_system_item_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                systemId: string;
+                templateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    expectedRevision: number;
+                    idempotencyKey: string;
+                    description: string;
+                    contentType: "image/png" | "image/jpeg" | "image/webp";
+                    dataBase64: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        image: null | {
+                            fileId: string;
+                            description: string;
+                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                            width: number;
+                            height: number;
+                            sizeBytes: number;
+                            checksum: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    delete_system_item_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                systemId: string;
+                templateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    expectedRevision: number;
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        image: null | {
+                            fileId: string;
+                            description: string;
+                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                            width: number;
+                            height: number;
+                            sizeBytes: number;
+                            checksum: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_draft_item_image_bytes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                systemId: string;
+                templateId: string;
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_draft_item_image_bytes_thumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                systemId: string;
+                templateId: string;
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_version_item_image_bytes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                versionId: string;
+                templateId: string;
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_version_item_image_bytes_thumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                versionId: string;
+                templateId: string;
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     get_templates: {
         parameters: {
             query?: never;
@@ -1655,6 +2946,26 @@ export interface operations {
                     };
                 };
             };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1676,6 +2987,26 @@ export interface operations {
                 };
             };
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2276,6 +3607,26 @@ export interface operations {
                     };
                 };
             };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -2297,6 +3648,26 @@ export interface operations {
                 };
             };
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2549,6 +3920,26 @@ export interface operations {
                     };
                 };
             };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -2570,6 +3961,26 @@ export interface operations {
                 };
             };
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2727,6 +4138,12 @@ export interface operations {
                         package: {
                             [key: string]: unknown;
                         };
+                        images?: {
+                            fileId: string;
+                            checksum: string;
+                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                            dataBase64: string;
+                        }[];
                     };
                 };
             };
@@ -3848,6 +5265,915 @@ export interface operations {
             };
         };
     };
+    get_character_entry_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                entryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        image: {
+                            fileId: string;
+                            description: string;
+                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                            width: number;
+                            height: number;
+                            sizeBytes: number;
+                            checksum: string;
+                        } | null;
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    put_character_entry_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                entryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    expectedCharacterRevision: number;
+                    expectedImageRevision: number;
+                    idempotencyKey: string;
+                    description: string;
+                    contentType: "image/png" | "image/jpeg" | "image/webp";
+                    dataBase64: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        image: {
+                            fileId: string;
+                            description: string;
+                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                            width: number;
+                            height: number;
+                            sizeBytes: number;
+                            checksum: string;
+                        } | null;
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    delete_character_entry_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                entryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    expectedCharacterRevision: number;
+                    expectedImageRevision: number;
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        image: {
+                            fileId: string;
+                            description: string;
+                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                            width: number;
+                            height: number;
+                            sizeBytes: number;
+                            checksum: string;
+                        } | null;
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_character_entry_image_thumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                entryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_character_entry_image_bytes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                entryId: string;
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_character_entry_image_bytes_thumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                entryId: string;
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     get_characters: {
         parameters: {
             query?: {
@@ -4052,6 +6378,15 @@ export interface operations {
                                 entries?: {
                                     [key: string]: {
                                         entryId: string;
+                                        image?: {
+                                            fileId: string;
+                                            description: string;
+                                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                                            width: number;
+                                            height: number;
+                                            sizeBytes: number;
+                                            checksum: string;
+                                        };
                                         slotId: string;
                                         templateId: string | null;
                                         source?: {
@@ -4947,6 +7282,15 @@ export interface operations {
                                 entries?: {
                                     [key: string]: {
                                         entryId: string;
+                                        image?: {
+                                            fileId: string;
+                                            description: string;
+                                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                                            width: number;
+                                            height: number;
+                                            sizeBytes: number;
+                                            checksum: string;
+                                        };
                                         slotId: string;
                                         templateId: string | null;
                                         source?: {
@@ -5409,6 +7753,15 @@ export interface operations {
                                     entries?: {
                                         [key: string]: {
                                             entryId: string;
+                                            image?: {
+                                                fileId: string;
+                                                description: string;
+                                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                                width: number;
+                                                height: number;
+                                                sizeBytes: number;
+                                                checksum: string;
+                                            };
                                             slotId: string;
                                             templateId: string | null;
                                             source?: {
@@ -6020,6 +8373,15 @@ export interface operations {
                                     entries?: {
                                         [key: string]: {
                                             entryId: string;
+                                            image?: {
+                                                fileId: string;
+                                                description: string;
+                                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                                width: number;
+                                                height: number;
+                                                sizeBytes: number;
+                                                checksum: string;
+                                            };
                                             slotId: string;
                                             templateId: string | null;
                                             source?: {
@@ -6631,6 +8993,15 @@ export interface operations {
                                     entries?: {
                                         [key: string]: {
                                             entryId: string;
+                                            image?: {
+                                                fileId: string;
+                                                description: string;
+                                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                                width: number;
+                                                height: number;
+                                                sizeBytes: number;
+                                                checksum: string;
+                                            };
                                             slotId: string;
                                             templateId: string | null;
                                             source?: {
@@ -7769,6 +10140,15 @@ export interface operations {
                                     entries?: {
                                         [key: string]: {
                                             entryId: string;
+                                            image?: {
+                                                fileId: string;
+                                                description: string;
+                                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                                width: number;
+                                                height: number;
+                                                sizeBytes: number;
+                                                checksum: string;
+                                            };
                                             slotId: string;
                                             templateId: string | null;
                                             source?: {
@@ -8392,6 +10772,15 @@ export interface operations {
                                     entries?: {
                                         [key: string]: {
                                             entryId: string;
+                                            image?: {
+                                                fileId: string;
+                                                description: string;
+                                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                                width: number;
+                                                height: number;
+                                                sizeBytes: number;
+                                                checksum: string;
+                                            };
                                             slotId: string;
                                             templateId: string | null;
                                             source?: {
@@ -9026,6 +11415,15 @@ export interface operations {
                                     entries?: {
                                         [key: string]: {
                                             entryId: string;
+                                            image?: {
+                                                fileId: string;
+                                                description: string;
+                                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                                width: number;
+                                                height: number;
+                                                sizeBytes: number;
+                                                checksum: string;
+                                            };
                                             slotId: string;
                                             templateId: string | null;
                                             source?: {
@@ -9636,6 +12034,15 @@ export interface operations {
                                     entries?: {
                                         [key: string]: {
                                             entryId: string;
+                                            image?: {
+                                                fileId: string;
+                                                description: string;
+                                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                                width: number;
+                                                height: number;
+                                                sizeBytes: number;
+                                                checksum: string;
+                                            };
                                             slotId: string;
                                             templateId: string | null;
                                             source?: {
@@ -10250,6 +12657,15 @@ export interface operations {
                                     entries?: {
                                         [key: string]: {
                                             entryId: string;
+                                            image?: {
+                                                fileId: string;
+                                                description: string;
+                                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                                width: number;
+                                                height: number;
+                                                sizeBytes: number;
+                                                checksum: string;
+                                            };
                                             slotId: string;
                                             templateId: string | null;
                                             source?: {
@@ -11145,6 +13561,15 @@ export interface operations {
                                     entries?: {
                                         [key: string]: {
                                             entryId: string;
+                                            image?: {
+                                                fileId: string;
+                                                description: string;
+                                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                                width: number;
+                                                height: number;
+                                                sizeBytes: number;
+                                                checksum: string;
+                                            };
                                             slotId: string;
                                             templateId: string | null;
                                             source?: {
@@ -11752,6 +14177,15 @@ export interface operations {
                                 entries?: {
                                     [key: string]: {
                                         entryId: string;
+                                        image?: {
+                                            fileId: string;
+                                            description: string;
+                                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                                            width: number;
+                                            height: number;
+                                            sizeBytes: number;
+                                            checksum: string;
+                                        };
                                         slotId: string;
                                         templateId: string | null;
                                         source?: {
@@ -12527,6 +14961,15 @@ export interface operations {
                             entries?: {
                                 [key: string]: {
                                     entryId: string;
+                                    image?: {
+                                        fileId: string;
+                                        description: string;
+                                        contentType: "image/png" | "image/jpeg" | "image/webp";
+                                        width: number;
+                                        height: number;
+                                        sizeBytes: number;
+                                        checksum: string;
+                                    };
                                     slotId: string;
                                     templateId: string | null;
                                     source?: {
@@ -12692,6 +15135,1544 @@ export interface operations {
             };
         };
     };
+    get_campaign_template_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                templateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        image: {
+                            fileId: string;
+                            description: string;
+                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                            width: number;
+                            height: number;
+                            sizeBytes: number;
+                            checksum: string;
+                        } | null;
+                        parentRevision?: number;
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    put_campaign_template_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                templateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    idempotencyKey: string;
+                    expectedTemplateRevision: number;
+                    description: string;
+                    contentType: "image/png" | "image/jpeg" | "image/webp";
+                    dataBase64: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        image: {
+                            fileId: string;
+                            description: string;
+                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                            width: number;
+                            height: number;
+                            sizeBytes: number;
+                            checksum: string;
+                        } | null;
+                        parentRevision?: number;
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    delete_campaign_template_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                templateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    idempotencyKey: string;
+                    expectedTemplateRevision: number;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        image: {
+                            fileId: string;
+                            description: string;
+                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                            width: number;
+                            height: number;
+                            sizeBytes: number;
+                            checksum: string;
+                        } | null;
+                        parentRevision?: number;
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_campaign_template_image_bytes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                templateId: string;
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_campaign_template_image_bytes_thumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                templateId: string;
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_campaign_proposal_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                proposalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        image: {
+                            fileId: string;
+                            description: string;
+                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                            width: number;
+                            height: number;
+                            sizeBytes: number;
+                            checksum: string;
+                        } | null;
+                        parentRevision?: number;
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    put_campaign_proposal_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                proposalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    idempotencyKey: string;
+                    expectedProposalRevision: number;
+                    expectedImageRevision: number;
+                    description: string;
+                    contentType: "image/png" | "image/jpeg" | "image/webp";
+                    dataBase64: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        image: {
+                            fileId: string;
+                            description: string;
+                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                            width: number;
+                            height: number;
+                            sizeBytes: number;
+                            checksum: string;
+                        } | null;
+                        parentRevision?: number;
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    delete_campaign_proposal_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                proposalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    idempotencyKey: string;
+                    expectedProposalRevision: number;
+                    expectedImageRevision: number;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        image: {
+                            fileId: string;
+                            description: string;
+                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                            width: number;
+                            height: number;
+                            sizeBytes: number;
+                            checksum: string;
+                        } | null;
+                        parentRevision?: number;
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_campaign_proposal_image_bytes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                proposalId: string;
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_campaign_proposal_image_bytes_thumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                proposalId: string;
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     get_campaigns_id_item_templates_bases: {
         parameters: {
             query?: never;
@@ -12711,6 +16692,15 @@ export interface operations {
                     "application/json": {
                         templates: {
                             id: string;
+                            image?: {
+                                fileId: string;
+                                description: string;
+                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                                checksum: string;
+                            };
                             label: string;
                             kind: "item" | "spell" | "talent" | "effect";
                             description?: string;
@@ -12970,6 +16960,15 @@ export interface operations {
                 content: {
                     "application/json": {
                         templates: {
+                            image?: {
+                                fileId: string;
+                                description: string;
+                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                                checksum: string;
+                            };
                             templateId: string;
                             campaignId: string;
                             creatorId: string;
@@ -13148,6 +17147,15 @@ export interface operations {
                 content: {
                     "application/json": {
                         template: {
+                            image?: {
+                                fileId: string;
+                                description: string;
+                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                                checksum: string;
+                            };
                             templateId: string;
                             campaignId: string;
                             creatorId: string;
@@ -13301,6 +17309,15 @@ export interface operations {
                 content: {
                     "application/json": {
                         template: {
+                            image?: {
+                                fileId: string;
+                                description: string;
+                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                                checksum: string;
+                            };
                             templateId: string;
                             campaignId: string;
                             creatorId: string;
@@ -13470,6 +17487,15 @@ export interface operations {
                 content: {
                     "application/json": {
                         template: {
+                            image?: {
+                                fileId: string;
+                                description: string;
+                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                                checksum: string;
+                            };
                             templateId: string;
                             campaignId: string;
                             creatorId: string;
@@ -13636,6 +17662,15 @@ export interface operations {
                 content: {
                     "application/json": {
                         template: {
+                            image?: {
+                                fileId: string;
+                                description: string;
+                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                                checksum: string;
+                            };
                             templateId: string;
                             campaignId: string;
                             creatorId: string;
@@ -13797,6 +17832,15 @@ export interface operations {
                 content: {
                     "application/json": {
                         templates: {
+                            image?: {
+                                fileId: string;
+                                description: string;
+                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                                checksum: string;
+                            };
                             templateId: string;
                             campaignId: string;
                             creatorId: string;
@@ -13958,6 +18002,15 @@ export interface operations {
                 content: {
                     "application/json": {
                         template: {
+                            image?: {
+                                fileId: string;
+                                description: string;
+                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                                checksum: string;
+                            };
                             templateId: string;
                             campaignId: string;
                             creatorId: string;
@@ -14118,6 +18171,15 @@ export interface operations {
                 content: {
                     "application/json": {
                         template: {
+                            image?: {
+                                fileId: string;
+                                description: string;
+                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                                checksum: string;
+                            };
                             templateId: string;
                             campaignId: string;
                             creatorId: string;
@@ -14274,6 +18336,16 @@ export interface operations {
                 content: {
                     "application/json": {
                         proposals: {
+                            image?: {
+                                fileId: string;
+                                description: string;
+                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                                checksum: string;
+                            } | null;
+                            imageRevision?: number;
                             proposalId: string;
                             campaignId: string;
                             submitterId: string;
@@ -14437,6 +18509,16 @@ export interface operations {
                 content: {
                     "application/json": {
                         proposal: {
+                            image?: {
+                                fileId: string;
+                                description: string;
+                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                                checksum: string;
+                            } | null;
+                            imageRevision?: number;
                             proposalId: string;
                             campaignId: string;
                             submitterId: string;
@@ -14585,6 +18667,16 @@ export interface operations {
                 content: {
                     "application/json": {
                         proposal: {
+                            image?: {
+                                fileId: string;
+                                description: string;
+                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                                checksum: string;
+                            } | null;
+                            imageRevision?: number;
                             proposalId: string;
                             campaignId: string;
                             submitterId: string;
@@ -14729,6 +18821,7 @@ export interface operations {
                 "application/json": {
                     expectedProposalRevision: number;
                     idempotencyKey: string;
+                    expectedImageRevision?: number;
                 };
             };
         };
@@ -14740,6 +18833,16 @@ export interface operations {
                 content: {
                     "application/json": {
                         proposal: {
+                            image?: {
+                                fileId: string;
+                                description: string;
+                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                                checksum: string;
+                            } | null;
+                            imageRevision?: number;
                             proposalId: string;
                             campaignId: string;
                             submitterId: string;
@@ -14767,6 +18870,15 @@ export interface operations {
                         };
                         requestId: string;
                         template: {
+                            image?: {
+                                fileId: string;
+                                description: string;
+                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                                checksum: string;
+                            };
                             templateId: string;
                             campaignId: string;
                             creatorId: string;
@@ -14915,6 +19027,7 @@ export interface operations {
                 "application/json": {
                     expectedProposalRevision: number;
                     idempotencyKey: string;
+                    expectedImageRevision?: number;
                     reason?: string;
                 };
             };
@@ -14927,6 +19040,16 @@ export interface operations {
                 content: {
                     "application/json": {
                         proposal: {
+                            image?: {
+                                fileId: string;
+                                description: string;
+                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                                checksum: string;
+                            } | null;
+                            imageRevision?: number;
                             proposalId: string;
                             campaignId: string;
                             submitterId: string;
@@ -17465,6 +21588,15 @@ export interface operations {
                                 entries?: {
                                     [key: string]: {
                                         entryId: string;
+                                        image?: {
+                                            fileId: string;
+                                            description: string;
+                                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                                            width: number;
+                                            height: number;
+                                            sizeBytes: number;
+                                            checksum: string;
+                                        };
                                         slotId: string;
                                         templateId: string | null;
                                         source?: {
@@ -18005,6 +22137,15 @@ export interface operations {
                                 entries?: {
                                     [key: string]: {
                                         entryId: string;
+                                        image?: {
+                                            fileId: string;
+                                            description: string;
+                                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                                            width: number;
+                                            height: number;
+                                            sizeBytes: number;
+                                            checksum: string;
+                                        };
                                         slotId: string;
                                         templateId: string | null;
                                         source?: {
@@ -18449,6 +22590,15 @@ export interface operations {
                                 entries?: {
                                     [key: string]: {
                                         entryId: string;
+                                        image?: {
+                                            fileId: string;
+                                            description: string;
+                                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                                            width: number;
+                                            height: number;
+                                            sizeBytes: number;
+                                            checksum: string;
+                                        };
                                         slotId: string;
                                         templateId: string | null;
                                         source?: {
@@ -18895,6 +23045,15 @@ export interface operations {
                                 entries?: {
                                     [key: string]: {
                                         entryId: string;
+                                        image?: {
+                                            fileId: string;
+                                            description: string;
+                                            contentType: "image/png" | "image/jpeg" | "image/webp";
+                                            width: number;
+                                            height: number;
+                                            sizeBytes: number;
+                                            checksum: string;
+                                        };
                                         slotId: string;
                                         templateId: string | null;
                                         source?: {
@@ -20587,6 +24746,16 @@ export interface operations {
                     "application/json": {
                         export: {
                             proposals?: {
+                                image?: {
+                                    fileId: string;
+                                    description: string;
+                                    contentType: "image/png" | "image/jpeg" | "image/webp";
+                                    width: number;
+                                    height: number;
+                                    sizeBytes: number;
+                                    checksum: string;
+                                } | null;
+                                imageRevision?: number;
                                 proposalId: string;
                                 campaignId: string;
                                 submitterId: string;
@@ -20613,6 +24782,15 @@ export interface operations {
                                 };
                             }[];
                             templates?: {
+                                image?: {
+                                    fileId: string;
+                                    description: string;
+                                    contentType: "image/png" | "image/jpeg" | "image/webp";
+                                    width: number;
+                                    height: number;
+                                    sizeBytes: number;
+                                    checksum: string;
+                                };
                                 templateId: string;
                                 campaignId: string;
                                 creatorId: string;

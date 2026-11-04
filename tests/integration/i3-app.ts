@@ -102,6 +102,8 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
   });
 
   const authoring = createSystemAuthoringModule({
+    pool: input.pool,
+    scanImage: input.scanImage ?? (async () => "clean" as const),
     repo: createSystemPersistenceRepository(input.pool),
   });
 

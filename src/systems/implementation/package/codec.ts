@@ -50,7 +50,10 @@ export function decodeSystemExport(input: unknown): DecodeResult<SystemExportV1>
     validateExport,
     (value) => validatePackageStructure(value.package, "/package"),
     preflightExportAstLimits,
-    (value) => verifyPackageChecksum(value.package, "/package"),
+    (value) => Buffer.byteLength(JSON.stringify(value.package), "utf8") > PACKAGE_LIMITS.encodedBytes
+      ? [{ code: "document_too_large", path: "/package", message: `Package exceeds ${PACKAGE_LIMITS.encodedBytes} bytes.` }]
+      : verifyPackageChecksum(value.package, "/package"),
+    16 * 1024 * 1024,
   ));
 }
 
@@ -60,8 +63,9 @@ function decode<T>(
   structuralCheck: (value: T) => ReturnType<typeof validateDocumentStructure>,
   preflight?: (value: unknown) => ReturnType<typeof validateDocumentStructure>,
   postValidate?: (value: T) => ReturnType<typeof verifyPackageChecksum>,
+  maxBytes = PACKAGE_LIMITS.encodedBytes as number,
 ): DecodeResult<T> {
-  const parsed = parseInput(input);
+  const parsed = parseInput(input, maxBytes);
   if (!parsed.ok) return parsed;
 
   const preflightDiagnostics = sortDiagnostics(preflight?.(parsed.value) ?? []);
@@ -103,19 +107,19 @@ function noThrow<T>(operation: () => DecodeResult<T>): DecodeResult<T> {
   }
 }
 
-function parseInput(input: unknown): DecodeResult<unknown> {
+function parseInput(input: unknown, maxBytes: number): DecodeResult<unknown> {
   if (typeof input !== "string" && !(input instanceof Uint8Array)) {
     return { ok: true, value: input };
   }
 
   const bytes = typeof input === "string" ? Buffer.from(input, "utf8") : input;
-  if (bytes.byteLength > PACKAGE_LIMITS.encodedBytes) {
+  if (bytes.byteLength > maxBytes) {
     return {
       ok: false,
       diagnostics: [{
         code: "document_too_large",
         path: "",
-        message: `Input exceeds ${PACKAGE_LIMITS.encodedBytes} bytes.`,
+        message: `Input exceeds ${maxBytes} bytes.`,
       }],
     };
   }

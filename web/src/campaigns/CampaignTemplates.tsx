@@ -1,3 +1,4 @@
+import { ItemArtwork } from "../ui/ItemArtwork.js";
 import {AudienceFields,memberLabel,TemplateSharing,type SharingMember} from "./TemplateSharing.js";
 import { TypedEntryFields } from "../characters/TypedEntryFields.js";
 import { campaignDetailKey } from "./campaignQueries.js";
@@ -49,6 +50,8 @@ export function CampaignTemplates(props:Props) {
 }
 function CampaignTemplateScope(props:Props) {
   const client = useQueryClient();
+  const images = props.api.images;
+  const imageFactory = useMemo(() => images ? (id: string) => images(props.campaignId, id) : undefined, [images, props.campaignId]);
   const [previewTarget,setPreviewTarget]=useState('');
   const [audience,setAudience]=useState<CampaignTemplate['audience']>('all_players');
   const [grants,setGrants]=useState<SharingMember[]>([]);
@@ -360,6 +363,7 @@ function CampaignTemplateScope(props:Props) {
         {rows.map((row) => (
           <li key={row.templateId} className={styles.row}>
             <h3>{row.content.name}</h3>
+            {imageFactory ? <ItemArtwork key={`${row.templateId}:${previewTarget}`} createApi={imageFactory} resourceId={row.templateId} online={props.online} canEdit={props.isGm && !previewTarget && !blocked && row.status === "active"} modal onChanged={async () => { await client.invalidateQueries({ queryKey: ["campaigns", "templates", props.campaignId] }); }} /> : null}
             <p>{t("campaign.sharing."+row.audience)}</p>
             <span>
               {t("campaign.templates." + row.kind)} ·{" "}

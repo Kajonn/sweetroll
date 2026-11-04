@@ -1,4 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
+import { ImageDescriptorSchema } from "../../../../platform/image-attachment.js";
 
 import { DefinitionIdSchema } from "./common.js";
 
@@ -102,6 +103,7 @@ export type EntrySnapshot = Static<typeof EntrySnapshotSchema>;
 export const CharacterEntryV1Schema = Type.Object(
   {
     entryId: Type.String({ pattern: UUID_PATTERN }),
+    image: Type.Optional(ImageDescriptorSchema),
     slotId: DefinitionIdSchema,
     templateId: Type.Union([DefinitionIdSchema, Type.Null()]),
     source: Type.Optional(EntrySourceSchema),

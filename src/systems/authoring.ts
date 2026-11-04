@@ -1,4 +1,11 @@
 import { randomUUID } from "node:crypto";
+import type { Pool } from "pg";
+import { createSystemItemImages, type SystemItemImages } from "./item-images.js";
+import { ImageProcessingError, type ImageScanner } from "../platform/image-processing.js";
+import { InvalidSystemImage, assertSystemImages, systemImages } from "./implementation/persistence/image-references.js";
+import { exportSystemItemImages, prepareImportedItemImages } from "./item-image-bundle.js";
+import { discardPreparedItemImage, ItemImageMissing, type PreparedItemImage } from "../platform/item-image-storage.js";
+import { createClamScanner } from "../platform/image-scanner.js";
 
 import {
   assessDocument,
@@ -33,6 +40,9 @@ import { comparePackages, type CompatibilityFinding } from "./implementation/pac
 export type Result<T> = { ok: true; value: T } | { ok: false; error: AppError };
 
 export type AppErrorCode =
+  | "too_large"
+  | "unprocessable"
+  | "temporarily_unavailable"
   | "bad_request"
   | "conflict"
   | "idempotency_mismatch"
@@ -179,7 +189,7 @@ export type SharingResult = {
   access: string;
 };
 
-export interface SystemAuthoring {
+export interface SystemAuthoring extends SystemItemImages {
   createDraft(ctx: RequestContext, input: CreateDraftInput): Promise<Result<AuthoringWorkspace>>;
   open(ctx: RequestContext, systemId: SystemId): Promise<Result<AuthoringWorkspace>>;
   list(
@@ -215,11 +225,25 @@ const NOT_FOUND_MESSAGE = "The requested resource does not exist.";
 const MISMATCH_MESSAGE = "This idempotency key was already used with different input.";
 
 export type CreateSystemAuthoringInput = {
+  pool: Pool;
+  scanImage?: ImageScanner;
   repo: SystemPersistenceRepository;
 };
 
 export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): SystemAuthoring {
   const repo = input.repo;
+  const scanner = input.scanImage ?? createClamScanner();
+  async function validateImages(systemId: string, document: SystemDocumentV1) {
+    if (!document.templates?.some(template => template.image)) return;
+    const client = await input.pool.connect();
+    try { await assertSystemImages(client, systemId, document); } finally { client.release(); }
+  }
+  function imageError(cause: unknown): AppError {
+    if (cause instanceof InvalidSystemImage) return errors.invalid_package([{ code: "unavailable_image", path: "/templates", message: cause.message }]);
+    if (cause instanceof ImageProcessingError) return { code: cause.code, message: cause.message };
+    if (cause instanceof ItemImageMissing) return { code: "unprocessable", message: "A referenced image is unavailable. Restore its private bytes before exporting." };
+    return errors.internal();
+  }
   const now = () => new Date();
 
   const errors = {
@@ -304,7 +328,9 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
   }
 
   return {
+    ...createSystemItemImages({ pool: input.pool, scanImage: scanner }),
     async createDraft(ctx, input) {
+      let newImages: PreparedItemImage[] = [], imagesCommitted = false;
       try {
         const inputHash = hashInput(input.source);
         const receipt = await receiptResult<AuthoringWorkspace>(ctx, "system_create", input.idempotencyKey, inputHash);
@@ -313,6 +339,8 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
 
         let document: SystemDocumentV1;
         let name: string;
+        let retainedImageIds: string[] = [];
+        let importedImages: Awaited<ReturnType<typeof prepareImportedItemImages>> | undefined;
         if (input.source.kind === "blank") {
           document = blankSystemDocument(input.source.name);
           name = input.source.name;
@@ -331,12 +359,19 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
               return { ok: false, error: errors.not_found() };
             }
             pkg = version.package as SystemPackageV1;
+            await validateImages(version.systemId, documentFromPackage(pkg));
+            retainedImageIds = systemImages(pkg).map(image => image.fileId);
           } else {
             const decoded = decodeSystemExport(input.source.content);
             if (!decoded.ok) return { ok: false, error: errors.invalid_package(decoded.diagnostics) };
             pkg = decoded.value.package;
+            importedImages = await prepareImportedItemImages(decoded.value, scanner, ctx.actorId);
+            newImages = importedImages.prepared;
           }
           document = documentFromPackage(pkg);
+          if (importedImages) for (const template of document.templates ?? []) {
+            if (template.image) template.image = { ...importedImages.descriptors.get(template.image.fileId)!, description: template.image.description };
+          }
           name = document.metadata.name;
         }
 
@@ -355,8 +390,11 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           sourceChecksum: documentChecksum(document),
           updatedBy: ctx.actorId,
           requestId: ctx.requestId,
+          newImages,
+          retainedImageIds,
         });
         if (!saved.ok) return { ok: false, error: errors.internal() };
+        imagesCommitted = true;
         const versions = await repo.listVersions(system.systemId);
         const assessed = assessDocument(document);
         const workspace = toWorkspace(system, saved.draft, versions, assessed.assessment);
@@ -369,8 +407,10 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           expiresAt: new Date(now().getTime() + RECEIPT_TTL_MS),
         });
         return { ok: true, value: workspace };
-      } catch {
-        return { ok: false, error: errors.internal() };
+      } catch (cause) {
+        return { ok: false, error: imageError(cause) };
+      } finally {
+        if (!imagesCommitted) await Promise.all(newImages.map(discardPreparedItemImage));
       }
     },
 
@@ -385,8 +425,8 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
         const assessment =
           draft === null ? { ok: true, diagnostics: [] } : assessDocument(draft.document).assessment;
         return { ok: true, value: toWorkspace(system, draft, versions, assessment) };
-      } catch {
-        return { ok: false, error: errors.internal() };
+      } catch (cause) {
+        return { ok: false, error: imageError(cause) };
       }
     },
 
@@ -407,8 +447,8 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
             nextCursor: page.nextCursor,
           },
         };
-      } catch {
-        return { ok: false, error: errors.internal() };
+      } catch (cause) {
+        return { ok: false, error: imageError(cause) };
       }
     },
 
@@ -439,8 +479,8 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           ? system
           : { ...system, name: assessed.document.metadata.name };
         return { ok: true, value: toWorkspace(renamedSystem, saved.draft, versions, assessed.assessment) };
-      } catch {
-        return { ok: false, error: errors.internal() };
+      } catch (cause) {
+        return { ok: false, error: imageError(cause) };
       }
     },
 
@@ -450,6 +490,7 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
         if (system === null) return { ok: false, error: errors.not_found() };
         const draft = await repo.loadDraft(input.systemId);
         if (draft === null) return { ok: false, error: errors.not_found("The system has no draft to preview.") };
+        await validateImages(input.systemId, draft.document as SystemDocumentV1);
         const assessed = assessDocument(draft.document);
         if (!assessed.ok || assessed.document === null) {
           return { ok: false, error: errors.invalid_package(assessed.assessment.diagnostics) };
@@ -476,8 +517,8 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
             expiresAt: snapshot.expiresAt,
           },
         };
-      } catch {
-        return { ok: false, error: errors.internal() };
+      } catch (cause) {
+        return { ok: false, error: imageError(cause) };
       }
     },
 
@@ -514,6 +555,7 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
             error: errors.conflict("The draft was modified by another request.", draft.revision),
           };
         }
+        await validateImages(input.systemId, draft.document as SystemDocumentV1);
         const assessed = assessDocument(draft.document);
         if (!assessed.ok || assessed.document === null) {
           return { ok: false, error: errors.invalid_package(assessed.assessment.diagnostics) };
@@ -598,8 +640,8 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           expiresAt: new Date(now().getTime() + RECEIPT_TTL_MS),
         });
         return { ok: true, value: published };
-      } catch {
-        return { ok: false, error: errors.internal() };
+      } catch (cause) {
+        return { ok: false, error: imageError(cause) };
       }
     },
 
@@ -608,8 +650,8 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
         const version = await repo.authorizeVersionUse(ctx.actorId, versionId);
         if (version === null) return { ok: false, error: errors.not_found() };
         return { ok: true, value: version };
-      } catch {
-        return { ok: false, error: errors.internal() };
+      } catch (cause) {
+        return { ok: false, error: imageError(cause) };
       }
     },
 
@@ -635,8 +677,8 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           systemId: input.systemId ?? null,
         });
         return { ok: true, value: { versions: page.versions, nextCursor: page.nextCursor } };
-      } catch {
-        return { ok: false, error: errors.internal() };
+      } catch (cause) {
+        return { ok: false, error: imageError(cause) };
       }
     },
 
@@ -652,9 +694,14 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           exportedAt: new Date().toISOString(),
           package: version.package as SystemPackageV1,
         };
+        const images = await exportSystemItemImages(input.pool, version.systemId, exported.package);
+        if (images.length) exported.images = images;
+        const stillOwned = await repo.openSystem(version.systemId);
+        if (stillOwned?.ownerId !== ctx.actorId) return { ok: false, error: errors.not_found() };
+        if (Buffer.byteLength(JSON.stringify(exported), "utf8") > 16 * 1024 * 1024) return { ok: false, error: { code: "too_large", message: "System export exceeds the 16 MiB envelope limit." } };
         return { ok: true, value: exported };
-      } catch {
-        return { ok: false, error: errors.internal() };
+      } catch (cause) {
+        return { ok: false, error: imageError(cause) };
       }
     },
 
@@ -664,8 +711,8 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
         if (system === null) return { ok: false, error: errors.not_found() };
         const versions = await repo.listVersions(input.systemId);
         return { ok: true, value: { versions: versions.map(summarizeVersion) } };
-      } catch {
-        return { ok: false, error: errors.internal() };
+      } catch (cause) {
+        return { ok: false, error: imageError(cause) };
       }
     },
 
@@ -710,8 +757,8 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
             lifecycle: updated.lifecycle,
           },
         };
-      } catch {
-        return { ok: false, error: errors.internal() };
+      } catch (cause) {
+        return { ok: false, error: imageError(cause) };
       }
     },
 
@@ -735,8 +782,8 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           ok: true,
           value: { systemId: updated.systemId, access: updated.access },
         };
-      } catch {
-        return { ok: false, error: errors.internal() };
+      } catch (cause) {
+        return { ok: false, error: imageError(cause) };
       }
     },
 
@@ -753,8 +800,8 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           return { ok: false, error: errors.not_found() };
         }
         return { ok: true, value: { systemId } };
-      } catch {
-        return { ok: false, error: errors.internal() };
+      } catch (cause) {
+        return { ok: false, error: imageError(cause) };
       }
     },
   };

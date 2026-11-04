@@ -1,5 +1,5 @@
 import {TypedEntryFields} from "./TypedEntryFields.js";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { t } from "../i18n/index.js";
 import { Button } from "../ui/Button.js";
@@ -60,6 +60,7 @@ export type SlotListEntry = {
 };
 
 export type SlotListControlProps = {
+  renderEntryImage?: ((entry: SlotListEntry) => ReactNode) | undefined;
   slotId: string;
   label: string;
   accepts: string[];
@@ -437,7 +438,7 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
  * projection elements are owned here (CharacterSheet skips them), resolved
  * against the template catalog passed down from the route.
  */
-export function SlotListControl({ slotId, label, accepts, entries, templates, disabled, actionsDisabled, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted }: SlotListControlProps) {
+export function SlotListControl({ slotId, label, accepts, entries, templates, disabled, actionsDisabled, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, renderEntryImage }: SlotListControlProps) {
   const byId = new Map(templates.map((template) => [template.id, template]));
   const grantedDisabled = actionsDisabled ?? disabled;
   return (
@@ -467,6 +468,7 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
               return (
                 <li key={entry.entryId} data-system-item data-testid={`slot-entry-${entry.entryId}`} className={styles.slotEntry}>
                   <span className={styles.slotEntryLabel}>{entry.label}</span>
+                  {renderEntryImage?.(entry)}
                   {(entry.templateId === null || template?.kind === "item") && (entry.quantity ?? 1) > 1
                     ? <span className={styles.meta}>×{entry.quantity}</span> : null}
                   {entry.templateId === null ? <>

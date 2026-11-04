@@ -1,3 +1,4 @@
+import { ImageDescriptorSchema } from "../../../../platform/image-attachment.js";
 import { Type, type Static } from "@sinclair/typebox";
 
 import {PushPolicySchema} from "./push-policy.js";
@@ -420,6 +421,7 @@ export type TemplateKind = Static<typeof TemplateKindSchema>;
 export const ObjectTemplateV1Schema = Type.Object(
   {
     id: DefinitionIdSchema,
+    image: Type.Optional(ImageDescriptorSchema),
     label: LabelSchema,
     kind: TemplateKindSchema,
     description: Type.Optional(Type.String({ maxLength: LONG_TEXT_MAX_LENGTH })),

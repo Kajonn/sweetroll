@@ -1,7 +1,7 @@
 # System themes and image uploads — staged feature plan
 
 **Date:** 2026-11-03
-**Status (2026-11-04):** T1 and T2 implemented with passing hosted journeys and CI #205. M0 durable storage/scanning foundation passed hosted upload and post-redeploy verification plus a local metadata/bytes restoration drill. See [themes](../../acceptance/system-themes-2026-11-04.md) and [media](../../acceptance/image-foundation-2026-11-04.md). M1 hosted acceptance passed and the final CI follow-up is pending; M2–M3 remain planned. The full requested implementation is incomplete.
+**Status (2026-11-04):** T1 and T2 implemented with passing hosted journeys and CI #205. M0 durable storage/scanning foundation passed hosted upload and post-redeploy verification plus a local metadata/bytes restoration drill. See [themes](../../acceptance/system-themes-2026-11-04.md) and [media](../../acceptance/image-foundation-2026-11-04.md). M1 hosted acceptance and CI #209 passed; M2 is implemented with local checks; hosted acceptance and CI remain pending, and M3 remains planned. The full requested implementation is incomplete.
 **Baseline:** `main` `01c9fba` (merged PR #29).
 **Scope authority:** Owner request for system color themes, then themed GUI elements; image uploads for characters, items, then adventure backgrounds.
 **Design:** [Sections 10.5, 17.9c and 18.2](../../../design_v2.md). Reuse the [GUI foundation and G9 gates](2026-09-08-gui-integration.md) and [I7b scene/display contract](../specs/2026-09-14-i7b-scenes-display-design.md).
@@ -105,7 +105,6 @@ For hosted acceptance, verify the test service's branch and latest successful de
 ## Implementation checkpoint (2026-11-04)
 
 T1/T2 and M0 evidence remains recorded above. M1 module, HTTP/contracts and UI
-are implemented and the hosted player/GM journey passed. Final CI on the
-landmark-selector follow-up is pending. See [M1 evidence](../../acceptance/character-portraits-2026-11-04.md).
-M2 and M3 remain unimplemented. Do not treat the checked implementation tasks as
+are implemented and accepted by the hosted player/GM journey and CI #209. See [M1 evidence](../../acceptance/character-portraits-2026-11-04.md).
+M2 is implemented under the [item image contract](../specs/2026-11-04-item-images.md), with [local validation and pending hosted acceptance](../../acceptance/item-images-2026-11-04.md); M3 remains unimplemented. Do not treat the checked implementation tasks as
 completed acceptance of the remaining feature request.

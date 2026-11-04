@@ -1,4 +1,5 @@
 import { SystemPresentationSchema } from "../../systems/implementation/package/schema/document.js";
+import { campaignItemImageHandlers, campaignItemImageRoutes } from "./campaignItemImages.js";
 import {campaignProposalRoutes,campaignProposalHandlers,CampaignProposalDto} from "./campaignProposals.js";
 import {RollBreakdownSchema,PushResultSchema} from "../../systems/implementation/rules/result.js";
 import { strictInputCompiler } from "./strictValidation.js";
@@ -738,6 +739,7 @@ export type CampaignsRouteDefinition = {
 };
 
 export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
+  ...campaignItemImageRoutes,
   ...campaignTemplateRoutes,
   ...campaignProposalRoutes,
   {
@@ -1654,6 +1656,7 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
 
     type Handler = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown> | unknown;
     const handlers: Record<string, Handler> = {
+      ...campaignItemImageHandlers(campaigns),
       ...campaignTemplateHandlers(campaigns),
       ...campaignProposalHandlers(campaigns),
       post_campaigns: async (request, reply) => {
@@ -2561,6 +2564,8 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
     for (const route of campaignsRouteDefinitions) {
       const response = toFastifyResponses(route.schema.response);
       const schema = response === undefined ? route.schema : { ...route.schema, response };
-      app[route.method](route.path, { schema, ...((route.path.includes("/item-templates") || route.path.includes("/item-proposals")) ? { validatorCompiler: strictInputCompiler, ...(route.path.includes("/item-proposals") ? {bodyLimit:32768}: {}) } : {}) }, handlers[route.operationId]!);
+      app[route.method](route.path, { schema, ...((route.path.includes("/item-templates") || route.path.includes("/item-proposals")) ? { validatorCompiler: strictInputCompiler, ...(route.path.includes("/item-proposals") ? {bodyLimit:32768}: {}) } : {}),
+        ...(route.path.includes("/image") && (route.path.includes("/item-templates") || route.path.includes("/item-proposals")) ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); }, ...(route.method === "put" ? { bodyLimit: 8 * 1024 * 1024 } : {}) } : {}),
+      }, handlers[route.operationId]!);
     }
   };

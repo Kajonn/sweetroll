@@ -1,3 +1,4 @@
+import { createImageEditorApi, type ImageEditorApi } from "../ui/imageEditorApi.js";
 import type { ApiClient } from "../api/client.js";
 import type { operations } from "../api/schema.js";
 export type CampaignProposal =
@@ -9,6 +10,7 @@ export type ProposalDecisionBody = NonNullable<
   operations["post_campaigns_id_item_proposals_proposalId_reject"]["requestBody"]
 >["content"]["application/json"];
 export type CampaignProposalsApi = {
+  images?: (campaignId: string, resourceId: string) => ImageEditorApi;
   list(
     campaignId: string,
     input?: { cursor?: string | null },
@@ -34,6 +36,7 @@ export function createCampaignProposalsApi(
 ): CampaignProposalsApi {
   const path = (id: string) => `/campaigns/${id}/item-proposals`;
   return {
+    images: (id, resourceId) => createImageEditorApi(client, `/campaigns/${encodeURIComponent(id)}/item-proposals/${encodeURIComponent(resourceId)}/image`, "proposal"),
     list: (id, input, signal) =>
       client.fetch("GET", path(id), {
         query: { limit: 25, cursor: input?.cursor ?? undefined },

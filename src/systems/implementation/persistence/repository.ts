@@ -2,6 +2,9 @@ import { d20Package, pbta2d6Package, d6SuccessPoolPackage } from "../package/fix
 import type { CompatibilityFinding } from "../package/compatibility.js";
 import type { SystemPackageV1 } from "../package/schema/index.js";
 import type { Pool, PoolClient } from "pg";
+import { saveSystemImages } from "./image-references.js";
+import type { PreparedItemImage } from "../../../platform/item-image-storage.js";
+import type { SystemDocumentV1 } from "../package/schema/index.js";
 
 export type SystemId = string;
 export type VersionId = string;
@@ -143,6 +146,8 @@ export type AuditRecord = {
 };
 
 export type SaveDraftInput = {
+  newImages?: PreparedItemImage[];
+  retainedImageIds?: string[];
   systemId: SystemId;
   expectedRevision: number | null;
   document: unknown;
@@ -689,6 +694,8 @@ async function saveDraftImpl(pool: Pool, input: SaveDraftInput): Promise<DraftSa
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    // Image changes and ordinary saves share the system-before-draft lock order.
+    await client.query("SELECT id FROM systems WHERE id=$1 FOR UPDATE", [input.systemId]);
     const existing = await client.query<DraftRow>(
       `SELECT system_id, revision, document_json, source_checksum, updated_by, updated_at
          FROM system_drafts
@@ -702,6 +709,7 @@ async function saveDraftImpl(pool: Pool, input: SaveDraftInput): Promise<DraftSa
         await client.query("COMMIT");
         return { ok: false, code: "stale_revision", latestRevision: null };
       }
+      await saveSystemImages(client, input.systemId, input.document as SystemDocumentV1, input.newImages, input.retainedImageIds);
       const inserted = await client.query<DraftRow>(
         `INSERT INTO system_drafts (system_id, revision, document_json, source_checksum, updated_by)
          VALUES ($1, 1, $2::jsonb, $3, $4)
@@ -725,6 +733,7 @@ async function saveDraftImpl(pool: Pool, input: SaveDraftInput): Promise<DraftSa
       await client.query("COMMIT");
       return { ok: false, code: "stale_revision", latestRevision: row.revision };
     }
+    await saveSystemImages(client, input.systemId, input.document as SystemDocumentV1, input.newImages, input.retainedImageIds);
     const updated = await client.query<DraftRow>(
       `UPDATE system_drafts
           SET revision = revision + 1, document_json = $2::jsonb, source_checksum = $3, updated_by = $4, updated_at = now()

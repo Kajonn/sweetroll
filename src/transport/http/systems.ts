@@ -1,4 +1,7 @@
 import { Type, type TSchema } from "@sinclair/typebox";
+import { systemImageHandlers, systemImageRoutes } from "./systemImages.js";
+import { strictInputCompiler } from "./strictValidation.js";
+import { SystemImageManifestSchema } from "../../systems/implementation/package/schema/export.js";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 
 import type {
@@ -12,6 +15,9 @@ export type BuildSystemsRoutesInput = {
 };
 
 const STATUS_BY_CODE: Record<AppError["code"], number> = {
+  too_large: 413,
+  unprocessable: 422,
+  temporarily_unavailable: 503,
   bad_request: 400,
   not_found: 404,
   conflict: 409,
@@ -116,7 +122,7 @@ const CreateDraftBody = Type.Object({
   source: Type.Union([
     Type.Object({ kind: Type.Literal("blank"), name: Type.String({ minLength: 1 }) }),
     Type.Object({ kind: Type.Literal("clone"), versionId: Type.String({ format: UUID_FORMAT }) }),
-    Type.Object({ kind: Type.Literal("import"), content: Type.String({ minLength: 1 }) }),
+    Type.Object({ kind: Type.Literal("import"), content: Type.String({ minLength: 1, maxLength: 16 * 1024 * 1024 }) }),
   ]),
   idempotencyKey: Type.String({ minLength: 1 }),
 });
@@ -188,6 +194,8 @@ const SharingResultDto = Type.Object({
 });
 
 const ErrorResponses = {
+  "413": ErrorEnvelope,
+  "503": ErrorEnvelope,
   "400": ErrorEnvelope,
   "401": UnauthorizedEnvelope,
   "404": ErrorEnvelope,
@@ -212,6 +220,7 @@ export type SystemsRouteDefinition = {
 };
 
 export const systemsRouteDefinitions: readonly SystemsRouteDefinition[] = [
+  ...systemImageRoutes,
   {
     method: "get",
     path: "/templates",
@@ -390,6 +399,7 @@ export const systemsRouteDefinitions: readonly SystemsRouteDefinition[] = [
             mediaType: Type.String(),
             exportedAt: Type.String(),
             package: Type.Object({}, { additionalProperties: true }),
+            images: Type.Optional(Type.Array(SystemImageManifestSchema, { maxItems: 128 })),
           }),
           mediaType: "application/vnd.sweetroll.system+json;version=1",
         },
@@ -461,6 +471,7 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
 
     type Handler = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown> | unknown;
     const handlers: Record<string, Handler> = {
+      ...systemImageHandlers(authoring),
       get_templates: async (request) => ({
         templates: [
           {
@@ -647,6 +658,7 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
         const result = await authoring.exportVersion(ctxOf(request), params.versionId);
         if (!result.ok) return sendError(reply, result.error, request.id);
         reply.header("content-type", "application/vnd.sweetroll.system+json;version=1");
+        reply.header("cache-control", "private, no-store");
         return result.value;
       },
     };
@@ -654,7 +666,11 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
     for (const route of systemsRouteDefinitions) {
       const response = toFastifyResponses(route.schema.response);
       const schema = response === undefined ? route.schema : { ...route.schema, response };
-      app[route.method](route.path, { schema }, handlers[route.operationId]!);
+      app[route.method](route.path, { schema,
+        ...(route.path === "/systems" && route.method === "post" ? { bodyLimit: 18 * 1024 * 1024 } : {}),
+        ...(route.path.includes("/image") ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); }, validatorCompiler: strictInputCompiler,
+          ...(route.method === "put" ? { bodyLimit: 8 * 1024 * 1024 } : {}) } : {}),
+      }, handlers[route.operationId]!);
     }
   };
 

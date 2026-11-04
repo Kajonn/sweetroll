@@ -2,6 +2,7 @@ import {DerivedBaseSchema,TemplateDefaultsSchema} from "../../systems/implementa
 import {ObjectTemplateV1Schema} from "../../systems/implementation/package/schema/document.js";
 import {DefinitionIdSchema} from "../../systems/implementation/package/schema/common.js";
 import { Type } from "@sinclair/typebox";
+import { ImageDescriptorSchema } from "../../platform/image-attachment.js";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Campaigns } from "../../campaigns/index.js";
 import type {
@@ -33,6 +34,7 @@ const Content = Type.Object(
   { additionalProperties: false },
 );
 export const CampaignTemplateDto = Type.Object({
+  image: Type.Optional(ImageDescriptorSchema),
   templateId: Type.String(),
   campaignId: Type.String(),
   creatorId: Type.String(),

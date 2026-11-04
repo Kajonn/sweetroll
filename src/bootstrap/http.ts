@@ -86,6 +86,7 @@ const identity = createIdentityModule({
 });
 
 const authoring = createSystemAuthoringModule({
+  pool,
   repo: createSystemPersistenceRepository(pool),
 });
 

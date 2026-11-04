@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { ItemArtwork } from "../ui/ItemArtwork.js";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Dialog, FormField, Panel, Select } from "../ui/index.js";
 import { t } from "../i18n/index.js";
@@ -48,6 +49,8 @@ export function CampaignProposals(props: Props) {
 }
 function ProposalScope(props: Props) {
   const client = useQueryClient();
+  const images = props.api.images;
+  const imageFactory = useMemo(() => images ? (id: string) => images(props.campaignId, id) : undefined, [images, props.campaignId]);
   const scope = [
     "campaigns",
     "proposals",
@@ -263,6 +266,7 @@ function ProposalScope(props: Props) {
           .map((p) => (
             <li key={p.proposalId} className={styles.row}>
               <h3>{p.content.name}</h3>
+              {imageFactory ? <ItemArtwork createApi={imageFactory} resourceId={p.proposalId} online={props.online} canEdit={!props.isGm && !props.readOnly && p.status === "pending" && p.submitterId === props.actorId} parentRevision={p.revision} modal onChanged={async () => { await client.invalidateQueries({ queryKey: scope }); }} /> : null}
               <p>
                 {t(`campaign.proposals.status.${p.status}`)} ·{" "}
                 {t(`campaign.templates.${p.kind}`)}
@@ -410,6 +414,7 @@ function ProposalScope(props: Props) {
         {review ? (
           <div className={styles.form}>
             <h3>{review.content.name}</h3>
+            {imageFactory ? <ItemArtwork createApi={imageFactory} resourceId={review.proposalId} online={props.online} canEdit={false} /> : null}
             <p className={styles.text}>{review.content.description}</p>
             <p className={styles.text}>{review.content.notes}</p>
             {review.content.defaultQuantity !== undefined ? (
@@ -444,6 +449,7 @@ function ProposalScope(props: Props) {
                     proposalId: review.proposalId,
                     body: {
                       expectedProposalRevision: review.revision,
+                      ...(review.imageRevision ? { expectedImageRevision: review.imageRevision } : {}),
                       idempotencyKey: randomUUID(),
                     },
                   })
@@ -460,6 +466,7 @@ function ProposalScope(props: Props) {
                     proposalId: review.proposalId,
                     body: {
                       expectedProposalRevision: review.revision,
+                      ...(review.imageRevision ? { expectedImageRevision: review.imageRevision } : {}),
                       idempotencyKey: randomUUID(),
                       ...(reason ? { reason } : {}),
                     },

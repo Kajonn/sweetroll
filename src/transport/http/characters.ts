@@ -1,5 +1,7 @@
 import { SystemPresentationSchema } from "../../systems/implementation/package/schema/document.js";
 import { characterImageHandlers, characterImageRoutes } from "./characterImages.js";
+import { ImageDescriptorSchema } from "../../platform/image-attachment.js";
+import { characterEntryImageHandlers, characterEntryImageRoutes } from "./characterEntryImages.js";
 import {DieResultSchema, RollBreakdownSchema, PushResultSchema} from "../../systems/implementation/rules/result.js";
 import { strictInputCompiler } from "./strictValidation.js";
 import {EntrySourceSchema, EntrySnapshotSchema, type EntrySource} from "../../systems/implementation/package/schema/dynamic.js";
@@ -58,6 +60,7 @@ const RuntimeStateDto = Type.Object({
   // offline snapshots). Optional so pre-entry clients keep validating.
   entries: Type.Optional(Type.Record(Type.String(), Type.Object({
     entryId: Type.String(),
+    image: Type.Optional(ImageDescriptorSchema),
     slotId: Type.String(),
     templateId: Type.Union([Type.String(), Type.Null()]),
     source:Type.Optional(EntrySourceSchema),snapshot:Type.Optional(EntrySnapshotSchema),
@@ -547,6 +550,7 @@ export type CharactersRouteDefinition = {
 
 export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = [
   ...characterImageRoutes,
+  ...characterEntryImageRoutes,
   {
     method: "post",
     path: "/characters",
@@ -926,6 +930,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
     type Handler = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown> | unknown;
     const handlers: Record<string, Handler> = {
       ...characterImageHandlers(characters),
+      ...characterEntryImageHandlers(characters),
       post_characters: async (request, reply) => {
         const body = request.body as {
           systemVersionId: string;
@@ -1257,8 +1262,8 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
       const response = toFastifyResponses(route.schema.response);
       const schema = response === undefined ? route.schema : { ...route.schema, response };
       app[route.method](route.path, { schema,
-        ...(route.path.includes("/portrait") ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); } } : {}),
-        ...(route.path.endsWith("/portrait") && route.method === "put" ? { bodyLimit: 8 * 1024 * 1024 } : {}),
+        ...((route.path.includes("/portrait") || route.path.includes("/image")) ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); } } : {}),
+        ...((route.path.endsWith("/portrait") || route.path.endsWith("/image")) && route.method === "put" ? { bodyLimit: 8 * 1024 * 1024 } : {}),
         ...((route.path.includes("/entries") || route.path.includes("/rolls/") || route.path.includes("/portrait")) ? { validatorCompiler: strictInputCompiler } : {}) }, handlers[route.operationId]!);
     }
   };

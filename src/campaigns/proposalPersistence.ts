@@ -8,16 +8,20 @@ import type {
 export type ProposalRecord = Omit<ProposalView, "eligibility"> & {
   membershipGeneration: number;
 };
-const SELECT = `SELECT id AS "proposalId", campaign_id AS "campaignId", submitter_id AS "submitterId", membership_generation AS "membershipGeneration", kind, content_json AS content, status, revision, created_at AS "createdAt", updated_at AS "updatedAt", decision_actor_id AS "decisionActorId", decided_at AS "decidedAt", decision_reason AS "decisionReason", approved_template_id AS "approvedTemplateId" FROM campaign_item_proposals`;
+const SELECT = `SELECT id AS "proposalId", campaign_id AS "campaignId", submitter_id AS "submitterId", membership_generation AS "membershipGeneration", kind, content_json AS content, status, revision, created_at AS "createdAt", updated_at AS "updatedAt", decision_actor_id AS "decisionActorId", decided_at AS "decidedAt", decision_reason AS "decisionReason", approved_template_id AS "approvedTemplateId",
+ (SELECT i.revision FROM campaign_proposal_images i WHERE i.proposal_id=campaign_item_proposals.id) AS "imageRevision",
+ (SELECT jsonb_build_object('fileId',a.id,'description',i.description,'contentType',a.media_type,'width',a.width,'height',a.height,'sizeBytes',a.size_bytes,'checksum',a.checksum) FROM campaign_proposal_images i JOIN item_image_assets a ON a.id=i.asset_id WHERE i.proposal_id=campaign_item_proposals.id) AS image
+ FROM campaign_item_proposals`;
 type Row = Omit<ProposalRecord, "decision"> & {
   decisionActorId: string | null;
   decidedAt: string | null;
   decisionReason: string | null;
 };
 function view(row: Row): ProposalRecord {
-  const { decisionActorId, decidedAt, decisionReason, ...p } = row;
+  const { decisionActorId, decidedAt, decisionReason, image, imageRevision, ...p } = row;
   return {
     ...p,
+    ...(imageRevision ? { image: image ?? null, imageRevision } : {}),
     createdAt: new Date(p.createdAt).toISOString(),
     updatedAt: new Date(p.updatedAt).toISOString(),
     decision:

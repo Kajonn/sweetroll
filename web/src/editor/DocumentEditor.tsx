@@ -1,3 +1,5 @@
+import { ItemArtwork } from "../ui/ItemArtwork.js";
+import { createImageEditorApi } from "../ui/imageEditorApi.js";
 import { useQueryClient } from "@tanstack/react-query";
 import { compileExpression, type ExpressionAstV1 } from "@sweetroll/rules";
 import { Check } from "lucide-react";
@@ -248,6 +250,7 @@ export function DocumentEditorBody({
   const [publishOpen, setPublishOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const draftRevision = ws.draft?.revision ?? null;
+  const imageFactory = useMemo(() => (id: string) => createImageEditorApi(client, `/systems/${encodeURIComponent(ws.system.systemId)}/templates/${encodeURIComponent(id)}/image`, "system"), [client, ws.system.systemId]);
   // Newest-first (server ORDER BY created_at DESC): the first entry is the
   // latest published version. Read from the already-loaded workspace — no
   // new backend calls for readiness.
@@ -599,7 +602,7 @@ export function DocumentEditorBody({
         ) : active === "dice" ? (
           <DiceTab client={client} document={document} dispatch={dispatch} />
         ) : active === "templates" ? (
-          <TemplatesTab client={client} document={document} dispatch={dispatch} />
+          <TemplatesTab client={client} document={document} dispatch={dispatch} renderArtwork={template => <><ItemArtwork createApi={imageFactory} resourceId={template.id} online={!sync.offline} canEdit={!unsaved && sync.status === "saved" && ws.system.lifecycle === "active"} modal onChanged={async () => { await queryClient.invalidateQueries({ queryKey: ["system", "open", ws.system.systemId] }); }} />{unsaved ? <p>{t("artwork.creatorReady")}</p> : null}</>} />
         ) : active === "sections" ? (
           <SheetsTab document={document} dispatch={dispatch} />
         ) : active === "advanced" ? (

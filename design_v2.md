@@ -915,7 +915,7 @@ The completed dynamic-object work added system templates and data-only character
 
 ## 17.9c Planned system themes and image uploads (2026-11-03)
 
-**Status (2026-11-04):** T1 color presets and T2 Default/Classic component styles passed hosted feature acceptance and CI #205. M0 scanning/storage passed real hosted clean/infected uploads and byte verification after redeployment, with a separate local metadata/bytes restoration drill ([evidence](docs/acceptance/image-foundation-2026-11-04.md)). M1 portrait module, private API and online controls are implemented, with hosted acceptance pending; M2–M3 remain planned in the [staged feature plan](docs/superpowers/plans/2026-11-03-system-themes-and-images.md). The complete feature request remains unfinished. This records the owner's requested additions without closing or reprioritizing unperformed G9 release gates.
+**Status (2026-11-04):** T1 color presets and T2 Default/Classic component styles passed hosted feature acceptance and CI #205. M0 scanning/storage passed real hosted clean/infected uploads and byte verification after redeployment, with a separate local metadata/bytes restoration drill ([evidence](docs/acceptance/image-foundation-2026-11-04.md)). M1 portraits passed the hosted player/GM journey and CI #209; M2–M3 remain planned in the [staged feature plan](docs/superpowers/plans/2026-11-03-system-themes-and-images.md). The complete feature request remains unfinished. This records the owner's requested additions without closing or reprioritizing unperformed G9 release gates.
 
 | Track | Ordered stages | Required result |
 | --- | --- | --- |

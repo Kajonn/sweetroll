@@ -1,6 +1,6 @@
 # M1 character portraits — 2026-11-04
 
-Implementation and hosted journey complete; final CI follow-up is pending. M2/M3 and wider
+M1 automated feature acceptance complete: hosted journey and CI #209 passed. M2/M3 and wider
 human/device G9 gates remain open.
 
 ## Red → green
@@ -77,3 +77,9 @@ section selector after the landmark correction; it now targets the named
 Roll result region and keeps the existing detail assertions. Final CI on that
 selector/runner follow-up is pending. No performance budget or accessibility
 check was relaxed. M1 remains pending that final CI result; M2/M3 remain open.
+
+CI [#209](https://github.com/Kajonn/sweetroll/actions/runs/41859815673) on
+`6076f8a6be21057a414bb898e312f8f997e5507c` passed all jobs, including the unchanged
+production-worker offline journey with the named roll-result selector. The tested
+application remains `1720605`; the follow-up changes tests/evidence only. M1 is
+accepted. M2 and M3 remain separate unfinished stages.

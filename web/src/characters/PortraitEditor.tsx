@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../api/client.js";
 import { t } from "../i18n/index.js";
 import { Button } from "../ui/Button.js";
+import { ImageFileFields } from "../ui/ImageFileFields.js";
 import { Dialog } from "../ui/Dialog.js";
 import { randomUUID } from "../utils/uuid.js";
 import {
@@ -47,8 +48,7 @@ export function PortraitEditor({
   const [viewing, setViewing] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const lifetime = useRef(0);
-  const selection = useRef(0);
-  const fileInput = useRef<HTMLInputElement>(null);
+  const [resetKey, setResetKey] = useState(0);
   useEffect(() => {
     const generation = ++lifetime.current;
     setState(null);
@@ -75,47 +75,10 @@ export function PortraitEditor({
     };
   }, [api, characterId, online, refresh]);
   function clearSelection() {
-    ++selection.current;
     setSelected(null);
     setAttempt(null);
     setDescription("");
-    if (fileInput.current) fileInput.current.value = "";
-  }
-  function choose(file: File | undefined) {
-    setError(null);
-    clearSelection();
-    if (!file) return;
-    if (
-      file.size > 5 * 1024 * 1024 ||
-      !["image/png", "image/jpeg", "image/webp"].includes(file.type)
-    ) {
-      setError(t("portrait.fileLimits"));
-      return;
-    }
-    const generation = lifetime.current;
-    const selectedGeneration = selection.current;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (
-        generation !== lifetime.current ||
-        selectedGeneration !== selection.current
-      )
-        return;
-      const preview = String(reader.result);
-      setSelected({
-        preview,
-        dataBase64: preview.slice(preview.indexOf(",") + 1),
-        contentType: file.type as SetPortraitBody["contentType"],
-      });
-    };
-    reader.onerror = () => {
-      if (
-        generation === lifetime.current &&
-        selectedGeneration === selection.current
-      )
-        setError(t("portrait.error"));
-    };
-    reader.readAsDataURL(file);
+    setResetKey(value => value + 1);
   }
   async function send(request: Attempt) {
     if (!online || busy || !canEdit) return;
@@ -188,35 +151,7 @@ export function PortraitEditor({
       )}
       {canEdit ? (
         <>
-          <p>{t("portrait.fileLimits")}</p>
-          <label>
-            {t("portrait.file")}
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              disabled={disabled || attempt !== null}
-              onChange={(event) => choose(event.target.files?.[0])}
-            />
-          </label>
-          {selected ? (
-            <>
-              <img
-                className={styles.thumbnail}
-                src={selected.preview}
-                alt={t("portrait.selected")}
-              />
-              <label>
-                {t("portrait.description")}
-                <input
-                  maxLength={500}
-                  value={description}
-                  disabled={busy || attempt !== null}
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-              </label>
-            </>
-          ) : null}
+          <ImageFileFields labels="portrait" selected={selected} description={description} onSelect={setSelected} onDescription={setDescription} onError={setError} disabled={disabled || attempt !== null} resetKey={resetKey} />
           <div className={styles.actions}>
             {selected && !attempt ? (
               <Button

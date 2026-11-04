@@ -1,7 +1,9 @@
+import { ItemArtwork } from "../ui/ItemArtwork.js";
+import type { CharactersApi } from "./api.js";
 import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import {PushPanel,type PushApi} from "../rolls/PushPanel.js";
 import {RollBreakdown} from "../rolls/RollBreakdown.js";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { t } from "../i18n/index.js";
 import { Button } from "../ui/Button.js";
@@ -31,6 +33,7 @@ export type CharacterSheetProps = { snapshot: CharacterSnapshot;pushApi?:PushApi
   /** Template catalog for slot pickers and granted-action buttons; omitted while unknown. */
   templates?: SlotTemplate[] | undefined;
   portrait?: ReactNode;
+  entryImages?: CharactersApi["entryImages"];
 };
 type Element = NonNullable<CharacterSnapshot["confirmed"]>["projection"]["sheets"][number]["sections"][number]["elements"][number];
 
@@ -137,7 +140,9 @@ function RollResult({ roll, fieldLabels }: { roll: NonNullable<CharacterSnapshot
   return <section className={styles.rollResult} aria-labelledby="character-roll-result"><h2 id="character-roll-result">{t("character.rollResult.title")}</h2><dl><dt>{t("character.rollResult.expression")}</dt><dd>{expression}</dd><dt>{t("character.rollResult.total")}</dt><dd>{roll.total}</dd><dt>{t("character.rollResult.output")}</dt><dd>{roll.output}</dd><dt>{t("character.rollResult.audience")}</dt><dd>{audienceLabel(roll.audience)}</dd></dl><RollBreakdown roll={roll}/><Button variant="secondary" onClick={() => setDetailsOpen(open => !open)} aria-expanded={detailsOpen}>{t(detailsOpen ? "character.rollResult.hideDetails" : "character.rollResult.showDetails")}</Button>{detailsOpen ? <div className={styles.rollDetails}><ul>{roll.dice.map((die, index) => <li key={`${die.sides}-${index}`}>d{die.sides}={die.value}</li>)}</ul><ul>{roll.bindings.map(binding => <li key={`${binding.scope}-${binding.definitionId}`}>{binding.scope === "fields" ? fieldLabels.get(binding.definitionId) ?? `${binding.scope}.${binding.definitionId}` : `${binding.scope}.${binding.definitionId}`}: {String(binding.value)}</li>)}</ul></div> : null}</section>;
 }
 
-export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, portrait, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {
+export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, portrait, entryImages, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {
+  const characterIdForImages = snapshot.confirmed?.characterId;
+  const imageFactory = useMemo(() => entryImages && characterIdForImages ? (id: string) => entryImages(characterIdForImages, id) : undefined, [entryImages, characterIdForImages]);
   const character = snapshot.confirmed;
   const [commandError, setCommandError] = useState<string | null>(null);
   // A purged snapshot carries no private content: the session nulls
@@ -229,6 +234,7 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, 
           accepts={[...element.accepts]}
           entries={element.entries.map((entry) => ({ ...entry, values: { ...entry.values } }))}
           templates={templates ?? []}
+          renderEntryImage={imageFactory ? entry => <ItemArtwork key={entry.entryId} resourceId={entry.entryId} createApi={imageFactory} online={snapshot.connected} canEdit={snapshot.editing.owned && character.lifecycle === "active" && snapshot.entries.length === 0 && !snapshot.error} parentRevision={character.revision} /> : undefined}
           disabled={!entriesEditable}
           actionsDisabled={!(editable && snapshot.phase === "ready" && onExecuteGranted !== undefined)}
           onAddEntry={onAddEntry ?? (async () => {})}

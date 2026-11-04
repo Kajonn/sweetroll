@@ -1,4 +1,5 @@
 import {canReadTemplate,templateReadScope,type TemplateAudience,type TemplateGrant} from "./templatePolicy.js";
+import type { ImageDescriptor } from "../platform/image-attachment.js";
 import {
   resolveTemplateBase,
   type PublishedPackageLoader,
@@ -24,6 +25,7 @@ export type TemplateContent = {
   defaultQuantity?: number;
 };
 export type CampaignTemplateView = {
+  image?: ImageDescriptor;
   templateId: string;
   campaignId: string;
   creatorId: string;

@@ -30,7 +30,7 @@ test("T1 creator, publication, pinned sheets, portals and scoped navigation", as
     await expect(page.getByLabel("System colors", { exact: true })).toBeVisible();
     await page.getByTestId("metadata-name").fill(`T1 hosted ${key().slice(0, 8)}`);
     await page.getByLabel("System colors", { exact: true }).selectOption("blue");
-    await expect.poll(async () => (await json(page, "GET", `/api/systems/${id}`)).workspace.draft.document.metadata.presentation.colorPreset).toBe("blue");
+    await expect.poll(async () => (await json(page, "GET", `/api/systems/${id}`)).workspace.draft.document.metadata.presentation?.colorPreset).toBe("blue");
     await page.reload();
     await expect(page.getByLabel("System colors", { exact: true })).toHaveValue("blue");
     await page.getByTestId("document-editor-preview-toggle").click();
@@ -44,13 +44,13 @@ test("T1 creator, publication, pinned sheets, portals and scoped navigation", as
     const exported = await json(page, "GET", `/api/system-versions/${published.versionId}/export`);
     expect(exported.package.presentation.colorPreset).toBe("blue");
     const cloned = await clone(published.versionId);
-    expect(cloned.draft.document.metadata.presentation.colorPreset).toBe("blue");
+    expect(cloned.draft.document.metadata.presentation?.colorPreset).toBe("blue");
     const campaign = (await json(page, "POST", "/api/campaigns", { title: "T1 pinned campaign", systemVersionId: published.versionId, idempotencyKey: key() })).campaign;
     campaigns.push(campaign.campaignId);
     const character = (await json(page, "POST", `/api/campaigns/${campaign.campaignId}/characters`, { name: "T1 hero", entityDefinitionId: "character", expectedCampaignRevision: campaign.revision, idempotencyKey: key() })).character;
     characters.push(character.characterId);
     await page.getByLabel("System colors", { exact: true }).selectOption("ochre");
-    await expect.poll(async () => (await json(page, "GET", `/api/systems/${id}`)).workspace.draft.document.metadata.presentation.colorPreset).toBe("ochre");
+    await expect.poll(async () => (await json(page, "GET", `/api/systems/${id}`)).workspace.draft.document.metadata.presentation?.colorPreset).toBe("ochre");
     expect((await json(page, "GET", `/api/characters/${character.characterId}`)).character.projection.presentation.colorPreset).toBe("blue");
     expect((await json(page, "GET", `/api/campaigns/${campaign.campaignId}`)).campaign.presentation.colorPreset).toBe("blue");
     for (const width of [360, 1280]) for (const mode of ["light", "dark"] as const) for (const preset of ["default", "blue", "ochre"]) {
@@ -59,7 +59,7 @@ test("T1 creator, publication, pinned sheets, portals and scoped navigation", as
       await page.goto(`/systems/${id}`);
       await page.getByLabel("System colors", { exact: true }).selectOption(preset);
       await expect(page.locator(`section[data-system-preset="${preset}"]`).first()).toBeVisible();
-      await expect.poll(async () => (await json(page, "GET", `/api/systems/${id}`)).workspace.draft.document.metadata.presentation.colorPreset).toBe(preset);
+      await expect.poll(async () => (await json(page, "GET", `/api/systems/${id}`)).workspace.draft.document.metadata.presentation?.colorPreset).toBe(preset);
       await expect(page.locator("html")).toHaveAttribute("data-theme", mode);
       const findings = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
       expect(findings.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.target) }))).toEqual([]);
@@ -78,6 +78,7 @@ test("T1 creator, publication, pinned sheets, portals and scoped navigation", as
     // The cached, authorized character projection supplies offline colors.
     await page.goto(`/characters/${character.characterId}`);
     await expect(page.locator('main[data-system-preset="blue"]')).toBeVisible();
+    await expect(page.getByText("Available offline", { exact: true })).toBeVisible({ timeout: 60_000 });
     await page.context().setOffline(true);
     await page.reload();
     await expect(page.locator('main[data-system-preset="blue"]')).toBeVisible();

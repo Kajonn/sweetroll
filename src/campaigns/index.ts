@@ -1084,14 +1084,16 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             campaign === null
               ? null
               : await repo.loadMembership(client, openInput.campaignId, ctx.actorId);
-          return { campaign, membership };
+          const packageValue = campaign !== null && canReadCampaign(campaign, membership)
+            ? await input.loadTemplatePackage?.(campaign.systemVersionId, client)
+            : null;
+          return { campaign, membership, presentation: packageValue?.presentation };
         });
         if (outcome.campaign === null || !canReadCampaign(outcome.campaign, outcome.membership)) {
           return { ok: false, error: errors.not_found() };
         }
-        const packageValue = await input.loadTemplatePackage?.(outcome.campaign.systemVersionId);
         return { ok: true, value: { ...toView(outcome.campaign),
-          ...(packageValue?.presentation === undefined ? {} : { presentation: packageValue.presentation }),
+          ...(outcome.presentation === undefined ? {} : { presentation: outcome.presentation }),
         } };
       } catch {
         return { ok: false, error: errors.internal() };

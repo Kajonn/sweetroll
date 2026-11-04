@@ -88,7 +88,7 @@ test("M3 GUI background upload, confirmed safe replacement and restricted displa
       const denied = await dp.evaluate(async path => { const credential = JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!); return (await fetch(path, { credentials: "omit", headers: { "x-display-secret": credential.secret } })).status; }, path); expect(denied).toBe(401);
     }
     expect((await new AxeBuilder({ page: gm }).analyze()).violations).toEqual([]);
-    const layout = await gm.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: innerWidth, overflowing: Array.from(document.querySelectorAll<HTMLElement>("body *")).map(el => ({ tag: el.tagName, className: el.className, right: el.getBoundingClientRect().right, width: el.getBoundingClientRect().width })).filter(el => el.right > innerWidth + 1) }));
+    const layout = await gm.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: innerWidth, scrollX, active: document.activeElement?.outerHTML.slice(0, 300), overflowing: Array.from(document.querySelectorAll<HTMLElement>("body *")).map(el => ({ tag: el.tagName, className: el.className, right: el.getBoundingClientRect().right + scrollX, width: el.getBoundingClientRect().width })).filter(el => el.right > innerWidth) }));
     await gm.screenshot({ path: info.outputPath("scene-layout-360.png"), fullPage: true });
     expect(layout.width, JSON.stringify(layout)).toBeLessThanOrEqual(layout.viewport + 1);
     await gm.screenshot({ path: info.outputPath("scene-gm-360.png"), fullPage: true }); await dp.screenshot({ path: info.outputPath("scene-display-768.png"), fullPage: true });

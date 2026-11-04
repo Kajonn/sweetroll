@@ -6,7 +6,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { PortraitEditor } from "./PortraitEditor.js";
+import { PortraitEditor, PortraitThumbnail } from "./PortraitEditor.js";
 import type { CharacterImagesApi } from "./imageApi.js";
 
 const state = { revision: 0, portrait: null, requestId: "read" };
@@ -18,6 +18,13 @@ function api(): CharacterImagesApi {
   };
 }
 describe("character portrait controls", () => {
+  it("gives a missing thumbnail a valid accessible image role", () => {
+    render(<PortraitThumbnail characterId="hero" name="Explorer" />);
+    const image = screen.getByRole("img", { name: "Portrait of Explorer" });
+    expect(image).toHaveAttribute("loading", "lazy");
+    fireEvent.error(image);
+    expect(screen.getByRole("img", { name: "No portrait" })).toBeInTheDocument();
+  });
   it("retains the exact uncertain upload request and leaves sheet controls usable", async () => {
     const images = api();
     const saved = {

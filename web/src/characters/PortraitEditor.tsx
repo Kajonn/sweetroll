@@ -332,6 +332,6 @@ export function PortraitThumbnail({
       onError={() => setMissing(true)}
     />
   ) : (
-    <span className={styles.placeholder} aria-label={t("portrait.empty")} />
+    <span role="img" className={styles.placeholder} aria-label={t("portrait.empty")} />
   );
 }

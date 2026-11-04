@@ -99,13 +99,33 @@ test("M1 player portraits, GM disclosure, return and offline sheet play", async 
     await owner
       .getByLabel("Portrait description", { exact: true })
       .fill("Explorer wearing a blue cloak");
+    const uploadBodies: string[] = [];
+    const uploadRoute = `**/api/characters/${characterId}/portrait`;
+    await owner.route(uploadRoute, async route => {
+      if (route.request().method() !== "PUT") return route.continue();
+      uploadBodies.push(route.request().postData()!);
+      if (uploadBodies.length === 1) {
+        const response = await route.fetch();
+        expect(response.status()).toBe(200);
+        // The server committed, but the browser never receives the result.
+        await route.abort("failed");
+      } else await route.continue();
+    });
     await owner
       .getByRole("button", { name: "Upload portrait", exact: true })
       .click();
+    await expect(owner.getByRole("button", { name: "Retry exact request" })).toBeEnabled();
+    await owner.getByRole("button", { name: "Retry exact request" }).click();
     await expect(
       owner.getByAltText("Explorer wearing a blue cloak", { exact: true }),
     ).toBeVisible();
+    expect(uploadBodies).toHaveLength(2);
+    expect(uploadBodies[0]).toBe(uploadBodies[1]);
+    await owner.unroute(uploadRoute);
     const first = await json(owner, "GET", portraitPath);
+    const safeBytes = await owner.evaluate(async path => Array.from(new Uint8Array(await (await fetch(path)).arrayBuffer())), `${portraitPath}/${first.portrait.fileId}`);
+    expect((await sharp(Buffer.from(safeBytes)).metadata()).exif).toBeUndefined();
+    await expect.poll(() => owner.getByAltText("Explorer wearing a blue cloak", { exact: true }).evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
     await owner.reload();
     await expect(
       owner.getByAltText("Explorer wearing a blue cloak", { exact: true }),

@@ -83,8 +83,8 @@ test("T1/T2 creator, publication, pinned sheets, portals and scoped navigation",
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     await page.screenshot({ path: info.outputPath("creator-classic-200-percent-360.png"), fullPage: true });
     await page.goto(`/characters/${character.characterId}`);
-    await expect(page.locator('main[data-system-preset="blue"]')).toBeVisible();
-    await expect(page.locator('main[data-system-preset="blue"]')).toHaveAttribute("data-system-style", "classic");
+    await expect(page.locator('section[data-system-preset="blue"]')).toBeVisible();
+    await expect(page.locator('section[data-system-preset="blue"]')).toHaveAttribute("data-system-style", "classic");
     await page.getByLabel("Ability Score", { exact: true }).fill("14");
     await page.getByLabel("Ability Score", { exact: true }).press("Tab");
     await page.getByRole("button", { name: "Check", exact: true }).click();
@@ -95,11 +95,11 @@ test("T1/T2 creator, publication, pinned sheets, portals and scoped navigation",
     await expect(page.getByLabel("System colors", { exact: true })).toHaveValue("blue");
     // The cached, authorized character projection supplies offline colors.
     await page.goto(`/characters/${character.characterId}`);
-    await expect(page.locator('main[data-system-preset="blue"]')).toBeVisible();
+    await expect(page.locator('section[data-system-preset="blue"]')).toBeVisible();
     await expect(page.getByText("Available offline", { exact: true })).toBeVisible({ timeout: 60_000 });
     await page.context().setOffline(true);
     await page.reload();
-    await expect(page.locator('main[data-system-preset="blue"]')).toBeVisible();
+    await expect(page.locator('section[data-system-preset="blue"]')).toBeVisible();
     await page.context().setOffline(false);
   } finally {
     await page.context().setOffline(false);

@@ -33,6 +33,10 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
 }
 
 describe("CharacterSheet", () => {
+  it("preserves the shell's single main landmark", () => {
+    render(<main><CharacterSheet snapshot={snapshot()} onSetField={() => {}} onBump={() => {}} /></main>);
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+  });
   it("shows a section title once when its first element repeats the title", () => {
     const current = snapshot();
     const basics = current.confirmed!.projection.sheets[0]!.sections[0]!;
@@ -198,7 +202,7 @@ describe("CharacterSheet", () => {
 
   it("shows name, pinned version, lifecycle, sync state and offline availability in the header", () => {
     const { rerender } = render(<CharacterSheet snapshot={snapshot()} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} offlineAvailable={true} />);
-    const sheet = screen.getByRole("main");
+    const sheet = screen.getByRole("region", { name: "Aria" });
     expect(screen.getByRole("heading", { level: 1, name: "Aria" })).toBeVisible();
     expect(sheet).toHaveTextContent("Pinned version 11111111-1111-4000-8000-000000000000");
     expect(sheet).toHaveTextContent("Active");
@@ -206,7 +210,7 @@ describe("CharacterSheet", () => {
     expect(screen.getByText("Available offline")).toBeVisible();
 
     rerender(<CharacterSheet snapshot={snapshot({ confirmed: { ...snapshot().confirmed!, lifecycle: "archived" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} offlineAvailable={false} />);
-    expect(screen.getByRole("main")).toHaveTextContent("Archived");
+    expect(screen.getByRole("region", { name: "Aria" })).toHaveTextContent("Archived");
     expect(screen.getByText("Offline copy not ready yet")).toBeVisible();
   });
 

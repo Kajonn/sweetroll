@@ -1,7 +1,7 @@
 import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import {PushPanel,type PushApi} from "../rolls/PushPanel.js";
 import {RollBreakdown} from "../rolls/RollBreakdown.js";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { t } from "../i18n/index.js";
 import { Button } from "../ui/Button.js";
@@ -30,6 +30,7 @@ export type CharacterSheetProps = { snapshot: CharacterSnapshot;pushApi?:PushApi
   offlineAvailable?: boolean | undefined;
   /** Template catalog for slot pickers and granted-action buttons; omitted while unknown. */
   templates?: SlotTemplate[] | undefined;
+  portrait?: ReactNode;
 };
 type Element = NonNullable<CharacterSnapshot["confirmed"]>["projection"]["sheets"][number]["sections"][number]["elements"][number];
 
@@ -136,7 +137,7 @@ function RollResult({ roll, fieldLabels }: { roll: NonNullable<CharacterSnapshot
   return <section className={styles.rollResult} aria-labelledby="character-roll-result"><h2 id="character-roll-result">{t("character.rollResult.title")}</h2><dl><dt>{t("character.rollResult.expression")}</dt><dd>{expression}</dd><dt>{t("character.rollResult.total")}</dt><dd>{roll.total}</dd><dt>{t("character.rollResult.output")}</dt><dd>{roll.output}</dd><dt>{t("character.rollResult.audience")}</dt><dd>{audienceLabel(roll.audience)}</dd></dl><RollBreakdown roll={roll}/><Button variant="secondary" onClick={() => setDetailsOpen(open => !open)} aria-expanded={detailsOpen}>{t(detailsOpen ? "character.rollResult.hideDetails" : "character.rollResult.showDetails")}</Button>{detailsOpen ? <div className={styles.rollDetails}><ul>{roll.dice.map((die, index) => <li key={`${die.sides}-${index}`}>d{die.sides}={die.value}</li>)}</ul><ul>{roll.bindings.map(binding => <li key={`${binding.scope}-${binding.definitionId}`}>{binding.scope === "fields" ? fieldLabels.get(binding.definitionId) ?? `${binding.scope}.${binding.definitionId}` : `${binding.scope}.${binding.definitionId}`}: {String(binding.value)}</li>)}</ul></div> : null}</section>;
 }
 
-export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {
+export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, portrait, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {
   const character = snapshot.confirmed;
   const [commandError, setCommandError] = useState<string | null>(null);
   // A purged snapshot carries no private content: the session nulls
@@ -243,8 +244,9 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, 
     }
   };
 
-  return <SystemPresentationScope as="main" presentation={character.projection.presentation} className={styles.sheet} aria-busy={pending}>
+  return <SystemPresentationScope as="section" aria-label={character.name} presentation={character.projection.presentation} className={styles.sheet} aria-busy={pending}>
     <header className={styles.header}><h1>{character.name}</h1><span>{projection.entityLabel}</span><p className={styles.meta}>{t("character.header.version", { version: character.systemVersionId })} · {t(character.lifecycle === "archived" ? "character.lifecycle.archived" : "character.lifecycle.active")}</p><output role="status" aria-live="polite">{syncStatusText(snapshot, pending)}</output>{commandError !== null ? <p role="alert" className={styles.commandError}>{commandError}</p> : null}{offlineAvailable === undefined ? null : <p role="status">{t(offlineAvailable ? "character.offline.available" : "character.offline.unavailable")}</p>}</header>
+    {portrait}
     {stale ? <p className={styles.stale}>{t("character.validation.stale")}</p> : null}
     {showEstimateNote ? <p className={styles.estimateNote}>{t("character.estimate.note")}</p> : null}
     {actionUnavailableReason !== null ? <p id="character-action-unavailable" className={styles.actionUnavailable}>{actionUnavailableReason}</p> : null}

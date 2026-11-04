@@ -81,6 +81,7 @@ describe("CampaignSceneView", () => {
     const props = routeProps();
     render(<CampaignSceneView {...{ ...props, api: props.api as never }} />, { wrapper: wrapper() });
     expect(await screen.findByRole("img", { name: /scene background/i })).toBeVisible();
+    expect(screen.getAllByRole("region", { name: "Scene" })).toHaveLength(1);
     expect(await screen.findByRole("button", { name: /token alpha/i })).toBeVisible();
     expect(screen.getByRole("button", { name: /commit fog edit/i })).toBeVisible();
     expect(screen.getByRole("button", { name: /place token/i })).toBeVisible();

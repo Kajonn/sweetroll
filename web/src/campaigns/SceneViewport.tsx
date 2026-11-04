@@ -207,7 +207,7 @@ export function CampaignSceneView(props: {
     void sceneQuery.refetch();
   };
   return (
-    <section aria-label={t("campaign.detail.scenes.title")}>
+    <section>
       <PageHeader title={t("campaign.detail.scenes.title")} />
       {library}
       <SceneViewportView

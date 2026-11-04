@@ -1,7 +1,7 @@
 # System themes and image uploads — staged feature plan
 
 **Date:** 2026-11-03
-**Status (2026-11-04):** T1 and T2 implemented with passing hosted journeys and CI #205. M0 durable storage/scanning foundation passed hosted upload and post-redeploy verification plus a local metadata/bytes restoration drill. See [themes](../../acceptance/system-themes-2026-11-04.md) and [media](../../acceptance/image-foundation-2026-11-04.md). M1 hosted acceptance and CI #209 passed; M2 is implemented with local checks; hosted acceptance and CI remain pending, and M3 remains planned. The full requested implementation is incomplete.
+**Status (2026-11-04):** T1 and T2 implemented with passing hosted journeys and CI #205. M0 durable storage/scanning foundation passed hosted upload and post-redeploy verification plus a local metadata/bytes restoration drill. See [themes](../../acceptance/system-themes-2026-11-04.md) and [media](../../acceptance/image-foundation-2026-11-04.md). M1 hosted acceptance and CI #209 passed; M2 passed the hosted one-GM/three-player journey and CI #210; M3 is next. The full requested implementation is incomplete.
 **Baseline:** `main` `01c9fba` (merged PR #29).
 **Scope authority:** Owner request for system color themes, then themed GUI elements; image uploads for characters, items, then adventure backgrounds.
 **Design:** [Sections 10.5, 17.9c and 18.2](../../../design_v2.md). Reuse the [GUI foundation and G9 gates](2026-09-08-gui-integration.md) and [I7b scene/display contract](../specs/2026-09-14-i7b-scenes-display-design.md).
@@ -76,13 +76,13 @@ not claim character or item attachment APIs exist yet.
 
 ## M2 — Items, spells, abilities and adventure equipment
 
-- [ ] Support one optional image on system item templates, campaign templates and personal entries, using the existing item/spell/ability kinds without a new rules engine or implicit effects.
-- [ ] System creators manage draft item art; publishing pins the exact safe asset reference/content identity and retains its bytes for immutable versions. Clone/import/export must document which assets are included, their bounded manifest/checksums and explicit missing/unauthorized-art behavior; never export credentials or private campaign asset references.
-- [ ] GM/co-GM manages campaign template art under the catalog's actual audience. A character controller manages personal/placed-copy art as presentation only. Do not widen the editable base/actions contract or require a system republish for personal art.
-- [ ] Placement pins the image with the selected template revision. Later replacement/archive/deletion of template art does not silently alter existing copies. Personal edits affect only that instance.
-- [ ] Proposals and restricted drafts inherit their existing audiences; thumbnail lists, preview, direct image reads and export cannot reveal secret template names/art. Explicit reveal governs new placement; no unrestricted media URL bypasses D1/D2 policy.
-- [ ] Define retained-copy ownership before implementation: when a disclosed copy must survive catalog archive or authorized character return, materialize/retain an authorized character-scoped safe asset. Do not depend on renewed access to the old campaign catalog or expose its GM originals.
-- [ ] Display art on item cards/detail views without obscuring quantity, description or actions. No image is required; personal entries remain data-only even when illustrated.
+- [x] Support one optional image on system item templates, campaign templates and personal entries, using the existing item/spell/ability kinds without a new rules engine or implicit effects.
+- [x] System creators manage draft item art; publishing pins the exact safe asset reference/content identity and retains its bytes for immutable versions. Clone/import/export must document which assets are included, their bounded manifest/checksums and explicit missing/unauthorized-art behavior; never export credentials or private campaign asset references.
+- [x] GM/co-GM manages campaign template art under the catalog's actual audience. A character controller manages personal/placed-copy art as presentation only. Do not widen the editable base/actions contract or require a system republish for personal art.
+- [x] Placement pins the image with the selected template revision. Later replacement/archive/deletion of template art does not silently alter existing copies. Personal edits affect only that instance.
+- [x] Proposals and restricted drafts inherit their existing audiences; thumbnail lists, preview, direct image reads and export cannot reveal secret template names/art. Explicit reveal governs new placement; no unrestricted media URL bypasses D1/D2 policy.
+- [x] Define retained-copy ownership before implementation: when a disclosed copy must survive catalog archive or authorized character return, materialize/retain an authorized character-scoped safe asset. Do not depend on renewed access to the old campaign catalog or expose its GM originals.
+- [x] Display art on item cards/detail views without obscuring quantity, description or actions. No image is required; personal entries remain data-only even when illustrated.
 
 **Red → green and acceptance:** First fail immutable-image pinning, proposal/audience and retained-copy tests. Journey with one GM and three players: publish a weapon, spell and equipment image, place copies, create personal art, narrow a template audience, preview as each player, attempt guessed direct reads, replace/archive source art, and verify placed copies and rolls remain correct. Include offline/return behavior and scoped cleanup.
 
@@ -106,5 +106,5 @@ For hosted acceptance, verify the test service's branch and latest successful de
 
 T1/T2 and M0 evidence remains recorded above. M1 module, HTTP/contracts and UI
 are implemented and accepted by the hosted player/GM journey and CI #209. See [M1 evidence](../../acceptance/character-portraits-2026-11-04.md).
-M2 is implemented under the [item image contract](../specs/2026-11-04-item-images.md), with [local validation and pending hosted acceptance](../../acceptance/item-images-2026-11-04.md); M3 remains unimplemented. Do not treat the checked implementation tasks as
+M2 is implemented under the [item image contract](../specs/2026-11-04-item-images.md), with [passing hosted acceptance and CI #210](../../acceptance/item-images-2026-11-04.md); M3 remains unimplemented. Do not treat the checked implementation tasks as
 completed acceptance of the remaining feature request.

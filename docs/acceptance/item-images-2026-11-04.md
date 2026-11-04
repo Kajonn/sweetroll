@@ -1,7 +1,7 @@
-# Item images — implementation checkpoint
+# Item images — hosted acceptance
 
-M2 is implemented locally; hosted acceptance and branch CI remain pending. This
-record does not mark the stage accepted or the full PR complete.
+M2 passed hosted acceptance on application `dafdcffab7e9d7fea6e9e0cd6ba7eee428a559bb`
+and CI #210. The full PR still requires M3.
 
 The module/HTTP cases began red with missing image routes. They now cover system
 publication, later draft replacement, clone, complete export/import with rescan,
@@ -34,3 +34,33 @@ results and screenshots will be recorded after it runs.
 
 Only the isolated branch preview is used. A new disposable database preserves
 all earlier preview databases. Production sources and migration policy are unchanged.
+
+## Hosted result
+
+PASS, 55.2 seconds, isolated `sweetroll-d2` deployment
+`1f4429d5-b85e-4c1f-b067-4faabfd6a587`, source branch
+`docs/system-themes-and-images`, commit `dafdcff`. Its branch/source and successful
+deployment were checked before running. Database `sweetroll_pr30_m2` uses the
+current schema; earlier databases are preserved. The private real ClamAV scanner
+and mounted media volume remain in use.
+
+The one-GM/three-player runner passed all listed workflows, including GUI art
+uploads for weapon/spell/equipment, displayed personal overrides, exact portable
+art, audience preview for each player and direct-byte denials, illustrated private
+suggestion approval, source replacement/archive, retained copies, 360px axe with
+zero violations, no page overflow, offline placeholder/edit/reconnect and a roll
+after return. The phone screenshot was inspected:
+
+![Player item cards at 360 px](assets/item-images-360-2026-11-04.png)
+
+Runner corrections used the actual command-response envelope and scrolled lazy
+cards into view before image assertions. Cleanup now returns attached characters
+before archiving; the exact interrupted fixture was separately cleaned up. The
+successful run archived its created character, campaign and three systems.
+
+CI #210 (`41871779956`) passed verify (including database integration, contracts,
+Docker), web, all three browser journey shards, offline and visual checks.
+Production deployment was skipped. A subsequent focused red/green portrait case
+preserves file-reader cancellation when the shared file control changes character.
+Its small follow-up awaits the next branch CI; it does not change accepted item
+workflows. Human/device/provider/table-play G9 gates remain separate.

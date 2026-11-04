@@ -26,6 +26,7 @@ test("M2 immutable item art, private catalogs, suggestions, retained copies and 
   const pages = await Promise.all(contexts.map(c => c.newPage())); const gm = pages[0]!, players = pages.slice(1), player = players[0]!;
   const systems: string[] = [], characters: Array<{ page: Page; id: string }> = []; let campaignId: string | undefined;
   const png = await sharp({ create: { width: 90, height: 60, channels: 3, background: "#725b38" } }).png().withMetadata({ exif: { IFD0: { Artist: "Private M2 fixture" } } }).toBuffer();
+  let failed = false;
   try {
     for (const [i, page] of pages.entries()) { await page.goto("/"); await json(page, "POST", "/dev/signin", { code: i === 0 ? "code-journey-gm" : `code-journey-p${i}`, redirectUri: new URL("/cb", page.url()).href }); }
     const ws = (await json(gm, "POST", "/api/systems", { source: { kind: "clone", versionId: "a0000000-0000-5000-8000-000000000002" }, idempotencyKey: key() })).workspace;
@@ -68,12 +69,12 @@ test("M2 immutable item art, private catalogs, suggestions, retained copies and 
     const entryIds = new Map<string, string>();
     for (const templateId of ["sword", "spark", "rope"]) {
       const entryId = key(); entryIds.set(templateId, entryId);
-      hero = (await json(player, "POST", `/api/characters/${hero.characterId}/entries`, { expectedRevision: hero.revision, idempotencyKey: key(), entry: { entryId, slotId: "inventory", templateId, values: {} } })).character;
+      hero = (await json(player, "POST", `/api/characters/${hero.characterId}/entries`, { expectedRevision: hero.revision, idempotencyKey: key(), entry: { entryId, slotId: "inventory", templateId, values: {} } })).result.character;
     }
     const currentCampaign = (await json(gm, "GET", `/api/campaigns/${campaignId}`)).campaign;
     await json(player, "POST", `/api/campaigns/${campaignId}/characters/${hero.characterId}/adopt`, { expectedCampaignRevision: currentCampaign.revision, expectedCharacterRevision: hero.revision, acknowledgedDisclosure: true, idempotencyKey: key() });
     await player.setViewportSize({ width: 360, height: 1000 }); await player.goto(`/characters/${hero.characterId}`);
-    for (const id of entryIds.keys()) await expect(player.getByAltText(`Published ${id} illustration`, { exact: true })).toBeVisible();
+    for (const id of entryIds.keys()) { await player.getByTestId(`slot-entry-${entryIds.get(id)}`).scrollIntoViewIfNeeded(); await expect(player.getByAltText(`Published ${id} illustration`, { exact: true })).toBeVisible(); }
     const sword = player.getByTestId(`slot-entry-${entryIds.get("sword")}`);
     await sword.getByRole("button", { name: "Edit artwork", exact: true }).click();
     await upload(sword, png, "My blue sword");
@@ -88,7 +89,7 @@ test("M2 immutable item art, private catalogs, suggestions, retained copies and 
     await gm.getByRole("dialog", { name: "Item artwork", exact: true }).getByRole("button", { name: "Close", exact: true }).click();
     const illustrated = (await json(gm, "GET", tpath)).template;
     hero = (await json(player, "GET", `/api/characters/${hero.characterId}`)).character; const retainedId = key();
-    hero = (await json(player, "POST", `/api/characters/${hero.characterId}/entries`, { expectedRevision: hero.revision, idempotencyKey: key(), entry: { entryId: retainedId, slotId: "inventory", templateId: null, source: { kind: "campaign", campaignId, templateId: template.templateId, templateRevision: illustrated.revision, contentRevision: illustrated.contentRevision }, values: {} } })).character;
+    hero = (await json(player, "POST", `/api/characters/${hero.characterId}/entries`, { expectedRevision: hero.revision, idempotencyKey: key(), entry: { entryId: retainedId, slotId: "inventory", templateId: null, source: { kind: "campaign", campaignId, templateId: template.templateId, templateRevision: illustrated.revision, contentRevision: illustrated.contentRevision }, values: {} } })).result.character;
     let shared = (await json(gm, "POST", `${tpath}/sharing`, { audience: "selected_players", grants: [{ userId: identities[1].userId, generation: 1 }], expectedTemplateRevision: illustrated.revision, idempotencyKey: key() })).template;
     for (const [i, p] of players.entries()) {
       const preview = await json(gm, "POST", `/api/campaigns/${campaignId}/item-template-preview`, { targetUserId: identities[i].userId });
@@ -112,24 +113,34 @@ test("M2 immutable item art, private catalogs, suggestions, retained copies and 
     await expect(gm.getByRole("dialog").getByAltText("Lantern spell suggestion", { exact: true })).toBeVisible();
     await gm.getByRole("button", { name: "Approve and publish to all members", exact: true }).click();
     await expect(gm.getByRole("dialog")).not.toBeVisible();
-    await player.goto(`/characters/${hero.characterId}`); await expect(player.getByAltText("Brass campaign key", { exact: true })).toBeVisible();
+    await player.goto(`/characters/${hero.characterId}`); await player.getByTestId(`slot-entry-${retainedId}`).scrollIntoViewIfNeeded(); await expect(player.getByAltText("Brass campaign key", { exact: true })).toBeVisible();
     expect((await new AxeBuilder({ page: player }).analyze()).violations).toEqual([]);
     expect(await player.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     await player.screenshot({ path: info.outputPath("items-player-360.png"), fullPage: true });
     await expect(player.getByText("Available offline", { exact: true })).toBeVisible({ timeout: 60_000 });
-    await contexts[1]!.setOffline(true); await player.reload(); await expect(player.getByText("Artwork unavailable offline").first()).toBeVisible();
+    await contexts[1]!.setOffline(true); await player.reload(); await player.getByTestId(`slot-entry-${retainedId}`).scrollIntoViewIfNeeded(); await expect(player.getByText("Artwork unavailable offline").first()).toBeVisible();
     await player.getByLabel("Ability Score", { exact: true }).fill("15"); await player.getByLabel("Ability Score", { exact: true }).press("Tab"); await contexts[1]!.setOffline(false);
     await expect.poll(async () => (await json(player, "GET", `/api/characters/${hero.characterId}`)).character.state.values.ability).toBe(15);
     const beforeReturn = (await json(gm, "GET", `/api/campaigns/${campaignId}`)).campaign;
     await json(gm, "DELETE", `/api/campaigns/${campaignId}/members/${identities[0].userId}`, { expectedCampaignRevision: beforeReturn.revision, idempotencyKey: key() });
     expect(await status(gm, retainedPath)).toBe(404); expect(await status(player, retainedPath)).toBe(200);
-    await player.reload(); await expect(player.getByAltText("Brass campaign key", { exact: true })).toBeVisible();
+    await player.reload(); await player.getByTestId(`slot-entry-${retainedId}`).scrollIntoViewIfNeeded(); await expect(player.getByAltText("Brass campaign key", { exact: true })).toBeVisible();
     await player.getByRole("button", { name: "Check", exact: true }).click(); await expect(player.getByRole("region", { name: "Roll result", exact: true })).toBeVisible();
-  } finally {
+  } catch (cause) { failed = true; console.error("M2 journey failure:", cause); throw cause; } finally {
+    const cleanupErrors: unknown[] = [];
     for (const context of contexts) await context.setOffline(false);
-    for (const { page, id } of characters) { const ch = (await json(page, "GET", `/api/characters/${id}`)).character; await json(page, "PATCH", `/api/characters/${id}`, { command: "archive", expectedRevision: ch.revision, idempotencyKey: key() }); }
-    if (campaignId) { const c = (await json(gm, "GET", `/api/campaigns/${campaignId}`)).campaign; await json(gm, "POST", `/api/campaigns/${campaignId}/archive`, { expectedCampaignRevision: c.revision, idempotencyKey: key() }); }
-    for (const id of systems) await json(gm, "PATCH", `/api/systems/${id}`, { lifecycle: "archived", access: "private" });
+    for (const { page, id } of characters) try {
+      let ch = (await json(page, "GET", `/api/characters/${id}`)).character;
+      if (ch.campaignId) {
+        const who = await json(page, "GET", "/api/me"), c = (await json(gm, "GET", `/api/campaigns/${ch.campaignId}`)).campaign;
+        await json(gm, "DELETE", `/api/campaigns/${ch.campaignId}/members/${who.userId}`, { expectedCampaignRevision: c.revision, idempotencyKey: key() });
+        ch = (await json(page, "GET", `/api/characters/${id}`)).character;
+      }
+      await json(page, "PATCH", `/api/characters/${id}`, { command: "archive", expectedRevision: ch.revision, idempotencyKey: key() });
+    } catch (cause) { cleanupErrors.push(cause); }
+    if (campaignId) try { const c = (await json(gm, "GET", `/api/campaigns/${campaignId}`)).campaign; await json(gm, "POST", `/api/campaigns/${campaignId}/archive`, { expectedCampaignRevision: c.revision, idempotencyKey: key() }); } catch (cause) { cleanupErrors.push(cause); }
+    for (const id of systems) try { await json(gm, "PATCH", `/api/systems/${id}`, { lifecycle: "archived", access: "private" }); } catch (cause) { cleanupErrors.push(cause); }
     for (const context of contexts) await context.close();
+    if (cleanupErrors.length) { console.error("M2 scoped cleanup errors:", cleanupErrors); if (!failed) throw new AggregateError(cleanupErrors); }
   }
 });

@@ -102,6 +102,20 @@ describe("character portrait controls", () => {
     expect(images.open).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Portrait file")).toBeDisabled();
   });
+  it("discards a late file read after the character changes", async () => {
+    const images = api(); let reader!: FileReader;
+    const read = vi.spyOn(FileReader.prototype, "readAsDataURL").mockImplementation(function (this: FileReader) { reader = this; });
+    const result = vi.spyOn(FileReader.prototype, "result", "get").mockReturnValue("data:image/png;base64,cGl4ZWxz");
+    try {
+      const view = render(<PortraitEditor api={images} characterId="old" characterRevision={1} online canEdit />);
+      await screen.findByText("No portrait");
+      fireEvent.change(screen.getByLabelText("Portrait file"), { target: { files: [new File(["pixels"], "old.png", { type: "image/png" })] } });
+      view.rerender(<PortraitEditor api={images} characterId="new" characterRevision={1} online canEdit />);
+      await screen.findByText("No portrait");
+      act(() => reader.onload?.call(reader, new ProgressEvent("load") as ProgressEvent<FileReader>));
+      expect(screen.queryByAltText("Selected portrait")).not.toBeInTheDocument();
+    } finally { read.mockRestore(); result.mockRestore(); }
+  });
   it("ignores an old character read after the scoped editor unmounts", async () => {
     const images = api();
     let finish!: (value: typeof state) => void;

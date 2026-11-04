@@ -52,6 +52,7 @@ export function PortraitEditor({
   useEffect(() => {
     const generation = ++lifetime.current;
     setState(null);
+    setResetKey(value => value + 1);
     setSelected(null);
     setAttempt(null);
     setDescription("");

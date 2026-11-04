@@ -82,3 +82,31 @@
   --color-highlight: #55432b;
   --color-wash: #4b3a26;
 }
+
+.scope[data-system-style="classic"] {
+  --font-heading: Georgia, "Times New Roman", serif;
+  --radius-control: 3px;
+  --radius-panel: 5px;
+  --radius-dialog: 7px;
+  --shadow-control: 0 2px 0 var(--border-default);
+  --shadow-control-hover: 0 3px 0 var(--border-default);
+}
+.scope[data-system-style="classic"] :is(h1, h2, h3) {
+  font-family: var(--font-heading);
+  letter-spacing: 0.015em;
+  border-block-end: 1px solid var(--border-default);
+  padding-block-end: 0.25em;
+}
+.scope[data-system-style="classic"] [data-system-panel] { border-style: double; border-width: 3px; }
+.scope[data-system-style="classic"] [data-system-item] {
+  border: 1px solid var(--border-default);
+  border-inline-start: 3px solid var(--action-primary);
+  border-radius: var(--radius-panel);
+  padding: 12px;
+}
+.scope[data-system-style="classic"] [data-system-resource] {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  padding: 12px;
+  background: var(--surface-highlight);
+}

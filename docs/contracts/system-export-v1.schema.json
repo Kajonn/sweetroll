@@ -105,6 +105,18 @@
             "colorPreset"
           ],
           "properties": {
+            "componentStyle": {
+              "anyOf": [
+                {
+                  "const": "default",
+                  "type": "string"
+                },
+                {
+                  "const": "classic",
+                  "type": "string"
+                }
+              ]
+            },
             "colorPreset": {
               "anyOf": [
                 {

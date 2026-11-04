@@ -454,6 +454,7 @@ export const ValidationV1Schema = Type.Object(
 export type ValidationV1 = Static<typeof ValidationV1Schema>;
 
 export const SystemPresentationSchema = Type.Object({
+  componentStyle: Type.Optional(Type.Union([Type.Literal("default"), Type.Literal("classic")])),
   colorPreset: Type.Union([Type.Literal("default"), Type.Literal("blue"), Type.Literal("ochre")]),
 }, { additionalProperties: false });
 export type SystemPresentation = Static<typeof SystemPresentationSchema>;

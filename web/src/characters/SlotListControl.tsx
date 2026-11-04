@@ -465,7 +465,7 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
               const template:SlotTemplate|undefined = entry.definition ? {...entry.definition,grantedActions:entry.definition.grantedActions.map(a=>({id:a.id,label:a.label,actionKind:a.kind,inputs:a.inputs ?? []}))} : entry.templateId === null ? undefined : byId.get(entry.templateId);
               const summary = entry.templateId === null && !entry.definition ? null : scalarSummary(entry.values, entry.label);
               return (
-                <li key={entry.entryId} data-testid={`slot-entry-${entry.entryId}`} className={styles.slotEntry}>
+                <li key={entry.entryId} data-system-item data-testid={`slot-entry-${entry.entryId}`} className={styles.slotEntry}>
                   <span className={styles.slotEntryLabel}>{entry.label}</span>
                   {(entry.templateId === null || template?.kind === "item") && (entry.quantity ?? 1) > 1
                     ? <span className={styles.meta}>×{entry.quantity}</span> : null}

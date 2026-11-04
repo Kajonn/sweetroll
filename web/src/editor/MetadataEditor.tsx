@@ -45,7 +45,13 @@ export function MetadataEditor({
   }, [onChange, state]);
 
   const selectColors = (colorPreset: SystemPresentation["colorPreset"]) => {
-    const next = { ...state, metadata: { ...state.metadata, presentation: { colorPreset } } };
+    const next = { ...state, metadata: { ...state.metadata, presentation: { ...state.metadata.presentation, colorPreset } } };
+    dirtyRef.current = false;
+    dispatch({ type: "replace", document: next });
+    onChange?.(next);
+  };
+  const selectStyle = (componentStyle: "default" | "classic") => {
+    const next = { ...state, metadata: { ...state.metadata, presentation: { colorPreset: state.metadata.presentation?.colorPreset ?? "default", componentStyle } } };
     dirtyRef.current = false;
     dispatch({ type: "replace", document: next });
     onChange?.(next);
@@ -121,6 +127,13 @@ export function MetadataEditor({
           />
         </FormField>
       </div>
+      <FormField label={t("editor.metadata.systemStyle")}>
+        <select id="metadata-system-style" className={styles.input} value={meta.presentation?.componentStyle ?? "default"}
+          onChange={event => selectStyle(event.target.value as "default" | "classic")}>
+          <option value="default">{t("editor.metadata.style.default")}</option>
+          <option value="classic">{t("editor.metadata.style.classic")}</option>
+        </select>
+      </FormField>
     </form>
   );
 }

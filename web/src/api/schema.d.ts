@@ -3142,6 +3142,7 @@ export interface operations {
                             }[];
                             projection: {
                                 presentation?: {
+                                    componentStyle?: "default" | "classic";
                                     colorPreset: "default" | "blue" | "ochre";
                                 };
                                 /** @constant */
@@ -4036,6 +4037,7 @@ export interface operations {
                             }[];
                             projection: {
                                 presentation?: {
+                                    componentStyle?: "default" | "classic";
                                     colorPreset: "default" | "blue" | "ochre";
                                 };
                                 /** @constant */
@@ -4497,6 +4499,7 @@ export interface operations {
                                 }[];
                                 projection: {
                                     presentation?: {
+                                        componentStyle?: "default" | "classic";
                                         colorPreset: "default" | "blue" | "ochre";
                                     };
                                     /** @constant */
@@ -5107,6 +5110,7 @@ export interface operations {
                                 }[];
                                 projection: {
                                     presentation?: {
+                                        componentStyle?: "default" | "classic";
                                         colorPreset: "default" | "blue" | "ochre";
                                     };
                                     /** @constant */
@@ -5717,6 +5721,7 @@ export interface operations {
                                 }[];
                                 projection: {
                                     presentation?: {
+                                        componentStyle?: "default" | "classic";
                                         colorPreset: "default" | "blue" | "ochre";
                                     };
                                     /** @constant */
@@ -6854,6 +6859,7 @@ export interface operations {
                                 }[];
                                 projection: {
                                     presentation?: {
+                                        componentStyle?: "default" | "classic";
                                         colorPreset: "default" | "blue" | "ochre";
                                     };
                                     /** @constant */
@@ -7476,6 +7482,7 @@ export interface operations {
                                 }[];
                                 projection: {
                                     presentation?: {
+                                        componentStyle?: "default" | "classic";
                                         colorPreset: "default" | "blue" | "ochre";
                                     };
                                     /** @constant */
@@ -8109,6 +8116,7 @@ export interface operations {
                                 }[];
                                 projection: {
                                     presentation?: {
+                                        componentStyle?: "default" | "classic";
                                         colorPreset: "default" | "blue" | "ochre";
                                     };
                                     /** @constant */
@@ -8718,6 +8726,7 @@ export interface operations {
                                 }[];
                                 projection: {
                                     presentation?: {
+                                        componentStyle?: "default" | "classic";
                                         colorPreset: "default" | "blue" | "ochre";
                                     };
                                     /** @constant */
@@ -9331,6 +9340,7 @@ export interface operations {
                                 }[];
                                 projection: {
                                     presentation?: {
+                                        componentStyle?: "default" | "classic";
                                         colorPreset: "default" | "blue" | "ochre";
                                     };
                                     /** @constant */
@@ -10225,6 +10235,7 @@ export interface operations {
                                 }[];
                                 projection: {
                                     presentation?: {
+                                        componentStyle?: "default" | "classic";
                                         colorPreset: "default" | "blue" | "ochre";
                                     };
                                     /** @constant */
@@ -10831,6 +10842,7 @@ export interface operations {
                             }[];
                             projection: {
                                 presentation?: {
+                                    componentStyle?: "default" | "classic";
                                     colorPreset: "default" | "blue" | "ochre";
                                 };
                                 /** @constant */
@@ -14181,6 +14193,7 @@ export interface operations {
                     "application/json": {
                         campaign: {
                             presentation?: {
+                                componentStyle?: "default" | "classic";
                                 colorPreset: "default" | "blue" | "ochre";
                             };
                             /** Format: uuid */
@@ -14330,6 +14343,7 @@ export interface operations {
                     "application/json": {
                         campaign: {
                             presentation?: {
+                                componentStyle?: "default" | "classic";
                                 colorPreset: "default" | "blue" | "ochre";
                             };
                             /** Format: uuid */
@@ -14428,6 +14442,7 @@ export interface operations {
                     "application/json": {
                         campaign: {
                             presentation?: {
+                                componentStyle?: "default" | "classic";
                                 colorPreset: "default" | "blue" | "ochre";
                             };
                             /** Format: uuid */
@@ -14584,6 +14599,7 @@ export interface operations {
                     "application/json": {
                         campaign: {
                             presentation?: {
+                                componentStyle?: "default" | "classic";
                                 colorPreset: "default" | "blue" | "ochre";
                             };
                             /** Format: uuid */
@@ -14740,6 +14756,7 @@ export interface operations {
                     "application/json": {
                         campaign: {
                             presentation?: {
+                                componentStyle?: "default" | "classic";
                                 colorPreset: "default" | "blue" | "ochre";
                             };
                             /** Format: uuid */
@@ -16538,6 +16555,7 @@ export interface operations {
                             }[];
                             projection: {
                                 presentation?: {
+                                    componentStyle?: "default" | "classic";
                                     colorPreset: "default" | "blue" | "ochre";
                                 };
                                 /** @constant */
@@ -17077,6 +17095,7 @@ export interface operations {
                             }[];
                             projection: {
                                 presentation?: {
+                                    componentStyle?: "default" | "classic";
                                     colorPreset: "default" | "blue" | "ochre";
                                 };
                                 /** @constant */
@@ -17520,6 +17539,7 @@ export interface operations {
                             }[];
                             projection: {
                                 presentation?: {
+                                    componentStyle?: "default" | "classic";
                                     colorPreset: "default" | "blue" | "ochre";
                                 };
                                 /** @constant */
@@ -17965,6 +17985,7 @@ export interface operations {
                             }[];
                             projection: {
                                 presentation?: {
+                                    componentStyle?: "default" | "classic";
                                     colorPreset: "default" | "blue" | "ochre";
                                 };
                                 /** @constant */

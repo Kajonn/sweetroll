@@ -26,3 +26,18 @@ Before accepting M0, record the application commit/deployment, mounted media
 volume, actual clean/infected upload results, scoped unauthorized reads, exact
 retry, post-redeploy byte identity and the restoration result. M1–M3 cannot be
 marked complete from this foundation work. Existing human/device G9 gates remain.
+
+
+## Hosted upload verification
+
+Application `a11ccc8`, deployment `a9a90fa8-8c9e-4e49-925e-9ae07630d746`
+reached SUCCESS with the private media volume
+`0da54472-1f74-4db6-a6c8-f4ea61cbc107` mounted at `/app/data`.
+The real hosted scanner/upload test passed: clean PNG accepted, EXIF stripped,
+served checksum matches exact private bytes, outsider receives 404, exact retry
+returns the same image, and a harmless EICAR test archive appended to a PNG is
+blocked by the real ClamAV engine with 422. A bare appended EICAR string was an
+unsuitable detection fixture; the standard archive supplies a recognized child
+file. It was normalized out of stored pixels, and is not treated as AV evidence.
+CI #204 passed all jobs. Post-redeploy byte identity and final scoped cleanup
+are still pending; test resource identifiers are saved in the runner fixture.

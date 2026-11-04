@@ -38,4 +38,14 @@ describe("system presentation scope", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reset system colors" }));
     expect(emitted.at(-1)).toHaveProperty("metadata.presentation.colorPreset", "default");
   });
+  it("composes color and component style without losing draft text", () => {
+    const emitted: ReturnType<typeof blankDocument>[] = [];
+    render(<MetadataEditor document={blankDocument()} onChange={next => emitted.push(next)} />);
+    fireEvent.change(screen.getByTestId("metadata-name"), { target: { value: "Preserved" } });
+    fireEvent.change(screen.getByLabelText("System style", { exact: true }), { target: { value: "classic" } });
+    fireEvent.change(screen.getByLabelText("System colors", { exact: true }), { target: { value: "ochre" } });
+    expect(emitted.at(-1)).toHaveProperty("metadata.presentation", { colorPreset: "ochre", componentStyle: "classic" });
+    expect(emitted.at(-1)?.metadata.name).toBe("Preserved");
+  });
+
 });

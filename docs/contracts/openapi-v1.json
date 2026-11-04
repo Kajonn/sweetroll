@@ -5010,11 +5010,24 @@
                           ],
                           "properties": {
                             "presentation": {
+                              "additionalProperties": false,
                               "type": "object",
                               "required": [
                                 "colorPreset"
                               ],
                               "properties": {
+                                "componentStyle": {
+                                  "anyOf": [
+                                    {
+                                      "const": "default",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "classic",
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
                                 "colorPreset": {
                                   "anyOf": [
                                     {
@@ -9617,11 +9630,24 @@
                           ],
                           "properties": {
                             "presentation": {
+                              "additionalProperties": false,
                               "type": "object",
                               "required": [
                                 "colorPreset"
                               ],
                               "properties": {
+                                "componentStyle": {
+                                  "anyOf": [
+                                    {
+                                      "const": "default",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "classic",
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
                                 "colorPreset": {
                                   "anyOf": [
                                     {
@@ -11897,11 +11923,24 @@
                               ],
                               "properties": {
                                 "presentation": {
+                                  "additionalProperties": false,
                                   "type": "object",
                                   "required": [
                                     "colorPreset"
                                   ],
                                   "properties": {
+                                    "componentStyle": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "classic",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    },
                                     "colorPreset": {
                                       "anyOf": [
                                         {
@@ -14969,11 +15008,24 @@
                               ],
                               "properties": {
                                 "presentation": {
+                                  "additionalProperties": false,
                                   "type": "object",
                                   "required": [
                                     "colorPreset"
                                   ],
                                   "properties": {
+                                    "componentStyle": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "classic",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    },
                                     "colorPreset": {
                                       "anyOf": [
                                         {
@@ -18052,11 +18104,24 @@
                               ],
                               "properties": {
                                 "presentation": {
+                                  "additionalProperties": false,
                                   "type": "object",
                                   "required": [
                                     "colorPreset"
                                   ],
                                   "properties": {
+                                    "componentStyle": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "classic",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    },
                                     "colorPreset": {
                                       "anyOf": [
                                         {
@@ -23419,11 +23484,24 @@
                               ],
                               "properties": {
                                 "presentation": {
+                                  "additionalProperties": false,
                                   "type": "object",
                                   "required": [
                                     "colorPreset"
                                   ],
                                   "properties": {
+                                    "componentStyle": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "classic",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    },
                                     "colorPreset": {
                                       "anyOf": [
                                         {
@@ -26538,11 +26616,24 @@
                               ],
                               "properties": {
                                 "presentation": {
+                                  "additionalProperties": false,
                                   "type": "object",
                                   "required": [
                                     "colorPreset"
                                   ],
                                   "properties": {
+                                    "componentStyle": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "classic",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    },
                                     "colorPreset": {
                                       "anyOf": [
                                         {
@@ -29708,11 +29799,24 @@
                               ],
                               "properties": {
                                 "presentation": {
+                                  "additionalProperties": false,
                                   "type": "object",
                                   "required": [
                                     "colorPreset"
                                   ],
                                   "properties": {
+                                    "componentStyle": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "classic",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    },
                                     "colorPreset": {
                                       "anyOf": [
                                         {
@@ -32778,11 +32882,24 @@
                               ],
                               "properties": {
                                 "presentation": {
+                                  "additionalProperties": false,
                                   "type": "object",
                                   "required": [
                                     "colorPreset"
                                   ],
                                   "properties": {
+                                    "componentStyle": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "classic",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    },
                                     "colorPreset": {
                                       "anyOf": [
                                         {
@@ -35856,11 +35973,24 @@
                               ],
                               "properties": {
                                 "presentation": {
+                                  "additionalProperties": false,
                                   "type": "object",
                                   "required": [
                                     "colorPreset"
                                   ],
                                   "properties": {
+                                    "componentStyle": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "classic",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    },
                                     "colorPreset": {
                                       "anyOf": [
                                         {
@@ -40187,11 +40317,24 @@
                               ],
                               "properties": {
                                 "presentation": {
+                                  "additionalProperties": false,
                                   "type": "object",
                                   "required": [
                                     "colorPreset"
                                   ],
                                   "properties": {
+                                    "componentStyle": {
+                                      "anyOf": [
+                                        {
+                                          "const": "default",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "classic",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    },
                                     "colorPreset": {
                                       "anyOf": [
                                         {
@@ -43236,11 +43379,24 @@
                           ],
                           "properties": {
                             "presentation": {
+                              "additionalProperties": false,
                               "type": "object",
                               "required": [
                                 "colorPreset"
                               ],
                               "properties": {
+                                "componentStyle": {
+                                  "anyOf": [
+                                    {
+                                      "const": "default",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "classic",
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
                                 "colorPreset": {
                                   "anyOf": [
                                     {
@@ -54857,11 +55013,24 @@
                       ],
                       "properties": {
                         "presentation": {
+                          "additionalProperties": false,
                           "type": "object",
                           "required": [
                             "colorPreset"
                           ],
                           "properties": {
+                            "componentStyle": {
+                              "anyOf": [
+                                {
+                                  "const": "default",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "classic",
+                                  "type": "string"
+                                }
+                              ]
+                            },
                             "colorPreset": {
                               "anyOf": [
                                 {
@@ -55501,11 +55670,24 @@
                       ],
                       "properties": {
                         "presentation": {
+                          "additionalProperties": false,
                           "type": "object",
                           "required": [
                             "colorPreset"
                           ],
                           "properties": {
+                            "componentStyle": {
+                              "anyOf": [
+                                {
+                                  "const": "default",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "classic",
+                                  "type": "string"
+                                }
+                              ]
+                            },
                             "colorPreset": {
                               "anyOf": [
                                 {
@@ -55782,11 +55964,24 @@
                       ],
                       "properties": {
                         "presentation": {
+                          "additionalProperties": false,
                           "type": "object",
                           "required": [
                             "colorPreset"
                           ],
                           "properties": {
+                            "componentStyle": {
+                              "anyOf": [
+                                {
+                                  "const": "default",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "classic",
+                                  "type": "string"
+                                }
+                              ]
+                            },
                             "colorPreset": {
                               "anyOf": [
                                 {
@@ -56230,11 +56425,24 @@
                       ],
                       "properties": {
                         "presentation": {
+                          "additionalProperties": false,
                           "type": "object",
                           "required": [
                             "colorPreset"
                           ],
                           "properties": {
+                            "componentStyle": {
+                              "anyOf": [
+                                {
+                                  "const": "default",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "classic",
+                                  "type": "string"
+                                }
+                              ]
+                            },
                             "colorPreset": {
                               "anyOf": [
                                 {
@@ -56678,11 +56886,24 @@
                       ],
                       "properties": {
                         "presentation": {
+                          "additionalProperties": false,
                           "type": "object",
                           "required": [
                             "colorPreset"
                           ],
                           "properties": {
+                            "componentStyle": {
+                              "anyOf": [
+                                {
+                                  "const": "default",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "classic",
+                                  "type": "string"
+                                }
+                              ]
+                            },
                             "colorPreset": {
                               "anyOf": [
                                 {
@@ -62007,11 +62228,24 @@
                           ],
                           "properties": {
                             "presentation": {
+                              "additionalProperties": false,
                               "type": "object",
                               "required": [
                                 "colorPreset"
                               ],
                               "properties": {
+                                "componentStyle": {
+                                  "anyOf": [
+                                    {
+                                      "const": "default",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "classic",
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
                                 "colorPreset": {
                                   "anyOf": [
                                     {
@@ -64348,11 +64582,24 @@
                           ],
                           "properties": {
                             "presentation": {
+                              "additionalProperties": false,
                               "type": "object",
                               "required": [
                                 "colorPreset"
                               ],
                               "properties": {
+                                "componentStyle": {
+                                  "anyOf": [
+                                    {
+                                      "const": "default",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "classic",
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
                                 "colorPreset": {
                                   "anyOf": [
                                     {
@@ -66410,11 +66657,24 @@
                           ],
                           "properties": {
                             "presentation": {
+                              "additionalProperties": false,
                               "type": "object",
                               "required": [
                                 "colorPreset"
                               ],
                               "properties": {
+                                "componentStyle": {
+                                  "anyOf": [
+                                    {
+                                      "const": "default",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "classic",
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
                                 "colorPreset": {
                                   "anyOf": [
                                     {
@@ -68477,11 +68737,24 @@
                           ],
                           "properties": {
                             "presentation": {
+                              "additionalProperties": false,
                               "type": "object",
                               "required": [
                                 "colorPreset"
                               ],
                               "properties": {
+                                "componentStyle": {
+                                  "anyOf": [
+                                    {
+                                      "const": "default",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "classic",
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
                                 "colorPreset": {
                                   "anyOf": [
                                     {

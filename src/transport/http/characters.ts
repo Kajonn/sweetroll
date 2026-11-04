@@ -1,4 +1,5 @@
 import { SystemPresentationSchema } from "../../systems/implementation/package/schema/document.js";
+import { characterImageHandlers, characterImageRoutes } from "./characterImages.js";
 import {DieResultSchema, RollBreakdownSchema, PushResultSchema} from "../../systems/implementation/rules/result.js";
 import { strictInputCompiler } from "./strictValidation.js";
 import {EntrySourceSchema, EntrySnapshotSchema, type EntrySource} from "../../systems/implementation/package/schema/dynamic.js";
@@ -545,6 +546,7 @@ export type CharactersRouteDefinition = {
 };
 
 export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = [
+  ...characterImageRoutes,
   {
     method: "post",
     path: "/characters",
@@ -923,6 +925,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
 
     type Handler = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown> | unknown;
     const handlers: Record<string, Handler> = {
+      ...characterImageHandlers(characters),
       post_characters: async (request, reply) => {
         const body = request.body as {
           systemVersionId: string;
@@ -1253,6 +1256,9 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
     for (const route of charactersRouteDefinitions) {
       const response = toFastifyResponses(route.schema.response);
       const schema = response === undefined ? route.schema : { ...route.schema, response };
-      app[route.method](route.path, { schema, ...((route.path.includes("/entries") || route.path.includes("/rolls/")) ? { validatorCompiler: strictInputCompiler } : {}) }, handlers[route.operationId]!);
+      app[route.method](route.path, { schema,
+        ...(route.path.includes("/portrait") ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); } } : {}),
+        ...(route.path.endsWith("/portrait") && route.method === "put" ? { bodyLimit: 8 * 1024 * 1024 } : {}),
+        ...((route.path.includes("/entries") || route.path.includes("/rolls/") || route.path.includes("/portrait")) ? { validatorCompiler: strictInputCompiler } : {}) }, handlers[route.operationId]!);
     }
   };

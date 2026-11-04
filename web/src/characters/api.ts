@@ -1,4 +1,5 @@
 import { ApiError, type ApiClient } from "../api/client.js";
+import { createCharacterImagesApi, type CharacterImagesApi } from "./imageApi.js";
 import type {
   PushOptionsResponse,ReadRollResponse,
   ActivityResponse,
@@ -37,6 +38,7 @@ export type CharacterListQuery = {
 };
 
 export type CharactersApi = {
+  images?: CharacterImagesApi;
   pushOptions(characterId:string,rollId:string):Promise<PushOptionsResponse>;
   readRoll(characterId:string,rollId:string):Promise<ReadRollResponse>;
   open(characterId: string): Promise<OpenCharacterResponse>;
@@ -91,6 +93,7 @@ export function createCharactersApi(client: ApiClient): CharactersApi {
   };
 
   return {
+    images: createCharacterImagesApi(client),
     pushOptions:(characterId,rollId)=>client.fetch<PushOptionsResponse>("GET",`/characters/${characterId}/rolls/${rollId}/push-options`),
     readRoll:(characterId,rollId)=>client.fetch<ReadRollResponse>("GET",`/characters/${characterId}/rolls/${rollId}`),
     open: (characterId) => client.fetch<OpenCharacterResponse>("GET", `/characters/${characterId}`),

@@ -1,3 +1,4 @@
+import { createCharacterImages, type CharacterImages } from "./images.js";
 import {canPlaceTemplate} from "../campaigns/templatePolicy.js";
 import {materializeDefaults,templateApplicable,validDefaults} from "../systems/implementation/runtime/effective-entry.js";
 import {readPushRoll,mayReadPush,narrowerAudience,type StoredPushRoll} from "./push.js";
@@ -458,7 +459,7 @@ export type CharacterExportV1 = {
 // Interface
 // ---------------------------------------------------------------------------
 
-export interface Characters {
+export interface Characters extends CharacterImages {
   readRoll(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<NormalizedRoll>>;
   pushOptions(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<PushOptions>>;
   create(ctx: RequestContext, input: CreateCharacter): Promise<CharacterResult<CharacterView>>;
@@ -496,6 +497,7 @@ export interface Characters {
 }
 
 export type CreateCharactersModuleInput = {
+  scanImage?: import("../platform/image-processing.js").ImageScanner;
   pool: Pool;
   runtime: SystemRuntime;
   authorizeVersionUse: SystemAuthoring["authorizeVersionUse"];
@@ -1241,6 +1243,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
   }
 
   return {
+    ...createCharacterImages({ pool: input.pool, now, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
     async create(ctx, createInput) {
       try {
         const inputHash = hashInput({

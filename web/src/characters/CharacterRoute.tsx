@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n/index.js";
 import type { CharactersApi } from "./api.js";
 import { CharacterSheet } from "./CharacterSheet.js";
+import { PortraitEditor } from "./PortraitEditor.js";
+import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import { CharacterTools } from "./CharacterTools.js";
 import { ConflictReview } from "./ConflictReview.js";
 import type { SlotTemplate } from "./SlotListControl.js";
@@ -308,6 +310,10 @@ function CharacterDetailLoaded({
         </section>
       ) : null}
       {snapshot.error !== null && !reviewOpen ? <p role="alert">{snapshot.error.message}</p> : null}
+      {api.images ? <SystemPresentationScope presentation={snapshot.confirmed.projection.presentation}>
+        <PortraitEditor key={`${actorId}:${identity.getGeneration()}:${characterId}`} api={api.images} characterId={characterId} characterRevision={snapshot.confirmed.revision}
+          online={online} canEdit={snapshot.editing.owned && snapshot.confirmed.lifecycle === "active" && snapshot.entries.length === 0 && !snapshot.error} onRefresh={session.refresh} />
+      </SystemPresentationScope> : null}
       <CharacterSheet
         snapshot={snapshot}
         pushApi={api}

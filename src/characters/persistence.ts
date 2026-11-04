@@ -776,6 +776,13 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           ],
         );
         const characterRow = requireRow(inserted.rows[0], "duplicateCharacterTx");
+        // Source lock serializes portrait replacement with duplication. The new
+        // character link owns access independently; immutable bytes are retained.
+        await client.query(
+          `INSERT INTO character_portraits(character_id, asset_id, description, revision)
+           SELECT $1, asset_id, description, 1 FROM character_portraits WHERE character_id=$2 AND asset_id IS NOT NULL`,
+          [characterRow.id, sourceRow.id],
+        );
         await client.query(
           `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, request_id)
            VALUES ($1, $2, $3, $4::jsonb, $5)`,

@@ -80,7 +80,10 @@ describeWithDatabase("current database schema", () => {
       "character_claim_designations",
       "character_command_executions",
       "character_controllers",
+      "character_image_assets",
+      "character_image_receipts",
       "character_placements",
+      "character_portraits",
       "character_rolls",
       "characters",
     ]);

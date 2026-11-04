@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { resolveMediaRoot } from "../platform/image-storage.js";
+export { resolveMediaRoot } from "../platform/image-storage.js";
 
 import type { Pool, PoolClient } from "pg";
 import { processImage, decodeImageBase64, ImageProcessingError, type ImageScanner } from "../platform/image-processing.js";
@@ -83,18 +84,6 @@ export interface MediaCommands {
   uploadImage(ctx: RequestContext, input: UploadImageInput): Promise<CampaignResult<MediaFileView>>;
   deleteImage(ctx: RequestContext, input: DeleteImageInput): Promise<CampaignResult<MediaFileView>>;
   openImage(ctx: RequestContext, input: OpenImageInput): Promise<CampaignResult<OpenImageSuccess>>;
-}
-
-/**
- * Disk root for validated originals. Tests override it per-suite through
- * `SWEETROLL_MEDIA_DIR`; production resolves to `<repo>/data/media`.
- * Resolved per call so the environment override applies without reboot.
- */
-export function resolveMediaRoot(): string {
-  const override = process.env.SWEETROLL_MEDIA_DIR;
-  if (override !== undefined && override.length > 0) return resolve(override);
-  const moduleDir = dirname(fileURLToPath(import.meta.url));
-  return resolve(moduleDir, "..", "..", "data", "media");
 }
 
 export function createMediaCommands(input: CreateMediaCommandsInput): MediaCommands {

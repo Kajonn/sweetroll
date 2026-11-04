@@ -1,7 +1,7 @@
 # System themes and image uploads — staged feature plan
 
 **Date:** 2026-11-03
-**Status (2026-11-04):** T1 and T2 implemented with passing hosted journeys and CI #205. M0 durable storage/scanning foundation passed hosted upload and post-redeploy verification plus a local metadata/bytes restoration drill. See [themes](../../acceptance/system-themes-2026-11-04.md) and [media](../../acceptance/image-foundation-2026-11-04.md). M1 is in progress; M2–M3 remain planned. The full requested implementation is incomplete.
+**Status (2026-11-04):** T1 and T2 implemented with passing hosted journeys and CI #205. M0 durable storage/scanning foundation passed hosted upload and post-redeploy verification plus a local metadata/bytes restoration drill. See [themes](../../acceptance/system-themes-2026-11-04.md) and [media](../../acceptance/image-foundation-2026-11-04.md). M1 implementation is awaiting hosted acceptance; M2–M3 remain planned. The full requested implementation is incomplete.
 **Baseline:** `main` `01c9fba` (merged PR #29).
 **Scope authority:** Owner request for system color themes, then themed GUI elements; image uploads for characters, items, then adventure backgrounds.
 **Design:** [Sections 10.5, 17.9c and 18.2](../../../design_v2.md). Reuse the [GUI foundation and G9 gates](2026-09-08-gui-integration.md) and [I7b scene/display contract](../specs/2026-09-14-i7b-scenes-display-design.md).
@@ -66,11 +66,11 @@ not claim character or item attachment APIs exist yet.
 
 ## M1 — Characters
 
-- [ ] Add one optional portrait per character, usable by standalone and campaign characters, including NPCs/monsters. Use a character attachment independent of a particular rules field so a portrait does not require editing the published system; explicitly define its relationship to the existing reserved image field before coding.
-- [ ] Character controllers may upload/replace/remove; GM/co-GM access follows existing character read/edit authority, not system authorship. Uploads grant no new sheet visibility. Retain existing controller/GM disclosure rules.
-- [ ] Render portrait thumbnails in the character library/authorized roster and character header, with an accessible larger view and a stable placeholder. Keep list payloads bounded and avoid eagerly downloading full images.
-- [ ] Handle ownership transfer, campaign adoption/return, archive/recovery and deletion consistently with character attachment ownership. Preserve authorized personal images on return without leaving a route into the old campaign.
-- [ ] Allow offline sheet play with an already authorized cached thumbnail or placeholder; image changes require connectivity and must not block unrelated queued resource/action changes.
+- [x] Add one optional portrait per character, usable by standalone and campaign characters, including NPCs/monsters. Use a character attachment independent of a particular rules field so a portrait does not require editing the published system; explicitly define its relationship to the existing reserved image field before coding.
+- [x] Character controllers may upload/replace/remove; GM/co-GM access follows existing character read/edit authority, not system authorship. Uploads grant no new sheet visibility. Retain existing controller/GM disclosure rules.
+- [x] Render portrait thumbnails in the character library/authorized roster and character header, with an accessible larger view and a stable placeholder. Keep list payloads bounded and avoid eagerly downloading full images.
+- [x] Handle ownership transfer, campaign adoption/return, archive/recovery and deletion consistently with character attachment ownership. Preserve authorized personal images on return without leaving a route into the old campaign.
+- [x] Allow offline sheet play with an already authorized cached thumbnail or placeholder; image changes require connectivity and must not block unrelated queued resource/action changes.
 
 **Red → green and acceptance:** Add failing portrait policy/persistence/concurrency tests, then implement module → HTTP/types → UI. Journey: player uploads, reloads, replaces and removes; GM sees only permitted characters; another player and unrelated creator fail direct fetches; transfer/return and account-switch/revocation cleanup behave correctly. Repeat offline sheet edit/roll/reconnect with no image network access.
 
@@ -102,23 +102,10 @@ Before each stage, read the current code, resolve its attachment/package contrac
 
 For hosted acceptance, verify the test service's branch and latest successful deployment first. Use the acceptance service for main or a separate preview for a branch; never change the production source for a test. Record tested commit, deployed artifact, relevant journeys, screenshots, remaining manual checks and scoped cleanup in `docs/acceptance/`. Mark a stage complete only with its own evidence. This planning PR leaves every new stage unchecked and existing release gates unchanged.
 
-## Continuation checkpoint (2026-11-04)
+## Implementation checkpoint (2026-11-04)
 
-The execution environment became unavailable during M1. The pushed branch through
-`0d51195` contains T1, T2 and M0, with CI #205 passing. The portrait work is still
-uncommitted in the existing checkout and must be recovered before rebuilding it.
-
-The working tree contains a character-portrait specification, current-schema
-portrait asset/link/receipt tables, `src/characters/images.ts`, a shared private
-storage-root helper, module composition and test-harness wiring, plus
-`tests/integration/character-portraits.test.ts`. Its three initial real-database
-tests were red for missing operations and then green for upload/replay/revision,
-private access and ownership-transfer behavior. Root type checking still reports
-the HTTP test fake missing the four new portrait methods.
-
-Resume by fixing that fake, then add failing duplication and HTTP cases before
-implementation. Character duplication must retain a safe immutable portrait link.
-Add the bounded private API and online-only controls, generated contracts,
-authorization/lifecycle/concurrency tests and hosted player/GM acceptance. Portrait
-revisions remain independent of rules revisions and offline sheet commands.
-M1 has not passed complete validation or been deployed. M2 and M3 have not begun.
+T1/T2 and M0 evidence remains recorded above. M1 module, HTTP/contracts and UI
+are implemented; full feature acceptance awaits CI and the hosted player/GM
+journey. See [M1 evidence](../../acceptance/character-portraits-2026-11-04.md).
+M2 and M3 remain unimplemented. Do not treat the checked implementation tasks as
+completed acceptance of the remaining feature request.

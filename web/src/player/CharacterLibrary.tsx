@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import type { CharactersApi } from "../characters/api.js";
+import { PortraitThumbnail } from "../characters/PortraitEditor.js";
 import type { CharacterSummary } from "../characters/types.js";
 import { t } from "../i18n/index.js";
 import { Button, EmptyState, FormField, PageHeader, Panel, Select } from "../ui/index.js";
@@ -222,6 +223,7 @@ export function CharacterLibrary({ api, identity, navigation }: CharacterLibrary
                       aria-label={t("player.library.open", { name: character.name })}
                     >
                       <span className={styles.rowName}>{character.name}</span>
+                      {api.images ? <PortraitThumbnail characterId={character.characterId} name={character.name} online={online} /> : null}
                       <span className={styles.rowMeta}>
                         {t(
                           character.lifecycle === "archived"

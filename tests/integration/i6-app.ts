@@ -136,6 +136,7 @@ export async function buildI6Harness(input?: {
   let placement!: CampaignPlacement;
   let campaigns!: Campaigns;
   const handle = await buildI3App({
+    ...(input?.scanImage ? { scanImage: input.scanImage } : {}),
     pool,
     wrapRuntime: input?.wrapRuntime,
     extraRoutes: ({ authoring, characters, runtime, identity }) => {

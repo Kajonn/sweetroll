@@ -224,6 +224,38 @@ CREATE TABLE characters (
 CREATE INDEX characters_owner_page_idx
   ON characters (owner_id, lifecycle, updated_at DESC, id DESC);
 
+-- Character-owned immutable safe art; authorization always follows a parent link.
+CREATE TABLE character_image_assets (
+  id uuid PRIMARY KEY,
+  created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  campaign_id uuid REFERENCES campaigns(id) ON DELETE SET NULL,
+  storage_key uuid NOT NULL,
+  media_type text NOT NULL CHECK (media_type IN ('image/png','image/jpeg','image/webp')),
+  width integer NOT NULL CHECK (width BETWEEN 1 AND 4096),
+  height integer NOT NULL CHECK (height BETWEEN 1 AND 4096),
+  size_bytes integer NOT NULL CHECK (size_bytes BETWEEN 1 AND 5242880),
+  thumbnail_bytes integer NOT NULL CHECK (thumbnail_bytes BETWEEN 1 AND 65536),
+  checksum text NOT NULL,
+  thumbnail_checksum text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX character_image_assets_owner_idx ON character_image_assets(created_by);
+CREATE INDEX character_image_assets_campaign_idx ON character_image_assets(campaign_id);
+CREATE TABLE character_portraits (
+  character_id uuid PRIMARY KEY REFERENCES characters(id) ON DELETE CASCADE,
+  asset_id uuid REFERENCES character_image_assets(id) ON DELETE RESTRICT,
+  description text NOT NULL DEFAULT '' CHECK (length(description) <= 500),
+  revision integer NOT NULL CHECK (revision >= 1)
+);
+CREATE TABLE character_image_receipts (
+  actor_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  idempotency_key text NOT NULL,
+  input_hash text NOT NULL,
+  result_json jsonb NOT NULL,
+  expires_at timestamptz NOT NULL,
+  PRIMARY KEY(actor_id,idempotency_key)
+);
+
 CREATE TABLE character_command_executions (
   id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   actor_id              uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,

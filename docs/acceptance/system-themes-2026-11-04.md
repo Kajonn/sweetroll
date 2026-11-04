@@ -56,6 +56,11 @@ production-worker offline suite. It caught two issues:
    Both CI-produced images (360/1280 px) were inspected before replacing their
    baselines. All other visual baselines passed unchanged.
 
-The follow-up commit and its CI result must be recorded before calling T1 done.
+Follow-up `047b0a7` passed CI #203 after the unchanged load check was retried:
+its initial p95 creation result was 302.3 ms against the 300 ms budget. No budget
+was relaxed. The transaction regression and both reviewed visual baselines pass.
+The hosted build `build-mw1ul18f` was separately compared byte-for-byte against
+its rebuilt HTML, CSS, JavaScript, worker and manifests; the artifact check passed.
+T1 automated feature acceptance is complete.
 T2 and M0–M3 remain separate unimplemented stages. Human visual approval, physical
 devices and the remaining G9 release gates are not closed by this automation.

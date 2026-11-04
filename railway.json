@@ -8,7 +8,7 @@
     "preDeployCommand": [
       "npm run start:db:init"
     ],
-    "startCommand": "node dist/bootstrap/http.js",
+    "startCommand": "sweetroll-entrypoint node dist/bootstrap/http.js",
     "healthcheckPath": "/health/ready",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",

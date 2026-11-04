@@ -4,7 +4,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { Pool, PoolClient } from "pg";
-import sharp from "sharp";
+import { processImage, decodeImageBase64, ImageProcessingError, type ImageScanner } from "../platform/image-processing.js";
+import { createClamScanner } from "../platform/image-scanner.js";
 
 import type { RequestContext } from "../systems/authoring.js";
 import { hashInput } from "../systems/implementation/authoring/assess.js";
@@ -48,11 +49,7 @@ export type MediaFileView = {
   revision: number;
 };
 
-/** Decoded image bytes above this size are rejected with `too_large`. */
-export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-
-/** Either dimension above this size is rejected with `unprocessable`. */
-export const MAX_IMAGE_DIMENSION = 4096;
+export { MAX_IMAGE_BYTES, MAX_IMAGE_DIMENSION } from "../platform/image-processing.js";
 
 const CONTENT_TYPES: UploadImageInput["contentType"][] = ["image/png", "image/jpeg", "image/webp"];
 
@@ -75,6 +72,7 @@ class ReceiptRace extends Error {
 }
 
 export type CreateMediaCommandsInput = {
+  scanImage?: ImageScanner;
   pool: Pool;
   repo: CampaignPersistenceRepository;
   now?: (() => Date) | undefined;
@@ -99,37 +97,9 @@ export function resolveMediaRoot(): string {
   return resolve(moduleDir, "..", "..", "data", "media");
 }
 
-const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-const JPEG_MAGIC = Buffer.from([0xff, 0xd8, 0xff]);
-
-function hasMagicBytes(bytes: Buffer, contentType: UploadImageInput["contentType"]): boolean {
-  switch (contentType) {
-    case "image/png":
-      return bytes.length >= PNG_MAGIC.length && bytes.subarray(0, PNG_MAGIC.length).equals(PNG_MAGIC);
-    case "image/jpeg":
-      return bytes.length >= JPEG_MAGIC.length && bytes.subarray(0, JPEG_MAGIC.length).equals(JPEG_MAGIC);
-    case "image/webp":
-      return (
-        bytes.length >= 12 &&
-        bytes.subarray(0, 4).toString("ascii") === "RIFF" &&
-        bytes.subarray(8, 12).toString("ascii") === "WEBP"
-      );
-  }
-}
-
-function sharpFormatFor(contentType: UploadImageInput["contentType"]): string {
-  switch (contentType) {
-    case "image/png":
-      return "png";
-    case "image/jpeg":
-      return "jpeg";
-    case "image/webp":
-      return "webp";
-  }
-}
-
 export function createMediaCommands(input: CreateMediaCommandsInput): MediaCommands {
   const repo = input.repo;
+  const scanImage = input.scanImage ?? createClamScanner();
   const now = input.now ?? (() => new Date());
   const newId = input.newId ?? (() => randomUUID());
 
@@ -173,52 +143,6 @@ export function createMediaCommands(input: CreateMediaCommandsInput): MediaComma
       return errors.bad_request("expectedRevision must be a positive integer.");
     }
     return null;
-  }
-
-  /**
-   * Strict base64 decode. Regexes are deliberately avoided here: V8 overflows
-   * its stack scanning multi-megabyte strings, and oversized payloads must
-   * fail as `too_large` without allocating the decoded buffer. The decoded
-   * length is computed from the encoding first; only in-cap payloads decode.
-   */
-  function decodeBytes(dataBase64: unknown): { bytes: Buffer } | { error: CampaignError } {
-    if (typeof dataBase64 !== "string" || dataBase64.length === 0) {
-      return { error: errors.bad_request("dataBase64 must be a non-empty base64 string.") };
-    }
-    // Whitespace-tolerant inputs are stripped in slices; a single
-    // `/\s+/g` replacement overflows the V8 stack past ~1 MiB.
-    const pieces: string[] = [];
-    for (let index = 0; index < dataBase64.length; index += 65536) {
-      pieces.push(dataBase64.slice(index, index + 65536).replace(/\s+/g, ""));
-    }
-    const normalized = pieces.join("");
-    const length = normalized.length;
-    if (length % 4 !== 0) {
-      return { error: errors.bad_request("dataBase64 must be valid base64.") };
-    }
-    for (let index = 0; index < length; index++) {
-      const code = normalized.charCodeAt(index);
-      const alphabet =
-        (code >= 48 && code <= 57) ||
-        (code >= 65 && code <= 90) ||
-        (code >= 97 && code <= 122) ||
-        code === 43 ||
-        code === 47;
-      // Padding only as the final one or two characters.
-      const padding = code === 61 && index >= length - 2;
-      if (!alphabet && !padding) {
-        return { error: errors.bad_request("dataBase64 must be valid base64.") };
-      }
-    }
-    let padding = 0;
-    if (normalized.endsWith("==")) padding = 2;
-    else if (normalized.endsWith("=")) padding = 1;
-    if ((length / 4) * 3 - padding > MAX_IMAGE_BYTES) {
-      return {
-        error: errors.too_large(`Image bytes exceed the ${MAX_IMAGE_BYTES} byte limit.`),
-      };
-    }
-    return { bytes: Buffer.from(normalized, "base64") };
   }
 
   async function withClient<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -411,36 +335,7 @@ export function createMediaCommands(input: CreateMediaCommandsInput): MediaComma
         if (!CONTENT_TYPES.some((candidate) => candidate === uploadInput.contentType)) {
           return { ok: false, error: errors.bad_request("contentType must be image/png, image/jpeg or image/webp.") };
         }
-        const decoded = decodeBytes(uploadInput.dataBase64);
-        if ("error" in decoded) return { ok: false, error: decoded.error };
-        const bytes = decoded.bytes;
-        if (!hasMagicBytes(bytes, uploadInput.contentType)) {
-          return {
-            ok: false,
-            error: errors.unprocessable("Image bytes do not match the declared content type."),
-          };
-        }
-        let metadata: { format?: string; width?: number; height?: number };
-        try {
-          metadata = await sharp(bytes).metadata();
-        } catch {
-          return { ok: false, error: errors.unprocessable("Image bytes could not be decoded.") };
-        }
-        if (
-          metadata.format !== sharpFormatFor(uploadInput.contentType) ||
-          metadata.width === undefined ||
-          metadata.height === undefined ||
-          metadata.width < 1 ||
-          metadata.height < 1 ||
-          metadata.width > MAX_IMAGE_DIMENSION ||
-          metadata.height > MAX_IMAGE_DIMENSION
-        ) {
-          return {
-            ok: false,
-            error: errors.unprocessable("Image dimensions are invalid or exceed the 4096 px limit."),
-          };
-        }
-
+        const bytes = decodeImageBase64(uploadInput.dataBase64);
         const checksum = createHash("sha256").update(bytes).digest("hex");
         const inputHash = hashInput({
           campaignId: uploadInput.campaignId,
@@ -459,13 +354,21 @@ export function createMediaCommands(input: CreateMediaCommandsInput): MediaComma
           return await resolveUploadReplay(ctx, { inputHash, receipt: preExisting });
         }
 
+        const allowed = await withClient(async client => {
+          const campaign = await repo.openCampaign(client, uploadInput.campaignId);
+          const membership = campaign === null ? null : await repo.loadMembership(client, campaign.campaignId, ctx.actorId);
+          return campaign !== null && canManageCampaign(campaign, membership);
+        });
+        if (!allowed) return { ok: false, error: errors.not_found() };
+        const processed = await processImage(uploadInput, scanImage);
+
         // Bytes hit the disk before the metadata row: a crash leaves at most
         // an unreferenced file, never a row pointing at missing bytes. The
         // key is fresh per attempt, so any failure below unlinks only ours.
         const fileId = newId();
         const storageKey = newId();
         await mkdir(resolveMediaRoot(), { recursive: true });
-        await writeFile(join(resolveMediaRoot(), storageKey), bytes, { mode: 0o600 });
+        await writeFile(join(resolveMediaRoot(), storageKey), processed.bytes, { mode: 0o600, flag: "wx" });
         writtenStorageKey = storageKey;
 
         const outcome = await withTransaction(async (client) => {
@@ -483,16 +386,20 @@ export function createMediaCommands(input: CreateMediaCommandsInput): MediaComma
           if (campaign === null || !canManageCampaign(campaign, membership)) {
             return { committed: false as const, failure: errors.not_found() as CampaignError };
           }
+          const usage = await repo.mediaUsage(client, campaign.campaignId);
+          if (usage.count >= 256 || usage.bytes + processed.bytes.length > 100 * 1024 * 1024) {
+            return { committed: false as const, failure: errors.too_large("Campaign images have reached the 100 MiB or 256 image quota.") };
+          }
           const record = await repo.insertMediaFile(client, {
             fileId,
             campaignId: campaign.campaignId,
             ownerId: ctx.actorId,
             name: uploadInput.name,
             mediaType: uploadInput.contentType,
-            sizeBytes: bytes.length,
-            width: metadata.width ?? 0,
-            height: metadata.height ?? 0,
-            checksum,
+            sizeBytes: processed.bytes.length,
+            width: processed.width,
+            height: processed.height,
+            checksum: processed.checksum,
             storageKey,
           });
           const value = toView(record);
@@ -535,10 +442,11 @@ export function createMediaCommands(input: CreateMediaCommandsInput): MediaComma
         await removeBytes(storageKey);
         writtenStorageKey = null;
         return await resolveUploadReplay(ctx, { inputHash, receipt: outcome.receipt ?? null });
-      } catch {
+      } catch (error) {
         if (writtenStorageKey !== null) {
           await removeBytes(writtenStorageKey);
         }
+        if (error instanceof ImageProcessingError) return { ok: false, error: { code: error.code, message: error.message } };
         return { ok: false, error: errors.internal() };
       }
     },
@@ -594,6 +502,9 @@ export function createMediaCommands(input: CreateMediaCommandsInput): MediaComma
                 locked.revision,
               ),
             };
+          }
+          if (await repo.mediaIsReferenced(client, locked.fileId)) {
+            return { committed: false as const, failure: errors.conflict("This image is used by a scene. Replace its background before removing the image.", locked.revision) };
           }
           const deleted = await repo.deleteMediaFile(client, {
             fileId: locked.fileId,

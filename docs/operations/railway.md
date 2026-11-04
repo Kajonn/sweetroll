@@ -116,3 +116,27 @@ when that flag is absent.
 - [Pre-deploy commands](https://docs.railway.com/deployments/pre-deploy-command)
 - [Volumes and ownership](https://docs.railway.com/volumes)
 - [Public networking](https://docs.railway.com/networking/public-networking)
+
+
+## Image storage and scanning (M0)
+
+Image uploads require `SWEETROLL_CLAMD_HOST` (private ClamD network address),
+optional `SWEETROLL_CLAMD_PORT` (3310 by default), and a real persistent volume
+mounted at `/app/data`. Never expose the scanner's unauthenticated TCP endpoint
+publicly. An unavailable scanner returns 503 and writes no accepted image.
+The official `clamav/clamav:1.4` service uses a signature volume at
+`/var/lib/clamav`; verify signature refresh and scanner readiness in its logs.
+
+Railway mounts volumes as root. Set `RAILWAY_RUN_UID=0` for volume initialization
+and keep the repository start command `sweetroll-entrypoint node dist/bootstrap/http.js` (one line). The entrypoint initializes the two private
+storage directories, then drops to the existing `node` user with `su-exec`.
+Do not replace this with a permanently root application process. Docker without
+an attached Railway volume still starts as the image's unprivileged node user.
+
+Uploads use PNG/JPEG/WebP, 5 MiB, one frame and 4096 px limits. They are scanned
+before full decode and re-encoded without metadata. Campaign quotas are 100 MiB
+and 256 retained images, serialized under the campaign lock. Referenced scene
+background/token art cannot be removed. Include metadata, stored checksums and
+private media bytes in the same recovery point; derivative caches may be rebuilt.
+Verify a real authorized upload after every storage configuration change and
+again after redeploy. Health alone does not prove storage persistence.

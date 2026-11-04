@@ -112,6 +112,7 @@ function cookieFromSignIn(response: {
 }
 
 export async function buildI6Harness(input?: {
+  scanImage?: import("../../src/platform/image-processing.js").ImageScanner;
   /** Wraps the runtime (e.g. to stall resolution for race tests). */
   wrapRuntime?: (runtime: SystemRuntime) => SystemRuntime;
   document?:SystemDocumentV1;
@@ -145,6 +146,7 @@ export async function buildI6Harness(input?: {
         maxAttachedCharacters: limits.maxAttachedCharacters,
       });
       campaigns = createCampaignsModule({
+        scanImage: input?.scanImage ?? (async () => "clean" as const),
         pool,
         limits,
         charactersPlacement: placement,

@@ -19992,6 +19992,21 @@ export interface operations {
                     };
                 };
             };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -20008,6 +20023,21 @@ export interface operations {
                 };
             };
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

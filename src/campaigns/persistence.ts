@@ -1609,6 +1609,15 @@ export function createCampaignPersistenceRepository(pool: Pool) {
      * on disk under `storageKey` (written before this insert); the row is
      * the durability record Tasks 2-4 reference.
      */
+    async mediaUsage(client: PoolClient, campaignId: string): Promise<{ count: number; bytes: number }> {
+      const result = await client.query<{ count: string; bytes: string }>("SELECT count(*)::text count, COALESCE(sum(size_bytes),0)::text bytes FROM media_files WHERE campaign_id=$1", [campaignId]);
+      return { count: Number(result.rows[0]!.count), bytes: Number(result.rows[0]!.bytes) };
+    },
+    async mediaIsReferenced(client: PoolClient, fileId: string): Promise<boolean> {
+      const result = await client.query("SELECT 1 FROM scenes WHERE background_file_id=$1 OR tokens_jsonb @> $2::jsonb LIMIT 1", [fileId, JSON.stringify([{ imageFileId: fileId }])]);
+      return result.rowCount !== 0;
+    },
+
     async insertMediaFile(
       client: PoolClient,
       input: {

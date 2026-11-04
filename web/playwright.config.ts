@@ -13,6 +13,11 @@ const backendPort = process.env.BACKEND_PORT ?? "3000";
 const webPort = process.env.WEB_PORT ?? "5173";
 const backendTarget = process.env.SWEETROLL_BACKEND_TARGET ?? `http://localhost:${backendPort}`;
 
+const scannerPort = String(Number(backendPort) + 10);
+const scannerHealthPort = String(Number(backendPort) + 11);
+const scannerHost = process.env.SWEETROLL_CLAMD_HOST ?? "127.0.0.1";
+const scannerBackendPort = process.env.SWEETROLL_CLAMD_PORT ?? scannerPort;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
@@ -36,13 +41,20 @@ export default defineConfig({
   snapshotPathTemplate: "{testDir}/../visual/__screenshots__/{testFilePath}/{arg}{ext}",
   use: { baseURL: `http://localhost:${webPort}`, trace: "retain-on-failure" },
   webServer: [
+    ...(process.env.SWEETROLL_CLAMD_HOST ? [] : [{
+      command: "node scripts/image-scan-fixture.mjs",
+      url: `http://127.0.0.1:${scannerHealthPort}`,
+      reuseExistingServer: !process.env.CI,
+      cwd: resolve(repoRoot, "web"),
+      env: { IMAGE_SCAN_FIXTURE_PORT: scannerPort, IMAGE_SCAN_FIXTURE_HEALTH_PORT: scannerHealthPort },
+    }]),
     {
       command: "npm run db:init && npm run dev:http",
       url: `http://localhost:${backendPort}/health/ready`,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
       cwd: repoRoot,
-      env: { PORT: backendPort },
+      env: { PORT: backendPort, SWEETROLL_CLAMD_HOST: scannerHost, SWEETROLL_CLAMD_PORT: scannerBackendPort },
     },
     {
       command: "npm run web:dev",

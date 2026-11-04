@@ -131,6 +131,7 @@ export type CampaignErrorCode =
   // `too_large` (HTTP 413); magic-byte/sharp/dimension rejections are
   // `unprocessable` (HTTP 422). Mapped in STATUS_BY_CODE alongside this
   // change; no system-package contract is affected.
+  | "temporarily_unavailable"
   | "too_large"
   | "unprocessable"
   | "internal";
@@ -526,6 +527,7 @@ export type {
 };
 
 export type CreateCampaignsModuleInput = {
+  scanImage?: import("../platform/image-processing.js").ImageScanner;
   loadTemplatePackage?: import("../systems/templates.js").PublishedPackageLoader;
   pool: Pool;
   limits: CampaignLimits;
@@ -885,7 +887,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
   // I7b Task 1: validated private image storage. Same shared dependencies;
   // the commands own magic-byte/sharp validation, disk writes and the
   // metadata rows Tasks 2-4 reference.
-  const media = createMediaCommands({ pool: input.pool, repo, now, newId });
+  const media = createMediaCommands({ pool: input.pool, repo, now, newId, ...(input.scanImage ? { scanImage: input.scanImage } : {}) });
 
   // I7b Task 2: revision-guarded scene/fog/token commands. Same shared
   // dependencies; the commands own guard checks, same-campaign pin checks

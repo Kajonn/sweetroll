@@ -54,6 +54,7 @@ const STATUS_BY_CODE: Record<CampaignError["code"], number> = {
   unprocessable: 422,
   rate_limited: 429,
   internal: 500,
+  temporarily_unavailable: 503,
 };
 
 const badRequest = (message: string): CampaignError => ({ code: "bad_request", message });
@@ -1214,6 +1215,8 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
       response: {
         "200": Type.Object({ image: MediaFileViewDto, requestId: Type.String() }),
         ...ErrorResponses,
+        "422": CampaignErrorEnvelope,
+        "503": CampaignErrorEnvelope,
       },
     },
   },

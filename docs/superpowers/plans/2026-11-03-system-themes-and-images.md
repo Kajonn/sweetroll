@@ -1,7 +1,7 @@
 # System themes and image uploads — staged feature plan
 
 **Date:** 2026-11-03
-**Status:** T1 implementation in progress (2026-11-04); hosted acceptance pending. T2 and M0–M3 remain planned.
+**Status (2026-11-04):** T1 implemented and accepted by CI #203 and the [hosted journey](../../acceptance/system-themes-2026-11-04.md). M0 implementation and hosted storage verification are in progress; T2 and M1–M3 remain planned.
 **Baseline:** `main` `01c9fba` (merged PR #29).
 **Scope authority:** Owner request for system color themes, then themed GUI elements; image uploads for characters, items, then adventure backgrounds.
 **Design:** [Sections 10.5, 17.9c and 18.2](../../../design_v2.md). Reuse the [GUI foundation and G9 gates](2026-09-08-gui-integration.md) and [I7b scene/display contract](../specs/2026-09-14-i7b-scenes-display-design.md).
@@ -29,12 +29,12 @@ Themes and images are independent tracks. Preserve T1 → T2 and M0 → M1 → M
 
 ## T1 — Basic system color themes
 
-- [ ] Specify a bounded presentation selection on the system draft/package: a platform preset ID, initially Default (current Sweetroll), Blue and Ochre. Each provides accessible light/dark token sets. No color-code fields or arbitrary CSS in this step.
-- [ ] Treat the preset as system presentation, separate from Light/Dark/Follow device. Keep the existing device > account > OS mode resolution. Apply system styling to the creator preview and system-bound character/campaign content; global account/library/navigation retains platform styling.
-- [ ] Store the selection through normal revision-safe draft saves and immutable publication. Clone/export/import and runtime projections preserve the selection. New publications never restyle existing pinned characters/campaigns. Missing selection uses Default; invalid authored IDs produce diagnostics. Update the current package contract/fixtures without old-build conversion code.
-- [ ] Add a small visual preset picker to the creator with immediate phone/desktop preview, saved status and a reset-to-Default action. Read-only published views expose no misleading edit controls.
-- [ ] Scope tokens and portaled dialogs/popovers to their originating system surface. Navigating between two systems, account switching and returning to global pages cannot retain another system's styling.
-- [ ] Preserve unsaved inputs, queued character changes, scroll/focus and action results when changing theme or light/dark mode. Cache the validated selection with the existing authorized sheet/package for offline rendering.
+- [x] Specify a bounded presentation selection on the system draft/package: a platform preset ID, initially Default (current Sweetroll), Blue and Ochre. Each provides accessible light/dark token sets. No color-code fields or arbitrary CSS in this step.
+- [x] Treat the preset as system presentation, separate from Light/Dark/Follow device. Keep the existing device > account > OS mode resolution. Apply system styling to the creator preview and system-bound character/campaign content; global account/library/navigation retains platform styling.
+- [x] Store the selection through normal revision-safe draft saves and immutable publication. Clone/export/import and runtime projections preserve the selection. New publications never restyle existing pinned characters/campaigns. Missing selection uses Default; invalid authored IDs produce diagnostics. Update the current package contract/fixtures without old-build conversion code.
+- [x] Add a small visual preset picker to the creator with immediate phone/desktop preview, saved status and a reset-to-Default action. Read-only published views expose no misleading edit controls.
+- [x] Scope tokens and portaled dialogs/popovers to their originating system surface. Navigating between two systems, account switching and returning to global pages cannot retain another system's styling.
+- [x] Preserve unsaved inputs, queued character changes, scroll/focus and action results when changing theme or light/dark mode. Cache the validated selection with the existing authorized sheet/package for offline rendering.
 
 **Red → green and acceptance:** First reproduce missing selection persistence/projection and cross-system/portal scoping in focused tests. Implement the smallest contract/token/UI change, then verify creator save/reload/preview/publish/clone/export and two differently themed systems. Run character edit/roll/offline/reconnect regressions where affected. Inspect actual routed screenshots in every preset and mode at 360/1280 px; check 200% text, keyboard focus, contrast and error/disabled states. Retain human and real-device sign-off as distinct G9 evidence.
 

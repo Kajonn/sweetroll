@@ -14,6 +14,10 @@ for (const width of [320, 360, 768, 1280]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     if (width < 1024) {
       await expect(nav).toBeHidden();
+      const menu = (await trigger.boundingBox())!;
+      const help = (await header.getByRole("button", { name: "Show keyboard shortcuts" }).boundingBox())!;
+      expect(menu.x).toBeGreaterThan(help.x + help.width);
+      expect(width - menu.x - menu.width).toBeLessThanOrEqual(16);
       await trigger.click();
       await expect(nav).toBeVisible();
       const popup = (await nav.boundingBox())!;

@@ -92,4 +92,10 @@ committed baseline candidates; human visual approval remains open.
 
 ![Systems at 320px](assets/gui-systems-320-2026-11-05.png)
 
+The navigation trigger was subsequently moved to the right edge, after sign-out
+and shortcut help, as requested. A browser position assertion failed before
+the change and passed afterwards. All five compact-navigation/tab checks and
+type checking passed; the phone screenshot above reflects the right-aligned
+trigger. Final CI and preview details are recorded in PR #33.
+
 ![Systems at 1280px](assets/gui-systems-1280-2026-11-05.png)

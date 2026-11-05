@@ -55,7 +55,8 @@ Requested on 2026-11-05 after the first preview:
 
 - Rename Home to Systems, retaining the existing `/` system-library route.
 - Use a compact header; below 1024px disclose the primary links through one
-  menu button. Preserve native link destinations and client navigation.
+  menu button at the right edge after the account actions. Preserve native
+  link destinations and client navigation.
 - Close on selection/outside pointer; Escape returns focus to the trigger.
 - Keep creator and campaign tabs on one scrollable row with 44px targets.
 - Verify 320/360/768/1280px geometry, keyboard use, Systems return navigation,

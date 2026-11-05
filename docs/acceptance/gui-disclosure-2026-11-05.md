@@ -98,4 +98,11 @@ the change and passed afterwards. All five compact-navigation/tab checks and
 type checking passed; the phone screenshot above reflects the right-aligned
 trigger. Final CI and preview details are recorded in PR #33.
 
+The updated position also passed on hosted application `a1e76a8`, successful
+deployment `5167ae54-d5b1-4e6f-ba29-d50cfd977dab`. CI #234's visual rerun passed
+the eight unchanged baselines. Its two phone screenshots (artifact
+`13447121110`) were inspected and updated; their pixel differences are confined
+to the 57px header. Dependency-download timeouts were retried separately from
+the app changes. Final committed screenshot checks are recorded in the PR.
+
 ![Systems at 1280px](assets/gui-systems-1280-2026-11-05.png)

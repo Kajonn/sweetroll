@@ -68,7 +68,7 @@ test("V1 image tokens: GUI upload/select, relative size, retained art and restri
         await expect(gm.getByRole("button", { name: `Token ${label}`, exact: true })).toBeVisible();
       }
       await tray.getByRole("button", { name: "Use label only", exact: true }).click();
-      await tray.getByLabel("Token label").fill("Label marker"); await tray.getByLabel(/^x \(0–1\)/i).fill(".3");
+      await tray.getByLabel("Token label").fill("Label marker"); await tray.getByLabel(/^x \(0–1\)/i).fill(".4");
       const response = gm.waitForResponse(r => r.url().endsWith(`/scenes/${sceneId}/tokens`) && r.request().method() === "POST");
       await tray.getByRole("button", { name: "Place token", exact: true }).click(); expect((await response).ok()).toBe(true);
       await gm.reload();

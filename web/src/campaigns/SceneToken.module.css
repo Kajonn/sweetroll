@@ -36,6 +36,7 @@
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
+  width: max-content;
   max-width: 12rem;
   overflow-wrap: anywhere;
   padding: 0.15rem 0.3rem;

@@ -290,7 +290,7 @@ export function DisplayView(props: {
   return (
     <section aria-label={t("display.title")}>
       <h1>{t("display.title")}</h1>
-      <div style={{ position: "relative" }}>
+      <div style={{ position: "relative", overflow: "hidden" }}>
         <DisplayImage key={`${credential.displayId}:${shown.imageUrl}`} path={shown.imageUrl} secret={credential.secret} alt={t("display.imageAlt")} />
         <ul aria-label={t("display.tokensLabel")} style={{ listStyle: "none", margin: 0, padding: 0 }}>
           {shown.tokens.map((token) => (

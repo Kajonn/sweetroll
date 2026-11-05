@@ -51,8 +51,10 @@ verification after redeploy and CI #219 on application `d62a9f8`. See the
 and [scene evidence](docs/acceptance/scene-backgrounds-2026-11-04.md). Physical
 devices, real provider login and human/playtest G9 gates remain open.
 
-I7b/G8 visual scene controls are **not complete**. The 2026-11-05 review reopened
-image-token selection/rendering, direct drag/tap token controls and on-image fog
-brushing. Follow the [visual-controls completion plan](docs/superpowers/plans/2026-11-05-scene-visual-controls.md).
-The numeric-control and M3 background acceptance records prove their stated
-foundation only; do not use them to close these visual-control requirements.
+I7b/G8 visual scene controls remain **partially complete**. PR #34 delivers V1
+image-token selection/upload and proportional GM/restricted-display rendering.
+[Hosted and redeploy acceptance](docs/acceptance/scene-image-tokens-2026-11-05.md)
+passed on application `34ed283`, with CI #248 green. The next implementation step
+is V2 direct drag/tap token placement/movement, then V3 on-image fog brushing and
+V4 combined acceptance. Follow the [visual-controls completion plan](docs/superpowers/plans/2026-11-05-scene-visual-controls.md).
+Do not close aggregate G8/G9 gates from V1 or the numeric/M3 foundation evidence.

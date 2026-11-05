@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 import { test, expect, type Page } from "@playwright/test";
@@ -21,6 +21,7 @@ test("V1 image tokens: GUI upload/select, relative size, retained art and restri
   const displayContext = await browser.newContext({ baseURL, ignoreHTTPSErrors: Boolean(process.env.SCENE_TOKEN_HOSTED), ...(proxy ? {proxy} : {}), viewport: { width: 768, height: 1024 } });
   const gm = await gmContext.newPage(), dp = await displayContext.newPage();
   gm.setDefaultTimeout(15_000); dp.setDefaultTimeout(15_000);
+  gm.setDefaultNavigationTimeout(45_000); dp.setDefaultNavigationTimeout(45_000);
   let campaignId: string | undefined, displayId: string | undefined, keep = false;
   const seen: string[] = [];
   dp.on("request", r => { if (r.url().startsWith(baseURL)) seen.push(new URL(r.url()).pathname); });
@@ -78,6 +79,9 @@ test("V1 image tokens: GUI upload/select, relative size, retained art and restri
     const state = (await json(gm, "GET", `/api/scenes/${sceneId}`)).scene;
     expect(state.tokens.find((t: any) => t.label === "Wren")).toMatchObject({ x: .25, y: .5, size: .12, imageFileId: expect.any(String) });
     const imageFileId = state.tokens.find((t: any) => t.label === "Wren").imageFileId;
+    const artBytes = await gm.evaluate(async path => Array.from(new Uint8Array(await (await fetch(path)).arrayBuffer())), `/api/campaigns/${campaignId}/images/${imageFileId}/original`);
+    const artChecksum = createHash("sha256").update(Buffer.from(artBytes)).digest("hex");
+    if (process.env.SCENE_TOKEN_PHASE === "verify" && retainedFixture) expect(artChecksum).toBe(JSON.parse(await readFile(retainedFixture, "utf8")).artChecksum);
     const images = (await json(gm, "GET", `/api/campaigns/${campaignId}/images`)).images;
     const artFile = images.find((f: any) => f.fileId === imageFileId);
     const deniedDelete = await gm.evaluate(async ({ campaignId, artFile }) => (await fetch(`/api/campaigns/${campaignId}/images/${artFile.fileId}`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ expectedRevision: artFile.revision, idempotencyKey: crypto.randomUUID() }) })).status, { campaignId, artFile });
@@ -93,21 +97,28 @@ test("V1 image tokens: GUI upload/select, relative size, retained art and restri
     const dialog = gm.getByRole("dialog"), code = (await dialog.locator("strong").last().textContent())!.trim();
     await dialog.getByRole("button", { name: "Done", exact: true }).click();
     await dp.goto(`/display?sceneId=${sceneId}`); await dp.getByLabel(/display code/i).fill(code); await dp.getByRole("button", { name: "Connect display", exact: true }).click();
+    await expect.poll(() => dp.evaluate(() => Boolean(sessionStorage.getItem("sweetroll:display-credential")))).toBe(true);
+    displayId = await dp.evaluate(() => JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!).displayId);
     await expect(dp.getByRole("img", { name: "Display image", exact: true })).toBeVisible({ timeout: 20_000 });
     await expect(dp.getByText("Wren", {exact:true}).locator("..").locator("img")).toBeVisible({ timeout: 20_000 });
     await expect(dp.getByText("Secret", { exact: true })).toHaveCount(0); await expect(dp.getByText("Fogged", { exact: true })).toHaveCount(0);
     await expect(dp.getByText("Label marker", { exact: true })).toBeVisible();
     displayId = await dp.evaluate(() => JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!).displayId);
     for (const token of state.tokens.filter((t: any) => ["Secret", "Fogged"].includes(t.label))) {
-      const status = await dp.evaluate(async ({ sceneId, tokenId }) => { const c = JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!); return (await fetch(`/api/displays/${c.displayId}/scenes/${sceneId}/tokens/${tokenId}/image?rev=1`, { credentials: "omit", headers: { "x-display-secret": c.secret } })).status; }, { sceneId, tokenId: token.tokenId });
+      const status = await dp.evaluate(async ({ sceneId, tokenId, revision }) => { const c = JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!); return (await fetch(`/api/displays/${c.displayId}/scenes/${sceneId}/tokens/${tokenId}/image?rev=${revision}`, { credentials: "omit", headers: { "x-display-secret": c.secret } })).status; }, { sceneId, tokenId: token.tokenId, revision: state.revision });
       expect(status).toBe(404);
     }
     expect(seen.filter(path => /^\/api\/(campaigns|characters|systems|scenes)\//.test(path))).toEqual([]);
+    const deniedOriginal = await dp.evaluate(async path => { const c = JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!); return (await fetch(path, {credentials:"omit",headers:{"x-display-secret":c.secret}})).status; }, `/api/campaigns/${campaignId}/images/${imageFileId}/original`);
+    expect(deniedOriginal).toBe(401);
     await gm.goto(`/campaigns/${campaignId}/scenes?sceneId=${sceneId}`);
     for (const width of [360, 768, 1280]) {
       await gm.setViewportSize({ width, height: 1000 }); await displayContext.pages()[0]!.setViewportSize({ width, height: 1000 });
       for (const [page, role] of [[gm, "Scene background"], [dp, "Display image"]] as const) {
-        const background = await page.getByRole("img", { name: role, exact: true }).boundingBox();
+        const backgroundImage = page.getByRole("img", { name: role, exact: true });
+        await expect(backgroundImage).toBeVisible({ timeout: 20_000 });
+        await backgroundImage.evaluate(image => (image as HTMLImageElement).decode());
+        const background = await backgroundImage.boundingBox();
         const art = await (page === gm ? page.getByRole("button", { name: "Token Wren", exact: true }).locator("img") : page.getByText("Wren", {exact:true}).locator("..").locator("img")).boundingBox();
         expect(art!.width / background!.width).toBeCloseTo(.12, 2);
         expect((art!.x + art!.width / 2 - background!.x) / background!.width).toBeCloseTo(.25, 2);
@@ -122,7 +133,7 @@ test("V1 image tokens: GUI upload/select, relative size, retained art and restri
     await expect(dp.getByText("Wren", {exact:true}).locator("..").locator("img")).toBeVisible({ timeout: 20_000 });
     await json(gm, "POST", `/api/campaigns/${campaignId}/displays/${displayId}/revoke`, {}); displayId = undefined;
     await expect(dp.locator("img")).toHaveCount(0, { timeout: 20_000 });
-    if (retainedFixture && process.env.SCENE_TOKEN_PHASE !== "verify") { await writeFile(retainedFixture, JSON.stringify({ campaignId, sceneId, tokens: state.tokens })); keep = true; }
+    if (retainedFixture && process.env.SCENE_TOKEN_PHASE !== "verify") { await writeFile(retainedFixture, JSON.stringify({ campaignId, sceneId, tokens: state.tokens, artChecksum })); keep = true; }
   } finally {
     if (displayId && campaignId) await json(gm, "POST", `/api/campaigns/${campaignId}/displays/${displayId}/revoke`, {});
     if (campaignId && !keep) { const c = (await json(gm, "GET", `/api/campaigns/${campaignId}`)).campaign; await json(gm, "POST", `/api/campaigns/${campaignId}/archive`, { expectedCampaignRevision: c.revision, idempotencyKey: randomUUID() }); }

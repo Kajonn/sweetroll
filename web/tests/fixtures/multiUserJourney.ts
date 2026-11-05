@@ -386,7 +386,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
       }
       for (const i of [1,2]) {
         const renderedPreview = gm.waitForResponse(r => r.request().method() === "POST" && r.url().endsWith("/item-template-preview") && r.request().postDataJSON().targetUserId === actorIds[i]);
-        await gm.getByLabel("Preview as player", { exact: true }).selectOption({ label: `${names[i]} (${actorIds[i]})` });
+        await gm.getByLabel("Preview as player", { exact: true }).selectOption({ label: names[i] });
         expect((await renderedPreview).status()).toBe(200);
         await expect(gm.getByRole("heading", { name: "Ashguard blade", exact: true })).toBeVisible();
         const actual = (await json(contexts[i]!.request,"GET",`/api/campaigns/${campaignId}/item-templates`)).templates;

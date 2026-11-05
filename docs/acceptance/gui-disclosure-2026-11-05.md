@@ -27,6 +27,7 @@ in Account. Member selectors use names, with identity suffixes when needed.
 | CI integration, contracts and Docker | Recorded in the PR checks; final workflow is authoritative. |
 | Offline production-worker regressions | Recorded in the PR checks; final workflow is authoritative. |
 | Focused production-worker rerun | All three campaign template/derived-template journeys passed after selectors were updated for the normal-mode “Campaign item” label. |
+| Full multi-user production-worker rerun | MU-00–MU-12 passed with one GM and three players, 24 rolls, named preview/sharing, offline recovery and scoped cleanup. |
 | Visual snapshots | Nine changed screenshots from CI run 42039280192, artifact 13420491381, inspected by the agent and proposed as updated baselines. Unchanged 360px sheet-preview baseline retained. |
 
 The nine CI screenshots cover creator, library, publish dialog, conflict banner

@@ -40,6 +40,9 @@ import {
  * `test-results/` directory.
  */
 
+// Fail at the stalled browser action instead of consuming the full journey budget.
+test.use({ actionTimeout: 30_000, navigationTimeout: 30_000 });
+
 const EVIDENCE_DIR = "tests/offline/evidence";
 
 async function buildId(page: Page): Promise<string> {
@@ -99,7 +102,7 @@ test.describe("full production UI journey per system", () => {
       try {
         await runJourney(context, system);
       } finally {
-        await context.close();
+        await context.close().catch(() => {});
       }
     });
   }
@@ -113,7 +116,7 @@ test.describe("full production UI journey per system", () => {
       await expect(page.getByTestId("dev-signin")).toHaveCount(0);
       await expect(page.getByTestId("dev-signin-panel")).toHaveCount(0);
     } finally {
-      await context.close();
+      await context.close().catch(() => {});
     }
   });
 
@@ -156,9 +159,9 @@ test.describe("full production UI journey per system", () => {
       await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+/, { timeout: 30_000 });
       await expectSheetReady(page, characterName);
       const build = await buildId(page);
-      await page.screenshot({ path: `${EVIDENCE_DIR}/creation-picker-360-${build}.png` });
+      await test.step("Capture creation picker", () => page.screenshot({ path: `${EVIDENCE_DIR}/creation-picker-360-${build}.png` }));
     } finally {
-      await context.close();
+      await context.close().catch(() => {});
     }
   });
 });
@@ -226,8 +229,8 @@ async function runJourney(context: BrowserContext, system: ReferenceSystem) {
   await expectOfflineAvailable(page);
   await expectNoHorizontalOverflow(page);
   const build = await buildId(page);
-  await page.screenshot({ path: `${EVIDENCE_DIR}/journey-${system.key}-360-online-${build}.png` });
-  const axe360 = await new AxeBuilder({ page }).analyze();
+  await test.step("Capture online phone sheet", () => page.screenshot({ path: `${EVIDENCE_DIR}/journey-${system.key}-360-online-${build}.png` }));
+  const axe360 = await test.step("Check phone accessibility", () => new AxeBuilder({ page }).analyze());
   expect(axe360.violations.filter(v => v.impact === "serious" || v.impact === "critical")).toEqual([]);
 
   // 6. Pending edits block export: queue one edit offline and assert the
@@ -246,7 +249,7 @@ async function runJourney(context: BrowserContext, system: ReferenceSystem) {
     await editBoxOffline.press("Enter");
     await page.getByRole("button", { name: bumpDown ? system.decreaseButton : system.increaseButton }).click();
     await expect(page.getByText("Changes pending")).toBeVisible({ timeout: 15_000 });
-    await page.screenshot({ path: `${EVIDENCE_DIR}/journey-${system.key}-360-pending-${build}.png` });
+    await test.step("Capture offline pending sheet", () => page.screenshot({ path: `${EVIDENCE_DIR}/journey-${system.key}-360-pending-${build}.png` }));
 
     // 8. Close and reopen the same deep link while offline: the durable
     // queue and confirmed state must survive in this browser profile.
@@ -301,7 +304,7 @@ async function runJourney(context: BrowserContext, system: ReferenceSystem) {
       const downloadPromise = reopened.waitForEvent("download", { timeout: 30_000 });
       await reopened.getByRole("button", { name: "Download export" }).click();
       const download = await downloadPromise;
-      const downloadPath = await download.path();
+      const downloadPath = await test.step("Read completed export download", () => download.path());
       if (!downloadPath) throw new Error("export download produced no file");
       const { readFile } = await import("node:fs/promises");
       const downloaded = JSON.parse(await readFile(downloadPath, "utf8")) as unknown;
@@ -319,8 +322,8 @@ async function runJourney(context: BrowserContext, system: ReferenceSystem) {
       await reopened.keyboard.press("Enter");
       await expect(reopened.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
       const wideBuild = await buildId(reopened);
-      await reopened.screenshot({ path: `${EVIDENCE_DIR}/journey-${system.key}-1280-final-${wideBuild}.png` });
-      const axe1280 = await new AxeBuilder({ page: reopened }).analyze();
+      await test.step("Capture desktop sheet", () => reopened.screenshot({ path: `${EVIDENCE_DIR}/journey-${system.key}-1280-final-${wideBuild}.png` }));
+      const axe1280 = await test.step("Check desktop accessibility", () => new AxeBuilder({ page: reopened }).analyze());
       expect(axe1280.violations.filter(v => v.impact === "serious" || v.impact === "critical")).toEqual([]);
     } finally {
       await reopened.close().catch(() => {});

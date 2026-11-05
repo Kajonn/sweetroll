@@ -143,3 +143,26 @@ The old offline copy remained through reloads; closing the preview tab and
 reopening it loaded the new styling. Production configuration was not changed.
 
 ![Scrolled character sheet without overlapping identity header](assets/character-scroll-2026-11-05.png)
+
+### CI #241 follow-up
+
+Run `42108091812` failed one frontend unit case and one production-worker
+journey. Backend/integration, the three browser journey shards and all visual
+comparisons passed. The archive retry test assumed a manual retry would beat
+the short automatic backoff; slow IndexedDB work allowed a third send. Manual
+and automatic retry cases now control that timer explicitly and still assert
+exact request bodies/keys, request count and retained-attempt retirement.
+Application synchronization code was not changed.
+
+The pool offline journey exhausted its 420-second budget and context cleanup
+masked the stalled action. No offline trace was uploaded by the old workflow.
+All three original per-system offline journeys passed locally before changing
+that test harness. The harness now uses 30-second action/navigation waits,
+named screenshot/accessibility/download steps and cleanup that preserves the
+original failure. CI retains offline failure traces and screenshots. No product
+assertion, test or privacy check was removed; retry and global journey budgets
+were not increased. The original timeout's stalled action remains unconfirmed.
+
+Local frontend suite: 1,230/1,230 passed; focused session suite: 118/118 passed;
+frontend type checking and workflow failure-evidence validation passed. Full
+production-worker and final CI outcomes are recorded in PR #33 checks.

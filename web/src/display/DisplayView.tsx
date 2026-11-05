@@ -1,3 +1,4 @@
+import tokenStyles from "../campaigns/SceneToken.module.css";
 // Restricted display shell: code entry → credential-scoped projection.
 // Runs outside the GM chrome (the /display route skips AppShell): no
 // identity gate and no campaign endpoints — only redeemDisplay plus the
@@ -295,14 +296,17 @@ export function DisplayView(props: {
           {shown.tokens.map((token) => (
             <li
               key={token.tokenId}
+              className={tokenStyles.token}
               style={{
+                width: `${token.size * 100}%`,
                 position: "absolute",
                 left: `${token.x * 100}%`,
                 top: `${token.y * 100}%`,
                 transform: "translate(-50%, -50%)",
               }}
             >
-              {token.label}
+              {token.imageUrl ? <DisplayImage key={`${credential.displayId}:${token.imageUrl}`} path={token.imageUrl} secret={credential.secret} alt={token.label} /> : null}
+              <span className={tokenStyles.label}>{token.label}</span>
             </li>
           ))}
         </ul>

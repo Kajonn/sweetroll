@@ -1,3 +1,4 @@
+import { SceneLibrary } from "./SceneLibrary.js";
 import { Disclosure } from "../ui/Disclosure.js";
 // GM token tray: owns the place form plus one move form per token.
 // The committing keyboard alternative to dragging is the numeric X/Y
@@ -8,7 +9,7 @@ import { useState } from "react";
 
 import { t } from "../i18n/index.js";
 import { Button, Checkbox, FormField, Panel } from "../ui/index.js";
-import type { CampaignsApi } from "./api.js";
+import type { CampaignsApi, SceneLibraryApi } from "./api.js";
 import type { SceneView } from "./types.js";
 import { randomUUID } from "../utils/uuid";
 
@@ -166,6 +167,10 @@ function TokenMoveRow(props: {
 
 export function TokenTrayView(props: {
   api: Pick<CampaignsApi, "placeToken" | "moveToken">;
+  mediaApi?: SceneLibraryApi | undefined;
+  campaignId?: string | undefined;
+  actorId?: string | null | undefined;
+  generation?: number | undefined;
   sceneId: string;
   sceneRevision: number;
   tokens: Token[];
@@ -176,7 +181,8 @@ export function TokenTrayView(props: {
   const [label, setLabel] = useState("");
   const [x, setX] = useState("0.5");
   const [y, setY] = useState("0.5");
-  const [size, setSize] = useState("1");
+  const [size, setSize] = useState("0.1");
+  const [imageFileId, setImageFileId] = useState<string | null>(null);
   const [visible, setVisible] = useState(true);
   const [pending, setPending] = useState(false);
   const [conflict, setConflict] = useState(false);
@@ -188,7 +194,7 @@ export function TokenTrayView(props: {
     const targetX = parseUnit(x);
     const targetY = parseUnit(y);
     const targetSize = Number(size);
-    if (pending || label.trim() === "" || targetX === null || targetY === null || !Number.isFinite(targetSize)) return;
+    if (!online || unavailable || pending || targetSize <= 0 || targetSize > 1 || label.trim() === "" || targetX === null || targetY === null || !Number.isFinite(targetSize)) return;
     setPending(true);
     setError(null);
     setConflict(false);
@@ -203,7 +209,7 @@ export function TokenTrayView(props: {
         y: targetY,
         size: targetSize,
         visible,
-        imageFileId: null,
+        imageFileId,
         idempotencyKey,
       });
       setPlaced(true);
@@ -231,6 +237,13 @@ export function TokenTrayView(props: {
       <FormField label={t("campaign.detail.scenes.tokens.labelLabel")}>
         <input type="text" value={label} disabled={!online} onChange={(event) => setLabel(event.target.value)} />
       </FormField>
+      {props.mediaApi && props.campaignId ? <>
+        <p>{t(imageFileId ? "scene.tokens.selected" : "scene.tokens.labelOnly")}</p>
+        {imageFileId ? <Button variant="secondary" disabled={!online || pending} onClick={() => setImageFileId(null)}>{t("scene.tokens.clear")}</Button> : null}
+        <Disclosure label={t("scene.tokens.artwork")}>
+          <SceneLibrary api={props.mediaApi} campaignId={props.campaignId} actorId={props.actorId ?? null} generation={props.generation ?? 0} online={online && !pending && !unavailable} selection={{ fileId: imageFileId, onSelect: fileId => setImageFileId(fileId || null) }} onChanged={() => {}} onOpenScene={() => {}} />
+        </Disclosure>
+      </> : null}
       <Disclosure label={t("disclosure.position")}>
       <FormField label={t("campaign.detail.scenes.tokens.xLabel")}>
         <input
@@ -255,7 +268,7 @@ export function TokenTrayView(props: {
         />
       </FormField>
       <FormField label={t("campaign.detail.scenes.tokens.sizeLabel")}>
-        <input type="number" min={0.1} step={0.1} value={size} disabled={!online} onChange={(event) => setSize(event.target.value)} />
+        <input type="number" min={0.01} max={1} step={0.01} value={size} disabled={!online} onChange={(event) => setSize(event.target.value)} />
       </FormField>
       </Disclosure>
       <Checkbox
@@ -270,7 +283,7 @@ export function TokenTrayView(props: {
       {placed ? <p role="status">{t("campaign.detail.scenes.tokens.placed")}</p> : null}
       {!online ? <p role="status">{t("campaign.detail.scenes.offline")}</p> : null}
       {conflict ? (
-        <Button variant="primary" pending={pending} onClick={() => void place()}>
+        <Button variant="primary" pending={pending} disabled={!online || unavailable} onClick={() => void place()}>
           {t("campaign.detail.scenes.tokens.retryPlace")}
         </Button>
       ) : (
@@ -278,7 +291,7 @@ export function TokenTrayView(props: {
           variant="primary"
           pending={pending}
           pendingText={t("campaign.detail.scenes.tokens.placing")}
-          disabled={!online || label.trim() === ""}
+          disabled={!online || unavailable || label.trim() === "" || Number(size) <= 0 || Number(size) > 1 || !Number.isFinite(Number(size))}
           onClick={() => void place()}
         >
           {t("campaign.detail.scenes.tokens.place")}

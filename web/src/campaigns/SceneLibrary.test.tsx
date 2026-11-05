@@ -42,3 +42,29 @@ describe("scene background library", () => {
     expect(screen.queryByRole("img")).not.toBeInTheDocument(); expect(screen.getByLabelText("Image file")).toBeDisabled();
   });
 });
+
+it("selects token artwork without scene reads or background replacement", async () => {
+  const { api, props, rerender } = setup();
+  const onSelect = vi.fn(); vi.mocked(api.listScenes).mockClear();
+  rerender(<SceneLibrary {...props} selection={{fileId:null,onSelect}} />);
+  const row = (await screen.findByRole("img", { name: "Forest" })).closest("li")!;
+  fireEvent.click(within(row).getByRole("button", { name: "Select token image" }));
+  expect(onSelect).toHaveBeenCalledWith("second");
+  expect(api.updateScene).not.toHaveBeenCalled(); expect(api.createScene).not.toHaveBeenCalled();
+  expect(api.listScenes).not.toHaveBeenCalled();
+});
+
+it("uploads token art with exact-request retry and auto-selects without modifying the scene", async () => {
+  const { api, props, rerender } = setup(); const onSelect = vi.fn();
+  vi.mocked(api.uploadImage).mockRejectedValueOnce(new Error("Lost response")).mockResolvedValue({ image: file("uploaded", "Scout") } as never);
+  rerender(<SceneLibrary {...props} selection={{fileId:null,onSelect}} />);
+  await screen.findByRole("img", {name:"Forest"});
+  fireEvent.change(screen.getByLabelText("Token image file"), {target:{files:[new File(["PNG"],"scout.png",{type:"image/png"})]}});
+  fireEvent.change(await screen.findByLabelText("Image description"), {target:{value:"Scout"}});
+  fireEvent.click(screen.getByRole("button", {name:"Upload token image"}));
+  await screen.findByText("Lost response"); expect(onSelect).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", {name:"Retry exact request"}));
+  await waitFor(() => expect(onSelect).toHaveBeenCalledWith("uploaded"));
+  expect(vi.mocked(api.uploadImage).mock.calls[0]).toEqual(vi.mocked(api.uploadImage).mock.calls[1]);
+  expect(api.updateScene).not.toHaveBeenCalled(); expect(api.createScene).not.toHaveBeenCalled();
+});

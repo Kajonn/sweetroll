@@ -45,6 +45,17 @@ function routeProps(overrides = {}) {
 }
 
 describe("SceneViewportView", () => {
+  it("renders campaign token art at its normalized size and keeps a label on image failure", () => {
+    const artScene = scene({ tokens: [{ tokenId: "t1", label: "Wren", x: .25, y: .5, size: .12, visible: true, imageFileId: "portrait" }] });
+    render(<SceneViewportView scene={artScene} imageUrl="/background" />);
+    const token = screen.getByRole("button", { name: "Token Wren" });
+    expect(token.parentElement).toHaveStyle({ width: "12%", left: "25%", top: "50%" });
+    const art = screen.getByRole("img", { name: "Wren" });
+    expect(art).toHaveAttribute("src", "/api/campaigns/c1/images/portrait/original");
+    fireEvent.error(art);
+    expect(screen.queryByRole("img", { name: "Wren" })).toBeNull();
+    expect(token).toHaveTextContent("Wren");
+  });
   it("shows the scene image with token markers at normalized positions", () => {
     const onSelectToken = vi.fn();
     render(

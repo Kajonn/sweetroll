@@ -36,12 +36,12 @@ for (const width of [360, 1280]) {
       await expect(page.getByTestId("metadata-name")).toHaveValue("D20 System");
       await expect(page.getByTestId("request-id")).toHaveCount(0);
       await page.getByTestId("document-editor-tab-attributes").click();
-      const score = page.getByTestId("scalar-field-default-ability_score");
+      const score = page.getByTestId("scalar-field-default-ability");
       await expect(score).toHaveValue("10");
-      const field = page.getByTestId("scalar-field-ability_score");
+      const field = page.getByTestId("scalar-field-ability");
       await expect(field.getByTestId("definition-id-input")).toBeHidden();
       await field.getByText("Identifier", { exact: true }).click();
-      await expect(field.getByTestId("definition-id-input")).toHaveValue("ability_score");
+      await expect(field.getByTestId("definition-id-input")).toHaveValue("ability");
     } finally {
       if (process.env.SWEETROLL_E2E_EPHEMERAL_DB !== "1") await page.request.delete(`/api/systems/${systemId}`);
     }

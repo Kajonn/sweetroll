@@ -43,3 +43,8 @@ Authorized by the owner's GUI verbosity review and implementation request on
 No database, package, API, identity-provider, migration or version-upgrade changes
 belong to this increment. Persistent account-profile improvements beyond existing
 roster names remain outside this presentation change.
+
+Implementation and observed validation are recorded in
+[the dated acceptance record](../../acceptance/gui-disclosure-2026-11-05.md).
+The isolated preview is deployed; human visual and broader G9 release gates
+remain open. Final automated results are attached to PR #33.

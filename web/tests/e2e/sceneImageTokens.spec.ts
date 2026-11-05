@@ -17,9 +17,10 @@ test("V1 image tokens: GUI upload/select, relative size, retained art and restri
   test.setTimeout(240_000);
   if (!baseURL) throw Error("Test target required");
   const proxy = process.env.SCENE_TOKEN_HOSTED && process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY } : undefined;
-  const gmContext = await browser.newContext({ baseURL, ...(proxy ? {proxy} : {}), viewport: { width: 360, height: 1000 } });
-  const displayContext = await browser.newContext({ baseURL, ...(proxy ? {proxy} : {}), viewport: { width: 768, height: 1024 } });
+  const gmContext = await browser.newContext({ baseURL, ignoreHTTPSErrors: Boolean(process.env.SCENE_TOKEN_HOSTED), ...(proxy ? {proxy} : {}), viewport: { width: 360, height: 1000 } });
+  const displayContext = await browser.newContext({ baseURL, ignoreHTTPSErrors: Boolean(process.env.SCENE_TOKEN_HOSTED), ...(proxy ? {proxy} : {}), viewport: { width: 768, height: 1024 } });
   const gm = await gmContext.newPage(), dp = await displayContext.newPage();
+  gm.setDefaultTimeout(15_000); dp.setDefaultTimeout(15_000);
   let campaignId: string | undefined, displayId: string | undefined, keep = false;
   const seen: string[] = [];
   dp.on("request", r => { if (r.url().startsWith(baseURL)) seen.push(new URL(r.url()).pathname); });
@@ -84,7 +85,7 @@ test("V1 image tokens: GUI upload/select, relative size, retained art and restri
     // Explicit existing-art selection cannot replace the background or reset the tokens.
     const tray = gm.getByRole("region", { name: "Tokens", exact: true });
     await tray.getByText("Token artwork", { exact: true }).click();
-    const artRow = tray.locator("li").filter({ has: tray.getByRole("img", { name: "Wren art", exact: true }) });
+    const artRow = tray.locator("li").filter({ has: gm.getByRole("img", { name: "Wren art", exact: true }) });
     await artRow.getByRole("button", { name: "Select token image" }).click();
     expect((await json(gm, "GET", `/api/scenes/${sceneId}`)).scene).toEqual(state);
     await gm.goto(`/campaigns/${campaignId}`); await gm.getByRole("tab", { name: "Settings", exact: true }).click();

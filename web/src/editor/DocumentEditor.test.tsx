@@ -306,14 +306,20 @@ describe("DocumentEditor", () => {
     expect(await screen.findByTestId("reference-data-add-button")).toBeInTheDocument();
   });
 
-  it("scrolls into view when a focus-editor:{path} event fires for an element with matching data-path", async () => {
+  it("reveals collapsed ancestor disclosures before focusing a validation target", async () => {
     renderEditor("http://localhost/?tab=sheets");
     const addButton = await screen.findByTestId("sheet-add-button");
-    addButton.setAttribute("data-path", "/sheets/0");
+    const details = document.createElement("details");
+    const input = document.createElement("input");
+    input.setAttribute("data-path", "/sheets/0");
+    details.append(input);
+    addButton.after(details);
     const scrollIntoView = vi.fn();
-    addButton.scrollIntoView = scrollIntoView;
+    input.scrollIntoView = scrollIntoView;
     window.dispatchEvent(new CustomEvent("focus-editor:/sheets/0"));
     expect(scrollIntoView).toHaveBeenCalled();
+    expect(details).toHaveAttribute("open");
+    expect(input).toHaveFocus();
   });
 
   it("preserves an edit made during a slow save instead of adopting the stale echo", async () => {

@@ -1696,6 +1696,9 @@ function useFocusEditorListener(bodyRef: React.RefObject<HTMLDivElement>): void 
         const selector = `[data-path="${candidate}"]`;
         const el = target.querySelector(selector) ?? window.document.querySelector(selector);
         if (el instanceof HTMLElement) {
+          for (let ancestor = el.parentElement; ancestor; ancestor = ancestor.parentElement) {
+            if (ancestor instanceof HTMLDetailsElement) ancestor.open = true;
+          }
           el.scrollIntoView({ block: "center" });
           el.focus({ preventScroll: true });
           return;

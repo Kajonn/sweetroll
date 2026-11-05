@@ -75,14 +75,6 @@ export function ChoiceFieldEditor({
   return (
     <section className={styles.field} data-testid={`choice-field-${field.id}`}>
       <div className={styles.row}>
-        <DefinitionIdInput
-          value={field.id}
-          onChange={(next) => update({ id: next })}
-          referencedBy={referencedBy}
-          disabled={disabled}
-        />
-      </div>
-      <div className={styles.row}>
         <label className={styles.field} htmlFor={`choice-field-label-${field.id}`}>
           {t("editor.fields.label")}
           <input
@@ -174,6 +166,14 @@ export function ChoiceFieldEditor({
             {t("editor.fields.options.addOption")}
           </button>
         </fieldset>
+      </div>
+      <div className={styles.row}>
+        <DefinitionIdInput
+          value={field.id}
+          onChange={(next) => update({ id: next })}
+          referencedBy={referencedBy}
+          disabled={disabled}
+        />
       </div>
     </section>
   );

@@ -56,7 +56,6 @@ export function ScalarFieldEditor({
               disabled={disabled}
             />
           </label>
-
         </div>
         <div className={styles.row}>
           <label className={styles.field}>
@@ -70,9 +69,9 @@ export function ScalarFieldEditor({
               disabled={disabled}
             />
           </label>
-
         </div>
-      <Disclosure label={t("disclosure.constraints")}><div className={styles.row}>
+        <Disclosure label={t("disclosure.constraints")}>
+          <div className={styles.row}>
           <label className={styles.checkbox}>
             <input
               type="checkbox"
@@ -83,7 +82,7 @@ export function ScalarFieldEditor({
             />
             {t("editor.fields.required")}
           </label>
-<label className={styles.field}>
+          <label className={styles.field}>
             {t("editor.fields.minLength")}
             <input
               type="number"
@@ -103,7 +102,8 @@ export function ScalarFieldEditor({
               disabled={disabled}
             />
           </label>
-      </div></Disclosure>
+          </div>
+        </Disclosure>
       </section>
     );
   }
@@ -134,7 +134,6 @@ export function ScalarFieldEditor({
               disabled={disabled}
             />
           </label>
-
         </div>
         <div className={styles.row}>
           <label className={styles.field}>
@@ -148,9 +147,9 @@ export function ScalarFieldEditor({
               disabled={disabled}
             />
           </label>
-
         </div>
-      <Disclosure label={t("disclosure.constraints")}><div className={styles.row}>
+        <Disclosure label={t("disclosure.constraints")}>
+          <div className={styles.row}>
           <label className={styles.checkbox}>
             <input
               type="checkbox"
@@ -161,7 +160,7 @@ export function ScalarFieldEditor({
             />
             {t("editor.fields.required")}
           </label>
-<label className={styles.field}>
+          <label className={styles.field}>
             {t("editor.fields.min")}
             <input
               type="number"
@@ -194,7 +193,8 @@ export function ScalarFieldEditor({
               disabled={disabled}
             />
           </label>
-      </div></Disclosure>
+          </div>
+        </Disclosure>
       </section>
     );
   }

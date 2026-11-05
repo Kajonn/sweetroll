@@ -369,7 +369,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
       const secret = gm.locator("li").filter({ has: gm.getByRole("heading", { name: "Secret vault key", exact: true }) });
       const sharing = async (audience: string) => {
         await secret.getByRole("button", { name: "Sharing", exact: true }).click(); await gm.getByLabel("Audience", { exact: true }).selectOption(audience);
-        if (audience === "selected_players") await gm.getByRole("checkbox", { name: `${names[1]} (${actorIds[1]})`, exact: true }).check();
+        if (audience === "selected_players") await gm.getByTestId(`template-grant-${actorIds[1]}`).check();
         await gm.getByRole("button", { name: audience === "all_players" ? "Reveal to all players" : "Save sharing", exact: true }).click(); await expect(gm.getByRole("dialog")).toHaveCount(0);
       };
       const path = `/api/campaigns/${campaignId}/item-templates/${templates[3]!.templateId}`;

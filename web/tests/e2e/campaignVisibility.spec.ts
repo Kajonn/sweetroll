@@ -241,7 +241,7 @@ test("campaign visibility: ordinary-player matrix, narrowing eviction, leave pur
       await gmPage.getByRole("button", { name: `Edit ${selTitle}` }).click({ timeout: STEP_TIMEOUT });
       await gmPage.getByLabel("Audience").nth(1).selectOption("selected_players", { timeout: STEP_TIMEOUT });
       await expect(gmPage.getByText("Share with (selected players)")).toBeVisible({ timeout: STEP_TIMEOUT });
-      await gmPage.getByRole("checkbox", { name: playerUserId.slice(0, 8) }).uncheck({ timeout: STEP_TIMEOUT });
+      await gmPage.getByTestId(`content-grant-${playerUserId}`).uncheck({ timeout: STEP_TIMEOUT });
       await gmPage.getByRole("button", { name: "Save note" }).nth(1).click({ timeout: STEP_TIMEOUT });
       const gmList = gmPage.getByRole("list", { name: "Campaign content" });
       await expect(gmList.getByText("Selected players", { exact: true })).toBeVisible({ timeout: STEP_TIMEOUT });

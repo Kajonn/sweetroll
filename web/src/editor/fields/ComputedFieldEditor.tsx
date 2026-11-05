@@ -1,3 +1,4 @@
+import { DebugOnly } from "../../ui/debugMode.js";
 import { useEffect, useMemo, useRef, useState, type Dispatch } from "react";
 
 import { evaluateExpression } from "../../ports/evaluateExpression.js";
@@ -149,14 +150,6 @@ export function ComputedFieldEditor({
   return (
     <section className={styles.field} data-testid={`computed-field-${field.id}`}>
       <div className={styles.row}>
-        <DefinitionIdInput
-          value={field.id}
-          onChange={(next) => update({ id: next })}
-          referencedBy={referencedBy}
-          disabled={disabled}
-        />
-      </div>
-      <div className={styles.row}>
         <label className={styles.field} htmlFor={`computed-field-label-${field.id}`}>
           {t("editor.fields.label")}
           <input
@@ -252,10 +245,7 @@ export function ComputedFieldEditor({
           ) : (
             <span data-testid={`computed-field-preview-error-${field.id}`}>
               {preview.diagnostics.length > 0
-                ? t("editor.fields.computed.diagnostic", {
-                    code: preview.diagnostics[0]!.code,
-                    message: preview.diagnostics[0]!.message,
-                  })
+                ? <>{preview.diagnostics[0]!.message}<DebugOnly> ({preview.diagnostics[0]!.code})</DebugOnly></>
                 : t("editor.fields.computed.preview.error")}
             </span>
           )}
@@ -282,10 +272,7 @@ export function ComputedFieldEditor({
                   data-testid={`computed-field-diagnostic-${field.id}`}
                   data-code={d.code}
                 >
-                  {t("editor.fields.computed.diagnostic", {
-                    code: d.code,
-                    message: d.message,
-                  })}
+                  {d.message}<DebugOnly> ({d.code})</DebugOnly>
                 </li>
               ))}
             </ul>
@@ -314,6 +301,14 @@ export function ComputedFieldEditor({
       >
         {t("editor.fields.computed.fallback.hint")}
       </p>
+      <div className={styles.row}>
+        <DefinitionIdInput
+          value={field.id}
+          onChange={(next) => update({ id: next })}
+          referencedBy={referencedBy}
+          disabled={disabled}
+        />
+      </div>
     </section>
   );
 }

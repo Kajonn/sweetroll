@@ -199,7 +199,7 @@ export function CampaignMembersTab(props: {
               const selected = selectedRoles[member.userId] ?? suggestedRole(member);
               const roleChangeable = manageable && (member.role === "co_gm" || member.role === "player");
               return (
-                <li key={member.userId}>
+                <li key={member.userId} data-testid={`campaign-member-${member.userId}`}>
                   <span>{labelMember(member)}</span> <span>{roleLabel(member.role)}</span>{" "}
                   {isSelf ? <span>({t("campaign.detail.members.you")})</span> : null}{" "}
                   {roleChangeable ? (

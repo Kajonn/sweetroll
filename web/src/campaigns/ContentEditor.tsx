@@ -292,6 +292,7 @@ export function ContentEditor(props: {
                 {roster.map((member) => (
                   <Checkbox
                     key={member.userId}
+                    data-testid={`content-grant-${member.userId}`}
                     label={labelMember(member)}
                     checked={checked.includes(member.userId)}
                     onChange={() => toggleGrant(member.userId)}

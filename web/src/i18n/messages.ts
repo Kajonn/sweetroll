@@ -869,7 +869,7 @@ export const defaultMessages: MessageTable = {
   "campaign.adopt.offline": "Reconnect to bring a character into the campaign.",
   "campaign.adopt.stale": "Access or revisions changed. Refresh and review the character before trying again.",
   "campaign.adopt.uncertain": "The outcome is uncertain. Retry the exact request to confirm whether the character joined.",
-  "campaign.member.unnamed": "Unnamed player",
+  "campaign.member.unnamed": "Unnamed member",
   "campaign.invitations.enterToken.change": "Enter another invitation",
   "campaign.invitations.enterToken.label": "Invitation token",
   "campaign.invitations.enterToken.hint": "Paste the invitation token shared with you.",

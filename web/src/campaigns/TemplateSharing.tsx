@@ -46,6 +46,7 @@ export function AudienceFields(props: {
               >
                 <input
                   type="checkbox"
+                  data-testid={`template-grant-${m.userId}`}
                   checked={props.grants.some(
                     (g) =>
                       g.userId === m.userId && g.generation === m.generation,

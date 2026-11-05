@@ -31,6 +31,7 @@ describe("technical metadata disclosure", () => {
     render(<SheetEditor onChange={onChange} sheet={{ id: "sheet_secret", label: "Hero", targetEntityId: "hero", sections: [{ id: "section_secret", label: "Stats", elements: [{ kind: "field", id: "element_secret", fieldId: "str" }] }] }} entities={[{ id: "hero", label: "Hero" }]} allDefinitions={[{ kind: "field", id: "str", label: "Strength" }, { kind: "field", id: "other_str", label: "Strength" }, { kind: "field", id: "dex", label: "Dexterity" }]} />);
     expect(screen.queryByText(/ID: sheet_secret/)).not.toBeInTheDocument();
     expect(screen.queryByText(/id: section_secret/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText("Bound field", { exact: true })).toHaveLength(1);
     const select = screen.getByTestId("definition-reference-select");
     expect(within(select).getByRole("option", { name: "Dexterity" })).toBeInTheDocument();
     expect(within(select).getByRole("option", { name: "Strength (str)" })).toBeInTheDocument();

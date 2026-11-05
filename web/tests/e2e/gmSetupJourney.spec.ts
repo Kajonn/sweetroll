@@ -191,7 +191,8 @@ test("I7 exit: GM setup through UI, invitations, accept, promote, remove, unavai
       await inviteePage.getByRole("link", { name: campaignTitle }).click({ timeout: STEP_TIMEOUT });
       await expect(inviteePage).toHaveURL(`/campaigns/${campaignId}`);
       await inviteePage.getByRole("tab", { name: "Members" }).click({ timeout: STEP_TIMEOUT });
-      await expect(inviteePage.getByText(inviteeUserId!)).toBeVisible({ timeout: STEP_TIMEOUT });
+      await expect(inviteePage.getByTestId(`campaign-member-${inviteeUserId!}`)).toBeVisible({ timeout: STEP_TIMEOUT });
+      await expect(inviteePage.getByText(inviteeUserId!, { exact: true })).toHaveCount(0);
       await expect(inviteePage.getByText("Campaign settings")).toHaveCount(0);
       await expect(inviteePage.getByRole("tab", { name: "Settings" })).toHaveCount(0);
       await expect(inviteePage.getByRole("heading", { name: "Invitations" })).toHaveCount(0);
@@ -202,7 +203,7 @@ test("I7 exit: GM setup through UI, invitations, accept, promote, remove, unavai
       await page.goto(`/campaigns/${campaignId}`);
       await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
       await page.getByRole("tab", { name: "Members" }).click({ timeout: STEP_TIMEOUT });
-      const memberRow = page.locator("li", { hasText: inviteeUserId! });
+      const memberRow = page.getByTestId(`campaign-member-${inviteeUserId!}`);
       await expect(memberRow).toBeVisible({ timeout: STEP_TIMEOUT });
       await memberRow.locator("select").selectOption("co_gm");
       await memberRow.getByRole("button", { name: "Change role" }).click({ timeout: STEP_TIMEOUT });
@@ -215,12 +216,12 @@ test("I7 exit: GM setup through UI, invitations, accept, promote, remove, unavai
       await page.goto(`/campaigns/${campaignId}`);
       await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
       await page.getByRole("tab", { name: "Members" }).click({ timeout: STEP_TIMEOUT });
-      const removalRow = page.locator("li", { hasText: inviteeUserId! });
+      const removalRow = page.getByTestId(`campaign-member-${inviteeUserId!}`);
       await expect(removalRow).toBeVisible({ timeout: STEP_TIMEOUT });
-      await removalRow.getByRole("button", { name: `Remove ${inviteeUserId!}` }).click({ timeout: STEP_TIMEOUT });
+      await removalRow.getByRole("button", { name: /^Remove / }).click({ timeout: STEP_TIMEOUT });
       await expect(page.getByRole("dialog")).toBeVisible({ timeout: STEP_TIMEOUT });
       await page.getByRole("dialog").getByRole("button", { name: "Confirm removal" }).click({ timeout: STEP_TIMEOUT });
-      await expect(page.getByText(inviteeUserId!)).toHaveCount(0);
+      await expect(page.getByTestId(`campaign-member-${inviteeUserId!}`)).toHaveCount(0);
 
       // 12. Removed invitee: direct detail shows unavailable with the
       // access-changed notice (revocation purge); the list stays clean.

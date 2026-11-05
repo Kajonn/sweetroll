@@ -62,6 +62,7 @@ export function RollBreakdown({
       </ul>
       {roll.push?.faceOutcomes.map(outcome => <p key={`${outcome.groupId}:${outcome.face}`}>{groups.get(outcome.groupId)?.label ?? outcome.groupId} face {outcome.face}: {outcome.combinedCount} in combined pool, {outcome.rerolledCount} newly rolled. Manual bookkeeping only.</p>)}
       <Disclosure label={t("character.rollResult.showDetails")}>
+        {roll.push ? <p>Original saved pool</p> : null}
         <ul>
           {b.groups.map(group => <li key={group.id}>
             <strong>{group.label}</strong>

@@ -329,7 +329,8 @@ export function RollActionEditor({
                   data-testid={`roll-action-input-${input.id}`}
                 >
                   <div className={styles.field}>
-                    <FormField label={t("editor.action.roll.inputs.id")}>
+                    <Disclosure label={t("disclosure.identifier")}>
+<FormField label={t("editor.action.roll.inputs.id")}>
                       <input
                         id={`roll-action-input-id-${input.id}`}
                         type="text"
@@ -339,6 +340,7 @@ export function RollActionEditor({
                         disabled={disabled}
                       />
                     </FormField>
+                    </Disclosure>
                   </div>
                   <div className={styles.field}>
                     <FormField label={t("editor.action.roll.inputs.label")}>

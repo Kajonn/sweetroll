@@ -10,7 +10,7 @@ afterEach(() => { act(() => setDebugMode(false)); localStorage.clear(); });
 it("uses names and disambiguates duplicates and unnamed members", () => {
   expect(memberLabel(alex, [alex])).toBe("Alex");
   expect(memberLabel(alex, [alex, otherAlex])).toBe("Alex (11111111)");
-  expect(memberLabel({ userId: "33333333-cccc", displayName: null })).toBe("Unnamed player (33333333)");
+  expect(memberLabel({ userId: "33333333-cccc", displayName: null })).toBe("Unnamed member (33333333)");
   const samePrefix = { userId: "11111111-bbbb", displayName: "Alex" };
   expect(memberLabel(alex, [alex, samePrefix])).toBe("Alex (11111111-aaaa)");
 });

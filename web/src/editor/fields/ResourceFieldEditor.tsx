@@ -38,14 +38,6 @@ export function ResourceFieldEditor({
   return (
     <section className={styles.field} data-testid={`resource-field-${field.id}`}>
       <div className={styles.row}>
-        <DefinitionIdInput
-          value={field.id}
-          onChange={(next) => update({ id: next })}
-          referencedBy={referencedBy}
-          disabled={disabled}
-        />
-      </div>
-      <div className={styles.row}>
         <label className={styles.field} htmlFor={`resource-field-label-${field.id}`}>
           {t("editor.fields.label")}
           <input
@@ -150,6 +142,14 @@ export function ResourceFieldEditor({
         {t("editor.fields.resource.resetRuleHint")}
       </p>
 </Disclosure>
+      <div className={styles.row}>
+        <DefinitionIdInput
+          value={field.id}
+          onChange={(next) => update({ id: next })}
+          referencedBy={referencedBy}
+          disabled={disabled}
+        />
+      </div>
     </section>
   );
 }

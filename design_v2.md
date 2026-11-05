@@ -685,6 +685,13 @@ deployments are test environments until the first application release Git tag
 multiple app versions are required only for changes after that tag. This policy takes
 precedence over historical plans, specifications and unchecked compatibility gates.
 
+**Owner clarification (2026-11-05):** Until the first application release tag,
+all app/database state may be cleared completely. The owner explicitly permits
+deleting and recreating the development app and its database when necessary;
+retaining old test state is optional. Do not ask again solely because a
+pre-release reset would discard test state. Check release-tag status first;
+after the first release tag, follow the released-data migration/recovery policy.
+
 | Phase | Required behavior |
 |---|---|
 | Before the first release tag (current) | Implement and verify the current app and schema. Edit the schema baseline and recreate test databases/profiles when needed. Do not add or maintain upgrade chains, one-off data repairs, old-build payload/cache adapters or mixed old/new app-client support. No implementation-plan tasks or transition tests may require this work before the tag. |

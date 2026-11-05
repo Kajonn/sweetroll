@@ -140,3 +140,13 @@ background/token art cannot be removed. Include metadata, stored checksums and
 private media bytes in the same recovery point; derivative caches may be rebuilt.
 Verify a real authorized upload after every storage configuration change and
 again after redeploy. Health alone does not prove storage persistence.
+
+
+## Current image hosting setup (2026-11-05)
+
+The main and acceptance services now have the image scanner, persistent media
+and separate current-schema test databases configured. See the
+[deployment inventory and verification](railway-2026-11-05.md). Both services
+retain locked sign-in; provisioning media does not enable the test-auth adapter.
+Pre-release app/database state may be reset completely under the owner's
+[explicit development-state policy](../../database/README.md).

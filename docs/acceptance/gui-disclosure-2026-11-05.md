@@ -132,3 +132,14 @@ d20, PbtA and dice pool at 360px and 1280px, including header scrolling, keyboar
 resource changes, save state, axe checks and horizontal-overflow checks. The
 33 targeted character-sheet/layout unit tests and frontend type checking also
 passed. Hosted deployment verification is recorded separately when complete.
+
+Hosted application `57e62ecff6ca1f598d71d8d0a80dfd20546e227b` passed in successful
+deployment `e028c9df-99d6-4e3f-87e6-ec51c916826b` on the isolated preview. Its
+`/health/ready` check succeeded. The saved Character Creation Verification sheet
+reopened with Human/proficiency edits intact. At document scroll Y=741, the
+character header had computed `position: static` and bounds -574.75 to -325.22px;
+it was fully outside the viewport, leaving abilities and combat unobstructed.
+The old offline copy remained through reloads; closing the preview tab and
+reopening it loaded the new styling. Production configuration was not changed.
+
+![Scrolled character sheet without overlapping identity header](assets/character-scroll-2026-11-05.png)

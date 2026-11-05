@@ -223,9 +223,6 @@
     padding-inline-start: max(12px, env(safe-area-inset-left));
     padding-inline-end: max(12px, env(safe-area-inset-right));
   }
-  .navigation {
-    order: 1;
-  }
   .menuButton {
     display: inline-flex;
   }

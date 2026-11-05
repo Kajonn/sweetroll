@@ -15,9 +15,9 @@ for (const width of [320, 360, 768, 1280]) {
     if (width < 1024) {
       await expect(nav).toBeHidden();
       const menu = (await trigger.boundingBox())!;
-      const help = (await header.getByRole("button", { name: "Show keyboard shortcuts" }).boundingBox())!;
-      expect(menu.x).toBeGreaterThan(help.x + help.width);
-      expect(width - menu.x - menu.width).toBeLessThanOrEqual(16);
+      const logo = (await header.getByText("Sweetroll", { exact: true }).boundingBox())!;
+      expect(menu.x - logo.x - logo.width).toBeGreaterThanOrEqual(7);
+      expect(menu.x - logo.x - logo.width).toBeLessThanOrEqual(9);
       await trigger.click();
       await expect(nav).toBeVisible();
       const popup = (await nav.boundingBox())!;

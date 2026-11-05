@@ -90,13 +90,10 @@ at 360/1280px, plus desktop preview/publish and the phone conflict banner.
 The other three baselines were unchanged. Final PR checks verify these exact
 committed baseline candidates; human visual approval remains open.
 
-![Systems at 320px](assets/gui-systems-320-2026-11-05.png)
-
 The navigation trigger was subsequently moved to the right edge, after sign-out
 and shortcut help, as requested. A browser position assertion failed before
 the change and passed afterwards. All five compact-navigation/tab checks and
-type checking passed; the phone screenshot above reflects the right-aligned
-trigger. Final CI and preview details are recorded in PR #33.
+type checking passed. That placement was superseded by the final position below.
 
 The updated position also passed on hosted application `a1e76a8`, successful
 deployment `5167ae54-d5b1-4e6f-ba29-d50cfd977dab`. CI #234's visual rerun passed
@@ -104,5 +101,16 @@ the eight unchanged baselines. Its two phone screenshots (artifact
 `13447121110`) were inspected and updated; their pixel differences are confined
 to the 57px header. Dependency-download timeouts were retried separately from
 the app changes. Final committed screenshot checks are recorded in the PR.
+
+### Final menu position: beside the logo
+
+The owner requested the menu on the left, immediately after the Sweetroll logo.
+The browser assertion now requires an 8px gap from the logo at 320/360/768px.
+It failed against the right-edge placement and passed after removing the
+responsive flex ordering. All five compact-navigation/tab checks and type
+checking passed. The phone screenshot below reflects this final placement;
+desktop navigation is unchanged. Final preview and CI evidence are in PR #33.
+
+![Systems at 320px](assets/gui-systems-320-2026-11-05.png)
 
 ![Systems at 1280px](assets/gui-systems-1280-2026-11-05.png)

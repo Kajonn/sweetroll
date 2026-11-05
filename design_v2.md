@@ -358,7 +358,7 @@ Use role-based permissions for coarse capabilities and resource-level policy che
 The app's `/` landing view is Systems, and its primary navigation label is
 “Systems”. The shared header uses a single compact row: primary links are inline
 on desktop and available through a keyboard-accessible navigation disclosure
-below 1024px, with its trigger at the right edge after the account actions.
+below 1024px, with its trigger immediately after the Sweetroll logo on the left.
 Phone bottom navigation remains available. Creator and campaign
 tabs use one horizontally scrollable row with 44px targets instead of wrapping
 into several rows. Navigation and viewport changes preserve the active view's

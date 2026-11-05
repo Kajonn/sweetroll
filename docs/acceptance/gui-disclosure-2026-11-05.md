@@ -56,3 +56,27 @@ outside the repository replace the restricted tsx CLI IPC launcher with
 
 Physical-device, real-provider-login, human visual approval and table/remote
 playtest gates remain open. These checks do not close the complete G9 release gate.
+
+## Follow-up: Systems and compact navigation
+
+The requested follow-up renames Home to Systems on the existing `/` system
+library route. The normal header is now 57px tall in browser checks, with a
+navigation disclosure below 1024px and inline links on desktop. Creator and
+campaign tabs stay in one horizontally scrollable row with 44px targets.
+Phone bottom navigation, sign-out, shortcut help and native link URLs remain.
+
+Red–green component tests verify the Systems label, client navigation, menu
+closing and Escape focus restoration. All 1,230 frontend unit tests passed;
+type checking and the production build passed. Eleven existing/follow-up browser
+checks passed together, followed by five focused checks covering 320/360/768/1280px,
+menu bounds, 200% text, Systems return navigation and campaign tab keyboard
+scrolling. Full branch CI results and the exact updated deployment are recorded
+in PR #33. Screenshot baselines are reviewed separately in the CI environment.
+
+The agent inspected the Systems and campaign layouts at phone and desktop
+widths. This provides browser evidence, not human visual or physical-device
+acceptance.
+
+![Systems at 320px](assets/gui-systems-320-2026-11-05.png)
+
+![Systems at 1280px](assets/gui-systems-1280-2026-11-05.png)

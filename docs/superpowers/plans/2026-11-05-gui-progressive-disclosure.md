@@ -48,3 +48,19 @@ Implementation and observed validation are recorded in
 [the dated acceptance record](../../acceptance/gui-disclosure-2026-11-05.md).
 The isolated preview is deployed; human visual and broader G9 release gates
 remain open. Final automated results are attached to PR #33.
+
+## Follow-up: Systems and compact top navigation
+
+Requested on 2026-11-05 after the first preview:
+
+- Rename Home to Systems, retaining the existing `/` system-library route.
+- Use a compact header; below 1024px disclose the primary links through one
+  menu button. Preserve native link destinations and client navigation.
+- Close on selection/outside pointer; Escape returns focus to the trigger.
+- Keep creator and campaign tabs on one scrollable row with 44px targets.
+- Verify 320/360/768/1280px geometry, keyboard use, Systems return navigation,
+  state preservation, existing journeys and updated routed screenshots.
+
+Red–green navigation tests cover labels and menu interactions. Final validation
+and the updated preview commit are recorded in the PR. This follow-up does not
+close human visual or wider G9 release gates.

@@ -11,6 +11,7 @@ import { ErrorBoundary } from "./ErrorBoundary.js";
 import { DevSignInPanel } from "./DevSignInPanel.js";
 import { ShortcutHelp } from "./ShortcutHelp.js";
 import { StatusBar } from "./StatusBar.js";
+import { AppNavigation } from "./AppNavigation.js";
 import { useShortcut } from "./useShortcut.js";
 import styles from "./AppShell.module.css";
 import { createApiClient } from "../api/client.js";
@@ -258,14 +259,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <a href="#main-content" className={styles.skipLink}>{t("shell.skipToContent")}</a>
           <header role="banner" data-testid="app-header" className={styles.header}>
             <span className={styles.brand}>Sweetroll</span>
-            <nav aria-label={t("shell.nav.label")} className={styles.nav}>
-              <AppLink href="/" className={styles.navLink}>{t("shell.nav.home")}</AppLink>
-              <AppLink href="/characters" className={styles.navLink}>{t("shell.nav.characters")}</AppLink>
-              <AppLink href="/campaigns" className={styles.navLink}>{t("shell.nav.campaigns")}</AppLink>
-              <AppLink href="/characters/new" className={styles.navLink}>{t("shell.nav.newCharacter")}</AppLink>
-              <AppLink href="/activity" className={styles.navLink}>{t("shell.nav.activity")}</AppLink>
-              <AppLink href="/account" className={styles.navLink}>{t("shell.nav.account")}</AppLink>
-            </nav>
+            <AppNavigation />
             <div className={styles.actions}>
             {auth.state === "authenticated" && (
               <button type="button" onClick={() => { void signOut(); }}>{t("shell.signOut.button")}</button>

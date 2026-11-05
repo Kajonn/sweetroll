@@ -27,37 +27,61 @@
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 8px 24px;
-  flex-wrap: wrap;
-  padding-top: env(safe-area-inset-top);
+  gap: 8px 12px;
+  flex-wrap: nowrap;
+  padding-top: max(6px, env(safe-area-inset-top));
   padding-inline-start: max(16px, env(safe-area-inset-left));
   padding-inline-end: max(16px, env(safe-area-inset-right));
-  padding-bottom: 12px;
-  min-height: 72px;
+  padding-bottom: 6px;
+  min-height: 56px;
   border-bottom: 1px solid var(--color-border);
   background: var(--surface-panel);
   box-shadow: 0 2px 12px var(--color-shadow);
 }
 
 .brand {
-  white-space: nowrap;
-  font-size: 1.45rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 1.2rem;
   font-weight: 800;
   letter-spacing: -0.05em;
+  color: var(--text-primary);
+}
+
+.navigation {
+  min-width: 0;
+}
+
+.menuButton {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--surface-panel);
   color: var(--text-primary);
 }
 
 .nav {
   display: flex;
   align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
+  gap: 2px;
+  flex-wrap: nowrap;
   min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 .navLink {
+  flex-shrink: 0;
   white-space: nowrap;
-  padding: 10px 12px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 10px;
   border-radius: var(--radius-control);
   color: var(--text-muted);
   font-weight: 600;
@@ -71,20 +95,26 @@
   color: var(--text-primary);
 }
 
+.navLink:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
 .actions {
   margin-inline-start: auto;
   display: flex;
   align-items: center;
-  gap: 8px 12px;
-  flex-wrap: wrap;
+  gap: 4px;
+  flex-wrap: nowrap;
   min-width: 0;
 }
 
 .signOutStatus {
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .actions > button:not(.helpButton) {
+  min-height: 44px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-control);
   background: var(--surface-panel);
@@ -185,7 +215,46 @@
   background: var(--surface-panel);
 }
 
-/* Phone: 320-599px. Single column, compact chrome, wrapping nav. */
+/* Keep the primary links in one compact disclosure on phone/tablet.
+   The header owns the popup bounds so it fits even at 320px. */
+@media (max-width: 1023px) {
+  .header {
+    gap: 8px;
+    padding-inline-start: max(12px, env(safe-area-inset-left));
+    padding-inline-end: max(12px, env(safe-area-inset-right));
+  }
+  .navigation {
+    margin-inline-start: auto;
+  }
+  .menuButton {
+    display: inline-flex;
+  }
+  .nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    inset-inline-start: max(12px, env(safe-area-inset-left));
+    inset-inline-end: max(12px, env(safe-area-inset-right));
+    padding: 8px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-panel);
+    background: var(--surface-panel);
+    box-shadow: var(--shadow-dialog);
+    max-height: calc(100dvh - 80px);
+    overflow-y: auto;
+  }
+  .navigation[data-open="true"] .nav {
+    display: grid;
+  }
+  .navLink {
+    white-space: normal;
+  }
+  .actions {
+    margin-inline-start: 0;
+  }
+}
+
+/* Phone: 320-599px. Single column and compact chrome. */
 @media (max-width: 599px) {
   .header {
     /* Player navigation already has a sticky bottom bar. Let the larger
@@ -193,13 +262,6 @@
     position: relative;
     row-gap: 4px;
     font-size: 15px;
-  }
-  .nav {
-    order: 3;
-    flex-basis: 100%;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: thin;
   }
   .main {
     padding-top: 12px;
@@ -243,7 +305,7 @@
 /* Tablet: 600-1023px. Header and nav share one row where they fit. */
 @media (min-width: 600px) and (max-width: 1023px) {
   .header {
-    padding-bottom: 10px;
+    padding-bottom: 6px;
   }
   .main {
     padding-top: 16px;

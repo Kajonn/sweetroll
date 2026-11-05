@@ -458,7 +458,7 @@ describe("AppShell responsive shell (G3-1)", () => {
     const nav = screen.getByRole("navigation", { name: "Primary" });
     expect(nav).toBeInTheDocument();
     // Plain-anchor deep links (no router context required).
-    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Systems" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "New character" })).toHaveAttribute("href", "/characters/new");
     expect(screen.getByRole("link", { name: "Skip to main content" })).toHaveAttribute("href", "#main-content");
     // Authorization context stays explicit: sign-out + pending-status slot,
@@ -475,7 +475,7 @@ describe("AppShell responsive shell (G3-1)", () => {
     // G3-3: the three G3-1 chrome literals now live in the message table.
     expect(defaultMessages["shell.skipToContent"]).toBe("Skip to main content");
     expect(defaultMessages["shell.nav.label"]).toBe("Primary");
-    expect(defaultMessages["shell.nav.home"]).toBe("Home");
+    expect(defaultMessages["shell.nav.home"]).toBe("Systems");
     try {
       registerLocale({
         "shell.skipToContent": "Zum Inhalt springen",

@@ -102,13 +102,19 @@
 .tabs {
   display: flex;
   gap: 4px;
-  padding: 6px 12px;
+  padding: 0 8px;
   border-bottom: 1px solid var(--border-default);
   overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 .tab,
 .tabActive {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  flex-shrink: 0;
   font-size: 13px;
   padding: 6px 12px;
   border-radius: var(--radius-control);
@@ -130,6 +136,12 @@
 .tabActive {
   color: var(--action-primary-fg);
   background: var(--action-primary);
+}
+
+.tab:focus-visible,
+.tabActive:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .body {

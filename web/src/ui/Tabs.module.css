@@ -7,8 +7,11 @@
 
 .tabList {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 2px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  min-width: 0;
+  scrollbar-width: thin;
   border-bottom: 1px solid var(--border-default);
 }
 
@@ -18,7 +21,9 @@
   justify-content: center;
   min-height: 44px;
   min-width: 44px;
-  padding: 8px 16px;
+  padding: 6px 10px;
+  flex-shrink: 0;
+  white-space: nowrap;
   border: none;
   border-bottom: 2px solid transparent;
   background: transparent;
@@ -49,6 +54,11 @@
 .panel:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;
+}
+
+/* Keep the focus ring inside the horizontally scrolling strip. */
+.tab:focus-visible {
+  outline-offset: -2px;
 }
 
 .panel {

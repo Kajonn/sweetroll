@@ -1,3 +1,5 @@
+import { createCharacterImages, type CharacterImages } from "./images.js";
+import { createCharacterEntryImages, type CharacterEntryImages } from "./entry-images.js";
 import {canPlaceTemplate} from "../campaigns/templatePolicy.js";
 import {materializeDefaults,templateApplicable,validDefaults} from "../systems/implementation/runtime/effective-entry.js";
 import {readPushRoll,mayReadPush,narrowerAudience,type StoredPushRoll} from "./push.js";
@@ -458,7 +460,7 @@ export type CharacterExportV1 = {
 // Interface
 // ---------------------------------------------------------------------------
 
-export interface Characters {
+export interface Characters extends CharacterImages, CharacterEntryImages {
   readRoll(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<NormalizedRoll>>;
   pushOptions(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<PushOptions>>;
   create(ctx: RequestContext, input: CreateCharacter): Promise<CharacterResult<CharacterView>>;
@@ -496,6 +498,7 @@ export interface Characters {
 }
 
 export type CreateCharactersModuleInput = {
+  scanImage?: import("../platform/image-processing.js").ImageScanner;
   pool: Pool;
   runtime: SystemRuntime;
   authorizeVersionUse: SystemAuthoring["authorizeVersionUse"];
@@ -1074,6 +1077,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (source.kind === "campaign" && (typeof source.campaignId !== "string" || !ENTRY_ID_PATTERN.test(source.campaignId) || typeof source.templateId !== "string" || !ENTRY_ID_PATTERN.test(source.templateId))) return fail(errors.bad_request("Invalid campaign template reference."));
       }
       let snapshot: EntrySnapshot | undefined;
+      let pinnedImage: import("../platform/image-attachment.js").ImageDescriptor | undefined;
       let values = entryInput.values;
       let quantity = entryInput.quantity;
       if (entryInput.source?.kind === "campaign") {
@@ -1084,6 +1088,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const template = await input.campaignTemplates.read(input.pool, selectedSource);
         if (template === null || template.audience !== "all_players") return fail(errors.not_found());
         if (template.status !== "active" || template.revision !== selectedSource.templateRevision || template.contentRevision !== selectedSource.contentRevision) return fail({code:"conflict",message:"The campaign template has changed. Refresh and explicitly review the selected revision.",cacheDisposition:"replace"});
+        pinnedImage = template.image;
         values = {name:template.content.name,description:template.content.description ?? "",notes:template.content.notes ?? ""};
         quantity = template.kind === "item" ? (template.content.defaultQuantity ?? 1) : undefined;
         snapshot = {kind:template.kind,values:{name:template.content.name,description:template.content.description ?? "",notes:template.content.notes ?? ""},...(quantity === undefined ? {} : {quantity})};
@@ -1101,6 +1106,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         slotId: entryInput.slotId,
         templateId: entryInput.templateId,
         values: structuredClone(values),
+        ...(pinnedImage ? { image: structuredClone(pinnedImage) } : {}),
         ...(entryInput.source === undefined ? {} : {source:structuredClone(entryInput.source)}),
         ...(snapshot === undefined ? {} : {snapshot}),
         ...(quantity === undefined ? {} : {quantity}),
@@ -1111,6 +1117,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       if (candidate.templateId !== null) {
         const template = templates.find((candidateTemplate) => candidateTemplate.id === candidate.templateId);
         if (template === undefined) return fail(errors.invalid_value("Entry template is unknown."));
+        if (template.image) candidate.image = structuredClone(template.image);
         for (const field of template.fields) {
           if (Object.hasOwn(candidate.values, field.id)) continue;
           // Computed/image template fields carry no player default and can
@@ -1241,6 +1248,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
   }
 
   return {
+    ...createCharacterImages({ pool: input.pool, now, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
+    ...createCharacterEntryImages({ pool: input.pool, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
     async create(ctx, createInput) {
       try {
         const inputHash = hashInput({
@@ -1515,7 +1524,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const copiedState = structuredClone(source.state);
         const outcome = await repo.duplicateCharacterTx({
           executionId,
-          source: { characterId: duplicateInput.characterId, actorId: ctx.actorId },
+          source: { characterId: duplicateInput.characterId, actorId: ctx.actorId, expectedRevision: source.revision },
           duplicate: {
             characterId: duplicateId,
             ownerId: ctx.actorId,
@@ -1594,6 +1603,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             resultJson: serializeDuplicateError(error),
             expiresAt: replayExpiresAt,
           });
+          return { ok: false, error };
+        }
+        if (outcome.kind === "conflict") {
+          const error: CharacterError = { code: "conflict", message: "The source character changed. Refresh before duplicating it.", latestRevision: outcome.latestRevision, cacheDisposition: "replace" };
+          await repo.finalizeExecutionError({ executionId, resultJson: serializeDuplicateError(error), expiresAt: replayExpiresAt });
           return { ok: false, error };
         }
         const stored = outcome.resultJson as StoredDuplicateOutcome;

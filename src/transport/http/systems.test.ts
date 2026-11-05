@@ -46,6 +46,10 @@ const workspace = (): AuthoringWorkspace => ({
 
 function makeAuthoring(overrides: Partial<SystemAuthoring> = {}): SystemAuthoring {
   const base: SystemAuthoring = {
+    openItemImage: async () => ({ ok: true, value: { revision: 1, image: null } }),
+    setItemImage: async () => ({ ok: true, value: { revision: 2, image: null } }),
+    removeItemImage: async () => ({ ok: true, value: { revision: 2, image: null } }),
+    openItemImageBytes: async () => ({ ok: false, error: { code: "not_found", message: "Unavailable" } }),
     createDraft: async () => ({ ok: true, value: workspace() }),
     open: async () => ({ ok: true, value: workspace() }),
     list: async () => ({ ok: true, value: { systems: [], nextCursor: null } }),

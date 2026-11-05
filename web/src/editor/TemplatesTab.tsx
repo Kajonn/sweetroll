@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import type { ApiClient } from "../api/client.js";
 import { t } from "../i18n/index.js";
@@ -52,6 +52,7 @@ export type TemplatesTabProps = {
   client: ApiClient;
   document: SystemDocumentV1;
   dispatch: React.Dispatch<DocumentAction>;
+  renderArtwork?: (template: ObjectTemplateV1) => ReactNode;
 };
 
 /**
@@ -65,7 +66,7 @@ export type TemplatesTabProps = {
  * entry including template-owned ones. Resource bumps reuse
  * `ResourceBumpEditor` directly (grammar-free).
  */
-export function TemplatesTab({ client, document, dispatch }: TemplatesTabProps) {
+export function TemplatesTab({ client, document, dispatch, renderArtwork }: TemplatesTabProps) {
   const templates = readTemplates(document);
   const slots = readSlots(document);
 
@@ -128,6 +129,7 @@ export function TemplatesTab({ client, document, dispatch }: TemplatesTabProps) 
           <ul className={styles.actionList}>
             {templates.map((template, idx) => (
               <li key={template.id} data-path={`/templates/${idx}`}>
+                {renderArtwork?.(template)}
                 <TemplateDetail
                   client={client}
                   document={document}

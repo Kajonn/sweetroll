@@ -208,6 +208,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     description: document.metadata.description,
     language: document.metadata.language,
     defaultDice: document.metadata.defaultDice,
+    ...(document.metadata.presentation === undefined ? {} : { presentation: document.metadata.presentation }),
     entities: document.entities,
     referenceData: document.referenceData,
     sheets: document.sheets,

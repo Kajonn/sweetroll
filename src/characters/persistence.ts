@@ -227,7 +227,7 @@ export type DuplicateCharacterInput = {
    * so an adoption racing the snapshot cannot leak attached state into a
    * personal copy.
    */
-  source: { characterId: CharacterId; actorId: UserId };
+  source: { characterId: CharacterId; actorId: UserId; expectedRevision: number };
   duplicate: {
     characterId: CharacterId;
     ownerId: UserId;
@@ -252,6 +252,7 @@ export type DuplicateCharacterInput = {
 };
 
 export type DuplicateCharacterOutcome =
+  | { kind: "conflict"; latestRevision: number }
   | { kind: "applied"; record: CharacterRecord; resultJson: unknown }
   | { kind: "already_completed"; resultJson: unknown }
   | { kind: "not_found" }
@@ -471,6 +472,7 @@ async function applyCommandCampaignTx(
     );
     updatedRow = requireRow(updated.rows[0], "applyCommandCampaignTx.update");
   }
+  await syncEntryImages(client, input);
 
   // I6 Task 8: the effective audience is fixed here, under the campaign
   // lock, at first claim: an explicit permitted audience wins, otherwise the
@@ -659,6 +661,23 @@ async function applyManagementCampaignTx(
   return { kind: "applied", record, resultJson };
 }
 
+async function syncEntryImages(client: PoolClient, input: ApplyCommandInput): Promise<void> {
+  if (input.activity.kind !== "entry_added" && input.activity.kind !== "entry_removed") return;
+  const payload = input.activity.payloadJson as { entryId?: unknown } | null;
+  if (typeof payload?.entryId !== "string") throw new Error("Entry activity needs its validated entry ID");
+  const entryId = payload.entryId;
+  if (input.activity.kind === "entry_removed") {
+    await client.query("UPDATE character_entry_images SET pinned_asset_id=NULL,asset_id=NULL,description='',overridden=false,revision=revision+1 WHERE character_id=$1 AND entry_id=$2", [input.characterId, entryId]);
+  } else {
+    const image = input.nextState.entries?.[entryId]?.image;
+    // Persist a character-scoped retention FK with placement. Retired IDs keep
+    // a counter tombstone so reusing a UUID cannot revive an earlier override.
+    await client.query(`INSERT INTO character_entry_images(character_id,entry_id,pinned_asset_id,overridden,revision)
+      SELECT $1,$2,$3,false,0 WHERE $3::uuid IS NOT NULL OR EXISTS(SELECT 1 FROM character_entry_images WHERE character_id=$1 AND entry_id=$2)
+      ON CONFLICT(character_id,entry_id) DO UPDATE SET pinned_asset_id=EXCLUDED.pinned_asset_id,asset_id=NULL,description='',overridden=false,revision=character_entry_images.revision+1`, [input.characterId, entryId, image?.fileId ?? null]);
+  }
+}
+
 export function createCharacterPersistenceRepository(pool: Pool): CharacterPersistenceRepository {
   return {
     async loadExecution(input) {
@@ -760,6 +779,10 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           await client.query("ROLLBACK");
           return { kind: "archived" };
         }
+        if (sourceRow.revision !== input.source.expectedRevision) {
+          await client.query("ROLLBACK");
+          return { kind: "conflict", latestRevision: sourceRow.revision };
+        }
 
         const inserted = await client.query<CharacterRow>(
           `INSERT INTO characters (id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, created_at, updated_at)
@@ -776,6 +799,19 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           ],
         );
         const characterRow = requireRow(inserted.rows[0], "duplicateCharacterTx");
+        // Source lock serializes portrait replacement with duplication. The new
+        // character link owns access independently; immutable bytes are retained.
+        await client.query(
+          `INSERT INTO character_portraits(character_id, asset_id, description, revision)
+           SELECT $1, asset_id, description, 1 FROM character_portraits WHERE character_id=$2 AND asset_id IS NOT NULL`,
+          [characterRow.id, sourceRow.id],
+        );
+        await client.query(
+          `INSERT INTO character_entry_images(character_id,entry_id,pinned_asset_id,asset_id,description,overridden,revision)
+           SELECT $1,entry_id,pinned_asset_id,asset_id,description,overridden,CASE WHEN overridden THEN 1 ELSE 0 END
+           FROM character_entry_images WHERE character_id=$2 AND entry_id=ANY($3::uuid[])`,
+          [characterRow.id, sourceRow.id, Object.keys(input.duplicate.state.entries ?? {})],
+        );
         await client.query(
           `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, request_id)
            VALUES ($1, $2, $3, $4::jsonb, $5)`,
@@ -995,6 +1031,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           );
           updatedRow = requireRow(updated.rows[0], "applyCommandTx.update");
         }
+        await syncEntryImages(client, input);
 
         let rollId: string | null = null;
         if(input.roll?.push&&pushCommit.value){rollId=await insertPushRoll(client,input,pushCommit.value);}

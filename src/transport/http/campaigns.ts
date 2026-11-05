@@ -1,3 +1,5 @@
+import { SystemPresentationSchema } from "../../systems/implementation/package/schema/document.js";
+import { campaignItemImageHandlers, campaignItemImageRoutes } from "./campaignItemImages.js";
 import {campaignProposalRoutes,campaignProposalHandlers,CampaignProposalDto} from "./campaignProposals.js";
 import {RollBreakdownSchema,PushResultSchema} from "../../systems/implementation/rules/result.js";
 import { strictInputCompiler } from "./strictValidation.js";
@@ -54,6 +56,7 @@ const STATUS_BY_CODE: Record<CampaignError["code"], number> = {
   unprocessable: 422,
   rate_limited: 429,
   internal: 500,
+  temporarily_unavailable: 503,
 };
 
 const badRequest = (message: string): CampaignError => ({ code: "bad_request", message });
@@ -66,6 +69,7 @@ const UUID_FORMAT = "uuid";
 const DATE_TIME_FORMAT = "date-time";
 
 const CampaignViewDto = Type.Object({
+  presentation: Type.Optional(SystemPresentationSchema),
   campaignId: Type.String({ format: UUID_FORMAT }),
   ownerId: Type.String({ format: UUID_FORMAT }),
   systemVersionId: Type.String({ format: UUID_FORMAT }),
@@ -735,6 +739,7 @@ export type CampaignsRouteDefinition = {
 };
 
 export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
+  ...campaignItemImageRoutes,
   ...campaignTemplateRoutes,
   ...campaignProposalRoutes,
   {
@@ -1203,6 +1208,11 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
       },
     },
   },
+  ...(["images", "scenes"] as const).map(kind => ({
+    method: "get" as const, path: `/campaigns/:id/${kind}`, operationId: `get_campaigns_id_${kind}`,
+    schema: { params: CampaignIdParams, querystring: Type.Object({ limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 50 })), cursor: Type.Optional(Type.String({ format: "uuid" })) }, { additionalProperties: false }), response: { "200": Type.Object({ [kind]: Type.Array(kind === "images" ? MediaFileViewDto : Type.Pick(SceneViewDto, ["sceneId", "backgroundFileId", "revision"])), nextCursor: Type.Union([Type.String(), Type.Null()]), requestId: Type.String() }), ...ErrorResponses } },
+  })),
+  { method: "get", path: "/campaigns/:id/images/:fileId/thumbnail", operationId: "get_campaigns_id_images_fileId_thumbnail", schema: { params: CampaignImageParams, response: { "200": { schema: BinaryBodyDto, mediaType: "image/webp" }, ...ErrorResponses } } },
   {
     method: "post",
     path: "/campaigns/:id/images",
@@ -1213,6 +1223,8 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
       response: {
         "200": Type.Object({ image: MediaFileViewDto, requestId: Type.String() }),
         ...ErrorResponses,
+        "422": CampaignErrorEnvelope,
+        "503": CampaignErrorEnvelope,
       },
     },
   },
@@ -1649,6 +1661,7 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
 
     type Handler = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown> | unknown;
     const handlers: Record<string, Handler> = {
+      ...campaignItemImageHandlers(campaigns),
       ...campaignTemplateHandlers(campaigns),
       ...campaignProposalHandlers(campaigns),
       post_campaigns: async (request, reply) => {
@@ -2268,6 +2281,23 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         return { export: result.value, requestId: request.id };
       },
 
+      get_campaigns_id_images: async (request, reply) => {
+        const query = request.query as { limit?: number; cursor?: string }, params = request.params as { id: string };
+        const result = await campaigns.listSceneImages(ctxOf(request), { campaignId: params.id, ...query });
+        return result.ok ? { ...result.value, requestId: request.id } : sendError(reply, result.error, request.id);
+      },
+      get_campaigns_id_scenes: async (request, reply) => {
+        const query = request.query as { limit?: number; cursor?: string }, params = request.params as { id: string };
+        const result = await campaigns.listScenes(ctxOf(request), { campaignId: params.id, ...query });
+        return result.ok ? { ...result.value, requestId: request.id } : sendError(reply, result.error, request.id);
+      },
+      get_campaigns_id_images_fileId_thumbnail: async (request, reply) => {
+        const params = request.params as { id: string; fileId: string };
+        const result = await campaigns.openImage(ctxOf(request), { fileId: params.fileId, thumbnail: true });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        if (result.value.file.campaignId !== params.id) return sendError(reply, { code: "not_found", message: "The requested campaign does not exist." }, request.id);
+        return reply.type("image/webp").header("x-content-type-options", "nosniff").send(result.value.bytes);
+      },
       post_campaigns_id_images: async (request, reply) => {
         const params = request.params as { id: string };
         const body = request.body as {
@@ -2556,6 +2586,8 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
     for (const route of campaignsRouteDefinitions) {
       const response = toFastifyResponses(route.schema.response);
       const schema = response === undefined ? route.schema : { ...route.schema, response };
-      app[route.method](route.path, { schema, ...((route.path.includes("/item-templates") || route.path.includes("/item-proposals")) ? { validatorCompiler: strictInputCompiler, ...(route.path.includes("/item-proposals") ? {bodyLimit:32768}: {}) } : {}) }, handlers[route.operationId]!);
+      app[route.method](route.path, { schema, ...((route.path.includes("/item-templates") || route.path.includes("/item-proposals")) ? { validatorCompiler: strictInputCompiler, ...(route.path.includes("/item-proposals") ? {bodyLimit:32768}: {}) } : {}),
+        ...(route.path.includes("/image") && (route.path.includes("/item-templates") || route.path.includes("/item-proposals")) ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); }, ...(route.method === "put" ? { bodyLimit: 8 * 1024 * 1024 } : {}) } : {}),
+      }, handlers[route.operationId]!);
     }
   };

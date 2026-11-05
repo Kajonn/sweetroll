@@ -15,7 +15,7 @@ export function Panel({ title, actions, children, className }: PanelProps) {
   const titleId = `ui-panel-${generated.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const classes = [styles.panel, className].filter((part): part is string => Boolean(part)).join(" ");
   return (
-    <section className={classes} aria-labelledby={title ? titleId : undefined}>
+    <section data-system-panel className={classes} aria-labelledby={title ? titleId : undefined}>
       {title || actions ? (
         <div className={styles.panelHeader}>
           {title ? (

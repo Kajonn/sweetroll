@@ -111,6 +111,7 @@ function emitClientTypes(): void {
 
   const generated = execSync(`npx --yes openapi-typescript ${openApiPath}`, {
     stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: 16 * 1024 * 1024,
   }).toString();
 
   if (checkMode) {

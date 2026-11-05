@@ -64,6 +64,43 @@
       "maxLength": 10000,
       "type": "string"
     },
+    "presentation": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "colorPreset"
+      ],
+      "properties": {
+        "componentStyle": {
+          "anyOf": [
+            {
+              "const": "default",
+              "type": "string"
+            },
+            {
+              "const": "classic",
+              "type": "string"
+            }
+          ]
+        },
+        "colorPreset": {
+          "anyOf": [
+            {
+              "const": "default",
+              "type": "string"
+            },
+            {
+              "const": "blue",
+              "type": "string"
+            },
+            {
+              "const": "ochre",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
     "entities": {
       "maxItems": 32,
       "type": "array",
@@ -1526,6 +1563,65 @@
           "id": {
             "pattern": "^[a-z][a-z0-9_]{0,63}$",
             "type": "string"
+          },
+          "image": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "fileId",
+              "description",
+              "contentType",
+              "width",
+              "height",
+              "sizeBytes",
+              "checksum"
+            ],
+            "properties": {
+              "fileId": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "description": {
+                "minLength": 1,
+                "maxLength": 500,
+                "type": "string"
+              },
+              "contentType": {
+                "anyOf": [
+                  {
+                    "const": "image/png",
+                    "type": "string"
+                  },
+                  {
+                    "const": "image/jpeg",
+                    "type": "string"
+                  },
+                  {
+                    "const": "image/webp",
+                    "type": "string"
+                  }
+                ]
+              },
+              "width": {
+                "minimum": 1,
+                "maximum": 4096,
+                "type": "integer"
+              },
+              "height": {
+                "minimum": 1,
+                "maximum": 4096,
+                "type": "integer"
+              },
+              "sizeBytes": {
+                "minimum": 1,
+                "maximum": 5242880,
+                "type": "integer"
+              },
+              "checksum": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              }
+            }
           },
           "label": {
             "maxLength": 120,

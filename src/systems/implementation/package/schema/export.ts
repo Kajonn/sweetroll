@@ -1,6 +1,14 @@
 import { Type, type Static } from "@sinclair/typebox";
 
 import { SystemPackageV1Schema } from "./package.js";
+import { ImageDescriptorSchema } from "../../../../platform/image-attachment.js";
+
+export const SystemImageManifestSchema = Type.Object({
+  fileId: ImageDescriptorSchema.properties.fileId,
+  checksum: ImageDescriptorSchema.properties.checksum,
+  contentType: ImageDescriptorSchema.properties.contentType,
+  dataBase64: Type.String({ minLength: 1, maxLength: Math.ceil(5 * 1024 * 1024 / 3) * 4 }),
+}, { additionalProperties: false });
 
 const UTC_TIMESTAMP_PATTERN =
   "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{3})?Z$";
@@ -20,6 +28,7 @@ export const SystemExportV1Schema = Type.Object(
       ),
     ),
     package: SystemPackageV1Schema,
+    images: Type.Optional(Type.Array(SystemImageManifestSchema, { maxItems: 128 })),
   },
   { additionalProperties: false },
 );

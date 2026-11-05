@@ -1,3 +1,4 @@
+import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import {CampaignProposals} from "./CampaignProposals.js";
 import {CampaignTemplates} from "./CampaignTemplates.js";
 // Campaign detail shell: openCampaign on mount, tabbed Characters /
@@ -261,14 +262,15 @@ export function CampaignDetail(props: {
       window.location.href = `/characters/${characterId}`;
     });
   return (
-    <section aria-label={campaign.title}>
+    <SystemPresentationScope as="section" aria-label={campaign.title} presentation={campaign.presentation}>
       <PageHeader
         title={campaign.title}
-        actions={
+        actions={<>
+          {isGm ? <Button variant="secondary" onClick={() => { window.location.assign(`/campaigns/${encodeURIComponent(props.campaignId)}/scenes`); }}>{t("campaign.detail.scenes.title")}</Button> : null}
           <Button variant="secondary" onClick={() => setLeavePhase("confirming")}>
             {t("campaign.detail.leave.button")}
           </Button>
-        }
+        </>}
       />
       {leavePhase === "conflict" ? (
         <EmptyState
@@ -414,6 +416,6 @@ export function CampaignDetail(props: {
           <p>{t("campaign.detail.leave.confirm.hint")}</p>
         </Panel>
       </Dialog>
-    </section>
+    </SystemPresentationScope>
   );
 }

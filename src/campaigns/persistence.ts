@@ -1609,6 +1609,21 @@ export function createCampaignPersistenceRepository(pool: Pool) {
      * on disk under `storageKey` (written before this insert); the row is
      * the durability record Tasks 2-4 reference.
      */
+    async listSceneImageMetadata(client: PoolClient, campaignId: string, limit: number, cursor: string | null) {
+      return (await client.query<import("./media.js").MediaFileView>(`SELECT id AS "fileId", campaign_id AS "campaignId", name, media_type AS "mediaType", size_bytes AS "sizeBytes", width, height, checksum, revision FROM media_files WHERE campaign_id=$1 AND ($2::uuid IS NULL OR id>$2) ORDER BY id LIMIT $3`, [campaignId, cursor, limit])).rows;
+    },
+    async listSceneMetadata(client: PoolClient, campaignId: string, limit: number, cursor: string | null) {
+      return (await client.query<import("./scene-library.js").SceneSummary>(`SELECT id AS "sceneId", background_file_id AS "backgroundFileId", revision FROM scenes WHERE campaign_id=$1 AND ($2::uuid IS NULL OR id>$2) ORDER BY id LIMIT $3`, [campaignId, cursor, limit])).rows;
+    },
+    async mediaUsage(client: PoolClient, campaignId: string): Promise<{ count: number; bytes: number }> {
+      const result = await client.query<{ count: string; bytes: string }>("SELECT count(*)::text count, COALESCE(sum(size_bytes),0)::text bytes FROM media_files WHERE campaign_id=$1", [campaignId]);
+      return { count: Number(result.rows[0]!.count), bytes: Number(result.rows[0]!.bytes) };
+    },
+    async mediaIsReferenced(client: PoolClient, fileId: string): Promise<boolean> {
+      const result = await client.query("SELECT 1 FROM scenes WHERE background_file_id=$1 OR tokens_jsonb @> $2::jsonb LIMIT 1", [fileId, JSON.stringify([{ imageFileId: fileId }])]);
+      return result.rowCount !== 0;
+    },
+
     async insertMediaFile(
       client: PoolClient,
       input: {
@@ -1743,6 +1758,8 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       const result = await client.query<SceneRow>(
         `UPDATE scenes
             SET background_file_id = $2,
+                fog_jsonb = CASE WHEN background_file_id IS DISTINCT FROM $2 THEN '[]'::jsonb ELSE fog_jsonb END,
+                tokens_jsonb = CASE WHEN background_file_id IS DISTINCT FROM $2 THEN '[]'::jsonb ELSE tokens_jsonb END,
                 revision = revision + 1
           WHERE id = $1 AND revision = $3
           RETURNING ${SCENE_COLUMNS}`,

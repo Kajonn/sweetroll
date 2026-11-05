@@ -1,5 +1,6 @@
 import type {TemplateAudience,TemplateGrant,TemplateReadScope} from "./templatePolicy.js";
 import type { Pool, PoolClient } from "pg";
+import type { ImageDescriptor } from "../platform/image-attachment.js";
 import type {
   CampaignTemplateView,
   TemplateContent,
@@ -12,11 +13,15 @@ import type { TemplateKind } from "../systems/implementation/package/schema/inde
 const SELECT = `SELECT t.id AS "templateId", t.campaign_id AS "campaignId", t.creator_id AS "creatorId", t.kind,
   COALESCE((SELECT jsonb_agg(jsonb_build_object('userId',g.user_id,'generation',g.membership_generation) ORDER BY g.user_id) FROM campaign_item_template_grants g WHERE g.template_id=t.id),'[]'::jsonb) AS grants,
   t.audience, t.status, t.revision, t.content_revision AS "contentRevision", r.content_json AS content,
+  CASE WHEN a.id IS NULL THEN NULL ELSE jsonb_build_object('fileId',a.id,'description',r.image_description,'contentType',a.media_type,'width',a.width,'height',a.height,'sizeBytes',a.size_bytes,'checksum',a.checksum) END AS image,
   t.created_at AS "createdAt", t.updated_at AS "updatedAt"
-  FROM campaign_item_templates t JOIN campaign_item_template_revisions r ON r.template_id = t.id AND r.content_revision = t.content_revision`;
+  FROM campaign_item_templates t JOIN campaign_item_template_revisions r ON r.template_id = t.id AND r.content_revision = t.content_revision
+  LEFT JOIN item_image_assets a ON a.id=r.image_asset_id`;
 function view(row: CampaignTemplateView): CampaignTemplateView {
+  const { image, ...rest } = row;
   return {
-    ...row,
+    ...rest,
+    ...(image ? { image } : {}),
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
   };
@@ -55,6 +60,7 @@ export function createTemplateRepository(pool: Pool) {
         creatorId: string;
         kind: TemplateKind;
         content: TemplateContent;
+        image?: ImageDescriptor;
       },
     ): Promise<CampaignTemplateView> {
       await client.query(
@@ -62,8 +68,8 @@ export function createTemplateRepository(pool: Pool) {
         [input.templateId, input.campaignId, input.creatorId, input.kind],
       );
       await client.query(
-        `INSERT INTO campaign_item_template_revisions(template_id,content_revision,author_id,content_json) VALUES($1,1,$2,$3)`,
-        [input.templateId, input.creatorId, input.content],
+        `INSERT INTO campaign_item_template_revisions(template_id,content_revision,author_id,content_json,image_asset_id,image_description) VALUES($1,1,$2,$3,$4,$5)`,
+        [input.templateId, input.creatorId, input.content, input.image?.fileId ?? null, input.image?.description ?? ""],
       );
       return (await read(client, input))!;
     },
@@ -72,10 +78,11 @@ export function createTemplateRepository(pool: Pool) {
       current: CampaignTemplateView,
       content: TemplateContent,
       actorId: string,
+      image: ImageDescriptor | null = current.image ?? null,
     ): Promise<CampaignTemplateView> {
       await client.query(
-        `INSERT INTO campaign_item_template_revisions(template_id,content_revision,author_id,content_json) VALUES($1,$2,$3,$4)`,
-        [current.templateId, current.contentRevision + 1, actorId, content],
+        `INSERT INTO campaign_item_template_revisions(template_id,content_revision,author_id,content_json,image_asset_id,image_description) VALUES($1,$2,$3,$4,$5,$6)`,
+        [current.templateId, current.contentRevision + 1, actorId, content, image?.fileId ?? null, image?.description ?? ""],
       );
       await client.query(
         `UPDATE campaign_item_templates SET revision=revision+1,content_revision=content_revision+1,updated_at=now() WHERE id=$1`,

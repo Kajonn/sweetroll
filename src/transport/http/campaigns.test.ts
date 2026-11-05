@@ -219,6 +219,9 @@ function displayProjection(overrides: Partial<DisplayProjection> = {}): DisplayP
 function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
   const unavailable = async () => ({ok:false as const,error:{code:"not_found" as const,message:"Unknown template"}});
   const base: Campaigns = {
+    openTemplateImage: unavailable, setTemplateImage: unavailable, removeTemplateImage: unavailable,
+    openProposalImage: unavailable, setProposalImage: unavailable, removeProposalImage: unavailable,
+    openCampaignItemImageBytes: unavailable,
     shareTemplate:unavailable,previewTemplates:unavailable,
     submitProposal:unavailable, openProposal:unavailable, listProposals:unavailable, approveProposal:unavailable, rejectProposal:unavailable,
     listTemplateBases: async()=>({ok:true,value:[]}),
@@ -291,6 +294,8 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
     adoptCampaignCharacter: async () => ({ ok: true, value: placedView() }),
     // I7b Task 1: image routes land in a later task; the stub keeps the
     // seam total while no route calls them yet.
+    listSceneImages: async () => ({ ok: true as const, value: { images: [], nextCursor: null } }),
+    listScenes: async () => ({ ok: true as const, value: { scenes: [], nextCursor: null } }),
     uploadImage: async () => ({ ok: true as const, value: mediaFileView() }),
     deleteImage: async () => ({ ok: true as const, value: mediaFileView() }),
     // I7b Task 4: GM original read; the stub keeps the seam total while no

@@ -1,4 +1,5 @@
 import * as RadixDialog from "@radix-ui/react-dialog";
+import { useSystemPresentationAttributes } from "../theme/SystemPresentation.js";
 import type { ReactNode } from "react";
 
 import { Button } from "./Button.js";
@@ -33,13 +34,15 @@ export function Dialog({
   onCloseAutoFocus,
   variant = "dialog",
 }: DialogProps) {
+  const presentation = useSystemPresentationAttributes();
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className={styles.overlay} />
+        <RadixDialog.Overlay {...presentation} className={`${presentation.className} ${styles.overlay}`} />
         <RadixDialog.Content
+          {...presentation}
           onCloseAutoFocus={onCloseAutoFocus}
-          className={variant === "sheet" ? styles.sheet : styles.content}
+          className={`${presentation.className} ${variant === "sheet" ? styles.sheet : styles.content}`}
         >
           <RadixDialog.Title className={styles.title}>{title}</RadixDialog.Title>
           {description ? (

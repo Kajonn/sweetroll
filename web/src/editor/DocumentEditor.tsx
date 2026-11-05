@@ -1,3 +1,5 @@
+import { ItemArtwork } from "../ui/ItemArtwork.js";
+import { createImageEditorApi } from "../ui/imageEditorApi.js";
 import { useQueryClient } from "@tanstack/react-query";
 import { compileExpression, type ExpressionAstV1 } from "@sweetroll/rules";
 import { Check } from "lucide-react";
@@ -6,6 +8,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { ApiClient } from "../api/client.js";
 import { openSystemKey, useOpenSystem } from "../api/openSystem.js";
 import type { DocumentAssessment, PublishedVersion, SystemWorkspace } from "../api/server.js";
+import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import { t } from "../i18n/index.js";
 import type { ScalarValue, ValueType } from "../ports/evaluateExpression.js";
 import { ResourceBumpEditor, type ResourceBumpActionV1 } from "./actions/ResourceBumpEditor.js";
@@ -247,6 +250,7 @@ export function DocumentEditorBody({
   const [publishOpen, setPublishOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const draftRevision = ws.draft?.revision ?? null;
+  const imageFactory = useMemo(() => (id: string) => createImageEditorApi(client, `/systems/${encodeURIComponent(ws.system.systemId)}/templates/${encodeURIComponent(id)}/image`, "system"), [client, ws.system.systemId]);
   // Newest-first (server ORDER BY created_at DESC): the first entry is the
   // latest published version. Read from the already-loaded workspace — no
   // new backend calls for readiness.
@@ -338,7 +342,7 @@ export function DocumentEditorBody({
   const previewVisible = previewOpen && previewPackage !== null && previewSample !== null;
 
   return (
-    <section className={styles.container}>
+    <SystemPresentationScope as="section" className={styles.container} presentation={document.metadata.presentation}>
       <header className={styles.header} data-testid="document-editor-header">
         <h1
           className={styles.name}
@@ -598,7 +602,7 @@ export function DocumentEditorBody({
         ) : active === "dice" ? (
           <DiceTab client={client} document={document} dispatch={dispatch} />
         ) : active === "templates" ? (
-          <TemplatesTab client={client} document={document} dispatch={dispatch} />
+          <TemplatesTab client={client} document={document} dispatch={dispatch} renderArtwork={template => <><ItemArtwork createApi={imageFactory} resourceId={template.id} online={!sync.offline} canEdit={!unsaved && sync.status === "saved" && ws.system.lifecycle === "active"} modal onChanged={async () => { await queryClient.invalidateQueries({ queryKey: ["system", "open", ws.system.systemId] }); }} />{unsaved ? <p>{t("artwork.creatorReady")}</p> : null}</>} />
         ) : active === "sections" ? (
           <SheetsTab document={document} dispatch={dispatch} />
         ) : active === "advanced" ? (
@@ -632,7 +636,7 @@ export function DocumentEditorBody({
           onClose={() => setVersionHistoryOpen(false)}
         />
       ) : null}
-    </section>
+    </SystemPresentationScope>
   );
 }
 
@@ -1496,6 +1500,7 @@ export function buildPreviewPackage(document: SystemDocumentV1): import("../prev
     | { kind: "resourceBump"; id: string; label: string; resourceId: string; operation: { kind: "delta"; amount: number } | { kind: "reset" } }
   >) ?? [];
   return {
+    presentation: document.metadata.presentation,
     entities,
     expressions: compilePreviewExpressions(document),
     sheets: sheets as unknown as never,

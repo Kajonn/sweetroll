@@ -1,0 +1,10 @@
+.panel { display: grid; gap: var(--space-2, .5rem); padding: var(--space-3, .75rem); border: 1px solid var(--color-border); border-radius: var(--radius-md); min-width: 0; }
+.panel h2, .panel p { margin: 0; }
+.panel label { display: grid; gap: .5rem; min-width: 0; }
+.panel input { min-height: 44px; max-width: 100%; box-sizing: border-box; font: inherit; }
+.previewButton { padding: 0; justify-self: start; border: 0; background: transparent; cursor: pointer; }
+.thumbnail { width: 128px; height: 128px; object-fit: contain; border-radius: var(--radius-md); }
+.full { display: block; max-width: 100%; max-height: 65dvh; object-fit: contain; }
+.actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.listThumbnail, .placeholder { width: 44px; height: 44px; object-fit: cover; border-radius: var(--radius-sm); flex-shrink: 0; }
+.placeholder { display: inline-block; background: var(--surface-hover); }

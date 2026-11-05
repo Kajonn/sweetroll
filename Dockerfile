@@ -19,6 +19,8 @@ COPY web ./web
 RUN npm --prefix web run build
 
 FROM node:24-alpine
+RUN apk add --no-cache su-exec
+COPY --chmod=755 scripts/container-entrypoint.sh /usr/local/bin/sweetroll-entrypoint
 ENV NODE_ENV=production
 WORKDIR /app
 # Railway mounts persistent media storage at runtime. Keep the mount point in
@@ -31,4 +33,5 @@ COPY --chown=node:node --from=web-build /app/web/dist ./web/dist
 COPY --chown=node:node package.json ./package.json
 COPY --chown=node:node database ./database
 EXPOSE 3000
+ENTRYPOINT ["sweetroll-entrypoint"]
 CMD ["npm", "run", "start:http"]

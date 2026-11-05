@@ -48,3 +48,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.colorSamples { display: flex; flex-wrap: wrap; gap: 8px; }
+.colorSample { display: block; border: 1px solid var(--border-default); border-inline-start: 12px solid var(--action-primary); border-radius: var(--radius-control); padding: 4px 8px; background: var(--surface-panel); color: var(--text-primary); font-size: var(--font-size-sm); }

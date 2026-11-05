@@ -1,3 +1,4 @@
+import { SceneLibrary } from "./SceneLibrary.js";
 // GM scene viewport: normalized scene-space image with token markers, plus
 // the GM scene route composition (viewport + fog toolbar + token tray).
 // Positions are fractions of the scene extent; markers use percentage
@@ -17,7 +18,7 @@ import type { SceneView } from "./types.js";
 export type SceneViewportApi = Pick<
   CampaignsApi,
   "openScene" | "applyFogEdit" | "placeToken" | "moveToken"
->;
+> & Pick<CampaignsApi, "sceneLibrary">;
 
 function isNotFound(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
@@ -148,10 +149,12 @@ export function CampaignSceneView(props: {
     );
   }
 
+  const library = props.api.sceneLibrary ? <SceneLibrary api={props.api.sceneLibrary} campaignId={props.campaignId} actorId={props.actorId} generation={generation} online={online} scene={sceneQuery.data?.scene} onChanged={async () => { if (props.sceneId) await sceneQuery.refetch(); }} onOpenScene={id => { window.location.assign(`/campaigns/${encodeURIComponent(props.campaignId)}/scenes?sceneId=${encodeURIComponent(id)}`); }} /> : null;
   if (props.sceneId === "") {
     return (
       <section aria-label={t("campaign.detail.scenes.title")}>
         <PageHeader title={t("campaign.detail.scenes.title")} />
+        {library}
         <EmptyState
           title={t("campaign.detail.scenes.empty.title")}
           description={t("campaign.detail.scenes.empty.description")}
@@ -204,15 +207,18 @@ export function CampaignSceneView(props: {
     void sceneQuery.refetch();
   };
   return (
-    <section aria-label={t("campaign.detail.scenes.title")}>
+    <section>
       <PageHeader title={t("campaign.detail.scenes.title")} />
+      {library}
       <SceneViewportView
+        key={`viewport:${scene.backgroundFileId}`}
         scene={scene}
         imageUrl={imageUrl}
         selectedTokenId={selectedTokenId}
         onSelectToken={setSelectedTokenId}
       />
       <FogToolbarView
+        key={`fog:${scene.backgroundFileId}`}
         api={props.api}
         sceneId={scene.sceneId}
         sceneRevision={scene.revision}
@@ -220,6 +226,7 @@ export function CampaignSceneView(props: {
         onChanged={refetch}
       />
       <TokenTrayView
+        key={`tokens:${scene.backgroundFileId}`}
         api={props.api}
         sceneId={scene.sceneId}
         sceneRevision={scene.revision}

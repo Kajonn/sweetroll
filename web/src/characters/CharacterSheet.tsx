@@ -1,6 +1,9 @@
+import { ItemArtwork } from "../ui/ItemArtwork.js";
+import type { CharactersApi } from "./api.js";
+import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import {PushPanel,type PushApi} from "../rolls/PushPanel.js";
 import {RollBreakdown} from "../rolls/RollBreakdown.js";
-import { useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { t } from "../i18n/index.js";
 import { Button } from "../ui/Button.js";
@@ -29,6 +32,8 @@ export type CharacterSheetProps = { snapshot: CharacterSnapshot;pushApi?:PushApi
   offlineAvailable?: boolean | undefined;
   /** Template catalog for slot pickers and granted-action buttons; omitted while unknown. */
   templates?: SlotTemplate[] | undefined;
+  portrait?: ReactNode;
+  entryImages?: CharactersApi["entryImages"];
 };
 type Element = NonNullable<CharacterSnapshot["confirmed"]>["projection"]["sheets"][number]["sections"][number]["elements"][number];
 
@@ -135,7 +140,9 @@ function RollResult({ roll, fieldLabels }: { roll: NonNullable<CharacterSnapshot
   return <section className={styles.rollResult} aria-labelledby="character-roll-result"><h2 id="character-roll-result">{t("character.rollResult.title")}</h2><dl><dt>{t("character.rollResult.expression")}</dt><dd>{expression}</dd><dt>{t("character.rollResult.total")}</dt><dd>{roll.total}</dd><dt>{t("character.rollResult.output")}</dt><dd>{roll.output}</dd><dt>{t("character.rollResult.audience")}</dt><dd>{audienceLabel(roll.audience)}</dd></dl><RollBreakdown roll={roll}/><Button variant="secondary" onClick={() => setDetailsOpen(open => !open)} aria-expanded={detailsOpen}>{t(detailsOpen ? "character.rollResult.hideDetails" : "character.rollResult.showDetails")}</Button>{detailsOpen ? <div className={styles.rollDetails}><ul>{roll.dice.map((die, index) => <li key={`${die.sides}-${index}`}>d{die.sides}={die.value}</li>)}</ul><ul>{roll.bindings.map(binding => <li key={`${binding.scope}-${binding.definitionId}`}>{binding.scope === "fields" ? fieldLabels.get(binding.definitionId) ?? `${binding.scope}.${binding.definitionId}` : `${binding.scope}.${binding.definitionId}`}: {String(binding.value)}</li>)}</ul></div> : null}</section>;
 }
 
-export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {
+export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, portrait, entryImages, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {
+  const characterIdForImages = snapshot.confirmed?.characterId;
+  const imageFactory = useMemo(() => entryImages && characterIdForImages ? (id: string) => entryImages(characterIdForImages, id) : undefined, [entryImages, characterIdForImages]);
   const character = snapshot.confirmed;
   const [commandError, setCommandError] = useState<string | null>(null);
   // A purged snapshot carries no private content: the session nulls
@@ -210,7 +217,7 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, 
       case "field": return <FieldControl key={element.id} field={element as ProjectedField} tentativeValue={tentativeValue(snapshot, element.fieldId)} disabled={!editable} pending={pending} onCommit={onSetField} />;
       case "resource": {
         const current = resourceCurrent(snapshot, element);
-        return <div key={element.id} className={styles.resourceGroup}><div className={styles.resource}><span className={styles.resourceLabel}>{element.label}</span><span className={styles.resourceValue}>{current} / {element.value.max}</span><Button variant="primary" disabled={!editable || current <= element.min} onClick={() => invokeCommand(() => onBump(element.resourceId, "down"))}>{t("character.resource.decrease", { label: element.label })}</Button><Button variant="primary" disabled={!editable || current >= element.max} onClick={() => invokeCommand(() => onBump(element.resourceId, "up"))}>{t("character.resource.increase", { label: element.label })}</Button></div><ValidationList validations={element.validations} /></div>;
+        return <div key={element.id} data-system-resource className={styles.resourceGroup}><div className={styles.resource}><span className={styles.resourceLabel}>{element.label}</span><span className={styles.resourceValue}>{current} / {element.value.max}</span><Button variant="primary" disabled={!editable || current <= element.min} onClick={() => invokeCommand(() => onBump(element.resourceId, "down"))}>{t("character.resource.decrease", { label: element.label })}</Button><Button variant="primary" disabled={!editable || current >= element.max} onClick={() => invokeCommand(() => onBump(element.resourceId, "up"))}>{t("character.resource.increase", { label: element.label })}</Button></div><ValidationList validations={element.validations} /></div>;
       }
       case "slot": {
         // Synthetic granted-action elements (action with entryId) are owned
@@ -227,6 +234,7 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, 
           accepts={[...element.accepts]}
           entries={element.entries.map((entry) => ({ ...entry, values: { ...entry.values } }))}
           templates={templates ?? []}
+          renderEntryImage={imageFactory ? entry => <ItemArtwork key={entry.entryId} resourceId={entry.entryId} createApi={imageFactory} online={snapshot.connected} canEdit={snapshot.editing.owned && character.lifecycle === "active" && snapshot.entries.length === 0 && !snapshot.error} parentRevision={character.revision} /> : undefined}
           disabled={!entriesEditable}
           actionsDisabled={!(editable && snapshot.phase === "ready" && onExecuteGranted !== undefined)}
           onAddEntry={onAddEntry ?? (async () => {})}
@@ -242,15 +250,16 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, 
     }
   };
 
-  return <main className={styles.sheet} aria-busy={pending}>
+  return <SystemPresentationScope as="section" aria-label={character.name} presentation={character.projection.presentation} className={styles.sheet} aria-busy={pending}>
     <header className={styles.header}><h1>{character.name}</h1><span>{projection.entityLabel}</span><p className={styles.meta}>{t("character.header.version", { version: character.systemVersionId })} · {t(character.lifecycle === "archived" ? "character.lifecycle.archived" : "character.lifecycle.active")}</p><output role="status" aria-live="polite">{syncStatusText(snapshot, pending)}</output>{commandError !== null ? <p role="alert" className={styles.commandError}>{commandError}</p> : null}{offlineAvailable === undefined ? null : <p role="status">{t(offlineAvailable ? "character.offline.available" : "character.offline.unavailable")}</p>}</header>
+    {portrait}
     {stale ? <p className={styles.stale}>{t("character.validation.stale")}</p> : null}
     {showEstimateNote ? <p className={styles.estimateNote}>{t("character.estimate.note")}</p> : null}
     {actionUnavailableReason !== null ? <p id="character-action-unavailable" className={styles.actionUnavailable}>{actionUnavailableReason}</p> : null}
     {diagnostics.length > 0 ? <section className={styles.diagnostics} aria-labelledby="character-diagnostics"><h2 id="character-diagnostics">{t("character.diagnostics.title")}</h2><ValidationList validations={diagnostics} /></section> : null}
-    {projection.sheets.map(sheet => <section key={sheet.id} className={styles.sheetSection} aria-labelledby={`sheet-${sheet.id}`}><h2 id={`sheet-${sheet.id}`}>{sheet.label}</h2>{sheet.sections.map(section => <section key={section.id} className={styles.section} aria-labelledby={`section-${section.id}`}><h3 id={`section-${section.id}`}>{section.label}</h3>{section.elements.filter((element, index) => !(index === 0 && element.kind === "heading" && element.text.trim() === section.label.trim())).map(renderElement)}</section>)}</section>)}
+    {projection.sheets.map(sheet => <section key={sheet.id} data-system-panel className={styles.sheetSection} aria-labelledby={`sheet-${sheet.id}`}><h2 id={`sheet-${sheet.id}`}>{sheet.label}</h2>{sheet.sections.map(section => <section key={section.id} className={styles.section} aria-labelledby={`section-${section.id}`}><h3 id={`section-${section.id}`}>{section.label}</h3>{section.elements.filter((element, index) => !(index === 0 && element.kind === "heading" && element.text.trim() === section.label.trim())).map(renderElement)}</section>)}</section>)}
     {projection.completionFields === undefined ? <p className={styles.completionUnavailable}>{t("character.completion.unavailable")}</p> : projection.completionFields.length > 0 ? <section className={styles.completion} aria-labelledby="character-completion"><h2 id="character-completion" tabIndex={-1}>{t("character.completion.title")}</h2>{projection.completionFields.map(field => <FieldControl key={field.id} field={field} tentativeValue={tentativeValue(snapshot, field.fieldId)} disabled={!editable} pending={pending} onCommit={onSetField} />)}</section> : null}
     {nominal !== null ? <section className={styles.nominalResult} role="status" aria-live="polite"><strong>{nominalLabel === null ? t("character.nominal.recorded") : t("character.nominal.recordedNamed", { label: nominalLabel })}</strong>{nominal.output.includes("{total}") || nominal.output === nominalLabel ? null : <p>{nominal.output}</p>}</section> : null}
     {snapshot.lastRoll !== null ? snapshot.lastRoll.push&&pushApi?<PushPanel roll={snapshot.lastRoll} characterId={character.characterId} api={pushApi} online={snapshot.connected} revision={character.revision} disabled={!editable||snapshot.phase!=="ready"||pending||snapshot.pendingOnlineAttempts.length>0} onPush={onPushRoll} onRefresh={onRefreshRoll} onDenied={onDeniedRoll}/>:<RollResult roll={snapshot.lastRoll} fieldLabels={fieldLabels} /> : null}
-  </main>;
+  </SystemPresentationScope>;
 }

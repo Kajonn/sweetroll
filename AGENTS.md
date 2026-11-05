@@ -19,7 +19,7 @@ Changes are in PR #28. This closes that journey gate; the broader G9 device,
 provider-login and table/remote-playtest gates remain open under design Section 18.2.
 No new feature is selected or authorized by this acceptance record.
 
-PR #29 adds the [2026-11-03 hosted G9 protocol and evidence](docs/acceptance/gui-2026-11-03-g9-hosted.md), including prefixed display authentication, redacted-image loading, private-device handoff and enlarged-text layout fixes. Consult its final result table and tested application/deployment before repeating work. Physical devices, real provider login, human visual sign-off, table/remote playtests and durable hosted media remain separate open release gates. Do not mark the complete G9 checklist accepted from browser automation alone.
+PR #29 adds the [2026-11-03 hosted G9 protocol and evidence](docs/acceptance/gui-2026-11-03-g9-hosted.md), including prefixed display authentication, redacted-image loading, private-device handoff and enlarged-text layout fixes. Consult its final result table and tested application/deployment before repeating work. Physical devices, real provider login, human visual sign-off, table/remote playtests remain separate open release gates. Do not mark the complete G9 checklist accepted from browser automation alone.
 
 The app is unreleased and databases contain only disposable test data. Follow the
 [development database policy](database/README.md): update the current schema
@@ -34,3 +34,11 @@ older compatibility checklists must not introduce pre-release acceptance or merg
 Before that tag, no app/database or character/campaign migration tasks or
 transition tests belong in implementation plans or suites. The strategy is agreed
 now in [the post-tag migration plan](docs/superpowers/plans/2026-10-27-application-migration-policy.md); implement transition code/tests only for changes after the tag.
+
+PR #30 delivers system color/component themes, durable scanned media, character
+portraits, item art and safe scene background upload/replacement. All stages
+T1/T2/M0–M3 passed their recorded hosted acceptance; M3 also passed byte/pixel
+verification after redeploy and CI #219 on application `d62a9f8`. See the
+[completed staged plan](docs/superpowers/plans/2026-11-03-system-themes-and-images.md)
+and [scene evidence](docs/acceptance/scene-backgrounds-2026-11-04.md). Physical
+devices, real provider login and human/playtest G9 gates remain open.

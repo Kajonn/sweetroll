@@ -135,7 +135,7 @@ describeWithDatabase("SystemAuthoring", () => {
     await admin.query(DDL);
     await admin.end();
     repo = createSystemPersistenceRepository(pool);
-    authoring = createSystemAuthoringModule({ repo });
+    authoring = createSystemAuthoringModule({ repo, pool });
   });
 
   beforeEach(async () => {

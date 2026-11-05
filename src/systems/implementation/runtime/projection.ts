@@ -38,6 +38,7 @@ export function buildCharacterProjection(input: {
   )));
 
   return {
+    ...(packageValue.presentation === undefined ? {} : { presentation: structuredClone(packageValue.presentation) }),
     projectionVersion: "1.0",
     systemId: packageValue.systemId,
     versionId: packageValue.versionId,

@@ -150,7 +150,7 @@ describeWithDatabase("Character command concurrency", () => {
     await admin.end();
 
     const repo = createSystemPersistenceRepository(pool);
-    authoring = createSystemAuthoringModule({ repo });
+    authoring = createSystemAuthoringModule({ repo, pool });
     runtime = createSystemRuntime({
       loadPackage: createPostgresPublishedPackageLoader(pool),
       authoritativeRollSecret: "a".repeat(32),

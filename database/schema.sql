@@ -224,6 +224,80 @@ CREATE TABLE characters (
 CREATE INDEX characters_owner_page_idx
   ON characters (owner_id, lifecycle, updated_at DESC, id DESC);
 
+-- Character-owned immutable safe art; authorization always follows a parent link.
+CREATE TABLE character_image_assets (
+  id uuid PRIMARY KEY,
+  created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  campaign_id uuid REFERENCES campaigns(id) ON DELETE SET NULL,
+  storage_key uuid NOT NULL,
+  media_type text NOT NULL CHECK (media_type IN ('image/png','image/jpeg','image/webp')),
+  width integer NOT NULL CHECK (width BETWEEN 1 AND 4096),
+  height integer NOT NULL CHECK (height BETWEEN 1 AND 4096),
+  size_bytes integer NOT NULL CHECK (size_bytes BETWEEN 1 AND 5242880),
+  thumbnail_bytes integer NOT NULL CHECK (thumbnail_bytes BETWEEN 1 AND 65536),
+  checksum text NOT NULL,
+  thumbnail_checksum text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX character_image_assets_owner_idx ON character_image_assets(created_by);
+CREATE INDEX character_image_assets_campaign_idx ON character_image_assets(campaign_id);
+CREATE TABLE character_portraits (
+  character_id uuid PRIMARY KEY REFERENCES characters(id) ON DELETE CASCADE,
+  asset_id uuid REFERENCES character_image_assets(id) ON DELETE RESTRICT,
+  description text NOT NULL DEFAULT '' CHECK (length(description) <= 500),
+  revision integer NOT NULL CHECK (revision >= 1)
+);
+CREATE TABLE character_image_receipts (
+  actor_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  idempotency_key text NOT NULL,
+  input_hash text NOT NULL,
+  result_json jsonb NOT NULL,
+  expires_at timestamptz NOT NULL,
+  PRIMARY KEY(actor_id,idempotency_key)
+);
+
+-- Immutable item art is retained across published systems, campaign catalogs
+-- and disclosed character copies. Owning Modules authorize their parent links.
+CREATE TABLE item_image_assets (
+  id uuid PRIMARY KEY,
+  storage_key uuid NOT NULL,
+  created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  campaign_id uuid REFERENCES campaigns(id) ON DELETE SET NULL,
+  media_type text NOT NULL CHECK (media_type IN ('image/png','image/jpeg','image/webp')),
+  width integer NOT NULL CHECK (width BETWEEN 1 AND 4096),
+  height integer NOT NULL CHECK (height BETWEEN 1 AND 4096),
+  size_bytes integer NOT NULL CHECK (size_bytes BETWEEN 1 AND 5242880),
+  thumbnail_bytes integer NOT NULL CHECK (thumbnail_bytes BETWEEN 1 AND 65536),
+  checksum text NOT NULL,
+  thumbnail_checksum text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX item_image_assets_uploader_idx ON item_image_assets(created_by);
+CREATE INDEX item_image_assets_campaign_idx ON item_image_assets(campaign_id);
+CREATE TABLE system_image_permissions (
+  system_id uuid NOT NULL REFERENCES systems(id) ON DELETE CASCADE,
+  asset_id uuid NOT NULL REFERENCES item_image_assets(id) ON DELETE RESTRICT,
+  PRIMARY KEY(system_id,asset_id)
+);
+CREATE TABLE item_image_receipts (
+  actor_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  idempotency_key text NOT NULL,
+  input_hash text NOT NULL,
+  result_json jsonb NOT NULL,
+  expires_at timestamptz NOT NULL,
+  PRIMARY KEY(actor_id,idempotency_key)
+);
+CREATE TABLE character_entry_images (
+  character_id uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+  entry_id uuid NOT NULL,
+  pinned_asset_id uuid REFERENCES item_image_assets(id) ON DELETE RESTRICT,
+  asset_id uuid REFERENCES item_image_assets(id) ON DELETE RESTRICT,
+  description text NOT NULL DEFAULT '' CHECK (length(description)<=500),
+  overridden boolean NOT NULL DEFAULT true,
+  revision integer NOT NULL CHECK (revision>=0),
+  PRIMARY KEY(character_id,entry_id)
+);
+
 CREATE TABLE character_command_executions (
   id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   actor_id              uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -535,6 +609,8 @@ CREATE TABLE campaign_item_template_revisions (
   content_revision integer NOT NULL CHECK (content_revision>=1),
   author_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   content_json jsonb NOT NULL CHECK (jsonb_typeof(content_json)='object'),
+  image_asset_id uuid REFERENCES item_image_assets(id) ON DELETE RESTRICT,
+  image_description text NOT NULL DEFAULT '' CHECK (length(image_description)<=500),
   created_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY(template_id,content_revision)
 );
@@ -567,6 +643,29 @@ CREATE TABLE campaign_item_proposals (
 );
 CREATE INDEX campaign_proposals_page_idx ON campaign_item_proposals(campaign_id,status,id);
 CREATE INDEX campaign_proposals_self_idx ON campaign_item_proposals(campaign_id,submitter_id,membership_generation,status,id);
+-- Proposal text and its terminal decision remain immutable. Pending artwork has
+-- its own revision and must be explicitly reviewed by an approver.
+CREATE TABLE campaign_proposal_images (
+  proposal_id uuid PRIMARY KEY REFERENCES campaign_item_proposals(id) ON DELETE CASCADE,
+  asset_id uuid REFERENCES item_image_assets(id) ON DELETE RESTRICT,
+  description text NOT NULL DEFAULT '' CHECK (length(description)<=500),
+  revision integer NOT NULL CHECK (revision>=1)
+);
+CREATE FUNCTION guard_campaign_proposal_image() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE parent_id uuid;
+BEGIN
+  IF TG_OP='DELETE' THEN parent_id=OLD.proposal_id; ELSE parent_id=NEW.proposal_id; END IF;
+  IF EXISTS(SELECT 1 FROM campaign_item_proposals WHERE id=parent_id AND status<>'pending') THEN
+    RAISE EXCEPTION 'Decided suggestion artwork is immutable';
+  END IF;
+  IF TG_OP='UPDATE' AND NEW.proposal_id IS DISTINCT FROM OLD.proposal_id THEN
+    RAISE EXCEPTION 'Suggestion artwork cannot change parent';
+  END IF;
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER campaign_proposal_image_immutable BEFORE INSERT OR UPDATE OR DELETE ON campaign_proposal_images FOR EACH ROW EXECUTE FUNCTION guard_campaign_proposal_image();
 CREATE FUNCTION guard_campaign_proposal() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF OLD.status <> 'pending' OR NEW.id IS DISTINCT FROM OLD.id OR NEW.campaign_id IS DISTINCT FROM OLD.campaign_id

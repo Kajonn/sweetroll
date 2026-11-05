@@ -891,13 +891,16 @@ describeWithDatabase("display pairing + redacted projection (Task 3 display comm
     const { sceneId } = await createScene(campaignId, fileId);
     const { displayId, secret } = await pairAndRedeem(campaignId);
 
-    // Row deleted while pinned (no FK): the projection collapses to not_found.
+    // Public deletion of pinned art is blocked; missing storage still fails closed.
     const deleted = await h.campaigns.deleteImage(ctxFor(h.users.gm), {
       fileId,
       expectedRevision: revision,
       idempotencyKey: randomUUID(),
     });
-    expect(deleted.ok).toBe(true);
+    expect(deleted).toMatchObject({ ok: false, error: { code: "conflict" } });
+    // Simulate missing durable bytes directly: the public API protects live references.
+    const record = await h.pool.query("SELECT storage_key FROM media_files WHERE id=$1", [fileId]);
+    await unlink(join(mediaDir, record.rows[0].storage_key));
     const orphaned = await h.campaigns.getDisplayProjection({ displayId, secret, sceneId });
     expect(orphaned).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
 

@@ -68,6 +68,7 @@ export type I3AppHandle = {
 };
 
 export type BuildI3AppInput = {
+  scanImage?: import("../../src/platform/image-processing.js").ImageScanner;
   pool: Pool;
   /** Wraps the runtime (e.g. to count resolve calls); defaults to identity. */
   wrapRuntime?: (runtime: SystemRuntime) => SystemRuntime;
@@ -101,6 +102,8 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
   });
 
   const authoring = createSystemAuthoringModule({
+    pool: input.pool,
+    scanImage: input.scanImage ?? (async () => "clean" as const),
     repo: createSystemPersistenceRepository(input.pool),
   });
 
@@ -112,6 +115,7 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
   const effectiveRuntime = input.wrapRuntime === undefined ? runtime : input.wrapRuntime(runtime);
 
   const characters = createCharactersModule({
+    scanImage: input.scanImage ?? (async () => "clean" as const),
     campaignTemplates:createTemplateRepository(input.pool),
     pool: input.pool,
     runtime: effectiveRuntime,

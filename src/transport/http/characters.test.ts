@@ -137,6 +137,14 @@ function characterExport(): CharacterExportV1 {
 
 function makeCharacters(overrides: Partial<Characters> = {}): Characters {
   const base: Characters = {
+    openEntryImage: async () => ({ ok: true, value: { revision: 0, image: null } }),
+    setEntryImage: async () => ({ ok: true, value: { revision: 1, image: null } }),
+    removeEntryImage: async () => ({ ok: true, value: { revision: 1, image: null } }),
+    openEntryImageBytes: async () => ({ ok: false, error: { code: "not_found", message: "Unavailable" } }),
+    openPortrait: async () => ({ ok: true, value: { revision: 0, portrait: null } }),
+    setPortrait: async () => ({ ok: true, value: { revision: 1, portrait: null } }),
+    removePortrait: async () => ({ ok: true, value: { revision: 1, portrait: null } }),
+    openPortraitImage: async () => ({ ok: false, error: { code: "not_found", message: "Unavailable" } }),
     readRoll:async()=>({ok:false,error:{code:"not_found",message:"Unavailable"}}),
     pushOptions:async()=>({ok:true,value:{canPush:false,reason:"no_eligible_dice",eligibleDiceIds:[],revision:1,nextAttempt:1,maxAttempts:1}}),
     create: async () => ({ ok: true, value: characterView() }),
@@ -189,7 +197,15 @@ describe("character HTTP routes", () => {
 
   it("rejects unauthenticated requests with 401 on every route", async () => {
     const app = await build(makeCharacters(), true);
-    const routes: Array<{ method: "get" | "post" | "patch" | "delete"; url: string; payload?: unknown }> = [
+    const portraitId = randomUUID();
+    const portraitCommand = { expectedCharacterRevision: 1, expectedPortraitRevision: 0, idempotencyKey: "portrait-auth" };
+    const routes: Array<{ method: "get" | "post" | "put" | "patch" | "delete"; url: string; payload?: unknown }> = [
+      { method: "get", url: `/characters/${portraitId}/portrait` },
+      { method: "get", url: `/characters/${portraitId}/portrait/thumbnail` },
+      { method: "get", url: `/characters/${portraitId}/portrait/${randomUUID()}` },
+      { method: "get", url: `/characters/${portraitId}/portrait/${randomUUID()}/thumbnail` },
+      { method: "put", url: `/characters/${portraitId}/portrait`, payload: { ...portraitCommand, description: "Hero", contentType: "image/png", dataBase64: "eA==" } },
+      { method: "delete", url: `/characters/${portraitId}/portrait`, payload: portraitCommand },
       { method: "post", url: "/characters", payload: { systemVersionId: randomUUID(), entityDefinitionId: "character", name: "Aria", idempotencyKey: "key-1" } },
       { method: "get", url: "/characters" },
       { method: "get", url: `/characters/${randomUUID()}` },

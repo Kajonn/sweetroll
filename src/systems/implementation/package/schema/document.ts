@@ -1,3 +1,4 @@
+import { ImageDescriptorSchema } from "../../../../platform/image-attachment.js";
 import { Type, type Static } from "@sinclair/typebox";
 
 import {PushPolicySchema} from "./push-policy.js";
@@ -420,6 +421,7 @@ export type TemplateKind = Static<typeof TemplateKindSchema>;
 export const ObjectTemplateV1Schema = Type.Object(
   {
     id: DefinitionIdSchema,
+    image: Type.Optional(ImageDescriptorSchema),
     label: LabelSchema,
     kind: TemplateKindSchema,
     description: Type.Optional(Type.String({ maxLength: LONG_TEXT_MAX_LENGTH })),
@@ -453,12 +455,19 @@ export const ValidationV1Schema = Type.Object(
 );
 export type ValidationV1 = Static<typeof ValidationV1Schema>;
 
+export const SystemPresentationSchema = Type.Object({
+  componentStyle: Type.Optional(Type.Union([Type.Literal("default"), Type.Literal("classic")])),
+  colorPreset: Type.Union([Type.Literal("default"), Type.Literal("blue"), Type.Literal("ochre")]),
+}, { additionalProperties: false });
+export type SystemPresentation = Static<typeof SystemPresentationSchema>;
+
 export const SystemMetadataV1Schema = Type.Object(
   {
     name: LabelSchema,
     description: Type.String({ maxLength: LONG_TEXT_MAX_LENGTH }),
     language: TextSchema,
     defaultDice: TextSchema,
+    presentation: Type.Optional(SystemPresentationSchema),
   },
   { additionalProperties: false },
 );

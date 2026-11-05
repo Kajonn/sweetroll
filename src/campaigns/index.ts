@@ -1,4 +1,7 @@
+export type { SceneLibraryQuery, SceneSummary } from "./scene-library.js";
+import { createSceneLibraryCommands, type SceneLibraryCommands } from "./scene-library.js";
 import { createProposalCommands, type ProposalCommands } from "./proposals.js";
+import { createCampaignItemImages, type CampaignItemImages } from "./item-images.js";
 import { createTemplateCommands, type TemplateCommands } from "./templates.js";
 import { randomUUID } from "node:crypto";
 
@@ -131,6 +134,7 @@ export type CampaignErrorCode =
   // `too_large` (HTTP 413); magic-byte/sharp/dimension rejections are
   // `unprocessable` (HTTP 422). Mapped in STATUS_BY_CODE alongside this
   // change; no system-package contract is affected.
+  | "temporarily_unavailable"
   | "too_large"
   | "unprocessable"
   | "internal";
@@ -144,6 +148,7 @@ export type CampaignError = {
 export type CampaignResult<T> = { ok: true; value: T } | { ok: false; error: CampaignError };
 
 export type CampaignView = {
+  presentation?: import("../systems/implementation/package/schema/index.js").SystemPresentation;
   campaignId: CampaignId;
   ownerId: UserId;
   systemVersionId: string;
@@ -309,7 +314,7 @@ export type AssignCampaignControllersInput = Omit<AssignControllersInput, "membe
 export type ClaimCampaignCharacterInput = Omit<ClaimCharacterInput, "membershipGeneration">;
 export type AdoptCampaignCharacterInput = Omit<AdoptCharacterInput, "membershipGeneration">;
 
-export interface Campaigns extends TemplateCommands, ProposalCommands {
+export interface Campaigns extends TemplateCommands, ProposalCommands, CampaignItemImages, SceneLibraryCommands {
   create(ctx: RequestContext, input: CreateCampaignInput): Promise<CampaignResult<CampaignView>>;
   open(ctx: RequestContext, input: OpenCampaignInput): Promise<CampaignResult<CampaignView>>;
   list(ctx: RequestContext, input: ListCampaignsInput): Promise<CampaignResult<ListCampaignsResult>>;
@@ -525,6 +530,7 @@ export type {
 };
 
 export type CreateCampaignsModuleInput = {
+  scanImage?: import("../platform/image-processing.js").ImageScanner;
   loadTemplatePackage?: import("../systems/templates.js").PublishedPackageLoader;
   pool: Pool;
   limits: CampaignLimits;
@@ -884,7 +890,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
   // I7b Task 1: validated private image storage. Same shared dependencies;
   // the commands own magic-byte/sharp validation, disk writes and the
   // metadata rows Tasks 2-4 reference.
-  const media = createMediaCommands({ pool: input.pool, repo, now, newId });
+  const media = createMediaCommands({ pool: input.pool, repo, now, newId, ...(input.scanImage ? { scanImage: input.scanImage } : {}) });
 
   // I7b Task 2: revision-guarded scene/fog/token commands. Same shared
   // dependencies; the commands own guard checks, same-campaign pin checks
@@ -936,6 +942,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
 
   return {
     ...templates,
+    ...createCampaignItemImages({ pool: input.pool, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
     ...createProposalCommands({ pool: input.pool, now, newId }),
     issueInvitation: invitations.issueInvitation,
     listInvitations: invitations.listInvitations,
@@ -954,6 +961,7 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     replaceGrants: content.replaceGrants,
     listActivity: content.listActivity,
     exportCampaign: content.exportCampaign,
+    ...createSceneLibraryCommands(input.pool, repo),
     uploadImage: media.uploadImage,
     deleteImage: media.deleteImage,
     openImage: media.openImage,
@@ -1083,12 +1091,17 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             campaign === null
               ? null
               : await repo.loadMembership(client, openInput.campaignId, ctx.actorId);
-          return { campaign, membership };
+          const packageValue = campaign !== null && canReadCampaign(campaign, membership)
+            ? await input.loadTemplatePackage?.(campaign.systemVersionId, client)
+            : null;
+          return { campaign, membership, presentation: packageValue?.presentation };
         });
         if (outcome.campaign === null || !canReadCampaign(outcome.campaign, outcome.membership)) {
           return { ok: false, error: errors.not_found() };
         }
-        return { ok: true, value: toView(outcome.campaign) };
+        return { ok: true, value: { ...toView(outcome.campaign),
+          ...(outcome.presentation === undefined ? {} : { presentation: outcome.presentation }),
+        } };
       } catch {
         return { ok: false, error: errors.internal() };
       }

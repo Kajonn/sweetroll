@@ -20,7 +20,7 @@ const proposal: CampaignProposal = {
   decision: null,
   approvedTemplateId: null,
 };
-function setup(isGm = false) {
+function setup(isGm = false, imageRevision?: number) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -29,6 +29,7 @@ function setup(isGm = false) {
       proposals: [
         {
           ...proposal,
+          ...(imageRevision === undefined ? {} : { imageRevision }),
           ...(isGm ? { eligibility: { canApprove: true, reason: null } } : {}),
         },
       ],
@@ -159,4 +160,11 @@ it("returns focus to the suggestion opener after Escape", async () => {
   await user.keyboard("{Escape}");
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(opener).toHaveFocus();
+});
+
+it("approves only the artwork revision present in the GM review", async () => {
+  const { api, user } = setup(true, 7);
+  await user.click(await screen.findByRole("button", { name: "Review suggestion" }));
+  await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Approve and publish to all members" }));
+  await waitFor(() => expect(api.approve).toHaveBeenCalledWith("c", "p", expect.objectContaining({ expectedProposalRevision: 1, expectedImageRevision: 7 })));
 });

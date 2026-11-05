@@ -77,6 +77,18 @@ const DDL = `
   );
   CREATE INDEX characters_owner_page_idx
     ON characters (owner_id, lifecycle, updated_at DESC, id DESC);
+  -- Portrait links are empty in this standalone command fixture. Image
+  -- asset constraints and campaign authority use the full-schema M1 suite.
+  CREATE TABLE character_portraits (
+    character_id uuid PRIMARY KEY REFERENCES characters(id) ON DELETE CASCADE,
+    asset_id uuid, description text NOT NULL DEFAULT '', revision integer NOT NULL
+  );
+  CREATE TABLE character_entry_images (
+    character_id uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    entry_id uuid NOT NULL, pinned_asset_id uuid, asset_id uuid,
+    description text NOT NULL DEFAULT '', overridden boolean NOT NULL DEFAULT true,
+    revision integer NOT NULL CHECK (revision>=0), PRIMARY KEY(character_id,entry_id)
+  );
   CREATE TABLE character_command_executions (
     id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     actor_id              uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -159,7 +171,7 @@ describeWithDatabase("Characters (create/list/open)", () => {
     await admin.end();
 
     const repo = createSystemPersistenceRepository(pool);
-    authoring = createSystemAuthoringModule({ repo });
+    authoring = createSystemAuthoringModule({ repo, pool });
     runtime = createSystemRuntime({
       loadPackage: createPostgresPublishedPackageLoader(pool),
       authoritativeRollSecret: "a".repeat(32),
@@ -520,7 +532,7 @@ describeWithDatabase("Characters (apply: set/bump)", () => {
     await admin.end();
 
     const repo = createSystemPersistenceRepository(pool);
-    authoring = createSystemAuthoringModule({ repo });
+    authoring = createSystemAuthoringModule({ repo, pool });
     runtime = createSystemRuntime({
       loadPackage: createPostgresPublishedPackageLoader(pool),
       authoritativeRollSecret: "a".repeat(32),
@@ -922,7 +934,7 @@ describeWithDatabase("Characters (apply: executeAction)", () => {
     await admin.end();
 
     const repo = createSystemPersistenceRepository(pool);
-    authoring = createSystemAuthoringModule({ repo });
+    authoring = createSystemAuthoringModule({ repo, pool });
     runtime = createSystemRuntime({
       loadPackage: createPostgresPublishedPackageLoader(pool),
       authoritativeRollSecret: "a".repeat(32),
@@ -1360,7 +1372,7 @@ describeWithDatabase("Characters (manage/activity/export)", () => {
     await admin.end();
 
     const repo = createSystemPersistenceRepository(pool);
-    authoring = createSystemAuthoringModule({ repo });
+    authoring = createSystemAuthoringModule({ repo, pool });
     runtime = createSystemRuntime({
       loadPackage: createPostgresPublishedPackageLoader(pool),
       authoritativeRollSecret: "a".repeat(32),

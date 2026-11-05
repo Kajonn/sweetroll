@@ -31,6 +31,11 @@ const databaseUrl =
   process.env.DATABASE_URL ?? "postgres://sweetroll:sweetroll@localhost:5432/sweetroll_i4remed";
 const rollSecret = process.env.AUTHORITATIVE_ROLL_SECRET ?? "development-only-roll-secret-32-bytes";
 
+const scannerPort = String(Number(backendPort) + 10);
+const scannerHealthPort = String(Number(backendPort) + 11);
+const scannerHost = process.env.SWEETROLL_CLAMD_HOST ?? "127.0.0.1";
+const scannerBackendPort = process.env.SWEETROLL_CLAMD_PORT ?? scannerPort;
+
 export default defineConfig({
   testDir: "./tests/offline",
   fullyParallel: false,
@@ -39,6 +44,13 @@ export default defineConfig({
   timeout: 180_000,
   use: { baseURL: `http://localhost:${previewPort}`, trace: "retain-on-failure" },
   webServer: [
+    ...(process.env.SWEETROLL_CLAMD_HOST ? [] : [{
+      command: "node scripts/image-scan-fixture.mjs",
+      url: `http://127.0.0.1:${scannerHealthPort}`,
+      reuseExistingServer: !process.env.CI,
+      cwd: ".",
+      env: { IMAGE_SCAN_FIXTURE_PORT: scannerPort, IMAGE_SCAN_FIXTURE_HEALTH_PORT: scannerHealthPort },
+    }]),
     {
       command: "npm run db:init && npx tsx src/bootstrap/http.ts",
       url: `http://localhost:${backendPort}/health/ready`,
@@ -51,6 +63,8 @@ export default defineConfig({
         NODE_ENV: "production",
         SWEETROLL_TEST_AUTH: "1",
         PORT: backendPort,
+        SWEETROLL_CLAMD_HOST: scannerHost,
+        SWEETROLL_CLAMD_PORT: scannerBackendPort,
       },
     },
     {

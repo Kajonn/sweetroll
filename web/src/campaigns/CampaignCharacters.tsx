@@ -84,6 +84,7 @@ function CharacterRow(props: {
   controlled: boolean;
   openable: boolean;
   isGm: boolean;
+  online: boolean;
   onOpen: () => void;
 }) {
   const indicator = props.controlled
@@ -93,6 +94,7 @@ function CharacterRow(props: {
       : t("campaign.detail.characters.indicator.viewOnly");
   return (
     <li>
+      {props.openable ? <PortraitThumbnail characterId={props.character.characterId} name={props.character.name} online={props.online} /> : null}
       <span>{props.character.name}</span>{" "}
       <span>{t("campaign.detail.characters.controllers", { count: props.character.controllers.length })}</span>{" "}
       <span>{props.character.lifecycle}</span>{" "}
@@ -310,6 +312,7 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
               controlled={isControlled(character, props.actorId)}
               openable={isControlled(character, props.actorId) || props.isGm === true}
               isGm={props.isGm === true}
+              online={online}
               onOpen={() => props.onOpenCharacter(character.characterId)}
             />
           ))}
@@ -337,6 +340,7 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
                   controlled={isControlled(character, props.actorId)}
                   openable={isControlled(character, props.actorId) || props.isGm === true}
                   isGm={props.isGm === true}
+                  online={online}
                   onOpen={() => props.onOpenCharacter(character.characterId)}
                 />
               ))}
@@ -564,3 +568,4 @@ export function CampaignCharactersTab(props: {
     </>
   );
 }
+import { PortraitThumbnail } from "../characters/PortraitEditor.js";

@@ -1,3 +1,4 @@
+import { SystemDialogContent, SystemDialogOverlay } from "../theme/SystemPresentation.js";
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { CheckCircle2, Download, GitBranch, XCircle } from "lucide-react";
@@ -216,8 +217,8 @@ export function VersionHistory({ client, systemId }: { client: ApiClient; system
         }}
       >
         <Dialog.Portal>
-          <Dialog.Overlay className={styles.dialogOverlay} />
-          <Dialog.Content
+          <SystemDialogOverlay className={styles.dialogOverlay} />
+          <SystemDialogContent
             className={styles.dialogContent}
             aria-describedby={undefined}
             data-testid="version-history-deprecate-dialog"
@@ -253,7 +254,7 @@ export function VersionHistory({ client, systemId }: { client: ApiClient; system
                   : t("versionHistory.confirm.deprecate.confirm")}
               </button>
             </div>
-          </Dialog.Content>
+          </SystemDialogContent>
         </Dialog.Portal>
       </Dialog.Root>
     </section>

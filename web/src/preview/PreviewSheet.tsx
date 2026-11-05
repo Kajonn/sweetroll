@@ -1,3 +1,4 @@
+import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import {RollBreakdown} from "../rolls/RollBreakdown.js";
 import { useState } from "react";
 
@@ -355,7 +356,7 @@ export function PreviewSheet({ pkg, sample, sheetId }: PreviewSheetProps) {
   }
   const { sheet, entity, actions } = resolved;
   return (
-    <div className={styles.sheet} data-testid={`preview-sheet-${sheet.id}`}>
+    <SystemPresentationScope presentation={pkg.presentation} className={styles.sheet} data-testid={`preview-sheet-${sheet.id}`}>
       <h1 className={styles.title}>{sheet.label}</h1>
       {sheet.sections.map((section) => (
         <PreviewSection
@@ -367,7 +368,7 @@ export function PreviewSheet({ pkg, sample, sheetId }: PreviewSheetProps) {
           sample={sample}
         />
       ))}
-    </div>
+    </SystemPresentationScope>
   );
 }
 

@@ -1,0 +1,84 @@
+name: Hosted scene acceptance
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        type: choice
+        options: [create, verify]
+        default: create
+        required: true
+      fixture_run_id:
+        description: Successful create-phase workflow run (required for verify)
+        type: string
+        required: false
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: hosted-scene-acceptance
+  cancel-in-progress: false
+jobs:
+  scenes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      SCENE_BACKGROUND_PHASE: ${{ inputs.phase }}
+      FIXTURE_RUN_ID: ${{ inputs.fixture_run_id }}
+      G9_ACCEPTANCE_URL: https://sweetroll-d2-preview.up.railway.app
+      SCENE_BACKGROUND_FIXTURE: ${{ github.workspace }}/scene-evidence/scene-background-fixture.json
+      G9_OUTPUT_DIR: ${{ github.workspace }}/scene-evidence/results
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      - run: npm ci
+      - run: npm --prefix web ci
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: mkdir -p scene-evidence
+      - uses: actions/download-artifact@v4
+        if: env.SCENE_BACKGROUND_PHASE == 'verify'
+        with:
+          name: scene-background-evidence
+          path: scene-evidence/
+          run-id: ${{ env.FIXTURE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Wait for the tested frontend artifact
+        run: |
+          npm run web:build
+          node --input-type=module <<'JS'
+          import { readFile } from 'node:fs/promises';
+          const base = process.env.G9_ACCEPTANCE_URL;
+          const local = JSON.parse(await readFile('web/dist/offline-manifest.json', 'utf8'));
+          const deadline = Date.now() + 180_000;
+          for (;;) {
+            try {
+              const response = await fetch(base + '/offline-manifest.json', { cache: 'no-store' });
+              const remote = await response.json();
+              if (JSON.stringify(remote.assets) !== JSON.stringify(local.assets)) throw Error('Waiting for source assets');
+              for (const path of local.assets.filter(path => path !== '/index.html')) {
+                const served = Buffer.from(await (await fetch(base + path, { cache: 'no-store' })).arrayBuffer());
+                if (!served.equals(await readFile('web/dist' + path))) throw Error('Asset bytes differ');
+              }
+              console.log('Deployed JS/CSS match this source checkout');
+              break;
+            } catch (error) {
+              if (Date.now() >= deadline) throw error;
+              await new Promise(resolve => setTimeout(resolve, 10_000));
+            }
+          }
+          JS
+      - name: Run isolated hosted background journey
+        run: npx playwright test --config playwright.g9-acceptance.config.ts sceneBackgrounds.spec.ts --workers=1
+        working-directory: web
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scene-background-evidence
+          path: scene-evidence/
+          retention-days: 7

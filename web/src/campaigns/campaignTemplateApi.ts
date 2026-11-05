@@ -1,3 +1,4 @@
+import { createImageEditorApi, type ImageEditorApi } from "../ui/imageEditorApi.js";
 import type { ApiClient } from "../api/client.js";
 import type { operations } from "../api/schema.js";
 export type CampaignTemplate =
@@ -14,6 +15,7 @@ export type TemplateLifecycleBody = NonNullable<
 export type TemplateSharingBody=NonNullable<operations["post_campaigns_id_item_templates_templateId_sharing"]["requestBody"]>["content"]["application/json"];
 export type TemplateBase = operations["get_campaigns_id_item_templates_bases"]["responses"]["200"]["content"]["application/json"]["templates"][number];
 export type CampaignTemplatesApi = {
+  images?: (campaignId: string, resourceId: string) => ImageEditorApi;
   share(campaignId:string,templateId:string,body:TemplateSharingBody):Promise<{template:CampaignTemplate}>;
   preview(campaignId:string,input:{targetUserId:string;cursor?:string}):Promise<{templates:CampaignTemplate[];nextCursor:string|null}>;
   bases(campaignId:string):Promise<{templates:TemplateBase[]}>;
@@ -47,6 +49,7 @@ export function createCampaignTemplatesApi(
   const path = (campaignId: string) =>
     `/campaigns/${campaignId}/item-templates`;
   return {
+    images: (id, resourceId) => createImageEditorApi(client, `/campaigns/${encodeURIComponent(id)}/item-templates/${encodeURIComponent(resourceId)}/image`, "template"),
     share:(campaignId,templateId,body)=>client.fetch('POST',`${path(campaignId)}/${templateId}/sharing`,{body}),
     preview:(campaignId,body)=>client.fetch('POST',`/campaigns/${campaignId}/item-template-preview`,{body}),
     bases:(campaignId)=>client.fetch("GET",`${path(campaignId)}/bases`),

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { ImageDescriptor } from "../platform/image-attachment.js";
 import type { Pool, PoolClient } from "pg";
 import type { CampaignError, CampaignResult } from "./index.js";
 import type { RequestContext } from "../systems/authoring.js";
@@ -20,6 +21,8 @@ import {
 export type ProposalContent = Omit<TemplateContent, "base" | "defaultValues">;
 export type ProposalStatus = "pending" | "approved" | "rejected";
 export type ProposalView = {
+  image?: ImageDescriptor | null;
+  imageRevision?: number;
   proposalId: string;
   campaignId: string;
   submitterId: string;
@@ -54,6 +57,7 @@ export type SubmitProposal = {
   idempotencyKey: string;
 };
 export type DecideProposal = ProposalLocation & {
+  expectedImageRevision?: number;
   expectedProposalRevision: number;
   idempotencyKey: string;
   reason?: string;
@@ -267,6 +271,7 @@ export function createProposalCommands(input: {
         "campaignId",
         "proposalId",
         "expectedProposalRevision",
+        "expectedImageRevision",
         "idempotencyKey",
         ...(operation === "reject" ? ["reason"] : []),
       ]);
@@ -290,6 +295,7 @@ export function createProposalCommands(input: {
       if (
         !Number.isSafeInteger(body.expectedProposalRevision) ||
         body.expectedProposalRevision < 1 ||
+        (body.expectedImageRevision !== undefined && (!Number.isSafeInteger(body.expectedImageRevision) || body.expectedImageRevision < 0)) ||
         (body.reason !== undefined &&
           (typeof body.reason !== "string" || body.reason.length > 2000))
       )
@@ -305,6 +311,8 @@ export function createProposalCommands(input: {
         );
       let template: CampaignTemplateView | undefined;
       if (operation === "approve") {
+        if ((p.imageRevision ?? 0) > 0 && body.expectedImageRevision !== p.imageRevision)
+          fail("conflict", "The suggestion artwork changed. Refresh and review it before approval.");
         const submitter = await repo.loadMembership(
           client,
           p.campaignId,
@@ -327,6 +335,7 @@ export function createProposalCommands(input: {
             creatorId: ctx.actorId,
             kind: p.kind,
             content: p.content,
+            ...(p.image ? { image: p.image } : {}),
           },
           fail,
         );

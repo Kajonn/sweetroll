@@ -1,3 +1,4 @@
+import { DebugOnly } from "../../ui/debugMode.js";
 import { useEffect, useMemo } from "react";
 
 import { useAssessDraft } from "../../api/assessDraft.js";
@@ -128,7 +129,7 @@ export function ExpressionEditor({
                   data-code={d.code}
                   data-testid="expression-editor-live-diagnostic"
                 >
-                  {t("editor.expression.diagnostic", { code: d.code, message: d.message })}
+                  {d.message}<DebugOnly> ({d.code})</DebugOnly>
                 </li>
               ))}
             </ul>
@@ -152,7 +153,7 @@ export function ExpressionEditor({
                   data-code={d.code}
                   data-testid="expression-editor-server-diagnostic"
                 >
-                  {t("editor.expression.diagnostic", { code: d.code, message: d.message })}
+                  {d.message}<DebugOnly> ({d.code})</DebugOnly>
                 </li>
               ))}
             </ul>
@@ -160,7 +161,7 @@ export function ExpressionEditor({
         </div>
         {expressionEntry !== null ? (
           <>
-            <div className={styles.section}>
+            <DebugOnly><div className={styles.section}>
               <span>{t("editor.expression.ast")}</span>
               <pre
                 className={styles.ast}
@@ -168,7 +169,7 @@ export function ExpressionEditor({
               >
                 {JSON.stringify(expressionEntry.ast ?? null, null, 2)}
               </pre>
-            </div>
+            </div></DebugOnly>
             <div className={styles.section}>
               <span>{t("editor.expression.dependencies")}</span>
               {(expressionEntry.dependencies ?? []).length === 0 ? (

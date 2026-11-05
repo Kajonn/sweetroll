@@ -1,3 +1,4 @@
+import { Disclosure } from "../ui/Disclosure.js";
 // GM token tray: owns the place form plus one move form per token.
 // The committing keyboard alternative to dragging is the numeric X/Y
 // inputs plus the Move button (nudge buttons only stage coordinates).
@@ -103,6 +104,7 @@ function TokenMoveRow(props: {
   const moveLabel = t("campaign.detail.scenes.tokens.move", { label: props.token.label });
   return (
     <div role="group" aria-label={t("campaign.detail.scenes.tokens.coordinates", { label: props.token.label })}>
+      <Disclosure label={t("disclosure.tokenPosition", { label: props.token.label })}>
       <FormField label={t("campaign.detail.scenes.tokens.rowXLabel", { label: props.token.label })}>
         <input
           type="number"
@@ -139,6 +141,7 @@ function TokenMoveRow(props: {
           {t("campaign.detail.scenes.tokens.nudgeRight", { label: props.token.label })}
         </Button>
       </div>
+      </Disclosure>
       {conflict ? <p role="alert">{t("campaign.detail.scenes.tokens.conflict")}</p> : null}
       {error !== null ? <p role="alert">{error}</p> : null}
       {moved ? <p role="status">{t("campaign.detail.scenes.tokens.moved")}</p> : null}
@@ -228,6 +231,7 @@ export function TokenTrayView(props: {
       <FormField label={t("campaign.detail.scenes.tokens.labelLabel")}>
         <input type="text" value={label} disabled={!online} onChange={(event) => setLabel(event.target.value)} />
       </FormField>
+      <Disclosure label={t("disclosure.position")}>
       <FormField label={t("campaign.detail.scenes.tokens.xLabel")}>
         <input
           type="number"
@@ -253,6 +257,7 @@ export function TokenTrayView(props: {
       <FormField label={t("campaign.detail.scenes.tokens.sizeLabel")}>
         <input type="number" min={0.1} step={0.1} value={size} disabled={!online} onChange={(event) => setSize(event.target.value)} />
       </FormField>
+      </Disclosure>
       <Checkbox
         label={t("campaign.detail.scenes.tokens.visibleLabel")}
         checked={visible}

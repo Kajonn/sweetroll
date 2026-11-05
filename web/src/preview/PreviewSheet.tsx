@@ -1,3 +1,4 @@
+import { DebugOnly } from "../ui/debugMode.js";
 import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import {RollBreakdown} from "../rolls/RollBreakdown.js";
 import { useState } from "react";
@@ -680,7 +681,7 @@ function RollResultSheet({
                 className={styles.diagnosticItem}
                 data-code={d.code}
               >
-                {d.code}: {d.message}
+                {d.message}<DebugOnly> ({d.code})</DebugOnly>
               </li>
             ))}
           </ul>

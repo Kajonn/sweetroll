@@ -50,3 +50,9 @@ verification after redeploy and CI #219 on application `d62a9f8`. See the
 [completed staged plan](docs/superpowers/plans/2026-11-03-system-themes-and-images.md)
 and [scene evidence](docs/acceptance/scene-backgrounds-2026-11-04.md). Physical
 devices, real provider login and human/playtest G9 gates remain open.
+
+I7b/G8 visual scene controls are **not complete**. The 2026-11-05 review reopened
+image-token selection/rendering, direct drag/tap token controls and on-image fog
+brushing. Follow the [visual-controls completion plan](docs/superpowers/plans/2026-11-05-scene-visual-controls.md).
+The numeric-control and M3 background acceptance records prove their stated
+foundation only; do not use them to close these visual-control requirements.

@@ -34,9 +34,10 @@ describe("ConflictBanner", () => {
     expect(screen.getByRole("button", { name: /dismiss/i })).toBeInTheDocument();
   });
 
-  it("shows the latest revision in the message", () => {
+  it("shows an actionable conflict without the internal revision", () => {
     renderBanner({ latestRevision: 42 });
-    expect(screen.getByTestId("conflict-banner")).toHaveTextContent(/42/);
+    expect(screen.getByTestId("conflict-banner")).not.toHaveTextContent(/42/);
+    expect(screen.getByTestId("conflict-banner")).toHaveTextContent(/changed elsewhere/);
   });
 
   it("invokes onAcceptTheirs when Reload theirs is clicked", async () => {

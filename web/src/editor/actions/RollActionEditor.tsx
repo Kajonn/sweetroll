@@ -1,3 +1,5 @@
+import { DebugOnly } from "../../ui/debugMode.js";
+import { Disclosure } from "../../ui/Disclosure.js";
 import {PushPolicyEditor} from "./PushPolicyEditor.js";
 import type {PushPolicy} from "@sweetroll/rules";
 import {GroupedPoolEditor} from "./GroupedPoolEditor.js";
@@ -327,7 +329,8 @@ export function RollActionEditor({
                   data-testid={`roll-action-input-${input.id}`}
                 >
                   <div className={styles.field}>
-                    <FormField label={t("editor.action.roll.inputs.id")}>
+                    <Disclosure label={t("disclosure.identifier")}>
+<FormField label={t("editor.action.roll.inputs.id")}>
                       <input
                         id={`roll-action-input-id-${input.id}`}
                         type="text"
@@ -337,6 +340,7 @@ export function RollActionEditor({
                         disabled={disabled}
                       />
                     </FormField>
+                    </Disclosure>
                   </div>
                   <div className={styles.field}>
                     <FormField label={t("editor.action.roll.inputs.label")}>
@@ -491,7 +495,7 @@ export function RollActionEditor({
                     data-code={d.code}
                     data-testid={`roll-action-try-diagnostic-${action.id}`}
                   >
-                    {t("editor.action.roll.tryIt.diagnostic", { code: d.code, message: d.message })}
+                    {d.message}<DebugOnly> ({d.code})</DebugOnly>
                   </li>
                 ))}
               </ul>

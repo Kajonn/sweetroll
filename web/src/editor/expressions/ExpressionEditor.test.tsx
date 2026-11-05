@@ -1,9 +1,12 @@
+import { setDebugMode } from "../../ui/debugMode.js";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createApiClient, type ApiClient } from "../../api/client.js";
 import { ExpressionEditor, type ExpressionEditorProps } from "./ExpressionEditor.js";
+
+afterEach(() => setDebugMode(false));
 
 function makeWrapper(qc: QueryClient) {
   return ({ children }: { children: React.ReactNode }) => (
@@ -116,7 +119,8 @@ describe("ExpressionEditor", () => {
     expect(onSourceChange).not.toHaveBeenCalled();
   });
 
-  it("renders the AST and dependency list when preview succeeds", async () => {
+  it("renders the AST in debug mode and preserves the dependency list", async () => {
+    setDebugMode(true);
     const fetch_ = setupFetch([
       () =>
         new Response(

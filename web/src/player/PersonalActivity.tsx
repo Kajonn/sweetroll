@@ -1,3 +1,4 @@
+import { DebugOnly } from "../ui/debugMode.js";
 import {RollBreakdown} from "../rolls/RollBreakdown.js";
 import { useQueries } from "@tanstack/react-query";
 
@@ -138,7 +139,7 @@ export function PersonalActivity({ api, identity }: PersonalActivityProps) {
                   {character.name}
                 </AppLink>{" "}
                 <span>{event.kind}</span>{" "}
-                <span>{t("character.tools.activitySummary", { revision: event.characterRevision, time: event.occurredAt })}</span>{" "}
+                <span><DebugOnly>{t("editor.readiness.draftRev", { revision: event.characterRevision })} · </DebugOnly><time dateTime={event.occurredAt}>{new Date(event.occurredAt).toLocaleString()}</time></span>{" "}
                 <time dateTime={event.occurredAt}>{event.occurredAt}</time>
                 {event.roll===undefined?null:<RollBreakdown roll={event.roll}/>}
               </li>

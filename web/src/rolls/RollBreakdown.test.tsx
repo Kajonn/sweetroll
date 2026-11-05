@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { evaluateExpression } from "../ports/evaluateExpression.js";
 import { RollBreakdown } from "./RollBreakdown.js";
@@ -27,6 +27,8 @@ describe("group results and guided source", () => {
     expect(screen.getByTestId("roll-group-gear")).toHaveTextContent(
       "Empty group",
     );
+    expect(screen.getByText(/Calculation:/)).not.toBeVisible();
+    fireEvent.click(screen.getByText("Show roll details"));
     expect(
       screen.getByText(/Calculation:.*Attribute \(2\).*2 × Gear \(0\).* = 2/),
     ).toBeVisible();

@@ -41,6 +41,12 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
 }
 
 describe("ConflictReview", () => {
+  it("uses projected labels for conflict choices while preserving exact intents", () => {
+    const snap = snapshot();
+    (snap.confirmed!.projection as any).completionFields = [{ kind: "field", fieldId: "name", label: "Character name" }];
+    render(<ConflictReview snapshot={snap} onResolve={vi.fn()} onClose={vi.fn()} />);
+    expect(screen.getByRole("checkbox", { name: /Character name → LocalName/ })).toBeVisible();
+  });
   it("compares server versus local values for scalar sets", () => {
     render(<ConflictReview snapshot={snapshot()} onResolve={vi.fn()} onClose={vi.fn()} />);
     expect(screen.getByText(/ServerName/)).toBeVisible();

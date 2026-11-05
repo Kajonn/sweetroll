@@ -1,3 +1,4 @@
+import { Disclosure } from "../ui/Disclosure.js";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 
 import { t } from "../i18n/index.js";
@@ -68,18 +69,6 @@ export function MetadataEditor({
       onBlur={flush}
       data-testid="metadata-editor"
     >
-      <FormField id="metadata-system-colors" label={t("editor.metadata.systemColors")}>
-        <select id="metadata-system-colors" className={styles.input}
-          value={meta.presentation?.colorPreset ?? "default"}
-          onChange={event => selectColors(event.target.value as SystemPresentation["colorPreset"])}>
-          {COLOR_PRESETS.map(preset => <option key={preset} value={preset}>{t(`editor.metadata.color.${preset}`)}</option>)}
-        </select>
-        <p>{t("editor.metadata.systemColorsHint")}</p>
-        <Button variant="secondary" type="button" onClick={() => selectColors("default")}>{t("editor.metadata.resetColors")}</Button>
-      </FormField>
-      <div className={styles.colorSamples} aria-hidden="true">
-        {COLOR_PRESETS.map(colorPreset => <SystemPresentationScope key={colorPreset} presentation={{ colorPreset }}><span className={styles.colorSample}>{t(`editor.metadata.color.${colorPreset}`)}</span></SystemPresentationScope>)}
-      </div>
       <FormField label={t("editor.metadata.name")}>
 
         <input
@@ -127,6 +116,19 @@ export function MetadataEditor({
           />
         </FormField>
       </div>
+      <Disclosure label={t("disclosure.appearance")}>
+      <FormField id="metadata-system-colors" label={t("editor.metadata.systemColors")}>
+        <select id="metadata-system-colors" className={styles.input}
+          value={meta.presentation?.colorPreset ?? "default"}
+          onChange={event => selectColors(event.target.value as SystemPresentation["colorPreset"])}>
+          {COLOR_PRESETS.map(preset => <option key={preset} value={preset}>{t(`editor.metadata.color.${preset}`)}</option>)}
+        </select>
+        <p>{t("editor.metadata.systemColorsHint")}</p>
+        <Button variant="secondary" type="button" onClick={() => selectColors("default")}>{t("editor.metadata.resetColors")}</Button>
+      </FormField>
+      <div className={styles.colorSamples} aria-hidden="true">
+        {COLOR_PRESETS.map(colorPreset => <SystemPresentationScope key={colorPreset} presentation={{ colorPreset }}><span className={styles.colorSample}>{t(`editor.metadata.color.${colorPreset}`)}</span></SystemPresentationScope>)}
+      </div>
       <FormField label={t("editor.metadata.systemStyle")}>
         <select id="metadata-system-style" className={styles.input} value={meta.presentation?.componentStyle ?? "default"}
           onChange={event => selectStyle(event.target.value as "default" | "classic")}>
@@ -134,6 +136,7 @@ export function MetadataEditor({
           <option value="classic">{t("editor.metadata.style.classic")}</option>
         </select>
       </FormField>
+      </Disclosure>
     </form>
   );
 }

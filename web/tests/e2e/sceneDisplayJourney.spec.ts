@@ -98,6 +98,7 @@ async function commitFogStroke(page: Page, mode: "Conceal" | "Reveal", x: string
 async function placeToken(page: Page, label: string, x: string, y: string, visible: boolean) {
   const tray = page.getByRole("region", { name: "Tokens" });
   await tray.getByLabel(/token label/i).fill(label);
+  await tray.getByText("Position and size", { exact: true }).click();
   await tray.getByLabel(/x \(0–1\)/i).fill(x);
   await tray.getByLabel(/y \(0–1\)/i).fill(y);
   const box = tray.getByLabel(/visible to the display/i);

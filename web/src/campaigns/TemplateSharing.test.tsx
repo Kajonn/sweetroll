@@ -54,8 +54,8 @@ it("labels recipients by name with stable disambiguation and submits only IDs an
   render(<TemplateSharing template={{ revision: 1, audience: "gm_only", grants: [] } as any} members={members} share={share} onDone={() => {}} />);
   await user.click(screen.getByRole("button", { name: "Sharing" }));
   await user.selectOptions(screen.getByLabelText("Audience"), "selected_players");
-  await user.click(screen.getByRole("checkbox", { name: `Alex (${members[1]!.userId})` }));
-  expect(screen.getByRole("checkbox", { name: `Unnamed player (${members[2]!.userId})` })).toBeVisible();
+  await user.click(screen.getByRole("checkbox", { name: `Alex (${members[1]!.userId.slice(0, 8)})` }));
+  expect(screen.getByRole("checkbox", { name: `Unnamed member (${members[2]!.userId.slice(0, 8)})` })).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Save sharing" }));
   expect(share).toHaveBeenCalledWith(expect.objectContaining({ grants: [{ userId: members[1]!.userId, generation: 3 }] }));
 });

@@ -137,7 +137,6 @@ function FieldEditor({
   return (
     <div className={styles.elementRow2}>
       <div className={styles.elementField} data-testid={`element-binding-${element.id}`}>
-        {t("editor.element.field.target")}
         <DefinitionReferenceSelect value={element.fieldId} options={options} onChange={(fieldId) => onChange({ fieldId })} label={t("editor.element.field.target")} />
       </div>
     </div>
@@ -156,7 +155,6 @@ function ResourceEditor({
   return (
     <div className={styles.elementRow2}>
       <div className={styles.elementField} data-testid={`element-binding-${element.id}`}>
-        {t("editor.element.resource.target")}
         <DefinitionReferenceSelect value={element.resourceId} options={options} onChange={(resourceId) => onChange({ resourceId })} label={t("editor.element.resource.target")} />
       </div>
     </div>
@@ -175,7 +173,6 @@ function ActionEditor({
   return (
     <div className={styles.elementRow2}>
       <div className={styles.elementField} data-testid={`element-binding-${element.id}`}>
-        {t("editor.element.action.target")}
         <DefinitionReferenceSelect value={element.actionId} options={options} onChange={(actionId) => onChange({ actionId })} label={t("editor.element.action.target")} />
       </div>
     </div>
@@ -194,7 +191,6 @@ function SlotEditor({
   return (
     <div className={styles.elementRow2}>
       <div className={styles.elementField} data-testid={`element-binding-${element.id}`}>
-        {t("editor.element.kind.slot")}
         <DefinitionReferenceSelect value={element.slotId} options={options} onChange={(slotId) => onChange({ slotId })} label={t("editor.element.kind.slot")} />
       </div>
     </div>

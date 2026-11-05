@@ -149,7 +149,7 @@ async function runJourney(page: Page, browser: Browser, viewport: { width: numbe
     await page.getByRole("button", { name: `Edit ${noteTitle}` }).click({ timeout: STEP_TIMEOUT });
     await page.getByLabel("Audience").nth(1).selectOption("selected_players");
     await expect(page.getByText("Share with (selected players)")).toBeVisible({ timeout: STEP_TIMEOUT });
-    await page.getByRole("checkbox", { name: gmUserId.slice(0, 8) }).check({ timeout: STEP_TIMEOUT });
+    await page.getByTestId(`content-grant-${gmUserId}`).check({ timeout: STEP_TIMEOUT });
     await page.getByRole("button", { name: "Save note" }).nth(1).click({ timeout: STEP_TIMEOUT });
     await expect(contentList.getByText("Selected players")).toBeVisible({ timeout: STEP_TIMEOUT });
 

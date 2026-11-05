@@ -23,8 +23,8 @@ describe("sheet reference selection", () => {
       {kind:"resource",id:"health",label:"Health"},
     ]} />);
     const selector = screen.getByTestId("definition-reference-select");
-    expect(within(selector).getByRole("option",{name:"Strength (strength)"})).toBeInTheDocument();
-    expect(within(selector).getByRole("option",{name:"Health (health)"})).toBeInTheDocument();
+    expect(within(selector).getByRole("option",{name:"Strength"})).toBeInTheDocument();
+    expect(within(selector).getByRole("option",{name:"Health"})).toBeInTheDocument();
     fireEvent.change(selector,{target:{value:"dexterity"}});
     expect(onChange.mock.lastCall?.[0].sections[0].elements[0].fieldId).toBe("dexterity");
   });
@@ -39,8 +39,8 @@ describe("sheet reference selection", () => {
       {kind:"resource",id:"health",label:"Health"},
     ]} />);
     const selector = screen.getByTestId("definition-reference-select");
-    expect(within(selector).getByRole("option",{name:"Health (health)"})).toBeInTheDocument();
-    expect(within(selector).queryByRole("option",{name:"Strength (strength)"})).not.toBeInTheDocument();
+    expect(within(selector).getByRole("option",{name:"Health"})).toBeInTheDocument();
+    expect(within(selector).queryByRole("option",{name:"Strength"})).not.toBeInTheDocument();
   });
 
   it("preserves an unresolved ID instead of silently changing data", () => {

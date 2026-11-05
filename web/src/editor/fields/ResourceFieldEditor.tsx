@@ -1,3 +1,4 @@
+import { Disclosure } from "../../ui/Disclosure.js";
 import { t } from "../../i18n/index.js";
 import type { FieldV1, ResourceFieldV1 } from "../../state/documentFieldTypes.js";
 import { DefinitionIdInput } from "./DefinitionIdInput.js";
@@ -36,14 +37,6 @@ export function ResourceFieldEditor({
 
   return (
     <section className={styles.field} data-testid={`resource-field-${field.id}`}>
-      <div className={styles.row}>
-        <DefinitionIdInput
-          value={field.id}
-          onChange={(next) => update({ id: next })}
-          referencedBy={referencedBy}
-          disabled={disabled}
-        />
-      </div>
       <div className={styles.row}>
         <label className={styles.field} htmlFor={`resource-field-label-${field.id}`}>
           {t("editor.fields.label")}
@@ -84,7 +77,8 @@ export function ResourceFieldEditor({
           />
         </label>
       </div>
-      <div className={styles.row}>
+      <Disclosure label={t("disclosure.constraints")}>
+<div className={styles.row}>
         <label className={styles.field} htmlFor={`resource-field-min-${field.id}`}>
           {t("editor.fields.min")}
           <input
@@ -147,6 +141,15 @@ export function ResourceFieldEditor({
       <p className={styles.placeholder} data-testid={`resource-field-reset-hint-${field.id}`}>
         {t("editor.fields.resource.resetRuleHint")}
       </p>
+</Disclosure>
+      <div className={styles.row}>
+        <DefinitionIdInput
+          value={field.id}
+          onChange={(next) => update({ id: next })}
+          referencedBy={referencedBy}
+          disabled={disabled}
+        />
+      </div>
     </section>
   );
 }

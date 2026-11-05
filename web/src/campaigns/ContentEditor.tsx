@@ -1,3 +1,4 @@
+import { useMemberLabel } from "./memberLabels.js";
 // GM content authoring: create form plus edit/delete/recover with audience
 // grants. Error paths never render server payloads or secrets: only the
 // generic strings below reach the page.
@@ -71,6 +72,7 @@ export function ContentEditor(props: {
   /** Online gate (mirrors the bump/Execute convention): mutations disabled while offline. */
   online?: boolean;
 }) {
+  const labelMember = useMemberLabel(props.members);
   const initial = props.initial;
   // After a successful Hide the editor stays mounted on the deleted view
   // (refetched for its fresh revision) so Recover stays reachable in-session.
@@ -93,8 +95,7 @@ export function ContentEditor(props: {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [recoverOpen, setRecoverOpen] = useState(false);
 
-  // The roster carries userIds only: label grant checkboxes by the short id
-  // with the full id as the accessible description. Never invent names.
+  // Roster-provided names are presentation only; grants retain exact user IDs.
   const roster = props.members.filter((member) => member.status === "active");
 
   const toggleGrant = (userId: string): void => {
@@ -291,8 +292,8 @@ export function ContentEditor(props: {
                 {roster.map((member) => (
                   <Checkbox
                     key={member.userId}
-                    label={member.userId.slice(0, 8)}
-                    hint={member.userId}
+                    data-testid={`content-grant-${member.userId}`}
+                    label={labelMember(member)}
                     checked={checked.includes(member.userId)}
                     onChange={() => toggleGrant(member.userId)}
                   />

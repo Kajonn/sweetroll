@@ -1,3 +1,5 @@
+import { DebugOnly, DebugSettings } from "../ui/debugMode.js";
+import { Disclosure } from "../ui/Disclosure.js";
 import { useEffect, useState, type ChangeEvent } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
@@ -226,18 +228,18 @@ export function Account({ client, identity, storageUnavailable }: AccountProps) 
         </Panel>
       ) : (
         <>
-          <Panel>
+          <DebugOnly><Panel>
             <dl>
               <dt>{t("player.account.userId")}</dt>
               <dd>{me.data.userId}</dd>
               <dt>{t("player.account.locale")}</dt>
               <dd>{deviceLocale()}</dd>
             </dl>
-          </Panel>
+          </Panel></DebugOnly>
           <Panel title={t("player.account.sessions")}>
             <ul>
               <li>
-                {me.data.userId} · {t("player.account.currentSession")}
+                {t("player.account.currentSession")}
               </li>
             </ul>
             {signOutError !== null ? <p role="alert">{signOutError}</p> : null}
@@ -251,12 +253,12 @@ export function Account({ client, identity, storageUnavailable }: AccountProps) 
               {t("shell.signOut.button")}
             </Button>
           </Panel>
-          <Panel title={t("player.account.sync")}>
+          <Disclosure label={t("disclosure.sync")}><Panel title={t("player.account.sync")}>
             <p>{online ? t("status.online") : t("status.offline")}</p>
             <p>{offline.available ? t("character.offline.available") : t("character.offline.unavailable")}</p>
-            <p>{t("player.library.manageHint")}</p>
-          </Panel>
-          <AccountThemeSection client={client} />
+          </Panel></Disclosure>
+          <Panel title={t("disclosure.appearance")}><AccountThemeSection client={client} /></Panel>
+          <Disclosure label={t("debug.tools")}><DebugSettings /></Disclosure>
         </>
       )}
     </div>

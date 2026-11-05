@@ -84,6 +84,8 @@ Roles are contextual capabilities, not account types. The same user can create a
 - Autosave drafts, show the last saved state, and never make a user guess whether data persisted.
 - Place in-session actions before administrative controls; destructive operations require confirmation and clear scope.
 - Use progressive disclosure. Basic creation should not expose formulas, validation, or visibility logic until needed.
+- Normal views show readable names and actionable state. Account → Developer tools offers an off-by-default device-local “Show debug information” preference for technical IDs, revisions, checksums, diagnostic paths/codes and expression ASTs. It changes presentation only, never authorization or data fetching. Identifier editing, field constraints, appearance and precise token positioning remain available through collapsed native disclosures that preserve values. Missing reference labels remain explicit repair fallbacks. See the [GUI disclosure plan](docs/superpowers/plans/2026-11-05-gui-progressive-disclosure.md).
+- The creator has one save indicator, one diagnostics action and one version-history action; publication blocking reasons remain visible. Roll group totals, push availability and relevant face outcomes stay visible; per-die calculations are available through roll details. Appearance preferences are edited in Account while the shell continues applying the effective device/account/OS theme.
 - Keep state and rules distinct: definitions describe what a field means; character and campaign records contain current values.
 - Every visibility control states its audience in plain language and offers a preview-as-player check.
 - Provide undo for builder operations and recoverable deletion for user content where practical.
@@ -260,7 +262,7 @@ A published system version updates the open editor's status immediately.
 
 The campaign workspace combines member management, content, characters, and an in-session activity feed. The **Session view** is a curated mobile surface: pinned content, recent rolls, quick character access, and reveal/hide controls.
 
-Campaign creation distinguishes versions with the same display name and semantic version by showing their publication date and a short version identifier. The campaign's pinned version supplies character creation choices automatically; players and GMs should not need to enter an internal version ID. A GM's roster access is labelled as GM access when they do not control a character. Campaign and Session activity show local dates and readable actor labels; the exact actor identifier remains available for identification. Sheet previews show a section title once when its first heading repeats that title.
+Campaign creation distinguishes versions with the same display name and semantic version by showing their publication date and a short version identifier. The campaign's pinned version supplies character creation choices automatically; players and GMs should not need to enter an internal version ID. A GM's roster access is labelled as GM access when they do not control a character. Member, sharing and content-preview controls use existing roster display names. Duplicate or absent names have an identifying suffix; short-ID collisions use full IDs, and debug mode shows full IDs. Requests retain exact user IDs and membership generations. Campaign and Session activity show local dates and readable actor labels; the exact actor identifier remains available for identification. Sheet previews show a section title once when its first heading repeats that title.
 
 ## 7.2 GM session board
 
@@ -297,6 +299,8 @@ I6/I7 deliver **text notes** with visibility levels and basic tags. I7b adds aut
 ## 7.7 Simple scenes and player display
 
 A scene consists of a background image, a manually edited fog mask, and GM-positioned tokens with simple labels/images and visibility. Provide fit/pan/zoom, reveal/conceal, local undo, and drag or tap-to-place/move controls, with keyboard alternatives. Use normalized scene coordinates and revision-checked edits. There are no tactical grids, movement rules, initiative, automatic vision, or combat automation.
+
+**Delivery status (2026-11-05):** Background upload/create/replace, numeric fog/token operations and restricted display are delivered. Uploaded token-image selection/rendering, direct drag/tap token placement/movement, and on-image reveal/conceal brushing remain unfinished. These are existing I7b/G8 requirements; follow the [scene visual-controls completion plan](docs/superpowers/plans/2026-11-05-scene-visual-controls.md). Numeric controls remain accessible precision alternatives and do not satisfy the direct visual controls gate. M3 background acceptance does not close these gaps.
 
 A separate tablet or remote player receives only an authorized display projection. Fog-covered pixels must be removed from server-generated display imagery (or safe tiles); sending the original image under a client-only overlay does not protect secrets. Filter hidden tokens and GM metadata before delivery. Pairing credentials are revocable and cannot read campaign administration, GM notes, or originals. Clear privileged browser state when entering display mode, and blank the display when authorization is uncertain or revoked. Previously revealed information cannot be retracted from screenshots. See the GUI plan G8 for acceptance cases.
 
@@ -353,7 +357,16 @@ Use role-based permissions for coarse capabilities and resource-level policy che
 
 ## 10.2 Player mobile sheet
 
-- Sticky character identity and primary-resource summary without excessive vertical space.
+The app's `/` landing view is Systems, and its primary navigation label is
+“Systems”. The shared header uses a single compact row: primary links are inline
+on desktop and available through a keyboard-accessible navigation disclosure
+below 1024px, with its trigger immediately after the Sweetroll logo on the left.
+Phone bottom navigation remains available. Creator and campaign
+tabs use one horizontally scrollable row with 44px targets instead of wrapping
+into several rows. Navigation and viewport changes preserve the active view's
+state; Escape closes the disclosure and restores focus to its trigger.
+
+- Character identity, save/offline status and resource sections scroll with the rest of the sheet; the character header must not stick over fields or actions on small screens.
 - Platform-owned bottom navigation for Characters, Activity, and Account; Campaigns is added in I6. System creators cannot add navigation destinations or divide the linear sheet into tabs.
 - Prominent action buttons and resource controls; numeric entry supports direct input and step controls.
 - Optimistic updates with visible pending/error state and automatic retry only when idempotent (offline-safe).
@@ -904,7 +917,7 @@ The first GM app is a responsive web surface within the shared PWA. Native packa
 
 ## 17.9a I7b - Simple scenes and restricted player display
 
-**Status:** Landed 2026-09-15 per GUI plan G8: media/scene/display contracts and persistence, authorized image storage with safe rendering, revision-controlled manual fog and token operations, revocable display pairing with server-filtered projections, touch/keyboard scene controls and the minimal display shell. Exit e2e `web/tests/e2e/sceneDisplayJourney.spec.ts` + acceptance `docs/acceptance/gui-2026-09-14-i7b-scenes.md`; the four findings from that record are closed on `main` (campaign-leave staleness, client-nav heading, offline bundle self-hit, document-editor-360 drift), each re-verified isolated. Production-auth and real-device gates stay open under G9.
+**Status: partially delivered; visual scene controls reopened 2026-11-05.** The 2026-09-15 delivery established media/scene/display contracts and persistence, authorized storage, revision-controlled fog/token operations, revocable pairing, server-filtered projections and numeric/keyboard controls. It did not deliver token-image selection/rendering, direct drag/tap placement/movement or an on-image fog brush. The earlier aggregate G8 completion claim overstated the GUI coverage; complete the [scene visual-controls completion plan](docs/superpowers/plans/2026-11-05-scene-visual-controls.md) before closing I7b/G8. Historical exit e2e `web/tests/e2e/sceneDisplayJourney.spec.ts` and acceptance `docs/acceptance/gui-2026-09-14-i7b-scenes.md` remain evidence of the foundation, not these missing interactions. The four historical regression findings are closed on `main`; production-auth and physical-device/playtest gates remain separate under G9.
 
 Complete GUI plan G8: define media/scene/display contracts and persistence; add safe authorized image storage and rendering; implement revision-controlled manual fog and token operations; implement revocable display pairing and server-filtered scene projections; then build touch/keyboard scene controls and the minimal display shell. Keep this within the modular application. Do not add a second rules engine or expose GM credentials on a shared tablet.
 
@@ -941,7 +954,7 @@ The two tracks are independent; preserve their internal stage order. T1 builds o
 - **I5:** A player can manage and play personal characters in a mobile browser or installed PWA with no campaign dependency.
 - **I6:** A player can join an HTTP-provisioned campaign, create or claim a character, and access only authorized content; guessed identifiers, revoked memberships, and replayed invitations disclose nothing.
 - **I7:** A GM can use the mobile-first web app to create a campaign from a shipped open-license template, invite four players, manage content visibility, verify each player's view, and run a session across two devices.
-- **I7b:** A GM phone and restricted tablet/remote display support simple images, manual fog, and tokens, with no GM secrets in display responses or caches.
+- **I7b (open visual-controls gate):** A GM phone supports uploaded image tokens, direct drag/tap placement/movement and on-image reveal/conceal brushing, with numeric/keyboard alternatives; a restricted tablet/remote display receives only revealed pixels and permitted tokens. Close only after the scene visual-controls plan passes its hosted journey; G9 physical-device/provider/playtest gates remain separate.
 - **GUI release:** Apply G9 to each migrated view and final release: actual routed visual review, real phone/iPad checks, built frontend/API deployment, and physical-table/remote playtests.
 - Publishing a new system version never changes an existing character or campaign; using a different snapshot requires creating a new test character/campaign.
 - Users can export system, character, and campaign data in documented formats.

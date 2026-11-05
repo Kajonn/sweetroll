@@ -33,14 +33,6 @@ export function BooleanFieldEditor({
   return (
     <section className={styles.field} data-testid={`boolean-field-${field.id}`}>
       <div className={styles.row}>
-        <DefinitionIdInput
-          value={field.id}
-          onChange={(next) => update({ id: next })}
-          referencedBy={referencedBy}
-          disabled={disabled}
-        />
-      </div>
-      <div className={styles.row}>
         <label className={styles.field} htmlFor={`boolean-field-label-${field.id}`}>
           {t("editor.fields.label")}
           <input
@@ -85,6 +77,14 @@ export function BooleanFieldEditor({
             </label>
           ))}
         </fieldset>
+      </div>
+      <div className={styles.row}>
+        <DefinitionIdInput
+          value={field.id}
+          onChange={(next) => update({ id: next })}
+          referencedBy={referencedBy}
+          disabled={disabled}
+        />
       </div>
     </section>
   );

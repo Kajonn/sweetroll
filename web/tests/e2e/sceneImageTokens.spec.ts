@@ -74,7 +74,7 @@ test("V1 image tokens: GUI upload/select, relative size, retained art and restri
       await gm.reload();
     }
     const viewport = gm.getByRole("region", { name: "Scene", exact: true });
-    await expect(viewport.getByRole("img", { name: "Wren", exact: true })).toBeVisible();
+    await expect(viewport.getByRole("button", { name: "Token Wren", exact: true }).locator("img")).toBeVisible();
     const state = (await json(gm, "GET", `/api/scenes/${sceneId}`)).scene;
     expect(state.tokens.find((t: any) => t.label === "Wren")).toMatchObject({ x: .25, y: .5, size: .12, imageFileId: expect.any(String) });
     const imageFileId = state.tokens.find((t: any) => t.label === "Wren").imageFileId;
@@ -93,7 +93,8 @@ test("V1 image tokens: GUI upload/select, relative size, retained art and restri
     const dialog = gm.getByRole("dialog"), code = (await dialog.locator("strong").last().textContent())!.trim();
     await dialog.getByRole("button", { name: "Done", exact: true }).click();
     await dp.goto(`/display?sceneId=${sceneId}`); await dp.getByLabel(/display code/i).fill(code); await dp.getByRole("button", { name: "Connect display", exact: true }).click();
-    await expect(dp.getByRole("img", { name: "Wren", exact: true })).toBeVisible();
+    await expect(dp.getByRole("img", { name: "Display image", exact: true })).toBeVisible({ timeout: 20_000 });
+    await expect(dp.getByText("Wren", {exact:true}).locator("..").locator("img")).toBeVisible({ timeout: 20_000 });
     await expect(dp.getByText("Secret", { exact: true })).toHaveCount(0); await expect(dp.getByText("Fogged", { exact: true })).toHaveCount(0);
     await expect(dp.getByText("Label marker", { exact: true })).toBeVisible();
     displayId = await dp.evaluate(() => JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!).displayId);
@@ -107,7 +108,7 @@ test("V1 image tokens: GUI upload/select, relative size, retained art and restri
       await gm.setViewportSize({ width, height: 1000 }); await displayContext.pages()[0]!.setViewportSize({ width, height: 1000 });
       for (const [page, role] of [[gm, "Scene background"], [dp, "Display image"]] as const) {
         const background = await page.getByRole("img", { name: role, exact: true }).boundingBox();
-        const art = await page.getByRole("img", { name: "Wren", exact: true }).boundingBox();
+        const art = await (page === gm ? page.getByRole("button", { name: "Token Wren", exact: true }).locator("img") : page.getByText("Wren", {exact:true}).locator("..").locator("img")).boundingBox();
         expect(art!.width / background!.width).toBeCloseTo(.12, 2);
         expect((art!.x + art!.width / 2 - background!.x) / background!.width).toBeCloseTo(.25, 2);
         expect((art!.y + art!.height / 2 - background!.y) / background!.height).toBeCloseTo(.5, 2);
@@ -116,10 +117,11 @@ test("V1 image tokens: GUI upload/select, relative size, retained art and restri
       await gm.screenshot({ path: info.outputPath(`gm-tokens-${width}.png`), fullPage: true }); await dp.screenshot({ path: info.outputPath(`display-tokens-${width}.png`), fullPage: true });
     }
     expect((await new AxeBuilder({ page: gm }).analyze()).violations).toEqual([]);
-    await displayContext.setOffline(true); await expect(dp.getByRole("img")).toHaveCount(0); await displayContext.setOffline(false);
-    await expect(dp.getByRole("img", { name: "Wren", exact: true })).toBeVisible();
+    await displayContext.setOffline(true); await expect(dp.locator("img")).toHaveCount(0); await displayContext.setOffline(false);
+    await expect(dp.getByRole("img", { name: "Display image", exact: true })).toBeVisible({ timeout: 20_000 });
+    await expect(dp.getByText("Wren", {exact:true}).locator("..").locator("img")).toBeVisible({ timeout: 20_000 });
     await json(gm, "POST", `/api/campaigns/${campaignId}/displays/${displayId}/revoke`, {}); displayId = undefined;
-    await expect(dp.getByRole("img")).toHaveCount(0, { timeout: 20_000 });
+    await expect(dp.locator("img")).toHaveCount(0, { timeout: 20_000 });
     if (retainedFixture && process.env.SCENE_TOKEN_PHASE !== "verify") { await writeFile(retainedFixture, JSON.stringify({ campaignId, sceneId, tokens: state.tokens })); keep = true; }
   } finally {
     if (displayId && campaignId) await json(gm, "POST", `/api/campaigns/${campaignId}/displays/${displayId}/revoke`, {});

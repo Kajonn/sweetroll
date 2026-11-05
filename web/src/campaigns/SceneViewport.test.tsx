@@ -50,10 +50,11 @@ describe("SceneViewportView", () => {
     render(<SceneViewportView scene={artScene} imageUrl="/background" />);
     const token = screen.getByRole("button", { name: "Token Wren" });
     expect(token.parentElement).toHaveStyle({ width: "12%", left: "25%", top: "50%" });
-    const art = screen.getByRole("img", { name: "Wren" });
+    const art = token.querySelector("img")!;
+    expect(art).toHaveAttribute("alt", "");
     expect(art).toHaveAttribute("src", "/api/campaigns/c1/images/portrait/original");
     fireEvent.error(art);
-    expect(screen.queryByRole("img", { name: "Wren" })).toBeNull();
+    expect(token.querySelector("img")).toBeNull();
     expect(token).toHaveTextContent("Wren");
   });
   it("shows the scene image with token markers at normalized positions", () => {

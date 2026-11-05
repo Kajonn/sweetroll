@@ -78,7 +78,8 @@ describe("DisplayView", () => {
     const payload = projectionPayload(); payload.projection.tokens = [{ tokenId:"t1",label:"Alpha",x:.25,y:.5,size:.12,imageUrl:"/displays/d1/scenes/s1/tokens/t1/image?rev=3" }] as never;
     api.getDisplayProjection.mockResolvedValue(payload);
     renderDisplay(<DisplayView api={api as never} sceneId="s1" online pollMs={50} storage={memoryStorage(seedCredential())} />, qc);
-    const image = await screen.findByRole("img", { name: "Alpha" });
+    await waitFor(() => expect(screen.getByText("Alpha").closest("li")?.querySelector("img")).not.toBeNull());
+    const image = screen.getByText("Alpha").closest("li")!.querySelector("img")!;
     expect(image.closest("li")).toHaveStyle({width:"12%",left:"25%",top:"50%"});
     expect(fetch).toHaveBeenCalledWith("/api/displays/d1/scenes/s1/tokens/t1/image?rev=3", expect.objectContaining({credentials:"omit",headers:{"x-display-secret":"s3cr3t"}}));
     api.getDisplayProjection.mockRejectedValue({ status:404 });

@@ -118,7 +118,7 @@ export function SceneViewportView(props: {
                   style={{ opacity: token.visible ? 1 : 0.5 }}
                   onClick={() => props.onSelectToken?.(token.tokenId)}
                 >
-                  {token.imageFileId ? <SceneTokenArt key={token.imageFileId} campaignId={props.scene.campaignId} fileId={token.imageFileId} label={token.label} /> : null}
+                  {token.imageFileId ? <SceneTokenArt key={token.imageFileId} campaignId={props.scene.campaignId} fileId={token.imageFileId} /> : null}
                   <span className={tokenStyles.label}>{token.label}</span>
                 </button>
               </li>

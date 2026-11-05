@@ -305,7 +305,7 @@ export function DisplayView(props: {
                 transform: "translate(-50%, -50%)",
               }}
             >
-              {token.imageUrl ? <DisplayImage key={`${credential.displayId}:${token.imageUrl}`} path={token.imageUrl} secret={credential.secret} alt={token.label} /> : null}
+              {token.imageUrl ? <DisplayImage key={`${credential.displayId}:${token.imageUrl}`} path={token.imageUrl} secret={credential.secret} alt="" /> : null}
               <span className={tokenStyles.label}>{token.label}</span>
             </li>
           ))}

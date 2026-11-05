@@ -1,6 +1,22 @@
 export type MessageTable = Record<string, string>;
 
 export const defaultMessages: MessageTable = {
+  "debug.enabled": "Show debug information",
+  "debug.hint": "Show technical identifiers, revisions and diagnostics on this device.",
+  "debug.tools": "Developer tools",
+  "debug.browserTrace": "Browser trace",
+  "disclosure.advanced": "Advanced options",
+  "disclosure.identifier": "Identifier",
+  "disclosure.constraints": "Validation and limits",
+  "disclosure.tokenPosition": "Position · {label}",
+  "disclosure.position": "Position and size",
+  "disclosure.appearance": "Appearance",
+  "disclosure.sync": "Storage and sync details",
+  "editor.readiness.fixIssue": "Resolve 1 issue before publishing.",
+  "editor.readiness.fixIssues": "Resolve {count} issues before publishing.",
+  "editor.conflict.summary": "This draft changed elsewhere. Choose which changes to keep.",
+  "character.review.campaignItem": "Campaign item",
+
   "scene.library.title": "Scene backgrounds",
   "scene.library.error": "The scene background could not be saved. Try again.",
   "scene.library.unavailable": "This scene library is unavailable.",

@@ -46,17 +46,15 @@ describe("DiagnosticsDrawer", () => {
     );
     const items = screen.getAllByTestId(/^diagnostic-item-/);
     expect(items).toHaveLength(3);
-    expect(screen.getByTestId("diagnostic-code-missing_field")).toHaveTextContent("missing_field");
+    expect(screen.queryByTestId("diagnostic-code-missing_field")).not.toBeInTheDocument();
     expect(screen.getByTestId("diagnostic-message-missing_field")).toHaveTextContent(
       "Field is required",
     );
-    expect(screen.getByTestId("diagnostic-code-invalid_expression")).toHaveTextContent(
-      "invalid_expression",
-    );
+    expect(screen.queryByTestId("diagnostic-code-invalid_expression")).not.toBeInTheDocument();
     expect(screen.getByTestId("diagnostic-message-invalid_expression")).toHaveTextContent(
       "Unexpected token",
     );
-    expect(screen.getByTestId("diagnostic-code-duplicate_id")).toHaveTextContent("duplicate_id");
+    expect(screen.queryByTestId("diagnostic-code-duplicate_id")).not.toBeInTheDocument();
   });
 
   it("renders one Jump to button per diagnostic", () => {

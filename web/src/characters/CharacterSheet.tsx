@@ -137,7 +137,22 @@ function audienceLabel(audience: NonNullable<CharacterSnapshot["lastRoll"]>["aud
 function RollResult({ roll, fieldLabels }: { roll: NonNullable<CharacterSnapshot["lastRoll"]>; fieldLabels: ReadonlyMap<string, string> }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const expression = roll.expression.replace(/\bfields\.([A-Za-z_][A-Za-z0-9_]*)\b/g, (reference, fieldId: string) => fieldLabels.get(fieldId) ?? reference);
-  return <section className={styles.rollResult} aria-labelledby="character-roll-result"><h2 id="character-roll-result">{t("character.rollResult.title")}</h2><dl><dt>{t("character.rollResult.expression")}</dt><dd>{expression}</dd><dt>{t("character.rollResult.total")}</dt><dd>{roll.total}</dd><dt>{t("character.rollResult.output")}</dt><dd>{roll.output}</dd><dt>{t("character.rollResult.audience")}</dt><dd>{audienceLabel(roll.audience)}</dd></dl><RollBreakdown roll={roll}/><Button variant="secondary" onClick={() => setDetailsOpen(open => !open)} aria-expanded={detailsOpen}>{t(detailsOpen ? "character.rollResult.hideDetails" : "character.rollResult.showDetails")}</Button>{detailsOpen ? <div className={styles.rollDetails}><ul>{roll.dice.map((die, index) => <li key={`${die.sides}-${index}`}>d{die.sides}={die.value}</li>)}</ul><ul>{roll.bindings.map(binding => <li key={`${binding.scope}-${binding.definitionId}`}>{binding.scope === "fields" ? fieldLabels.get(binding.definitionId) ?? `${binding.scope}.${binding.definitionId}` : `${binding.scope}.${binding.definitionId}`}: {String(binding.value)}</li>)}</ul></div> : null}</section>;
+  const bindings = <ul>{roll.bindings.map(binding => <li key={`${binding.scope}-${binding.definitionId}`}>
+    {binding.scope === "fields" ? fieldLabels.get(binding.definitionId) ?? `${binding.scope}.${binding.definitionId}` : `${binding.scope}.${binding.definitionId}`}: {String(binding.value)}
+  </li>)}</ul>;
+  return <section className={styles.rollResult} aria-labelledby="character-roll-result">
+    <h2 id="character-roll-result">{t("character.rollResult.title")}</h2>
+    <dl>
+      <dt>{t("character.rollResult.expression")}</dt><dd>{expression}</dd>
+      <dt>{t("character.rollResult.total")}</dt><dd>{roll.total}</dd>
+      <dt>{t("character.rollResult.output")}</dt><dd>{roll.output}</dd>
+      <dt>{t("character.rollResult.audience")}</dt><dd>{audienceLabel(roll.audience)}</dd>
+    </dl>
+    {roll.breakdown?.version === "1.0" ? <RollBreakdown roll={roll}>{bindings}</RollBreakdown> : <>
+      <Button variant="secondary" onClick={() => setDetailsOpen(open => !open)} aria-expanded={detailsOpen}>{t(detailsOpen ? "character.rollResult.hideDetails" : "character.rollResult.showDetails")}</Button>
+      {detailsOpen ? <div className={styles.rollDetails}><ul>{roll.dice.map((die, index) => <li key={`${die.sides}-${index}`}>d{die.sides}={die.value}</li>)}</ul>{bindings}</div> : null}
+    </>}
+  </section>;
 }
 
 export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, portrait, entryImages, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {

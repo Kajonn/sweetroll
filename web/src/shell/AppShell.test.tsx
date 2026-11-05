@@ -1,5 +1,6 @@
+import { setDebugMode } from "../ui/debugMode.js";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -354,7 +355,7 @@ describe("AppShell", () => {
     expect(signouts).toBe(2);
   });
 
-  it("switches the device theme without remounting content", async () => {
+  it("switches debug presentation without remounting or clearing edited content", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ state: "authenticated", userId: "theme-user" }))));
     const previousTheme = document.documentElement.getAttribute("data-theme");
     let mounts = 0;
@@ -374,12 +375,10 @@ describe("AppShell", () => {
       const user = userEvent.setup();
       await user.click(input);
       await user.type(input, "+edited");
-      const theme = screen.getByLabelText("Theme");
-      await user.selectOptions(theme, "dark");
-      expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
-      expect(document.documentElement.style.colorScheme).toBe("dark");
-      await user.selectOptions(theme, "light");
-      expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+      act(() => setDebugMode(true));
+      expect(screen.getByTestId("request-id")).toBeVisible();
+      act(() => setDebugMode(false));
+      expect(screen.queryByTestId("request-id")).not.toBeInTheDocument();
       // Attribute-only switch: content is neither remounted nor reset.
       expect(mounts).toBe(0);
       expect(screen.getByTestId("probe-input")).toHaveValue("draft-title+edited");
@@ -465,7 +464,8 @@ describe("AppShell responsive shell (G3-1)", () => {
     // Authorization context stays explicit: sign-out + pending-status slot,
     // device theme switcher, shortcut help, and status bar.
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Theme")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Theme")).not.toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "Account" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show keyboard shortcuts" })).toBeInTheDocument();
     expect(screen.getByTestId("status-bar")).toHaveTextContent("Online");
     expect(screen.getByTestId("child")).toBeInTheDocument();

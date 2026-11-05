@@ -1,3 +1,4 @@
+import { useMemberLabel } from "./memberLabels.js";
 import { useEffect, useRef, useState } from "react";
 import { Button, Dialog, Select } from "../ui/index.js";
 import { t } from "../i18n/index.js";
@@ -13,12 +14,6 @@ export type SharingMember = {
   status: string;
   generation: number;
 };
-/** Always include the full stable ID: duplicate names on another roster page
- * remain unambiguous and labels never change when more members are loaded. */
-export function memberLabel(member: Pick<SharingMember, "userId" | "displayName">): string {
-  const name = member.displayName?.trim() || t("campaign.member.unnamed");
-  return `${name} (${member.userId})`;
-}
 export function AudienceFields(props: {
   audience: CampaignTemplate["audience"];
   setAudience: (v: CampaignTemplate["audience"]) => void;
@@ -27,6 +22,7 @@ export function AudienceFields(props: {
   members: SharingMember[];
   disabled?: boolean;
 }) {
+  const labelMember = useMemberLabel(props.members);
   return (
     <fieldset disabled={props.disabled}>
       <Select
@@ -62,7 +58,7 @@ export function AudienceFields(props: {
                     )
                   }
                 />
-                {memberLabel(m)}
+                {labelMember(m)}
               </label>
             ))
         : null}

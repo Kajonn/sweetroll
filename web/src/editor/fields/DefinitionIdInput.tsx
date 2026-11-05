@@ -1,3 +1,4 @@
+import { Disclosure } from "../../ui/Disclosure.js";
 import { SystemDialogContent, SystemDialogOverlay } from "../../theme/SystemPresentation.js";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useEffect, useId, useState } from "react";
@@ -64,6 +65,7 @@ export function DefinitionIdInput({
   const referencesId = `definition-id-references-${generatedId}`;
 
   return (
+    <Disclosure label={t("disclosure.identifier")} defaultOpen={!valid}>
     <div className={styles.field} data-testid="definition-id-input-wrapper">
       <label className={styles.label} htmlFor={inputId}>
         {t("editor.fields.id")}
@@ -136,5 +138,6 @@ export function DefinitionIdInput({
         </Dialog.Portal>
       </Dialog.Root>
     </div>
+    </Disclosure>
   );
 }

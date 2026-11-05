@@ -1,3 +1,4 @@
+import { Disclosure } from "../../ui/Disclosure.js";
 import { t } from "../../i18n/index.js";
 import type { FieldV1, ResourceFieldV1 } from "../../state/documentFieldTypes.js";
 import { DefinitionIdInput } from "./DefinitionIdInput.js";
@@ -84,7 +85,8 @@ export function ResourceFieldEditor({
           />
         </label>
       </div>
-      <div className={styles.row}>
+      <Disclosure label={t("disclosure.constraints")}>
+<div className={styles.row}>
         <label className={styles.field} htmlFor={`resource-field-min-${field.id}`}>
           {t("editor.fields.min")}
           <input
@@ -147,6 +149,7 @@ export function ResourceFieldEditor({
       <p className={styles.placeholder} data-testid={`resource-field-reset-hint-${field.id}`}>
         {t("editor.fields.resource.resetRuleHint")}
       </p>
+</Disclosure>
     </section>
   );
 }

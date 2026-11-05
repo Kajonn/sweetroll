@@ -32,6 +32,16 @@ function trayProps(overrides = {}) {
 }
 
 describe("TokenTrayView", () => {
+  it("keeps visibility and placement available while revealing precise coordinates on request", () => {
+    const props = trayProps();
+    render(<TokenTrayView {...{ ...props, api: props.api as never }} />, { wrapper: wrapper() });
+    expect(screen.getByLabelText(/^x \(0–1\)/i)).not.toBeVisible();
+    expect(screen.getByRole("button", { name: /place token/i })).toBeVisible();
+    expect(screen.getByRole("checkbox")).toBeVisible();
+    fireEvent.click(screen.getByText("Position and size"));
+    expect(screen.getByLabelText(/^x \(0–1\)/i)).toBeVisible();
+    expect(screen.getByLabelText(/^x \(0–1\)/i)).toHaveValue(0.5);
+  });
   it("places a token with a fresh key", async () => {
     const props = trayProps();
     render(<TokenTrayView {...{ ...props, api: props.api as never }} />, { wrapper: wrapper() });

@@ -229,7 +229,7 @@ describe("DocumentEditor", () => {
     expect(button).toBeDisabled();
     expect(button.getAttribute("aria-disabled")).toBe("true");
     expect(button.getAttribute("title")).toBe(
-      "Publish disabled — 2 error diagnostics must be resolved.",
+      "Resolve 2 issues before publishing.",
     );
   });
 
@@ -242,11 +242,11 @@ describe("DocumentEditor", () => {
       ],
     });
     expect(await screen.findByTestId("document-editor-publish-reason")).toHaveTextContent(
-      "Publish disabled — 2 error diagnostics must be resolved.",
+      "Resolve 2 issues before publishing.",
     );
     const panel = screen.getByTestId("document-editor-readiness");
     expect(panel).toHaveTextContent(/2 issues/);
-    expect(panel).toHaveTextContent(/No draft yet/);
+    expect(panel).not.toHaveTextContent(/No draft yet/);
     expect(panel).toHaveTextContent(/Not published yet/);
   });
 

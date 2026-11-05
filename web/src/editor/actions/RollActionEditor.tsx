@@ -1,3 +1,5 @@
+import { DebugOnly } from "../../ui/debugMode.js";
+import { Disclosure } from "../../ui/Disclosure.js";
 import {PushPolicyEditor} from "./PushPolicyEditor.js";
 import type {PushPolicy} from "@sweetroll/rules";
 import {GroupedPoolEditor} from "./GroupedPoolEditor.js";
@@ -491,7 +493,7 @@ export function RollActionEditor({
                     data-code={d.code}
                     data-testid={`roll-action-try-diagnostic-${action.id}`}
                   >
-                    {t("editor.action.roll.tryIt.diagnostic", { code: d.code, message: d.message })}
+                    {d.message}<DebugOnly> ({d.code})</DebugOnly>
                   </li>
                 ))}
               </ul>

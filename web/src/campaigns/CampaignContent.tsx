@@ -1,3 +1,4 @@
+import { useMemberLabel } from "./memberLabels.js";
 // Content tab body: permitted-content list with persistent audience marks,
 // detail opens via openContent, and revocation handling (404 on open →
 // "unavailable" EmptyState + list invalidation; revoked ids never mount).
@@ -122,6 +123,7 @@ function CampaignContentPreview(props: {
   api: Pick<CampaignsApi, "previewContent">;
   campaignId: string;
   targetUserId: string;
+  targetLabel: string;
   online: boolean;
   actorId: string | null;
   onExit: () => void;
@@ -200,7 +202,7 @@ function CampaignContentPreview(props: {
   }
   return (
     <div>
-      <p role="status">{t("campaign.detail.content.preview.banner", { name: props.targetUserId })}</p>
+      <p role="status">{t("campaign.detail.content.preview.banner", { name: props.targetLabel })}</p>
       <Button variant="secondary" onClick={props.onExit}>
         {t("campaign.detail.content.preview.exit")}
       </Button>
@@ -237,6 +239,7 @@ export function CampaignContentTab(props: {
   // offline or before the actor is known. Authoring mutations below are
   // likewise disabled while offline (same discipline as the board's
   // bump/Execute buttons).
+  const labelMember = useMemberLabel(props.members ?? []);
   const online = props.online ?? true;
   const actorId = props.actorId ?? null;
   const generation = props.generation ?? 0;
@@ -492,6 +495,7 @@ export function CampaignContentTab(props: {
           api={props.api}
           campaignId={props.campaignId}
           targetUserId={previewTargetId}
+          targetLabel={labelMember(props.members?.find(member => member.userId === previewTargetId) ?? { userId: previewTargetId })}
           online={online}
           actorId={actorId}
           onExit={exitPreview}
@@ -499,8 +503,7 @@ export function CampaignContentTab(props: {
       );
     }
     const members = props.members ?? [];
-    // The roster carries userIds only: the picker offers every active member
-    // regardless of role and labels options by userId. Never invent names.
+    // Preserve identities while displaying the roster-provided member names.
     const previewRoster = members.filter((member) => member.status === "active");
     const visible = items.filter((item) => !revokedIds.has(item.contentId));
     const hiddenRows = (deleted.data?.pages.flatMap((page) => page.content) ?? []).filter(
@@ -512,7 +515,7 @@ export function CampaignContentTab(props: {
           <Select
             label={t("campaign.detail.content.preview.label")}
             placeholder={t("campaign.detail.content.preview.placeholder")}
-            options={previewRoster.map((member) => ({ value: member.userId, label: member.userId }))}
+            options={previewRoster.map((member) => ({ value: member.userId, label: labelMember(member) }))}
             value=""
             required
             onChange={(event) => {

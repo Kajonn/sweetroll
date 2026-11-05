@@ -3,11 +3,10 @@ import { HelpCircle } from "lucide-react";
 
 import { t } from "../i18n/index.js";
 import { isOnboardingComplete, Onboarding } from "../player/Onboarding.js";
-import { getStoredPreference, normalizePreference, THEME_STORAGE_KEY, applyDeviceSelection, applyEffectiveTheme, subscribeMatchesDark, toDevicePreference, type ThemePreference } from "../theme/theme.js";
+import { getStoredPreference, THEME_STORAGE_KEY, applyEffectiveTheme, subscribeMatchesDark, toDevicePreference } from "../theme/theme.js";
 import { usePreferences } from "../theme/accountTheme.js";
 import { Button } from "../ui/Button.js";
 import { AppLink } from "../ui/AppLink.js";
-import { Select } from "../ui/Select.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { DevSignInPanel } from "./DevSignInPanel.js";
 import { ShortcutHelp } from "./ShortcutHelp.js";
@@ -70,66 +69,26 @@ export function AuthProvider({ initial, children }: { initial: AuthState; childr
   return <AuthContext.Provider value={initial}>{children}</AuthContext.Provider>;
 }
 
-/**
- * Minimal device-theme switcher (G2-structural, reversible) layered with the
- * G6 account default. Attribute-only: switching sets data-theme via theme.ts,
- * so no React tree remounts and no editor/character state resets. Stays in
- * sync with cross-tab updates. Resolves through the single shared
- * `resolveTheme` (device > account > system) -- the same function the account
- * screen uses, never a fork: an anonymous or failed account load simply
- * resolves device-only.
- */
-function ThemeSwitcher() {
+/** Apply account/device themes without duplicating the Account controls. */
+function ThemePreferenceSync() {
   const client = useMemo(() => createApiClient({ baseUrl: "/api" }), []);
   const preferences = usePreferences(client);
-  const [preference, setPreference] = useState<ThemePreference>(() => getStoredPreference());
-  // A failed load is device-only; a pending one resolves once it settles.
   const accountDefault = preferences.isError ? null : (preferences.data ?? null);
   const accountRef = useRef(accountDefault);
   accountRef.current = accountDefault;
   useEffect(() => {
-    const onStorage = (event: StorageEvent): void => {
-      if (event.key !== null && event.key !== THEME_STORAGE_KEY) return;
-      setPreference(getStoredPreference());
+    applyEffectiveTheme({ device: toDevicePreference(getStoredPreference()), accountDefault });
+  }, [accountDefault]);
+  useEffect(() => {
+    const apply = () => applyEffectiveTheme({ device: toDevicePreference(getStoredPreference()), accountDefault: accountRef.current });
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === THEME_STORAGE_KEY) apply();
     };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    const unsubscribe = subscribeMatchesDark(apply);
+    return () => { window.removeEventListener("storage", onStorage); unsubscribe(); };
   }, []);
-  // Re-apply the effective theme as the cached account default settles.
-  // initTheme (main.tsx) still owns device-only application at startup; this
-  // upgrades to the effective value once the account is known, on hydration.
-  useEffect(() => {
-    applyEffectiveTheme({ device: toDevicePreference(preference), accountDefault });
-  }, [preference, accountDefault]);
-  // OS changes re-apply device-only via initTheme's listener; this listener
-  // (registered later) corrects to the effective value when an account
-  // default is set, so Follow-device + account-default stays exact.
-  useEffect(() => {
-    return subscribeMatchesDark(() => {
-      applyEffectiveTheme({
-        device: toDevicePreference(getStoredPreference()),
-        accountDefault: accountRef.current,
-      });
-    });
-  }, []);
-  return (
-    <span style={{ display: "inline-block", minWidth: 160 }}>
-      <Select
-        label={t("shell.theme.label")}
-        value={preference}
-        onChange={(event) => {
-          const next = normalizePreference(event.target.value);
-          setPreference(next);
-          applyDeviceSelection({ preference: next, accountDefault: accountRef.current });
-        }}
-        options={[
-          { value: "light", label: t("shell.theme.light") },
-          { value: "dark", label: t("shell.theme.dark") },
-          { value: "system", label: t("shell.theme.system") },
-        ]}
-      />
-    </span>
-  );
+  return null;
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -319,7 +278,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <button type="button" onClick={() => { void signOut(); }}>{t("shell.signOut.button")}</button>
             )}
             {logoutStatus && <span role="status" className={styles.signOutStatus}>{t(`shell.signOut.${logoutStatus}`)}</span>}
-            <ThemeSwitcher />
+            <ThemePreferenceSync />
             <button
               type="button"
               aria-label={t("shortcutHelp.open")}

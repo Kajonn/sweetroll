@@ -1,3 +1,4 @@
+import { Disclosure } from "../../ui/Disclosure.js";
 import { t } from "../../i18n/index.js";
 import type {
   DecimalFieldV1,
@@ -55,16 +56,7 @@ export function ScalarFieldEditor({
               disabled={disabled}
             />
           </label>
-          <label className={styles.checkbox}>
-            <input
-              type="checkbox"
-              checked={field.required}
-              onChange={(e) => update({ required: e.target.checked })}
-              data-testid={`scalar-field-required-${field.id}`}
-              disabled={disabled}
-            />
-            {t("editor.fields.required")}
-          </label>
+
         </div>
         <div className={styles.row}>
           <label className={styles.field}>
@@ -78,7 +70,20 @@ export function ScalarFieldEditor({
               disabled={disabled}
             />
           </label>
-          <label className={styles.field}>
+
+        </div>
+      <Disclosure label={t("disclosure.constraints")}><div className={styles.row}>
+          <label className={styles.checkbox}>
+            <input
+              type="checkbox"
+              checked={field.required}
+              onChange={(e) => update({ required: e.target.checked })}
+              data-testid={`scalar-field-required-${field.id}`}
+              disabled={disabled}
+            />
+            {t("editor.fields.required")}
+          </label>
+<label className={styles.field}>
             {t("editor.fields.minLength")}
             <input
               type="number"
@@ -98,7 +103,7 @@ export function ScalarFieldEditor({
               disabled={disabled}
             />
           </label>
-        </div>
+      </div></Disclosure>
       </section>
     );
   }
@@ -129,16 +134,7 @@ export function ScalarFieldEditor({
               disabled={disabled}
             />
           </label>
-          <label className={styles.checkbox}>
-            <input
-              type="checkbox"
-              checked={field.required}
-              onChange={(e) => update({ required: e.target.checked })}
-              data-testid={`scalar-field-required-${field.id}`}
-              disabled={disabled}
-            />
-            {t("editor.fields.required")}
-          </label>
+
         </div>
         <div className={styles.row}>
           <label className={styles.field}>
@@ -152,7 +148,20 @@ export function ScalarFieldEditor({
               disabled={disabled}
             />
           </label>
-          <label className={styles.field}>
+
+        </div>
+      <Disclosure label={t("disclosure.constraints")}><div className={styles.row}>
+          <label className={styles.checkbox}>
+            <input
+              type="checkbox"
+              checked={field.required}
+              onChange={(e) => update({ required: e.target.checked })}
+              data-testid={`scalar-field-required-${field.id}`}
+              disabled={disabled}
+            />
+            {t("editor.fields.required")}
+          </label>
+<label className={styles.field}>
             {t("editor.fields.min")}
             <input
               type="number"
@@ -185,7 +194,7 @@ export function ScalarFieldEditor({
               disabled={disabled}
             />
           </label>
-        </div>
+      </div></Disclosure>
       </section>
     );
   }

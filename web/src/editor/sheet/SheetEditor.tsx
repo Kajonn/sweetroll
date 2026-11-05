@@ -1,3 +1,4 @@
+import { DebugOnly, useDebugMode } from "../../ui/debugMode.js";
 import { SystemDialogContent, SystemDialogOverlay } from "../../theme/SystemPresentation.js";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useState } from "react";
@@ -49,6 +50,7 @@ export function SheetEditor({
   const replaceSheet = (patch: Partial<SheetEditorV1>) => {
     onChange({ ...sheet, ...patch });
   };
+  const debug = useDebugMode();
   const replaceSection = (idx: number, section: SheetSectionV1) => {
     const next = sheet.sections.map((s, i) => (i === idx ? section : s));
     replaceSheet({ sections: next });
@@ -180,11 +182,11 @@ export function SheetEditor({
             {t("editor.sheet.targetEntity")}
             <select aria-label={t("editor.sheet.targetEntity")} data-testid="sheet-target-entity" value={sheet.targetEntityId} onChange={(event) => replaceSheet({ targetEntityId: event.target.value })}>
               {!entities.some((entity) => entity.id === sheet.targetEntityId) && <option value={sheet.targetEntityId}>Unknown entity ({sheet.targetEntityId})</option>}
-              {entities.map((entity) => <option key={entity.id} value={entity.id}>{entity.label} ({entity.id})</option>)}
+              {entities.map((entity) => <option key={entity.id} value={entity.id}>{entity.label}{debug || entities.filter(candidate => candidate.label === entity.label).length > 1 ? ` (${entity.id})` : ""}</option>)}
             </select>
           </div>
           <div className={styles.elementField}>
-            <span className={styles.monoLabel}>ID: {sheet.id}</span>
+            <DebugOnly><span className={styles.monoLabel}>ID: {sheet.id}</span></DebugOnly>
           </div>
           <div className={styles.headerMeta}>
             <RemoveSheetButton sheet={sheet} onRemove={() => undefined} />

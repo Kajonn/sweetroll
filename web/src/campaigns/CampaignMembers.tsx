@@ -1,3 +1,4 @@
+import { useMemberLabel } from "./memberLabels.js";
 // Member roster tab: role changes and removals with caller-minted
 // idempotency keys. Management buttons are display gating only — the
 // server remains the policy authority for owner-protections and co-GM
@@ -73,6 +74,7 @@ export function CampaignMembersTab(props: {
     online: props.online,
   });
 
+  const labelMember = useMemberLabel(members.data?.pages.flatMap(page => page.members) ?? []);
   const [selectedRoles, setSelectedRoles] = useState<Record<string, ManageableRole>>({});
   const [roleTargetId, setRoleTargetId] = useState<string | null>(null);
   const [removeTargetId, setRemoveTargetId] = useState<string | null>(null);
@@ -198,7 +200,7 @@ export function CampaignMembersTab(props: {
               const roleChangeable = manageable && (member.role === "co_gm" || member.role === "player");
               return (
                 <li key={member.userId}>
-                  <span>{member.userId}</span> <span>{roleLabel(member.role)}</span>{" "}
+                  <span>{labelMember(member)}</span> <span>{roleLabel(member.role)}</span>{" "}
                   {isSelf ? <span>({t("campaign.detail.members.you")})</span> : null}{" "}
                   {roleChangeable ? (
                     <Select
@@ -223,7 +225,7 @@ export function CampaignMembersTab(props: {
                   ) : null}{" "}
                   {manageable ? (
                     <Button variant="secondary" onClick={() => setRemoveTargetId(member.userId)}>
-                      {t("campaign.detail.members.remove", { name: member.userId })}
+                      {t("campaign.detail.members.remove", { name: labelMember(member) })}
                     </Button>
                   ) : null}
                 </li>
@@ -241,7 +243,7 @@ export function CampaignMembersTab(props: {
           roleTarget === null
             ? ""
             : t("campaign.detail.members.changeRole.confirm.title", {
-                name: roleTarget.userId,
+                name: labelMember(roleTarget),
                 role: roleLabel(roleValue),
               })
         }
@@ -260,7 +262,7 @@ export function CampaignMembersTab(props: {
           )
         }
       >
-        <Panel title={roleTarget?.userId ?? ""}>
+        <Panel title={roleTarget ? labelMember(roleTarget) : ""}>
           <p>{roleTarget === null ? "" : roleLabel(roleValue)}</p>
         </Panel>
       </Dialog>
@@ -272,7 +274,7 @@ export function CampaignMembersTab(props: {
         title={
           removeTarget === null
             ? ""
-            : t("campaign.detail.members.remove.confirm.title", { name: removeTarget.userId })
+            : t("campaign.detail.members.remove.confirm.title", { name: labelMember(removeTarget) })
         }
         description={
           removeTarget === null ? undefined : t("campaign.detail.members.remove.confirm.description")
@@ -289,7 +291,7 @@ export function CampaignMembersTab(props: {
           )
         }
       >
-        <Panel title={removeTarget?.userId ?? ""}>
+        <Panel title={removeTarget ? labelMember(removeTarget) : ""}>
           <p>{removeTarget === null ? "" : roleLabel(removeTarget.role)}</p>
         </Panel>
       </Dialog>

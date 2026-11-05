@@ -1,3 +1,4 @@
+import { DebugOnly } from "../ui/debugMode.js";
 import { SystemDialogContent, SystemDialogOverlay } from "../theme/SystemPresentation.js";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useState } from "react";
@@ -141,7 +142,7 @@ export function PublishDialog({
           >
             <Dialog.Title className={styles.title}>{t("publish.success.title")}</Dialog.Title>
             <p className={styles.body}>{t("publish.success.message", { version: published.semanticVersion })}</p>
-            <dl className={styles.meta}>
+            <DebugOnly><dl className={styles.meta}>
               <div className={styles.metaRow}>
                 <dt className={styles.metaKey}>{t("publish.success.versionId")}</dt>
                 <dd className={styles.metaValue}>{published.versionId}</dd>
@@ -150,7 +151,7 @@ export function PublishDialog({
                 <dt className={styles.metaKey}>{t("publish.success.checksum")}</dt>
                 <dd className={styles.metaValue}>{published.checksum}</dd>
               </div>
-            </dl>
+            </dl></DebugOnly>
             <div className={styles.actions}>
               <AppLink
                 className={styles.createLink}
@@ -190,11 +191,11 @@ export function PublishDialog({
               data-testid="publish-dialog-readiness"
             >
               <ul className={styles.readinessList}>
-                <li>
+                <DebugOnly><li>
                   {readiness.draftRevision !== null
                     ? t("publish.readiness.draft", { revision: readiness.draftRevision })
                     : t("publish.readiness.noDraft")}
-                </li>
+                </li></DebugOnly>
                 <li>{readiness.unsaved ? t("publish.readiness.unsaved") : t("publish.readiness.saved")}</li>
                 <li>
                   {readiness.diagnosticsCount === 0

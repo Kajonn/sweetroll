@@ -252,7 +252,7 @@ describe("PublishDialog", () => {
     await user.click(screen.getByTestId("publish-dialog-submit"));
     expect(await screen.findByTestId("publish-dialog-success")).toBeInTheDocument();
     expect(screen.getByTestId("publish-dialog-success")).toHaveTextContent("1.0.0");
-    expect(screen.getByTestId("publish-dialog-success")).toHaveTextContent("deadbeef");
+    expect(screen.getByTestId("publish-dialog-success")).not.toHaveTextContent("deadbeef");
   });
 
   it("success card links to character creation for the published version", async () => {
@@ -283,9 +283,9 @@ describe("PublishDialog", () => {
     const cta = await screen.findByTestId("publish-dialog-create-character");
     expect(cta).toHaveAttribute("href", "/characters/new?systemVersionId=v1");
     expect(cta).toHaveTextContent("Create test character");
-    // versionId/checksum display + Close are preserved alongside the CTA.
-    expect(screen.getByTestId("publish-dialog-success")).toHaveTextContent("v1");
-    expect(screen.getByTestId("publish-dialog-success")).toHaveTextContent("deadbeef");
+    // Technical metadata is hidden; the CTA still uses the immutable version ID.
+    expect(screen.getByTestId("publish-dialog-success")).not.toHaveTextContent("v1");
+    expect(screen.getByTestId("publish-dialog-success")).not.toHaveTextContent("deadbeef");
     expect(screen.getByTestId("publish-dialog-close")).toBeInTheDocument();
   });
 

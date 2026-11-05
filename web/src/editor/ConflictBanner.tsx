@@ -1,3 +1,4 @@
+import { DebugOnly } from "../ui/debugMode.js";
 import { AlertTriangle, X } from "lucide-react";
 
 import { t } from "../i18n/index.js";
@@ -27,7 +28,7 @@ export function ConflictBanner({
         <AlertTriangle size={20} />
       </div>
       <div className={styles.body}>
-        <p className={styles.message}>{t("editor.conflict.message", { latestRevision })}</p>
+        <p className={styles.message}>{t("editor.conflict.summary")}<DebugOnly> {t("editor.readiness.draftRev", { revision: latestRevision })}</DebugOnly></p>
         <div className={styles.actions}>
           <button
             type="button"

@@ -125,20 +125,22 @@ function okFetch() {
 }
 
 describe("publish readiness (G5 task 5)", () => {
-  test("readiness panel shows draft rev, unsaved state, diagnostics, and latest published version", () => {
+  test("readiness is compact and keeps actionable issues and latest version visible", () => {
     renderBody(okFetch(), stubWs());
 
     const panel = screen.getByTestId("document-editor-readiness");
-    expect(panel).toHaveTextContent(/Draft rev 7/);
-    expect(panel).toHaveTextContent(/Not saved yet/);
-    expect(panel).toHaveTextContent(/2 issues/);
+    expect(panel).not.toHaveTextContent(/Draft rev 7/);
+    expect(screen.queryByTestId("document-editor-readiness-diagnostics")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("document-editor-readiness-versions")).not.toBeInTheDocument();
+    expect(screen.getByTestId("document-editor-autosave")).toHaveTextContent(/Not saved yet/);
+    expect(screen.getByTestId("document-editor-diagnostics-toggle")).toHaveTextContent(/2/);
     expect(panel).toHaveTextContent(/Latest published 1\.0\.0/);
 
     // Publish stays disabled and the reason is visible text, not tooltip-only.
     const publish = screen.getByTestId("document-editor-publish");
     expect(publish).toBeDisabled();
     expect(screen.getByTestId("document-editor-publish-reason")).toHaveTextContent(
-      /2 error diagnostics must be resolved/,
+      /Resolve 2 issues before publishing/,
     );
   });
 
@@ -146,10 +148,10 @@ describe("publish readiness (G5 task 5)", () => {
     const user = userEvent.setup();
     renderBody(okFetch(), stubWs());
 
-    await user.click(screen.getByTestId("document-editor-readiness-diagnostics"));
+    await user.click(screen.getByTestId("document-editor-diagnostics-toggle"));
     expect(screen.getByTestId("document-editor-diagnostics")).toBeInTheDocument();
 
-    await user.click(screen.getByTestId("document-editor-readiness-versions"));
+    await user.click(screen.getByTestId("document-editor-version-history-toggle"));
     expect(screen.getByTestId("version-history")).toBeInTheDocument();
   });
 
@@ -195,7 +197,8 @@ describe("publish readiness (G5 task 5)", () => {
 
     // The 600ms autosave debounce fires the first PUT, which 409s.
     const banner = await screen.findByTestId("conflict-banner", undefined, { timeout: 5000 });
-    expect(banner).toHaveTextContent(/revision 9/);
+    expect(banner).toHaveTextContent(/changed elsewhere/);
+    expect(banner).not.toHaveTextContent(/revision 9/);
     expect(screen.getByRole("button", { name: /reload theirs/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /replace server version/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /dismiss/i })).toBeInTheDocument();

@@ -1,3 +1,4 @@
+import { DebugOnly } from "../ui/debugMode.js";
 import { ItemArtwork } from "../ui/ItemArtwork.js";
 import { createImageEditorApi } from "../ui/imageEditorApi.js";
 import { useQueryClient } from "@tanstack/react-query";
@@ -478,7 +479,7 @@ export function DocumentEditorBody({
           onClick={() => setPublishOpen(true)}
           title={
             publishDisabled
-              ? t("editor.publish.disabled.reason", { count: errorCount })
+              ? t(errorCount === 1 ? "editor.readiness.fixIssue" : "editor.readiness.fixIssues", { count: errorCount })
               : !publishReady
                 ? t("editor.publish.waitForSave")
               : undefined
@@ -491,48 +492,15 @@ export function DocumentEditorBody({
           data-testid="document-editor-readiness"
           aria-label={t("editor.readiness.title")}
         >
-          <ul className={styles.readinessList}>
-            <li className={styles.readinessItem}>
-              {confirmedDraftRevision !== null
-                ? t("editor.readiness.draftRev", { revision: confirmedDraftRevision })
-                : t("editor.readiness.noDraft")}
-            </li>
-            <li className={styles.readinessItem}>
-              {t("editor.readiness.saveState", { state: autosaveLabel(sync.status) })}
-            </li>
-            <li className={styles.readinessItem}>
-              {errorCount === 0
-                ? t("editor.readiness.noIssues")
-                : t("editor.readiness.issues", { count: errorCount })}{" "}
-              <Button
-                variant="secondary"
-                data-testid="document-editor-readiness-diagnostics"
-                disabled={errorCount === 0}
-                onClick={() => setDiagnosticsOpen(true)}
-              >
-                {t("editor.readiness.reviewDiagnostics")}
-              </Button>
-            </li>
-            <li className={styles.readinessItem}>
-              {latestPublished !== null
-                ? t("editor.readiness.latestPublished", { version: latestPublished })
-                : t("editor.readiness.noPublished")}{" "}
-              <Button
-                variant="secondary"
-                data-testid="document-editor-readiness-versions"
-                onClick={() => setVersionHistoryOpen(true)}
-              >
-                {t("editor.readiness.viewVersions")}
-              </Button>
-            </li>
-          </ul>
+          <DebugOnly><span>{confirmedDraftRevision !== null ? t("editor.readiness.draftRev", { revision: confirmedDraftRevision }) : t("editor.readiness.noDraft")} · </span></DebugOnly>
+          <span>{latestPublished !== null ? t("editor.readiness.latestPublished", { version: latestPublished }) : t("editor.readiness.noPublished")}</span>
           <p
             className={styles.readinessReason}
             data-testid="document-editor-publish-reason"
             role="status"
           >
             {publishDisabled
-              ? t("editor.publish.disabled.reason", { count: errorCount })
+              ? t(errorCount === 1 ? "editor.readiness.fixIssue" : "editor.readiness.fixIssues", { count: errorCount })
               : !publishReady
                 ? t("editor.publish.waitForSave")
               : t("editor.readiness.ready")}

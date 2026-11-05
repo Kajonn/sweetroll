@@ -1,3 +1,5 @@
+import { DebugOnly } from "../ui/debugMode.js";
+import { t } from "../i18n/index.js";
 import styles from "./StatusBar.module.css";
 
 export function StatusBar({ requestId, online }: { requestId?: string; online: boolean }) {
@@ -6,7 +8,7 @@ export function StatusBar({ requestId, online }: { requestId?: string; online: b
       <span className={`${styles.indicator} ${online ? "" : styles.offline}`} aria-hidden />
       <span>{online ? "Online" : "Offline"}</span>
       <span className={styles.spacer} />
-      {requestId !== undefined && <span data-testid="request-id">{requestId}</span>}
+      {requestId !== undefined && <DebugOnly><span data-testid="request-id">{t("debug.browserTrace")}: {requestId}</span></DebugOnly>}
       <kbd>?</kbd><span>Shortcuts</span>
     </footer>
   );

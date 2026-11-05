@@ -1,3 +1,4 @@
+import { DebugOnly } from "../ui/debugMode.js";
 import type { DocumentAssessment, PackageDiagnostic } from "../api/server.js";
 import { t } from "../i18n/index.js";
 
@@ -62,16 +63,16 @@ function DiagnosticRow({
       data-diagnostic-code={diagnostic.code}
     >
       <div className="diagnostics-drawer__body">
-        <code className="diagnostics-drawer__code" data-testid={`diagnostic-code-${diagnostic.code}`}>
+        <DebugOnly><code className="diagnostics-drawer__code" data-testid={`diagnostic-code-${diagnostic.code}`}>
           {diagnostic.code}
-        </code>
+        </code></DebugOnly>
         <p
           className="diagnostics-drawer__message"
           data-testid={`diagnostic-message-${diagnostic.code}`}
         >
           {diagnostic.message}
         </p>
-        <span className="diagnostics-drawer__path">{diagnostic.path}</span>
+        <DebugOnly><span className="diagnostics-drawer__path">{diagnostic.path}</span></DebugOnly>
       </div>
       <button
         type="button"

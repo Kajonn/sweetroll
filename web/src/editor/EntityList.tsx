@@ -1,3 +1,4 @@
+import { DebugOnly } from "../ui/debugMode.js";
 import { SystemDialogContent, SystemDialogOverlay } from "../theme/SystemPresentation.js";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useState } from "react";
@@ -400,7 +401,7 @@ function EntityDetail({
           </FormField>
         </div>
         <div className={styles.detailMeta}>
-          <span className={styles.monoLabel}>{t("editor.entity.idLabel")} {entity.id}</span>
+          <DebugOnly><span className={styles.monoLabel}>{t("editor.entity.idLabel")} {entity.id}</span></DebugOnly>
           <RemoveEntityButton entity={entity} onRemove={onRemove} />
         </div>
       </header>

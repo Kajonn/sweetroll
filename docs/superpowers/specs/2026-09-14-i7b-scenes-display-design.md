@@ -1,6 +1,6 @@
 # I7b Scenes & Restricted Display Design
 
-Date: 2026-09-14. Status: approved spec (sections 1–4 reviewed in chat); implementation plan not yet written.
+Date: 2026-09-14. Status corrected 2026-11-05: approved spec, foundation delivered, visual controls incomplete. See the [implementation status](../plans/2026-09-14-i7b-scenes-display.md#current-delivery-status--corrected-2026-11-05) and [visual-controls completion plan](../plans/2026-11-05-scene-visual-controls.md).
 Authority: `design_v2.md` §§7.6–7.7, 17.9a; GUI plan `docs/superpowers/plans/2026-09-08-gui-integration.md` G8.
 Prior slice: I7 GM app (`docs/superpowers/specs/2026-09-11-i7-gm-app-design.md`, Phases 1–3 landed).
 Reconciliation: full I7b is specified here as one spec; the implementation plan may split it into
@@ -94,8 +94,9 @@ CSRF-able requests on the shared display context the entry purge is designed to 
 - `TokenTray`: scene token library (label + optional uploaded token image); tap-to-place /
   drag-to-move; per-token visibility toggle (hidden tokens never leave the server).
 - Display status: pending/applied/offline per mutation via existing sync text; paired-display
-  list + revoke. Offline GM edits queue with idempotent replay; the display itself is
-  online-only (blank/reconnecting when stale).
+  list + revoke. Per current design Section 7.8, scene mutations start online-only with
+  revision/idempotency recovery; offline queueing is not part of the visual-controls
+  completion work. The display is online-only (blank/reconnecting when stale).
 
 Excluded: grids, measurement, initiative, vision, lighting automation, arbitrary drawing.
 

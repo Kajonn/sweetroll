@@ -77,6 +77,19 @@ The agent inspected the Systems and campaign layouts at phone and desktop
 widths. This provides browser evidence, not human visual or physical-device
 acceptance.
 
+Application `e3496ca` deployed successfully to the isolated preview in deployment
+`ed55bf92-8a07-4248-872f-d69f1a0d5197`. The four Systems/navigation checks also
+passed against that deployment (320/360/768/1280px). CI #232 passed all 69 browser
+journeys and all 31 offline checks. The local full journey run had 68 passes and
+one missing Archive control after return; the same journey passed in CI, and a
+focused local rerun passed without changing application code.
+
+Seven changed screenshots from CI run `42084194670`, artifact `13441073561`,
+were inspected by the agent and proposed as new baselines: library and creator
+at 360/1280px, plus desktop preview/publish and the phone conflict banner.
+The other three baselines were unchanged. Final PR checks verify these exact
+committed baseline candidates; human visual approval remains open.
+
 ![Systems at 320px](assets/gui-systems-320-2026-11-05.png)
 
 ![Systems at 1280px](assets/gui-systems-1280-2026-11-05.png)

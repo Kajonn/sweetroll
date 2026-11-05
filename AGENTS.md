@@ -24,6 +24,14 @@ PR #29 adds the [2026-11-03 hosted G9 protocol and evidence](docs/acceptance/gui
 The app is unreleased and databases contain only disposable test data. Follow the
 [development database policy](database/README.md): update the current schema
 baseline instead of adding migrations or repair code for obsolete app versions.
+
+**Owner clarification (2026-11-05):** Until the first application release tag,
+all app/database state may be cleared completely. The owner explicitly permits
+deleting and recreating the development app and its database when necessary;
+retaining old test state is optional. Do not ask again solely because a
+pre-release reset would discard test state. Check release-tag status first;
+after the first release tag, follow the released-data migration/recovery policy.
+
 Character/campaign version upgrades, mapping previews and rollback are also out of scope.
 Keep published rules identifiers and immutable snapshots; do not add conversion paths.
 Application-version migrations and support for older app/API/package/cache/client

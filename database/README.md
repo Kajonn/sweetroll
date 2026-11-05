@@ -3,6 +3,13 @@
 The app is unreleased, runs only in test environments and has no users. There is
 one current schema: `database/schema.sql`.
 
+**Owner clarification (2026-11-05):** Until the first application release tag,
+all app/database state may be cleared completely. The owner explicitly permits
+deleting and recreating the development app and its database when necessary;
+retaining old test state is optional. Do not ask again solely because a
+pre-release reset would discard test state. Check release-tag status first;
+after the first release tag, follow the released-data migration/recovery policy.
+
 Run `npm run db:init` (`npm run start:db:init` from the built image). Initialization
 creates the schema atomically in an empty database, serializes concurrent starts,
 and inserts missing reference templates. Repeated startup preserves existing data.

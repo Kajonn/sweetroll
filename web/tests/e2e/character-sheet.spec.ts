@@ -50,6 +50,20 @@ test.describe("character sheet responsive and keyboard", () => {
           timeout: 30_000,
         });
 
+        // Character identity/status must scroll with the sheet rather than
+        // covering fields and actions on short screens.
+        const header = page.getByRole("heading", { name: characterName }).locator("..");
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+        const headerTop = await header.evaluate(element =>
+          element.getBoundingClientRect().top + window.scrollY);
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(50);
+        await expect.poll(() => header.evaluate((element, initialTop) =>
+          Math.abs(element.getBoundingClientRect().top - (initialTop - window.scrollY)),
+        headerTop)).toBeLessThan(2);
+        await page.evaluate(() => window.scrollTo(0, 0));
+
         // Keyboard flow: tab to the resource control and activate by keyboard.
         const bump = page.getByRole("button", { name: system.bumpButton });
         await bump.focus();

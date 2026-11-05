@@ -118,3 +118,17 @@ The other eight baselines remain unchanged.
 ![Systems at 320px](assets/gui-systems-320-2026-11-05.png)
 
 ![Systems at 1280px](assets/gui-systems-1280-2026-11-05.png)
+
+### Character header scroll follow-up
+
+The character identity/save/offline header now stays in normal document flow
+instead of sticking over the sheet. Design Section 10.2 reflects this behavior
+at all viewport widths.
+
+A rendered-browser regression first failed with the old sticky header at 360px
+(the header differed from its expected scrolled position by 967.75px), then
+passed after removing the sticky rule. All six character-sheet journeys passed:
+d20, PbtA and dice pool at 360px and 1280px, including header scrolling, keyboard
+resource changes, save state, axe checks and horizontal-overflow checks. The
+33 targeted character-sheet/layout unit tests and frontend type checking also
+passed. Hosted deployment verification is recorded separately when complete.

@@ -364,7 +364,7 @@ tabs use one horizontally scrollable row with 44px targets instead of wrapping
 into several rows. Navigation and viewport changes preserve the active view's
 state; Escape closes the disclosure and restores focus to its trigger.
 
-- Sticky character identity and primary-resource summary without excessive vertical space.
+- Character identity, save/offline status and resource sections scroll with the rest of the sheet; the character header must not stick over fields or actions on small screens.
 - Platform-owned bottom navigation for Characters, Activity, and Account; Campaigns is added in I6. System creators cannot add navigation destinations or divide the linear sheet into tabs.
 - Prominent action buttons and resource controls; numeric entry supports direct input and step controls.
 - Optimistic updates with visible pending/error state and automatic retry only when idempotent (offline-safe).

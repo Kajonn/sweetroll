@@ -111,6 +111,10 @@ responsive flex ordering. All five compact-navigation/tab checks and type
 checking passed. The phone screenshot below reflects this final placement;
 desktop navigation is unchanged. Final preview and CI evidence are in PR #33.
 
+CI #236's two phone screenshots (artifact `13446123648`) were inspected and
+updated for this placement; their pixel changes are confined to the header.
+The other eight baselines remain unchanged.
+
 ![Systems at 320px](assets/gui-systems-320-2026-11-05.png)
 
 ![Systems at 1280px](assets/gui-systems-1280-2026-11-05.png)

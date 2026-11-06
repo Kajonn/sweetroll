@@ -225,7 +225,8 @@ test.describe("visual: sheet preview", () => {
             expect(aligned!.x).toBeCloseTo(capture.x, 6);
             expect(aligned!.y).toBeCloseTo(capture.y, 6);
             await expect(page).toHaveScreenshot(`sheet-preview-${width}.png`, {
-              clip: { x: capture.x, y: capture.y, width: 276, height: 610 },
+              // The retained baseline includes one pixel of context above the frame.
+              clip: { x: capture.x, y: capture.y - 1, width: 276, height: 610 },
               maxDiffPixels: 700,
             });
           } finally {

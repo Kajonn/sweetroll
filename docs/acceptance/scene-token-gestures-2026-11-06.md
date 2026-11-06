@@ -115,7 +115,7 @@ CI #257 passed backend/contracts/Docker, all frontend tests, offline and two bro
 shards. Its remaining failures were the same 1,484-pixel mobile preview crop shift
 and a journey shard cancelled before tests while downloading Ubuntu fonts.
 The capture now translates only the test fixture onto integer device pixels after
-all product geometry assertions, uses the same 276×610 crop, and restores the
+all product geometry assertions, retains the baseline's one-pixel context above the frame in the same 276×610 crop, and restores the
 original transform afterward. The existing baseline and 700-pixel threshold stay
 unchanged. Local reproduction confirmed a fractional origin (`y=71.78125`);
 local fonts differ from CI, so the retained CI baseline remains the authority.
@@ -123,3 +123,8 @@ Browser dependency installation now bounds stalled HTTP/HTTPS reads to 30 second
 with two download retries. Fonts and browser dependencies are still installed;
 application test retries and job time budgets are unchanged. These are CI/test-only
 changes; the accepted deployed application remains `b112835`.
+
+A local browser stress check moved the mobile preview through six fractional
+origins and confirmed one identical screenshot hash after normalization. The
+first normalized CI capture exposed the baseline's existing one-pixel top context;
+that context is retained explicitly rather than changing the baseline or threshold.

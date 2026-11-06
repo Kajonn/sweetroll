@@ -35,12 +35,13 @@
   },
   "local": {
     "focusedTests": 50,
-    "frontendTests": 1276,
+    "frontendTests": 1277,
     "postgresIntegrationTests": 30,
     "browserJourneys": 3,
     "browserRetries": 0,
     "typecheck": "passed",
-    "build": "passed"
+    "build": "passed",
+    "ciMirrorRegression": "failed on unchanged apt-mirrors.txt, then passed after including mirror-transport lists"
   },
   "coverage": {
     "widths": [

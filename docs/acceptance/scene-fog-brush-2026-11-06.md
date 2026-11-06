@@ -43,7 +43,7 @@ adopted a newer revision instead of retaining its starting revision.
 | Check | Result |
 | --- | --- |
 | Focused fog/gesture/tray/viewport component tests | 50 passed |
-| Full frontend suite | 1,276 passed across 130 files |
+| Full frontend suite, including CI setup regression | 1,277 passed across 131 files |
 | Frontend typecheck and production build | Passed |
 | Actual PostgreSQL scene/media integration | 30 passed across campaign-scenes and campaign-item-images |
 | Local real-HTTP browser journeys | 3 passed in 1.2 minutes, zero retries |
@@ -108,3 +108,22 @@ V4 still requires the full ordered combined image-token + gesture + brush hosted
 protocol. Separate V2 and V3 runs do not close that aggregate gate. Physical-device
 input, real provider login, human visual approval and actual table/remote G9
 playtests are not covered by emulated touch.
+
+
+## CI mirror-transport follow-up
+
+CI #263 passed backend/frontend/offline and one journey shard; three browser jobs
+were cancelled at their ten-minute limit before any test ran. The completed logs
+showed font downloads still using `http://azure.archive.ubuntu.com/ubuntu` via
+`file:/etc/apt/apt-mirrors.txt`. The earlier fix searched only `.list`/`.sources`
+files, leaving Ubuntu's mirror-transport text lists unchanged. CI #264 passed six
+of seven verification jobs while its remaining browser job had the same setup delay.
+
+The shared `scripts/ci-browser-deps.sh` now updates both source formats and
+`apt-mirrors*.txt` before installing the same signed Ubuntu packages. The isolated
+filesystem regression failed specifically because `apt-mirrors.txt` retained the
+Azure URL, then passed after the correction. It also checks preservation of
+unrelated files, repeat execution and bounded download timeout configuration.
+Browser/application tests, baselines, tolerances, retries and time limits are
+unchanged. This CI-only follow-up leaves the accepted application bytes intact.
+Final-head verification remains linked from PR #37.

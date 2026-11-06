@@ -45,6 +45,7 @@ test("V2 token gestures: mouse/touch, transformed coordinates, recovery, display
     const tray = gm.getByRole("region", { name: "Tokens", exact: true });
     const scene = gm.getByRole("region", { name: "Scene", exact: true });
     const fog = gm.getByRole("region", { name: "Fog of war", exact: true });
+    if (!await fog.getByLabel(/x \(0–1\)/i).isVisible()) await fog.getByText("Precise fog position", { exact: true }).click();
     await fog.getByLabel(/radius/i).fill("1"); await fog.getByRole("button", { name: "Add fog dab" }).click(); await fog.getByRole("button", { name: "Commit fog edit" }).click();
     await expect(fog.getByText("Fog edit committed.")).toBeVisible();
     await tray.getByText("Token artwork", { exact: true }).click();

@@ -7,14 +7,16 @@ import { SceneLibrary } from "./SceneLibrary.js";
 // offsets so they track any rendered size. Zoom/pan expose button and
 // keyboard (+/-/arrows) alternatives; token dragging alternatives live in
 // TokenTray (numeric coordinates + nudge buttons).
-import { useRef, useState } from "react";
-import { useSceneGestures, type SceneInteraction } from "./useSceneGestures.js";
-import { useTokenCommands, type TokenMode } from "./useTokenCommands.js";
+import { useRef, useState, type RefObject } from "react";
+import { useSceneGestures, type SceneInteraction, type SceneMode } from "./useSceneGestures.js";
+import { useTokenCommands } from "./useTokenCommands.js";
 
 import { t } from "../i18n/index.js";
 import { Button, EmptyState, PageHeader, Panel } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
 import { useScene } from "./campaignQueries.js";
+import { useFogEditor, MAX_FOG_DABS, type FogMode, type FogDab } from "./useFogEditor.js";
+import { SceneFogOverlay } from "./SceneFogOverlay.js";
 import { FogToolbarView } from "./FogToolbar.js";
 import { TokenTrayView, TokenCommandFeedback } from "./TokenTray.js";
 import type { SceneView } from "./types.js";
@@ -37,6 +39,8 @@ const PAN_STEP = 10;
 
 export function SceneViewportView(props: {
   feedback?: React.ReactNode;
+  viewportRef?: RefObject<HTMLDivElement> | undefined;
+  fog?: { mode: FogMode; radius: number; draft: FogDab[] } | undefined;
   interaction?: SceneInteraction | undefined;
   scene: SceneView;
   imageUrl: string;
@@ -62,7 +66,8 @@ export function SceneViewportView(props: {
       {props.interaction ? <div role="group" aria-label={t("scene.gestures.tools")}>
         <Button variant="secondary" aria-pressed={props.interaction.mode === "move"} onClick={() => props.interaction?.setMode("move")}>{t("scene.gestures.move")}</Button>{" "}
         <Button variant="secondary" aria-pressed={props.interaction.mode === "pan"} onClick={() => props.interaction?.setMode("pan")}>{t("scene.gestures.pan")}</Button>
-        <p role="status">{t(props.interaction.mode === "place" ? "scene.gestures.placeHint" : props.interaction.mode === "pan" ? "scene.gestures.panHint" : "scene.gestures.moveHint")}</p>
+        {props.fog ? <Button variant="secondary" aria-pressed={props.interaction.mode === "brush"} onClick={() => props.interaction?.setMode("brush")}>{t("scene.fog.paint")}</Button> : null}
+        <p role="status">{t(props.interaction.mode === "brush" ? "scene.fog.brushHint" : props.interaction.mode === "place" ? "scene.gestures.placeHint" : props.interaction.mode === "pan" ? "scene.gestures.panHint" : "scene.gestures.moveHint")}</p>
       </div> : null}
       <div>
         <Button variant="secondary" onClick={zoomOut} disabled={zoom <= ZOOM_MIN}>
@@ -77,6 +82,7 @@ export function SceneViewportView(props: {
       </div>
       <div
         {...gestures.handlers}
+        ref={props.viewportRef}
         role="region"
         aria-label={t("campaign.detail.scenes.viewport.regionLabel")}
         tabIndex={0}
@@ -141,6 +147,7 @@ export function SceneViewportView(props: {
               </li>
             ))}
           </ul>
+          {props.fog ? <SceneFogOverlay fog={props.scene.fog} draft={props.fog.draft} active={gestures.fogPreview} mode={props.fog.mode} radius={props.fog.radius} cursor={gestures.cursor} /> : null}
         </div>
       </div>
       {props.feedback}
@@ -241,25 +248,29 @@ function CampaignSceneScope(props: {
 function SceneEditor({ scene, library, props, refresh }: { scene: SceneView; library: React.ReactNode; props: Parameters<typeof CampaignSceneView>[0]; refresh(): Promise<number> }) {
   const online = props.online ?? true, generation = props.generation ?? 0;
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
-  const [mode, setMode] = useState<TokenMode>("move");
+  const [mode, setMode] = useState<SceneMode>("move");
+  const viewportRef = useRef<HTMLDivElement>(null);
   const [placement, setPlacement] = useState<{ label: string; size: number; visible: boolean; imageFileId: string | null } | null>(null);
   const commands = useTokenCommands({ api: props.api, sceneId: scene.sceneId, sceneRevision: scene.revision, online, onChanged: refresh });
+  const fog = useFogEditor({ api: props.api, sceneId: scene.sceneId, sceneRevision: scene.revision, online, enabled: !commands.blocked, onChanged: refresh });
   const imageUrl = `/api/campaigns/${props.campaignId}/images/${scene.backgroundFileId}/original`;
   const refetch = (): void => { void refresh().catch(() => {}); };
-  if (commands.status === "unavailable") return <EmptyState title={t("campaign.detail.scenes.unavailable.title")} description={t("campaign.detail.scenes.unavailable.description")} />;
+  if (commands.status === "unavailable" || fog.status === "unavailable") return <EmptyState title={t("campaign.detail.scenes.unavailable.title")} description={t("campaign.detail.scenes.unavailable.description")} />;
   return (
     <section>
       <PageHeader title={t("campaign.detail.scenes.title")} />
       {library}
       <SceneViewportView
         scene={scene}
+        fog={fog}
+        viewportRef={viewportRef}
         imageUrl={imageUrl}
         feedback={<TokenCommandFeedback commands={commands} online={online} />}
         selectedTokenId={selectedTokenId}
         onSelectToken={setSelectedTokenId}
-        interaction={{ mode, setMode, disabled: commands.blocked, onPlace: point => { if (placement) { commands.place({ ...placement, ...point }); setPlacement(null); setMode("move"); } }, onMove: (id, point) => { const token = scene.tokens.find(t => t.tokenId === id); if (token) commands.move(id, token.label, point); } }}
+        interaction={{ mode, setMode, disabled: commands.blocked || fog.blocked, brush: { mode: fog.mode, radius: fog.radius, remaining: MAX_FOG_DABS-fog.draft.length, onStroke: fog.addStroke }, onPlace: point => { if (placement && !fog.blocked) { commands.place({ ...placement, ...point }); setPlacement(null); setMode("move"); } }, onMove: (id, point) => { const token = scene.tokens.find(t => t.tokenId === id); if (token && !fog.blocked) commands.move(id, token.label, point); } }}
       />
-      <FogToolbarView api={props.api} sceneId={scene.sceneId} sceneRevision={scene.revision} online={online} onChanged={refetch} />
+      <FogToolbarView api={props.api} sceneId={scene.sceneId} sceneRevision={scene.revision} online={online} editor={fog} disabled={commands.blocked} onChanged={refetch} onPaint={() => { setMode("brush"); viewportRef.current?.scrollIntoView({block:"center"}); viewportRef.current?.focus({preventScroll:true}); }} />
       <TokenTrayView
         mediaApi={props.api.sceneLibrary}
         campaignId={props.campaignId}
@@ -270,6 +281,7 @@ function SceneEditor({ scene, library, props, refresh }: { scene: SceneView; lib
         sceneRevision={scene.revision}
         tokens={scene.tokens}
         online={online}
+        disabled={fog.blocked}
         onChanged={refetch}
         commands={commands}
         onPlaceOnScene={draft => { setPlacement(draft); setMode("place"); }}

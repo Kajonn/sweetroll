@@ -42,6 +42,7 @@ test("hosted scene controls, redacted pixels, display reconnect and revocation",
     await page.goto(sceneUrl);
     await expect(page.getByRole("img", { name: "Scene background" })).toBeVisible();
     const fog = page.getByRole("region", { name: "Fog of war" });
+    if (!await fog.getByLabel(/x \(0–1\)/i).isVisible()) await fog.getByText("Precise fog position", { exact: true }).click();
     await fog.getByLabel(/fog mode/i).selectOption("reveal");
     for (const [label, value] of [[/x \(0–1\)/i,"0.25"],[/y \(0–1\)/i,"0.5"],[/radius \(0–1\)/i,"0.32"]] as const) await fog.getByLabel(label).fill(value);
     await fog.getByRole("button", { name: "Add fog dab" }).click();

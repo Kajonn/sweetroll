@@ -110,6 +110,7 @@ export function TokenTrayView(props: {
   online?: boolean | undefined;
   onChanged?: (() => void | number | Promise<void | number>) | undefined;
   commands?: TokenCommands | undefined;
+  disabled?: boolean | undefined;
   onPlaceOnScene?: ((draft: { label: string; size: number; visible: boolean; imageFileId: string | null }) => void) | undefined;
 }) {
   const online = props.online ?? true;
@@ -122,7 +123,7 @@ export function TokenTrayView(props: {
   const localCommands = useTokenCommands(props);
   const commands = props.commands ?? localCommands;
   const pending = commands.status === "pending", unavailable = commands.status === "unavailable";
-  const disabled = !online || commands.blocked;
+  const disabled = !online || commands.blocked || Boolean(props.disabled);
   const draft = () => ({ label: label.trim(), size: Number(size), visible, imageFileId });
   const valid = label.trim() !== "" && Number(size) > 0 && Number(size) <= 1 && Number.isFinite(Number(size));
   const place = (): void => {
@@ -187,7 +188,7 @@ export function TokenTrayView(props: {
               <TokenMoveRow
                 commands={commands}
                 token={token}
-                online={online && !unavailable}
+                online={online && !unavailable && !props.disabled}
               />
             </li>
           ))}

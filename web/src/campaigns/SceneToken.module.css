@@ -45,3 +45,8 @@
   color: var(--text-primary);
   font-size: 0.875rem;
 }
+
+.marker[aria-pressed="true"] {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}

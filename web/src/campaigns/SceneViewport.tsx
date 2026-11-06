@@ -7,7 +7,9 @@ import { SceneLibrary } from "./SceneLibrary.js";
 // offsets so they track any rendered size. Zoom/pan expose button and
 // keyboard (+/-/arrows) alternatives; token dragging alternatives live in
 // TokenTray (numeric coordinates + nudge buttons).
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useSceneGestures, type SceneInteraction } from "./useSceneGestures.js";
+import { useTokenCommands, type TokenMode } from "./useTokenCommands.js";
 
 import { t } from "../i18n/index.js";
 import { Button, EmptyState, PageHeader, Panel } from "../ui/index.js";
@@ -34,6 +36,7 @@ const ZOOM_MAX = 4;
 const PAN_STEP = 10;
 
 export function SceneViewportView(props: {
+  interaction?: SceneInteraction | undefined;
   scene: SceneView;
   imageUrl: string;
   selectedTokenId?: string | null | undefined;
@@ -42,16 +45,24 @@ export function SceneViewportView(props: {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const selectedTokenId = props.selectedTokenId ?? null;
+  const layer = useRef<HTMLDivElement>(null);
+  const gestures = useSceneGestures({ layer, scope: `${props.scene.sceneId}:${props.scene.backgroundFileId}:${props.scene.revision}`, zoom, pan, setPan, selectedTokenId, tokenPosition: id => props.scene.tokens.find(token => token.tokenId === id), onSelectToken: props.onSelectToken, interaction: props.interaction });
 
-  const zoomIn = (): void => setZoom((current) => Math.min(ZOOM_MAX, current * ZOOM_STEP));
-  const zoomOut = (): void => setZoom((current) => Math.max(ZOOM_MIN, current / ZOOM_STEP));
+  const zoomIn = (): void => { gestures.cancel(); setZoom((current) => Math.min(ZOOM_MAX, current * ZOOM_STEP)); };
+  const zoomOut = (): void => { gestures.cancel(); setZoom((current) => Math.max(ZOOM_MIN, current / ZOOM_STEP)); };
   const resetView = (): void => {
+    gestures.cancel();
     setZoom(1);
     setPan({ x: 0, y: 0 });
   };
 
   return (
     <Panel title={t("campaign.detail.scenes.title")}>
+      {props.interaction ? <div role="group" aria-label={t("scene.gestures.tools")}>
+        <Button variant="secondary" aria-pressed={props.interaction.mode === "move"} onClick={() => props.interaction?.setMode("move")}>{t("scene.gestures.move")}</Button>{" "}
+        <Button variant="secondary" aria-pressed={props.interaction.mode === "pan"} onClick={() => props.interaction?.setMode("pan")}>{t("scene.gestures.pan")}</Button>
+        <p role="status">{t(props.interaction.mode === "place" ? "scene.gestures.placeHint" : props.interaction.mode === "pan" ? "scene.gestures.panHint" : "scene.gestures.moveHint")}</p>
+      </div> : null}
       <div>
         <Button variant="secondary" onClick={zoomOut} disabled={zoom <= ZOOM_MIN}>
           {t("campaign.detail.scenes.viewport.zoomOut")}
@@ -64,10 +75,13 @@ export function SceneViewportView(props: {
         </Button>
       </div>
       <div
+        {...gestures.handlers}
         role="region"
         aria-label={t("campaign.detail.scenes.viewport.regionLabel")}
         tabIndex={0}
         onKeyDown={(event) => {
+          if ((event.target as HTMLElement).closest("button")) return;
+          gestures.cancel();
           if (event.key === "+" || event.key === "=") {
             event.preventDefault();
             zoomIn();
@@ -88,10 +102,11 @@ export function SceneViewportView(props: {
             setPan((current) => ({ ...current, y: current.y - PAN_STEP }));
           }
         }}
-        style={{ position: "relative", overflow: "hidden" }}
+        style={{ position: "relative", overflow: "hidden", touchAction: props.interaction ? "none" : "auto", userSelect: "none" }}
       >
-        <div data-testid="scene-zoom-layer" style={{ transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)` }}>
+        <div ref={layer} data-testid="scene-zoom-layer" style={{ transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)` }}>
           <img
+            draggable={false}
             src={props.imageUrl}
             alt={t("campaign.detail.scenes.viewport.imageAlt")}
             style={{ display: "block", width: "100%" }}
@@ -104,19 +119,20 @@ export function SceneViewportView(props: {
                 style={{
                   width: `${token.size * 100}%`,
                   position: "absolute",
-                  left: `${token.x * 100}%`,
-                  top: `${token.y * 100}%`,
+                  left: `${(gestures.preview?.tokenId === token.tokenId ? gestures.preview.point.x : token.x) * 100}%`,
+                  top: `${(gestures.preview?.tokenId === token.tokenId ? gestures.preview.point.y : token.y) * 100}%`,
                   transform: "translate(-50%, -50%)",
                 }}
               >
                 <button
+                  data-token-id={token.tokenId}
                   type="button"
                   className={tokenStyles.marker}
                   aria-label={t("campaign.detail.scenes.viewport.token", { label: token.label })}
                   aria-pressed={selectedTokenId === token.tokenId}
                   data-visible={token.visible ? "true" : "false"}
                   style={{ opacity: token.visible ? 1 : 0.5 }}
-                  onClick={() => props.onSelectToken?.(token.tokenId)}
+                  onClick={() => { if (!props.interaction || props.interaction.mode === "move") props.onSelectToken?.(token.tokenId); }}
                 >
                   {token.imageFileId ? <SceneTokenArt key={token.imageFileId} campaignId={props.scene.campaignId} fileId={token.imageFileId} /> : null}
                   <span className={tokenStyles.label}>{token.label}</span>
@@ -138,13 +154,23 @@ export function CampaignSceneView(props: {
   generation?: number | undefined;
   online?: boolean | undefined;
 }) {
+  return <CampaignSceneScope key={`${props.actorId}:${props.generation}:${props.campaignId}:${props.sceneId}:${props.online}`} {...props} />;
+}
+
+function CampaignSceneScope(props: {
+  api: SceneViewportApi;
+  campaignId: string;
+  sceneId: string;
+  actorId: string | null;
+  generation?: number | undefined;
+  online?: boolean | undefined;
+}) {
   const online = props.online ?? true;
   const generation = props.generation ?? 0;
   const sceneQuery = useScene(props.api as CampaignsApi, props.campaignId, props.sceneId, props.actorId, generation, {
     enabled: props.sceneId !== "" && online,
     online,
   });
-  const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
 
   if (!online) {
     return (
@@ -178,7 +204,7 @@ export function CampaignSceneView(props: {
     );
   }
 
-  if (sceneQuery.status === "error") {
+  if (sceneQuery.status === "error" && (!sceneQuery.data || isNotFound(sceneQuery.error) || [401, 403].includes(Number((sceneQuery.error as { status?: number })?.status)))) {
     if (isNotFound(sceneQuery.error)) {
       // Server-driven gate: players (and revoked readers) get 404, so the
       // route shows unavailable instead of any scene content.
@@ -207,32 +233,31 @@ export function CampaignSceneView(props: {
     );
   }
 
-  const scene = sceneQuery.data.scene;
+  return <SceneEditor key={sceneQuery.data!.scene.backgroundFileId} scene={sceneQuery.data!.scene} library={library} props={props} refresh={async () => { const result = await sceneQuery.refetch(); if (result.error) throw result.error; return result.data!.scene.revision; }} />;
+}
+
+function SceneEditor({ scene, library, props, refresh }: { scene: SceneView; library: React.ReactNode; props: Parameters<typeof CampaignSceneView>[0]; refresh(): Promise<number> }) {
+  const online = props.online ?? true, generation = props.generation ?? 0;
+  const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
+  const [mode, setMode] = useState<TokenMode>("move");
+  const [placement, setPlacement] = useState<{ label: string; size: number; visible: boolean; imageFileId: string | null } | null>(null);
+  const commands = useTokenCommands({ api: props.api, sceneId: scene.sceneId, sceneRevision: scene.revision, online, onChanged: refresh });
   const imageUrl = `/api/campaigns/${props.campaignId}/images/${scene.backgroundFileId}/original`;
-  const refetch = (): void => {
-    void sceneQuery.refetch();
-  };
+  const refetch = (): void => { void refresh().catch(() => {}); };
+  if (commands.status === "unavailable") return <EmptyState title={t("campaign.detail.scenes.unavailable.title")} description={t("campaign.detail.scenes.unavailable.description")} />;
   return (
     <section>
       <PageHeader title={t("campaign.detail.scenes.title")} />
       {library}
       <SceneViewportView
-        key={`viewport:${props.actorId}:${generation}:${scene.sceneId}:${scene.backgroundFileId}`}
         scene={scene}
         imageUrl={imageUrl}
         selectedTokenId={selectedTokenId}
         onSelectToken={setSelectedTokenId}
+        interaction={{ mode, setMode, disabled: commands.blocked, onPlace: point => { if (placement) { commands.place({ ...placement, ...point }); setPlacement(null); setMode("move"); } }, onMove: (id, point) => { const token = scene.tokens.find(t => t.tokenId === id); if (token) commands.move(id, token.label, point); } }}
       />
-      <FogToolbarView
-        key={`fog:${scene.backgroundFileId}`}
-        api={props.api}
-        sceneId={scene.sceneId}
-        sceneRevision={scene.revision}
-        online={online}
-        onChanged={refetch}
-      />
+      <FogToolbarView api={props.api} sceneId={scene.sceneId} sceneRevision={scene.revision} online={online} onChanged={refetch} />
       <TokenTrayView
-        key={`tokens:${props.actorId}:${generation}:${scene.sceneId}:${scene.backgroundFileId}`}
         mediaApi={props.api.sceneLibrary}
         campaignId={props.campaignId}
         actorId={props.actorId}
@@ -243,6 +268,8 @@ export function CampaignSceneView(props: {
         tokens={scene.tokens}
         online={online}
         onChanged={refetch}
+        commands={commands}
+        onPlaceOnScene={draft => { setPlacement(draft); setMode("place"); }}
       />
     </section>
   );

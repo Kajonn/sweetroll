@@ -112,6 +112,13 @@ jobs:
           node-version-file: .nvmrc
       - run: npm ci
         working-directory: web
+      - name: Bound browser dependency downloads
+        run: |
+          sudo tee /etc/apt/apt.conf.d/80-sweetroll-ci >/dev/null <<'APT'
+          Acquire::Retries "2";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APT
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - run: npm run test:e2e -- --suite=${{ matrix.suite }} ${{ matrix.shard }}
@@ -158,6 +165,13 @@ jobs:
           node-version-file: .nvmrc
       - run: npm ci
         working-directory: web
+      - name: Bound browser dependency downloads
+        run: |
+          sudo tee /etc/apt/apt.conf.d/80-sweetroll-ci >/dev/null <<'APT'
+          Acquire::Retries "2";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APT
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - run: psql postgres://sweetroll:sweetroll@localhost:5432/sweetroll -c "CREATE DATABASE sweetroll_offline;"

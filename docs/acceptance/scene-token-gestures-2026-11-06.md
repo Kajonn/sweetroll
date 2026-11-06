@@ -108,3 +108,18 @@ checksums. Hosted screenshots were inspected at all three widths:
  Production and main-linked acceptance sources are
 unchanged. No physical phone/tablet, real provider login, human visual approval or
 real playtest is claimed.
+
+## Final CI stabilization follow-up
+
+CI #257 passed backend/contracts/Docker, all frontend tests, offline and two browser
+shards. Its remaining failures were the same 1,484-pixel mobile preview crop shift
+and a journey shard cancelled before tests while downloading Ubuntu fonts.
+The capture now translates only the test fixture onto integer device pixels after
+all product geometry assertions, uses the same 276×610 crop, and restores the
+original transform afterward. The existing baseline and 700-pixel threshold stay
+unchanged. Local reproduction confirmed a fractional origin (`y=71.78125`);
+local fonts differ from CI, so the retained CI baseline remains the authority.
+Browser dependency installation now bounds stalled HTTP/HTTPS reads to 30 seconds
+with two download retries. Fonts and browser dependencies are still installed;
+application test retries and job time budgets are unchanged. These are CI/test-only
+changes; the accepted deployed application remains `b112835`.

@@ -208,12 +208,29 @@ test.describe("visual: sheet preview", () => {
       try {
         if (width === 360) {
           await frame.scrollIntoViewIfNeeded();
-          const bounds = await frame.boundingBox();
-          expect(bounds).not.toBeNull();
-          await expect(page).toHaveScreenshot(`sheet-preview-${width}.png`, {
-            clip: { x: bounds!.x, y: bounds!.y, width: 276, height: 610 },
-            maxDiffPixels: 700,
+          // Centering a tall frame can leave its origin between device pixels.
+          // Chromium rounds that crop independently of text painting, producing
+          // the observed whole-frame one-pixel shift. Align only the capture
+          // fixture to integer pixels after the real layout/overlap assertions.
+          const capture = await frame.evaluate((element) => {
+            const bounds = element.getBoundingClientRect();
+            const previousTransform = element.style.transform;
+            const x = Math.ceil(bounds.x), y = Math.ceil(bounds.y);
+            element.style.transform = `translate(${x - bounds.x}px, ${y - bounds.y}px)`;
+            return { x, y, previousTransform };
           });
+          try {
+            const aligned = await frame.boundingBox();
+            expect(aligned).not.toBeNull();
+            expect(aligned!.x).toBeCloseTo(capture.x, 6);
+            expect(aligned!.y).toBeCloseTo(capture.y, 6);
+            await expect(page).toHaveScreenshot(`sheet-preview-${width}.png`, {
+              clip: { x: capture.x, y: capture.y, width: 276, height: 610 },
+              maxDiffPixels: 700,
+            });
+          } finally {
+            await frame.evaluate((element, previous) => { element.style.transform = previous; }, capture.previousTransform);
+          }
         } else {
           await expect(frame).toHaveScreenshot(`sheet-preview-${width}.png`);
         }

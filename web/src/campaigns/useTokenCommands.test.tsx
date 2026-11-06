@@ -37,6 +37,19 @@ describe("shared token command recovery", () => {
     const old = p.api.moveToken.mock.calls[0]![2], next = p.api.moveToken.mock.calls[1]![2];
     expect(next).toMatchObject({ x: .4, y: .6, expectedSceneRevision: 9 }); expect(next.idempotencyKey).not.toBe(old.idempotencyKey);
   });
+  it.each([400, 422])("allows correction after a definite validation rejection %s without retrying the rejected request", async status => {
+    const p = props(); p.api.placeToken.mockRejectedValueOnce({ status });
+    const h = renderHook(() => useTokenCommands(p)); act(() => h.result.current.place(draft));
+    await waitFor(() => expect(h.result.current.status).toBe("rejected"));
+    await act(async () => { await h.result.current.retry(); });
+    expect(p.api.placeToken).toHaveBeenCalledTimes(1);
+    act(() => h.result.current.discard());
+    expect(h.result.current.blocked).toBe(false);
+    await act(async () => { h.result.current.place({ ...draft, label: "Corrected" }); });
+    expect(p.api.placeToken).toHaveBeenCalledTimes(2);
+    expect(p.api.placeToken.mock.calls[1]![1].label).toBe("Corrected");
+    expect(p.api.placeToken.mock.calls[1]![1].idempotencyKey).not.toBe(p.api.placeToken.mock.calls[0]![1].idempotencyKey);
+  });
   it("does not resubmit an applied command when its follow-up read fails", async () => {
     const p = props(); p.onChanged.mockRejectedValueOnce(new Error("read failed"));
     const h = renderHook(() => useTokenCommands(p)); act(() => h.result.current.place(draft));

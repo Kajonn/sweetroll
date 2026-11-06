@@ -135,3 +135,15 @@ installation at the previously failing Azure Ubuntu mirror. Both browser job typ
 now use Ubuntu's public HTTPS archive for the same signed distribution packages,
 in addition to the bounded stalled-read retries. No dependency, test workload,
 assertion, screenshot baseline or comparison threshold is removed.
+
+## Validation-rejection correction
+
+Final review found that definite HTTP 400/422 rejections shared uncertain-outcome
+recovery, preventing a user from correcting rejected input. Two regression cases
+failed before the correction. Confirmed validation rejection now offers Discard,
+then allows a corrected command with a fresh key; it never retries the rejected
+body. Unknown/lost responses still retain their exact body/key. The GUI journey
+submits an overlength label, confirms no token was created, discards the rejection
+and places the corrected token before running the complete gesture/recovery flow.
+Focused tests: 38 passed. Local historical display + extended V2 journeys:
+2 passed in 32.5s without retries. Updated hosted acceptance follows below.

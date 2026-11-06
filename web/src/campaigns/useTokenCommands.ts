@@ -6,7 +6,7 @@ import { randomUUID } from "../utils/uuid.js";
 export type Point = { x: number; y: number };
 export type TokenMode = "move" | "place" | "pan";
 type Operation = { kind: "place"; body: PlaceTokenBody } | { kind: "move"; tokenId: string; label: string; body: MoveTokenBody };
-type State = { status: "idle" | "pending" | "applied" | "conflict" | "uncertain" | "refresh" | "unavailable"; operation?: Operation; refreshed?: boolean };
+type State = { status: "idle" | "pending" | "applied" | "conflict" | "uncertain" | "refresh" | "rejected" | "unavailable"; operation?: Operation; refreshed?: boolean };
 export type TokenCommands = ReturnType<typeof useTokenCommands>;
 
 /** One in-flight token command across gestures and precision forms. Uncertain
@@ -40,6 +40,7 @@ export function useTokenCommands(props: {
       if (!active.current) return;
       const e = cause as { status?: number; code?: string } | null;
       if ([401, 403, 404].includes(e?.status ?? 0) || e?.code === "not_found") update({ status: "unavailable" });
+      else if (!committed && [400, 422].includes(e?.status ?? 0)) update({ status: "rejected", operation });
       else if (!committed && (e?.status === 409 || e?.code === "conflict")) {
         update({ status: "conflict", operation, refreshed: false });
         try { await refresh(); update({ status: "conflict", operation, refreshed: true }); }
@@ -74,6 +75,6 @@ export function useTokenCommands(props: {
           : { ...operation, body: { ...operation.body, expectedSceneRevision: revision, idempotencyKey: randomUUID() } });
       }
     },
-    discard: () => { if (!lock.current && stateRef.current.status === "conflict") update({ status: "idle" }); },
+    discard: () => { if (!lock.current && ["conflict", "rejected"].includes(stateRef.current.status)) update({ status: "idle" }); },
   };
 }

@@ -206,8 +206,9 @@ export function TokenCommandFeedback({ commands, online }: { commands: TokenComm
     {commands.status === "applied" ? <p role="status">{t(op?.kind === "place" ? "campaign.detail.scenes.tokens.placed" : "campaign.detail.scenes.tokens.moved")}</p> : null}
     {commands.status === "conflict" ? <p role="alert">{t(commands.refreshed ? "campaign.detail.scenes.tokens.conflict" : "scene.gestures.refresh")}</p> : null}
     {commands.status === "uncertain" || commands.status === "refresh" ? <p role="alert">{t(commands.status === "uncertain" ? "scene.gestures.uncertain" : "scene.gestures.refresh")}</p> : null}
+    {commands.status === "rejected" ? <p role="alert">{t("scene.gestures.rejected")}</p> : null}
     {commands.status === "unavailable" ? <p role="alert">{t("campaign.detail.scenes.tokens.unavailable")}</p> : null}
     {["conflict", "uncertain", "refresh"].includes(commands.status) ? <Button disabled={!online} onClick={() => void commands.retry()}>{retryLabel}</Button> : null}
-    {commands.status === "conflict" ? <Button variant="secondary" onClick={commands.discard}>{t("scene.gestures.discard")}</Button> : null}
+    {["conflict", "rejected"].includes(commands.status) ? <Button variant="secondary" onClick={commands.discard}>{t("scene.gestures.discard")}</Button> : null}
   </>;
 }

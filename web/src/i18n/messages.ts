@@ -26,6 +26,7 @@ export const defaultMessages: MessageTable = {
   "scene.gestures.moveHint": "Drag a token, or select it and tap a destination. Use Position for keyboard controls.",
   "scene.gestures.panHint": "Drag the scene to pan. Token positions stay saved.",
   "scene.gestures.saving": "Saving token change…",
+  "scene.gestures.rejected": "The server rejected this token change. Discard it to review the token and try again.",
   "scene.gestures.uncertain": "Save not confirmed. Retry the same request before making another token change.",
   "scene.gestures.refresh": "Refresh the scene before continuing. The token change will not be sent again.",
   "scene.gestures.retry": "Retry token recovery",

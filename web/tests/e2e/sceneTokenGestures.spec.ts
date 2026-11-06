@@ -53,6 +53,14 @@ test("V2 token gestures: mouse/touch, transformed coordinates, recovery, display
     await art.getByLabel("Token image file").setInputFiles({ name: "wren.png", mimeType: "image/png", buffer: token }); await art.getByLabel("Image description").fill("Wren art");
     await art.getByRole("button", { name: "Upload token image" }).click();
     await expect(tray.getByText("Campaign image selected for this token.")).toBeVisible();
+    // A definite validation failure must allow correction; it is not an uncertain save.
+    await tray.getByLabel("Token label").fill("Invalid".repeat(50));
+    await tray.getByRole("button", { name: "Place on scene", exact: true }).click();
+    const rejectedPlacement = await point(gm, .4, .5); await gm.touchscreen.tap(rejectedPlacement.x, rejectedPlacement.y);
+    await expect(gm.getByText(/server rejected this token change/i)).toBeVisible();
+    expect((await state()).tokens).toEqual([]);
+    await gm.getByRole("button", { name: "Discard token change", exact: true }).click();
+    await expect(tray.getByLabel("Token label")).toBeEnabled();
     await tray.getByLabel("Token label").fill("Wren");
     await tray.getByRole("button", { name: "Place on scene", exact: true }).click();
     const placement = await point(gm, .4, .5); await gm.touchscreen.tap(placement.x, placement.y);

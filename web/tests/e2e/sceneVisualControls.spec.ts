@@ -19,9 +19,21 @@ async function point(page: Page, x: number, y: number) {
 async function pixels(page: Page) {
   const image = page.getByRole("img", { name: "Display image", exact: true });
   await expect(image).toBeVisible({ timeout: 20_000 });
-  const bytes = await image.evaluate(async i => Array.from(new Uint8Array(await (await fetch((i as HTMLImageElement).src)).arrayBuffer())));
-  const raw = await sharp(Buffer.from(bytes)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  return [.25,.5,.75].map(x => { const offset = (Math.floor(raw.info.height * .5) * raw.info.width + Math.floor(raw.info.width * x)) * 4; return Array.from(raw.data.subarray(offset,offset+4)); });
+  // Read one loaded frame atomically. A polled revision revokes the previous
+  // blob URL; fetching that URL again races cleanup and does not test the frame.
+  let sample: number[][] | null = null;
+  await expect.poll(async () => {
+    sample = await image.evaluate(node => {
+      const img = node as HTMLImageElement;
+      if (!img.complete || img.naturalWidth === 0) return null;
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d")!; ctx.drawImage(img, 0, 0);
+      return [.25,.5,.75].map(x => Array.from(ctx.getImageData(Math.floor(canvas.width*x),Math.floor(canvas.height*.5),1,1).data));
+    });
+    return sample !== null;
+  }, { timeout: 20_000, message: "Redacted display frame is decoded" }).toBe(true);
+  return sample;
 }
 
 test("V4 combined: image tokens, gestures, fog, recovery and restricted display", async ({ browser, baseURL }, info) => {

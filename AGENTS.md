@@ -51,13 +51,16 @@ verification after redeploy and CI #219 on application `d62a9f8`. See the
 and [scene evidence](docs/acceptance/scene-backgrounds-2026-11-04.md). Physical
 devices, real provider login and human/playtest G9 gates remain open.
 
-I7b/G8 visual scene controls remain **partially complete**. PR #34 delivers V1
-image-token selection/upload and proportional GM/restricted-display rendering.
-[Hosted and redeploy acceptance](docs/acceptance/scene-image-tokens-2026-11-05.md)
-passed on application `34ed283`, with CI #248 green. V3 on-image fog brushing is
-implemented in PR #37 and accepted locally and on the isolated hosted preview
-(application `637a60f`, SUCCESS deployment `483aa50c`); see
-[V3 evidence](docs/acceptance/scene-fog-brush-2026-11-06.md). V4 combined acceptance is next. PR #36 implements V2
-direct drag/tap movement with passing local and hosted mouse/touch acceptance
-on `84c23fd`, SUCCESS deployment `f8dcab88`; see [V2 evidence](docs/acceptance/scene-token-gestures-2026-11-06.md). Follow the [visual-controls completion plan](docs/superpowers/plans/2026-11-05-scene-visual-controls.md).
-Do not close aggregate G8/G9 gates from V1 or the numeric/M3 foundation evidence.
+I7b/G8 visual scene controls passed combined V4 feature acceptance in PR #38 on
+2026-11-06. PR #36 contains V2 direct gestures and merged V3 fog brushing from
+#37; merge #36 before #38. V1 image-token rendering was delivered in #34.
+[Combined evidence](docs/acceptance/scene-visual-controls-2026-11-06.md) records
+one ordered local/hosted GUI journey at deployed `3a35a5f`, terminal SUCCESS
+`f33cf328`, with mouse/native emulated touch/keyboard at 360/768/1280px, exact
+redacted pixels/art, privacy, conflicts/idempotency recovery, reopen, offline,
+background reset, revocation and independent cleanup readback. Follow the
+[completed visual-controls plan](docs/superpowers/plans/2026-11-05-scene-visual-controls.md).
+The G8 visual-control feature gate is complete; physical-device/provider-login,
+human visual approval and actual table/remote G9 release gates remain open.
+Emulated touch must not be reported as physical-device acceptance. This record
+selects no new feature; final-head CI is tracked in PR #38.

@@ -113,16 +113,7 @@ jobs:
       - run: npm ci
         working-directory: web
       - name: Bound browser dependency downloads
-        run: |
-          # The Azure mirror has repeatedly stalled before browser tests start.
-          # Keep the same signed Ubuntu packages, using the public archive.
-          sudo find /etc/apt -maxdepth 2 -type f \( -name '*.list' -o -name '*.sources' \) \
-            -exec sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' {} +
-          sudo tee /etc/apt/apt.conf.d/80-sweetroll-ci >/dev/null <<'APT'
-          Acquire::Retries "2";
-          Acquire::http::Timeout "30";
-          Acquire::https::Timeout "30";
-          APT
+        run: sudo bash scripts/ci-browser-deps.sh
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - run: npm run test:e2e -- --suite=${{ matrix.suite }} ${{ matrix.shard }}
@@ -170,16 +161,7 @@ jobs:
       - run: npm ci
         working-directory: web
       - name: Bound browser dependency downloads
-        run: |
-          # The Azure mirror has repeatedly stalled before browser tests start.
-          # Keep the same signed Ubuntu packages, using the public archive.
-          sudo find /etc/apt -maxdepth 2 -type f \( -name '*.list' -o -name '*.sources' \) \
-            -exec sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' {} +
-          sudo tee /etc/apt/apt.conf.d/80-sweetroll-ci >/dev/null <<'APT'
-          Acquire::Retries "2";
-          Acquire::http::Timeout "30";
-          Acquire::https::Timeout "30";
-          APT
+        run: sudo bash scripts/ci-browser-deps.sh
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - run: psql postgres://sweetroll:sweetroll@localhost:5432/sweetroll -c "CREATE DATABASE sweetroll_offline;"

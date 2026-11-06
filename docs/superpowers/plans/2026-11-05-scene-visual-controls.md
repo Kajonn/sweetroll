@@ -1,6 +1,6 @@
 # Complete the I7b/G8 visual scene controls
 
-Status: V1 accepted in PR #34; V2 accepted in PR #36 on application `84c23fd` with local and hosted mouse/touch acceptance passed. V3–V4 remain open.
+Status: V1 accepted in PR #34; V2 accepted in PR #36 on application `84c23fd` with local and hosted mouse/touch acceptance passed. V3 accepted in PR #37 on application `637a60f` with local and hosted mouse/touch verification passed. V4 remains open.
 Evidence: [V1 hosted/redeploy acceptance](../../acceptance/scene-image-tokens-2026-11-05.md).
 Updated 2026-11-05 after the owner's review of campaign scenes.
 Baseline inspected: `5e3d81f` on PR #33.
@@ -16,7 +16,7 @@ This completes already specified work; it does not introduce a full VTT.
 | --- | --- | --- |
 | Backgrounds | Upload, select, create/open and confirmed replacement; M3 accepted. | Reuse these controls and private campaign media. |
 | Tokens | V1: upload/select campaign art or use label-only tokens; centered art, normalized position/size, numeric placement/movement and nudges. | V2 direct placement/movement implemented and hosted accepted. |
-| Fog | Reveal/conceal circular dabs entered numerically, undo local dabs and commit. | Paint on the scene with mouse/touch and preview the stroke. |
+| Fog | V3: bounded mouse/touch painting, radius/draft preview, local stroke undo, explicit commit and conflict recovery; numeric precision retained. | V3 hosted verification passed; combined V4 acceptance remains separate. |
 | Restricted display | Paired access, server-redacted background and permitted art/labels/size; credential-only image reads and polling. V1 hosted/redeploy accepted. | V4 gesture/brush acceptance after V2/V3. |
 
 Inspect the existing `SceneViewport.tsx`, `TokenTray.tsx`, `FogToolbar.tsx`,
@@ -105,24 +105,24 @@ conflict and exact lost-response recovery, save/reopen, paired display,
 offline/reconnect and revocation. Hosted exit also passed on application `84c23fd`, SUCCESS deployment `f8dcab88`,
 in 63.6s total with zero retries. See
 [the V2 acceptance record](../../acceptance/scene-token-gestures-2026-11-06.md).
-The next implementation stage is V3; aggregate G8/V4/G9 remain open.
+V3 is implemented below; aggregate G8/V4/G9 remain open.
 
 ## V3 — On-image reveal/conceal brush
 
-- [ ] Write failing tests for pointer/touch strokes, radius preview, Reveal/Conceal,
+- [x] Write failing tests for pointer/touch strokes, radius preview, Reveal/Conceal,
   local undo, cancellation and coordinate conversion under zoom/pan.
-- [ ] Connect FogToolbar mode/radius to an on-scene brush. Show committed fog and
+- [x] Connect FogToolbar mode/radius to an on-scene brush. Show committed fog and
   the uncommitted stroke clearly on the GM view while allowing the GM to inspect
   the original. Collect bounded normalized dabs using the existing fog operation;
   avoid unbounded pointer samples or one request per sample.
-- [ ] Keep explicit **Commit fog edit** and local **Undo fog stroke**. Uncommitted
+- [x] Keep explicit **Commit fog edit** and local **Undo fog stroke**. Uncommitted
   preview never changes the player display. The numeric dab controls remain
   available as a keyboard/precision alternative.
-- [ ] Send the existing revision-checked fog command. Preserve the local stroke on
+- [x] Send the existing revision-checked fog command. Preserve the local stroke on
   a conflict for explicit review/retry against the refreshed scene; do not merge
   strokes automatically. Cancel unsafe drafts on authorization loss, scene or
   background change. Keep offline mutation disabling and clear feedback.
-- [ ] Verify the paired display receives only server-redacted pixels after commit.
+- [x] Verify the paired display receives only server-redacted pixels after commit.
   Concealed regions never arrive as original image bytes under a client overlay;
   zoom/pan and brush size remain aligned across both input types and viewport sizes.
 
@@ -132,6 +132,14 @@ by both token gestures and brush input; keep rendering outside the rules engine.
 
 Exit: a GM paints a region, previews/undoes it, commits Reveal, then commits
 Conceal. Only committed permitted pixels appear on the paired display.
+
+V3 local exit passed on 2026-11-06: mouse and native emulated touch at
+360/768/1280px under zoom/pan, preview/undo isolation, Reveal/Conceal redacted
+pixels, real conflict and exact lost-response retry, keyboard, reopen, offline,
+background replacement and display revocation. The final hosted journey passed
+in 80.1s with zero retries on application `637a60f`, SUCCESS deployment `483aa50c`.
+See [V3 evidence](../../acceptance/scene-fog-brush-2026-11-06.md).
+V4 combined ordered image-token + brush acceptance remains the next stage.
 
 ## V4 — Hosted acceptance and completion gate
 

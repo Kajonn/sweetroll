@@ -79,6 +79,7 @@ async function signInViaPanel(page: Page, code: string) {
 /** Commit one fog stroke (mode + single dab), retrying once on 409. */
 async function commitFogStroke(page: Page, mode: "Conceal" | "Reveal", x: string, y: string, r: string) {
   const fog = page.getByRole("region", { name: "Fog of war" });
+  if (!await fog.getByLabel(/x \(0–1\)/i).isVisible()) await fog.getByText("Precise fog position", { exact: true }).click();
   await fog.getByLabel(/fog mode/i).selectOption(mode === "Conceal" ? "conceal" : "reveal");
   await fog.getByLabel(/x \(0–1\)/i).fill(x);
   await fog.getByLabel(/y \(0–1\)/i).fill(y);

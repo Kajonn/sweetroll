@@ -11,6 +11,7 @@ async function request(page: Page, method: string, path: string, data?: unknown)
 async function json(page: Page, method: string, path: string, data?: unknown) { const r = await request(page, method, path, data); expect(r.status, `${method} ${path}: ${r.body?.error?.message ?? ""}`).toBeGreaterThanOrEqual(200); expect(r.status, `${method} ${path}: ${r.body?.error?.message ?? ""}`).toBeLessThan(300); return r.body; }
 async function fog(page: Page) {
   const panel = page.getByRole("region", { name: "Fog of war", exact: true });
+  if (!await panel.getByLabel(/x \(0–1\)/i).isVisible()) await panel.getByText("Precise fog position", { exact: true }).click();
   await panel.getByLabel(/fog mode/i).selectOption("reveal");
   for (const [label, value] of [[/x \(0–1\)/i, "0.25"], [/y \(0–1\)/i, "0.5"], [/radius \(0–1\)/i, "0.2"]] as const) await panel.getByLabel(label).fill(value);
   await panel.getByRole("button", { name: "Add fog dab", exact: true }).click(); await panel.getByRole("button", { name: "Commit fog edit", exact: true }).click(); await expect(panel.getByText("Fog edit committed.")).toBeVisible();

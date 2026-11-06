@@ -48,6 +48,7 @@ test("V1 image tokens: GUI upload/select, relative size, retained art and restri
       await expect(gm).toHaveURL(/sceneId=[a-f0-9-]{36}/);
       sceneId = new URL(gm.url()).searchParams.get("sceneId")!;
       const fog = gm.getByRole("region", { name: "Fog of war", exact: true });
+      if (!await fog.getByLabel(/x \(0–1\)/i).isVisible()) await fog.getByText("Precise fog position", { exact: true }).click();
       await fog.getByLabel(/fog mode/i).selectOption("reveal");
       await fog.getByLabel(/x \(0–1\)/i).fill("0.25"); await fog.getByLabel(/y \(0–1\)/i).fill("0.5"); await fog.getByLabel(/radius/i).fill("0.2");
       await fog.getByRole("button", { name: "Add fog dab" }).click(); await fog.getByRole("button", { name: "Commit fog edit" }).click();

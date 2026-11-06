@@ -1,6 +1,6 @@
 # Complete the I7b/G8 visual scene controls
 
-Status: V1 accepted in PR #34; V2 accepted in PR #36 on application `b112835` with local and hosted mouse/touch acceptance passed. V3–V4 remain open.
+Status: V1 accepted in PR #34; V2 accepted in PR #36 on application `84c23fd` with local and hosted mouse/touch acceptance passed. V3–V4 remain open.
 Evidence: [V1 hosted/redeploy acceptance](../../acceptance/scene-image-tokens-2026-11-05.md).
 Updated 2026-11-05 after the owner's review of campaign scenes.
 Baseline inspected: `5e3d81f` on PR #33.
@@ -102,8 +102,8 @@ users can perform the same operation with the existing alternatives.
 V2 local exit passed (2026-11-06): mouse and native emulated touch at
 360/768/1280px, zoom/pan, Escape/touch cancellation, keyboard controls,
 conflict and exact lost-response recovery, save/reopen, paired display,
-offline/reconnect and revocation. Hosted exit also passed on application `b112835`, SUCCESS deployment `13b1f59e`,
-in 68.5s total with zero retries. See
+offline/reconnect and revocation. Hosted exit also passed on application `84c23fd`, SUCCESS deployment `f8dcab88`,
+in 63.6s total with zero retries. See
 [the V2 acceptance record](../../acceptance/scene-token-gestures-2026-11-06.md).
 The next implementation stage is V3; aggregate G8/V4/G9 remain open.
 

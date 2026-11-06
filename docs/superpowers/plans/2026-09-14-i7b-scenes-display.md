@@ -4,7 +4,7 @@
 GM/restricted-display rendering passed hosted and redeploy acceptance on `34ed283`
 with CI #248 green. See [evidence](../../acceptance/scene-image-tokens-2026-11-05.md).
 PR #36 implements V2 direct tap/drag token placement/movement with local and hosted browser
-acceptance passed on `b112835`; see [V2 evidence](../../acceptance/scene-token-gestures-2026-11-06.md). Fog brushing (V3) is next, followed by the combined V4 journey. Aggregate I7b/G8 and G9 gates remain open.
+acceptance passed on `84c23fd`; see [V2 evidence](../../acceptance/scene-token-gestures-2026-11-06.md). Fog brushing (V3) is next, followed by the combined V4 journey. Aggregate I7b/G8 and G9 gates remain open.
 
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

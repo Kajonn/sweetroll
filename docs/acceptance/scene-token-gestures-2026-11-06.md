@@ -36,12 +36,12 @@ cancelling them.
 | Check | Result |
 | --- | --- |
 | Frontend full suite before final feedback polish | 1,255 passed; the later focus test adds one case |
-| Final affected viewport/gesture/command/tray tests | 36 passed |
+| Final affected viewport/gesture/command/tray tests | 38 passed |
 | Backend unit suite | 489 passed, 10 database-dependent skipped |
 | Actual PostgreSQL scene/media integration | 31 passed (PostgreSQL 18.6 local fixture) |
 | Frontend typecheck and production build | Passed |
 | Generated contracts | Passed using `node --import tsx scripts/generate-system-contracts.ts --check` |
-| Final local Chromium regressions | Historical display journey + V2 journey: 2 passed in 31.1s, no retries |
+| Final local Chromium regressions | Historical display journey + V2 journey: 2 passed in 32.5s, no retries |
 | Whitespace/diff checks | Passed |
 
 Local browser journey uses real HTTP, PostgreSQL and the existing bounded clean-image
@@ -72,13 +72,13 @@ https://sweetroll-d2-preview.up.railway.app
 
 | Field | Verified value |
 | --- | --- |
-| Application commit | `b112835cdbe5d697815124a4b7e0b04e8ed1eb61` |
-| Deployment | `13b1f59e-2929-4ba8-8d8b-bffc56f22661`, terminal SUCCESS |
+| Application commit | `84c23fd4221e6de3ef263e44057bc97d18daa8ba` |
+| Deployment | `f8dcab88-4e0a-461d-b1ce-f2f79380740f`, terminal SUCCESS |
 | Readiness | `/health/ready` → `{"status":"ok"}` |
-| Served JS | `/assets/index-Dkse5Ljt.js` · SHA-256 `d67af8187c2d3599ec0028bbf47a703fe759862ee64f46dff474a8db7cb505cf` |
+| Served JS | `/assets/index-D7nX4OBN.js` · SHA-256 `5be5d1559e76eff415ba40df7e41977becfe481941ccf046630fed5e1e93c76a` |
 | Served CSS | `/assets/index-DF3Bkxz_.css` · SHA-256 `8d74655dc84143613f866c3f90298313a931a8f380e4c4b7927744f389421a55` |
 | Source identity | Manifest assets and both files match the local final-source production build byte for byte |
-| Hosted journey | PASS · 68.5s total · 1 expected, 0 unexpected/skipped/flaky, zero retries |
+| Hosted journey | PASS · 63.6s total · 1 expected, 0 unexpected/skipped/flaky, zero retries |
 | Cleanup | Journey revoked its display and read back its archived campaign; one interrupted earlier V2 fixture was separately archived and read back |
 
 The hosted run covered the same complete ordered V2 journey described above,
@@ -121,8 +121,9 @@ unchanged. Local reproduction confirmed a fractional origin (`y=71.78125`);
 local fonts differ from CI, so the retained CI baseline remains the authority.
 Browser dependency installation now bounds stalled HTTP/HTTPS reads to 30 seconds
 with two download retries. Fonts and browser dependencies are still installed;
-application test retries and job time budgets are unchanged. These are CI/test-only
-changes; the accepted deployed application remains `b112835`.
+application test retries and job time budgets are unchanged. Those CI/test-only
+changes preserved the then-tested application `b112835`; the subsequent validation
+rejection correction below is included in the final accepted `84c23fd` build.
 
 A local browser stress check moved the mobile preview through six fractional
 origins and confirmed one identical screenshot hash after normalization. The
@@ -146,4 +147,7 @@ body. Unknown/lost responses still retain their exact body/key. The GUI journey
 submits an overlength label, confirms no token was created, discards the rejection
 and places the corrected token before running the complete gesture/recovery flow.
 Focused tests: 38 passed. Local historical display + extended V2 journeys:
-2 passed in 32.5s without retries. Updated hosted acceptance follows below.
+2 passed in 32.5s without retries. The extended hosted journey also passed in 63.6s total, zero retries, on `84c23fd`
+and SUCCESS deployment `f8dcab88`. It independently confirms no token is created
+by invalid input, allows correction, and then passes every original gesture,
+uncertain-response, privacy/display, offline and cleanup assertion.

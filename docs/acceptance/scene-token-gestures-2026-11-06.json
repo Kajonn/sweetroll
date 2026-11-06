@@ -1,26 +1,26 @@
 {
   "date": "2026-11-06",
-  "applicationCommit": "b112835cdbe5d697815124a4b7e0b04e8ed1eb61",
-  "deploymentId": "13b1f59e-2929-4ba8-8d8b-bffc56f22661",
+  "applicationCommit": "84c23fd4221e6de3ef263e44057bc97d18daa8ba",
+  "deploymentId": "f8dcab88-4e0a-461d-b1ce-f2f79380740f",
   "deploymentStatus": "SUCCESS",
   "build": {
     "target": "https://sweetroll-d2-preview.up.railway.app",
     "health": "{\"status\":\"ok\"}",
     "assets": [
       {
-        "path": "/assets/index-DF3Bkxz_.css",
-        "sha256": "8d74655dc84143613f866c3f90298313a931a8f380e4c4b7927744f389421a55"
+        "path": "/assets/index-D7nX4OBN.js",
+        "sha256": "5be5d1559e76eff415ba40df7e41977becfe481941ccf046630fed5e1e93c76a"
       },
       {
-        "path": "/assets/index-Dkse5Ljt.js",
-        "sha256": "d67af8187c2d3599ec0028bbf47a703fe759862ee64f46dff474a8db7cb505cf"
+        "path": "/assets/index-DF3Bkxz_.css",
+        "sha256": "8d74655dc84143613f866c3f90298313a931a8f380e4c4b7927744f389421a55"
       }
     ]
   },
   "hosted": {
     "stats": {
-      "startTime": "2026-11-06T18:59:02.576Z",
-      "duration": 68511.58,
+      "startTime": "2026-11-06T19:54:22.467Z",
+      "duration": 63575.621,
       "expected": 1,
       "skipped": 0,
       "unexpected": 0,
@@ -39,7 +39,8 @@
     "pairedDisplay": true,
     "offlineReconnect": true,
     "revocation": true,
-    "campaignArchiveReadback": true
+    "campaignArchiveReadback": true,
+    "validationRejectionCorrection": true
   },
   "interruptedFixtureCleanup": {
     "archivedInterruptedFixtures": 1,

@@ -56,6 +56,6 @@ image-token selection/upload and proportional GM/restricted-display rendering.
 [Hosted and redeploy acceptance](docs/acceptance/scene-image-tokens-2026-11-05.md)
 passed on application `34ed283`, with CI #248 green. The next implementation step
 is V3 on-image fog brushing, then V4 combined acceptance. PR #36 implements V2
-direct drag/tap movement with passing local browser acceptance; hosted verification
-is tracked in [V2 evidence](docs/acceptance/scene-token-gestures-2026-11-06.md). Follow the [visual-controls completion plan](docs/superpowers/plans/2026-11-05-scene-visual-controls.md).
+direct drag/tap movement with passing local and hosted mouse/touch acceptance
+on `b112835`, SUCCESS deployment `13b1f59e`; see [V2 evidence](docs/acceptance/scene-token-gestures-2026-11-06.md). Follow the [visual-controls completion plan](docs/superpowers/plans/2026-11-05-scene-visual-controls.md).
 Do not close aggregate G8/G9 gates from V1 or the numeric/M3 foundation evidence.

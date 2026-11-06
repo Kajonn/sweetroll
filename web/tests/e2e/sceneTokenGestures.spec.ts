@@ -116,8 +116,10 @@ test("V2 token gestures: mouse/touch, transformed coordinates, recovery, display
     expect((await state()).tokens[0].x).toBe(.35);
     await gm.getByRole("button", { name: "Retry moving Wren", exact: true }).click(); await savedAt(.7, .3);
     // A lost response is a real committed server request, retried byte-for-byte.
-    await gm.route(`**${movePath}`, async route => { await route.fetch(); await route.abort("failed"); }, { times: 1 });
+    let dropped = false;
+    await gm.route(`**${movePath}`, async route => { await route.fetch({ timeout: 15_000 }); await route.abort("failed"); dropped = true; }, { times: 1 });
     await marker.click(); const next = await point(gm, .55, .5); await gm.mouse.click(next.x, next.y);
+    await expect.poll(() => dropped, { timeout: 15_000, message: "Actual committed response was dropped" }).toBe(true);
     await expect(gm.getByText(/save not confirmed/i)).toBeVisible(); const uncertain = changes.at(-1);
     await gm.getByRole("button", { name: "Retry token recovery", exact: true }).click(); await savedAt(.55, .5);
     expect(changes.at(-1)).toEqual(uncertain);

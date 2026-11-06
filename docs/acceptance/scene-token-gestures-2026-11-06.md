@@ -2,7 +2,7 @@
 
 PR: https://github.com/Kajonn/sweetroll/pull/36
 
-Status: implemented; local browser acceptance passed. Hosted and final CI checks pending.
+Status: V2 implemented and accepted on the isolated hosted preview. Final branch CI is tracked in PR #36.
 V3 fog brushing, V4 combined acceptance and aggregate G8/G9 remain open.
 
 ## Implementation
@@ -41,7 +41,7 @@ cancelling them.
 | Actual PostgreSQL scene/media integration | 31 passed (PostgreSQL 18.6 local fixture) |
 | Frontend typecheck and production build | Passed |
 | Generated contracts | Passed using `node --import tsx scripts/generate-system-contracts.ts --check` |
-| Final local Chromium V2 journey | Passed in 15.2s, no retries |
+| Final local Chromium regressions | Historical display journey + V2 journey: 2 passed in 31.1s, no retries |
 | Whitespace/diff checks | Passed |
 
 Local browser journey uses real HTTP, PostgreSQL and the existing bounded clean-image
@@ -70,7 +70,41 @@ the final test taps an unoccupied destination. Cleanup preserves the original fa
 Only `sweetroll-d2-acceptance` / `preview` / `sweetroll-d2` is changed:
 https://sweetroll-d2-preview.up.railway.app
 
-Final application commit, deployment, served-build identity and hosted results will
-be recorded after verification. Production and main-linked acceptance sources are
+| Field | Verified value |
+| --- | --- |
+| Application commit | `b112835cdbe5d697815124a4b7e0b04e8ed1eb61` |
+| Deployment | `13b1f59e-2929-4ba8-8d8b-bffc56f22661`, terminal SUCCESS |
+| Readiness | `/health/ready` → `{"status":"ok"}` |
+| Served JS | `/assets/index-Dkse5Ljt.js` · SHA-256 `d67af8187c2d3599ec0028bbf47a703fe759862ee64f46dff474a8db7cb505cf` |
+| Served CSS | `/assets/index-DF3Bkxz_.css` · SHA-256 `8d74655dc84143613f866c3f90298313a931a8f380e4c4b7927744f389421a55` |
+| Source identity | Manifest assets and both files match the local final-source production build byte for byte |
+| Hosted journey | PASS · 68.5s total · 1 expected, 0 unexpected/skipped/flaky, zero retries |
+| Cleanup | Journey revoked its display and read back its archived campaign; one interrupted earlier V2 fixture was separately archived and read back |
+
+The hosted run covered the same complete ordered V2 journey described above,
+including all three widths, native touch, real stale-write conflict, exact
+lost-response recovery and display/offline/revocation checks. No response or
+server projection was mocked. Tests-only follow-ups update historical feedback
+locators and wait for the actual response-drop handler to complete; the deployed
+application bytes remain unchanged.
+
+The initial hosted attempt reached the deliberately lost-response check before a
+five-second assertion expired while the proxy-backed handler was still finishing.
+The final test first awaits the bounded real fetch/abort, then asserts the same
+uncertain state and exact retry body/key. All save/count/privacy assertions remain.
+CI #256 exposed an older scene journey still locating feedback in the token tray;
+it and the hosted G9/background helpers now locate that same feedback beside the
+scene. CI #255 also reproduced the previously recorded one-pixel sheet-preview crop
+flake (1,484 pixels); inspected expected/actual/diff images show a one-pixel vertical
+shift, and CI #256 passed the unchanged visual baselines. No screenshot baseline,
+comparison tolerance or application behavior was altered for this failure.
+
+[Machine evidence](scene-token-gestures-2026-11-06.json) includes asset and screenshot
+checksums. Hosted screenshots were inspected at all three widths:
+
+![Phone 360px](assets/scene-token-gestures-2026-11-06/scene-360.png)
+![Tablet 768px](assets/scene-token-gestures-2026-11-06/scene-768.png)
+![Desktop 1280px](assets/scene-token-gestures-2026-11-06/scene-1280.png)
+ Production and main-linked acceptance sources are
 unchanged. No physical phone/tablet, real provider login, human visual approval or
 real playtest is claimed.

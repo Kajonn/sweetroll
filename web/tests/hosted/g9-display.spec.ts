@@ -54,7 +54,7 @@ test("hosted scene controls, redacted pixels, display reconnect and revocation",
       await tray.getByLabel(/x \(0–1\)/i).fill(x); await tray.getByLabel(/y \(0–1\)/i).fill("0.5");
       await tray.getByLabel(/visible to the display/i).setChecked(visible);
       await tray.getByRole("button", { name: "Place token", exact: true }).click();
-      await expect(tray.getByText("Token placed.")).toBeVisible();
+      await expect(page.getByText("Token placed.")).toBeVisible();
       await page.reload(); await expect(page.getByRole("img", { name: "Scene background" })).toBeVisible();
     }
     await test.info().attach("gm-scene-phone", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });

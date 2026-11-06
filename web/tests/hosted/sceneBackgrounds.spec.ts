@@ -58,7 +58,7 @@ test("M3 GUI background upload, confirmed safe replacement and restricted displa
     const sceneId = new URL(gm.url()).searchParams.get("sceneId")!; await expect(gm.getByRole("img", { name: "Scene background", exact: true })).toBeVisible();
     await fog(gm);
     for (const [label, visible] of [["Visible explorer", true], ["Hidden GM marker", false]] as const) {
-      const tray = gm.getByRole("region", { name: "Tokens", exact: true }); await tray.getByLabel(/token label/i).fill(label); await tray.getByLabel(/x \(0–1\)/i).fill("0.25"); await tray.getByLabel(/y \(0–1\)/i).fill("0.5"); await tray.getByLabel(/visible to the display/i).setChecked(visible); await tray.getByRole("button", { name: "Place token", exact: true }).click(); await expect(tray.getByText("Token placed.")).toBeVisible();
+      const tray = gm.getByRole("region", { name: "Tokens", exact: true }); await tray.getByLabel(/token label/i).fill(label); await tray.getByLabel(/x \(0–1\)/i).fill("0.25"); await tray.getByLabel(/y \(0–1\)/i).fill("0.5"); await tray.getByLabel(/visible to the display/i).setChecked(visible); await tray.getByRole("button", { name: "Place token", exact: true }).click(); await expect(gm.getByText("Token placed.")).toBeVisible();
       await gm.reload(); await expect(gm.getByRole("img", { name: "Scene background", exact: true })).toBeVisible();
     }
     const seen: string[] = []; dp.on("request", r => { if (r.url().startsWith(baseURL)) seen.push(new URL(r.url()).pathname); });

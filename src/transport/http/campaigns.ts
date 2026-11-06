@@ -2587,6 +2587,10 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
       const response = toFastifyResponses(route.schema.response);
       const schema = response === undefined ? route.schema : { ...route.schema, response };
       app[route.method](route.path, { schema, ...((route.path.includes("/item-templates") || route.path.includes("/item-proposals")) ? { validatorCompiler: strictInputCompiler, ...(route.path.includes("/item-proposals") ? {bodyLimit:32768}: {}) } : {}),
+        // Campaign backgrounds and token art carry up to 5 MiB as base64
+        // inside JSON. Match the other image routes without raising the
+        // default limit for unrelated campaign commands.
+        ...(route.operationId === "post_campaigns_id_images" ? { bodyLimit: 8 * 1024 * 1024 } : {}),
         ...(route.path.includes("/image") && (route.path.includes("/item-templates") || route.path.includes("/item-proposals")) ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); }, ...(route.method === "put" ? { bodyLimit: 8 * 1024 * 1024 } : {}) } : {}),
       }, handlers[route.operationId]!);
     }

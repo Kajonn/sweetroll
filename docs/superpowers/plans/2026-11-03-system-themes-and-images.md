@@ -106,3 +106,14 @@ For hosted acceptance, verify the test service's branch and latest successful de
 T1/T2 and M0 evidence remains recorded above. M1 module, HTTP/contracts and UI
 are implemented and accepted by the hosted player/GM journey and CI #209. See [M1 evidence](../../acceptance/character-portraits-2026-11-04.md).
 M2 is implemented under the [item image contract](../specs/2026-11-04-item-images.md), with [passing hosted acceptance and CI #210](../../acceptance/item-images-2026-11-04.md); M3 is implemented under the [background contract](../specs/2026-11-04-scene-backgrounds.md), with [passing hosted journey, post-redeploy verification and CI #219](../../acceptance/scene-backgrounds-2026-11-04.md). The feature request is complete; unperformed G9 release gates remain separate.
+
+## Campaign upload-size correction (2026-11-06)
+
+Real Library fixtures exposed an inherited 1 MiB JSON limit on campaign
+background/token uploads despite the documented 5 MiB image cap. PR #35 adds a
+real-PNG red/green HTTP regression and a route-only 8 MiB JSON allowance, retaining
+all image/scanner/security limits. The three previously rejected originals now
+pass hosted GUI upload, placement/reload and safe replacement. See the
+[correction acceptance](../../acceptance/campaign-upload-limit-2026-11-06.md).
+This fixes the existing M0/M3/V1 behavior and does not close other visual/device
+release gates.

@@ -16,7 +16,7 @@ import { Button, EmptyState, PageHeader, Panel } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
 import { useScene } from "./campaignQueries.js";
 import { FogToolbarView } from "./FogToolbar.js";
-import { TokenTrayView } from "./TokenTray.js";
+import { TokenTrayView, TokenCommandFeedback } from "./TokenTray.js";
 import type { SceneView } from "./types.js";
 
 export type SceneViewportApi = Pick<
@@ -36,6 +36,7 @@ const ZOOM_MAX = 4;
 const PAN_STEP = 10;
 
 export function SceneViewportView(props: {
+  feedback?: React.ReactNode;
   interaction?: SceneInteraction | undefined;
   scene: SceneView;
   imageUrl: string;
@@ -142,6 +143,7 @@ export function SceneViewportView(props: {
           </ul>
         </div>
       </div>
+      {props.feedback}
     </Panel>
   );
 }
@@ -252,6 +254,7 @@ function SceneEditor({ scene, library, props, refresh }: { scene: SceneView; lib
       <SceneViewportView
         scene={scene}
         imageUrl={imageUrl}
+        feedback={<TokenCommandFeedback commands={commands} online={online} />}
         selectedTokenId={selectedTokenId}
         onSelectToken={setSelectedTokenId}
         interaction={{ mode, setMode, disabled: commands.blocked, onPlace: point => { if (placement) { commands.place({ ...placement, ...point }); setPlacement(null); setMode("move"); } }, onMove: (id, point) => { const token = scene.tokens.find(t => t.tokenId === id); if (token) commands.move(id, token.label, point); } }}

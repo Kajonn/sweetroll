@@ -174,7 +174,7 @@ export function TokenTrayView(props: {
         disabled={disabled}
         onChange={(event) => setVisible(event.target.checked)}
       />
-      <TokenCommandFeedback commands={commands} online={online} />
+      {!props.commands ? <TokenCommandFeedback commands={commands} online={online} /> : null}
       {!online ? <p role="status">{t("campaign.detail.scenes.offline")}</p> : null}
       {props.onPlaceOnScene ? <Button variant="secondary" disabled={disabled || !valid} onClick={() => props.onPlaceOnScene?.(draft())}>{t("scene.gestures.place")}</Button> : null}
       <Button variant="primary" pending={pending} pendingText={t("campaign.detail.scenes.tokens.placing")} disabled={disabled || !valid} onClick={place}>{t("campaign.detail.scenes.tokens.place")}</Button>
@@ -201,6 +201,7 @@ export function TokenCommandFeedback({ commands, online }: { commands: TokenComm
   const op = commands.operation;
   const retryLabel = commands.status === "conflict" && commands.refreshed ? op?.kind === "move" ? t("campaign.detail.scenes.tokens.retryMove", { label: op.label }) : t("campaign.detail.scenes.tokens.retryPlace") : t("scene.gestures.retry");
   return <>
+    {op && ["conflict", "uncertain"].includes(commands.status) ? <p>{t("scene.gestures.destination", { label: op.kind === "move" ? op.label : op.body.label, x: op.body.x, y: op.body.y })}</p> : null}
     {commands.status === "pending" ? <p role="status">{t("scene.gestures.saving")}</p> : null}
     {commands.status === "applied" ? <p role="status">{t(op?.kind === "place" ? "campaign.detail.scenes.tokens.placed" : "campaign.detail.scenes.tokens.moved")}</p> : null}
     {commands.status === "conflict" ? <p role="alert">{t(commands.refreshed ? "campaign.detail.scenes.tokens.conflict" : "scene.gestures.refresh")}</p> : null}

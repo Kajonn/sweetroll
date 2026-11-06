@@ -1,6 +1,6 @@
 # Complete the I7b/G8 visual scene controls
 
-Status: V1 implemented and accepted in PR #34; V2–V4 remain open.
+Status: V1 accepted in PR #34; V2 implemented in PR #36 with local acceptance passed; hosted verification pending. V3–V4 remain open.
 Evidence: [V1 hosted/redeploy acceptance](../../acceptance/scene-image-tokens-2026-11-05.md).
 Updated 2026-11-05 after the owner's review of campaign scenes.
 Baseline inspected: `5e3d81f` on PR #33.
@@ -15,7 +15,7 @@ This completes already specified work; it does not introduce a full VTT.
 | Capability | Observed implementation | Remaining work |
 | --- | --- | --- |
 | Backgrounds | Upload, select, create/open and confirmed replacement; M3 accepted. | Reuse these controls and private campaign media. |
-| Tokens | V1: upload/select campaign art or use label-only tokens; centered art, normalized position/size, numeric placement/movement and nudges. | V2 direct placement/movement. |
+| Tokens | V1: upload/select campaign art or use label-only tokens; centered art, normalized position/size, numeric placement/movement and nudges. | V2 direct placement/movement implemented; hosted verification pending. |
 | Fog | Reveal/conceal circular dabs entered numerically, undo local dabs and commit. | Paint on the scene with mouse/touch and preview the stroke. |
 | Restricted display | Paired access, server-redacted background and permitted art/labels/size; credential-only image reads and polling. V1 hosted/redeploy accepted. | V4 gesture/brush acceptance after V2/V3. |
 
@@ -70,24 +70,24 @@ Exit: a GM uploads/selects art and places a labelled image token entirely throug
 UI; the permitted paired display shows the same image, position and relative size.
 
 V1 exit passed on application `34ed283`, deployments `90a83af7` and `e8098628`;
-CI #248, hosted and post-redeploy journeys passed. Next implementation step: **V2**.
+CI #248, hosted and post-redeploy journeys passed. V2 implementation follows below.
 Do not close aggregate G8 or the V4 gesture gates from this V1 evidence.
 
 ## V2 — Direct token placement and movement
 
-- [ ] Start with failing browser/component tests for mouse dragging, touch dragging
+- [x] Start with failing browser/component tests for mouse dragging, touch dragging
   and tap-to-place/move, plus cancellation and normalized coordinates at zoom/pan.
-- [ ] Provide explicit token selection/placement/move modes. Tap a scene position
+- [x] Provide explicit token selection/placement/move modes. Tap a scene position
   to place/move a selected token; use pointer events/capture for drag preview.
   Only a completed move commits; pointer cancellation or Escape discards the local
   preview. Panning and painting do not move tokens.
-- [ ] Convert pointer/touch positions through the rendered scene transform to
+- [x] Convert pointer/touch positions through the rendered scene transform to
   normalized scene coordinates. Bound positions consistently and keep overlays
   aligned under fit, zoom, pan, resize and phone/tablet orientation changes.
-- [ ] Use the existing move/place commands, revision checks and mutation recovery.
+- [x] Use the existing move/place commands, revision checks and mutation recovery.
   Do not send a request for every pointer move. A conflict re-reads the scene and
   requires explicit review/retry; no silent overwrite or guessed revision.
-- [ ] Preserve the numeric/nudge + Move workflow. Verify keyboard operation,
+- [x] Preserve the numeric/nudge + Move workflow. Verify keyboard operation,
   offline disabling, pending feedback and actor/scene/background changes during
   an unfinished gesture.
 
@@ -98,6 +98,13 @@ and numeric controls so the same operation cannot be submitted twice.
 Exit: mouse and touch can place and move an image token while zoomed/panned;
 reopening and the paired display show its committed position. Keyboard-only
 users can perform the same operation with the existing alternatives.
+
+V2 local exit passed (2026-11-06): mouse and native emulated touch at
+360/768/1280px, zoom/pan, Escape/touch cancellation, keyboard controls,
+conflict and exact lost-response recovery, save/reopen, paired display,
+offline/reconnect and revocation. Hosted verification remains pending in
+[the V2 acceptance record](../../acceptance/scene-token-gestures-2026-11-06.md).
+The next implementation stage is V3; aggregate G8/V4/G9 remain open.
 
 ## V3 — On-image reveal/conceal brush
 

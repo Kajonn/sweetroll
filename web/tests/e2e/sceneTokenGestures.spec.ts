@@ -27,7 +27,7 @@ test("V2 token gestures: mouse/touch, transformed coordinates, recovery, display
   const gm = await context.newPage(), dp = await displayContext.newPage();
   gm.setDefaultTimeout(15_000); dp.setDefaultTimeout(15_000);
   gm.setDefaultNavigationTimeout(45_000); dp.setDefaultNavigationTimeout(45_000);
-  let campaignId: string | undefined, displayId: string | undefined;
+  let campaignId: string | undefined, displayId: string | undefined, primaryError: unknown;
   try {
     await gm.goto("/");
     await json(gm, "POST", "/dev/signin", { code: "code-journey-gm", redirectUri: new URL("/cb", baseURL!).href });
@@ -56,7 +56,7 @@ test("V2 token gestures: mouse/touch, transformed coordinates, recovery, display
     await tray.getByLabel("Token label").fill("Wren");
     await tray.getByRole("button", { name: "Place on scene", exact: true }).click();
     const placement = await point(gm, .4, .5); await gm.touchscreen.tap(placement.x, placement.y);
-    await expect(tray.getByText("Token placed.")).toBeVisible();
+    await expect(gm.getByText("Token placed.")).toBeVisible();
     const saved = await state(), tokenId = saved.tokens[0].tokenId;
     expect(saved.tokens[0]).toMatchObject({ label: "Wren", x: .4, y: .5, imageFileId: expect.any(String) });
     const movePath = `/api/scenes/${sceneId}/tokens/${tokenId}`;
@@ -65,19 +65,20 @@ test("V2 token gestures: mouse/touch, transformed coordinates, recovery, display
     gm.on("request", r => { if (isMove(r.url())) changes.push(r.postDataJSON()); });
     async function savedAt(x: number, y: number) {
       await expect.poll(async () => { const t = (await state()).tokens.find((t: any) => t.tokenId === tokenId); return [t.x, t.y]; }).toEqual([x, y]);
-      await expect(tray.getByText("Token moved.")).toBeVisible();
+      await expect(gm.getByText("Token moved.")).toBeVisible();
     }
     for (const width of [360, 768, 1280]) {
+      const before = changes.length;
       await gm.setViewportSize({ width, height: 1024 });
       await scene.getByRole("button", { name: "Zoom in", exact: true }).click();
       await scene.getByRole("button", { name: "Pan scene", exact: true }).click();
       const start = await point(gm, .5, .5);
       await gm.mouse.move(start.x, start.y); await gm.mouse.down(); await gm.mouse.move(start.x + 12, start.y + 8, { steps: 4 }); await gm.mouse.up();
-      const before = changes.length;
+      expect(changes.length).toBe(before);
       await scene.getByRole("button", { name: "Select / move tokens", exact: true }).click();
       const marker = scene.getByRole("button", { name: "Token Wren", exact: true });
       await marker.click();
-      const tap = await point(gm, .5, .6); await gm.touchscreen.tap(tap.x, tap.y); await savedAt(.5, .6);
+      const tap = await point(gm, .65, .65); await gm.touchscreen.tap(tap.x, tap.y); await savedAt(.65, .65);
       const destination = await point(gm, .6, .5), box = (await marker.boundingBox())!;
       await gm.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await gm.mouse.down();
       await gm.mouse.move(destination.x, destination.y, { steps: 8 });
@@ -95,6 +96,11 @@ test("V2 token gestures: mouse/touch, transformed coordinates, recovery, display
       expect(await gm.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
       await scene.getByRole("button", { name: "Reset view", exact: true }).click();
     }
+    const cancelledTouch = await context.newCDPSession(gm), touchStart = await point(gm, .4, .5), touchEnd = await point(gm, .7, .3), beforeTouchCancel = changes.length;
+    await cancelledTouch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ ...touchStart, id: 1 }] });
+    await cancelledTouch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ ...touchEnd, id: 1 }] });
+    await cancelledTouch.send("Input.dispatchTouchEvent", { type: "touchCancel", touchPoints: [] }); await cancelledTouch.detach();
+    expect(changes.length).toBe(beforeTouchCancel); await savedAt(.4, .5);
     // Cancellation does not save; numeric controls remain a real keyboard path.
     const start = await point(gm, .4, .5), end = await point(gm, .7, .7), beforeCancel = changes.length;
     await gm.mouse.move(start.x, start.y); await gm.mouse.down(); await gm.mouse.move(end.x, end.y, { steps: 4 }); await gm.keyboard.press("Escape"); await gm.mouse.up();
@@ -105,15 +111,15 @@ test("V2 token gestures: mouse/touch, transformed coordinates, recovery, display
     // Make the browser stale using a second actual command; only explicit retry overwrites it.
     const stale = await state(); await json(gm, "PATCH", movePath, { x: .35, y: .5, expectedSceneRevision: stale.revision, idempotencyKey: randomUUID() });
     const marker = scene.getByRole("button", { name: "Token Wren", exact: true }); await marker.click();
-    const target = await point(gm, .5, .5); await gm.mouse.click(target.x, target.y);
-    await expect(tray.getByText(/this scene changed/i)).toBeVisible();
+    const target = await point(gm, .7, .3); await gm.mouse.click(target.x, target.y);
+    await expect(gm.getByText(/this scene changed/i)).toBeVisible();
     expect((await state()).tokens[0].x).toBe(.35);
-    await tray.getByRole("button", { name: "Retry moving Wren", exact: true }).click(); await savedAt(.5, .5);
+    await gm.getByRole("button", { name: "Retry moving Wren", exact: true }).click(); await savedAt(.7, .3);
     // A lost response is a real committed server request, retried byte-for-byte.
     await gm.route(`**${movePath}`, async route => { await route.fetch(); await route.abort("failed"); }, { times: 1 });
     await marker.click(); const next = await point(gm, .55, .5); await gm.mouse.click(next.x, next.y);
-    await expect(tray.getByText(/save not confirmed/i)).toBeVisible(); const uncertain = changes.at(-1);
-    await tray.getByRole("button", { name: "Retry token recovery", exact: true }).click(); await savedAt(.55, .5);
+    await expect(gm.getByText(/save not confirmed/i)).toBeVisible(); const uncertain = changes.at(-1);
+    await gm.getByRole("button", { name: "Retry token recovery", exact: true }).click(); await savedAt(.55, .5);
     expect(changes.at(-1)).toEqual(uncertain);
     await gm.reload(); await expect(scene.getByRole("button", { name: "Token Wren", exact: true })).toBeVisible(); expect((await state()).tokens[0]).toMatchObject({ x: .55, y: .5 });
     // Pair a separate restricted display through the GUI, then verify the committed center.
@@ -125,14 +131,19 @@ test("V2 token gestures: mouse/touch, transformed coordinates, recovery, display
     const image = dp.getByText("Wren", { exact: true }).locator(".."); await expect(image).toHaveCSS("left", /.+/);
     expect(await image.evaluate(el => parseFloat((el as HTMLElement).style.left))).toBeCloseTo(55, 5);
     await gm.goto(`/campaigns/${campaignId}/scenes?sceneId=${sceneId}`);
+    await expect(scene.getByRole("button", { name: "Token Wren", exact: true })).toBeVisible();
     expect((await new AxeBuilder({ page: gm }).analyze()).violations).toEqual([]);
     await context.setOffline(true); await expect(gm.getByText("You are offline. Reconnect to change this scene.")).toBeVisible();
     await context.setOffline(false); await expect(scene.getByRole("button", { name: "Token Wren", exact: true })).toBeVisible();
     await json(gm, "POST", `/api/campaigns/${campaignId}/displays/${displayId}/revoke`, {}); displayId = undefined;
     await expect(dp.locator("img")).toHaveCount(0, { timeout: 20_000 });
-  } finally {
+  } catch (error) { primaryError = error; throw error; } finally {
+    await context.setOffline(false);
+    try {
     if (displayId && campaignId) await json(gm, "POST", `/api/campaigns/${campaignId}/displays/${displayId}/revoke`, {});
     if (campaignId) { const c = (await json(gm, "GET", `/api/campaigns/${campaignId}`)).campaign; await json(gm, "POST", `/api/campaigns/${campaignId}/archive`, { expectedCampaignRevision: c.revision, idempotencyKey: randomUUID() }); expect((await json(gm, "GET", `/api/campaigns/${campaignId}`)).campaign.status).toBe("archived"); }
-    await context.close(); await displayContext.close();
+    } catch (cleanupError) { if (!primaryError) throw cleanupError; } finally {
+      await Promise.allSettled([context.close(), displayContext.close()]);
+    }
   }
 });

@@ -30,6 +30,11 @@ describe("scene pointer gestures", () => {
     expect(s.interaction.onMove).toHaveBeenCalledTimes(1);
     expect(s.interaction.onMove).toHaveBeenCalledWith("t1", { x: .75, y: .75 });
   });
+  it("does not scroll the scene when capturing a pointer", () => {
+    const s = setup(), focus = vi.spyOn(s.region, "focus");
+    s.pointer(s.region, "pointerDown", 200, 95);
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
   it("tap places or moves through the transformed layer rectangle", () => {
     const s = setup("place");
     s.pointer(s.region, "pointerDown", 200, 95); s.pointer(s.region, "pointerUp", 200, 95);

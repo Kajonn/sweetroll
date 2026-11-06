@@ -17,6 +17,7 @@ export const defaultMessages: MessageTable = {
   "editor.conflict.summary": "This draft changed elsewhere. Choose which changes to keep.",
   "character.review.campaignItem": "Campaign item",
 
+  "scene.gestures.destination": "Requested position for {label}: X {x}, Y {y}.",
   "scene.gestures.tools": "Scene tools",
   "scene.gestures.move": "Select / move tokens",
   "scene.gestures.pan": "Pan scene",

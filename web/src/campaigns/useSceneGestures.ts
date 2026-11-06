@@ -50,7 +50,7 @@ export function useSceneGestures(props: {
     const rect = props.layer.current?.getBoundingClientRect();
     if (!rect || rect.width <= 0 || rect.height <= 0) return;
     const target = e.target as HTMLElement, tokenId = target.closest<HTMLElement>("[data-token-id]")?.dataset.tokenId ?? null;
-    e.preventDefault(); e.currentTarget.focus(); e.currentTarget.setPointerCapture(e.pointerId); element.current = e.currentTarget;
+    e.preventDefault(); e.currentTarget.focus({ preventScroll: true }); e.currentTarget.setPointerCapture(e.pointerId); element.current = e.currentTarget;
     if (tokenId && props.interaction.mode === "move") props.onSelectToken?.(tokenId);
     const raw = rawPosition(e, rect), token = tokenId ? props.tokenPosition(tokenId) : undefined;
     const offset = token && props.interaction.mode === "move" ? { x: raw.x - token.x, y: raw.y - token.y } : { x: 0, y: 0 };

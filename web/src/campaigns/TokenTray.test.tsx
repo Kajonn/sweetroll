@@ -121,3 +121,14 @@ describe("TokenTrayView", () => {
     expect(screen.getByText(/you are offline\. reconnect to change this scene\./i)).toBeVisible();
   });
 });
+
+it("places selected campaign art and defaults to a bounded scene-relative size", async () => {
+  const props = trayProps();
+  const mediaApi = { listImages: vi.fn().mockResolvedValue({ images: [{fileId:"art",name:"Wren art"}], nextCursor:null }), listScenes: vi.fn(), uploadImage: vi.fn(), deleteImage: vi.fn(), createScene: vi.fn(), updateScene: vi.fn() };
+  render(<TokenTrayView {...props} mediaApi={mediaApi} campaignId="c1" actorId="gm" generation={0} />, { wrapper: wrapper() });
+  fireEvent.click(screen.getByText("Token artwork"));
+  const art = await screen.findByRole("button", { name: "Select token image" }); fireEvent.click(art);
+  fireEvent.change(screen.getByLabelText(/token label/i), {target:{value:"Wren"}});
+  fireEvent.click(screen.getByRole("button", {name:"Place token"}));
+  await vi.waitFor(() => expect(props.api.placeToken).toHaveBeenCalledWith("s1", expect.objectContaining({imageFileId:"art",size:.1})));
+});

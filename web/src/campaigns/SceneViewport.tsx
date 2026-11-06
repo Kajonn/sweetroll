@@ -1,3 +1,5 @@
+import { SceneTokenArt } from "./SceneTokenArt.js";
+import tokenStyles from "./SceneToken.module.css";
 import { SceneLibrary } from "./SceneLibrary.js";
 // GM scene viewport: normalized scene-space image with token markers, plus
 // the GM scene route composition (viewport + fog toolbar + token tray).
@@ -98,7 +100,9 @@ export function SceneViewportView(props: {
             {props.scene.tokens.map((token) => (
               <li
                 key={token.tokenId}
+                className={tokenStyles.token}
                 style={{
+                  width: `${token.size * 100}%`,
                   position: "absolute",
                   left: `${token.x * 100}%`,
                   top: `${token.y * 100}%`,
@@ -107,13 +111,15 @@ export function SceneViewportView(props: {
               >
                 <button
                   type="button"
+                  className={tokenStyles.marker}
                   aria-label={t("campaign.detail.scenes.viewport.token", { label: token.label })}
                   aria-pressed={selectedTokenId === token.tokenId}
                   data-visible={token.visible ? "true" : "false"}
                   style={{ opacity: token.visible ? 1 : 0.5 }}
                   onClick={() => props.onSelectToken?.(token.tokenId)}
                 >
-                  {token.label}
+                  {token.imageFileId ? <SceneTokenArt key={token.imageFileId} campaignId={props.scene.campaignId} fileId={token.imageFileId} /> : null}
+                  <span className={tokenStyles.label}>{token.label}</span>
                 </button>
               </li>
             ))}
@@ -211,7 +217,7 @@ export function CampaignSceneView(props: {
       <PageHeader title={t("campaign.detail.scenes.title")} />
       {library}
       <SceneViewportView
-        key={`viewport:${scene.backgroundFileId}`}
+        key={`viewport:${props.actorId}:${generation}:${scene.sceneId}:${scene.backgroundFileId}`}
         scene={scene}
         imageUrl={imageUrl}
         selectedTokenId={selectedTokenId}
@@ -226,7 +232,11 @@ export function CampaignSceneView(props: {
         onChanged={refetch}
       />
       <TokenTrayView
-        key={`tokens:${scene.backgroundFileId}`}
+        key={`tokens:${props.actorId}:${generation}:${scene.sceneId}:${scene.backgroundFileId}`}
+        mediaApi={props.api.sceneLibrary}
+        campaignId={props.campaignId}
+        actorId={props.actorId}
+        generation={generation}
         api={props.api}
         sceneId={scene.sceneId}
         sceneRevision={scene.revision}

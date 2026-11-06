@@ -1,6 +1,7 @@
 # Complete the I7b/G8 visual scene controls
 
-Status: planned; V1–V4 are open. No implementation or acceptance is claimed.
+Status: V1 implemented and accepted in PR #34; V2–V4 remain open.
+Evidence: [V1 hosted/redeploy acceptance](../../acceptance/scene-image-tokens-2026-11-05.md).
 Updated 2026-11-05 after the owner's review of campaign scenes.
 Baseline inspected: `5e3d81f` on PR #33.
 
@@ -14,9 +15,9 @@ This completes already specified work; it does not introduce a full VTT.
 | Capability | Observed implementation | Remaining work |
 | --- | --- | --- |
 | Backgrounds | Upload, select, create/open and confirmed replacement; M3 accepted. | Reuse these controls and private campaign media. |
-| Tokens | Label markers; place/move forms; normalized coordinates; numeric/nudge controls. Placement currently sends `imageFileId: null`. | Select/upload art, render images/size and provide direct placement/movement. |
+| Tokens | V1: upload/select campaign art or use label-only tokens; centered art, normalized position/size, numeric placement/movement and nudges. | V2 direct placement/movement. |
 | Fog | Reveal/conceal circular dabs entered numerically, undo local dabs and commit. | Paint on the scene with mouse/touch and preview the stroke. |
-| Restricted display | Paired access, server-redacted background, permitted label markers and polling. | Render permitted token images/size without gaining GM/original access. |
+| Restricted display | Paired access, server-redacted background and permitted art/labels/size; credential-only image reads and polling. V1 hosted/redeploy accepted. | V4 gesture/brush acceptance after V2/V3. |
 
 Inspect the existing `SceneViewport.tsx`, `TokenTray.tsx`, `FogToolbar.tsx`,
 `SceneLibrary.tsx`, `DisplayView.tsx`, campaign API/query seams and Campaigns
@@ -46,17 +47,17 @@ regressions. Keep established Module ownership and generated API types.
 
 ## V1 — Image tokens in GM and restricted display
 
-- [ ] Write failing component/authorization tests for selecting existing campaign
+- [x] Write failing component/authorization tests for selecting existing campaign
   art or uploading an image, optional labelled fallback, normalized image size,
   unavailable art and display-safe image loading.
-- [ ] Reuse campaign upload/catalog controls in the token tray. Pass the selected
+- [x] Reuse campaign upload/catalog controls in the token tray. Pass the selected
   `imageFileId` on placement; retain a readable label and optional label-only token.
   Do not add background replacement merely to select token art.
-- [ ] Render token art and its stored scene-relative size in both scene views.
+- [x] Render token art and its stored scene-relative size in both scene views.
   Preserve the same position/anchor at different viewport widths. Use GM-authorized
   bytes on the GM view and the existing credential-scoped token-image path on the
   display; never give a display the campaign original route or GM credentials.
-- [ ] Verify hidden/fog-covered tokens and their image bytes remain unavailable
+- [x] Verify hidden/fog-covered tokens and their image bytes remain unavailable
   to the display; referenced image deletion remains protected. Reopen the scene
   and redeploy to prove the selected image is retained. Missing art shows a labelled
   fallback; sign-out/revocation clears protected presentation.
@@ -67,6 +68,10 @@ existing campaign media/scene/display APIs and authorized image loader patterns.
 
 Exit: a GM uploads/selects art and places a labelled image token entirely through
 UI; the permitted paired display shows the same image, position and relative size.
+
+V1 exit passed on application `34ed283`, deployments `90a83af7` and `e8098628`;
+CI #248, hosted and post-redeploy journeys passed. Next implementation step: **V2**.
+Do not close aggregate G8 or the V4 gesture gates from this V1 evidence.
 
 ## V2 — Direct token placement and movement
 

@@ -1,5 +1,12 @@
 # I7b Scenes & Restricted Display Implementation Plan
 
+**V1 update (PR #34, 2026-11-05):** Image-token upload/selection and proportional
+GM/restricted-display rendering passed hosted and redeploy acceptance on `34ed283`
+with CI #248 green. See [evidence](../../acceptance/scene-image-tokens-2026-11-05.md).
+Direct tap/drag token placement/movement is next (V2), followed by fog brushing
+(V3) and the combined V4 journey. Aggregate I7b/G8 and G9 gates remain open.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A GM uploads images, composes fog/token scenes, and pairs a restricted display that shows only revealed pixels and visible tokens.
@@ -24,9 +31,9 @@ remaining work.
 | Media, scene persistence, revisions and numeric fog/token operations | Delivered; reuse existing contracts and Module boundaries. |
 | Background upload/create/replace | Delivered and accepted under M3. |
 | Pairing, redacted background and hidden-token filtering | Delivered; retain privacy regressions. |
-| Task 6: GM scene UI | Partial: forms/zoom/pan exist; image selection/rendering, direct token gestures and brush painting remain open. |
-| Task 7: restricted display | Foundation delivered; rendering permitted token images and size remains open. |
-| Task 8: exit journey | Foundation evidence only; visual-control gestures and image-token display need new acceptance. |
+| Task 6: GM scene UI | V1 image selection/rendering and forms/zoom/pan delivered; direct token gestures and brush painting remain open. |
+| Task 7: restricted display | Foundation plus V1 permitted token-image/size rendering delivered and accepted. |
+| Task 8: exit journey | Foundation and V1 hosted/redeploy evidence pass; combined visual-control gesture acceptance remains open. |
 
 - [ ] Complete V1–V4 in the linked plan before closing I7b/G8.
 - [ ] Keep G9 physical-device, provider-login and human/playtest gates separate.

@@ -128,3 +128,10 @@ A local browser stress check moved the mobile preview through six fractional
 origins and confirmed one identical screenshot hash after normalization. The
 first normalized CI capture exposed the baseline's existing one-pixel top context;
 that context is retained explicitly rather than changing the baseline or threshold.
+
+CI #259 passed every completed verification job, including the normalized visual
+baseline and all browser journey shards. Offline remained in browser dependency
+installation at the previously failing Azure Ubuntu mirror. Both browser job types
+now use Ubuntu's public HTTPS archive for the same signed distribution packages,
+in addition to the bounded stalled-read retries. No dependency, test workload,
+assertion, screenshot baseline or comparison threshold is removed.

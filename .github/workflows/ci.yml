@@ -114,6 +114,10 @@ jobs:
         working-directory: web
       - name: Bound browser dependency downloads
         run: |
+          # The Azure mirror has repeatedly stalled before browser tests start.
+          # Keep the same signed Ubuntu packages, using the public archive.
+          sudo find /etc/apt -maxdepth 2 -type f \( -name '*.list' -o -name '*.sources' \) \
+            -exec sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' {} +
           sudo tee /etc/apt/apt.conf.d/80-sweetroll-ci >/dev/null <<'APT'
           Acquire::Retries "2";
           Acquire::http::Timeout "30";
@@ -167,6 +171,10 @@ jobs:
         working-directory: web
       - name: Bound browser dependency downloads
         run: |
+          # The Azure mirror has repeatedly stalled before browser tests start.
+          # Keep the same signed Ubuntu packages, using the public archive.
+          sudo find /etc/apt -maxdepth 2 -type f \( -name '*.list' -o -name '*.sources' \) \
+            -exec sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' {} +
           sudo tee /etc/apt/apt.conf.d/80-sweetroll-ci >/dev/null <<'APT'
           Acquire::Retries "2";
           Acquire::http::Timeout "30";

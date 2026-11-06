@@ -36,10 +36,10 @@ export function useSceneGestures(props: {
     cancel();
     if (props.interaction?.mode === "place") { props.layer.current?.parentElement?.scrollIntoView?.({ block: "center" }); props.layer.current?.parentElement?.focus(); }
     const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { cancel(); latest.current.interaction?.setMode("move"); } };
-    window.addEventListener("keydown", escape); window.addEventListener("resize", cancel); window.addEventListener("blur", cancel);
+    window.addEventListener("keydown", escape); window.addEventListener("resize", cancel); window.addEventListener("blur", cancel); window.addEventListener("scroll", cancel, true);
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(cancel);
     if (props.layer.current) observer?.observe(props.layer.current);
-    return () => { gesture.current = null; observer?.disconnect(); window.removeEventListener("keydown", escape); window.removeEventListener("resize", cancel); window.removeEventListener("blur", cancel); };
+    return () => { gesture.current = null; observer?.disconnect(); window.removeEventListener("keydown", escape); window.removeEventListener("resize", cancel); window.removeEventListener("blur", cancel); window.removeEventListener("scroll", cancel, true); };
   }, [props.scope, props.zoom, props.interaction?.mode, props.interaction?.disabled]);
 
   const rawPosition = (e: ReactPointerEvent, rect: DOMRect): Point => ({ x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height });

@@ -11,7 +11,7 @@ V3 fog brushing, V4 combined acceptance and aggregate G8/G9 remain open.
   Tap the scene to place it. Select/move mode supports dragging, or selecting a
   token then tapping its destination. Pan mode never changes token coordinates.
 - Pointer capture tracks a local preview. A completed gesture saves once; Escape,
-  touch cancellation, capture loss, resize/blur, changed scene revision or scoped
+  touch cancellation, capture loss, page scroll, resize/blur, changed scene revision or scoped
   actor/scene/background/offline remount discards unfinished input. Grabbing a
   token off-center preserves that offset. Focus capture does not scroll the scene.
 - Coordinates are bounded normalized positions computed from the actual transformed
@@ -30,13 +30,13 @@ The pre-implementation gesture suite had four failing tests (mouse/touch preview
 tap placement and pan); four cancellation checks initially passed vacuously because
 no gestures existed. Later regression cases independently failed before fixes for
 grab offset, protected-content removal after denied commands, scope-unmount read
-cleanup and scrolling focus. The completed suite exercises active gestures before
+cleanup and scrolling focus and scrolling during an active gesture. The completed suite exercises active gestures before
 cancelling them.
 
 | Check | Result |
 | --- | --- |
 | Frontend full suite before final feedback polish | 1,255 passed; the later focus test adds one case |
-| Final affected viewport/gesture/command/tray tests | 35 passed |
+| Final affected viewport/gesture/command/tray tests | 36 passed |
 | Backend unit suite | 489 passed, 10 database-dependent skipped |
 | Actual PostgreSQL scene/media integration | 31 passed (PostgreSQL 18.6 local fixture) |
 | Frontend typecheck and production build | Passed |

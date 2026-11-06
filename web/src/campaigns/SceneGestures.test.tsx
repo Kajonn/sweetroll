@@ -81,6 +81,13 @@ describe("scene pointer gestures", () => {
     s.pointer(s.region, "pointerDown", 200, 95); s.pointer(s.region, "pointerUp", 200, 95);
     expect(s.interaction.onMove).toHaveBeenCalledTimes(1);
   });
+  it("cancels when page scrolling changes the captured scene rectangle", () => {
+    const s = setup();
+    s.pointer(screen.getByRole("button", { name: "Token Alpha" }), "pointerDown", 75, 170);
+    s.pointer(s.region, "pointerMove", 200, 95); fireEvent.scroll(window);
+    s.pointer(s.region, "pointerUp", 200, 95);
+    expect(s.interaction.onMove).not.toHaveBeenCalled();
+  });
   it("cancels a gesture when the scene revision changes", () => {
     const s = setup();
     s.pointer(screen.getByRole("button", { name: "Token Alpha" }), "pointerDown", 75, 170);

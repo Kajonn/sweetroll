@@ -1,6 +1,6 @@
 # Complete the I7b/G8 visual scene controls
 
-Status: V1 accepted in PR #34; V2 accepted in PR #36 on application `84c23fd` with local and hosted mouse/touch acceptance passed. V3 implemented with local mouse/touch acceptance passed; isolated hosted verification in progress. V4 remains open.
+Status: V1 accepted in PR #34; V2 accepted in PR #36 on application `84c23fd` with local and hosted mouse/touch acceptance passed. V3 accepted in PR #37 on application `637a60f` with local and hosted mouse/touch verification passed. V4 remains open.
 Evidence: [V1 hosted/redeploy acceptance](../../acceptance/scene-image-tokens-2026-11-05.md).
 Updated 2026-11-05 after the owner's review of campaign scenes.
 Baseline inspected: `5e3d81f` on PR #33.
@@ -16,7 +16,7 @@ This completes already specified work; it does not introduce a full VTT.
 | --- | --- | --- |
 | Backgrounds | Upload, select, create/open and confirmed replacement; M3 accepted. | Reuse these controls and private campaign media. |
 | Tokens | V1: upload/select campaign art or use label-only tokens; centered art, normalized position/size, numeric placement/movement and nudges. | V2 direct placement/movement implemented and hosted accepted. |
-| Fog | V3: bounded mouse/touch painting, radius/draft preview, local stroke undo, explicit commit and conflict recovery; numeric precision retained. | Complete isolated hosted verification; combined V4 acceptance remains separate. |
+| Fog | V3: bounded mouse/touch painting, radius/draft preview, local stroke undo, explicit commit and conflict recovery; numeric precision retained. | V3 hosted verification passed; combined V4 acceptance remains separate. |
 | Restricted display | Paired access, server-redacted background and permitted art/labels/size; credential-only image reads and polling. V1 hosted/redeploy accepted. | V4 gesture/brush acceptance after V2/V3. |
 
 Inspect the existing `SceneViewport.tsx`, `TokenTray.tsx`, `FogToolbar.tsx`,
@@ -136,7 +136,9 @@ Conceal. Only committed permitted pixels appear on the paired display.
 V3 local exit passed on 2026-11-06: mouse and native emulated touch at
 360/768/1280px under zoom/pan, preview/undo isolation, Reveal/Conceal redacted
 pixels, real conflict and exact lost-response retry, keyboard, reopen, offline,
-background replacement and display revocation. Hosted verification is in progress.
+background replacement and display revocation. The final hosted journey passed
+in 80.1s with zero retries on application `637a60f`, SUCCESS deployment `483aa50c`.
+See [V3 evidence](../../acceptance/scene-fog-brush-2026-11-06.md).
 V4 combined ordered image-token + brush acceptance remains the next stage.
 
 ## V4 — Hosted acceptance and completion gate

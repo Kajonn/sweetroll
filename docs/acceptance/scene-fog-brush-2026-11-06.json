@@ -1,0 +1,104 @@
+{
+  "applicationCommit": "637a60f7b5718bc00a2a80c1df4cc566e4928aad",
+  "deployment": {
+    "id": "483aa50c-e6fe-42da-bcd4-9704f8457c7a",
+    "status": "SUCCESS",
+    "project": "sweetroll-d2-acceptance",
+    "environment": "preview",
+    "service": "sweetroll-d2"
+  },
+  "build": {
+    "target": "https://sweetroll-d2-preview.up.railway.app",
+    "health": "{\"status\":\"ok\"}",
+    "assets": [
+      {
+        "path": "/assets/index-DF3Bkxz_.css",
+        "sha256": "8d74655dc84143613f866c3f90298313a931a8f380e4c4b7927744f389421a55"
+      },
+      {
+        "path": "/assets/index-YVS7s7JI.js",
+        "sha256": "9c903a9a37aedea0883b040246b8b13d556abf599902ffa49a9aedd22db8e571"
+      }
+    ]
+  },
+  "hosted": {
+    "stats": {
+      "startTime": "2026-11-06T20:33:50.250Z",
+      "duration": 80085.826,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "errors": [],
+    "retries": 0
+  },
+  "local": {
+    "focusedTests": 50,
+    "frontendTests": 1276,
+    "postgresIntegrationTests": 30,
+    "browserJourneys": 3,
+    "browserRetries": 0,
+    "typecheck": "passed",
+    "build": "passed"
+  },
+  "coverage": {
+    "widths": [
+      360,
+      768,
+      1280
+    ],
+    "input": [
+      "mouse",
+      "native emulated CDP touch",
+      "keyboard"
+    ],
+    "checks": [
+      "zoom/pan normalization",
+      "radius and bounded draft preview",
+      "Undo and display draft isolation",
+      "Reveal then Conceal redacted pixels",
+      "real conflict with retained draft and explicit fresh-key retry",
+      "real committed lost-response exact retry without duplicate revision",
+      "keyboard numeric alternative",
+      "save/reopen",
+      "original route denied",
+      "axe",
+      "no horizontal overflow",
+      "offline/reconnect clears drafts",
+      "background replacement clears fog/tokens/draft",
+      "GUI revoke blanks display; actual projection 200 before and 404 after",
+      "cleanup archive readback"
+    ]
+  },
+  "screenshots": [
+    {
+      "path": "docs/acceptance/assets/scene-fog-brush-2026-11-06/fog-1280-mouse.png",
+      "sha256": "6b655e3a53410641184adf09fda28fb52722ac79d76272083aba30e7190e9e90"
+    },
+    {
+      "path": "docs/acceptance/assets/scene-fog-brush-2026-11-06/fog-1280-touch.png",
+      "sha256": "0e543b943f8cebbeb9dba44cdd37373fd311a17ffc2ecd42fd491e70039ac94c"
+    },
+    {
+      "path": "docs/acceptance/assets/scene-fog-brush-2026-11-06/fog-360-mouse.png",
+      "sha256": "d806e784c7fd75c68cf5a41459152b7fdd02b11683241d1f4e54fe765f1d3a0a"
+    },
+    {
+      "path": "docs/acceptance/assets/scene-fog-brush-2026-11-06/fog-360-touch.png",
+      "sha256": "8815af4b21a5a96f6e00f2b5d29bed1270d27bcf76d5e7542b4e7e962c269219"
+    },
+    {
+      "path": "docs/acceptance/assets/scene-fog-brush-2026-11-06/fog-768-mouse.png",
+      "sha256": "62ed20663b23bbd67354b056c1aa0bba55d74a9d08bcdc09177f7301693cf1b5"
+    },
+    {
+      "path": "docs/acceptance/assets/scene-fog-brush-2026-11-06/fog-768-touch.png",
+      "sha256": "ec757f74a1fd1af27eff3e624a22878cc16db4b531c21ee92a175376c6e0bd06"
+    }
+  ],
+  "limitations": [
+    "V4 combined ordered image-token and brush journey remains open",
+    "No physical device, real provider login, human approval or table/remote playtest claimed"
+  ]
+}

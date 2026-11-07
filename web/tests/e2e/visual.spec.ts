@@ -212,25 +212,42 @@ test.describe("visual: sheet preview", () => {
           // Chromium rounds that crop independently of text painting, producing
           // the observed whole-frame one-pixel shift. Align only the capture
           // fixture to integer pixels after the real layout/overlap assertions.
-          const capture = await frame.evaluate((element) => {
-            const bounds = element.getBoundingClientRect();
-            const previousTransform = element.style.transform;
-            const x = Math.ceil(bounds.x), y = Math.ceil(bounds.y);
-            element.style.transform = `translate(${x - bounds.x}px, ${y - bounds.y}px)`;
-            return { x, y, previousTransform };
-          });
+          // Late layout work (font swap, scroll settling, a re-render) can move
+          // the frame after the translate is applied, leaving it off-grid.
+          // Wait for fonts and two stable animation frames, then re-align and
+          // verify until the aligned origin holds.
+          await page.evaluate(() => document.fonts.ready.then(() => undefined));
+          const previousTransform = await frame.evaluate((element) => element.style.transform);
+          let capture = { x: 0, y: 0 };
           try {
-            const aligned = await frame.boundingBox();
-            expect(aligned).not.toBeNull();
-            expect(aligned!.x).toBeCloseTo(capture.x, 6);
-            expect(aligned!.y).toBeCloseTo(capture.y, 6);
+            await expect(async () => {
+              capture = await frame.evaluate(async (element, previous) => {
+                element.style.transform = previous;
+                const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+                let bounds = element.getBoundingClientRect();
+                for (;;) {
+                  await nextFrame();
+                  await nextFrame();
+                  const settled = element.getBoundingClientRect();
+                  if (settled.x === bounds.x && settled.y === bounds.y) break;
+                  bounds = settled;
+                }
+                const x = Math.ceil(bounds.x), y = Math.ceil(bounds.y);
+                element.style.transform = `translate(${x - bounds.x}px, ${y - bounds.y}px)`;
+                return { x, y };
+              }, previousTransform);
+              const aligned = await frame.boundingBox();
+              expect(aligned).not.toBeNull();
+              expect(aligned!.x).toBeCloseTo(capture.x, 6);
+              expect(aligned!.y).toBeCloseTo(capture.y, 6);
+            }).toPass({ timeout: 5_000 });
             await expect(page).toHaveScreenshot(`sheet-preview-${width}.png`, {
               // The retained baseline includes one pixel of context above the frame.
               clip: { x: capture.x, y: capture.y - 1, width: 276, height: 610 },
               maxDiffPixels: 700,
             });
           } finally {
-            await frame.evaluate((element, previous) => { element.style.transform = previous; }, capture.previousTransform);
+            await frame.evaluate((element, previous) => { element.style.transform = previous; }, previousTransform);
           }
         } else {
           await expect(frame).toHaveScreenshot(`sheet-preview-${width}.png`);

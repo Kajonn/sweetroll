@@ -201,6 +201,11 @@ function environmentFor(owner: ExpressionOwner | undefined, base: SystemPackageV
   if (owner === undefined) return { fields: {}, inputs: {} };
   const templateFields = entityFieldTypes(owner.template.fields);
   if (owner.kind === "computed") return { fields: templateFields, inputs: {} };
+  // Granted rolls see stored entry values only: the entry runtime scope
+  // (`grantedFieldScope`) never evaluates computed template fields.
+  for (const field of owner.template.fields) {
+    if (field.kind === "computed") delete templateFields[field.id];
+  }
   const fields: Record<string, ValueType> = {
     ...grantedEntityFieldsForKind(base, owner.template.kind),
     ...templateFields,

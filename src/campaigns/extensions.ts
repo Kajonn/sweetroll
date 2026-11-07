@@ -227,11 +227,15 @@ export function createCampaignExtensionCommands(deps: {
         return { ok: false, error: fail("bad_request", "extensionId and versionId must be UUIDs.") };
       }
       const inputHash = hashInput({ campaignId: input.campaignId, extensionId: input.extensionId, versionId: input.versionId, expectedCampaignRevision: input.expectedCampaignRevision });
+      // Decision X2: the GM must be allowed to use the extension. Authorized
+      // before the transaction: the authorizer reads through the pool, and
+      // waiting for a second connection while holding one can exhaust it.
+      const use = deps.authorizeExtensionUse === undefined
+        ? null
+        : await deps.authorizeExtensionUse(ctx, input.versionId).catch(() => null);
       return command(ctx, ADD_KIND, input, inputHash, async (client, campaign) => {
-        // Decision X2: the GM must be allowed to use the extension, and it must
-        // extend the campaign's own system.
-        if (deps.authorizeExtensionUse === undefined) return notFound();
-        const use = await deps.authorizeExtensionUse(ctx, input.versionId);
+        // It must also extend the campaign's own system.
+        if (use === null) return notFound();
         const base = await client.query<{ system_id: string }>("SELECT system_id FROM system_versions WHERE id = $1", [campaign.systemVersionId]);
         if (!use.ok || use.value.extensionId !== input.extensionId || use.value.baseSystemId !== base.rows[0]?.system_id) return notFound();
         const current = await loadCampaignExtensions(client, campaign.campaignId);

@@ -110,6 +110,15 @@ describe("compileExtensionDocument", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("does not let a granted roll read a computed template field the entry runtime cannot supply", () => {
+    const document = extensionDocument();
+    document.expressions[0]!.source = "d20 + fields.edge_total";
+    const result = compileExtensionDocument(document, basePackage(), { extensionId: EXT_A, versionId: EXT_A, semanticVersion: "1.0.0" });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.diagnostics[0]).toMatchObject({ code: "missing_reference", path: "/expressions/0" });
+  });
+
   it("warns when no base sheet slot accepts a template kind", () => {
     const document = extensionDocument();
     document.templates[0]!.kind = "spell";

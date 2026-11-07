@@ -713,6 +713,7 @@ caller. Hosted acceptance still depends on real provider sign-in.
 - Responsive visual regression at 360 and 1280 px for platform UI primitives and reference systems.
 - Browser journeys run in isolated, ephemeral databases and may be sharded across CI jobs; the visual suite remains isolated from journeys. Ordinary UI waits fail within 15 seconds, complete journeys within two minutes, and the browser job within ten minutes so broken selectors cannot serialize into long CI stalls.
 - Load and soak tests shaped like session bursts: many resource updates, rolls, and views in a short window.
+- Replay scripted, multi-account API sessions with the [scenario runner](tests/integration/scenarios/README.md). Each run gets a fresh PostgreSQL schema, scoped credentials, and a request timeline for diagnosing failures.
 
 ## 16.2 Reference systems
 

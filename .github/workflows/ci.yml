@@ -145,6 +145,7 @@ jobs:
       DATABASE_URL: postgres://sweetroll:sweetroll@localhost:5432/sweetroll_offline
       AUTHORITATIVE_ROLL_SECRET: development-only-roll-secret-32-bytes
       SWEETROLL_TEST_AUTH: "1"
+      SWEETROLL_E2E_EPHEMERAL_DB: "1"
       CI: "1"
     steps:
       - uses: actions/checkout@v4

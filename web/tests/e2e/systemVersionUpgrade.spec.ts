@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "../fixtures/browserTest";
 
 import { createCatalogCampaign } from "../fixtures/campaignTemplates.js";
 import { json, key } from "../fixtures/configurablePush.js";

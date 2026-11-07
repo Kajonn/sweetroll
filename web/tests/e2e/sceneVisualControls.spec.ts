@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../fixtures/browserTest";
 import AxeBuilder from "@axe-core/playwright";
 
 async function json(page: Page, method: string, path: string, data?: unknown) {

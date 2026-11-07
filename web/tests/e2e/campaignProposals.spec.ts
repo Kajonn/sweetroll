@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { test } from "../fixtures/browserTest";
 import { campaignProposalJourney } from "../fixtures/campaignProposals.js";
 test("private player suggestions, atomic GM publication and exact-request recovery", async ({
   browser,

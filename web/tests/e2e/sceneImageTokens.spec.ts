@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import sharp from "sharp";
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../fixtures/browserTest";
 import AxeBuilder from "@axe-core/playwright";
 
 const retainedFixture = process.env.SCENE_TOKEN_FIXTURE;

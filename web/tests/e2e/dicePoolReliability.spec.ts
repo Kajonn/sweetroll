@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "../fixtures/browserTest";
 import type { SystemDocumentV1 } from "../../../src/systems/implementation/package/schema/index.js";
 import { uid } from "../offline/test-auth.js";
 

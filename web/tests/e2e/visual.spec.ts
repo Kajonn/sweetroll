@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../fixtures/browserTest";
 
 // Visual regression baselines at 360 (mobile) and 1280 (desktop) px.
 // Baselines land under web/tests/visual/__screenshots__/ (configured in

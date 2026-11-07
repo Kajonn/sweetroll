@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { test } from "../fixtures/browserTest";
 import { campaignTemplateJourney, campaignTemplateReviewJourney } from "../fixtures/campaignTemplates.js";
 test("campaign choice survives offline reload and reconnect, while racing archive requires review", async ({
   browser,

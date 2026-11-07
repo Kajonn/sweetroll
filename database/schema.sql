@@ -541,7 +541,9 @@ CREATE TABLE campaign_activity_events (
     'template_create',
     'template_update',
     'template_archive',
-    'template_recover'
+    'template_recover',
+    'system_version_upgraded',
+    'system_version_reverted'
   ))
 );
 

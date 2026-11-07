@@ -37,6 +37,10 @@ export function activityKindLabel(kind: CampaignActivityEvent["kind"]): string {
       return t("campaign.detail.activity.kind.content_grants_replaced");
     case "roll_executed":
       return t("campaign.detail.activity.kind.roll_executed");
+    case "system_version_upgraded":
+      return t("campaign.activity.system_version_upgraded");
+    case "system_version_reverted":
+      return t("campaign.activity.system_version_reverted");
   }
 }
 

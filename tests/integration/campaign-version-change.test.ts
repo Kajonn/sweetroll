@@ -198,6 +198,10 @@ db("campaign system version upgrade and revert", () => {
     // Placement works again at the new version.
     value(await place(await openCharacter(unarmed.characterId), rebased));
 
+    // Players see the rules change in the campaign feed.
+    const feed = value(await h.campaigns.listActivity(ctxFor(h.users.player), { campaignId }));
+    expect(feed.events[0]).toMatchObject({ kind: "system_version_upgraded", actorId: h.users.gm.actorId });
+
     const afterOptions = await h.app.inject({ method: "GET", url: `/campaigns/${campaignId}/version-options`, headers: gmHeaders() });
     expect(afterOptions.json().options.revertTo.versionId).toBe(h.versionId);
     const reverted = await change(campaignId, h.versionId, before + 1);

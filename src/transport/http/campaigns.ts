@@ -257,6 +257,8 @@ const ActivityEventDto = Type.Object({
     Type.Literal("content_recovered"),
     Type.Literal("content_grants_replaced"),
     Type.Literal("roll_executed"),
+    Type.Literal("system_version_upgraded"),
+    Type.Literal("system_version_reverted"),
   ]),
   actorId: Type.String({ format: UUID_FORMAT }),
   sourceContentId: Type.Union([Type.String({ format: UUID_FORMAT }), Type.Null()]),

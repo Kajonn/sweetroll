@@ -94258,6 +94258,14 @@
                               {
                                 "const": "roll_executed",
                                 "type": "string"
+                              },
+                              {
+                                "const": "system_version_upgraded",
+                                "type": "string"
+                              },
+                              {
+                                "const": "system_version_reverted",
+                                "type": "string"
                               }
                             ]
                           },
@@ -95244,6 +95252,14 @@
                                   },
                                   {
                                     "const": "roll_executed",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "system_version_upgraded",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "system_version_reverted",
                                     "type": "string"
                                   }
                                 ]

@@ -194,3 +194,10 @@ export type RedeemedDisplay = RedeemDisplayResponse["display"];
 /** JSON data of each `event: scene` message on the display's scene stream. */
 export type DisplayProjection =
   operations["get_displays_id_scenes_sceneId_events"]["responses"]["200"]["content"]["text/event-stream"];
+
+// Design 6.7: campaign rules-version upgrade and revert.
+export type CampaignVersionOptionsResponse = operations["get_campaigns_id_version_options"]["responses"]["200"]["content"]["application/json"];
+export type CampaignVersionCheckResponse = operations["get_campaigns_id_version_check"]["responses"]["200"]["content"]["application/json"];
+export type CampaignVersionCheck = CampaignVersionCheckResponse["check"];
+export type ChangeCampaignVersionBody = NonNullable<operations["post_campaigns_id_version"]["requestBody"]>["content"]["application/json"];
+export type ChangeCampaignVersionResponse = operations["post_campaigns_id_version"]["responses"]["200"]["content"]["application/json"];

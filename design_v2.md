@@ -325,7 +325,11 @@ templates, re-verifies them and writes the campaign pin, each character and a ne
 template content revision with the re-pinned base in one transaction. A campaign
 records `previous_system_version_id` like a character. A blocked change returns 409,
 and activity records `system_version_upgraded` or `system_version_reverted` with
-version and definition identifiers only. The [system version upgrade plan](docs/superpowers/plans/2026-11-07-system-version-upgrades.md)
+version and definition identifiers only; the campaign feed shows the same kinds to
+all members. In the GUI, **Rules version** sits in the character tools (standalone
+characters) and in campaign Settings (GM/co-GM). Both run the check before offering
+**Upgrade** or **Revert**, and the character change uses the session's durable
+online-attempt ordering like archive/recover. The [system version upgrade plan](docs/superpowers/plans/2026-11-07-system-version-upgrades.md)
 defines the delivery stages.
 
 Character activity uses readable action names and local date/time formatting.

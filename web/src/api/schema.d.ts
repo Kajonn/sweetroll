@@ -26418,7 +26418,7 @@ export interface operations {
                         events: {
                             /** Format: uuid */
                             eventId: string;
-                            kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed";
+                            kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted";
                             /** Format: uuid */
                             actorId: string;
                             sourceContentId: string | null;
@@ -26640,7 +26640,7 @@ export interface operations {
                             activity: {
                                 /** Format: uuid */
                                 eventId: string;
-                                kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed";
+                                kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted";
                                 /** Format: uuid */
                                 actorId: string;
                                 sourceContentId: string | null;

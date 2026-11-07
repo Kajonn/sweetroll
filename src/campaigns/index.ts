@@ -1509,6 +1509,15 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
             summary: `Campaign rules version ${direction.value === "upgrade" ? "upgraded" : "reverted"} with ${plan.characters.length} character(s) and ${plan.templates.length} template base(s)`,
             requestId: ctx.requestId,
           });
+          await repo.appendActivity(client, {
+            eventId: newId(),
+            campaignId: campaign.campaignId,
+            actorId: ctx.actorId,
+            kind: direction.value === "upgrade" ? "system_version_upgraded" : "system_version_reverted",
+            sourceContentId: null,
+            requestId: ctx.requestId,
+            occurredAt: now(),
+          });
           const value = toView(updated);
           const inserted = await repo.tryInsertReceipt(client, {
             actorId: ctx.actorId,

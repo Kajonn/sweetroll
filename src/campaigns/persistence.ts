@@ -61,7 +61,9 @@ export type ActivityEventKind =
   | "content_deleted"
   | "content_recovered"
   | "content_grants_replaced"
-  | "roll_executed";
+  | "roll_executed"
+  | "system_version_upgraded"
+  | "system_version_reverted";
 
 export type ActivityEventRecord = {
   eventId: string;
@@ -444,6 +446,8 @@ function toActivityEventRecord(row: ActivityEventRow): ActivityEventRecord {
     case "content_recovered":
     case "content_grants_replaced":
     case "roll_executed":
+    case "system_version_upgraded":
+    case "system_version_reverted":
       break;
     default:
       throw new Error(`Unknown activity kind: ${row.kind}`);

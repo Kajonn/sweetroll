@@ -1424,6 +1424,25 @@ describe("CharacterSession online operations", () => {
     await store.close();
   });
 
+  it("changes the rules version through POST with the confirmed revision and adopts the new pin", async () => {
+    const target = "11111111-1111-4000-8000-0000000000aa";
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { systemVersionId: target })));
+    await session.changeVersion(target);
+    expect(api.sent).toHaveLength(1);
+    expect(api.sent[0]?.method).toBe("POST");
+    expect(api.sent[0]?.path).toBe("/characters/char-1/version");
+    expect(api.sent[0]?.body).toMatchObject({ targetVersionId: target, expectedRevision: 3 });
+    expect(typeof api.sent[0]?.body.idempotencyKey).toBe("string");
+    expect(session.getSnapshot().confirmed?.systemVersionId).toBe(target);
+    expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+    session.dispose();
+    await store.close();
+  });
+
   it("recovers an archived character through PATCH", async () => {
     const { api, store, session } = await makeHarness();
     api.scriptOpenView(viewFor("char-1", 4, { lifecycle: "archived" }));

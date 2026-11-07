@@ -120,18 +120,38 @@ columns are added to the current schema baseline.
   `system_version_reverted` there in stage 4. Audit and per-character activity
   are recorded now.
 
-## Stage 4 — GUI
+## Stage 4 — GUI — done
 
-- [ ] Character sheet menu and campaign settings: **Rules version** shows the
-  current version, compatible later versions (publication date, short ID, release
-  notes) and **Revert to …** when available. The preview lists added and dropped
-  fields, changed items in this character's inventory and blockers in plain
-  language; confirm commits.
-- [ ] Standalone adoption into a campaign on a newer version offers the upgrade
-  first.
-- [ ] e2e at 360/1280 px: author publishes an additive version with a changed
-  item stat, owner upgrades, the sheet shows the new stat and a roll uses it,
-  owner reverts and the old stat returns with current values kept.
+- [x] Character tools: **Rules version** (standalone characters the actor may
+  edit; hidden for campaign characters and read-only tabs) opens a dialog with
+  the current version, the revert target and later versions (semantic version,
+  publication date, release notes). Choosing one runs the server check; the
+  preview (`VersionReportSummary`) lists blockers first, then added and dropped
+  fields, per-item updated/kept/added/removed stats and art, error messages after
+  the change and how many other rule changes do not affect the character.
+  **Upgrade**/**Revert** stays disabled until the check passes and while edits
+  are pending, the tab is offline or the character is archived.
+- [x] The change goes through the character session as a durable online attempt
+  (`kind: "version"`, `POST /characters/:id/version`) with the same ordering,
+  replay and review rules as archive/recover. The POST answers 409 (not 404) for
+  a target that is no longer available, so the session never reads it as a lost
+  character.
+- [x] Campaign Settings (GM/co-GM): **Rules version** panel with the same choices;
+  the check shows every character's summary and blocked campaign items; the
+  change asks for confirmation and sends the current campaign revision with a
+  fresh key.
+- [x] Campaign activity feed: `system_version_upgraded` /
+  `system_version_reverted` (schema CHECK, API enum, web labels), visible to all
+  members.
+- [x] Adoption: the dialog still lists only characters at the campaign's exact
+  version and now tells owners to upgrade older characters with Rules version
+  first (character summaries carry no system ID, so mismatched characters are
+  not listed individually).
+- [x] Tests: `VersionDialog.test.tsx`, campaign settings rules-version tests,
+  session request test, and e2e `tests/e2e/systemVersionUpgrade.spec.ts` (player
+  upgrade with the new item stat, revert with the old stat back, GM campaign
+  upgrade, no horizontal scroll at 360/1280 px). The e2e journey passed locally
+  against a fresh database; it does not roll dice after the upgrade.
 
 ## Out of scope
 

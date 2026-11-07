@@ -9,6 +9,7 @@ import { captureOpener, focusFirst, restoreOpener, trapTabKey } from "./dialogTr
 import type { CharacterSession } from "./session.js";
 import type { ActivityEvent } from "./types.js";
 import styles from "./characters.module.css";
+import { VersionDialog } from "./VersionDialog.js";
 
 export type CharacterToolsProps = {
   characterId: string;
@@ -16,7 +17,7 @@ export type CharacterToolsProps = {
   session: CharacterSession;
 };
 
-type DialogKind = "activity" | "archive" | "recover" | "export" | null;
+type DialogKind = "activity" | "archive" | "recover" | "export" | "version" | null;
 
 function useSnapshot(session: CharacterSession) {
   const [snapshot, setSnapshot] = useState(() => session.getSnapshot());
@@ -42,6 +43,12 @@ export function CharacterTools({ characterId, api, session }: CharacterToolsProp
   const manageBlocked = blocked || uncertain || readOnly || offline;
   const lifecycle = snapshot.confirmed?.lifecycle ?? "active";
   const [dialog, setDialog] = useState<DialogKind>(null);
+  // Design 6.7: standalone characters change rules version here; attached
+  // characters move with their campaign.
+  const versionApi = api.versionOptions !== undefined && api.versionCheck !== undefined
+    ? { versionOptions: api.versionOptions, versionCheck: api.versionCheck }
+    : null;
+  const standalone = (snapshot.confirmed?.campaignId ?? null) === null;
   const openerRef = useRef<Element | null>(null);
 
   const openDialog = (kind: Exclude<DialogKind, null>) => {
@@ -67,6 +74,11 @@ export function CharacterTools({ characterId, api, session }: CharacterToolsProp
       <Button type="button" variant="primary" disabled={blocked} onClick={() => openDialog("export")}>
         {t("character.tools.export")}
       </Button>
+      {versionApi !== null && standalone && !readOnly ? (
+        <Button type="button" variant="primary" disabled={manageBlocked || lifecycle === "archived"} onClick={() => openDialog("version")}>
+          {t("version.open")}
+        </Button>
+      ) : null}
       {lifecycle === "archived" ? <p>{t("character.tools.archivedReadOnly")}</p> : null}
       {dialog === "activity" ? (
         <ActivityDialog characterId={characterId} api={api} session={session} onClose={closeDialog} />
@@ -96,6 +108,15 @@ export function CharacterTools({ characterId, api, session }: CharacterToolsProp
             // Refresh and freeze before initiating the online-only operation.
             await session.recover();
           }}
+          onClose={closeDialog}
+        />
+      ) : null}
+      {dialog === "version" && versionApi !== null ? (
+        <VersionDialog
+          characterId={characterId}
+          api={versionApi}
+          session={session}
+          blocked={manageBlocked || lifecycle === "archived"}
           onClose={closeDialog}
         />
       ) : null}
@@ -166,6 +187,7 @@ function ActivityRow({ event,api,session,snapshot }: { event: ActivityEvent;api:
     "character_exported", "character_campaign_created", "character_adopted",
     "character_controllers_assigned", "character_claimed", "character_ownership_transferred",
     "entry_added", "entry_removed", "entry_updated",
+    "system_version_upgraded", "system_version_reverted",
   ]);
   const label = knownKinds.has(event.kind)
     ? t(`character.activity.${event.kind}`)

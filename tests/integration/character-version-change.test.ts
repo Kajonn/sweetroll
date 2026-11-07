@@ -306,7 +306,7 @@ describeWithDatabase("character system version upgrade and revert", () => {
 
       // v1 is older and was never this character's previous version.
       expect((await check(app, ada, created.characterId, v1)).statusCode).toBe(404);
-      expect((await change(app, ada, created.characterId, v1, created.revision)).statusCode).toBe(404);
+      expect((await change(app, ada, created.characterId, v1, created.revision)).statusCode).toBe(409);
       expect((await check(app, ada, created.characterId, foreign)).statusCode).toBe(404);
       expect((await check(app, ada, created.characterId, v2)).statusCode).toBe(422);
     } finally {

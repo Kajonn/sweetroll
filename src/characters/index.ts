@@ -1402,6 +1402,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     const planned = await planVersionChange(ctx, record, command.targetVersionId);
     if (!planned.ok) {
       if (planned.error.code === "internal") return planned;
+      // A command must not read as "character not found" to the client
+      // session; an unavailable target is a conflict with current state.
+      if (planned.error.code === "not_found") {
+        return finish({ code: "conflict", message: planned.error.message, latestRevision: record.revision, cacheDisposition: "retain" });
+      }
       return finish(planned.error);
     }
     const { direction, report } = planned.value;

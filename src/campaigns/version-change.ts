@@ -11,6 +11,7 @@ import type { VersionChangeBlocker } from "../systems/implementation/runtime/ver
 import type { RuntimeStateV1 } from "../systems/runtime.js";
 import type { CampaignTemplateView, TemplateContent } from "./templates.js";
 import type { createTemplateRepository } from "./templatePersistence.js";
+import { repinEntryImages } from "../characters/persistence.js";
 
 /**
  * Design 6.7 campaign path (plan stage 3). A campaign, its attached characters
@@ -164,6 +165,12 @@ export async function applyCampaignVersionPlan(
     );
     const revision = updated.rows[0]?.revision;
     if (revision === undefined) throw new Error("applyCampaignVersionPlan: character changed under lock");
+    await repinEntryImages(
+      client,
+      character.characterId,
+      character.nextState.entries ?? {},
+      character.report.changedEntries.filter((entry) => entry.imageUpdated).map((entry) => entry.entryId),
+    );
     await client.query(
       `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, request_id, scope_campaign_id)
        VALUES ($1, $2, $3, $4::jsonb, $5, $6)`,

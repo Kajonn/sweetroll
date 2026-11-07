@@ -1451,6 +1451,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         toVersionId: command.targetVersionId,
         previousVersionId: direction === "upgrade" ? record.systemVersionId : null,
         nextState,
+        repinEntryIds: report.changedEntries.filter((entry) => entry.imageUpdated).map((entry) => entry.entryId),
       },
       activity: { kind: activityKind, payloadJson: payload, requestId: ctx.requestId },
       audit: {

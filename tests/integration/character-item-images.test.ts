@@ -39,6 +39,24 @@ db("M2 retained character entry images", () => {
     const r = await h.characters.apply(ctxFor(h.users.player), { kind: "addEntry", characterId: ch.characterId, expectedRevision: ch.revision, idempotencyKey: randomUUID(), entry: { entryId, slotId: "inventory", templateId: "sword", values: {} } });
     if (!r.ok) throw new Error(JSON.stringify(r.error)); return { ch: r.value.character, entryId };
   }
+  it("moves the art pin with a rules version change and back on revert", async () => {
+    // Placed at the version without art, then upgraded to the version that adds it.
+    const ch = await hero(h.versionId), entryId = randomUUID();
+    const placed = await h.characters.apply(ctxFor(h.users.player), { kind: "addEntry", characterId: ch.characterId, expectedRevision: ch.revision, idempotencyKey: randomUUID(), entry: { entryId, slotId: "inventory", templateId: "sword", values: {} } });
+    if (!placed.ok) throw new Error(JSON.stringify(placed.error));
+    const url = `/characters/${ch.characterId}/entries/${entryId}/image`;
+    expect((await request("player", "GET", url)).json().image).toBeNull();
+    const upgraded = await h.characters.manage(ctxFor(h.users.player), { kind: "changeVersion", characterId: ch.characterId, targetVersionId: artVersion, expectedRevision: placed.value.character.revision, idempotencyKey: randomUUID() });
+    if (!upgraded.ok) throw new Error(JSON.stringify(upgraded.error));
+    expect(upgraded.value.character.state.entries![entryId]!.image).toEqual(systemArt.image);
+    expect((await request("player", "GET", url)).json().image).toEqual(systemArt.image);
+    expect((await request("player", "GET", `${url}/${systemArt.image.fileId}`)).statusCode).toBe(200);
+    const reverted = await h.characters.manage(ctxFor(h.users.player), { kind: "changeVersion", characterId: ch.characterId, targetVersionId: h.versionId, expectedRevision: upgraded.value.character.revision, idempotencyKey: randomUUID() });
+    if (!reverted.ok) throw new Error(JSON.stringify(reverted.error));
+    expect((await request("player", "GET", url)).json().image).toBeNull();
+    expect((await request("player", "GET", `${url}/${systemArt.image.fileId}`)).statusCode).toBe(404);
+  });
+
   it("rejects a duplicate whose rules snapshot changed before its retained art is copied", async () => {
     const { ch } = await sword();
     let entered!: () => void;

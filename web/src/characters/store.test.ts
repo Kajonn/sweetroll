@@ -140,6 +140,7 @@ function makeView(characterId: string, revision: number): CharacterView {
     returnOwnerId: null,
     name: "Aria",
     systemVersionId: "11111111-1111-4000-8000-000000000000",
+    extensions: [],
     entityDefinitionId: "hero",
     revision,
     lifecycle: "active",

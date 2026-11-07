@@ -37,7 +37,11 @@ it("creates and revokes a scoped API token and only shows its secret on creation
   fireEvent.change(screen.getByRole("textbox", { name: "Token label" }), { target: { value: "My script" } });
   fireEvent.click(screen.getByRole("checkbox", { name: "Read systems" }));
   fireEvent.click(screen.getByRole("checkbox", { name: "Read campaigns" }));
-  fireEvent.click(screen.getByRole("checkbox", { name: "Write campaigns" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Read and write campaigns" }));
+  // Write includes read: the read box shows as included and cannot be cleared.
+  expect(screen.getByRole("checkbox", { name: /^Read campaigns/ })).toBeChecked();
+  expect(screen.getByRole("checkbox", { name: /^Read campaigns/ })).toBeDisabled();
+  expect(screen.getByRole("checkbox", { name: "Read characters" })).not.toBeChecked();
   fireEvent.click(screen.getByRole("button", { name: "Create token" }));
   expect(await screen.findByDisplayValue(secret)).toBeVisible();
   expect(fetch).toHaveBeenCalledWith("POST", "/me/personal-tokens", {

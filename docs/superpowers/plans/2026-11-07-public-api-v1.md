@@ -90,8 +90,11 @@ are in place. Its hosted journey is pending.
 
 - Commands that change both a character and its campaign need both write
   scopes. These are campaign character creation, assign, claim and adopt.
-  They return the resulting sheet, so they also need `characters:read`
-  (review fix 2026-11-07, PR #44).
+- A write scope includes read for the same area (owner decision 2026-11-07,
+  PR #44): write commands return the resulting state, so a write-only token
+  could never be kept from reading. The check applies this; stored scopes are
+  unchanged, and Account → API tokens shows read as included when write is
+  selected. Read never implies write.
 - Reading a campaign character's sheet needs only `characters:read`; the
   existing GM-visibility and owner-only-notes policy still applies.
 - Update the `personal_access_tokens.scopes` CHECK in the schema baseline. No
@@ -150,9 +153,9 @@ explicit public schemas, never copies of browser DTOs.
 
 | Method and path | Purpose | Scope |
 |---|---|---|
-| `GET/POST /campaigns/{campaignId}/characters` | List attached characters; create a campaign character | `campaigns:read` / `campaigns:write` + `characters:write` + `characters:read` |
+| `GET/POST /campaigns/{campaignId}/characters` | List attached characters; create a campaign character | `campaigns:read` / `campaigns:write` + `characters:write` |
 | `GET /campaigns/{campaignId}/claimable-characters` | Claim discovery | `campaigns:read` |
-| `POST /campaigns/{campaignId}/characters/{characterId}/assign`, `/claim`, `/adopt` | Placement commands | `campaigns:write` + `characters:write` + `characters:read` |
+| `POST /campaigns/{campaignId}/characters/{characterId}/assign`, `/claim`, `/adopt` | Placement commands | `campaigns:write` + `characters:write` |
 | `GET/POST /campaigns/{campaignId}/content`; `GET/PATCH/DELETE /content/{contentId}`; `POST /content/{contentId}/grants`, `/recover` | Campaign content with audiences and grants | `campaigns:read` / `campaigns:write` |
 | `POST /campaigns/{campaignId}/content-preview` | GM preview as a member | `campaigns:read` |
 | `GET/POST /campaigns/{campaignId}/item-templates`; `GET .../bases`; `POST .../item-template-preview` | Template catalog and creation | `campaigns:read` / `campaigns:write` |

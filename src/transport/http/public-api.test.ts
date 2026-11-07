@@ -53,7 +53,7 @@ describe.each([false, true])("public API with combined deployment = %s", (combin
         }
       }
       expect(paths["/campaigns/{campaignId}/characters/{characterId}/claim"]?.post?.["x-required-scopes"])
-        .toEqual(["campaigns:write", "characters:write", "characters:read"]);
+        .toEqual(["campaigns:write", "characters:write"]);
 
       const denied = await app.inject({ url: "/api/v1/systems", headers: { cookie: "session=existing" } });
       expect(denied.statusCode).toBe(401);

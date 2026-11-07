@@ -6,7 +6,7 @@ import type { Pool } from "pg";
 import type { CampaignError } from "../../../campaigns/index.js";
 import type { CharacterError } from "../../../characters/index.js";
 import type { Identity } from "../../../identity/index.js";
-import type { PersonalTokenScope } from "../../../identity/personal-tokens.js";
+import { grantsScope, type PersonalTokenScope } from "../../../identity/personal-tokens.js";
 import type { ImageAttachmentError } from "../../../platform/image-attachment.js";
 import type { AppError, RequestContext } from "../../../systems/authoring.js";
 import { PACKAGE_LIMITS } from "../../../systems/implementation/package/limits.js";
@@ -201,7 +201,7 @@ export function createRouter({ app, identity, pool, outputSchemas }: RouterInput
           reply.header("www-authenticate", "Bearer");
           return failure(reply, request.id, 401, "unauthorized", "A valid bearer token is required.");
         }
-        if (!scopes.every((scope) => credential.scopes.includes(scope))) {
+        if (!scopes.every((scope) => grantsScope(credential.scopes, scope))) {
           return failure(reply, request.id, 403, "insufficient_scope", "The token lacks the required scope.");
         }
         if (!await consumeRequest(pool, credential.actorId, "general")

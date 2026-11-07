@@ -731,7 +731,8 @@ wire contract and retry windows.
 is implemented for local testing. Scopes are `systems:*`, `characters:*` and
 `campaigns:read`/`campaigns:write`; commands that change both a character and
 its campaign (campaign character creation, assign, claim and adopt) need both
-write scopes. Tokens hold up to six scopes, and earlier four-scope tokens keep
+write scopes. A write scope includes read for the same area (owner decision
+2026-11-07); read never implies write. Tokens hold up to six scopes, and earlier four-scope tokens keep
 their scopes. Uploads share an `upload` quota of 30 per minute. Binary art and
 media reads accept Bearer tokens and are `private, no-store`. Each successful
 v1 command writes an audit log line with operation, account and request ID,

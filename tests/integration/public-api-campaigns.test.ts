@@ -206,9 +206,17 @@ describe.skipIf(!databaseUrl)("public API v1 campaigns, play and scenes", () => 
     expect((await call(tokens.noCharacters, "POST", `/campaigns/${campaign.campaignId}/characters`, {
       name: "Blocked", entityDefinitionId: "character", expectedCampaignRevision: campaign.revision, idempotencyKey: randomUUID(),
     })).json()).toMatchObject({ error: { code: "insufficient_scope" } });
-    // Placement returns the sheet, so write-only tokens cannot use it to read sheets.
-    expect((await call(tokens.writeOnly, "POST", `/campaigns/${campaign.campaignId}/characters`, {
+    // A write scope includes read for its area (owner decision 2026-11-07).
+    expect((await call(tokens.writeOnly, "GET", `/campaigns/${campaign.campaignId}`)).statusCode).toBe(200);
+    const placed = await call(tokens.writeOnly, "POST", `/campaigns/${campaign.campaignId}/characters`, {
       name: "Write only", entityDefinitionId: "character", expectedCampaignRevision: campaign.revision, idempotencyKey: randomUUID(),
+    });
+    expect(placed.statusCode, placed.body).toBe(201);
+    const characterId = placed.json().characterId as string;
+    expect((await call(tokens.writeOnly, "GET", `/characters/${characterId}`)).statusCode).toBe(200);
+    // Read never implies write.
+    expect((await call(tokens.readOnly, "PATCH", `/characters/${characterId}`, {
+      command: "rename", name: "Nope", expectedRevision: 1, idempotencyKey: randomUUID(),
     })).json()).toMatchObject({ error: { code: "insufficient_scope" } });
 
     const unauthenticated = await h.app.inject(`/api/v1/campaigns/${campaign.campaignId}/images/${randomUUID()}/original`);

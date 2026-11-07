@@ -8,6 +8,7 @@ import type { FastifyInstance, FastifyPluginCallback } from "fastify";
 import { createTestOidcClient } from "../../src/identity/adapters/test.js";
 import { createIdentityModule, type Identity } from "../../src/identity/index.js";
 import { createSystemAuthoringModule, type SystemAuthoring } from "../../src/systems/authoring.js";
+import { createExtensionAuthoringModule, type ExtensionAuthoring } from "../../src/systems/extensions.js";
 import {
   createSystemPersistenceRepository,
 } from "../../src/systems/implementation/persistence/index.js";
@@ -62,6 +63,7 @@ export type I3AppHandle = {
   app: FastifyInstance;
   identity: Identity;
   authoring: SystemAuthoring;
+  extensions: ExtensionAuthoring;
   characters: Characters;
   runtime: SystemRuntime;
   pool: Pool;
@@ -106,11 +108,13 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
     allowPersonalTokens: input.allowPersonalTokens ?? false,
   });
 
+  const systemRepository = createSystemPersistenceRepository(input.pool);
   const authoring = createSystemAuthoringModule({
     pool: input.pool,
     scanImage: input.scanImage ?? (async () => "clean" as const),
-    repo: createSystemPersistenceRepository(input.pool),
+    repo: systemRepository,
   });
+  const extensions = createExtensionAuthoringModule({ pool: input.pool, repo: systemRepository });
 
   const runtime = createSystemRuntime({
     loadPackage: createPostgresPublishedPackageLoader(input.pool),
@@ -148,7 +152,7 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
   });
 
   void app.register(buildIdentityRoutes({ identity, cookieName: "session", secure: false }));
-  void app.register(buildSystemsRoutes({ authoring }));
+  void app.register(buildSystemsRoutes({ authoring, extensions }));
   void app.register(buildCharactersRoutes({ characters }));
   void app.register(
     buildDevSignInRoutes({
@@ -185,7 +189,7 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
     users[key] = { actorId: body.userId, cookie: idkCookieFromSetCookieResponse(response) };
   }
 
-  return { app, identity, authoring, characters, runtime, pool: input.pool, users };
+  return { app, identity, authoring, extensions, characters, runtime, pool: input.pool, users };
 }
 
 function idkCookieFromSetCookieResponse(response: {

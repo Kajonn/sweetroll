@@ -64,9 +64,16 @@ CREATE TABLE systems (
   name       text NOT NULL,
   access     text NOT NULL DEFAULT 'private',
   lifecycle  text NOT NULL DEFAULT 'active',
+  -- System extensions (design 6.8): an extension is a systems row of kind
+  -- 'extension' that adds templates to exactly one base system.
+  kind       text NOT NULL DEFAULT 'system' CHECK (kind IN ('system', 'extension')),
+  base_system_id uuid REFERENCES systems(id) ON DELETE RESTRICT,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK ((kind = 'extension') = (base_system_id IS NOT NULL))
 );
+CREATE INDEX systems_extensions_by_base ON systems (base_system_id, created_at DESC, id DESC)
+  WHERE kind = 'extension';
 
 CREATE TABLE system_drafts (
   system_id       uuid PRIMARY KEY REFERENCES systems(id) ON DELETE CASCADE,
@@ -86,9 +93,15 @@ CREATE TABLE system_versions (
   release_notes    text NOT NULL DEFAULT '',
   lifecycle        text NOT NULL DEFAULT 'published',
   compatibility_findings_json jsonb NOT NULL DEFAULT '[]'::jsonb,
+  -- Extension versions: the base system version they were compiled against.
+  built_against_version_id uuid REFERENCES system_versions(id) ON DELETE RESTRICT,
   created_at       timestamptz NOT NULL DEFAULT now(),
   UNIQUE (system_id, semantic_version)
 );
+
+-- Extension drafts: the base system version used for preview and validation.
+ALTER TABLE system_drafts
+  ADD COLUMN base_version_id uuid REFERENCES system_versions(id) ON DELETE RESTRICT;
 
 CREATE TABLE idempotency_receipts (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),

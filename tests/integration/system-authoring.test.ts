@@ -32,6 +32,8 @@ const DDL = `
     name text NOT NULL,
     access text NOT NULL DEFAULT 'private',
     lifecycle text NOT NULL DEFAULT 'active',
+    kind text NOT NULL DEFAULT 'system',
+    base_system_id uuid REFERENCES systems(id),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
   );
@@ -41,6 +43,7 @@ const DDL = `
     document_json jsonb NOT NULL,
     source_checksum text NOT NULL,
     updated_by uuid NOT NULL REFERENCES users(id),
+    base_version_id uuid,
     updated_at timestamptz NOT NULL DEFAULT now()
   );
   CREATE TABLE system_versions (
@@ -52,6 +55,7 @@ const DDL = `
     release_notes text NOT NULL DEFAULT '',
     lifecycle text NOT NULL DEFAULT 'published',
     compatibility_findings_json jsonb NOT NULL DEFAULT '[]'::jsonb,
+    built_against_version_id uuid,
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (system_id, semantic_version)
   );

@@ -345,7 +345,10 @@ composition). A campaign's composition is the union of the extensions it chose a
 those used by its attached characters. Scope, access, ID scoping, campaign-union,
 removal and upgrade rules are decisions X1–X13 in the
 [system extensions plan](docs/superpowers/plans/2026-11-07-system-extensions.md),
-which also tracks implementation stages E1–E8.
+which also tracks implementation stages E1–E8. E1 (package contract) and E2
+(authoring and publishing under `/systems/:systemId/extensions` and
+`/extensions/:extensionId`) are implemented; an extension is a `systems` row of
+kind `extension` whose versions record the base version they were built against.
 
 **Future feature (recorded 2026-11-07, not authorized):** an extension catalog for
 discovering and previewing published extensions. It depends on OD-07 and needs its
@@ -626,7 +629,7 @@ Use Node.js LTS, TypeScript, Fastify, a thin PostgreSQL driver, explicit current
 | **Aggregate/table** | **Key relationships**                        | **Important fields**                                                |
 |---------------------|----------------------------------------------|---------------------------------------------------------------------|
 | users               | external_identities, owned resources         | id, display_name, locale, status, created_at                        |
-| systems             | creator; drafts; versions; collaborators     | id, owner_id, name, access, lifecycle                               |
+| systems             | creator; drafts; versions; collaborators     | id, owner_id, name, access, lifecycle, kind, base_system_id (6.8)   |
 | system_drafts       | one current draft per system                 | system_id, revision, document_json, source_checksum, updated_by     |
 | system_versions     | immutable child of system                    | version_id, semantic_version, checksum, package_json, release_notes |
 | preview_snapshots   | immutable expiring draft preview             | snapshot_id, system_id, source_revision, package_json, expires_at   |

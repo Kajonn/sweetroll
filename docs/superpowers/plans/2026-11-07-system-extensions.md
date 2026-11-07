@@ -151,20 +151,43 @@ the design document updated (red → green, per existing plans).
   exposes a field, other system, same template ID in base and two extensions,
   checksum stability, duplicate/too many extensions, extension comparison.
 
-### E2 — Authoring and publishing
+### E2 — Authoring and publishing — done
 
-- [ ] Schema baseline: `systems.kind`, `systems.base_system_id`,
-  `system_versions.built_against_version_id`.
-- [ ] `SystemAuthoring.createExtension(systemVersionId)`; drafts restricted to
-  metadata, templates and their expressions; preview against the chosen base
-  version; publish with validation and comparison; sharing and archive reuse
-  `changeSharing`/lifecycle.
-- [ ] Routes: `POST /systems/:id/extensions`, `GET /systems/:id/extensions`
-  (owned plus `public`; `link` by ID), existing draft/publish routes accept
-  extension drafts. Seeding of reference templates is unchanged.
-- [ ] Item art bundles and `system_image_permissions` cover extension templates.
-- [ ] Tests: authorization matrix (owner/public/link/private, archived base),
-  publish idempotency, immutable versions.
+- [x] Schema baseline: `systems.kind` (`system` | `extension`, check constraint
+  with `base_system_id`), `systems.base_system_id`,
+  `system_versions.built_against_version_id` and `system_drafts.base_version_id`
+  (the base version an extension draft is previewed and validated against).
+- [x] Repository: system records carry `kind`/`baseSystemId`; the system
+  library, creation-version listing, version use and upgrade targets select
+  `kind = 'system'` only, so extension versions can never become a character's
+  base. New `listExtensionsPage`, `listPublishedVersions` and
+  `authorizeExtensionUse`; `publishVersion` stores `built_against_version_id`
+  and re-compares with `compareExtensionPackages` for extensions.
+- [x] `ExtensionAuthoring` (`src/systems/extensions.ts`): `createExtension`
+  (base version must be usable by the actor), `open`, `list`, `saveDraft`
+  (optional base version change, rule errors are reported in the assessment
+  with warnings, schema errors rejected), `preview`, `publish` (idempotent,
+  breaking changes need acknowledgement and a major bump, the base version must
+  still be usable) and `authorizeExtensionUse`.
+- [x] Routes (`src/transport/http/extensions.ts`): `POST`/`GET
+  /systems/:systemId/extensions`, `GET /extensions/:extensionId`, `PUT
+  /extensions/:extensionId/draft`, `POST /extensions/:extensionId/preview`,
+  `POST /extensions/:extensionId/publish`. **Deviation from the first draft of
+  this plan:** extension drafts use these dedicated routes instead of the system
+  draft/publish routes, because the draft format differs; the system draft,
+  preview, publish, clone and export routes return 404 for extensions. Sharing,
+  archive/restore and deletion reuse `PATCH`/`DELETE /systems/:systemId`;
+  version deprecation reuses `PATCH /system-versions/:versionId`. Extension
+  export/import is not included.
+- [x] Template art: the system item image routes and `system_image_permissions`
+  work for extension drafts and published extension versions unchanged.
+- [x] Tests (`tests/integration/system-extensions.test.ts`): full
+  create/draft/preview/publish/replay/breaking flow with immutable stored
+  package; extensions absent from system routes and never usable as a base;
+  base version switch and incompatible base; archived base; owner/public/link/
+  private matrix for create, open, edit, list and use; archive and
+  deprecation; no extension of an extension; referenced base cannot be deleted;
+  template art upload, ownership and frozen published bytes.
 
 ### E3 — Character composition
 

@@ -4,6 +4,7 @@ import { loadCampaignLimits } from "../platform/config.js";
 import { createIdentityModule } from "../identity/index.js";
 import { createTestOidcClient } from "../identity/adapters/test.js";
 import { createSystemAuthoringModule } from "../systems/authoring.js";
+import { createExtensionAuthoringModule } from "../systems/extensions.js";
 import { createCharactersModule } from "../characters/index.js";
 import { createCampaignPlacement } from "../characters/campaignPlacement.js";
 import { createCampaignsModule } from "../campaigns/index.js";
@@ -91,10 +92,12 @@ const identity = createIdentityModule({
   allowPersonalTokens: config.nodeEnv !== "production" && process.env.SWEETROLL_LOCAL_API_TOKENS === "1",
 });
 
+const systemRepository = createSystemPersistenceRepository(pool);
 const authoring = createSystemAuthoringModule({
   pool,
-  repo: createSystemPersistenceRepository(pool),
+  repo: systemRepository,
 });
+const extensionAuthoring = createExtensionAuthoringModule({ pool, repo: systemRepository });
 
 const runtime = createSystemRuntime({
   loadPackage: createPostgresPublishedPackageLoader(pool),
@@ -170,7 +173,7 @@ registerApiRoutes(app, [
     secure: config.cookieSecure,
   }),
   buildPersonalTokenRoutes({ identity }),
-  buildSystemsRoutes({ authoring }),
+  buildSystemsRoutes({ authoring, extensions: extensionAuthoring }),
   buildCharactersRoutes({ characters }),
   buildCampaignsRoutes({ campaigns, characters, runtime, identity }),
 ], serveStatic, { pool });

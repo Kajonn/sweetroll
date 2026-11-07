@@ -1540,14 +1540,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/displays/{id}/scenes/{sceneId}/projection": {
+    "/displays/{id}/scenes/{sceneId}/events": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["get_displays_id_scenes_sceneId_projection"];
+        get: operations["get_displays_id_scenes_sceneId_events"];
         put?: never;
         post?: never;
         delete?: never;
@@ -27384,7 +27384,7 @@ export interface operations {
             };
         };
     };
-    get_displays_id_scenes_sceneId_projection: {
+    get_displays_id_scenes_sceneId_events: {
         parameters: {
             query?: never;
             header?: never;
@@ -27401,21 +27401,20 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        projection: {
-                            sceneId: string;
-                            sceneRevision: number;
-                            imageUrl: string;
-                            tokens: {
-                                tokenId: string;
-                                label: string;
-                                x: number;
-                                y: number;
-                                size: number;
-                                imageUrl: string | null;
-                            }[];
-                        };
-                        requestId: string;
+                    "text/event-stream": {
+                        sceneId: string;
+                        sceneRevision: number;
+                        /** @description Player-safe map version. Changes only when fog or a different background changes the map. */
+                        imageRevision: number;
+                        imageUrl: string;
+                        tokens: {
+                            tokenId: string;
+                            label: string;
+                            x: number;
+                            y: number;
+                            size: number;
+                            imageUrl: string | null;
+                        }[];
                     };
                 };
             };
@@ -27450,6 +27449,21 @@ export interface operations {
                 };
             };
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -27538,7 +27552,7 @@ export interface operations {
     get_displays_id_scenes_sceneId_tokens_tokenId_image: {
         parameters: {
             query: {
-                rev: number;
+                file: string;
             };
             header?: never;
             path: {

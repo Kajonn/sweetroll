@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CampaignsApi } from "./api.js";
-import type { ApplyFogEditBody } from "./types.js";
+import type { ApplyFogEditBody, SceneView } from "./types.js";
 import { randomUUID } from "../utils/uuid.js";
 export type FogMode = "reveal" | "conceal";
 export type FogDab = { x: number; y: number; r: number };
@@ -15,6 +15,8 @@ export function useFogEditor(props: {
   api: Pick<CampaignsApi, "applyFogEdit">; sceneId: string; sceneRevision: number;
   online?: boolean | undefined; enabled?: boolean | undefined;
   onChanged?: (() => void | number | Promise<void | number>) | undefined;
+  /** Adopt the committed scene from the command response (no extra read). */
+  onApplied?: ((scene: SceneView) => void) | undefined;
 }) {
   const latest = useRef(props); latest.current = props;
   const active = useRef(true), lock = useRef(false), statusRef = useRef<Status>("idle");
@@ -31,9 +33,10 @@ export function useFogEditor(props: {
     if (lock.current || !active.current || latest.current.online === false || latest.current.enabled === false) return;
     lock.current = true; attempt.current = body; transition("pending"); let applied = false;
     try {
-      await latest.current.api.applyFogEdit(latest.current.sceneId, body); applied = true;
+      const response: { scene?: SceneView } | undefined = await latest.current.api.applyFogEdit(latest.current.sceneId, body); applied = true;
       if (!active.current) return;
-      await refresh(); update([]); attempt.current = null; transition("applied");
+      if (response?.scene && latest.current.onApplied) latest.current.onApplied(response.scene); else await refresh();
+      update([]); attempt.current = null; transition("applied");
     } catch (cause) {
       if (!active.current) return;
       const e = cause as { status?: number; code?: string } | null;

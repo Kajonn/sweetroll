@@ -165,8 +165,9 @@ test("V3 fog: mouse/touch brush, local undo, conflict/retry and redacted display
     await expect.poll(()=>pixels(dp),{timeout:20_000}).toEqual([black,black,black]);
     await gm.goto(`/campaigns/${campaignId}`); await gm.getByRole("tab",{name:"Settings",exact:true}).click();
     const revokedCredential = await dp.evaluate(() => JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!));
-    const projectionPath = `/api/displays/${displayId}/scenes/${sceneId}/projection`;
-    const readWithCredential = () => dp.evaluate(async ({path,secret}) => (await fetch(path,{headers:{"x-display-secret":secret},credentials:"omit"})).status,{path:projectionPath,secret:revokedCredential.secret});
+    const streamPath = `/api/displays/${displayId}/scenes/${sceneId}/events`;
+    // Status only: abort the live stream as soon as the headers arrive.
+    const readWithCredential = () => dp.evaluate(async ({path,secret}) => { const c=new AbortController(); const r=await fetch(path,{headers:{"x-display-secret":secret},credentials:"omit",signal:c.signal}); c.abort(); return r.status; },{path:streamPath,secret:revokedCredential.secret});
     expect(await readWithCredential()).toBe(200);
     await gm.getByRole("button",{name:"Revoke",exact:true}).click(); await expect(gm.getByText("Display revoked.",{exact:true})).toBeVisible();
     displayId=undefined;

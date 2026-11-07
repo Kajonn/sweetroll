@@ -24,7 +24,6 @@ import type {
   DeleteImageBody,
   DeleteImageResponse,
   DisplayCredentialsResponse,
-  DisplayProjectionResponse,
   ExportCampaignBody,
   ExportCampaignResponse,
   InvitationAcceptBody,
@@ -146,7 +145,6 @@ export type CampaignsApi = {
   listDisplayCredentials(campaignId: string): Promise<DisplayCredentialsResponse>;
   revokeDisplay(campaignId: string, displayId: string): Promise<RevokeDisplayResponse>;
   redeemDisplay(body: RedeemDisplayBody): Promise<RedeemDisplayResponse>;
-  getDisplayProjection(displayId: string, sceneId: string, secret: string): Promise<DisplayProjectionResponse>;
 };
 
 export function createCampaignsApi(client: ApiClient): CampaignsApi {
@@ -291,9 +289,5 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
       client.fetch<RevokeDisplayResponse>("POST", `/campaigns/${campaignId}/displays/${displayId}/revoke`, { body: {} }),
     redeemDisplay: (body) =>
       client.fetch<RedeemDisplayResponse>("POST", "/displays/redeem", { body }),
-    getDisplayProjection: (displayId, sceneId, secret) =>
-      client.fetch<DisplayProjectionResponse>("GET", `/displays/${displayId}/scenes/${sceneId}/projection`, {
-        headers: { "x-display-secret": secret },
-      }),
   };
 }

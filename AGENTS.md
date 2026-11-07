@@ -64,3 +64,10 @@ The G8 visual-control feature gate is complete; physical-device/provider-login,
 human visual approval and actual table/remote G9 release gates remain open.
 Emulated touch must not be reported as physical-device acceptance. This record
 selects no new feature; final-head CI is tracked in PR #38.
+
+The owner approved the [scene streaming plan](docs/superpowers/plans/2026-11-07-scene-streaming.md)
+on 2026-11-07. Stages 1–3 are implemented: the paired display receives scene
+snapshots over SSE (`GET /displays/:id/scenes/:sceneId/events`, PostgreSQL
+`LISTEN`/`NOTIFY`), and the old polled projection route was removed with all its
+client code. Do not reintroduce display polling. The hosted journey and the
+200-table load comparison (stage 4) remain open.

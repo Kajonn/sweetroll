@@ -92,7 +92,7 @@ import {
   type DisplayCredentialMetadata,
   type DisplayImageBytes,
   type DisplayProjection,
-  type GetDisplayProjectionInput,
+  type DisplaySceneInput,
   type GetDisplaySceneImageInput,
   type GetDisplayTokenImageInput,
   type ListDisplayCredentialsInput,
@@ -102,7 +102,10 @@ import {
   type RedeemDisplayCodeSuccess,
   type RevokeDisplayInput,
   type RevokeDisplaySuccess,
+  type DisplayObserver,
 } from "./display.js";
+import { createDisplayStreams, type OpenDisplayStreamResult } from "./display-stream.js";
+import type { SceneEventHub } from "./scene-events.js";
 import {
   authorizeRemoval,
   authorizeRoleChange,
@@ -441,20 +444,20 @@ export interface Campaigns extends TemplateCommands, ProposalCommands, CampaignI
    * I7b Task 3: restricted display pairing + redacted projection. `pairDisplay`
    * (GM only) mints a single-use 6-char code (5-min TTL, hash stored);
    * `redeemDisplayCode` (unauthenticated, display-side) consumes the code for
-   * a revocable credential; `getDisplayProjection` (credential-scoped, no GM
-   * session) returns the visible-and-revealed projection with fog-concealed
-   * pixels removed server-side; `revokeDisplay` (GM only) kills the
+   * a revocable credential; `openDisplayStream` (credential-scoped, no GM
+   * session) streams the visible-and-revealed projection, whose map image has
+   * fog-concealed pixels removed server-side; `revokeDisplay` (GM only) kills the
    * credential. Unknown/expired/used/revoked credentials collapse to generic
    * `not_found`.
    */
   pairDisplay(ctx: RequestContext, input: PairDisplayInput): Promise<CampaignResult<PairDisplaySuccess>>;
   redeemDisplayCode(input: RedeemDisplayCodeInput): Promise<CampaignResult<RedeemDisplayCodeSuccess>>;
-  getDisplayProjection(input: GetDisplayProjectionInput): Promise<CampaignResult<DisplayProjection>>;
   revokeDisplay(ctx: RequestContext, input: RevokeDisplayInput): Promise<CampaignResult<RevokeDisplaySuccess>>;
   /**
    * I7b Task 4: GM Settings credential list (metadata without secrets) plus
    * the display-credential binary image reads backing the projection's
-   * `imageUrl` shapes (`.../image?rev=N` and `.../tokens/:tokenId/image?rev=N`).
+   * `imageUrl` shapes (`.../image?rev=<imageRevision>` and
+   * `.../tokens/:tokenId/image?file=<imageFileId>`).
    */
   listDisplayCredentials(
     ctx: RequestContext,
@@ -462,6 +465,14 @@ export interface Campaigns extends TemplateCommands, ProposalCommands, CampaignI
   ): Promise<CampaignResult<DisplayCredentialMetadata[]>>;
   getDisplaySceneImage(input: GetDisplaySceneImageInput): Promise<CampaignResult<DisplayImageBytes>>;
   getDisplayTokenImage(input: GetDisplayTokenImageInput): Promise<CampaignResult<DisplayImageBytes>>;
+  /**
+   * Scene streaming: open a credential-scoped live stream of complete scene
+   * snapshots for one paired display. Fails with not_found for any
+   * credential/scene failure and `unavailable` while change delivery is down.
+   */
+  openDisplayStream(input: DisplaySceneInput): Promise<OpenDisplayStreamResult>;
+  /** Close every open display stream (process shutdown). */
+  closeDisplayStreams(): void;
 }
 
 export type {
@@ -480,7 +491,7 @@ export type {
   DisplayProjection,
   ExportCampaignInput,
   FogOp,
-  GetDisplayProjectionInput,
+  DisplaySceneInput,
   GetDisplaySceneImageInput,
   GetDisplayTokenImageInput,
   InvitationAcceptSuccess,
@@ -530,6 +541,10 @@ export type {
 };
 
 export type CreateCampaignsModuleInput = {
+  /** Per-process scene change hub (LISTEN connection). Absent: display streams answer `unavailable`. */
+  sceneEvents?: SceneEventHub | null | undefined;
+  displayObserver?: DisplayObserver | undefined;
+  displayStream?: { heartbeatMs?: number; stallTimeoutMs?: number } | undefined;
   scanImage?: import("../platform/image-processing.js").ImageScanner;
   loadTemplatePackage?: import("../systems/templates.js").PublishedPackageLoader;
   pool: Pool;
@@ -901,7 +916,13 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
   // dependencies; the commands own code minting (hash-only storage),
   // single-use redeem, credential validation and the sharp redaction
   // composite Tasks 4-5 and 7 serve and poll.
-  const display = createDisplayCommands({ pool: input.pool, repo, now, newId });
+  const display = createDisplayCommands({ pool: input.pool, repo, now, newId, observer: input.displayObserver });
+  const displayStreams = createDisplayStreams({
+    hub: input.sceneEvents ?? null,
+    loadSnapshot: display.getDisplaySnapshot,
+    heartbeatMs: input.displayStream?.heartbeatMs,
+    stallTimeoutMs: input.displayStream?.stallTimeoutMs,
+  });
 
   /**
    * I6 Task 9 fix: module-owned placement transaction. Resolves the caller's
@@ -974,11 +995,12 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     removeToken: scenes.removeToken,
     pairDisplay: display.pairDisplay,
     redeemDisplayCode: display.redeemDisplayCode,
-    getDisplayProjection: display.getDisplayProjection,
     revokeDisplay: display.revokeDisplay,
     listDisplayCredentials: display.listDisplayCredentials,
     getDisplaySceneImage: display.getDisplaySceneImage,
     getDisplayTokenImage: display.getDisplayTokenImage,
+    openDisplayStream: displayStreams.open,
+    closeDisplayStreams: displayStreams.closeAll,
     async create(ctx, createInput) {
       try {
         const keyError = checkIdempotencyKey(createInput.idempotencyKey);

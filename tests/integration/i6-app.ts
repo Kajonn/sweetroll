@@ -5,6 +5,8 @@ import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 
 import { createCampaignsModule, type Campaigns } from "../../src/campaigns/index.js";
+import type { DisplayObserver } from "../../src/campaigns/display.js";
+import type { SceneEventHub } from "../../src/campaigns/scene-events.js";
 import {
   createCampaignPlacement,
   type CampaignPlacement,
@@ -32,6 +34,9 @@ export type TestActor = { actorId: string; cookie: string };
 
 export type I6Harness = {
   app: FastifyInstance;
+  /** Schema-scoped connection string (search_path set) for extra processes. */
+  databaseUrl: string;
+  schema: string;
   pool: Pool;
   campaigns: Campaigns;
   characters: Characters;
@@ -118,6 +123,10 @@ export async function buildI6Harness(input?: {
   document?:SystemDocumentV1;
   /** Overrides the shared campaign limits (e.g. tiny maxAttachedCharacters). */
   limits?: CampaignLimits;
+  /** Scene streaming: per-process change hub (null disables streams). */
+  sceneEvents?: SceneEventHub | null;
+  displayObserver?: DisplayObserver;
+  displayStream?: { heartbeatMs?: number; stallTimeoutMs?: number };
 }): Promise<I6Harness> {
   const databaseUrl = process.env.TEST_DATABASE_URL;
   if (databaseUrl === undefined || databaseUrl.length === 0) {
@@ -147,6 +156,9 @@ export async function buildI6Harness(input?: {
         maxAttachedCharacters: limits.maxAttachedCharacters,
       });
       campaigns = createCampaignsModule({
+        sceneEvents: input?.sceneEvents ?? null,
+        displayObserver: input?.displayObserver,
+        displayStream: input?.displayStream,
         scanImage: input?.scanImage ?? (async () => "clean" as const),
         pool,
         limits,
@@ -190,6 +202,8 @@ export async function buildI6Harness(input?: {
 
   return {
     app: handle.app,
+    databaseUrl,
+    schema,
     pool,
     campaigns,
     characters: handle.characters,

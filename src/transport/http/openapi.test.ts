@@ -114,8 +114,8 @@ describe("buildOpenApiDocument", () => {
       "/content/{id}/grants",
       "/content/{id}/recover",
       "/displays/redeem",
+      "/displays/{id}/scenes/{sceneId}/events",
       "/displays/{id}/scenes/{sceneId}/image",
-      "/displays/{id}/scenes/{sceneId}/projection",
       "/displays/{id}/scenes/{sceneId}/tokens/{tokenId}/image",
       "/invitations/accept",
       "/invitations/decline",
@@ -282,9 +282,10 @@ describe("buildOpenApiDocument", () => {
       "get_campaigns_id_display_credentials",
     );
     expect(paths["/displays/redeem"]?.post?.operationId).toBe("post_displays_redeem");
-    expect(paths["/displays/{id}/scenes/{sceneId}/projection"]?.get?.operationId).toBe(
-      "get_displays_id_scenes_sceneId_projection",
+    expect(paths["/displays/{id}/scenes/{sceneId}/events"]?.get?.operationId).toBe(
+      "get_displays_id_scenes_sceneId_events",
     );
+    expect(paths["/displays/{id}/scenes/{sceneId}/projection"]).toBeUndefined();
     expect(paths["/displays/{id}/scenes/{sceneId}/image"]?.get?.operationId).toBe(
       "get_displays_id_scenes_sceneId_image",
     );

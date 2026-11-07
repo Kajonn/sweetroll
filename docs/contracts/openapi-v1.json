@@ -90449,6 +90449,7 @@
                               },
                               "runs": {
                                 "minItems": 1,
+                                "maxItems": 512,
                                 "type": "array",
                                 "items": {
                                   "type": "object",
@@ -91814,6 +91815,7 @@
                               },
                               "runs": {
                                 "minItems": 1,
+                                "maxItems": 512,
                                 "type": "array",
                                 "items": {
                                   "type": "object",
@@ -92127,6 +92129,7 @@
                               },
                               "runs": {
                                 "minItems": 1,
+                                "maxItems": 512,
                                 "type": "array",
                                 "items": {
                                   "type": "object",
@@ -92552,6 +92555,7 @@
                       },
                       "runs": {
                         "minItems": 1,
+                        "maxItems": 512,
                         "type": "array",
                         "items": {
                           "type": "object",
@@ -92659,6 +92663,7 @@
                               },
                               "runs": {
                                 "minItems": 1,
+                                "maxItems": 512,
                                 "type": "array",
                                 "items": {
                                   "type": "object",
@@ -93181,6 +93186,7 @@
                               },
                               "runs": {
                                 "minItems": 1,
+                                "maxItems": 512,
                                 "type": "array",
                                 "items": {
                                   "type": "object",
@@ -93684,6 +93690,7 @@
                               },
                               "runs": {
                                 "minItems": 1,
+                                "maxItems": 512,
                                 "type": "array",
                                 "items": {
                                   "type": "object",
@@ -94173,6 +94180,7 @@
                               },
                               "runs": {
                                 "minItems": 1,
+                                "maxItems": 512,
                                 "type": "array",
                                 "items": {
                                   "type": "object",
@@ -95686,9 +95694,9 @@
         }
       }
     },
-    "/displays/{id}/scenes/{sceneId}/projection": {
+    "/displays/{id}/scenes/{sceneId}/events": {
       "get": {
-        "operationId": "get_displays_id_scenes_sceneId_projection",
+        "operationId": "get_displays_id_scenes_sceneId_events",
         "parameters": [
           {
             "name": "id",
@@ -95712,77 +95720,72 @@
         "responses": {
           "200": {
             "content": {
-              "application/json": {
+              "text/event-stream": {
                 "schema": {
+                  "description": "Server-sent events. Each `event: scene` message carries this complete credential-scoped projection as JSON data (newer sceneRevision only); `event: revoked` ends the stream when access is lost; `: hb` comment lines are heartbeats. Authenticate with the X-Display-Secret header.",
                   "type": "object",
                   "required": [
-                    "projection",
-                    "requestId"
+                    "sceneId",
+                    "sceneRevision",
+                    "imageRevision",
+                    "imageUrl",
+                    "tokens"
                   ],
                   "properties": {
-                    "projection": {
-                      "type": "object",
-                      "required": [
-                        "sceneId",
-                        "sceneRevision",
-                        "imageUrl",
-                        "tokens"
-                      ],
-                      "properties": {
-                        "sceneId": {
-                          "type": "string"
-                        },
-                        "sceneRevision": {
-                          "type": "integer"
-                        },
-                        "imageUrl": {
-                          "type": "string"
-                        },
-                        "tokens": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "required": [
-                              "tokenId",
-                              "label",
-                              "x",
-                              "y",
-                              "size",
-                              "imageUrl"
-                            ],
-                            "properties": {
-                              "tokenId": {
+                    "sceneId": {
+                      "type": "string"
+                    },
+                    "sceneRevision": {
+                      "type": "integer"
+                    },
+                    "imageRevision": {
+                      "minimum": 1,
+                      "description": "Player-safe map version. Changes only when fog or a different background changes the map.",
+                      "type": "integer"
+                    },
+                    "imageUrl": {
+                      "type": "string"
+                    },
+                    "tokens": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "tokenId",
+                          "label",
+                          "x",
+                          "y",
+                          "size",
+                          "imageUrl"
+                        ],
+                        "properties": {
+                          "tokenId": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "x": {
+                            "type": "number"
+                          },
+                          "y": {
+                            "type": "number"
+                          },
+                          "size": {
+                            "type": "number"
+                          },
+                          "imageUrl": {
+                            "anyOf": [
+                              {
                                 "type": "string"
                               },
-                              "label": {
-                                "type": "string"
-                              },
-                              "x": {
-                                "type": "number"
-                              },
-                              "y": {
-                                "type": "number"
-                              },
-                              "size": {
-                                "type": "number"
-                              },
-                              "imageUrl": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ]
+                              {
+                                "type": "null"
                               }
-                            }
+                            ]
                           }
                         }
                       }
-                    },
-                    "requestId": {
-                      "type": "string"
                     }
                   }
                 }
@@ -95876,6 +95879,49 @@
             }
           },
           "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
             "content": {
               "application/json": {
                 "schema": {
@@ -96129,12 +96175,12 @@
             }
           },
           {
-            "name": "rev",
+            "name": "file",
             "in": "query",
             "required": true,
             "schema": {
-              "minimum": 1,
-              "type": "integer"
+              "format": "uuid",
+              "type": "string"
             }
           }
         ],

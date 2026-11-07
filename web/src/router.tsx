@@ -612,10 +612,10 @@ function CampaignSceneRouteView() {
 }
 
 /**
- * Restricted display entry: code form → credential-scoped projection. There
- * is deliberately no identity gate, no sign-in stash, and no campaign API
- * use here — the shell must not retain or fetch GM state, and the entry
- * purge inside DisplayView runs before the first projection fetch.
+ * Restricted display entry: code form → credential-scoped scene stream.
+ * There is deliberately no identity gate, no sign-in stash, and no campaign
+ * API use here — the shell must not retain or fetch GM state, and the entry
+ * purge inside DisplayView runs before the stream opens.
  */
 function DisplayRouteView() {
   const search = displayRoute.useSearch();

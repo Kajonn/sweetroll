@@ -1,6 +1,8 @@
 import type {RollBreakdown,PushResult} from "../systems/implementation/rules/result.js";
 import type { Pool, PoolClient } from "pg";
 
+import { notifySceneEvent } from "./scene-events.js";
+
 export type DbClient = Pool | PoolClient;
 
 export type CampaignRecord = {
@@ -165,6 +167,8 @@ export type SceneRecord = {
   campaignId: string;
   backgroundFileId: string;
   revision: number;
+  /** Player-safe map version: bumps only with fog or a different background. */
+  imageRevision: number;
   fog: unknown;
   tokens: unknown;
   createdAt: Date;
@@ -323,6 +327,7 @@ type SceneRow = {
   campaign_id: string;
   background_file_id: string;
   revision: number;
+  image_revision: number;
   fog_jsonb: unknown;
   tokens_jsonb: unknown;
   created_at: Date;
@@ -396,7 +401,7 @@ const CONTENT_COLUMNS =
 const MEDIA_COLUMNS =
   "id, campaign_id, owner_id, name, media_type, size_bytes, width, height, checksum, storage_key, revision, created_at";
 const SCENE_COLUMNS =
-  "id, campaign_id, background_file_id, revision, fog_jsonb, tokens_jsonb, created_at";
+  "id, campaign_id, background_file_id, revision, image_revision, fog_jsonb, tokens_jsonb, created_at";
 const DISPLAY_CODE_COLUMNS = "code_hash, campaign_id, expires_at, created_at";
 const DISPLAY_CREDENTIAL_COLUMNS = "id, campaign_id, secret_hash, revoked_at, created_at";
 const ACTIVITY_COLUMNS = "id, campaign_id, actor_id, kind, source_content_id, source_roll_id, request_id, occurred_at";
@@ -496,12 +501,29 @@ function toMediaFileRecord(row: MediaFileRow): MediaFileRecord {
   };
 }
 
+/**
+ * Scene writes run inside the caller's transaction; the queued NOTIFY is
+ * delivered only on COMMIT, so rollbacks never reach display streams.
+ */
+async function notifiedScene(client: PoolClient, row: SceneRow | undefined): Promise<SceneRecord | null> {
+  if (row === undefined) return null;
+  const record = toSceneRecord(row);
+  await notifySceneEvent(client, {
+    kind: "scene",
+    sceneId: record.sceneId,
+    campaignId: record.campaignId,
+    revision: record.revision,
+  });
+  return record;
+}
+
 function toSceneRecord(row: SceneRow): SceneRecord {
   return {
     sceneId: row.id,
     campaignId: row.campaign_id,
     backgroundFileId: row.background_file_id,
     revision: row.revision,
+    imageRevision: row.image_revision,
     fog: row.fog_jsonb,
     tokens: row.tokens_jsonb,
     createdAt: row.created_at,
@@ -1695,7 +1717,12 @@ export function createCampaignPersistenceRepository(pool: Pool) {
         [input.fileId, input.expectedRevision],
       );
       const row = result.rows[0];
-      return row === undefined ? null : toMediaFileRecord(row);
+      if (row === undefined) return null;
+      const record = toMediaFileRecord(row);
+      // Scene streams of this campaign reload: a deleted background or token
+      // image must stop being served (fail closed) without waiting for a write.
+      await notifySceneEvent(client, { kind: "campaign", campaignId: record.campaignId });
+      return record;
     },
 
     /**
@@ -1760,13 +1787,13 @@ export function createCampaignPersistenceRepository(pool: Pool) {
             SET background_file_id = $2,
                 fog_jsonb = CASE WHEN background_file_id IS DISTINCT FROM $2 THEN '[]'::jsonb ELSE fog_jsonb END,
                 tokens_jsonb = CASE WHEN background_file_id IS DISTINCT FROM $2 THEN '[]'::jsonb ELSE tokens_jsonb END,
+                image_revision = CASE WHEN background_file_id IS DISTINCT FROM $2 THEN image_revision + 1 ELSE image_revision END,
                 revision = revision + 1
           WHERE id = $1 AND revision = $3
           RETURNING ${SCENE_COLUMNS}`,
         [input.sceneId, input.backgroundFileId, input.expectedRevision],
       );
-      const row = result.rows[0];
-      return row === undefined ? null : toSceneRecord(row);
+      return await notifiedScene(client, result.rows[0]);
     },
 
     /**
@@ -1781,13 +1808,13 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       const result = await client.query<SceneRow>(
         `UPDATE scenes
             SET fog_jsonb = fog_jsonb || $2::jsonb,
+                image_revision = image_revision + 1,
                 revision = revision + 1
           WHERE id = $1 AND revision = $3
           RETURNING ${SCENE_COLUMNS}`,
         [input.sceneId, JSON.stringify([input.fogOp]), input.expectedRevision],
       );
-      const row = result.rows[0];
-      return row === undefined ? null : toSceneRecord(row);
+      return await notifiedScene(client, result.rows[0]);
     },
 
     /**
@@ -1808,8 +1835,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
           RETURNING ${SCENE_COLUMNS}`,
         [input.sceneId, JSON.stringify(input.tokens), input.expectedRevision],
       );
-      const row = result.rows[0];
-      return row === undefined ? null : toSceneRecord(row);
+      return await notifiedScene(client, result.rows[0]);
     },
 
     /**
@@ -1910,7 +1936,10 @@ export function createCampaignPersistenceRepository(pool: Pool) {
         [input.displayId, input.now.toISOString()],
       );
       const row = result.rows[0];
-      return row === undefined ? null : toDisplayCredentialRecord(row);
+      if (row === undefined) return null;
+      const record = toDisplayCredentialRecord(row);
+      await notifySceneEvent(client, { kind: "display", displayId: record.displayId, campaignId: record.campaignId });
+      return record;
     },
   };
 }

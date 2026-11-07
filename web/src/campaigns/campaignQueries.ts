@@ -89,10 +89,6 @@ export function sceneDetailKey(
   return ["campaigns", "scene", campaignId, sceneId, actorId, generation];
 }
 
-export function displayProjectionKey(displayId: string, sceneId: string, revision: number) {
-  return ["displays", "projection", displayId, sceneId, revision];
-}
-
 export function useScene(
   api: CampaignsApi,
   campaignId: string,
@@ -109,32 +105,10 @@ export function useScene(
   });
 }
 
-export function useDisplayProjection(
-  api: CampaignsApi,
-  displayId: string,
-  sceneId: string,
-  revision: number,
-  secret: string | null,
-  options: { enabled: boolean; online: boolean },
-) {
-  return useQuery({
-    queryKey: displayProjectionKey(displayId, sceneId, revision),
-    queryFn: () => {
-      if (secret === null) throw new Error("display credential missing");
-      return api.getDisplayProjection(displayId, sceneId, secret);
-    },
-    enabled: options.enabled && options.online && secret !== null,
-    staleTime: 30_000,
-  });
-}
-
 /**
- * Shared scene-commit invalidation: the campaign-wide scene prefix (same
- * literal-prefix style used by campaign queries, so every actor/generation
- * scoped scene read under this campaign reloads) plus the display-scoped
- * projection entries for exactly this scene. Projection keys are
- * display-first, so the scene slice is matched with a predicate — no new
- * purge prefix is introduced.
+ * Shared scene-commit invalidation: the campaign-wide scene prefix (every
+ * actor/generation scoped scene read under this campaign reloads). Paired
+ * displays receive committed changes through the scene event stream.
  */
 function invalidateSceneReads(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -142,10 +116,6 @@ function invalidateSceneReads(
   sceneId: string,
 ) {
   void queryClient.invalidateQueries({ queryKey: ["campaigns", "scene", campaignId] });
-  void queryClient.invalidateQueries({
-    queryKey: ["displays", "projection"],
-    predicate: (query) => query.queryKey.includes(sceneId),
-  });
 }
 
 export function useUpdateScene(api: CampaignsApi, campaignId: string, sceneId: string) {
@@ -201,14 +171,10 @@ export function useRemoveToken(api: CampaignsApi, campaignId: string, sceneId: s
 }
 
 export function useRevokeDisplay(api: CampaignsApi, campaignId: string) {
-  const queryClient = useQueryClient();
+  // The server ends the revoked display's scene stream; no display-side
+  // cache exists to purge here.
   return useMutation({
     mutationFn: (displayId: string) => api.revokeDisplay(campaignId, displayId),
-    onSuccess: (_data, displayId) => {
-      // Purge this credential's cached projections; the display blanks on
-      // its next poll. Scoped to the display — no campaign-wide purge.
-      void queryClient.invalidateQueries({ queryKey: ["displays", "projection", displayId] });
-    },
   });
 }
 

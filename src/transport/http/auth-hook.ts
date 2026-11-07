@@ -4,6 +4,9 @@ import fp from "fastify-plugin";
 import type { Identity } from "../../identity/index.js";
 
 declare module "fastify" {
+  interface FastifyContextConfig {
+    bearerOnly?: boolean;
+  }
   interface FastifyRequest {
     auth: import("../../identity/index.js").AuthContext;
   }
@@ -20,6 +23,7 @@ export const buildAuthHook: (input: BuildAuthHookInput) => FastifyPluginCallback
   ({ identity, cookieName, secure, maxAgeSeconds }) =>
   fp(async (app) => {
     app.addHook("preHandler", async (request, reply) => {
+      if (request.routeOptions.config.bearerOnly === true) return;
       const raw = request.cookies[cookieName];
       if (raw === undefined || raw.length === 0) {
         request.auth = { state: "anonymous" };

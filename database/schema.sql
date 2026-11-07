@@ -32,6 +32,29 @@ CREATE TABLE sessions (
 
 CREATE INDEX sessions_user_id_idx ON sessions (user_id);
 
+CREATE TABLE personal_access_tokens (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash text NOT NULL UNIQUE,
+  label      text NOT NULL CHECK (char_length(label) BETWEEN 1 AND 80),
+  scopes     text[] NOT NULL CHECK (cardinality(scopes) BETWEEN 1 AND 4
+    AND scopes <@ ARRAY['systems:read', 'systems:write', 'characters:read', 'characters:write']),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  revoked_at timestamptz
+);
+
+CREATE INDEX personal_access_tokens_user_active_idx
+  ON personal_access_tokens (user_id) WHERE revoked_at IS NULL;
+
+CREATE TABLE public_api_rate_limits (
+  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  bucket      text NOT NULL CHECK (bucket IN ('general', 'validate', 'publish')),
+  window_at   timestamptz NOT NULL,
+  hits        integer NOT NULL CHECK (hits > 0),
+  PRIMARY KEY (user_id, bucket)
+);
+
 -- Systems
 -- NULL owners identify global reference templates.
 CREATE TABLE systems (

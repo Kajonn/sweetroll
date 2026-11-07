@@ -19,6 +19,7 @@ import { buildSystemsRoutes } from "./systems.js";
 const actorId = randomUUID();
 
 const fakeIdentity: Identity = {
+  personalTokens: {} as Identity["personalTokens"],
   completeSignIn: async () => {
     throw new Error("not used");
   },
@@ -46,6 +47,7 @@ const workspace = (): AuthoringWorkspace => ({
 
 function makeAuthoring(overrides: Partial<SystemAuthoring> = {}): SystemAuthoring {
   const base: SystemAuthoring = {
+    validateDocument: () => ({ ok: true, diagnostics: [] }),
     openItemImage: async () => ({ ok: true, value: { revision: 1, image: null } }),
     setItemImage: async () => ({ ok: true, value: { revision: 2, image: null } }),
     removeItemImage: async () => ({ ok: true, value: { revision: 2, image: null } }),

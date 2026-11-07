@@ -12,7 +12,7 @@ import { createDeterministicRng } from "./implementation/runtime/deterministic-r
 import { buildFieldBindings, decodeRuntimeState, initializeState } from "./implementation/runtime/state.js";
 import { actionEvaluationFailure } from "./implementation/runtime/action-evaluation.js";
 import { evaluate } from "./implementation/rules/evaluate.js";
-import type { CharacterEntryV1, EntityDefinitionV1, SystemPackageV1, TemplateKind } from "./implementation/package/schema/index.js";
+import type { CharacterEntryV1, EntityDefinitionV1, FieldV1, SystemPackageV1, TemplateKind } from "./implementation/package/schema/index.js";
 
 export { resolveGrantedAction } from "./implementation/runtime/resolve-entries.js";
 export type {
@@ -284,12 +284,17 @@ export type RuntimeResult<T> =
 export type VersionDescription = {
   versionId: VersionId;
   packageChecksum: string;
-  entities: { id: DefinitionId; label: string; kind: "playable" | "npc" }[];
+  entities: {
+    id: DefinitionId;
+    label: string;
+    kind: "playable" | "npc";
+    fields?: Exclude<FieldV1, { kind: "computed" | "image" }>[];
+  }[];
 };
 
 export interface SystemRuntime {
   resolve(input: RuntimeRequest): Promise<RuntimeResult<RuntimeResolution>>;
-  describeVersion(input: { versionId: VersionId }): Promise<RuntimeResult<VersionDescription>>;
+  describeVersion(input: { versionId: VersionId; includeFields?: boolean }): Promise<RuntimeResult<VersionDescription>>;
 }
 
 export function createSystemRuntime(input: {
@@ -313,6 +318,9 @@ export function createSystemRuntime(input: {
             id: entity.id,
             label: entity.label,
             kind: entity.kind ?? "playable",
+            ...(describeInput.includeFields ? {
+              fields: entity.fields.filter((field) => field.kind !== "computed" && field.kind !== "image"),
+            } : {}),
           })),
         },
       };

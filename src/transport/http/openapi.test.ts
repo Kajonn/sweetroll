@@ -13,6 +13,7 @@ import { buildSystemsRoutes } from "./systems.js";
 import type { SystemAuthoring } from "../../systems/authoring.js";
 
 const testIdentity: Identity = {
+  personalTokens: {} as Identity["personalTokens"],
   completeSignIn: async () => {
     throw new Error("not used");
   },

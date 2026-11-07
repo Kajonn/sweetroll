@@ -1,6 +1,12 @@
 # Sweetroll public API v1
 
-**Proposed implementation plan · 7 November 2026**
+**Implementation plan · 7 November 2026**
+
+The v1 API, token lifecycle, Account controls, contract check, and quickstarts
+are implemented for local testing. The current authentication configuration
+uses deterministic identities, so hosted token issuance and the real-provider
+Railway acceptance below remain gated on provider sign-in. The local opt-in
+and usage examples are in the [API quickstart](../../api/v1.md).
 
 ## Goal and scope
 

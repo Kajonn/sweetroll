@@ -34,6 +34,7 @@ import type {
   RuntimeScalar,
   RuntimeStateV1,
   RuntimeValidation,
+  VersionDescription,
   SystemRuntime,
   VersionId,
 } from "../systems/runtime.js";
@@ -43,6 +44,7 @@ import {
   type ApplyCommandOutcome,
   type AttachedAuthorization,
   type CampaignMembershipSnapshot,
+  type CharacterPageCursor,
   type CharacterPersistenceRepository,
   type CharacterRecord,
   type ManagementMutation,
@@ -125,6 +127,7 @@ export type CharacterError = {
   pushReason?: string;
   code: CharacterErrorCode;
   message: string;
+  definitionId?: DefinitionId;
   latestRevision?: number | null;
   diagnostics?: RuntimeValidation[];
   actionDiagnostics?: import("../systems/runtime.js").ActionEvaluationDiagnostic[];
@@ -202,14 +205,11 @@ export type CreateCharacter = {
   idempotencyKey: string;
 };
 
-export type CharacterCreationOptions = {
-  versionId: VersionId;
-  packageChecksum: string;
-  entities: { id: DefinitionId; label: string; kind: "playable" | "npc" }[];
-};
+export type CharacterCreationOptions = VersionDescription;
 
 export type CreationOptionsInput = {
   systemVersionId: VersionId;
+  includeFields?: boolean;
 };
 
 export type CreationVersionEntry = {
@@ -460,6 +460,8 @@ export type CharacterExportV1 = {
 // Interface
 // ---------------------------------------------------------------------------
 
+type CharacterAccess = { standaloneOnly?: boolean };
+
 export interface Characters extends CharacterImages, CharacterEntryImages {
   readRoll(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<NormalizedRoll>>;
   pushOptions(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<PushOptions>>;
@@ -474,9 +476,9 @@ export interface Characters extends CharacterImages, CharacterEntryImages {
   ): Promise<CharacterResult<CreationVersions>>;
   list(ctx: RequestContext, input: ListCharacters): Promise<CharacterResult<CharacterPage>>;
   duplicate(ctx: RequestContext, input: DuplicateCharacter): Promise<CharacterResult<CharacterView>>;
-  open(ctx: RequestContext, characterId: CharacterId): Promise<CharacterResult<CharacterView>>;
+  open(ctx: RequestContext, characterId: CharacterId, access?: CharacterAccess): Promise<CharacterResult<CharacterView>>;
 
-  apply(ctx: RequestContext, input: CharacterCommand): Promise<CharacterResult<CharacterCommandResult>>;
+  apply(ctx: RequestContext, input: CharacterCommand, access?: CharacterAccess): Promise<CharacterResult<CharacterCommandResult>>;
   /**
    * Task 7: template catalog for one character's sheet add flow, authorized
    * exactly like `open` (standalone owner, attached campaign-authorized).
@@ -814,8 +816,13 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     characterId: CharacterId,
     resultJson: unknown,
     denied: () => CharacterError,
+    standaloneOnly = false,
   ): Promise<CharacterResult<never> | null> {
     const scope = peekStoredScope(resultJson);
+    if (standaloneOnly) {
+      if (scope !== null) return { ok: false, error: denied() };
+      return denyReplayUnlessOwner(ctx, characterId, denied);
+    }
     const denial=scope===null?await denyStoredOutcomeUnlessStandaloneOwned(ctx,characterId,denied):await authorizeStoredCampaignOutcome(ctx,characterId,scope,denied);
     if(denial)return denial;
     const stored=resultJson as StoredCommandOutcome;
@@ -892,13 +899,14 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     expectedRevision: number;
     attachedCampaignId: string | null;
     resultScope: StoredResultScope;
+    standaloneOnly?: boolean;
     executionId: string;
     replayExpiresAt: Date;
   }): Promise<CharacterResult<CharacterCommandResult>> {
     const { ctx, outcome, characterId, expectedRevision, attachedCampaignId, resultScope, executionId, replayExpiresAt } = input;
     if (outcome.kind === "already_completed") {
-      const placementDenial = await authorizeStoredOutcome(ctx, characterId, outcome.resultJson, () =>
-        errors.not_found(),
+      const placementDenial = await authorizeStoredOutcome(
+        ctx, characterId, outcome.resultJson, () => errors.not_found(), input.standaloneOnly,
       );
       if (placementDenial !== null) return placementDenial;
       return replayStoredOutcome(outcome.resultJson);
@@ -1251,30 +1259,33 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     ...createCharacterImages({ pool: input.pool, now, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
     ...createCharacterEntryImages({ pool: input.pool, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
     async create(ctx, createInput) {
-      try {
-        const inputHash = hashInput({
-          systemVersionId: createInput.systemVersionId,
-          entityDefinitionId: createInput.entityDefinitionId,
-          name: createInput.name,
-          initialValues: createInput.initialValues ?? {},
-        });
+      const inputHash = hashInput({
+        systemVersionId: createInput.systemVersionId,
+        entityDefinitionId: createInput.entityDefinitionId,
+        name: createInput.name,
+        initialValues: createInput.initialValues ?? {},
+      });
 
+      async function replayCreate(): Promise<CharacterResult<CharacterView> | null> {
         const existing = await repo.loadExecution({
           actorId: ctx.actorId,
           commandKind: CREATE_COMMAND_KIND,
           idempotencyKey: createInput.idempotencyKey,
         });
-        if (existing !== null) {
-          if (existing.inputHash !== inputHash) return { ok: false, error: errors.mismatch() };
-          if (existing.expiresAt.getTime() <= now().getTime()) return { ok: false, error: errors.replayExpired() };
-          const replayedView = deserializeView(existing.resultJson);
-          const denial = await denyReplayUnlessOwner(ctx, replayedView.characterId, () => errors.not_found());
-          if (denial !== null) return denial;
-          return {
-            ok: true,
-            value: { ...replayedView, reconciliation: { ...replayedView.reconciliation, replayed: true } },
-          };
-        }
+        if (existing === null) return null;
+        const replayedView = deserializeView(existing.resultJson);
+        const denial = await denyReplayUnlessOwner(ctx, replayedView.characterId, () => errors.not_found());
+        if (denial !== null) return denial;
+        if (existing.inputHash !== inputHash) return { ok: false, error: errors.mismatch() };
+        if (existing.expiresAt.getTime() <= now().getTime()) return { ok: false, error: errors.replayExpired() };
+        return { ok: true, value: {
+          ...replayedView, reconciliation: { ...replayedView.reconciliation, replayed: true },
+        } };
+      }
+
+      try {
+        const replay = await replayCreate();
+        if (replay !== null) return replay;
 
         const authorized = await input.authorizeVersionUse(ctx, createInput.systemVersionId);
         if (!authorized.ok) return { ok: false, error: errors.not_found() };
@@ -1369,7 +1380,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             updatedAt: record.updatedAt,
           },
         };
-      } catch {
+      } catch (error) {
+        if ((error as { code?: string }).code === "23505") {
+          // The loser rolled back its character and can read the winning receipt.
+          return await replayCreate().catch(() => null) ?? { ok: false, error: errors.internal() };
+        }
         return { ok: false, error: errors.internal() };
       }
     },
@@ -1379,7 +1394,10 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const authorized = await input.authorizeVersionUse(ctx, creationInput.systemVersionId);
         if (!authorized.ok) return { ok: false, error: errors.not_found() };
 
-        const described = await input.runtime.describeVersion({ versionId: authorized.value.versionId });
+        const described = await input.runtime.describeVersion({
+          versionId: authorized.value.versionId,
+          ...(creationInput.includeFields ? { includeFields: true } : {}),
+        });
         if (!described.ok) return { ok: false, error: mapRuntimeError(described.error) };
 
         return { ok: true, value: described.value };
@@ -1423,7 +1441,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const page = records.slice(0, limit);
         const nextCursor =
           records.length > limit
-            ? encodeCursor({ updatedAt: page[page.length - 1]!.updatedAt, characterId: page[page.length - 1]!.characterId })
+            ? encodeCursor({ updatedAt: page[page.length - 1]!.updatedAtCursor, characterId: page[page.length - 1]!.characterId })
             : null;
         return {
           ok: true,
@@ -1618,7 +1636,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       }
     },
 
-    async open(ctx, characterId) {
+    async open(ctx, characterId, access) {
       try {
         const record = await repo.openOwnedCharacter(characterId, ctx.actorId);
         if (record !== null) {
@@ -1646,8 +1664,17 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
               replayed: false,
             },
           );
+          if (access?.standaloneOnly) {
+            const current = await repo.loadCharacterScope(characterId);
+            if (current?.ownerId !== ctx.actorId || current.campaignId !== null
+              || current.placementGeneration !== record.placementGeneration) {
+              return { ok: false, error: errors.not_found() };
+            }
+          }
           return { ok: true, value: view };
         }
+
+        if (access?.standaloneOnly) return { ok: false, error: errors.not_found() };
 
         // I6 Task 5 campaign read: active GMs see every attached sheet,
         // active players only sheets they control. The scope lookup stays on
@@ -1730,7 +1757,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         return {ok:true,value:{canPush:reason===null,reason,eligibleDiceIds:reason===null?eligible.eligibleDiceIds:[],revision:record.revision,nextAttempt:parent.roll.push!.attempt+1,maxAttempts:parent.context.policy.maxAttempts}};
       }catch{return {ok:false,error:errors.internal()};}
     },
-    async apply(ctx, command) {
+    async apply(ctx, command, access) {
       try {
         if (!Number.isInteger(command.expectedRevision) || command.expectedRevision < 1) {
           return { ok: false, error: errors.bad_request("expectedRevision must be a positive integer.") };
@@ -1774,6 +1801,10 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             : {}),
         });
 
+        if (access?.standaloneOnly && await repo.openOwnedCharacter(command.characterId, ctx.actorId) === null) {
+          return { ok: false, error: errors.not_found() };
+        }
+
         const claimStartedAt = now();
         const claimed = await claimExecution(input.pool, {
           actorId: ctx.actorId,
@@ -1790,8 +1821,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
         if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
         if (claimed.status === "replay") {
-          const denial = await authorizeStoredOutcome(ctx, command.characterId, claimed.resultJson, () =>
-            errors.not_found(),
+          const denial = await authorizeStoredOutcome(
+            ctx, command.characterId, claimed.resultJson, () => errors.not_found(), access?.standaloneOnly,
           );
           if (denial !== null) return denial;
           return replayStoredOutcome(claimed.resultJson);
@@ -1813,7 +1844,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         let pushMembership: MembershipRecord | null = null;
         if (snapshot === null) {
           const scope = await repo.loadCharacterScope(command.characterId);
-          if (scope === null || scope.campaignId === null) {
+          if (access?.standaloneOnly || scope === null || scope.campaignId === null) {
             const error = errors.not_found();
             await repo.finalizeExecutionError({
               executionId,
@@ -1899,6 +1930,14 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         }
 
         const resolveSource: CharacterRecord = attachedRecord ?? snapshot!;
+        if (access?.standaloneOnly && resolveSource.revision !== command.expectedRevision) {
+          return finishCommandTx({
+            ctx, outcome: { kind: "conflict", latestRevision: resolveSource.revision },
+            characterId: command.characterId, expectedRevision: command.expectedRevision,
+            attachedCampaignId, resultScope, executionId, replayExpiresAt,
+          });
+        }
+
         let pushParent:StoredPushRoll|null=null;
         if(command.kind==="pushRoll"){
           pushParent=await readPushRoll(input.pool,command.characterId,command.parentRollId);
@@ -2005,6 +2044,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           expectedRevision: command.expectedRevision,
           attachedCampaignId,
           resultScope,
+          standaloneOnly: access?.standaloneOnly ?? false,
           executionId,
           replayExpiresAt,
         });
@@ -2536,22 +2576,23 @@ function minimizeActivityPayload(kind: string, payload: unknown): unknown {
   }
 }
 
-function encodeCursor(cursor: { updatedAt: Date; characterId: CharacterId }): string {
-  const payload = JSON.stringify({ updatedAt: cursor.updatedAt.toISOString(), characterId: cursor.characterId });
-  return Buffer.from(payload, "utf8").toString("base64url");
+function encodeCursor(cursor: CharacterPageCursor): string {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
 }
 
-function decodeCursor(cursor: string | null): { updatedAt: Date; characterId: CharacterId } | null {
+function decodeCursor(cursor: string | null): CharacterPageCursor | null {
   if (cursor === null) return null;
   try {
     const payload = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as {
-      updatedAt: string;
-      characterId: string;
+      updatedAt: unknown;
+      characterId: unknown;
     };
-    if (typeof payload.updatedAt !== "string" || typeof payload.characterId !== "string") return null;
-    const updatedAt = new Date(payload.updatedAt);
-    if (Number.isNaN(updatedAt.getTime())) return null;
-    return { updatedAt, characterId: payload.characterId };
+    if (typeof payload.updatedAt !== "string" || typeof payload.characterId !== "string"
+      || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(payload.characterId)
+      || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.(?:\d{3}|\d{6})Z$/.test(payload.updatedAt)) return null;
+    const parsed = new Date(payload.updatedAt);
+    if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 19) !== payload.updatedAt.slice(0, 19)) return null;
+    return { updatedAt: payload.updatedAt, characterId: payload.characterId };
   } catch {
     return null;
   }

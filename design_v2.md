@@ -615,6 +615,25 @@ The owner approved the recommended [pre-upgrade remediation](docs/superpowers/pl
 
 Detailed contracts and required regression matrices are in the [I6 backend spec](docs/superpowers/specs/2026-09-09-i6-campaign-backend-design.md) Sections 3.5 and 4.1.1 and the claim/recovery plans. Their implementation, ordinary-player journey, durable recovery, cache/privacy and release gates remain unverified by this docs-only change.
 
+## 13.3 Public API v1 (2026-11-07)
+
+The separate `/api/v1` contract lets an account validate, create, save, and
+publish private system drafts and discover versions, create standalone
+characters, read their values, and edit individual fields. Both local and
+combined HTTP serving expose the same prefix and public OpenAPI document.
+Browser routes keep cookie authentication. The API uses scoped personal
+access tokens and checks current resource permissions for every request,
+including receipt replay. Characters owns the standalone-only policy and
+checks custody at the write boundary. Character pins are immutable.
+
+Identity stores token digests and handles issuance, expiration and revocation
+through the signed-in Account surface. Hosted issuance depends on a real
+provider. Local development can opt in with `SWEETROLL_LOCAL_API_TOKENS=1`.
+Authenticated request quotas use PostgreSQL counters shared across replicas.
+The [API plan](docs/superpowers/plans/2026-11-07-public-api-v1.md) defines the
+scope and hosted acceptance. The [quickstart](docs/api/v1.md) documents the
+wire contract and retry windows.
+
 # 14. Security, privacy, and abuse prevention
 
 | **Risk**                     | **Required control**                                                                                |

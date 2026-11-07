@@ -92,7 +92,7 @@ export type CreateCharacterInput = {
 };
 
 export type CharacterPageCursor = {
-  updatedAt: Date;
+  updatedAt: string;
   characterId: CharacterId;
 };
 
@@ -341,7 +341,7 @@ export interface CharacterPersistenceRepository {
   listOwnedCharactersPage(
     ownerId: UserId,
     page: { limit: number; cursor: CharacterPageCursor | null },
-  ): Promise<CharacterRecord[]>;
+  ): Promise<Array<CharacterRecord & { updatedAtCursor: string }>>;
 
   applyCommandTx(input: ApplyCommandInput): Promise<ApplyCommandOutcome>;
 
@@ -947,25 +947,23 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
     },
 
     async listOwnedCharactersPage(ownerId, page) {
-      const rows =
-        page.cursor === null
-          ? await pool.query<CharacterRow>(
-              `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
-                 FROM characters
-                WHERE owner_id = $1 AND campaign_id IS NULL
-                ORDER BY updated_at DESC, id DESC
-                LIMIT $2`,
-              [ownerId, page.limit],
-            )
-          : await pool.query<CharacterRow>(
-              `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
-                 FROM characters
-                WHERE owner_id = $1 AND campaign_id IS NULL AND (updated_at, id) < ($2, $3)
-                ORDER BY updated_at DESC, id DESC
-                LIMIT $4`,
-              [ownerId, page.cursor.updatedAt, page.cursor.characterId, page.limit],
-            );
-      return rows.rows.map(toCharacterRecord);
+      const params: unknown[] = [ownerId, page.limit];
+      let cursorClause = "";
+      if (page.cursor !== null) {
+        params.push(page.cursor.updatedAt, page.cursor.characterId);
+        cursorClause = "AND (updated_at, id) < ($3, $4)";
+      }
+      const result = await pool.query<CharacterRow & { updated_at_cursor: string }>(
+        `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id,
+                name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at,
+                to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS updated_at_cursor
+           FROM characters
+          WHERE owner_id = $1 AND campaign_id IS NULL ${cursorClause}
+          ORDER BY updated_at DESC, id DESC
+          LIMIT $2`,
+        params,
+      );
+      return result.rows.map((row) => ({ ...toCharacterRecord(row), updatedAtCursor: row.updated_at_cursor }));
     },
 
     async applyCommandTx(input) {
@@ -1003,7 +1001,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           [input.characterId],
         );
         const charRow = charResult.rows[0];
-        if (charRow === undefined || charRow.owner_id !== input.actorId) {
+        if (charRow === undefined || charRow.owner_id !== input.actorId || charRow.campaign_id !== null) {
           await client.query("ROLLBACK");
           return { kind: "not_found" };
         }

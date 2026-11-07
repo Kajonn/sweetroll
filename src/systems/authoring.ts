@@ -11,6 +11,7 @@ import {
   assessDocument,
   blankSystemDocument,
   documentChecksum,
+  documentDiagnosticPointers,
   documentFromPackage,
   hashInput,
   type PackageAssessment,
@@ -190,6 +191,7 @@ export type SharingResult = {
 };
 
 export interface SystemAuthoring extends SystemItemImages {
+  validateDocument(document: unknown): PackageAssessment;
   createDraft(ctx: RequestContext, input: CreateDraftInput): Promise<Result<AuthoringWorkspace>>;
   open(ctx: RequestContext, systemId: SystemId): Promise<Result<AuthoringWorkspace>>;
   list(
@@ -329,13 +331,24 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
 
   return {
     ...createSystemItemImages({ pool: input.pool, scanImage: scanner }),
+    validateDocument(document) {
+      const assessed = assessDocument(document);
+      return {
+        ok: assessed.assessment.ok,
+        diagnostics: documentDiagnosticPointers(assessed.document, assessed.assessment.diagnostics),
+      };
+    },
+
     async createDraft(ctx, input) {
       let newImages: PreparedItemImage[] = [], imagesCommitted = false;
       try {
         const inputHash = hashInput(input.source);
         const receipt = await receiptResult<AuthoringWorkspace>(ctx, "system_create", input.idempotencyKey, inputHash);
         if (receipt.replayed === "mismatch") return { ok: false, error: errors.mismatch() };
-        if (receipt.replayed === true) return { ok: true, value: receipt.value };
+        if (receipt.replayed === true) {
+          const owner = await authorizeOwner(receipt.value.system.systemId, ctx.actorId);
+          return owner === null ? { ok: false, error: errors.not_found() } : { ok: true, value: receipt.value };
+        }
 
         let document: SystemDocumentV1;
         let name: string;
@@ -375,38 +388,44 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           name = document.metadata.name;
         }
 
-        const system = await repo.createSystem({ ownerId: ctx.actorId, name });
-        await repo.appendAudit({
-          systemId: system.systemId,
-          actorId: ctx.actorId,
-          kind: "system_created",
-          summary: "System created",
-          requestId: ctx.requestId,
-        });
-        const saved = await repo.saveDraft({
-          systemId: system.systemId,
-          expectedRevision: null,
-          document,
-          sourceChecksum: documentChecksum(document),
-          updatedBy: ctx.actorId,
-          requestId: ctx.requestId,
-          newImages,
-          retainedImageIds,
-        });
-        if (!saved.ok) return { ok: false, error: errors.internal() };
-        imagesCommitted = true;
-        const versions = await repo.listVersions(system.systemId);
         const assessed = assessDocument(document);
-        const workspace = toWorkspace(system, saved.draft, versions, assessed.assessment);
-        await repo.recordReceipt({
+        const result = await repo.executeWithReceipt<AuthoringWorkspace, AppError>({
           actorId: ctx.actorId,
           commandKind: "system_create",
           key: input.idempotencyKey,
           inputHash,
-          result: workspace,
           expiresAt: new Date(now().getTime() + RECEIPT_TTL_MS),
+        }, async (transaction) => {
+          const system = await transaction.createSystem({ ownerId: ctx.actorId, name });
+          await transaction.appendAudit({
+            systemId: system.systemId,
+            actorId: ctx.actorId,
+            kind: "system_created",
+            summary: "System created",
+            requestId: ctx.requestId,
+          });
+          const saved = await transaction.saveDraft({
+            systemId: system.systemId,
+            expectedRevision: null,
+            document,
+            sourceChecksum: documentChecksum(document),
+            updatedBy: ctx.actorId,
+            requestId: ctx.requestId,
+            newImages,
+            retainedImageIds,
+          });
+          if (!saved.ok) throw new Error("A newly created system already has a draft.");
+          return { ok: true, value: toWorkspace(system, saved.draft, [], assessed.assessment) };
         });
-        return { ok: true, value: workspace };
+        if (!result.ok) return "mismatch" in result ? { ok: false, error: errors.mismatch() } : result;
+        if ("replayed" in result) {
+          if (await authorizeOwner(result.value.system.systemId, ctx.actorId) === null) {
+            return { ok: false, error: errors.not_found() };
+          }
+        } else {
+          imagesCommitted = true;
+        }
+        return { ok: true, value: result.value };
       } catch (cause) {
         return { ok: false, error: imageError(cause) };
       } finally {
@@ -456,6 +475,10 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
       try {
         const system = await authorizeOwner(input.systemId, ctx.actorId);
         if (system === null) return { ok: false, error: errors.not_found() };
+        const current = await repo.loadDraft(input.systemId);
+        if ((current?.revision ?? null) !== input.expectedRevision) {
+          return { ok: false, error: errors.conflict("The draft was modified by another request.", current?.revision ?? null) };
+        }
         const assessed = assessDocument(input.document);
         if (assessed.document === null) {
           return { ok: false, error: errors.invalid_package(assessed.assessment.diagnostics) };
@@ -477,7 +500,7 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
         const versions = await repo.listVersions(input.systemId);
         const renamedSystem = assessed.document.metadata.name.trim() === ""
           ? system
-          : { ...system, name: assessed.document.metadata.name };
+          : { ...system, name: assessed.document.metadata.name, updatedAt: saved.draft.updatedAt };
         return { ok: true, value: toWorkspace(renamedSystem, saved.draft, versions, assessed.assessment) };
       } catch (cause) {
         return { ok: false, error: imageError(cause) };
@@ -543,13 +566,17 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           releaseNotes: input.releaseNotes,
           acknowledgeBreaking: input.acknowledgeBreaking,
         });
-        const receipt = await receiptResult<PublishedVersion>(ctx, "system_publish", input.idempotencyKey, inputHash);
+        const commandKind = "system_publish";
+        const receipt = await receiptResult<PublishedVersion>(ctx, commandKind, input.idempotencyKey, inputHash);
         if (receipt.replayed === "mismatch") return { ok: false, error: errors.mismatch() };
         if (receipt.replayed === true) return { ok: true, value: receipt.value };
 
         const draft = await repo.loadDraft(input.systemId);
         if (draft === null) return { ok: false, error: errors.not_found("The system has no draft to publish.") };
         if (draft.revision !== input.expectedRevision) {
+          const completed = await receiptResult<PublishedVersion>(ctx, commandKind, input.idempotencyKey, inputHash);
+          if (completed.replayed === "mismatch") return { ok: false, error: errors.mismatch() };
+          if (completed.replayed === true) return { ok: true, value: completed.value };
           return {
             ok: false,
             error: errors.conflict("The draft was modified by another request.", draft.revision),
@@ -586,60 +613,46 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
           }
         }
 
-        const result = await repo.publishVersion({
-          systemId: input.systemId,
-          versionId,
-          expectedRevision: draft.revision,
-          sourceChecksum: draft.sourceChecksum,
-          semanticVersion: input.semanticVersion,
-          checksum: compiled.value.integrity.checksum,
-          package: compiled.value,
-          releaseNotes: input.releaseNotes,
-          compatibilityFindings,
-          acknowledgeBreaking: input.acknowledgeBreaking,
+        const publication = await repo.executeWithReceipt<PublishedVersion, AppError>({
           actorId: ctx.actorId,
-          requestId: ctx.requestId,
-        });
-        if (!result.ok) {
-          if (result.code === "stale_revision") {
-            return {
-              ok: false,
-              error: errors.conflict("The draft was modified by another request.", result.latestRevision),
-            };
-          }
-          if (result.code === "breaking_version") {
-            return {
-              ok: false,
-              error: errors.invalid_package(result.findings as unknown as PackageDiagnostic[]),
-            };
-          }
-          return {
-            ok: false,
-            error: errors.conflict(
-              "A version with this semantic version or identical content already exists for this system.",
-            ),
-          };
-        }
-
-        const published: PublishedVersion = {
-          versionId: result.version.versionId,
-          systemId: result.version.systemId,
-          semanticVersion: result.version.semanticVersion,
-          checksum: result.version.checksum,
-          package: compiled.value,
-          releaseNotes: result.version.releaseNotes,
-          lifecycle: result.version.lifecycle,
-          createdAt: result.version.createdAt,
-        };
-        await repo.recordReceipt({
-          actorId: ctx.actorId,
-          commandKind: "system_publish",
+          commandKind,
           key: input.idempotencyKey,
           inputHash,
-          result: published,
           expiresAt: new Date(now().getTime() + RECEIPT_TTL_MS),
+        }, async (transaction) => {
+          const result = await transaction.publishVersion({
+            systemId: input.systemId,
+            versionId,
+            expectedRevision: draft.revision,
+            sourceChecksum: draft.sourceChecksum,
+            semanticVersion: input.semanticVersion,
+            checksum: compiled.value.integrity.checksum,
+            package: compiled.value,
+            releaseNotes: input.releaseNotes,
+            compatibilityFindings,
+            compatibilityBaseVersionId: latest?.versionId ?? null,
+            acknowledgeBreaking: input.acknowledgeBreaking,
+            actorId: ctx.actorId,
+            requestId: ctx.requestId,
+          });
+          if (!result.ok) {
+            switch (result.code) {
+              case "stale_revision":
+                return { ok: false, error: errors.conflict("The draft was modified by another request.", result.latestRevision) };
+              case "breaking_version":
+                return { ok: false, error: errors.invalid_package(result.findings) };
+              case "not_found":
+                return { ok: false, error: errors.not_found() };
+              case "archived":
+                return { ok: false, error: errors.conflict("An archived system cannot publish versions.") };
+              case "duplicate_version":
+                return { ok: false, error: errors.conflict("A version with this semantic version or identical content already exists for this system.") };
+            }
+          }
+          return { ok: true, value: { ...result.version, package: compiled.value } };
         });
-        return { ok: true, value: published };
+        if (!publication.ok) return "mismatch" in publication ? { ok: false, error: errors.mismatch() } : publication;
+        return { ok: true, value: publication.value };
       } catch (cause) {
         return { ok: false, error: imageError(cause) };
       }

@@ -3,11 +3,12 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 import Fastify from "fastify";
+import type { Pool } from "pg";
 
 import { SystemDocumentV1Schema } from "../src/systems/implementation/package/schema/document.js";
 import { SystemExportV1Schema } from "../src/systems/implementation/package/schema/export.js";
 import { SystemPackageV1Schema } from "../src/systems/implementation/package/schema/package.js";
-import { d20Export } from "../src/systems/implementation/package/fixtures/d20.js";
+import { d20Document, d20Export } from "../src/systems/implementation/package/fixtures/d20.js";
 import type { Characters } from "../src/characters/index.js";
 import type { Campaigns } from "../src/campaigns/index.js";
 import type { SystemRuntime } from "../src/systems/runtime.js";
@@ -15,6 +16,7 @@ import type { Identity } from "../src/identity/index.js";
 import { buildCampaignsRoutes } from "../src/transport/http/campaigns.js";
 import { buildCharactersRoutes } from "../src/transport/http/characters.js";
 import { buildIdentityRoutes } from "../src/transport/http/identity.js";
+import { buildPublicApi, publicApiPrefix } from "../src/transport/http/public-api/index.js";
 import { buildOpenApiDocument } from "../src/transport/http/openapi.js";
 import { buildSystemsRoutes } from "../src/transport/http/systems.js";
 import type { SystemAuthoring } from "../src/systems/authoring.js";
@@ -26,21 +28,18 @@ const outputs = new Map<string, unknown>([
   ["docs/contracts/system-package-v1.schema.json", SystemPackageV1Schema],
   ["docs/contracts/system-export-v1.schema.json", SystemExportV1Schema],
   ["docs/contracts/examples/d20-system-export-v1.json", d20Export],
+  ["docs/contracts/examples/d20-system-document-v1.json", d20Document],
 ]);
 
 const checkMode = process.argv.includes("--check");
 const diffs: string[] = [];
 
-for (const [relativePath, value] of outputs) {
+function emitJson(relativePath: string, value: unknown): void {
   const content = JSON.stringify(value, null, 2) + "\n";
   const absolutePath = resolve(cwd, relativePath);
-
   if (checkMode) {
     try {
-      const existing = readFileSync(absolutePath, "utf8");
-      if (existing !== content) {
-        diffs.push(relativePath);
-      }
+      if (readFileSync(absolutePath, "utf8") !== content) diffs.push(relativePath);
     } catch {
       diffs.push(relativePath);
     }
@@ -50,9 +49,13 @@ for (const [relativePath, value] of outputs) {
   }
 }
 
+for (const [relativePath, value] of outputs) emitJson(relativePath, value);
+
 async function emitOpenApi(): Promise<void> {
   const app = Fastify({ logger: false });
   const identity: Identity = {
+    personalTokens: {} as Identity["personalTokens"],
+    getDisplayNames: async () => ({ ok: true, value: [] }),
     completeSignIn: async () => {
       throw new Error("not used");
     },
@@ -74,28 +77,15 @@ async function emitOpenApi(): Promise<void> {
       runtime: {} as SystemRuntime,
     }),
   );
+  await app.register(buildPublicApi({
+    identity, pool: {} as Pool, authoring: {} as SystemAuthoring, characters: {} as Characters,
+  }), { prefix: publicApiPrefix });
   await app.ready();
   try {
-    const doc = buildOpenApiDocument(app);
-    const content = JSON.stringify(doc, null, 2) + "\n";
-    const relativePath = "docs/contracts/openapi-v1.json";
-    const absolutePath = resolve(cwd, relativePath);
-
-    if (checkMode) {
-      let existing: string;
-      try {
-        existing = readFileSync(absolutePath, "utf8");
-      } catch {
-        diffs.push(relativePath);
-        return;
-      }
-      if (existing !== content) {
-        diffs.push(relativePath);
-      }
-    } else {
-      mkdirSync(dirname(absolutePath), { recursive: true });
-      writeFileSync(absolutePath, content, "utf8");
-    }
+    emitJson("docs/contracts/openapi-v1.json", buildOpenApiDocument(app));
+    const response = await app.inject(`${publicApiPrefix}/openapi.json`);
+    if (response.statusCode !== 200) throw new Error("Public API contract route failed.");
+    emitJson("docs/contracts/public-api-v1.json", response.json());
   } finally {
     await app.close();
   }

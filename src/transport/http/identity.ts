@@ -119,7 +119,7 @@ export const identityRouteDefinitions: readonly IdentityRouteDefinition[] = [
   },
 ];
 
-function isSameOrigin(origin: string, request: FastifyRequest, allowedOrigins: ReadonlyArray<string>): boolean {
+export function isSameOrigin(origin: string, request: FastifyRequest, allowedOrigins: ReadonlyArray<string>): boolean {
   if (allowedOrigins.includes(origin)) return true;
   try {
     // Compare the Origin host (including port) against the request Host header.

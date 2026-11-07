@@ -64,10 +64,8 @@ test("hosted scene controls, redacted pixels, display reconnect and revocation",
     const dialog = page.getByRole("dialog"); await expect(dialog).toBeVisible();
     const code = (await dialog.locator("strong").last().innerText()).trim();
     await dialog.getByRole("button", { name: "Done", exact: true }).click();
-    const seen: string[] = [], bodies: Promise<string>[] = [];
+    const seen: string[] = [];
     dp.on("request", r => { if (r.url().startsWith(baseURL!)) seen.push(new URL(r.url()).pathname); });
-    const recordProjection = (r: import("@playwright/test").Response) => { if (r.url().includes("/projection")) bodies.push(r.text()); };
-    dp.on("response", recordProjection);
     await dp.goto(`/display?sceneId=${sid}`);
     await dp.getByLabel(/display code/i).fill(code); await dp.getByRole("button", { name: "Connect display", exact: true }).click();
     await expect(dp.getByRole("img", { name: "Display image" })).toBeVisible({timeout:15_000});
@@ -97,8 +95,17 @@ test("hosted scene controls, redacted pixels, display reconnect and revocation",
     for (const path of cachePaths) expect(path).toMatch(/^\/(?:index\.html|assets\/[^/]+)$/);
     expect(cachePaths.some(path=>path.startsWith("/api/"))).toBe(false);
     expect(seen.filter(p => /^\/api\/(campaigns|scenes|characters|content|systems)/.test(p))).toEqual(expect.arrayContaining([`/api/campaigns/${cid}`, `/api/scenes/${sid}`])); // only explicit denial probes above
-    dp.off("response", recordProjection);
-    const projections = await Promise.all(bodies);
+    // Read one streamed snapshot with the stored display credential.
+    const streamCredential = await dp.evaluate(() => JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!) as { displayId: string; secret: string });
+    expect(seen).toContain(`/api/displays/${streamCredential.displayId}/scenes/${sid}/events`);
+    const projections = [await dp.evaluate(async ({ path, secret }: { path: string; secret: string }) => {
+        // First complete `event: scene` message of the live stream, then abort.
+        const controller = new AbortController();
+        const response = await fetch(path, { headers: { "x-display-secret": secret }, credentials: "omit", signal: controller.signal });
+        const reader = response.body!.getReader(); const decoder = new TextDecoder(); let text = "";
+        for (;;) { const at = text.indexOf("event: scene"); if (at >= 0 && text.indexOf("\n\n", at) >= 0) break; const { value, done } = await reader.read(); if (done) break; text += decoder.decode(value, { stream: true }); }
+        controller.abort(); return text;
+      }, { path: `/api/displays/${streamCredential.displayId}/scenes/${sid}/events`, secret: streamCredential.secret })];
     expect(projections.length).toBeGreaterThan(0);
     for (const body of projections) { expect(body).not.toContain("GM SECRET"); expect(body).not.toContain("Fog-covered guard"); expect(body).not.toContain(original.toString("base64")); }
     await test.info().attach("restricted-display-tablet", { body: await dp.screenshot({ fullPage: true }), contentType: "image/png" });
@@ -137,7 +144,9 @@ test("hosted scene controls, redacted pixels, display reconnect and revocation",
     await expect(dp.getByRole("img", { name: "Display image" })).toHaveCount(0);
     const revokedRead = await dp.evaluate(async sid => {
       const credential=JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!);
-      const r=await fetch(`/api/displays/${credential.displayId}/scenes/${sid}/projection`,{headers:{"x-display-secret":credential.secret},cache:"no-store"});
+      const c=new AbortController();
+      const r=await fetch(`/api/displays/${credential.displayId}/scenes/${sid}/events`,{headers:{"x-display-secret":credential.secret},cache:"no-store",signal:c.signal});
+      c.abort();
       return {status:r.status,type:r.headers.get("content-type")};
     },sid);
     expect(revokedRead.status).toBe(404);

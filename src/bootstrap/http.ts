@@ -7,6 +7,7 @@ import { createSystemAuthoringModule } from "../systems/authoring.js";
 import { createCharactersModule } from "../characters/index.js";
 import { createCampaignPlacement } from "../characters/campaignPlacement.js";
 import { createCampaignsModule } from "../campaigns/index.js";
+import { createSceneEventHub } from "../campaigns/scene-events.js";
 import {
   createSystemPersistenceRepository,
   seedReferenceTemplates,
@@ -122,7 +123,15 @@ const placement = createCampaignPlacement({
   runtime,
   maxAttachedCharacters: placementLimits.maxAttachedCharacters,
 });
+// Scene streaming: one dedicated LISTEN connection per process, separate
+// from the request pool. Until it is listening, display streams answer 503
+// and displays retry; it reconnects by itself after a failure.
+const sceneEvents = createSceneEventHub({ connection: { connectionString: config.databaseUrl }, logger });
+void sceneEvents.start().catch((error: unknown) => {
+  logger.warn({ err: error }, "scene event listener not ready; retrying");
+});
 const campaigns = createCampaignsModule({
+  sceneEvents,
   pool,
   limits: placementLimits,
   charactersPlacement: placement,
@@ -174,6 +183,7 @@ void app.register(
 const shutdown = async (signal: string) => {
   logger.info({ signal }, "shutting down HTTP process");
   await app.close();
+  await sceneEvents.close();
   await pool.end();
 };
 

@@ -9,12 +9,10 @@ import {
   campaignInvitationsKey,
   campaignListKey,
   campaignMembersKey,
-  displayProjectionKey,
   sceneDetailKey,
   useApplyFogEdit,
   useCampaignList,
   useCampaignMembers,
-  useDisplayProjection,
   useScene,
 } from "./campaignQueries.js";
 
@@ -146,45 +144,8 @@ describe("useScene", () => {
   });
 });
 
-describe("displayProjectionKey", () => {
-  it("keys the projection by display credential, scene, and revision", () => {
-    expect(displayProjectionKey("d1", "s1", 3)).toEqual(["displays", "projection", "d1", "s1", 3]);
-    expect(displayProjectionKey("d1", "s1", 3)).not.toEqual(displayProjectionKey("d1", "s1", 4));
-    expect(displayProjectionKey("d1", "s1", 3)).not.toEqual(displayProjectionKey("d2", "s1", 3));
-  });
-});
-
-describe("useDisplayProjection", () => {
-  it("stays disabled without a credential or while offline", () => {
-    const api = { getDisplayProjection: vi.fn() };
-    const noCredential = renderHook(
-      () => useDisplayProjection(api as never, "d1", "s1", 3, null, { enabled: true, online: true }),
-      { wrapper: wrapper() },
-    );
-    const offline = renderHook(
-      () => useDisplayProjection(api as never, "d1", "s1", 3, "s3cr3t", { enabled: true, online: false }),
-      { wrapper: wrapper() },
-    );
-    expect(noCredential.result.current.status).toBe("pending");
-    expect(offline.result.current.status).toBe("pending");
-    expect(api.getDisplayProjection).not.toHaveBeenCalled();
-  });
-
-  it("reads the projection with the display credential while online", async () => {
-    const api = {
-      getDisplayProjection: vi.fn().mockResolvedValue({ projection: { sceneId: "s1" }, requestId: "r" }),
-    };
-    const { result } = renderHook(
-      () => useDisplayProjection(api as never, "d1", "s1", 3, "s3cr3t", { enabled: true, online: true }),
-      { wrapper: wrapper() },
-    );
-    await waitFor(() => expect(api.getDisplayProjection).toHaveBeenCalledWith("d1", "s1", "s3cr3t"));
-    await waitFor(() => expect(result.current.status).toBe("success"));
-  });
-});
-
 describe("useApplyFogEdit", () => {
-  it("commits with a caller-minted key and invalidates the scene and projection keys", async () => {
+  it("commits with a caller-minted key and invalidates the scene keys only", async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const withClient = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={qc}>{children}</QueryClientProvider>
@@ -193,7 +154,6 @@ describe("useApplyFogEdit", () => {
       applyFogEdit: vi.fn().mockResolvedValue({ scene: { sceneId: "s1" }, requestId: "r" }),
     };
     qc.setQueryData(sceneDetailKey("c1", "s1", "u1", 0), { scene: { sceneId: "s1" } });
-    qc.setQueryData(displayProjectionKey("d1", "s1", 3), { projection: { sceneId: "s1" } });
     const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
     const { result } = renderHook(() => useApplyFogEdit(api as never, "c1", "s1"), {
       wrapper: withClient,
@@ -210,15 +170,7 @@ describe("useApplyFogEdit", () => {
       idempotencyKey,
     });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["campaigns", "scene", "c1"] });
-    const projectionCall = invalidateSpy.mock.calls.find((call) => {
-      const key = (call[0] as { queryKey?: readonly unknown[] }).queryKey;
-      return key?.[0] === "displays";
-    });
-    expect(projectionCall).toBeDefined();
-    const predicate = (projectionCall?.[0] as { predicate?: (query: { queryKey: unknown }) => boolean })
-      .predicate;
-    expect(predicate).toEqual(expect.any(Function));
-    expect(predicate?.({ queryKey: displayProjectionKey("d1", "s1", 3) })).toBe(true);
-    expect(predicate?.({ queryKey: displayProjectionKey("d1", "s2", 3) })).toBe(false);
+    // Displays get committed changes from the scene stream, not query caches.
+    expect(invalidateSpy.mock.calls.some((call) => (call[0] as { queryKey?: readonly unknown[] }).queryKey?.[0] === "displays")).toBe(false);
   });
 });

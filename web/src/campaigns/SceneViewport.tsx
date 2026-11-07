@@ -14,7 +14,8 @@ import { useTokenCommands } from "./useTokenCommands.js";
 import { t } from "../i18n/index.js";
 import { Button, EmptyState, PageHeader, Panel } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
-import { useScene } from "./campaignQueries.js";
+import { sceneDetailKey, useScene } from "./campaignQueries.js";
+import { useQueryClient } from "@tanstack/react-query";
 import { useFogEditor, MAX_FOG_DABS, type FogMode, type FogDab } from "./useFogEditor.js";
 import { SceneFogOverlay } from "./SceneFogOverlay.js";
 import { FogToolbarView } from "./FogToolbar.js";
@@ -176,6 +177,7 @@ function CampaignSceneScope(props: {
 }) {
   const online = props.online ?? true;
   const generation = props.generation ?? 0;
+  const queryClient = useQueryClient();
   const sceneQuery = useScene(props.api as CampaignsApi, props.campaignId, props.sceneId, props.actorId, generation, {
     enabled: props.sceneId !== "" && online,
     online,
@@ -242,17 +244,21 @@ function CampaignSceneScope(props: {
     );
   }
 
-  return <SceneEditor key={sceneQuery.data!.scene.backgroundFileId} scene={sceneQuery.data!.scene} library={library} props={props} refresh={async () => { const result = await sceneQuery.refetch(); if (result.error) throw result.error; return result.data!.scene.revision; }} />;
+  const adopt = (scene: SceneView): void => {
+    queryClient.setQueryData(sceneDetailKey(props.campaignId, props.sceneId, props.actorId, generation), (old: unknown) =>
+      old && typeof old === "object" ? { ...(old as object), scene } : old);
+  };
+  return <SceneEditor key={sceneQuery.data!.scene.backgroundFileId} scene={sceneQuery.data!.scene} library={library} props={props} adopt={adopt} refresh={async () => { const result = await sceneQuery.refetch(); if (result.error) throw result.error; return result.data!.scene.revision; }} />;
 }
 
-function SceneEditor({ scene, library, props, refresh }: { scene: SceneView; library: React.ReactNode; props: Parameters<typeof CampaignSceneView>[0]; refresh(): Promise<number> }) {
+function SceneEditor({ scene, library, props, refresh, adopt }: { scene: SceneView; library: React.ReactNode; props: Parameters<typeof CampaignSceneView>[0]; refresh(): Promise<number>; adopt(scene: SceneView): void }) {
   const online = props.online ?? true, generation = props.generation ?? 0;
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   const [mode, setMode] = useState<SceneMode>("move");
   const viewportRef = useRef<HTMLDivElement>(null);
   const [placement, setPlacement] = useState<{ label: string; size: number; visible: boolean; imageFileId: string | null } | null>(null);
-  const commands = useTokenCommands({ api: props.api, sceneId: scene.sceneId, sceneRevision: scene.revision, online, onChanged: refresh });
-  const fog = useFogEditor({ api: props.api, sceneId: scene.sceneId, sceneRevision: scene.revision, online, enabled: !commands.blocked, onChanged: refresh });
+  const commands = useTokenCommands({ api: props.api, sceneId: scene.sceneId, sceneRevision: scene.revision, online, onChanged: refresh, onApplied: adopt });
+  const fog = useFogEditor({ api: props.api, sceneId: scene.sceneId, sceneRevision: scene.revision, online, enabled: !commands.blocked, onChanged: refresh, onApplied: adopt });
   const imageUrl = `/api/campaigns/${props.campaignId}/images/${scene.backgroundFileId}/original`;
   const refetch = (): void => { void refresh().catch(() => {}); };
   if (commands.status === "unavailable" || fog.status === "unavailable") return <EmptyState title={t("campaign.detail.scenes.unavailable.title")} description={t("campaign.detail.scenes.unavailable.description")} />;

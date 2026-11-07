@@ -1,3 +1,4 @@
+import { PassThrough } from "node:stream";
 import { SystemPresentationSchema } from "../../systems/implementation/package/schema/document.js";
 import { campaignItemImageHandlers, campaignItemImageRoutes } from "./campaignItemImages.js";
 import {campaignProposalRoutes,campaignProposalHandlers,CampaignProposalDto} from "./campaignProposals.js";
@@ -575,7 +576,7 @@ const FogRunDto = Type.Object({
 
 const FogOpDto = Type.Object({
   mode: Type.Union([Type.Literal("reveal"), Type.Literal("conceal")]),
-  runs: Type.Array(FogRunDto, { minItems: 1 }),
+  runs: Type.Array(FogRunDto, { minItems: 1, maxItems: 512 }),
 });
 
 const TokenRecordDto = Type.Object({
@@ -609,6 +610,10 @@ const DisplayProjectionTokenDto = Type.Object({
 const DisplayProjectionDto = Type.Object({
   sceneId: Type.String(),
   sceneRevision: Type.Integer(),
+  imageRevision: Type.Integer({
+    minimum: 1,
+    description: "Player-safe map version. Changes only when fog or a different background changes the map.",
+  }),
   imageUrl: Type.String(),
   tokens: Type.Array(DisplayProjectionTokenDto),
 });
@@ -699,6 +704,9 @@ const RedeemDisplayBody = Type.Object({
 // arrive as strings; Fastify coerces to Integer under the shared query
 // validation (same as the PageQuery limit), and the handler rechecks.
 const ImageRevQuery = Type.Object({ rev: Type.Integer({ minimum: 1 }) });
+// Token art is keyed by the token's image file, so its URL stays stable while
+// the token moves; a different or missing file reads as not_found.
+const TokenImageQuery = Type.Object({ file: Type.String({ format: UUID_FORMAT }) });
 
 const CampaignImageParams = Type.Object({
   id: Type.String({ format: UUID_FORMAT }),
@@ -1410,15 +1418,26 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
   },
   {
     method: "get",
-    path: "/displays/:id/scenes/:sceneId/projection",
-    operationId: "get_displays_id_scenes_sceneId_projection",
+    path: "/displays/:id/scenes/:sceneId/events",
+    operationId: "get_displays_id_scenes_sceneId_events",
     schema: {
       params: DisplaySceneParams,
       response: {
-        "200": Type.Object({ projection: DisplayProjectionDto, requestId: Type.String() }),
+        "200": {
+          // Documents the JSON `data:` of each `event: scene` message (the
+          // stream itself is never serialized through this schema).
+          schema: Type.Object(DisplayProjectionDto.properties, {
+            description:
+              "Server-sent events. Each `event: scene` message carries this complete credential-scoped " +
+              "projection as JSON data (newer sceneRevision only); `event: revoked` ends the stream when " +
+              "access is lost; `: hb` comment lines are heartbeats. Authenticate with the X-Display-Secret header.",
+          }),
+          mediaType: "text/event-stream",
+        },
         "400": CampaignErrorEnvelope,
         "404": CampaignErrorEnvelope,
         "500": CampaignErrorEnvelope,
+        "503": CampaignErrorEnvelope,
       },
     },
   },
@@ -1443,7 +1462,7 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
     operationId: "get_displays_id_scenes_sceneId_tokens_tokenId_image",
     schema: {
       params: DisplayTokenParams,
-      querystring: ImageRevQuery,
+      querystring: TokenImageQuery,
       response: {
         "200": { schema: BinaryBodyDto, mediaType: "image/png" },
         "400": CampaignErrorEnvelope,
@@ -1476,11 +1495,17 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
       // plugin-scoped onSend covers reads, mutations and errors alike; no
       // shared HTTP cache or service-worker payload caching is introduced.
       // Binary display routes set their own Cache-Control first
-      // (revision-keyed derivatives are privately cacheable), so the
-      // default applies only when the handler set none.
+      // (`private, no-store`), so the default applies only when the
+      // handler set none.
       if (reply.getHeader("cache-control") === undefined) {
         reply.header("cache-control", "no-store");
       }
+    });
+
+    // Long-lived display streams would otherwise hold server.close() open.
+    app.addHook("preClose", async () => {
+      // Contract generation builds routes over a stub module.
+      if (typeof campaigns.closeDisplayStreams === "function") campaigns.closeDisplayStreams();
     });
 
     app.addHook("preHandler", async (request, reply) => {
@@ -2538,15 +2563,48 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         return { display: result.value, requestId: request.id };
       },
 
-      get_displays_id_scenes_sceneId_projection: async (request, reply) => {
+      get_displays_id_scenes_sceneId_events: async (request, reply) => {
         const params = request.params as { id: string; sceneId: string };
-        const result = await campaigns.getDisplayProjection({
+        const opened = await campaigns.openDisplayStream({
           displayId: params.id,
           secret: displaySecretOf(request),
           sceneId: params.sceneId,
         });
-        if (!result.ok) return sendError(reply, result.error, request.id);
-        return { projection: result.value, requestId: request.id };
+        if (!opened.ok) {
+          if (opened.error.code === "unavailable") {
+            return reply.code(503).header("retry-after", "2").send({
+              error: { code: "unavailable", message: opened.error.message },
+              requestId: request.id,
+            });
+          }
+          return sendError(reply, opened.error, request.id);
+        }
+        const stream = opened.value;
+        const body = new PassThrough();
+        const end = (): void => {
+          stream.close();
+        };
+        request.raw.once("close", end);
+        body.once("close", end);
+        body.once("error", end);
+        reply
+          .code(200)
+          .header("content-type", "text/event-stream; charset=utf-8")
+          .header("cache-control", "no-store")
+          .header("x-accel-buffering", "no")
+          .header("x-content-type-options", "nosniff");
+        // Initial comment flushes headers through proxies before the first snapshot.
+        body.write(": open\n\n");
+        stream.attach({
+          write: (chunk) => body.write(chunk),
+          onDrain: (callback) => {
+            body.on("drain", callback);
+          },
+          end: () => {
+            if (!body.writableEnded) body.end();
+          },
+        });
+        return reply.send(body);
       },
 
       get_displays_id_scenes_sceneId_image: async (request, reply) => {
@@ -2561,24 +2619,30 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         reply.header("content-type", result.value.contentType);
-        reply.header("cache-control", "private, max-age=3600");
+        // Never reusable from a browser cache: every read re-checks the
+        // credential, fog and image revision (token art URLs are stable).
+        reply.header("cache-control", "private, no-store");
         return reply.send(result.value.bytes);
       },
 
       get_displays_id_scenes_sceneId_tokens_tokenId_image: async (request, reply) => {
         const params = request.params as { id: string; sceneId: string; tokenId: string };
-        // The rev query key is enforced by the route schema (required cache
-        // key); token bytes are immutable originals, so the handler serves
-        // the current bytes without matching rev to the scene revision.
+        // The file query key must name the token's current image file; the
+        // URL stays stable across token moves (no scene-revision key).
+        const query = request.query as { file?: unknown } | undefined;
+        const file = typeof query?.file === "string" ? query.file : "";
         const result = await campaigns.getDisplayTokenImage({
           displayId: params.id,
           secret: displaySecretOf(request),
           sceneId: params.sceneId,
           tokenId: params.tokenId,
+          file,
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         reply.header("content-type", result.value.contentType);
-        reply.header("cache-control", "private, max-age=3600");
+        // Never reusable from a browser cache: every read re-checks the
+        // credential, fog and image revision (token art URLs are stable).
+        reply.header("cache-control", "private, no-store");
         return reply.send(result.value.bytes);
       },
     };

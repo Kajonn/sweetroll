@@ -1,17 +1,17 @@
 // web/src/display/DisplayView.test.tsx
-// Task 7 RED: code entry redeems and renders the projection; entry purges
-// ["campaigns", ...] GM state before the first projection fetch; revoked
-// credentials blank with no GM chrome or GM endpoint calls.
+// Display shell over the live scene stream: code entry redeems and renders
+// streamed snapshots; entry purges ["campaigns", ...] GM state before the
+// stream opens; disconnects and revocation blank the frame; image-revision
+// changes clear the map until the new redacted bytes arrive.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  DISPLAY_CREDENTIAL_STORAGE_KEY,
-  DisplayView,
-} from "./DisplayView.js";
+import { DISPLAY_CREDENTIAL_STORAGE_KEY, DisplayView } from "./DisplayView.js";
+import type { SceneStreamFactory, SceneStreamHandlers, SceneStreamOptions } from "./sceneStream.js";
+import type { DisplayProjection } from "../campaigns/types.js";
 
 function memoryStorage(initial: Record<string, string> = {}) {
   const store = new Map<string, string>(Object.entries(initial));
@@ -26,337 +26,290 @@ function memoryStorage(initial: Record<string, string> = {}) {
   };
 }
 
-function projectionPayload(overrides: Record<string, unknown> = {}) {
+function projection(overrides: Partial<DisplayProjection> = {}): DisplayProjection {
   return {
-    projection: {
-      sceneId: "s1",
-      sceneRevision: 3,
-      imageUrl: "/displays/d1/scenes/s1/image?rev=3",
-      tokens: [
-        { tokenId: "t1", label: "Alpha", x: 0.25, y: 0.5, size: 1, imageUrl: null },
-      ],
-    },
-    requestId: "r-projection",
+    sceneId: "s1",
+    sceneRevision: 3,
+    imageRevision: 2,
+    imageUrl: "/displays/d1/scenes/s1/image?rev=2",
+    tokens: [{ tokenId: "t1", label: "Alpha", x: 0.25, y: 0.5, size: 1, imageUrl: null }],
     ...overrides,
   };
 }
 
-function failingApi() {
+/** Controllable stand-in for the fetch-based SSE client. */
+function fakeStreams() {
+  const opened: Array<{ options: SceneStreamOptions; handlers: SceneStreamHandlers; closed: boolean; retries: number }> = [];
+  const factory: SceneStreamFactory = vi.fn((options, handlers) => {
+    const entry = { options, handlers, closed: false, retries: 0 };
+    opened.push(entry);
+    return {
+      close: () => {
+        entry.closed = true;
+      },
+      retryNow: () => {
+        entry.retries += 1;
+      },
+    };
+  });
+  const current = () => opened.at(-1)!;
   return {
-    redeemDisplay: vi.fn(),
-    getDisplayProjection: vi.fn(),
-    openCampaign: vi.fn(),
-    openScene: vi.fn(),
+    factory,
+    opened,
+    snapshot(value: DisplayProjection) {
+      act(() => {
+        current().handlers.onSnapshot(value);
+        current().handlers.onStatus("open");
+      });
+    },
+    status(value: Parameters<SceneStreamHandlers["onStatus"]>[0]) {
+      act(() => current().handlers.onStatus(value));
+    },
   };
 }
 
-function renderDisplay(
-  ui: ReactNode,
-  client: QueryClient,
-) {
+function api() {
+  return { redeemDisplay: vi.fn(), openCampaign: vi.fn(), openScene: vi.fn() };
+}
+
+function renderDisplay(ui: ReactNode, client: QueryClient) {
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
 function seedCredential() {
-  return {
-    [DISPLAY_CREDENTIAL_STORAGE_KEY]: JSON.stringify({ displayId: "d1", secret: "s3cr3t" }),
-  };
+  return { [DISPLAY_CREDENTIAL_STORAGE_KEY]: JSON.stringify({ displayId: "d1", secret: "s3cr3t" }) };
 }
 
+type Deferred = { resolve(value: unknown): void };
+
 describe("DisplayView", () => {
+  let pendingImages: Map<string, Deferred[]>;
+  let blobCount: number;
   beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ok:true,blob:async()=>new Blob(["redacted"],{type:"image/png"})}));
-    vi.stubGlobal("URL", class extends URL {
-      static createObjectURL = vi.fn(() => "blob:redacted");
-      static revokeObjectURL = vi.fn();
-    });
+    pendingImages = new Map();
+    blobCount = 0;
+    // Image bytes resolve immediately unless a test holds them.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({ ok: true, blob: async () => new Blob([url], { type: "image/png" }) })),
+    );
+    vi.stubGlobal(
+      "URL",
+      class extends URL {
+        static createObjectURL = vi.fn((blob: Blob) => `blob:${blob.size}:${++blobCount}`);
+        static revokeObjectURL = vi.fn();
+      },
+    );
   });
-  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
-  it("fetches token art only with the display credential and blanks/revokes its URL on revocation", async () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const api = failingApi();
-    const payload = projectionPayload(); payload.projection.tokens = [{ tokenId:"t1",label:"Alpha",x:.25,y:.5,size:.12,imageUrl:"/displays/d1/scenes/s1/tokens/t1/image?rev=3" }] as never;
-    api.getDisplayProjection.mockResolvedValue(payload);
-    renderDisplay(<DisplayView api={api as never} sceneId="s1" online pollMs={50} storage={memoryStorage(seedCredential())} />, qc);
-    await waitFor(() => expect(screen.getByText("Alpha").closest("li")?.querySelector("img")).not.toBeNull());
-    const image = screen.getByText("Alpha").closest("li")!.querySelector("img")!;
-    expect(image.closest("li")).toHaveStyle({width:"12%",left:"25%",top:"50%"});
-    expect(fetch).toHaveBeenCalledWith("/api/displays/d1/scenes/s1/tokens/t1/image?rev=3", expect.objectContaining({credentials:"omit",headers:{"x-display-secret":"s3cr3t"}}));
-    api.getDisplayProjection.mockRejectedValue({ status:404 });
-    await screen.findByText(/this display is unavailable/i);
-    expect(screen.queryByRole("img")).toBeNull(); expect(URL.revokeObjectURL).toHaveBeenCalled();
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
   });
 
-  it("redeems the entered code and renders the image with visible tokens", async () => {
+  const qc = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+  it("redeems the entered code, purges GM state first and renders streamed snapshots", async () => {
     const user = userEvent.setup();
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    // GM state that must not survive display entry.
-    qc.setQueryData(["campaigns", "detail", "c1"], { campaign: { campaignId: "c1" } });
-    const cancelSpy = vi.spyOn(qc, "cancelQueries");
-    const removeSpy = vi.spyOn(qc, "removeQueries");
-    const api = failingApi();
-    api.redeemDisplay.mockResolvedValue({
-      display: { displayId: "d1", secret: "s3cr3t" },
-      requestId: "r-redeem",
-    });
-    api.getDisplayProjection.mockResolvedValue(projectionPayload());
+    const client = qc();
+    client.setQueryData(["campaigns", "detail", "c1"], { campaign: { campaignId: "c1" } });
+    const removeSpy = vi.spyOn(client, "removeQueries");
+    const cancelSpy = vi.spyOn(client, "cancelQueries");
+    const a = api();
+    a.redeemDisplay.mockResolvedValue({ display: { displayId: "d1", secret: "s3cr3t" }, requestId: "r" });
+    const streams = fakeStreams();
     const storage = memoryStorage();
 
-    renderDisplay(
-      <DisplayView api={api as never} sceneId="s1" online storage={storage} />,
-      qc,
-    );
-
-    // Entry purge drops GM cache and cancels in-flight campaign reads.
-    await waitFor(() => expect(qc.getQueryData(["campaigns", "detail", "c1"])).toBeUndefined());
+    renderDisplay(<DisplayView api={a as never} sceneId="s1" online storage={storage} openSceneStream={streams.factory} />, client);
+    await waitFor(() => expect(client.getQueryData(["campaigns", "detail", "c1"])).toBeUndefined());
     expect(cancelSpy).toHaveBeenCalledWith({ queryKey: ["campaigns"] });
-    expect(removeSpy).toHaveBeenCalledWith({ queryKey: ["campaigns"] });
+    expect(streams.opened).toHaveLength(0);
 
     await user.type(screen.getByLabelText(/display code/i), "AB12CD");
     await user.click(screen.getByRole("button", { name: /connect display/i }));
-    expect(api.redeemDisplay).toHaveBeenCalledWith({ code: "AB12CD" });
-
-    const image = await screen.findByRole("img", { name: /display image/i });
-    expect(image).toHaveAttribute("src", "blob:redacted");
-    expect(fetch).toHaveBeenCalledWith("/api/displays/d1/scenes/s1/image?rev=3",expect.objectContaining({headers:{"x-display-secret":"s3cr3t"},credentials:"omit"}));
-    const alpha = await screen.findByText("Alpha");
-    expect(alpha.closest("li")?.style.left).toBe("25%");
-    expect(alpha.closest("li")?.style.top).toBe("50%");
-
-    // The restricted shell never touches GM endpoints.
-    expect(api.openCampaign).not.toHaveBeenCalled();
-    expect(api.openScene).not.toHaveBeenCalled();
-    // The credential persists for the reload path.
-    expect(storage.getItem(DISPLAY_CREDENTIAL_STORAGE_KEY)).toContain("d1");
-  });
-
-  it("purges GM state before the first projection fetch and revalidates on reload", async () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    qc.setQueryData(["campaigns", "detail", "c1"], { campaign: { campaignId: "c1" } });
-    const removeSpy = vi.spyOn(qc, "removeQueries");
-    const cancelSpy = vi.spyOn(qc, "cancelQueries");
-    const api = failingApi();
-    let resolveProjection!: (value: unknown) => void;
-    api.getDisplayProjection.mockReturnValue(
-      new Promise((resolve) => {
-        resolveProjection = resolve as (value: unknown) => void;
-      }),
+    expect(a.redeemDisplay).toHaveBeenCalledWith({ code: "AB12CD" });
+    await waitFor(() => expect(streams.opened).toHaveLength(1));
+    expect(streams.opened[0]!.options).toMatchObject({ displayId: "d1", sceneId: "s1", secret: "s3cr3t" });
+    expect(Math.min(...removeSpy.mock.invocationCallOrder)).toBeLessThan(
+      (streams.factory as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]!,
     );
-    const storage = memoryStorage(seedCredential());
-
-    renderDisplay(
-      <DisplayView api={api as never} sceneId="s1" online storage={storage} />,
-      qc,
-    );
-
-    // Reload revalidates before rendering: connecting status, no image yet,
-    // and the credential-scoped fetch already issued.
     expect(await screen.findByText(/connecting display/i)).toBeVisible();
-    expect(screen.queryByRole("img")).toBeNull();
-    await waitFor(() => expect(api.getDisplayProjection).toHaveBeenCalledTimes(1));
-    expect(api.getDisplayProjection).toHaveBeenCalledWith("d1", "s1", "s3cr3t");
 
-    // The purge ran before that first fetch.
-    expect(cancelSpy).toHaveBeenCalledWith({ queryKey: ["campaigns"] });
-    expect(removeSpy).toHaveBeenCalledWith({ queryKey: ["campaigns"] });
-    expect(qc.getQueryData(["campaigns", "detail", "c1"])).toBeUndefined();
-    const purgeOrder = Math.min(
-      ...(removeSpy.mock.invocationCallOrder as number[]),
+    streams.snapshot(projection());
+    const image = await screen.findByRole("img", { name: /display image/i });
+    expect(image.getAttribute("src")).toMatch(/^blob:/);
+    expect(await screen.findByText("Alpha")).toBeVisible();
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/displays/d1/scenes/s1/image?rev=2",
+      expect.objectContaining({ credentials: "omit", headers: { "x-display-secret": "s3cr3t" } }),
     );
-    const fetchOrder = Math.min(
-      ...(api.getDisplayProjection.mock.invocationCallOrder as number[]),
-    );
-    expect(purgeOrder).toBeLessThan(fetchOrder);
+    expect(storage.getItem(DISPLAY_CREDENTIAL_STORAGE_KEY)).toContain("d1");
+    expect(a.openCampaign).not.toHaveBeenCalled();
+    expect(a.openScene).not.toHaveBeenCalled();
+  });
 
-    resolveProjection(projectionPayload());
+  it("moves tokens on the current map without downloading the map again", async () => {
+    const streams = fakeStreams();
+    renderDisplay(<DisplayView api={api() as never} sceneId="s1" online storage={memoryStorage(seedCredential())} openSceneStream={streams.factory} />, qc());
+    const art = "/displays/d1/scenes/s1/tokens/t1/image?file=f-1";
+    streams.snapshot(projection({ tokens: [{ tokenId: "t1", label: "Alpha", x: 0.25, y: 0.5, size: 0.12, imageUrl: art }] }));
+    await waitFor(() => expect(screen.getByText("Alpha").closest("li")?.querySelector("img")).not.toBeNull());
+    const mapImage = screen.getByRole("img", { name: /display image/i });
+    const mapCalls = () => (fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([u]) => String(u).includes("/image?rev=")).length;
+    const artCalls = () => (fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([u]) => String(u).includes("?file=")).length;
+    expect([mapCalls(), artCalls()]).toEqual([1, 1]);
+
+    streams.snapshot(projection({ sceneRevision: 4, tokens: [{ tokenId: "t1", label: "Alpha", x: 0.6, y: 0.4, size: 0.12, imageUrl: art }] }));
+    await waitFor(() => expect(screen.getByText("Alpha").closest("li")).toHaveStyle({ left: "60%", top: "40%" }));
+    // Same map element, no new map or token-art download.
+    expect(screen.getByRole("img", { name: /display image/i })).toBe(mapImage);
+    expect([mapCalls(), artCalls()]).toEqual([1, 1]);
+  });
+
+  it("clears the frame on an image revision change and shows the new map only after it loads", async () => {
+    const holds: Deferred[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init: { signal: AbortSignal }) =>
+        url.endsWith("rev=2")
+          ? Promise.resolve({ ok: true, blob: async () => new Blob(["old"]) })
+          : new Promise((resolve, reject) => {
+              holds.push({ resolve });
+              init.signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+            }),
+      ),
+    );
+    const streams = fakeStreams();
+    renderDisplay(<DisplayView api={api() as never} sceneId="s1" online storage={memoryStorage(seedCredential())} openSceneStream={streams.factory} />, qc());
+    streams.snapshot(projection());
     expect(await screen.findByRole("img", { name: /display image/i })).toBeVisible();
-    expect(api.openCampaign).not.toHaveBeenCalled();
-  });
+    expect(screen.getByText("Alpha")).toBeVisible();
 
-  it("blanks a revoked credential with no GM chrome or GM endpoint calls", async () => {
-    const user = userEvent.setup();
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const api = failingApi();
-    api.getDisplayProjection.mockRejectedValue({ code: "not_found", status: 404, message: "gone" });
-    const storage = memoryStorage(seedCredential());
-
-    const { container } = renderDisplay(
-      <DisplayView api={api as never} sceneId="s1" online storage={storage} />,
-      qc,
-    );
-
-    expect(await screen.findByText(/this display is unavailable/i)).toBeVisible();
+    streams.snapshot(projection({ sceneRevision: 4, imageRevision: 3, imageUrl: "/displays/d1/scenes/s1/image?rev=3" }));
+    // Old frame and its tokens are gone immediately.
     expect(screen.queryByRole("img")).toBeNull();
-    // No GM chrome: no links anywhere in the restricted shell.
-    expect(container.querySelectorAll("a").length).toBe(0);
-    expect(api.openCampaign).not.toHaveBeenCalled();
-    expect(api.openScene).not.toHaveBeenCalled();
-    expect(api.redeemDisplay).not.toHaveBeenCalled();
+    expect(screen.queryByText("Alpha")).toBeNull();
+    expect(screen.getByText(/connecting display/i)).toBeVisible();
 
-    // The operator can drop the dead credential and return to code entry.
-    await user.click(screen.getByRole("button", { name: /enter a different code/i }));
-    expect(screen.getByLabelText(/display code/i)).toBeVisible();
-    expect(storage.getItem(DISPLAY_CREDENTIAL_STORAGE_KEY)).toBeNull();
-  });
-
-  it("blanks the cached frame when revocation lands after a good frame", async () => {
-    const user = userEvent.setup();
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const api = failingApi();
-    api.getDisplayProjection.mockResolvedValue(projectionPayload());
-    // Revocation surfaces strictly as 404/not_found (backend Task 5
-    // contract: every credential failure collapses to generic not_found).
-    const storage = memoryStorage(seedCredential());
-
-    const { container } = renderDisplay(
-      <DisplayView api={api as never} sceneId="s1" online pollMs={50} storage={storage} />,
-      qc,
-    );
-
-    expect(await screen.findByRole("img", { name: /display image/i })).toBeVisible();
-    api.getDisplayProjection.mockRejectedValue({ code: "not_found", status: 404, message: "gone" });
-    // The poll picks up revocation after an actually rendered frame: the
-    // frozen frame must blank per §7.7, not linger behind a notice.
-    expect(await screen.findByText(/this display is unavailable/i)).toBeVisible();
-    expect(screen.queryByRole("img")).toBeNull();
-    expect(container.querySelectorAll("a").length).toBe(0);
-
-    await user.click(screen.getByRole("button", { name: /enter a different code/i }));
-    expect(screen.getByLabelText(/display code/i)).toBeVisible();
-    expect(storage.getItem(DISPLAY_CREDENTIAL_STORAGE_KEY)).toBeNull();
-  });
-
-  it("keeps the cached frame across transient non-404 poll failures", async () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const api = failingApi();
-    api.getDisplayProjection.mockResolvedValueOnce(projectionPayload());
-    api.getDisplayProjection.mockRejectedValue({ status: 500, message: "boom" });
-
-    renderDisplay(
-      <DisplayView api={api as never} sceneId="s1" online pollMs={50} storage={memoryStorage(seedCredential())} />,
-      qc,
-    );
-
-    expect(await screen.findByRole("img", { name: /display image/i })).toBeVisible();
-    // Transient failure: the last good frame stays with a reconnecting
-    // notice — only revocation (404/not_found) blanks.
-    await waitFor(() => expect(screen.getByText(/reconnecting/i)).toBeVisible());
-    expect(screen.getByRole("img", { name: /display image/i })).toBeVisible();
-    expect(screen.queryByText(/this display is unavailable/i)).toBeNull();
-  });
-
-  it("blanks on the code-only revocation shape (no status attached)", async () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const api = failingApi();
-    // The HTTP contract always carries code "not_found" for revoked
-    // credentials; match it even when no numeric status is attached.
-    api.getDisplayProjection.mockRejectedValue({ code: "not_found", message: "gone" });
-
-    renderDisplay(
-      <DisplayView api={api as never} sceneId="s1" online storage={memoryStorage(seedCredential())} />,
-      qc,
-    );
-
-    expect(await screen.findByText(/this display is unavailable/i)).toBeVisible();
-    expect(screen.queryByRole("img")).toBeNull();
-    expect(api.openCampaign).not.toHaveBeenCalled();
-  });
-
-  it("shows reconnecting with retry when the projection poll fails", async () => {
-    const user = userEvent.setup();
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const api = failingApi();
-    api.getDisplayProjection.mockRejectedValue({ status: 500, message: "boom" });
-
-    renderDisplay(
-      <DisplayView api={api as never} sceneId="s1" online storage={memoryStorage(seedCredential())} />,
-      qc,
-    );
-
-    expect(await screen.findByText(/reconnecting/i)).toBeVisible();
-    expect(screen.queryByRole("img")).toBeNull();
-    await user.click(screen.getByRole("button", { name: /retry/i }));
-    await waitFor(() => expect(api.getDisplayProjection).toHaveBeenCalledTimes(2));
-    expect(api.openCampaign).not.toHaveBeenCalled();
-  });
-
-  it("polls the projection while the credential is active", async () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const api = failingApi();
-    api.getDisplayProjection.mockResolvedValue(projectionPayload());
-
-    renderDisplay(
-      <DisplayView api={api as never} sceneId="s1" online pollMs={50} storage={memoryStorage(seedCredential())} />,
-      qc,
-    );
-
-    expect(await screen.findByRole("img", { name: /display image/i })).toBeVisible();
-    // First fetch (revision 0) adopts revision 3 and refetches; the interval
-    // keeps polling after that, so an active display issues ongoing reads.
-    await waitFor(() => expect(api.getDisplayProjection.mock.calls.length).toBeGreaterThanOrEqual(3), {
-      timeout: 5000,
+    await act(async () => {
+      holds[0]!.resolve({ ok: true, blob: async () => new Blob(["new-map"]) });
     });
-    expect(api.openCampaign).not.toHaveBeenCalled();
+    expect(await screen.findByRole("img", { name: /display image/i })).toBeVisible();
+    expect(screen.getByText("Alpha")).toBeVisible();
   });
 
-  it("explains offline without fetching while offline", async () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const api = failingApi();
-
-    renderDisplay(
-      <DisplayView api={api as never} sceneId="s1" online={false} storage={memoryStorage(seedCredential())} />,
-      qc,
+  it("never shows a superseded map when a conceal lands while the previous image is loading", async () => {
+    const holds = new Map<string, Deferred>();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (url: string) =>
+          new Promise((resolve) => {
+            holds.set(url, { resolve });
+          }),
+      ),
     );
+    const streams = fakeStreams();
+    renderDisplay(<DisplayView api={api() as never} sceneId="s1" online storage={memoryStorage(seedCredential())} openSceneStream={streams.factory} />, qc());
+    // Reveal (rev 2) starts loading, then a conceal (rev 3) supersedes it.
+    streams.snapshot(projection({ imageRevision: 2, imageUrl: "/displays/d1/scenes/s1/image?rev=2" }));
+    await waitFor(() => expect(holds.has("/api/displays/d1/scenes/s1/image?rev=2")).toBe(true));
+    streams.snapshot(projection({ sceneRevision: 4, imageRevision: 3, imageUrl: "/displays/d1/scenes/s1/image?rev=3", tokens: [] }));
+    await waitFor(() => expect(holds.has("/api/displays/d1/scenes/s1/image?rev=3")).toBe(true));
 
+    // The superseded (more revealing) response arrives late: never adopted.
+    await act(async () => {
+      holds.get("/api/displays/d1/scenes/s1/image?rev=2")!.resolve({ ok: true, blob: async () => new Blob(["revealing-old-frame"]) });
+    });
+    expect(screen.queryByRole("img")).toBeNull();
+    const signal = ((fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1] as { signal: AbortSignal }).signal;
+    expect(signal.aborted).toBe(true);
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+
+    await act(async () => {
+      holds.get("/api/displays/d1/scenes/s1/image?rev=3")!.resolve({ ok: true, blob: async () => new Blob(["concealed"]) });
+    });
+    const shown = await screen.findByRole("img", { name: /display image/i });
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+    expect((URL.createObjectURL as ReturnType<typeof vi.fn>).mock.calls[0]![0].size).toBe("concealed".length);
+    expect(shown).toBeVisible();
+  });
+
+  it("blanks the frame on disconnect and restores it from the next snapshot", async () => {
+    const streams = fakeStreams();
+    renderDisplay(<DisplayView api={api() as never} sceneId="s1" online storage={memoryStorage(seedCredential())} openSceneStream={streams.factory} />, qc());
+    streams.snapshot(projection());
+    expect(await screen.findByRole("img", { name: /display image/i })).toBeVisible();
+    streams.status("reconnecting");
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.queryByText("Alpha")).toBeNull();
+    expect(await screen.findByText(/reconnecting/i)).toBeVisible();
+    streams.snapshot(projection({ sceneRevision: 5 }));
+    expect(await screen.findByRole("img", { name: /display image/i })).toBeVisible();
+  });
+
+  it("blanks a revoked credential, stops automatic retries and only retries on request", async () => {
+    const user = userEvent.setup();
+    const streams = fakeStreams();
+    const storage = memoryStorage(seedCredential());
+    renderDisplay(<DisplayView api={api() as never} sceneId="s1" online storage={storage} openSceneStream={streams.factory} />, qc());
+    streams.snapshot(projection());
+    expect(await screen.findByRole("img", { name: /display image/i })).toBeVisible();
+    streams.status("revoked");
+    expect(await screen.findByText(/this display is unavailable/i)).toBeVisible();
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(URL.revokeObjectURL).toHaveBeenCalled();
+    expect(streams.opened).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: /retry/i }));
+    expect(streams.opened[0]!.retries).toBe(1);
+    await user.click(screen.getByRole("button", { name: /different code/i }));
+    expect(streams.opened[0]!.closed).toBe(true);
+    expect(storage.getItem(DISPLAY_CREDENTIAL_STORAGE_KEY)).toBeNull();
+    expect(screen.getByLabelText(/display code/i)).toBeVisible();
+  });
+
+  it("closes the stream and hides the frame while offline", async () => {
+    const streams = fakeStreams();
+    const storage = memoryStorage(seedCredential());
+    const client = qc();
+    const { rerender } = renderDisplay(<DisplayView api={api() as never} sceneId="s1" online storage={storage} openSceneStream={streams.factory} />, client);
+    streams.snapshot(projection());
+    expect(await screen.findByRole("img")).toBeVisible();
+    rerender(
+      <QueryClientProvider client={client}>
+        <DisplayView api={api() as never} sceneId="s1" online={false} storage={storage} openSceneStream={streams.factory} />
+      </QueryClientProvider>,
+    );
+    expect(screen.queryByRole("img")).toBeNull();
     expect(await screen.findByText(/you are offline/i)).toBeVisible();
-    expect(api.getDisplayProjection).not.toHaveBeenCalled();
-    expect(api.openCampaign).not.toHaveBeenCalled();
+    expect(streams.opened[0]!.closed).toBe(true);
+    rerender(
+      <QueryClientProvider client={client}>
+        <DisplayView api={api() as never} sceneId="s1" online storage={storage} openSceneStream={streams.factory} />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(streams.opened).toHaveLength(2));
+  });
+
+  it("does not open a stream while offline or without a target", async () => {
+    const streams = fakeStreams();
+    renderDisplay(<DisplayView api={api() as never} sceneId="s1" online={false} storage={memoryStorage(seedCredential())} openSceneStream={streams.factory} />, qc());
+    expect(await screen.findByText(/you are offline/i)).toBeVisible();
+    cleanup();
+    renderDisplay(<DisplayView api={api() as never} sceneId="" online storage={memoryStorage(seedCredential())} openSceneStream={streams.factory} />, qc());
+    expect(await screen.findByText(/no target selected/i)).toBeVisible();
+    expect(streams.opened).toHaveLength(0);
   });
 
   it("rejects an unknown code and stays on code entry", async () => {
     const user = userEvent.setup();
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const api = failingApi();
-    api.redeemDisplay.mockRejectedValue({ code: "not_found", status: 404, message: "gone" });
-
-    renderDisplay(
-      <DisplayView api={api as never} sceneId="s1" online storage={memoryStorage()} />,
-      qc,
-    );
-
+    const a = api();
+    a.redeemDisplay.mockRejectedValue({ code: "not_found", status: 404, message: "gone" });
+    const streams = fakeStreams();
+    renderDisplay(<DisplayView api={a as never} sceneId="s1" online storage={memoryStorage()} openSceneStream={streams.factory} />, qc());
     await user.type(screen.getByLabelText(/display code/i), "ZZ99ZZ");
     await user.click(screen.getByRole("button", { name: /connect display/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/not recognized/i);
-    expect(api.getDisplayProjection).not.toHaveBeenCalled();
+    expect(streams.opened).toHaveLength(0);
     expect(screen.getByLabelText(/display code/i)).toBeVisible();
   });
-
-  it("renders the empty state without fetching when no target is selected", async () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const api = failingApi();
-
-    renderDisplay(
-      <DisplayView api={api as never} sceneId="" online storage={memoryStorage(seedCredential())} />,
-      qc,
-    );
-
-    expect(await screen.findByText(/no target selected/i)).toBeVisible();
-    expect(api.getDisplayProjection).not.toHaveBeenCalled();
-  });
-});
-
-
-it("hides an already rendered frame while offline", async () => {
-  const qc = new QueryClient({defaultOptions:{queries:{retry:false}}});
-  const api = failingApi(); api.getDisplayProjection.mockResolvedValue(projectionPayload());
-  vi.stubGlobal("fetch",vi.fn().mockResolvedValue({ok:true,blob:async()=>new Blob(["redacted"])}));
-  vi.stubGlobal("URL",class extends URL { static createObjectURL=vi.fn(()=>"blob:offline-test"); static revokeObjectURL=vi.fn(); });
-  try {
-    const storage=memoryStorage(seedCredential());
-    const {rerender}=renderDisplay(<DisplayView api={api as never} sceneId="s1" online storage={storage}/>,qc);
-    expect(await screen.findByRole("img")).toBeVisible();
-    rerender(<QueryClientProvider client={qc}><DisplayView api={api as never} sceneId="s1" online={false} storage={storage}/></QueryClientProvider>);
-    expect(screen.queryByRole("img")).toBeNull();
-    expect(await screen.findByText(/you are offline/i)).toBeVisible();
-  } finally {cleanup(); vi.unstubAllGlobals();}
 });

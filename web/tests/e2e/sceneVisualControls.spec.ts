@@ -132,10 +132,12 @@ test("V4 combined: image tokens, gestures, fog, recovery and restricted display"
     expect(await pixels(dp)).toEqual([black,black,black]);
     displayId = await dp.evaluate(() => JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!).displayId);
     await gm.goto(`/campaigns/${campaignId}/scenes?sceneId=${sceneId}`);
-    const imageStatus = (id: string, revision: number) => dp.evaluate(async ({sceneId,id,revision}) => {
+    // Token art URLs are keyed by the token's image file (stable across moves);
+    // the scene revision argument only documents when each probe runs.
+    const imageStatus = (id: string, _revision: number) => dp.evaluate(async ({sceneId,id,file}) => {
       const c = JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!);
-      return (await fetch(`/api/displays/${c.displayId}/scenes/${sceneId}/tokens/${id}/image?rev=${revision}`, { credentials:"omit",headers:{"x-display-secret":c.secret} })).status;
-    }, {sceneId,id,revision});
+      return (await fetch(`/api/displays/${c.displayId}/scenes/${sceneId}/tokens/${id}/image?file=${file}`, { credentials:"omit",headers:{"x-display-secret":c.secret} })).status;
+    }, {sceneId,id,file:(initial.tokens.find((t: any) => t.tokenId === id).imageFileId ?? "00000000-0000-4000-8000-000000000000") as string});
     // Hidden and visible-but-fogged image endpoints both deny bytes.
     expect(await imageStatus(secretId,initial.revision)).toBe(404);
     expect(await imageStatus(tokenId,initial.revision)).toBe(404);
@@ -285,8 +287,9 @@ test("V4 combined: image tokens, gestures, fog, recovery and restricted display"
     await expect.poll(()=>pixels(dp),{timeout:20_000}).toEqual([black,black,black]);
     await gm.goto(`/campaigns/${campaignId}`); await gm.getByRole("tab",{name:"Settings",exact:true}).click();
     const revokedCredential = await dp.evaluate(() => JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!));
-    const projectionPath = `/api/displays/${displayId}/scenes/${sceneId}/projection`;
-    const readWithCredential = () => dp.evaluate(async ({path,secret}) => (await fetch(path,{headers:{"x-display-secret":secret},credentials:"omit"})).status,{path:projectionPath,secret:revokedCredential.secret});
+    const streamPath = `/api/displays/${displayId}/scenes/${sceneId}/events`;
+    // Status only: abort the live stream as soon as the headers arrive.
+    const readWithCredential = () => dp.evaluate(async ({path,secret}) => { const c=new AbortController(); const r=await fetch(path,{headers:{"x-display-secret":secret},credentials:"omit",signal:c.signal}); c.abort(); return r.status; },{path:streamPath,secret:revokedCredential.secret});
     expect(await readWithCredential()).toBe(200);
     await gm.getByRole("button",{name:"Revoke",exact:true}).click(); await expect(gm.getByText("Display revoked.",{exact:true})).toBeVisible();
     displayId=undefined;

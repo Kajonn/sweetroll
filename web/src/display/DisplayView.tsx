@@ -1,8 +1,8 @@
 import tokenStyles from "../campaigns/SceneToken.module.css";
-// Restricted display shell: code entry → credential-scoped projection.
+// Restricted display shell: code entry → credential-scoped live scene stream.
 // Runs outside the GM chrome (the /display route skips AppShell): no
 // identity gate and no campaign endpoints — only redeemDisplay plus the
-// credential-scoped getDisplayProjection read.
+// credential-scoped scene event stream and redacted image reads.
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -10,10 +10,10 @@ import { t } from "../i18n/index.js";
 import { DisplayImage } from "./DisplayImage.js";
 import { Button, EmptyState, FormField } from "../ui/index.js";
 import type { CampaignsApi } from "../campaigns/api.js";
-import { useDisplayProjection } from "../campaigns/campaignQueries.js";
 import type { DisplayProjection } from "../campaigns/types.js";
+import { connectSceneStream, type SceneStreamFactory, type SceneStreamHandle, type SceneStreamStatus } from "./sceneStream.js";
 
-export type DisplayViewApi = Pick<CampaignsApi, "redeemDisplay" | "getDisplayProjection">;
+export type DisplayViewApi = Pick<CampaignsApi, "redeemDisplay">;
 
 export type DisplayCredential = { displayId: string; secret: string };
 
@@ -24,7 +24,6 @@ export type DisplayStorage = {
 };
 
 export const DISPLAY_CREDENTIAL_STORAGE_KEY = "sweetroll:display-credential";
-export const DISPLAY_PROJECTION_POLL_MS = 5000;
 
 function readStoredCredential(storage: DisplayStorage | undefined): DisplayCredential | null {
   if (storage === undefined) return null;
@@ -41,12 +40,6 @@ function readStoredCredential(storage: DisplayStorage | undefined): DisplayCrede
   } catch {
     return null;
   }
-}
-
-function isNotFound(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const record = error as { code?: unknown; status?: unknown };
-  return record.status === 404 || record.code === "not_found";
 }
 
 /** Live browser online state, unless the caller pins a test/route value. */
@@ -72,26 +65,30 @@ export function DisplayView(props: {
   api: DisplayViewApi;
   sceneId: string;
   online?: boolean | undefined;
-  pollMs?: number | undefined;
   storage?: DisplayStorage | undefined;
+  /** Test seam: replaces the fetch-based scene event stream. */
+  openSceneStream?: SceneStreamFactory | undefined;
 }) {
   const fallbackStorage: DisplayStorage | undefined =
     typeof sessionStorage === "undefined" ? undefined : sessionStorage;
   const storage = props.storage ?? fallbackStorage;
   const online = useDisplayOnline(props.online);
-  const pollMs = props.pollMs ?? DISPLAY_PROJECTION_POLL_MS;
   const queryClient = useQueryClient();
   const [credential, setCredential] = useState<DisplayCredential | null>(() => readStoredCredential(storage));
   const [code, setCode] = useState("");
   const [redeemPending, setRedeemPending] = useState(false);
   const [redeemFailed, setRedeemFailed] = useState(false);
-  const [revision, setRevision] = useState(0);
   const [shown, setShown] = useState<DisplayProjection | null>(null);
+  const [status, setStatus] = useState<SceneStreamStatus>("connecting");
+  // The map URL whose redacted bytes have arrived. Tokens render only over
+  // the map they belong to: after an image revision change the old frame is
+  // cleared immediately and the new one appears only once its bytes load.
+  const [loadedMapUrl, setLoadedMapUrl] = useState<string | null>(null);
+  const streamRef = useRef<SceneStreamHandle | null>(null);
 
   // Entry purge: a shared tablet must not retain GM session or private cached
   // data (design §7.7). Cancel in-flight campaign reads and drop every cached
-  // ["campaigns", ...] entry. Declared before the projection hook so the
-  // removal runs before the first projection fetch on entry.
+  // ["campaigns", ...] entry before the stream opens.
   const purgedRef = useRef(false);
   useEffect(() => {
     if (purgedRef.current) return;
@@ -100,38 +97,38 @@ export function DisplayView(props: {
     queryClient.removeQueries({ queryKey: ["campaigns"] });
   }, [queryClient]);
 
-  const projection = useDisplayProjection(
-    props.api as CampaignsApi,
-    credential?.displayId ?? "",
-    props.sceneId,
-    revision,
-    credential?.secret ?? null,
-    { enabled: credential !== null && props.sceneId !== "" && online, online },
-  );
-
-  // Adopt the polled revision so the query key tracks the latest known
-  // projection; the revision-keyed imageUrl stays Cache-Control friendly.
+  // One live stream per (credential, scene) while online. Every snapshot is
+  // complete; a disconnect or lost authorization blanks the frame.
+  const openStream = props.openSceneStream ?? connectSceneStream;
   useEffect(() => {
-    const next = projection.data?.projection.sceneRevision;
-    if (next !== undefined && next !== revision) setRevision(next);
-  }, [projection.data, revision]);
-
-  // Keep the last good frame across revision-key changes and poll failures:
-  // a fresh credential with no frame yet renders connecting/blank instead.
-  useEffect(() => {
-    if (!online) { setShown(null); return; }
-    if (projection.data !== undefined && !projection.isFetching) setShown(projection.data.projection);
-  }, [projection.data, projection.isFetching, online]);
-
-  const refetchRef = useRef((): void => {});
-  refetchRef.current = () => {
-    void projection.refetch();
-  };
-  useEffect(() => {
+    setShown(null);
+    setLoadedMapUrl(null);
     if (credential === null || props.sceneId === "" || !online) return undefined;
-    const id = window.setInterval(() => refetchRef.current(), pollMs);
-    return () => window.clearInterval(id);
-  }, [credential, props.sceneId, online, pollMs]);
+    setStatus("connecting");
+    const handle = openStream(
+      { displayId: credential.displayId, sceneId: props.sceneId, secret: credential.secret },
+      {
+        onSnapshot: (projection) => setShown(projection),
+        onStatus: (next) => {
+          setStatus(next);
+          if (next !== "open") {
+            setShown(null);
+            setLoadedMapUrl(null);
+          }
+        },
+      },
+    );
+    streamRef.current = handle;
+    return () => {
+      handle.close();
+      if (streamRef.current === handle) streamRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [credential?.displayId, credential?.secret, props.sceneId, online]);
+
+  const retry = (): void => {
+    streamRef.current?.retryNow();
+  };
 
   const redeem = async (): Promise<void> => {
     if (redeemPending) return;
@@ -147,7 +144,6 @@ export function DisplayView(props: {
       };
       setCredential(next);
       setShown(null);
-      setRevision(0);
       setCode("");
       try {
         storage?.setItem(DISPLAY_CREDENTIAL_STORAGE_KEY, JSON.stringify(next));
@@ -165,7 +161,6 @@ export function DisplayView(props: {
   const disconnect = (): void => {
     setCredential(null);
     setShown(null);
-    setRevision(0);
     setCode("");
     setRedeemFailed(false);
     try {
@@ -222,16 +217,17 @@ export function DisplayView(props: {
     );
   }
 
-  if (shown === null || !online || shown.sceneId !== props.sceneId) {
-    if (!online) {
-      return (
-        <section aria-label={t("display.title")}>
-          <h1>{t("display.title")}</h1>
-          <p role="status">{t("display.offline")}</p>
-        </section>
-      );
-    }
-    if (projection.status === "pending") {
+  if (!online) {
+    return (
+      <section aria-label={t("display.title")}>
+        <h1>{t("display.title")}</h1>
+        <p role="status">{t("display.offline")}</p>
+      </section>
+    );
+  }
+
+  if (status === "revoked" || shown === null || shown.sceneId !== props.sceneId) {
+    if (status === "connecting") {
       return (
         <section aria-label={t("display.title")}>
           <h1>{t("display.title")}</h1>
@@ -239,7 +235,9 @@ export function DisplayView(props: {
         </section>
       );
     }
-    const revoked = isNotFound(projection.error);
+    // Revoked credentials stop retrying until the display is paired again;
+    // Retry here is an explicit, single user-initiated attempt.
+    const revoked = status === "revoked";
     return (
       <section aria-label={t("display.title")}>
         <h1>{t("display.title")}</h1>
@@ -248,7 +246,7 @@ export function DisplayView(props: {
           description={revoked ? t("display.blank.description") : t("display.reconnecting.description")}
           action={
             <>
-              <Button variant="primary" onClick={() => void projection.refetch()}>
+              <Button variant="primary" onClick={retry}>
                 {t("display.retry")}
               </Button>{" "}
               <Button variant="secondary" onClick={disconnect}>
@@ -261,65 +259,39 @@ export function DisplayView(props: {
     );
   }
 
-  // A revoked credential must blank even when a good frame is cached
-  // (design §7.7): a post-frame 404 replaces the frozen frame with the
-  // blank state + disconnect affordance. Transient non-404 failures keep
-  // the last good frame with a reconnecting notice instead.
-  if (online && projection.status === "error" && isNotFound(projection.error)) {
-    return (
-      <section aria-label={t("display.title")}>
-        <h1>{t("display.title")}</h1>
-        <EmptyState
-          title={t("display.blank.title")}
-          description={t("display.blank.description")}
-          action={
-            <>
-              <Button variant="primary" onClick={() => void projection.refetch()}>
-                {t("display.retry")}
-              </Button>{" "}
-              <Button variant="secondary" onClick={disconnect}>
-                {t("display.disconnect")}
-              </Button>
-            </>
-          }
-        />
-      </section>
-    );
-  }
-
+  const mapReady = loadedMapUrl === shown.imageUrl;
   return (
     <section aria-label={t("display.title")}>
       <h1>{t("display.title")}</h1>
       <div style={{ position: "relative", overflow: "hidden" }}>
-        <DisplayImage key={`${credential.displayId}:${shown.imageUrl}`} path={shown.imageUrl} secret={credential.secret} alt={t("display.imageAlt")} />
-        <ul aria-label={t("display.tokensLabel")} style={{ listStyle: "none", margin: 0, padding: 0 }}>
-          {shown.tokens.map((token) => (
-            <li
-              key={token.tokenId}
-              className={tokenStyles.token}
-              style={{
-                width: `${token.size * 100}%`,
-                position: "absolute",
-                left: `${token.x * 100}%`,
-                top: `${token.y * 100}%`,
-                transform: "translate(-50%, -50%)",
-              }}
-            >
-              {token.imageUrl ? <DisplayImage key={`${credential.displayId}:${token.imageUrl}`} path={token.imageUrl} secret={credential.secret} alt="" /> : null}
-              <span className={tokenStyles.label}>{token.label}</span>
-            </li>
-          ))}
-        </ul>
+        <DisplayImage
+          key={`${credential.displayId}:${shown.imageUrl}`}
+          path={shown.imageUrl}
+          secret={credential.secret}
+          alt={t("display.imageAlt")}
+          onReady={setLoadedMapUrl}
+        />
+        {mapReady ? (
+          <ul aria-label={t("display.tokensLabel")} style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            {shown.tokens.map((token) => (
+              <li
+                key={token.tokenId}
+                className={tokenStyles.token}
+                style={{
+                  width: `${token.size * 100}%`,
+                  position: "absolute",
+                  left: `${token.x * 100}%`,
+                  top: `${token.y * 100}%`,
+                  transform: "translate(-50%, -50%)",
+                }}
+              >
+                {token.imageUrl ? <DisplayImage key={`${credential.displayId}:${token.imageUrl}`} path={token.imageUrl} secret={credential.secret} alt="" /> : null}
+                <span className={tokenStyles.label}>{token.label}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
-      {!online ? <p role="status">{t("display.offline")}</p> : null}
-      {online && projection.status === "error" ? (
-        <p role="status">
-          {t("display.reconnecting.title")}{" "}
-          <Button variant="secondary" onClick={() => void projection.refetch()}>
-            {t("display.retry")}
-          </Button>
-        </p>
-      ) : null}
     </section>
   );
 }

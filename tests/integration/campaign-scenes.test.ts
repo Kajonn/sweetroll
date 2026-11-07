@@ -7,6 +7,15 @@ import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { buildI6Harness, ctxFor, type I6Harness } from "./i6-app.js";
+import { createDisplayCommands, type DisplaySceneInput } from "../../src/campaigns/display.js";
+import { createCampaignPersistenceRepository } from "../../src/campaigns/persistence.js";
+
+/** The display's projection, as the scene stream loads it for each snapshot. */
+async function projectionFor(h: I6Harness, input: DisplaySceneInput) {
+  const display = createDisplayCommands({ pool: h.pool, repo: createCampaignPersistenceRepository(h.pool) });
+  const snapshot = await display.getDisplaySnapshot(input);
+  return snapshot.ok ? { ok: true as const, value: snapshot.value.projection } : snapshot;
+}
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const describeWithDatabase = databaseUrl === undefined ? describe.skip : describe;
@@ -682,7 +691,7 @@ describeWithDatabase("display pairing + redacted projection (Task 3 display comm
     expect(displayId).toEqual(expect.any(String));
     expect(secret).toEqual(expect.any(String));
 
-    const projection = await h.campaigns.getDisplayProjection({ displayId, secret, sceneId });
+    const projection = await projectionFor(h, { displayId, secret, sceneId });
     expect(projection.ok).toBe(true);
     if (!projection.ok) throw new Error("expected projection");
     expect(projection.value).toMatchObject({ sceneId, sceneRevision: 1, tokens: [] });
@@ -715,21 +724,21 @@ describeWithDatabase("display pairing + redacted projection (Task 3 display comm
     const { sceneId } = await createScene(campaignId, fileId);
     const { displayId, secret } = await pairAndRedeem(campaignId);
 
-    const unknownDisplay = await h.campaigns.getDisplayProjection({
+    const unknownDisplay = await projectionFor(h, {
       displayId: randomUUID(),
       secret,
       sceneId,
     });
     expect(unknownDisplay).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
 
-    const wrongSecret = await h.campaigns.getDisplayProjection({
+    const wrongSecret = await projectionFor(h, {
       displayId,
       secret: "wrong-secret-value",
       sceneId,
     });
     expect(wrongSecret).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
 
-    const unknownScene = await h.campaigns.getDisplayProjection({
+    const unknownScene = await projectionFor(h, {
       displayId,
       secret,
       sceneId: randomUUID(),
@@ -800,7 +809,7 @@ describeWithDatabase("display pairing + redacted projection (Task 3 display comm
     expect(hiddenId).toEqual(expect.any(String));
 
     const { displayId, secret } = await pairAndRedeem(campaignId);
-    const projection = await h.campaigns.getDisplayProjection({ displayId, secret, sceneId });
+    const projection = await projectionFor(h, { displayId, secret, sceneId });
     expect(projection.ok).toBe(true);
     if (!projection.ok) throw new Error("expected projection");
     expect(projection.value.sceneRevision).toBe(ghost.value.revision);
@@ -810,8 +819,15 @@ describeWithDatabase("display pairing + redacted projection (Task 3 display comm
     expect(projection.value.tokens.find((t) => t.tokenId === hiddenId)).toBeUndefined();
     expect(projection.value.tokens.find((t) => t.tokenId === cornerId)).toBeUndefined();
 
-    // The derivative is cached on disk keyed by (sceneId, revision) and its
-    // bytes differ from the original: concealed pixels are gone, not overlaid.
+    // Token-only edits keep the image revision: only the reveal changed the map.
+    expect(projection.value.imageRevision).toBe(2);
+    expect(projection.value.imageUrl).toBe(`/displays/${displayId}/scenes/${sceneId}/image?rev=2`);
+    // The projection is metadata only; the image route renders and caches the
+    // derivative keyed by (sceneId, imageRevision). Its bytes differ from the
+    // original: concealed pixels are gone, not overlaid.
+    expect(await derivativeFiles(sceneId)).toHaveLength(0);
+    const served = await h.campaigns.getDisplaySceneImage({ displayId, secret, sceneId, rev: 2 });
+    expect(served.ok).toBe(true);
     const files = await derivativeFiles(sceneId);
     expect(files).toHaveLength(1);
     const derivative = await readFile(join(displayDir, files[0] as string));
@@ -825,8 +841,9 @@ describeWithDatabase("display pairing + redacted projection (Task 3 display comm
     const centerIdx = (32 * info.width + 32) * 4;
     expect([data[centerIdx], data[centerIdx + 1], data[centerIdx + 2]]).toEqual([200, 30, 30]);
 
-    // A conceal stroke bumps the revision, blanks the revealed token list and
-    // caches a second derivative instead of overwriting the first.
+    // A conceal stroke bumps both revisions and blanks the revealed token
+    // list; the next image request renders a new derivative and retention
+    // removes the older image revision.
     const concealed = await h.campaigns.applyFogEdit(ctxFor(h.users.gm), {
       sceneId,
       expectedSceneRevision: ghost.value.revision,
@@ -835,12 +852,17 @@ describeWithDatabase("display pairing + redacted projection (Task 3 display comm
     });
     expect(concealed.ok).toBe(true);
     if (!concealed.ok) throw new Error("expected fog conceal");
-    const after = await h.campaigns.getDisplayProjection({ displayId, secret, sceneId });
+    const after = await projectionFor(h, { displayId, secret, sceneId });
     expect(after.ok).toBe(true);
     if (!after.ok) throw new Error("expected projection after conceal");
     expect(after.value.sceneRevision).toBe(concealed.value.revision);
     expect(after.value.tokens).toEqual([]);
-    expect(await derivativeFiles(sceneId)).toHaveLength(2);
+    expect(after.value.imageRevision).toBe(3);
+    const staleImage = await h.campaigns.getDisplaySceneImage({ displayId, secret, sceneId, rev: 2 });
+    expect(staleImage).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+    const concealedImage = await h.campaigns.getDisplaySceneImage({ displayId, secret, sceneId, rev: 3 });
+    expect(concealedImage.ok).toBe(true);
+    expect(await derivativeFiles(sceneId)).toEqual([`${sceneId}-rev3.png`]);
   });
 
   it("revoke kills the credential and denies players pairing or revoking", async () => {
@@ -856,13 +878,13 @@ describeWithDatabase("display pairing + redacted projection (Task 3 display comm
     expect(playerRevoke).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
 
     // The player's denied revoke changed nothing: the credential still works.
-    const before = await h.campaigns.getDisplayProjection({ displayId, secret, sceneId });
+    const before = await projectionFor(h, { displayId, secret, sceneId });
     expect(before.ok).toBe(true);
 
     const revoked = await h.campaigns.revokeDisplay(ctxFor(h.users.gm), { displayId });
     expect(revoked.ok).toBe(true);
 
-    const after = await h.campaigns.getDisplayProjection({ displayId, secret, sceneId });
+    const after = await projectionFor(h, { displayId, secret, sceneId });
     expect(after).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
 
     const again = await h.campaigns.revokeDisplay(ctxFor(h.users.gm), { displayId });
@@ -877,7 +899,7 @@ describeWithDatabase("display pairing + redacted projection (Task 3 display comm
     const otherCampaignId = await createCampaign();
     const other = await pairAndRedeem(otherCampaignId);
 
-    const crossed = await h.campaigns.getDisplayProjection({
+    const crossed = await projectionFor(h, {
       displayId: other.displayId,
       secret: other.secret,
       sceneId,
@@ -901,18 +923,25 @@ describeWithDatabase("display pairing + redacted projection (Task 3 display comm
     // Simulate missing durable bytes directly: the public API protects live references.
     const record = await h.pool.query("SELECT storage_key FROM media_files WHERE id=$1", [fileId]);
     await unlink(join(mediaDir, record.rows[0].storage_key));
-    const orphaned = await h.campaigns.getDisplayProjection({ displayId, secret, sceneId });
+    // The projection is metadata-only; the image route fails closed.
+    const orphaned = await h.campaigns.getDisplaySceneImage({ displayId, secret, sceneId, rev: 1 });
     expect(orphaned).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+
+    // Media row gone (orphaned pin, no FK): the projection itself fails closed.
+    await h.pool.query("DELETE FROM media_files WHERE id=$1", [fileId]);
+    const noRow = await projectionFor(h, { displayId, secret, sceneId });
+    expect(noRow).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
 
     // Row present but bytes missing from disk: same fail-closed collapse.
     const { fileId: secondFile } = await uploadBackground(campaignId);
     const second = await createScene(campaignId, secondFile);
     const rows = await h.pool.query(`SELECT storage_key FROM media_files WHERE id = $1`, [secondFile]);
     await unlink(join(mediaDir, rows.rows[0].storage_key as string));
-    const missingBytes = await h.campaigns.getDisplayProjection({
+    const missingBytes = await h.campaigns.getDisplaySceneImage({
       displayId,
       secret,
       sceneId: second.sceneId,
+      rev: 1,
     });
     expect(missingBytes).toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
   });
@@ -1090,11 +1119,11 @@ describeWithDatabase("Task 4 transport support reads (openScene, openImage, cred
     const { sceneId, revision } = await createScene(campaignId, fileId);
     const { displayId, secret } = await pairAndRedeem(campaignId);
 
-    const projection = await h.campaigns.getDisplayProjection({ displayId, secret, sceneId });
+    const projection = await projectionFor(h, { displayId, secret, sceneId });
     expect(projection.ok).toBe(true);
-    const derivative = await readFile(join(displayDir, `${sceneId}-rev${revision}.png`));
 
     const image = await h.campaigns.getDisplaySceneImage({ displayId, secret, sceneId, rev: revision });
+    const derivative = await readFile(join(displayDir, `${sceneId}-rev${revision}.png`));
     expect(image.ok).toBe(true);
     if (!image.ok) throw new Error("expected scene image");
     expect(image.value.contentType).toBe("image/png");
@@ -1237,7 +1266,7 @@ describeWithDatabase("Task 4 transport support reads (openScene, openImage, cred
     const { sceneId } = await createScene(campaignId, fileId);
     const { displayId, secret } = await pairAndRedeem(campaignId);
 
-    const projection = await h.campaigns.getDisplayProjection({ displayId, secret, sceneId });
+    const projection = await h.campaigns.getDisplaySceneImage({ displayId, secret, sceneId, rev: 1 });
     expect(projection.ok).toBe(true);
     expect(await derivativeNames(sceneId)).toHaveLength(1);
 
@@ -1249,7 +1278,7 @@ describeWithDatabase("Task 4 transport support reads (openScene, openImage, cred
 
     // A fresh credential regenerates the derivative lazily on next projection.
     const next = await pairAndRedeem(campaignId);
-    const again = await h.campaigns.getDisplayProjection({
+    const again = await projectionFor(h, {
       displayId: next.displayId,
       secret: next.secret,
       sceneId,
@@ -1257,6 +1286,9 @@ describeWithDatabase("Task 4 transport support reads (openScene, openImage, cred
     expect(again.ok).toBe(true);
     if (!again.ok) throw new Error("expected regenerated projection");
     expect(again.value.imageUrl).toBe(`/displays/${next.displayId}/scenes/${sceneId}/image?rev=1`);
+    expect(await derivativeNames(sceneId)).toHaveLength(0);
+    const regenerated = await h.campaigns.getDisplaySceneImage({ ...next, sceneId, rev: 1 });
+    expect(regenerated.ok).toBe(true);
     expect(await derivativeNames(sceneId)).toHaveLength(1);
   });
 });

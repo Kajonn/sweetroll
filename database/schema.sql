@@ -578,10 +578,13 @@ CREATE TABLE scenes (
   campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
   background_file_id uuid NOT NULL,
   revision integer NOT NULL DEFAULT 1,
+  -- Player-safe map version: changes only with fog or a different background.
+  image_revision integer NOT NULL DEFAULT 1,
   fog_jsonb jsonb NOT NULL DEFAULT '[]'::jsonb,
   tokens_jsonb jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
-  CHECK (revision > 0)
+  CHECK (revision > 0),
+  CHECK (image_revision > 0)
 );
 
 CREATE INDEX scenes_page_idx

@@ -191,6 +191,6 @@ export type RedeemDisplayResponse =
   operations["post_displays_redeem"]["responses"]["200"]["content"]["application/json"];
 export type RedeemedDisplay = RedeemDisplayResponse["display"];
 
-export type DisplayProjectionResponse =
-  operations["get_displays_id_scenes_sceneId_projection"]["responses"]["200"]["content"]["application/json"];
-export type DisplayProjection = DisplayProjectionResponse["projection"];
+/** JSON data of each `event: scene` message on the display's scene stream. */
+export type DisplayProjection =
+  operations["get_displays_id_scenes_sceneId_events"]["responses"]["200"]["content"]["text/event-stream"];

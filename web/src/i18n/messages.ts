@@ -254,6 +254,7 @@ export const defaultMessages: MessageTable = {
   "library.cloneFromTemplate.d20": "Clone d20",
   "library.cloneFromTemplate.pbta2d6": "Clone PbtA 2d6",
   "library.cloneFromTemplate.d6SuccessPool": "Clone d6 success pool",
+  "library.cloneFromTemplate.forgedInTheDark": "Clone Forged in the Dark",
   "library.cloneFromTemplate.cloning": "Cloning…",
   "library.sharing.label": "Sharing for {name}",
   "library.sharing.private": "Private",

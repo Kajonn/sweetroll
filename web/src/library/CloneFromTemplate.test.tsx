@@ -27,6 +27,7 @@ describe("CloneFromTemplate", () => {
     expect(screen.getByTestId("clone-from-template-d20")).toBeInTheDocument();
     expect(screen.getByTestId("clone-from-template-pbta2d6")).toBeInTheDocument();
     expect(screen.getByTestId("clone-from-template-d6SuccessPool")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clone Forged in the Dark" })).toBeInTheDocument();
   });
 
   it("posts a clone draft with the d20 version id on click", async () => {

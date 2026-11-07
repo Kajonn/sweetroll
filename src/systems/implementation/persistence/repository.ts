@@ -1,3 +1,4 @@
+import { forgedInTheDarkPackage } from "../package/fixtures/forged-in-the-dark.js";
 import { d20Package, pbta2d6Package, d6SuccessPoolPackage } from "../package/fixtures/index.js";
 import { comparePackages, type CompatibilityFinding } from "../package/compatibility.js";
 import type { SystemPackageV1 } from "../package/schema/index.js";
@@ -1017,6 +1018,12 @@ export const REFERENCE_TEMPLATES: ReadonlyArray<ReferenceTemplate> = [
     versionId: "c0000000-0000-5000-8000-000000000002",
     name: "Template: d6 success pool",
     package: d6SuccessPoolPackage,
+  },
+  {
+    systemId: forgedInTheDarkPackage.systemId,
+    versionId: forgedInTheDarkPackage.versionId,
+    name: "Template: Forged in the Dark",
+    package: forgedInTheDarkPackage,
   },
 ];
 

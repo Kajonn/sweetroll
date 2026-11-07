@@ -1,3 +1,4 @@
+import { PersonalTokens } from "./PersonalTokens.js";
 import { DebugOnly, DebugSettings } from "../ui/debugMode.js";
 import { Disclosure } from "../ui/Disclosure.js";
 import { useEffect, useState, type ChangeEvent } from "react";
@@ -253,6 +254,7 @@ export function Account({ client, identity, storageUnavailable }: AccountProps) 
               {t("shell.signOut.button")}
             </Button>
           </Panel>
+          <PersonalTokens key={me.data.userId} client={client} online={online} />
           <Disclosure label={t("disclosure.sync")}><Panel title={t("player.account.sync")}>
             <p>{online ? t("status.online") : t("status.offline")}</p>
             <p>{offline.available ? t("character.offline.available") : t("character.offline.unavailable")}</p>

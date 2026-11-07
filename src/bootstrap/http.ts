@@ -13,6 +13,8 @@ import {
 } from "../systems/implementation/persistence/index.js";
 import { createSystemRuntime } from "../systems/runtime.js";
 import { createPostgresPublishedPackageLoader } from "../systems/implementation/runtime/package-loader.js";
+import { buildPublicApi, publicApiPrefix } from "../transport/http/public-api/index.js";
+import { buildPersonalTokenRoutes } from "../transport/http/personal-tokens.js";
 import { buildAuthHook } from "../transport/http/auth-hook.js";
 import { buildDevSignInRoutes, resolveAuthMode } from "../transport/http/dev-signin.js";
 import {
@@ -83,6 +85,9 @@ const identity = createIdentityModule({
       : createTestOidcClient(seed),
   pool,
   sessionTtlMs: config.sessionTtlDays * 86_400_000,
+  // Hosted token issuance requires a real sign-in provider. The current
+  // deterministic provider is only suitable for local API development.
+  allowPersonalTokens: config.nodeEnv !== "production" && process.env.SWEETROLL_LOCAL_API_TOKENS === "1",
 });
 
 const authoring = createSystemAuthoringModule({
@@ -149,10 +154,12 @@ registerApiRoutes(app, [
     secure: config.cookieSecure,
     allowedOrigins: config.allowedOrigins,
   }),
+  buildPersonalTokenRoutes({ identity, allowedOrigins: config.allowedOrigins }),
   buildSystemsRoutes({ authoring }),
   buildCharactersRoutes({ characters }),
   buildCampaignsRoutes({ campaigns, characters, runtime, identity }),
 ], serveStatic);
+void app.register(buildPublicApi({ identity, authoring, characters, pool }), { prefix: publicApiPrefix });
 void app.register(
   buildDevSignInRoutes({
     identity,

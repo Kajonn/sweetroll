@@ -19,7 +19,11 @@ export function mapRuntimeError(error: {
     case "unsupported_field_value":
     case "budget_exceeded":
     case "invalid_package":
-      return { code: "invalid_value", message: error.message };
+      return {
+        code: "invalid_value",
+        message: error.message,
+        ...(error.definitionId === undefined ? {} : { definitionId: error.definitionId }),
+      };
     default:
       return { code: "temporarily_unavailable", message: "A temporary infrastructure failure occurred." };
   }

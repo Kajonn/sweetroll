@@ -66,6 +66,19 @@ export function materializeDefaults(
     ),
   );
 }
+export function slotsForEntity(pkg: SystemPackageV1, entityId: string) {
+  const sheetSlots = new Set(
+    pkg.sheets
+      .filter((s) => s.targetEntityId === entityId)
+      .flatMap((s) =>
+        s.sections.flatMap((x) =>
+          x.elements.flatMap((e) => (e.kind === "slot" ? [e.slotId] : [])),
+        ),
+      ),
+  );
+  return (pkg.slots ?? []).filter((slot) => sheetSlots.has(slot.id));
+}
+
 /** All inherited actions must be applicable; never omit an unsupported action. */
 export function templateApplicable(
   pkg: SystemPackageV1,
@@ -73,21 +86,9 @@ export function templateApplicable(
   template: ObjectTemplateV1,
   slotId?: string,
 ): boolean {
-  const sheetSlots = new Set(
-    pkg.sheets
-      .filter((s) => s.targetEntityId === entity.id)
-      .flatMap((s) =>
-        s.sections.flatMap((x) =>
-          x.elements.flatMap((e) => (e.kind === "slot" ? [e.slotId] : [])),
-        ),
-      ),
-  );
   if (
-    !(pkg.slots ?? []).some(
-      (s) =>
-        sheetSlots.has(s.id) &&
-        (!slotId || s.id === slotId) &&
-        s.accepts.includes(template.kind),
+    !slotsForEntity(pkg, entity.id).some(
+      (slot) => (!slotId || slot.id === slotId) && slot.accepts.includes(template.kind),
     )
   )
     return false;

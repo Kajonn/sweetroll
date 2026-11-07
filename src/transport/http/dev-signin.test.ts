@@ -6,6 +6,7 @@ import type { Identity } from "../../identity/index.js";
 import { buildDevSignInRoutes } from "./dev-signin.js";
 
 const buildIdentity = (): Identity => ({
+  personalTokens: {} as Identity["personalTokens"],
   completeSignIn: async () => ({
     ok: true,
     value: { token: "tok", userId: "u", sessionId: "s", expiresAt: new Date(0) },

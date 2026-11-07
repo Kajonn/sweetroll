@@ -1,6 +1,12 @@
 # Sweetroll public API v1
 
-**Proposed implementation plan · 7 November 2026**
+**Implementation plan · 7 November 2026**
+
+The v1 API, token lifecycle, Account controls, contract check, and quickstarts
+are implemented for local testing. The current authentication configuration
+uses deterministic identities, so hosted token issuance and the real-provider
+Railway acceptance below remain gated on provider sign-in. The local opt-in
+and usage examples are in the [API quickstart](../../api/v1.md).
 
 ## Goal and scope
 
@@ -8,7 +14,7 @@ A Sweetroll account holder can run a Python script or use curl to validate a dec
 
 Use a curated JSON REST interface at `/api/v1`. Keep browser routes and cookie authentication in place. Reuse the Identity, SystemAuthoring, Characters, and SystemRuntime modules for authorization, validation, publication, revisions, and transactions. System definitions remain declarative JSON and published versions remain immutable. A new publication leaves existing characters pinned to their original version.
 
-The first slice covers system drafts, publication, version discovery, standalone characters, and single-field edits. Defer campaign operations, rolls, inventory commands, media uploads, bulk writes, package import/export, delegated OAuth, and SDK packages. Use a checked-in system document and a standard-library Python example for the quickstart.
+The owner expanded v1 to cover the full standalone authoring and setup flow. A script can start from a blank system, clone an authorized version, or import a package. It can preview, publish, export and share the system, then create a character, place or move inventory entries, and attach art. Campaign play, executing rolls, bulk mutations, delegated OAuth and SDK packages are outside this creation scope. Use a checked-in system document and a standard-library Python example for the quickstart.
 
 ## Proposed endpoint set
 
@@ -17,17 +23,28 @@ All paths below are relative to `/api/v1`. Read and write scopes are separate, s
 | Method and path | Purpose | Scope |
 |---|---|---|
 | `GET /systems` | List owned systems with cursor pagination | `systems:read` |
-| `POST /systems` | Create a private system with a blank draft | `systems:write` |
+| `POST /systems` | Create a private draft from scratch, a clone or an import | `systems:write` |
+| `GET /templates` | Discover the built-in starter versions | `systems:read` |
 | `GET /systems/{systemId}` | Read the authoring workspace and current draft revision | `systems:read` |
 | `POST /systems/validate` | Validate a local document and return field diagnostics without persisting it | `systems:write` |
 | `PUT /systems/{systemId}/draft` | Save the complete document at the expected revision | `systems:write` |
+| `POST /systems/{systemId}/preview` | Compile an expiring snapshot of the current draft | `systems:write` |
+| `PUT /systems/{systemId}/sharing` | Set private, link or public access | `systems:write` |
+| `GET /system-versions/{versionId}/export` | Export an owned version and its image bundle | `systems:read` |
+| `GET/PUT/DELETE /systems/{systemId}/templates/{templateId}/image` | Read metadata, upload or remove draft art | `systems:read` / `systems:write` |
 | `POST /systems/{systemId}/publish` | Publish an exact draft revision and return the immutable version ID | `systems:write` |
 | `GET /characters/creation-versions` | List published versions available for discovery | `characters:read` |
-| `GET /characters/creation-options?systemVersionId={id}` | Return available entity types and writable initial-field metadata | `characters:read` |
+| `GET /characters/creation-options?systemVersionId={id}` | Return entity types, initial fields, compatible slots and templates | `characters:read` |
 | `GET /characters` | List the caller’s standalone characters with cursor pagination | `characters:read` |
 | `POST /characters` | Create a standalone character from a published version | `characters:write` |
 | `GET /characters/{characterId}` | Read the standalone sheet and its revision | `characters:read` |
 | `POST /characters/{characterId}/fields/{fieldId}/set` | Update one field at the expected revision | `characters:write` |
+| `POST /characters/{characterId}/duplicate` | Copy a standalone character | `characters:write` |
+| `POST /characters/{characterId}/resources/{resourceId}/bump` | Change a resource by one configured step | `characters:write` |
+| `POST /characters/{characterId}/entries` | Place an item, spell, or personal entry | `characters:write` |
+| `PATCH/DELETE /characters/{characterId}/entries/{entryId}` | Move, edit or remove an entry | `characters:write` |
+| `GET/PUT/DELETE /characters/{characterId}/portrait` | Read metadata, upload or remove the portrait | `characters:read` / `characters:write` |
+| `GET/PUT/DELETE /characters/{characterId}/entries/{entryId}/image` | Read metadata, upload or remove entry art | `characters:read` / `characters:write` |
 | `GET /openapi.json` | Download the published API contract | Public |
 
 Keep token creation, listing, and revocation in the signed-in Account UI. Apply standalone-only policy inside Characters for v1 list, read, and write operations, including when a character is moved into a campaign concurrently. Use explicit public response schemas so campaign, controller, offline-recovery, and browser workspace internals are outside the v1 contract.
@@ -57,7 +74,7 @@ Stages 1, 3, and 4 can be developed against deterministic test identities while 
 
 1. Confirm the isolated Railway test service’s source commit, deployment status, and readiness. Sign in with a real provider test account and issue a token for the four workflow scopes.
 2. Run the quickstart with a well-formed JSON document that violates a system rule, then validate a valid system document, create a draft, save it, and publish it. Confirm validation diagnostics identify the bad field and that the validation call leaves no persisted draft.
-3. Discover entity types and writable fields, create a character with a non-default value, and read it back. Open the character in the GUI and verify its values and actions render from the pinned system version.
+3. Discover entity types, writable fields, slots and templates. Create a character with a non-default value, equip starting gear, move an entry, and attach a portrait. Open the character in the GUI and verify its values, inventory, portrait and actions render from the pinned system version.
 4. Simulate a lost create response and replay the identical request. Confirm the original character ID returns and only one character exists. Edit the same character in the GUI, then verify a script update with the old revision returns a conflict without overwriting the GUI edit.
 5. Verify a read-only token cannot write, another account cannot access private resources even with known IDs, and the next request after token revocation returns `401`. Record the tested commit, deployment, and results without including credentials.
 

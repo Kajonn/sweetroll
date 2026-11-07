@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 
+import { createPersonalTokens } from "./personal-tokens.js";
 import type { AppError } from "./errors.js";
 import type { OidcClient } from "./oidc.js";
 import {
@@ -28,6 +29,7 @@ export type AuthContext =
   | { state: "session_expired" };
 
 export interface Identity {
+  personalTokens: ReturnType<typeof createPersonalTokens>;
   completeSignIn(input: {
     code: string;
     redirectUri: string;
@@ -45,12 +47,15 @@ export type CreateIdentityModuleInput = {
   oidc: OidcClient;
   pool: Pool;
   sessionTtlMs: number;
+  allowPersonalTokens?: boolean;
 };
 
 export function createIdentityModule(input: CreateIdentityModuleInput): Identity {
   const repo: IdentityRepository = createIdentityRepository(input.pool);
 
   return {
+    personalTokens: createPersonalTokens(input.pool, input.allowPersonalTokens === true),
+
     async completeSignIn({ code, redirectUri, previousToken }) {
       let claims;
       try {

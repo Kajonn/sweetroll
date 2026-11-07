@@ -1,8 +1,8 @@
 # Complete the I7b/G8 visual scene controls
 
-Status: V1 accepted in PR #34; V2 accepted in PR #36 on application `84c23fd` with local and hosted mouse/touch acceptance passed. V3 accepted in PR #37 on application `637a60f` with local and hosted mouse/touch verification passed. V4 remains open.
+Status: V1 accepted in PR #34; V2 accepted in PR #36 on application `84c23fd` with local and hosted mouse/touch acceptance passed. V3 accepted in PR #37 on application `637a60f` with local and hosted mouse/touch verification passed. V4 combined ordered local/hosted acceptance passed in PR #38; the I7b/G8 visual-controls feature gate is complete. G9 release gates remain separate.
 Evidence: [V1 hosted/redeploy acceptance](../../acceptance/scene-image-tokens-2026-11-05.md).
-Updated 2026-11-05 after the owner's review of campaign scenes.
+Updated 2026-11-06 after the owner's review of campaign scenes.
 Baseline inspected: `5e3d81f` on PR #33.
 
 Authority: [design Sections 7.7 and 17.9a](../../../design_v2.md),
@@ -16,8 +16,8 @@ This completes already specified work; it does not introduce a full VTT.
 | --- | --- | --- |
 | Backgrounds | Upload, select, create/open and confirmed replacement; M3 accepted. | Reuse these controls and private campaign media. |
 | Tokens | V1: upload/select campaign art or use label-only tokens; centered art, normalized position/size, numeric placement/movement and nudges. | V2 direct placement/movement implemented and hosted accepted. |
-| Fog | V3: bounded mouse/touch painting, radius/draft preview, local stroke undo, explicit commit and conflict recovery; numeric precision retained. | V3 hosted verification passed; combined V4 acceptance remains separate. |
-| Restricted display | Paired access, server-redacted background and permitted art/labels/size; credential-only image reads and polling. V1 hosted/redeploy accepted. | V4 gesture/brush acceptance after V2/V3. |
+| Fog | V3: bounded mouse/touch painting, radius/draft preview, local stroke undo, explicit commit and conflict recovery; numeric precision retained. | V4 combined local/hosted verification passed. |
+| Restricted display | Paired access, server-redacted background and permitted art/labels/size; credential-only image reads and polling. V1 hosted/redeploy accepted. | V4 combined pointer/touch, privacy and recovery acceptance passed. |
 
 Inspect the existing `SceneViewport.tsx`, `TokenTray.tsx`, `FogToolbar.tsx`,
 `SceneLibrary.tsx`, `DisplayView.tsx`, campaign API/query seams and Campaigns
@@ -105,7 +105,7 @@ conflict and exact lost-response recovery, save/reopen, paired display,
 offline/reconnect and revocation. Hosted exit also passed on application `84c23fd`, SUCCESS deployment `f8dcab88`,
 in 63.6s total with zero retries. See
 [the V2 acceptance record](../../acceptance/scene-token-gestures-2026-11-06.md).
-V3 is implemented below; aggregate G8/V4/G9 remain open.
+V3 and combined V4 have since passed; the separate G9 release gates remain open.
 
 ## V3 — On-image reveal/conceal brush
 
@@ -139,23 +139,23 @@ pixels, real conflict and exact lost-response retry, keyboard, reopen, offline,
 background replacement and display revocation. The final hosted journey passed
 in 80.1s with zero retries on application `637a60f`, SUCCESS deployment `483aa50c`.
 See [V3 evidence](../../acceptance/scene-fog-brush-2026-11-06.md).
-V4 combined ordered image-token + brush acceptance remains the next stage.
+V4 combined ordered image-token + brush acceptance passed below.
 
 ## V4 — Hosted acceptance and completion gate
 
-- [ ] Extend browser journeys using actual pointer gestures and touch input,
+- [x] Extend browser journeys using actual pointer gestures and touch input,
   instead of proving only coordinate-form API calls. Cover phone 360px, tablet
   768px and desktop 1280px, zoom/pan, cancellation and keyboard alternatives.
-- [ ] Run component regressions/typecheck, affected scene/media/display integration
+- [x] Run component regressions/typecheck, affected scene/media/display integration
   and privacy tests, scene journeys, relevant offline regressions and normal CI.
   Record failures before implementation and passing checks after it.
-- [ ] Deploy the branch to the isolated test service; check its source commit,
+- [x] Deploy the branch to the isolated test service; check its source commit,
   successful deployment and served build identity before testing. Do not change
   production sources. Run the ordered journey below through the real GUI.
-- [ ] Record commit/deployment, commands/results, input/viewport coverage, screenshots,
+- [x] Record commit/deployment, commands/results, input/viewport coverage, screenshots,
   limitations and retained/cleaned fixtures in
   `docs/acceptance/scene-visual-controls-YYYY-MM-DD.md`.
-- [ ] Close the three visual-control items in G8 and update I7b/design status only
+- [x] Close the three visual-control items in G8 and update I7b/design status only
   after this evidence passes. Numeric-only tests, API support and M3 background
   acceptance cannot close them. Keep physical-device, real-login, human visual
   approval and table/remote G9 playtests open until separately performed.
@@ -177,3 +177,12 @@ Ordered hosted journey:
 Human verification on an actual phone/tablet and a real table or remote session
 remains part of G9; emulated touch alone must not be reported as physical-device
 acceptance.
+
+V4 exit passed on 2026-11-06 at deployed commit `3a35a5f`, terminal SUCCESS
+deployment `f33cf328`: one ordered GUI sequence combines image tokens, gestures,
+brushes, exact redacted pixels/art, real conflicts/lost responses, reopen, offline
+cleanup, replacement and revocation at 360/768/1280px. No runtime fix was needed.
+See [combined evidence](../../acceptance/scene-visual-controls-2026-11-06.md),
+screenshot hashes and cleanup readback. Normal final-head CI is tracked in PR #38.
+The three G8 visual-control items and their hosted journey gate are complete;
+physical-device/provider-login/human/table/remote G9 gates remain open.

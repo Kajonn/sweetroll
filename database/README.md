@@ -22,10 +22,10 @@ Browser storage creates the current stores on first creation without requesting
 a version upgrade. Clear obsolete browser test profiles rather than maintaining
 conversion code.
 
-Character/campaign upgrades between published rules versions, field-mapping
-previews, upgrade commits and rollback are not supported. Published rules remain
-immutable and existing characters/campaigns retain their original version IDs.
-Create new test characters/campaigns to use a different published rules snapshot.
+Published rules versions remain immutable. Moving a character or campaign to a
+later non-breaking system version is a product feature that rewrites only its
+version ID and state (design Section 6.7); it is not a database migration.
+Breaking upgrades, field mapping and rollback are not supported.
 
 The app and database remain under development until the first application release
 Git tag (`v*.*.*`, used by the release workflow). The

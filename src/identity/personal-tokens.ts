@@ -6,6 +6,17 @@ export const personalTokenScopes = [
 ] as const;
 export type PersonalTokenScope = (typeof personalTokenScopes)[number];
 
+/**
+ * Owner decision 2026-11-07: a write scope includes read for the same area
+ * (`characters:write` satisfies `characters:read`). Write commands already
+ * return the resulting state, so a write-only token could never be kept from
+ * reading. Stored scopes are unchanged; this is applied when checking.
+ */
+export function grantsScope(held: readonly PersonalTokenScope[], required: PersonalTokenScope): boolean {
+  if (held.includes(required)) return true;
+  return required.endsWith(":read") && held.includes(required.replace(/:read$/, ":write") as PersonalTokenScope);
+}
+
 type TokenMetadata = {
   id: string;
   label: string;

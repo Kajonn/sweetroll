@@ -13283,7 +13283,8 @@
     "securitySchemes": {
       "bearerAuth": {
         "type": "http",
-        "scheme": "bearer"
+        "scheme": "bearer",
+        "description": "Personal access token. An operation needs every scope in x-required-scopes; a write scope includes read for the same area."
       }
     },
     "schemas": {

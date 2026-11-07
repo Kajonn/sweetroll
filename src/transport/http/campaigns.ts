@@ -23,7 +23,13 @@ import type {
 import type { Characters } from "../../characters/index.js";
 import { prepareCampaignCharacter } from "../../characters/campaignPlacement.js";
 import type { SystemRuntime } from "../../systems/runtime.js";
-import { CharacterViewDto, toCharacterViewDto } from "./characters.js";
+import {
+  CharacterViewDto,
+  toCharacterViewDto,
+  VersionChangeDirectionDto,
+  VersionChangeReportDto,
+  VersionChoiceDto,
+} from "./characters.js";
 
 import type { Identity } from "../../identity/index.js";
 
@@ -251,6 +257,8 @@ const ActivityEventDto = Type.Object({
     Type.Literal("content_recovered"),
     Type.Literal("content_grants_replaced"),
     Type.Literal("roll_executed"),
+    Type.Literal("system_version_upgraded"),
+    Type.Literal("system_version_reverted"),
   ]),
   actorId: Type.String({ format: UUID_FORMAT }),
   sourceContentId: Type.Union([Type.String({ format: UUID_FORMAT }), Type.Null()]),
@@ -532,6 +540,47 @@ const ExportCampaignBody = Type.Object({
 });
 
 const CampaignIdParams = Type.Object({ id: Type.String({ format: UUID_FORMAT }) });
+// Design 6.7: campaign rules-version upgrade and revert.
+const CampaignVersionOptionsDto = Type.Object({
+  current: VersionChoiceDto,
+  revertTo: Type.Union([VersionChoiceDto, Type.Null()]),
+  upgrades: Type.Array(VersionChoiceDto),
+});
+const CampaignVersionCheckDto = Type.Object({
+  revision: Type.Integer(),
+  direction: VersionChangeDirectionDto,
+  fromVersionId: Type.String(),
+  toVersionId: Type.String(),
+  ok: Type.Boolean(),
+  characters: Type.Array(Type.Object({
+    characterId: Type.String({ format: UUID_FORMAT }),
+    name: Type.String(),
+    ok: Type.Boolean(),
+    report: VersionChangeReportDto,
+  })),
+  templates: Type.Array(Type.Object({
+    templateId: Type.String({ format: UUID_FORMAT }),
+    name: Type.String(),
+    ok: Type.Boolean(),
+    blockers: Type.Array(Type.Object({
+      code: Type.String(),
+      message: Type.String(),
+      definitionId: Type.Optional(Type.String()),
+    })),
+  })),
+});
+const CampaignVersionCheckQuery = Type.Object(
+  { targetVersionId: Type.String({ format: UUID_FORMAT }) },
+  { additionalProperties: false },
+);
+const ChangeCampaignVersionBody = Type.Object(
+  {
+    targetVersionId: Type.String({ format: UUID_FORMAT }),
+    expectedCampaignRevision: Type.Integer({ minimum: 1 }),
+    idempotencyKey: Type.String({ minLength: 1, maxLength: 200 }),
+  },
+  { additionalProperties: false },
+);
 const MemberParams = Type.Object({
   id: Type.String({ format: UUID_FORMAT }),
   userId: Type.String({ format: UUID_FORMAT }),
@@ -814,6 +863,44 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
     schema: {
       params: CampaignIdParams,
       body: CampaignLifecycleBody,
+      response: {
+        "200": Type.Object({ campaign: CampaignViewDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/campaigns/:id/version-options",
+    operationId: "get_campaigns_id_version_options",
+    schema: {
+      params: CampaignIdParams,
+      response: {
+        "200": Type.Object({ options: CampaignVersionOptionsDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/campaigns/:id/version-check",
+    operationId: "get_campaigns_id_version_check",
+    schema: {
+      params: CampaignIdParams,
+      querystring: CampaignVersionCheckQuery,
+      response: {
+        "200": Type.Object({ check: CampaignVersionCheckDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/campaigns/:id/version",
+    operationId: "post_campaigns_id_version",
+    schema: {
+      params: CampaignIdParams,
+      body: ChangeCampaignVersionBody,
       response: {
         "200": Type.Object({ campaign: CampaignViewDto, requestId: Type.String() }),
         ...ErrorResponses,
@@ -1757,6 +1844,44 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         const body = request.body as { expectedCampaignRevision: number; idempotencyKey: string };
         const result = await campaigns.archive(ctxOf(request), {
           campaignId: params.id,
+          expectedCampaignRevision: body.expectedCampaignRevision,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { campaign: toCampaignDto(result.value), requestId: request.id };
+      },
+
+      get_campaigns_id_version_options: async (request, reply) => {
+        const params = request.params as { id: string };
+        const result = await campaigns.listVersionOptions(ctxOf(request), { campaignId: params.id });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "private, no-store");
+        const toDto = (choice: { createdAt: Date } & Record<string, unknown>) => ({ ...choice, createdAt: choice.createdAt.toISOString() });
+        return {
+          options: {
+            current: toDto(result.value.current),
+            revertTo: result.value.revertTo === null ? null : toDto(result.value.revertTo),
+            upgrades: result.value.upgrades.map(toDto),
+          },
+          requestId: request.id,
+        };
+      },
+
+      get_campaigns_id_version_check: async (request, reply) => {
+        const params = request.params as { id: string };
+        const query = request.query as { targetVersionId: string };
+        const result = await campaigns.checkVersionChange(ctxOf(request), { campaignId: params.id, targetVersionId: query.targetVersionId });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "private, no-store");
+        return { check: result.value, requestId: request.id };
+      },
+
+      post_campaigns_id_version: async (request, reply) => {
+        const params = request.params as { id: string };
+        const body = request.body as { targetVersionId: string; expectedCampaignRevision: number; idempotencyKey: string };
+        const result = await campaigns.changeVersion(ctxOf(request), {
+          campaignId: params.id,
+          targetVersionId: body.targetVersionId,
           expectedCampaignRevision: body.expectedCampaignRevision,
           idempotencyKey: body.idempotencyKey,
         });

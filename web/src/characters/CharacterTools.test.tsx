@@ -79,7 +79,7 @@ function makeApi(overrides: Partial<CharactersApi> = {}): CharactersApi {
 }
 
 describe("CharacterTools", () => {
-  it("does not offer character version migration or rollback", () => {
+  it("hides the rules-version tool when the API does not provide version checks", () => {
     render(<CharacterTools characterId="char-1" api={makeApi()} session={makeSession(readySnapshot())} />);
     expect(screen.queryByRole("button", { name: /migration|rollback|upgrade/i })).not.toBeInTheDocument();
   });

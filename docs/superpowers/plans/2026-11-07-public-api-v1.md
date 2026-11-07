@@ -90,6 +90,11 @@ are in place. Its hosted journey is pending.
 
 - Commands that change both a character and its campaign need both write
   scopes. These are campaign character creation, assign, claim and adopt.
+- A write scope includes read for the same area (owner decision 2026-11-07,
+  PR #44): write commands return the resulting state, so a write-only token
+  could never be kept from reading. The check applies this; stored scopes are
+  unchanged, and Account → API tokens shows read as included when write is
+  selected. Read never implies write.
 - Reading a campaign character's sheet needs only `characters:read`; the
   existing GM-visibility and owner-only-notes policy still applies.
 - Update the `personal_access_tokens.scopes` CHECK in the schema baseline. No

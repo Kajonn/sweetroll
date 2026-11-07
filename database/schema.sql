@@ -157,6 +157,8 @@ CREATE TABLE campaigns (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id          uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   system_version_id uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  -- Design 6.7: the version used before the most recent upgrade; the only revert target.
+  previous_system_version_id uuid REFERENCES system_versions(id) ON DELETE RESTRICT,
   title             text NOT NULL,
   description       text NOT NULL DEFAULT '',
   status            text NOT NULL DEFAULT 'active',
@@ -228,6 +230,8 @@ CREATE TABLE characters (
   id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id             uuid REFERENCES users(id) ON DELETE RESTRICT,
   system_version_id    uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  -- Design 6.7: the version used before the most recent upgrade; the only revert target.
+  previous_system_version_id uuid REFERENCES system_versions(id) ON DELETE RESTRICT,
   entity_definition_id text NOT NULL,
   name                 text NOT NULL,
   revision             integer NOT NULL DEFAULT 1 CHECK (revision >= 1),
@@ -537,7 +541,9 @@ CREATE TABLE campaign_activity_events (
     'template_create',
     'template_update',
     'template_archive',
-    'template_recover'
+    'template_recover',
+    'system_version_upgraded',
+    'system_version_reverted'
   ))
 );
 

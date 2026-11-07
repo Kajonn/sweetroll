@@ -24,6 +24,8 @@ import type {
   RemoveCharacterEntryResponse,
   UpdateCharacterEntryBody,
   UpdateCharacterEntryResponse,
+  VersionCheckResponse,
+  VersionOptionsResponse,
 } from "./types.js";
 
 export type VersionCatalogQuery = {
@@ -73,6 +75,9 @@ export type CharactersApi = {
   activity(characterId: string, cursor: string | null): Promise<ActivityResponse>;
   send(request: FrozenRequest): Promise<CommandResultResponse>;
   export(characterId: string): Promise<CharacterExport>;
+  /** Design 6.7 read-only version choices and dry run; the change itself goes through the session. */
+  versionOptions?(characterId: string): Promise<VersionOptionsResponse>;
+  versionCheck?(characterId: string, targetVersionId: string): Promise<VersionCheckResponse>;
 };
 
 export function createCharactersApi(client: ApiClient): CharactersApi {
@@ -157,5 +162,11 @@ export function createCharactersApi(client: ApiClient): CharactersApi {
       ),
     export: (characterId) =>
       client.fetch<CharacterExport>("POST", `/characters/${characterId}/exports`),
+    versionOptions: (characterId) =>
+      client.fetch<VersionOptionsResponse>("GET", `/characters/${encodeURIComponent(characterId)}/version-options`),
+    versionCheck: (characterId, targetVersionId) =>
+      client.fetch<VersionCheckResponse>("GET", `/characters/${encodeURIComponent(characterId)}/version-check`, {
+        query: { targetVersionId },
+      }),
   };
 }

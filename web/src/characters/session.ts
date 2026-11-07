@@ -125,6 +125,12 @@ export type CharacterSession = {
   archive(): Promise<void>;
   recover(): Promise<void>;
   /**
+   * Design 6.7: move this standalone character to another version of its
+   * system (a checked upgrade or the recorded revert target). Online only,
+   * through the same durable attempt ordering as archive/recover.
+   */
+  changeVersion(targetVersionId: string): Promise<void>;
+  /**
    * Explicit unknown-outcome review for one retained expired online attempt.
    * Never retries the stored request and never mints a replacement: it
    * retires exactly the identified attempt after fetching current authorized
@@ -1104,11 +1110,13 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   type OnlineOperation =
     | {kind:"push";operation:"push";parentRollId:string}
-    | { kind: "archive" | "recover"; operation: "archive" | "recover" };
+    | { kind: "archive" | "recover"; operation: "archive" | "recover" }
+    | { kind: "version"; operation: "version"; targetVersionId: string };
 
   function onlineAttemptMatches(attempt: OnlineAttempt, op: OnlineOperation): boolean {
     if (attempt.characterId !== characterId) return false;
     if(op.operation==="push")return attempt.kind==="push"&&attempt.request.path===`/characters/${characterId}/rolls/${op.parentRollId}/push`;
+    // One version change at a time: a retained attempt replays verbatim, whatever its target.
     return attempt.kind === op.operation;
   }
 
@@ -1130,7 +1138,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       return;
     }
     const stored = await store.readOnlineAttempts(actorId);
-    if(stored.some(a=>a.characterId===characterId&&!["archive","recover","push"].includes(a.kind)))throw new Error("Update Sweetroll to recover this pending operation.");
+    if(stored.some(a=>a.characterId===characterId&&!["archive","recover","push","version"].includes(a.kind)))throw new Error("Update Sweetroll to recover this pending operation.");
     if (!identityMatches()) return;
     pendingOnline = stored
       .filter((attempt) => attempt.characterId === characterId)
@@ -1199,6 +1207,14 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     const firstAttemptAt = now();
     const key = newId();
     if(op.operation==="push")return {method:"POST",path:`/characters/${characterId}/rolls/${op.parentRollId}/push`,body:{expectedRevision,idempotencyKey:key},firstAttemptAt};
+    if (op.operation === "version") {
+      return {
+        method: "POST",
+        path: `/characters/${characterId}/version`,
+        body: { targetVersionId: op.targetVersionId, expectedRevision, idempotencyKey: key },
+        firstAttemptAt,
+      };
+    }
     if (op.operation === "archive" || op.operation === "recover") {
       return {
         method: "PATCH",
@@ -1979,6 +1995,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     },
     async recover(): Promise<void> {
       await runOnlineOperation({ kind: "recover", operation: "recover" });
+    },
+    async changeVersion(targetVersionId: string): Promise<void> {
+      await runOnlineOperation({ kind: "version", operation: "version", targetVersionId });
     },
     reviewExpiredAttempt(input) {
       return trackOnline(reviewExpiredAttemptInner(input));

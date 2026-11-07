@@ -166,6 +166,8 @@ function makeCharacters(overrides: Partial<Characters> = {}): Characters {
     duplicate: async () => ({ ok: true, value: characterView() }),
     listActivity: async () => ({ ok: true, value: { events: [], nextCursor: null } }),
     exportCharacter: async () => ({ ok: true, value: characterExport() }),
+    listVersionOptions: async () => ({ ok: false, error: { code: "not_found", message: "not found" } }),
+    checkVersionChange: async () => ({ ok: false, error: { code: "not_found", message: "not found" } }),
   };
   return { ...base, ...overrides };
 }

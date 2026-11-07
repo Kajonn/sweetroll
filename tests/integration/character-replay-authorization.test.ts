@@ -555,6 +555,8 @@ describeWithDatabase("Character replay authorization (I6 Task 1)", () => {
         "listActivity",
         "listCreationVersions",
         "listEntryTemplates",
+        "listVersionOptions",
+        "checkVersionChange",
         "manage",
         "open",
         "pushOptions",

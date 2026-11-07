@@ -18,6 +18,8 @@ type Dependencies = {
 const asWire = <T>(result: Result<T>) => map(result, wire);
 const page = (query: { limit?: number; cursor?: string }) => ({ limit: query.limit ?? 25, cursor: query.cursor ?? null });
 const campaignWrite = ["campaigns:write"] as const;
+// Placement changes the character and its campaign and returns the sheet;
+// `characters:write` includes `characters:read` (grantsScope).
 const placementScopes = ["campaigns:write", "characters:write"] as const;
 
 export function registerCampaignRoutes(route: Route, { campaigns, characters, runtime, identity }: Dependencies) {

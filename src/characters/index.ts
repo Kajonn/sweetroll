@@ -20,6 +20,8 @@ import type {
   TemplateKind,
 } from "../systems/implementation/package/schema/index.js";
 import type { SystemAuthoring } from "../systems/authoring.js";
+import type { VersionChoice } from "../systems/implementation/persistence/index.js";
+import type { VersionChangeDirection, VersionChangeReport } from "../systems/runtime.js";
 import { hashInput } from "../systems/implementation/authoring/assess.js";
 import { validateEntryForSlot } from "../systems/implementation/runtime/entries.js";
 import {
@@ -78,25 +80,30 @@ const MANAGEMENT_COMMAND_KIND: Record<CharacterManagementCommand["kind"], string
   transferOwnership: "character_transfer_ownership",
   archive: "character_archive",
   recover: "character_recover",
+  changeVersion: "character_change_version",
 };
 const MANAGEMENT_ACTIVITY_KIND: Record<CharacterManagementCommand["kind"], string> = {
   rename: "character_renamed",
   transferOwnership: "character_ownership_transferred",
   archive: "character_archived",
   recover: "character_recovered",
+  changeVersion: "system_version_upgraded",
 };
 const MANAGEMENT_AUDIT_KIND: Record<CharacterManagementCommand["kind"], string> = {
   rename: "character_renamed",
   transferOwnership: "character_ownership_transferred",
   archive: "character_archived",
   recover: "character_recovered",
+  changeVersion: "system_version_upgraded",
 };
 const MANAGEMENT_AUDIT_SUMMARY: Record<CharacterManagementCommand["kind"], string> = {
   rename: "Character renamed",
   transferOwnership: "Character ownership transferred",
   archive: "Character archived",
   recover: "Character recovered",
+  changeVersion: "System version upgraded",
 };
+const VERSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LEASE_MS = 60 * 1000;
 const REPLAY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_PAGE_LIMIT = 100;
@@ -403,7 +410,36 @@ export type CharacterManagementCommand =
   | CharacterRenameCommand
   | CharacterTransferCommand
   | CharacterArchiveCommand
-  | CharacterRecoverCommand;
+  | CharacterRecoverCommand
+  | CharacterVersionChangeCommand;
+
+/**
+ * Design 6.7: move a standalone character to a later non-breaking version of
+ * its system, or back to the version recorded before its most recent upgrade.
+ */
+export type CharacterVersionChangeCommand = {
+  kind: "changeVersion";
+  characterId: CharacterId;
+  targetVersionId: VersionId;
+  expectedRevision: number;
+  idempotencyKey: string;
+};
+
+export type { VersionChoice } from "../systems/implementation/persistence/index.js";
+
+export type CharacterVersionOptions = {
+  current: VersionChoice;
+  /** The version recorded before the most recent upgrade, if any. */
+  revertTo: VersionChoice | null;
+  /** Later published versions of the same system the actor may use, newest first. */
+  upgrades: VersionChoice[];
+};
+
+export type CharacterVersionCheck = {
+  revision: number;
+  direction: VersionChangeDirection;
+  report: Omit<VersionChangeReport, "nextState">;
+};
 
 export type CharacterCommandResult = {
   character: CharacterView;
@@ -492,6 +528,14 @@ export interface Characters extends CharacterImages, CharacterEntryImages {
     ctx: RequestContext,
     input: CharacterManagementCommand,
   ): Promise<CharacterResult<CharacterCommandResult>>;
+  listVersionOptions(
+    ctx: RequestContext,
+    input: { characterId: CharacterId },
+  ): Promise<CharacterResult<CharacterVersionOptions>>;
+  checkVersionChange(
+    ctx: RequestContext,
+    input: { characterId: CharacterId; targetVersionId: VersionId },
+  ): Promise<CharacterResult<CharacterVersionCheck>>;
 
   listActivity(
     ctx: RequestContext,
@@ -506,6 +550,9 @@ export type CreateCharactersModuleInput = {
   runtime: SystemRuntime;
   authorizeVersionUse: SystemAuthoring["authorizeVersionUse"];
   listAuthorizedVersions: SystemAuthoring["listAuthorizedVersions"];
+  /** Design 6.7 version choices; version-change operations are unavailable without them. */
+  listUpgradeTargets?: SystemAuthoring["listUpgradeTargets"];
+  describeVersionChoices?: SystemAuthoring["describeVersionChoices"];
   campaignTemplates?: ReturnType<typeof createTemplateRepository>;
   now?: () => Date;
   newId?: () => string;
@@ -1259,6 +1306,191 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       executionId,
       replayExpiresAt,
     });
+  }
+
+  /**
+   * Design 6.7: decide direction and run the dry run for a standalone record.
+   * The revert target is only the recorded previous version; any other
+   * target must be a later authorized version of the same system.
+   */
+  async function planVersionChange(
+    ctx: RequestContext,
+    record: CharacterRecord,
+    targetVersionId: VersionId,
+  ): Promise<CharacterResult<{ direction: VersionChangeDirection; report: VersionChangeReport }>> {
+    if (input.listUpgradeTargets === undefined) return { ok: false, error: errors.internal() };
+    if (targetVersionId === record.systemVersionId) {
+      return { ok: false, error: errors.invalid_value("The character already uses this version.") };
+    }
+    const previous = await repo.loadPreviousSystemVersionId(record.characterId);
+    const direction: VersionChangeDirection = targetVersionId === previous ? "revert" : "upgrade";
+    if (direction === "upgrade") {
+      const targets = await input.listUpgradeTargets(ctx, record.systemVersionId);
+      if (!targets.ok) return { ok: false, error: errors.internal() };
+      if (!targets.value.some((choice) => choice.versionId === targetVersionId)) {
+        return { ok: false, error: errors.not_found("The target version is not an available upgrade for this character.") };
+      }
+    }
+    const checked = await input.runtime.checkVersionChange({
+      fromVersionId: record.systemVersionId,
+      toVersionId: targetVersionId,
+      entityId: record.entityDefinitionId,
+      state: record.state,
+      direction,
+    });
+    if (!checked.ok) return { ok: false, error: mapRuntimeError(checked.error) };
+    return { ok: true, value: { direction, report: checked.value } };
+  }
+
+  function withoutNextState(report: VersionChangeReport): Omit<VersionChangeReport, "nextState"> {
+    const { nextState: _nextState, ...rest } = report;
+    return rest;
+  }
+
+  async function changeVersion(
+    ctx: RequestContext,
+    command: CharacterVersionChangeCommand,
+  ): Promise<CharacterResult<CharacterCommandResult>> {
+    if (!Number.isInteger(command.expectedRevision) || command.expectedRevision < 1) {
+      return { ok: false, error: errors.bad_request("expectedRevision must be a positive integer.") };
+    }
+    if (typeof command.targetVersionId !== "string" || !VERSION_ID_PATTERN.test(command.targetVersionId)) {
+      return { ok: false, error: errors.bad_request("targetVersionId must be a version UUID.") };
+    }
+    const commandKind = MANAGEMENT_COMMAND_KIND.changeVersion;
+    const inputHash = hashInput({
+      commandKind,
+      characterId: command.characterId,
+      expectedRevision: command.expectedRevision,
+      targetVersionId: command.targetVersionId,
+    });
+    const claimStartedAt = now();
+    const claimed = await claimExecution(input.pool, {
+      actorId: ctx.actorId,
+      commandKind,
+      idempotencyKey: command.idempotencyKey,
+      inputHash,
+      newExecutionId,
+      now: claimStartedAt,
+      leaseMs: LEASE_MS,
+      replayTtlMs: REPLAY_TTL_MS,
+    });
+    if (claimed.status === "mismatch") return { ok: false, error: errors.mismatch() };
+    if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
+    if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
+    if (claimed.status === "replay") {
+      const denial = await authorizeStoredOutcome(ctx, command.characterId, claimed.resultJson, () => errors.notFoundPurge(), true);
+      if (denial !== null) return denial;
+      return replayStoredOutcome(claimed.resultJson);
+    }
+    const executionId = claimed.executionId;
+    const replayExpiresAt = new Date(claimStartedAt.getTime() + REPLAY_TTL_MS);
+    const finish = async (error: CharacterError): Promise<CharacterResult<never>> => {
+      await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+      return { ok: false, error };
+    };
+
+    // Stage 2 is standalone only; attached sheets move with their campaign (stage 3).
+    const record = await repo.openOwnedCharacter(command.characterId, ctx.actorId);
+    if (record === null) return finish(errors.notFoundPurge());
+    if (record.revision !== command.expectedRevision) {
+      // The dry run must verify exactly the state the transaction will replace.
+      const changed = await repo.changedDefinitionIdsSinceRevision(command.characterId, command.expectedRevision, { scopeCampaignId: null });
+      const cursor = changed.latestActivity === null ? null : encodeActivityCursor(changed.latestActivity);
+      return finish(errors.conflict(record.revision, changed.changedDefinitionIds, cursor));
+    }
+    const planned = await planVersionChange(ctx, record, command.targetVersionId);
+    if (!planned.ok) {
+      if (planned.error.code === "internal") return planned;
+      // A command must not read as "character not found" to the client
+      // session; an unavailable target is a conflict with current state.
+      if (planned.error.code === "not_found") {
+        return finish({ code: "conflict", message: planned.error.message, latestRevision: record.revision, cacheDisposition: "retain" });
+      }
+      return finish(planned.error);
+    }
+    const { direction, report } = planned.value;
+    if (!report.ok || report.nextState === null) {
+      const first = report.blockers[0];
+      return finish({
+        code: "conflict",
+        message: `This character cannot move to that version${first === undefined ? "." : `: ${first.message}`} Check the version first for every blocker.`,
+        latestRevision: record.revision,
+        cacheDisposition: "retain",
+      });
+    }
+    const nextState = report.nextState;
+    const resolved = await input.runtime.resolve({
+      versionId: command.targetVersionId,
+      entityId: record.entityDefinitionId,
+      state: nextState,
+      intent: { kind: "observe" },
+    });
+    if (!resolved.ok) {
+      const error = mapRuntimeError(resolved.error);
+      if (isFinalizableRuntimeError(resolved.error.code)) return finish(error);
+      return { ok: false, error };
+    }
+    const activityKind = direction === "upgrade" ? "system_version_upgraded" : "system_version_reverted";
+    const payload = {
+      fromVersionId: record.systemVersionId,
+      toVersionId: command.targetVersionId,
+      direction,
+      updatedEntries: report.changedEntries.length,
+      addedFields: report.addedFields,
+      droppedFields: report.droppedFields,
+    };
+    const outcome = await repo.applyManagementCommandTx({
+      executionId,
+      characterId: command.characterId,
+      actorId: ctx.actorId,
+      expectedRevision: command.expectedRevision,
+      mutation: {
+        kind: "changeVersion",
+        fromVersionId: record.systemVersionId,
+        toVersionId: command.targetVersionId,
+        previousVersionId: direction === "upgrade" ? record.systemVersionId : null,
+        nextState,
+        repinEntryIds: report.changedEntries.filter((entry) => entry.imageUpdated).map((entry) => entry.entryId),
+      },
+      activity: { kind: activityKind, payloadJson: payload, requestId: ctx.requestId },
+      audit: {
+        kind: activityKind,
+        summary: direction === "upgrade" ? "System version upgraded" : "System version reverted",
+        requestId: ctx.requestId,
+      },
+      resultExpiresAt: replayExpiresAt,
+      buildResult: ({ record: updated, controllers, scope }) => {
+        const view = toView(
+          updated,
+          {
+            derivedValues: resolved.value.derivedValues,
+            validations: resolved.value.validations,
+            projection: resolved.value.projection,
+            packageChecksum: resolved.value.packageChecksum,
+            changedDefinitionIds: [],
+          },
+          { baseRevision: command.expectedRevision, commandExecutionId: executionId, replayExpiresAt: replayExpiresAt.toISOString(), replayed: false },
+        );
+        const replaced = { ...view, reconciliation: { ...view.reconciliation, cacheDisposition: "replace" as const } };
+        return { ok: true, value: { scope, character: serializeView(withControllers(replaced, controllers)), roll: null } };
+      },
+    });
+    if (outcome.kind === "already_completed") {
+      const denial = await authorizeStoredOutcome(ctx, command.characterId, outcome.resultJson, () => errors.notFoundPurge(), true);
+      if (denial !== null) return denial;
+      return replayStoredOutcome(outcome.resultJson);
+    }
+    if (outcome.kind === "not_found" || outcome.kind === "invalid_target") return finish(errors.notFoundPurge());
+    if (outcome.kind === "conflict") {
+      if (!(await recheckWriteAccess(ctx, command.characterId, null))) return finish(errors.notFoundPurge());
+      const changed = await repo.changedDefinitionIdsSinceRevision(command.characterId, command.expectedRevision, { scopeCampaignId: null });
+      const cursor = changed.latestActivity === null ? null : encodeActivityCursor(changed.latestActivity);
+      return finish(errors.conflict(outcome.latestRevision, changed.changedDefinitionIds, cursor));
+    }
+    const stored = outcome.resultJson as StoredCommandOutcome;
+    if (!stored.ok) return { ok: false, error: stored.error };
+    return { ok: true, value: { character: deserializeView(stored.value.character), roll: null, nominal: null } };
   }
 
   return {
@@ -2131,7 +2363,60 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         return { ok: false, error: errors.internal() };
       }
     },
+    async listVersionOptions(ctx, request) {
+      try {
+        if (input.listUpgradeTargets === undefined || input.describeVersionChoices === undefined) {
+          return { ok: false, error: errors.internal() };
+        }
+        const record = await repo.openOwnedCharacter(request.characterId, ctx.actorId);
+        if (record === null) return { ok: false, error: errors.not_found() };
+        const previous = await repo.loadPreviousSystemVersionId(record.characterId);
+        const described = await input.describeVersionChoices(
+          previous === null ? [record.systemVersionId] : [record.systemVersionId, previous],
+        );
+        const upgrades = await input.listUpgradeTargets(ctx, record.systemVersionId);
+        if (!described.ok || !upgrades.ok) return { ok: false, error: errors.internal() };
+        const current = described.value.find((choice) => choice.versionId === record.systemVersionId);
+        if (current === undefined) return { ok: false, error: errors.internal() };
+        return {
+          ok: true,
+          value: {
+            current,
+            revertTo: previous === null ? null : described.value.find((choice) => choice.versionId === previous) ?? null,
+            upgrades: upgrades.value,
+          },
+        };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async checkVersionChange(ctx, request) {
+      try {
+        if (typeof request.targetVersionId !== "string" || !VERSION_ID_PATTERN.test(request.targetVersionId)) {
+          return { ok: false, error: errors.bad_request("targetVersionId must be a version UUID.") };
+        }
+        const record = await repo.openOwnedCharacter(request.characterId, ctx.actorId);
+        if (record === null) return { ok: false, error: errors.not_found() };
+        const planned = await planVersionChange(ctx, record, request.targetVersionId);
+        if (!planned.ok) return planned;
+        return {
+          ok: true,
+          value: { revision: record.revision, direction: planned.value.direction, report: withoutNextState(planned.value.report) },
+        };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
     async manage(ctx, command) {
+      if (command.kind === "changeVersion") {
+        try {
+          return await changeVersion(ctx, command);
+        } catch {
+          return { ok: false, error: errors.internal() };
+        }
+      }
       try {
         if (!Number.isInteger(command.expectedRevision) || command.expectedRevision < 1) {
           return { ok: false, error: errors.bad_request("expectedRevision must be a positive integer.") };
@@ -2577,6 +2862,17 @@ function minimizeActivityPayload(kind: string, payload: unknown): unknown {
     case "character_archived":
     case "character_recovered":
       return {};
+    case "system_version_upgraded":
+    case "system_version_reverted":
+      // Version and definition identifiers only; no stored values.
+      return {
+        fromVersionId: record.fromVersionId,
+        toVersionId: record.toVersionId,
+        direction: record.direction,
+        updatedEntries: record.updatedEntries,
+        addedFields: record.addedFields ?? [],
+        droppedFields: record.droppedFields ?? [],
+      };
     default:
       return {};
   }

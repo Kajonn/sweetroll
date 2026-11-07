@@ -114,13 +114,18 @@ export function PersonalTokens({ client, online }: { client: ApiClient; online: 
             </FormField>
             <Select label={t("account.tokens.expiration")} value={days} onChange={(event) => setDays(event.currentTarget.value)}
               options={["7", "30", "90"].map((value) => ({ value, label: t("account.tokens.days", { days: value }) }))} />
-            {scopes.map((scope) => (
-              <Checkbox key={scope} label={t(`account.tokens.scope.${scope}`)} checked={selected.includes(scope)}
+            {scopes.map((scope) => {
+              // A write scope includes read for the same area; show read as included.
+              const implied = scope.endsWith(":read") && selected.includes(scope.replace(/:read$/, ":write") as Scope);
+              return (
+              <Checkbox key={scope} label={t(`account.tokens.scope.${scope}`)} checked={implied || selected.includes(scope)}
+                disabled={implied} hint={implied ? t("account.tokens.includedByWrite") : undefined}
                 onChange={(event) => {
                   const checked = event.currentTarget.checked;
                   setSelected((previous) => checked ? [...previous, scope] : previous.filter((value) => value !== scope));
                 }} />
-            ))}
+              );
+            })}
             <Button type="submit" variant="primary" disabled={label.trim() === "" || selected.length === 0}>
               {t("account.tokens.create")}
             </Button>

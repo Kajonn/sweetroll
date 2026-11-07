@@ -28,6 +28,8 @@
 .dialogActions { display: flex; flex-wrap: wrap; gap: 8px; }
 .toolGroup > *, .dialogActions > * { min-height: 44px; min-width: 44px; }
 .checkRow { display: flex; align-items: center; gap: 8px; min-height: 44px; font-family: var(--font-body); color: var(--text-primary); }
+.versionChoice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 44px; overflow-wrap: anywhere; }
+.versionNotes { flex-basis: 100%; color: var(--text-muted); white-space: pre-line; }
 .dialogField { max-width: 100%; min-width: 0; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-panel); color: var(--text-primary); font: inherit; }
 .slotList { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; min-width: 0; }
 .slotEntry { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-top: 1px solid var(--border-default); min-width: 0; }

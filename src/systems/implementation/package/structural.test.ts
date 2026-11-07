@@ -279,6 +279,42 @@ describe("template/slot compatibility", () => {
     );
   });
 
+  const bonusField = (overrides: Record<string, unknown> = {}) => ({
+    kind: "integer", id: "bonus", label: "Bonus", default: 1, required: false, min: 0, max: 10, step: 1, ...overrides,
+  });
+
+  it("flags template field removal, kind change and new requirement", () => {
+    const prev = packageWith([itemTemplate("torch", { fields: [bonusField()] })]);
+    expect(comparePackages(prev, packageWith([itemTemplate("torch")])).findings).toContainEqual(
+      expect.objectContaining({ code: "template_field_removed", path: "/templates/torch/fields/bonus" }),
+    );
+    const asText = { kind: "text", id: "bonus", label: "Bonus", default: "", required: false, minLength: 0, maxLength: 10 };
+    expect(comparePackages(prev, packageWith([itemTemplate("torch", { fields: [asText] })])).findings).toContainEqual(
+      expect.objectContaining({ code: "template_field_kind_changed" }),
+    );
+    expect(comparePackages(prev, packageWith([itemTemplate("torch", { fields: [bonusField({ required: true })] })])).findings).toContainEqual(
+      expect.objectContaining({ code: "template_field_required_added" }),
+    );
+  });
+
+  it("treats template stat and default changes as non-breaking", () => {
+    const report = comparePackages(
+      packageWith([itemTemplate("torch", { fields: [bonusField()] })]),
+      packageWith([itemTemplate("torch", { label: "Lantern", fields: [bonusField({ default: 3, max: 20 }), bonusField({ id: "weight" })] })]),
+    );
+    expect(report).toEqual({ compatible: true, findings: [] });
+  });
+
+  it("flags slot_capacity_reduced, including against the implicit default", () => {
+    const report = comparePackages(
+      packageWith([], [inventory()]),
+      packageWith([], [{ ...inventory(), maxEntries: 10 }]),
+    );
+    expect(report.findings).toContainEqual(
+      expect.objectContaining({ code: "slot_capacity_reduced", path: "/slots/inventory/maxEntries" }),
+    );
+  });
+
   it("treats adding templates, slots, and granted actions as non-breaking", () => {
     const report = comparePackages(
       packageWith([], []),

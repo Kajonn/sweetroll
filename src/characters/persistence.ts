@@ -185,7 +185,21 @@ export type ManagementMutation =
   | { kind: "rename"; name: string }
   | { kind: "transferOwnership"; toUserId: UserId }
   | { kind: "archive" }
-  | { kind: "recover" };
+  | { kind: "recover" }
+  /**
+   * Design 6.7: move to another version of the same system. Standalone only;
+   * the module verified `nextState` against the target at `expectedRevision`.
+   * `previousVersionId` is stored as the revert target (null after a revert).
+   */
+  | {
+      kind: "changeVersion";
+      fromVersionId: VersionId;
+      toVersionId: VersionId;
+      previousVersionId: VersionId | null;
+      nextState: RuntimeStateV1;
+      /** Entries whose template art changed; their image pins move with the state. */
+      repinEntryIds: string[];
+    };
 
 export type ApplyManagementCommandInput = {
   executionId: ExecutionId;
@@ -327,6 +341,9 @@ export interface CharacterPersistenceRepository {
    * row does not exist. Attached rows (campaignId non-null) must never
    * authorize owner-only paths; standalone receipts must never replay them.
    */
+  /** Design 6.7 revert target; null when there is none or the row is missing. */
+  loadPreviousSystemVersionId(characterId: CharacterId): Promise<VersionId | null>;
+
   loadCharacterScope(characterId: CharacterId): Promise<{
     characterId: CharacterId;
     ownerId: UserId | null;
@@ -628,6 +645,9 @@ async function applyManagementCampaignTx(
         [input.characterId],
       );
       break;
+    default:
+      // Transfer and version changes are standalone-only; the module denies them first.
+      throw new Error(`applyManagementCampaignTx: unsupported mutation ${input.mutation.kind}`);
   }
   const updatedRow = requireRow(updated.rows[0], "applyManagementCampaignTx.update");
 
@@ -659,6 +679,26 @@ async function applyManagementCampaignTx(
   );
   await client.query("COMMIT");
   return { kind: "applied", record, resultJson };
+}
+
+/**
+ * Design 6.7: a version change can move an entry to the target template's art.
+ * The entry-image read path only serves art matching `pinned_asset_id`, so the
+ * pin moves in the same transaction. Player overrides are kept as they are.
+ */
+export async function repinEntryImages(
+  client: PoolClient,
+  characterId: CharacterId,
+  entries: Record<string, { image?: { fileId: string } }>,
+  entryIds: readonly string[],
+): Promise<void> {
+  for (const entryId of entryIds) {
+    const fileId = entries[entryId]?.image?.fileId ?? null;
+    await client.query(`INSERT INTO character_entry_images(character_id,entry_id,pinned_asset_id,overridden,revision)
+      SELECT $1,$2,$3,false,0 WHERE $3::uuid IS NOT NULL OR EXISTS(SELECT 1 FROM character_entry_images WHERE character_id=$1 AND entry_id=$2)
+      ON CONFLICT(character_id,entry_id) DO UPDATE SET pinned_asset_id=EXCLUDED.pinned_asset_id,revision=character_entry_images.revision+1`,
+      [characterId, entryId, fileId]);
+  }
 }
 
 async function syncEntryImages(client: PoolClient, input: ApplyCommandInput): Promise<void> {
@@ -850,6 +890,14 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       );
       const row = result.rows[0];
       return row === undefined ? null : toCharacterRecord(row);
+    },
+
+    async loadPreviousSystemVersionId(characterId) {
+      const result = await pool.query<{ previous_system_version_id: string | null }>(
+        `SELECT previous_system_version_id FROM characters WHERE id = $1`,
+        [characterId],
+      );
+      return result.rows[0]?.previous_system_version_id ?? null;
     },
 
     async loadCharacterScope(characterId) {
@@ -1178,6 +1226,21 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
               RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
               [input.characterId],
             );
+            break;
+          case "changeVersion":
+            if (charRow.system_version_id !== input.mutation.fromVersionId || charRow.campaign_id !== null) {
+              await client.query("ROLLBACK");
+              return { kind: "conflict", latestRevision: charRow.revision };
+            }
+            updated = await client.query<CharacterRow>(
+              `UPDATE characters
+                  SET system_version_id = $1, previous_system_version_id = $2, state_json = $3::jsonb,
+                      revision = revision + 1, updated_at = now()
+                WHERE id = $4
+              RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+              [input.mutation.toVersionId, input.mutation.previousVersionId, JSON.stringify(input.mutation.nextState), input.characterId],
+            );
+            await repinEntryImages(client, input.characterId, input.mutation.nextState.entries ?? {}, input.mutation.repinEntryIds);
             break;
         }
         const updatedRow = requireRow(updated.rows[0], "applyManagementCommandTx.update");

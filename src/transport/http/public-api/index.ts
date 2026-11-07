@@ -318,7 +318,10 @@ export function buildPublicApi({ identity, authoring, characters, pool, campaign
       paths,
       components: {
         responses: errorResponses,
-        securitySchemes: { bearerAuth: { type: "http", scheme: "bearer" } },
+        securitySchemes: { bearerAuth: {
+          type: "http", scheme: "bearer",
+          description: "Personal access token. An operation needs every scope in x-required-scopes; a write scope includes read for the same area.",
+        } },
         schemas: {
           ...outputSchemas,
           // Keep the document schema in a single OpenAPI component.

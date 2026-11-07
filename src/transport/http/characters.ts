@@ -13,6 +13,7 @@ import type {
   CharacterCommand,
   CharacterError,
   CharacterManagementCommand,
+  VersionChoice,
   CharacterView,
   Characters,
   CharacterCommandResult,
@@ -529,6 +530,67 @@ const TransferOwnershipBody = Type.Object({
   expectedRevision: Type.Integer(),
   idempotencyKey: Type.String({ minLength: 1 }),
 });
+// Design 6.7: system version upgrade and revert.
+export const VersionChoiceDto = Type.Object({
+  versionId: Type.String({ format: UUID_FORMAT }),
+  systemId: Type.String({ format: UUID_FORMAT }),
+  semanticVersion: Type.String(),
+  releaseNotes: Type.String(),
+  createdAt: Type.String({ format: DATE_TIME_FORMAT }),
+});
+const CharacterVersionOptionsDto = Type.Object({
+  current: VersionChoiceDto,
+  revertTo: Type.Union([VersionChoiceDto, Type.Null()]),
+  upgrades: Type.Array(VersionChoiceDto),
+});
+export const VersionChangeDirectionDto = Type.Union([Type.Literal("upgrade"), Type.Literal("revert")]);
+export const VersionChangeReportDto = Type.Object({
+  ok: Type.Boolean(),
+  direction: VersionChangeDirectionDto,
+  fromVersionId: Type.String(),
+  toVersionId: Type.String(),
+  packageFindings: Type.Array(Type.Object({
+    code: Type.String(),
+    path: Type.String(),
+    message: Type.String(),
+    affectsCharacter: Type.Boolean(),
+  })),
+  blockers: Type.Array(Type.Object({
+    code: Type.String(),
+    message: Type.String(),
+    definitionId: Type.Optional(Type.String()),
+    entryId: Type.Optional(Type.String()),
+  })),
+  addedFields: Type.Array(Type.String()),
+  droppedFields: Type.Array(Type.String()),
+  changedEntries: Type.Array(Type.Object({
+    entryId: Type.String(),
+    templateId: Type.String(),
+    updatedFields: Type.Array(Type.String()),
+    keptFields: Type.Array(Type.String()),
+    addedFields: Type.Array(Type.String()),
+    droppedFields: Type.Array(Type.String()),
+    imageUpdated: Type.Boolean(),
+  })),
+  validations: Type.Array(RuntimeValidationDto),
+});
+const CharacterVersionCheckDto = Type.Object({
+  revision: Type.Integer(),
+  direction: VersionChangeDirectionDto,
+  report: VersionChangeReportDto,
+});
+const VersionCheckQuery = Type.Object(
+  { targetVersionId: Type.String({ format: UUID_FORMAT }) },
+  { additionalProperties: false },
+);
+const ChangeVersionBody = Type.Object(
+  {
+    targetVersionId: Type.String({ format: UUID_FORMAT }),
+    expectedRevision: Type.Integer({ minimum: 1 }),
+    idempotencyKey: Type.String({ minLength: 1, maxLength: 200 }),
+  },
+  { additionalProperties: false },
+);
 const DuplicateCharacterBody = Type.Object({
   idempotencyKey: Type.String({ minLength: 1 }),
 });
@@ -749,6 +811,44 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
     schema: {
       params: CharacterIdParams,
       body: TransferOwnershipBody,
+      response: {
+        "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/characters/:characterId/version-options",
+    operationId: "get_characters_characterId_version_options",
+    schema: {
+      params: CharacterIdParams,
+      response: {
+        "200": Type.Object({ options: CharacterVersionOptionsDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/characters/:characterId/version-check",
+    operationId: "get_characters_characterId_version_check",
+    schema: {
+      params: CharacterIdParams,
+      querystring: VersionCheckQuery,
+      response: {
+        "200": Type.Object({ check: CharacterVersionCheckDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/characters/:characterId/version",
+    operationId: "post_characters_characterId_version",
+    schema: {
+      params: CharacterIdParams,
+      body: ChangeVersionBody,
       response: {
         "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
         ...ErrorResponses,
@@ -1208,6 +1308,48 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
           idempotencyKey: body.idempotencyKey,
         };
         const result = await characters.manage(ctxOf(request), command);
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
+      get_characters_characterId_version_options: async (request, reply) => {
+        const params = request.params as { characterId: string };
+        const result = await characters.listVersionOptions(ctxOf(request), { characterId: params.characterId });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "private, no-store");
+        const toDto = (choice: VersionChoice) => ({ ...choice, createdAt: choice.createdAt.toISOString() });
+        return {
+          options: {
+            current: toDto(result.value.current),
+            revertTo: result.value.revertTo === null ? null : toDto(result.value.revertTo),
+            upgrades: result.value.upgrades.map(toDto),
+          },
+          requestId: request.id,
+        };
+      },
+
+      get_characters_characterId_version_check: async (request, reply) => {
+        const params = request.params as { characterId: string };
+        const query = request.query as { targetVersionId: string };
+        const result = await characters.checkVersionChange(ctxOf(request), {
+          characterId: params.characterId,
+          targetVersionId: query.targetVersionId,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "private, no-store");
+        return { check: result.value, requestId: request.id };
+      },
+
+      post_characters_characterId_version: async (request, reply) => {
+        const params = request.params as { characterId: string };
+        const body = request.body as { targetVersionId: string; expectedRevision: number; idempotencyKey: string };
+        const result = await characters.manage(ctxOf(request), {
+          kind: "changeVersion",
+          characterId: params.characterId,
+          targetVersionId: body.targetVersionId,
+          expectedRevision: body.expectedRevision,
+          idempotencyKey: body.idempotencyKey,
+        });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { result: toCommandResultDto(result.value), requestId: request.id };
       },

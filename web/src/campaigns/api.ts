@@ -57,6 +57,10 @@ import type {
   UploadImageBody,
   UploadImageResponse,
   MemberListResponse,
+  CampaignVersionCheckResponse,
+  CampaignVersionOptionsResponse,
+  ChangeCampaignVersionBody,
+  ChangeCampaignVersionResponse,
 } from "./types.js";
 import type { operations } from "../api/schema.js";
 
@@ -118,6 +122,10 @@ export type CampaignsApi = {
   updateCampaign(campaignId: string, body: UpdateCampaignBody): Promise<CampaignViewResponse>;
   archiveCampaign(campaignId: string, body: CampaignLifecycleBody): Promise<CampaignViewResponse>;
   recoverCampaign(campaignId: string, body: CampaignLifecycleBody): Promise<CampaignViewResponse>;
+  /** Design 6.7: GM rules-version choices, dry run and change (optional for test seams). */
+  campaignVersionOptions?(campaignId: string): Promise<CampaignVersionOptionsResponse>;
+  campaignVersionCheck?(campaignId: string, targetVersionId: string): Promise<CampaignVersionCheckResponse>;
+  changeCampaignVersion?(campaignId: string, body: ChangeCampaignVersionBody): Promise<ChangeCampaignVersionResponse>;
   exportCampaign(campaignId: string, body: ExportCampaignBody): Promise<ExportCampaignResponse>;
   listMembers(campaignId: string, input?: CampaignListQuery): Promise<MemberListResponse>;
   changeMemberRole(campaignId: string, memberUserId: string, body: ChangeMemberRoleBody): Promise<unknown>;
@@ -234,6 +242,14 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
       client.fetch<CampaignViewResponse>("POST", `/campaigns/${campaignId}/archive`, { body }),
     recoverCampaign: (campaignId, body) =>
       client.fetch<CampaignViewResponse>("POST", `/campaigns/${campaignId}/recover`, { body }),
+    campaignVersionOptions: (campaignId) =>
+      client.fetch<CampaignVersionOptionsResponse>("GET", `/campaigns/${encodeURIComponent(campaignId)}/version-options`),
+    campaignVersionCheck: (campaignId, targetVersionId) =>
+      client.fetch<CampaignVersionCheckResponse>("GET", `/campaigns/${encodeURIComponent(campaignId)}/version-check`, {
+        query: { targetVersionId },
+      }),
+    changeCampaignVersion: (campaignId, body) =>
+      client.fetch<ChangeCampaignVersionResponse>("POST", `/campaigns/${encodeURIComponent(campaignId)}/version`, { body }),
     exportCampaign: (campaignId, body) =>
       client.fetch<ExportCampaignResponse>("POST", `/campaigns/${campaignId}/exports`, { body }),
     listMembers: (campaignId, input) =>

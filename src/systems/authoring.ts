@@ -32,6 +32,7 @@ import type {
   SystemRecord,
   UserId,
   VersionId,
+  VersionChoice,
   VersionRecord,
 } from "./implementation/persistence/index.js";
 import { decodeCreationVersionsCursor } from "./implementation/persistence/index.js";
@@ -209,6 +210,10 @@ export interface SystemAuthoring extends SystemItemImages {
     ctx: RequestContext,
     input: { limit?: number; cursor?: string | null; q?: string | null; systemId?: string | null },
   ): Promise<Result<ListCreationVersionsResult>>;
+  /** Design 6.7: later published versions of the same system the actor may move to. */
+  listUpgradeTargets(ctx: RequestContext, fromVersionId: VersionId): Promise<Result<VersionChoice[]>>;
+  /** Metadata for versions a record already pins (current or revert target). */
+  describeVersionChoices(versionIds: VersionId[]): Promise<Result<VersionChoice[]>>;
   exportVersion(ctx: RequestContext, versionId: VersionId): Promise<Result<ExportedPackage>>;
   listVersions(
     ctx: RequestContext,
@@ -663,6 +668,22 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
         const version = await repo.authorizeVersionUse(ctx.actorId, versionId);
         if (version === null) return { ok: false, error: errors.not_found() };
         return { ok: true, value: version };
+      } catch (cause) {
+        return { ok: false, error: imageError(cause) };
+      }
+    },
+
+    async listUpgradeTargets(ctx, fromVersionId) {
+      try {
+        return { ok: true, value: await repo.listLaterAuthorizedVersions(ctx.actorId, fromVersionId) };
+      } catch (cause) {
+        return { ok: false, error: imageError(cause) };
+      }
+    },
+
+    async describeVersionChoices(versionIds) {
+      try {
+        return { ok: true, value: await repo.describeVersionChoices(versionIds) };
       } catch (cause) {
         return { ok: false, error: imageError(cause) };
       }

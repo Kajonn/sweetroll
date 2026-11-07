@@ -1,3 +1,4 @@
+import { DEFAULT_SLOT_MAX_ENTRIES } from "../runtime/entries.js";
 import type { SystemPackageV1 } from "./schema/index.js";
 
 export type CompatibilityCode =
@@ -10,8 +11,12 @@ export type CompatibilityCode =
   | "breaking_expression_result_type_change"
   | "template_removed"
   | "template_action_removed"
+  | "template_field_removed"
+  | "template_field_kind_changed"
+  | "template_field_required_added"
   | "slot_removed"
-  | "slot_kind_narrowed";
+  | "slot_kind_narrowed"
+  | "slot_capacity_reduced";
 
 export type CompatibilityFinding = {
   code: CompatibilityCode;
@@ -66,6 +71,10 @@ function compareFields(
       });
     }
   }
+}
+
+function isRequired(field: object): boolean {
+  return "required" in field && field.required === true;
 }
 
 export function comparePackages(prev: SystemPackageV1, next: SystemPackageV1): CompatibilityReport {
@@ -132,6 +141,32 @@ export function comparePackages(prev: SystemPackageV1, next: SystemPackageV1): C
         });
       }
     }
+    // Template fields are stored on every placed entry, so removals, kind
+    // changes and newly required fields break existing characters.
+    const nextFields = indexById(nextTemplate.fields);
+    for (const prevField of prevTemplate.fields) {
+      const path = `/templates/${id}/fields/${prevField.id}`;
+      const nextField = nextFields.get(prevField.id);
+      if (nextField === undefined) {
+        findings.push({
+          code: "template_field_removed",
+          path,
+          message: `Field "${prevField.id}" was removed from template "${id}".`,
+        });
+      } else if (nextField.kind !== prevField.kind) {
+        findings.push({
+          code: "template_field_kind_changed",
+          path,
+          message: `Field "${prevField.id}" of template "${id}" changed kind from "${prevField.kind}" to "${nextField.kind}".`,
+        });
+      } else if (!isRequired(prevField) && isRequired(nextField)) {
+        findings.push({
+          code: "template_field_required_added",
+          path,
+          message: `Field "${prevField.id}" of template "${id}" is now required.`,
+        });
+      }
+    }
   }
 
   const prevSlots = indexById(prev.slots ?? []);
@@ -152,6 +187,15 @@ export function comparePackages(prev: SystemPackageV1, next: SystemPackageV1): C
         code: "slot_kind_narrowed",
         path: `/slots/${id}/accepts`,
         message: `Slot "${id}" no longer accepts ${narrowed.map((kind) => `"${kind}"`).join(", ")}.`,
+      });
+    }
+    const prevCapacity = prevSlot.maxEntries ?? DEFAULT_SLOT_MAX_ENTRIES;
+    const nextCapacity = nextSlot.maxEntries ?? DEFAULT_SLOT_MAX_ENTRIES;
+    if (nextCapacity < prevCapacity) {
+      findings.push({
+        code: "slot_capacity_reduced",
+        path: `/slots/${id}/maxEntries`,
+        message: `Slot "${id}" capacity was reduced from ${prevCapacity} to ${nextCapacity}.`,
       });
     }
   }

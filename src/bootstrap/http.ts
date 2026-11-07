@@ -107,6 +107,8 @@ const characters = createCharactersModule({
   runtime,
   authorizeVersionUse: authoring.authorizeVersionUse,
   listAuthorizedVersions: authoring.listAuthorizedVersions,
+  listUpgradeTargets: authoring.listUpgradeTargets,
+  describeVersionChoices: authoring.describeVersionChoices,
 });
 
 // I6 Task 9 (fix): one shared campaign policy/placement implementation. The
@@ -136,6 +138,8 @@ const campaigns = createCampaignsModule({
   limits: placementLimits,
   charactersPlacement: placement,
     loadTemplatePackage:createPostgresPublishedPackageLoader(pool),
+    listUpgradeTargets: authoring.listUpgradeTargets,
+    describeVersionChoices: authoring.describeVersionChoices,
 });
 
 const app = buildHttpApp({

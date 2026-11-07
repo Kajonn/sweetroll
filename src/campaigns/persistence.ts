@@ -61,7 +61,9 @@ export type ActivityEventKind =
   | "content_deleted"
   | "content_recovered"
   | "content_grants_replaced"
-  | "roll_executed";
+  | "roll_executed"
+  | "system_version_upgraded"
+  | "system_version_reverted";
 
 export type ActivityEventRecord = {
   eventId: string;
@@ -444,6 +446,8 @@ function toActivityEventRecord(row: ActivityEventRow): ActivityEventRecord {
     case "content_recovered":
     case "content_grants_replaced":
     case "roll_executed":
+    case "system_version_upgraded":
+    case "system_version_reverted":
       break;
     default:
       throw new Error(`Unknown activity kind: ${row.kind}`);
@@ -709,6 +713,23 @@ export function createCampaignPersistenceRepository(pool: Pool) {
           WHERE id = $1 AND revision = $4
           RETURNING ${CAMPAIGN_COLUMNS}`,
         [input.campaignId, input.status, input.now.toISOString(), input.expectedRevision],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toCampaignRecord(row);
+    },
+
+    /** Design 6.7: move the campaign pin; the caller verified and moved attached characters. */
+    async updateCampaignVersion(
+      client: PoolClient,
+      input: { campaignId: string; fromVersionId: string; toVersionId: string; previousVersionId: string | null; expectedRevision: number; now: Date },
+    ): Promise<CampaignRecord | null> {
+      const result = await client.query<CampaignRow>(
+        `UPDATE campaigns
+            SET system_version_id = $2, previous_system_version_id = $3,
+                revision = revision + 1, updated_at = $4::timestamptz
+          WHERE id = $1 AND revision = $5 AND system_version_id = $6
+          RETURNING ${CAMPAIGN_COLUMNS}`,
+        [input.campaignId, input.toVersionId, input.previousVersionId, input.now.toISOString(), input.expectedRevision, input.fromVersionId],
       );
       const row = result.rows[0];
       return row === undefined ? null : toCampaignRecord(row);

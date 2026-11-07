@@ -628,6 +628,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/characters/{characterId}/version-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_characters_characterId_version_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/version-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_characters_characterId_version_check"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_characters_characterId_version"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/characters/{characterId}/duplicate": {
         parameters: {
             query?: never;
@@ -990,6 +1038,54 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["post_campaigns_id_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/version-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaigns_id_version_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/version-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaigns_id_version_check"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_campaigns_id_version"];
         delete?: never;
         options?: never;
         head?: never;
@@ -14142,6 +14238,1159 @@ export interface operations {
             };
         };
     };
+    get_characters_characterId_version_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        options: {
+                            current: {
+                                /** Format: uuid */
+                                versionId: string;
+                                /** Format: uuid */
+                                systemId: string;
+                                semanticVersion: string;
+                                releaseNotes: string;
+                                /** Format: date-time */
+                                createdAt: string;
+                            };
+                            revertTo: {
+                                /** Format: uuid */
+                                versionId: string;
+                                /** Format: uuid */
+                                systemId: string;
+                                semanticVersion: string;
+                                releaseNotes: string;
+                                /** Format: date-time */
+                                createdAt: string;
+                            } | null;
+                            upgrades: {
+                                /** Format: uuid */
+                                versionId: string;
+                                /** Format: uuid */
+                                systemId: string;
+                                semanticVersion: string;
+                                releaseNotes: string;
+                                /** Format: date-time */
+                                createdAt: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_characters_characterId_version_check: {
+        parameters: {
+            query: {
+                targetVersionId: string;
+            };
+            header?: never;
+            path: {
+                characterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        check: {
+                            revision: number;
+                            direction: "upgrade" | "revert";
+                            report: {
+                                ok: boolean;
+                                direction: "upgrade" | "revert";
+                                fromVersionId: string;
+                                toVersionId: string;
+                                packageFindings: {
+                                    code: string;
+                                    path: string;
+                                    message: string;
+                                    affectsCharacter: boolean;
+                                }[];
+                                blockers: {
+                                    code: string;
+                                    message: string;
+                                    definitionId?: string;
+                                    entryId?: string;
+                                }[];
+                                addedFields: string[];
+                                droppedFields: string[];
+                                changedEntries: {
+                                    entryId: string;
+                                    templateId: string;
+                                    updatedFields: string[];
+                                    keptFields: string[];
+                                    addedFields: string[];
+                                    droppedFields: string[];
+                                    imageUpdated: boolean;
+                                }[];
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                            };
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_characters_characterId_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    targetVersionId: string;
+                    expectedRevision: number;
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        result: {
+                            character: {
+                                /** Format: uuid */
+                                characterId: string;
+                                ownerId: string | null;
+                                campaignId: string | null;
+                                controllers: string[];
+                                placementGeneration: number;
+                                returnOwnerId: string | null;
+                                name: string;
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                entityDefinitionId: string;
+                                revision: number;
+                                lifecycle: "active" | "archived";
+                                archivedAt: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                                state: {
+                                    /** @constant */
+                                    schemaVersion: "1.0";
+                                    values: {
+                                        [key: string]: unknown;
+                                    };
+                                    entries?: {
+                                        [key: string]: {
+                                            entryId: string;
+                                            image?: {
+                                                fileId: string;
+                                                description: string;
+                                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                                width: number;
+                                                height: number;
+                                                sizeBytes: number;
+                                                checksum: string;
+                                            };
+                                            slotId: string;
+                                            templateId: string | null;
+                                            source?: {
+                                                /** @constant */
+                                                kind: "personal";
+                                            } | {
+                                                /** @constant */
+                                                kind: "system";
+                                                templateId: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "campaign";
+                                                campaignId: string;
+                                                templateId: string;
+                                                templateRevision: number;
+                                                contentRevision: number;
+                                            };
+                                            snapshot?: {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
+                                                quantity?: number;
+                                            } | {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
+                                                quantity?: number;
+                                                base: {
+                                                    versionId: string;
+                                                    packageChecksum: string;
+                                                    templateId: string;
+                                                };
+                                                defaultValues: {
+                                                    [key: string]: unknown;
+                                                };
+                                            };
+                                            values: {
+                                                [key: string]: unknown;
+                                            };
+                                            quantity?: number;
+                                        };
+                                    };
+                                };
+                                derivedValues: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                                projection: {
+                                    presentation?: {
+                                        componentStyle?: "default" | "classic";
+                                        colorPreset: "default" | "blue" | "ochre";
+                                    };
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    entityId: string;
+                                    entityLabel: string;
+                                    completionFields?: {
+                                        /** @constant */
+                                        kind: "field";
+                                        id: string;
+                                        fieldId: string;
+                                        label: string;
+                                        fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                        value: string | number | boolean | null | string[];
+                                        editable: boolean;
+                                        constraints: {
+                                            required?: boolean;
+                                            min?: number;
+                                            max?: number;
+                                            step?: number;
+                                            minLength?: number;
+                                            maxLength?: number;
+                                            options?: {
+                                                id: string;
+                                                label: string;
+                                            }[];
+                                        };
+                                        validations: {
+                                            validationId: string;
+                                            severity: "error" | "warning";
+                                            message: string;
+                                            targetDefinitionId: string;
+                                        }[];
+                                    }[];
+                                    sheets: {
+                                        id: string;
+                                        label: string;
+                                        sections: {
+                                            id: string;
+                                            label: string;
+                                            elements: ({
+                                                /** @constant */
+                                                kind: "heading";
+                                                id: string;
+                                                text: string;
+                                                level: 2 | 3;
+                                            } | {
+                                                /** @constant */
+                                                kind: "field";
+                                                id: string;
+                                                fieldId: string;
+                                                label: string;
+                                                fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                                value: string | number | boolean | null | string[];
+                                                editable: boolean;
+                                                constraints: {
+                                                    required?: boolean;
+                                                    min?: number;
+                                                    max?: number;
+                                                    step?: number;
+                                                    minLength?: number;
+                                                    maxLength?: number;
+                                                    options?: {
+                                                        id: string;
+                                                        label: string;
+                                                    }[];
+                                                };
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "resource";
+                                                id: string;
+                                                resourceId: string;
+                                                label: string;
+                                                value: {
+                                                    current: number;
+                                                    max: number;
+                                                };
+                                                min: number;
+                                                max: number;
+                                                step: number;
+                                                resetTo: "min" | "max";
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "action";
+                                                id: string;
+                                                actionId: string;
+                                                label: string;
+                                                actionKind: "roll" | "resourceBump";
+                                                inputs: {
+                                                    id: string;
+                                                    label: string;
+                                                    valueType: "integer" | "decimal" | "boolean" | "text";
+                                                    required: boolean;
+                                                    default: string | number | boolean | null;
+                                                }[];
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                                entryId?: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "slot";
+                                                id: string;
+                                                slotId: string;
+                                                label: string;
+                                                accepts: ("item" | "spell" | "talent" | "effect")[];
+                                                entries: {
+                                                    definition?: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "item" | "spell" | "talent" | "effect";
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
+                                                                id: string;
+                                                                label: string;
+                                                            }[];
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "roll" | "resourceBump";
+                                                            inputs: {
+                                                                id: string;
+                                                                label: string;
+                                                                valueType: "integer" | "decimal" | "boolean" | "text";
+                                                                required: boolean;
+                                                                default: string | number | boolean | null;
+                                                            }[];
+                                                        }[];
+                                                    };
+                                                    metadata?: {
+                                                        name: string;
+                                                        description?: string;
+                                                        notes?: string;
+                                                    };
+                                                    source?: {
+                                                        /** @constant */
+                                                        kind: "personal";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "system";
+                                                        templateId: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "campaign";
+                                                        campaignId: string;
+                                                        templateId: string;
+                                                        templateRevision: number;
+                                                        contentRevision: number;
+                                                    };
+                                                    entryId: string;
+                                                    templateId: string | null;
+                                                    label: string;
+                                                    values: {
+                                                        [key: string]: unknown;
+                                                    };
+                                                    quantity?: number;
+                                                }[];
+                                            })[];
+                                        }[];
+                                    }[];
+                                    derivedValues: {
+                                        [key: string]: string | number | boolean | null;
+                                    };
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                };
+                                reconciliation: {
+                                    /** Format: uuid */
+                                    characterId: string;
+                                    baseRevision: number | null;
+                                    revision: number;
+                                    packageChecksum: string;
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    commandExecutionId: string;
+                                    /** Format: date-time */
+                                    replayExpiresAt: string;
+                                    replayed: boolean;
+                                    changedDefinitionIds: string[];
+                                    activityCursor: string | null;
+                                    cacheDisposition: "retain" | "replace" | "purge";
+                                };
+                            };
+                            roll: {
+                                push?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rollId: string;
+                                    rootRollId: string;
+                                    parentRollId: string | null;
+                                    attempt: number;
+                                    maxAttempts: number;
+                                    rerolledDiceIds: string[];
+                                    faceOutcomes: {
+                                        groupId: string;
+                                        face: number;
+                                        combinedCount: number;
+                                        rerolledCount: number;
+                                    }[];
+                                };
+                                breakdown?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rootId: string;
+                                    groups: {
+                                        id: string;
+                                        label: string;
+                                        count: number;
+                                        sides: number;
+                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        threshold?: number;
+                                        diceIds: string[];
+                                        total: number;
+                                    }[];
+                                    terms: {
+                                        id: string;
+                                        operation: string;
+                                        operandIds: string[];
+                                        value: string | number | boolean | null;
+                                        groupId?: string;
+                                    }[];
+                                };
+                                actionId: string;
+                                expression: string;
+                                dice: {
+                                    sides: number;
+                                    value: number;
+                                    kept: boolean;
+                                    id?: string;
+                                    groupId?: string;
+                                    success?: boolean;
+                                }[];
+                                bindings: {
+                                    scope: "fields" | "inputs";
+                                    definitionId: string;
+                                    value: string | number | boolean | null;
+                                }[];
+                                total: number;
+                                output: string;
+                                audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
+                            } | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     post_characters_characterId_duplicate: {
         parameters: {
             query?: never;
@@ -19839,6 +21088,514 @@ export interface operations {
             };
         };
     };
+    get_campaigns_id_version_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        options: {
+                            current: {
+                                /** Format: uuid */
+                                versionId: string;
+                                /** Format: uuid */
+                                systemId: string;
+                                semanticVersion: string;
+                                releaseNotes: string;
+                                /** Format: date-time */
+                                createdAt: string;
+                            };
+                            revertTo: {
+                                /** Format: uuid */
+                                versionId: string;
+                                /** Format: uuid */
+                                systemId: string;
+                                semanticVersion: string;
+                                releaseNotes: string;
+                                /** Format: date-time */
+                                createdAt: string;
+                            } | null;
+                            upgrades: {
+                                /** Format: uuid */
+                                versionId: string;
+                                /** Format: uuid */
+                                systemId: string;
+                                semanticVersion: string;
+                                releaseNotes: string;
+                                /** Format: date-time */
+                                createdAt: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_campaigns_id_version_check: {
+        parameters: {
+            query: {
+                targetVersionId: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        check: {
+                            revision: number;
+                            direction: "upgrade" | "revert";
+                            fromVersionId: string;
+                            toVersionId: string;
+                            ok: boolean;
+                            characters: {
+                                /** Format: uuid */
+                                characterId: string;
+                                name: string;
+                                ok: boolean;
+                                report: {
+                                    ok: boolean;
+                                    direction: "upgrade" | "revert";
+                                    fromVersionId: string;
+                                    toVersionId: string;
+                                    packageFindings: {
+                                        code: string;
+                                        path: string;
+                                        message: string;
+                                        affectsCharacter: boolean;
+                                    }[];
+                                    blockers: {
+                                        code: string;
+                                        message: string;
+                                        definitionId?: string;
+                                        entryId?: string;
+                                    }[];
+                                    addedFields: string[];
+                                    droppedFields: string[];
+                                    changedEntries: {
+                                        entryId: string;
+                                        templateId: string;
+                                        updatedFields: string[];
+                                        keptFields: string[];
+                                        addedFields: string[];
+                                        droppedFields: string[];
+                                        imageUpdated: boolean;
+                                    }[];
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                };
+                            }[];
+                            templates: {
+                                /** Format: uuid */
+                                templateId: string;
+                                name: string;
+                                ok: boolean;
+                                blockers: {
+                                    code: string;
+                                    message: string;
+                                    definitionId?: string;
+                                }[];
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_campaigns_id_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    targetVersionId: string;
+                    expectedCampaignRevision: number;
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        campaign: {
+                            presentation?: {
+                                componentStyle?: "default" | "classic";
+                                colorPreset: "default" | "blue" | "ochre";
+                            };
+                            /** Format: uuid */
+                            campaignId: string;
+                            /** Format: uuid */
+                            ownerId: string;
+                            /** Format: uuid */
+                            systemVersionId: string;
+                            title: string;
+                            description: string;
+                            status: "active" | "archived";
+                            revision: number;
+                            accessRevision: number;
+                            archivedAt: string | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     post_campaigns_id_recover: {
         parameters: {
             query?: never;
@@ -24661,7 +26418,7 @@ export interface operations {
                         events: {
                             /** Format: uuid */
                             eventId: string;
-                            kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed";
+                            kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted";
                             /** Format: uuid */
                             actorId: string;
                             sourceContentId: string | null;
@@ -24883,7 +26640,7 @@ export interface operations {
                             activity: {
                                 /** Format: uuid */
                                 eventId: string;
-                                kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed";
+                                kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted";
                                 /** Format: uuid */
                                 actorId: string;
                                 sourceContentId: string | null;

@@ -1,5 +1,5 @@
 import {preparePushCommit,insertPushRoll} from "./push.js";
-import type {PushContext} from "../systems/runtime.js";
+import type {PushContext, ExtensionRef} from "../systems/runtime.js";
 import type { Pool, PoolClient } from "pg";
 
 import type {
@@ -35,6 +35,8 @@ export type CharacterRecord = {
   /** Immutable adopter recorded at adoption; NULL for standalone and campaign-created sheets. */
   returnOwnerId: UserId | null;
   systemVersionId: VersionId;
+  /** Design 6.8: extension versions the character is built on, sorted by extensionId. */
+  extensions: ExtensionRef[];
   entityDefinitionId: DefinitionId;
   name: string;
   revision: number;
@@ -64,6 +66,8 @@ export type CreateCharacterInput = {
     characterId: CharacterId;
     ownerId: UserId;
     systemVersionId: VersionId;
+    /** Design 6.8: authorized, composition-checked extension versions. */
+    extensions?: readonly ExtensionRef[];
     entityDefinitionId: DefinitionId;
     name: string;
     state: RuntimeStateV1;
@@ -408,7 +412,36 @@ type CharacterRow = {
   archived_at: Date | null;
   created_at: Date;
   updated_at: Date;
+  extensions_json: ExtensionRef[];
 };
+
+/**
+ * Design 6.8: a character's extensions live in `character_extensions` (FK
+ * protected); every character read returns them as one sorted JSON column.
+ */
+export const CHARACTER_EXTENSIONS_COLUMN = `COALESCE((SELECT jsonb_agg(jsonb_build_object('extensionId', ce.extension_id, 'versionId', ce.extension_version_id) ORDER BY ce.extension_id)
+  FROM character_extensions ce WHERE ce.character_id = characters.id), '[]'::jsonb) AS extensions_json`;
+
+/** Replaces a character's extension rows (inside the caller's transaction). */
+export async function writeCharacterExtensions(
+  client: PoolClient,
+  characterId: CharacterId,
+  extensions: readonly ExtensionRef[],
+): Promise<void> {
+  await client.query("DELETE FROM character_extensions WHERE character_id = $1", [characterId]);
+  for (const ref of extensions) {
+    await client.query(
+      "INSERT INTO character_extensions (character_id, extension_id, extension_version_id) VALUES ($1, $2, $3)",
+      [characterId, ref.extensionId, ref.versionId],
+    );
+  }
+}
+
+export function sortExtensionRefs(extensions: readonly ExtensionRef[]): ExtensionRef[] {
+  return [...extensions]
+    .map((ref) => ({ extensionId: ref.extensionId, versionId: ref.versionId }))
+    .sort((a, b) => (a.extensionId < b.extensionId ? -1 : a.extensionId > b.extensionId ? 1 : 0));
+}
 
 type ExecutionRow = {
   execution_id: string;
@@ -444,7 +477,7 @@ async function applyCommandCampaignTx(
     return { kind: "not_found" };
   }
   const charResult = await client.query<CharacterRow>(
-    `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+    `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}
        FROM characters WHERE id = $1 FOR UPDATE`,
     [input.characterId],
   );
@@ -484,7 +517,7 @@ async function applyCommandCampaignTx(
       `UPDATE characters
           SET state_json = $1::jsonb, revision = revision + 1, updated_at = now()
         WHERE id = $2
-        RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+        RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}`,
       [JSON.stringify(input.nextState), input.characterId],
     );
     updatedRow = requireRow(updated.rows[0], "applyCommandCampaignTx.update");
@@ -594,7 +627,7 @@ async function applyManagementCampaignTx(
     return { kind: "not_found" };
   }
   const charResult = await client.query<CharacterRow>(
-    `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+    `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}
        FROM characters WHERE id = $1 FOR UPDATE`,
     [input.characterId],
   );
@@ -625,7 +658,7 @@ async function applyManagementCampaignTx(
       updated = await client.query<CharacterRow>(
         `UPDATE characters SET name = $1, revision = revision + 1, updated_at = now()
           WHERE id = $2
-        RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+        RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}`,
         [input.mutation.name, input.characterId],
       );
       break;
@@ -633,7 +666,7 @@ async function applyManagementCampaignTx(
       updated = await client.query<CharacterRow>(
         `UPDATE characters SET lifecycle = 'archived', archived_at = now(), revision = revision + 1, updated_at = now()
           WHERE id = $1
-        RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+        RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}`,
         [input.characterId],
       );
       break;
@@ -641,7 +674,7 @@ async function applyManagementCampaignTx(
       updated = await client.query<CharacterRow>(
         `UPDATE characters SET lifecycle = 'active', archived_at = null, revision = revision + 1, updated_at = now()
           WHERE id = $1
-        RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+        RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}`,
         [input.characterId],
       );
       break;
@@ -739,7 +772,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         const inserted = await client.query<CharacterRow>(
           `INSERT INTO characters (id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, created_at, updated_at)
            VALUES ($1, $2, $3, $4, $5, 1, $6::jsonb, 'owner_only', 'active', $7, $7)
-           RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+           RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}`,
           [
             input.character.characterId,
             input.character.ownerId,
@@ -751,6 +784,9 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           ],
         );
         const characterRow = requireRow(inserted.rows[0], "createCharacterTx");
+        const extensions = sortExtensionRefs(input.character.extensions ?? []);
+        await writeCharacterExtensions(client, characterRow.id, extensions);
+        characterRow.extensions_json = extensions;
         await client.query(
           `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, request_id)
            VALUES ($1, $2, $3, $4::jsonb, $5)`,
@@ -806,7 +842,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         // must deny instead of copying attached state into a personal
         // library sheet.
         const sourceResult = await client.query<CharacterRow>(
-          `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+          `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}
              FROM characters WHERE id = $1 FOR UPDATE`,
           [input.source.characterId],
         );
@@ -827,7 +863,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         const inserted = await client.query<CharacterRow>(
           `INSERT INTO characters (id, owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, created_at, updated_at)
            VALUES ($1, $2, $3, $4, $5, 1, $6::jsonb, 'owner_only', 'active', $7, $7)
-           RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+           RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}`,
           [
             input.duplicate.characterId,
             input.duplicate.ownerId,
@@ -839,6 +875,9 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           ],
         );
         const characterRow = requireRow(inserted.rows[0], "duplicateCharacterTx");
+        // Design 6.8: the copy is built on the source's exact composition.
+        await writeCharacterExtensions(client, characterRow.id, sourceRow.extensions_json);
+        characterRow.extensions_json = sourceRow.extensions_json;
         // Source lock serializes portrait replacement with duplication. The new
         // character link owns access independently; immutable bytes are retained.
         await client.query(
@@ -883,7 +922,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
 
     async openOwnedCharacter(characterId, ownerId) {
       const result = await pool.query<CharacterRow>(
-        `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+        `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}
            FROM characters
           WHERE id = $1 AND owner_id = $2 AND campaign_id IS NULL`,
         [characterId, ownerId],
@@ -902,7 +941,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
 
     async loadCharacterScope(characterId) {
       const result = await pool.query<CharacterRow>(
-        `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+        `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}
            FROM characters
           WHERE id = $1`,
         [characterId],
@@ -929,7 +968,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       try {
         await client.query("BEGIN READ ONLY");
         const charResult = await client.query<CharacterRow>(
-          `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+          `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}
              FROM characters
             WHERE id = $1`,
           [characterId],
@@ -1003,7 +1042,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       }
       const result = await pool.query<CharacterRow & { updated_at_cursor: string }>(
         `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id,
-                name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at,
+                name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN},
                 to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS updated_at_cursor
            FROM characters
           WHERE owner_id = $1 AND campaign_id IS NULL ${cursorClause}
@@ -1044,7 +1083,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         }
 
         const charResult = await client.query<CharacterRow>(
-          `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+          `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}
              FROM characters WHERE id = $1 FOR UPDATE`,
           [input.characterId],
         );
@@ -1072,7 +1111,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
             `UPDATE characters
                 SET state_json = $1::jsonb, revision = revision + 1, updated_at = now()
               WHERE id = $2
-              RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+              RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}`,
             [JSON.stringify(input.nextState), input.characterId],
           );
           updatedRow = requireRow(updated.rows[0], "applyCommandTx.update");
@@ -1170,7 +1209,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         }
 
         const charResult = await client.query<CharacterRow>(
-          `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at
+          `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}
              FROM characters WHERE id = $1 FOR UPDATE`,
           [input.characterId],
         );
@@ -1199,7 +1238,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
             updated = await client.query<CharacterRow>(
               `UPDATE characters SET name = $1, revision = revision + 1, updated_at = now()
                 WHERE id = $2
-              RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+              RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}`,
               [input.mutation.name, input.characterId],
             );
             break;
@@ -1207,7 +1246,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
             updated = await client.query<CharacterRow>(
               `UPDATE characters SET owner_id = $1, revision = revision + 1, updated_at = now()
                 WHERE id = $2
-              RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+              RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}`,
               [input.mutation.toUserId, input.characterId],
             );
             break;
@@ -1215,7 +1254,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
             updated = await client.query<CharacterRow>(
               `UPDATE characters SET lifecycle = 'archived', archived_at = now(), revision = revision + 1, updated_at = now()
                 WHERE id = $1
-              RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+              RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}`,
               [input.characterId],
             );
             break;
@@ -1223,7 +1262,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
             updated = await client.query<CharacterRow>(
               `UPDATE characters SET lifecycle = 'active', archived_at = null, revision = revision + 1, updated_at = now()
                 WHERE id = $1
-              RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+              RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}`,
               [input.characterId],
             );
             break;
@@ -1237,7 +1276,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
                   SET system_version_id = $1, previous_system_version_id = $2, state_json = $3::jsonb,
                       revision = revision + 1, updated_at = now()
                 WHERE id = $4
-              RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+              RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}`,
               [input.mutation.toVersionId, input.mutation.previousVersionId, JSON.stringify(input.mutation.nextState), input.characterId],
             );
             await repinEntryImages(client, input.characterId, input.mutation.nextState.entries ?? {}, input.mutation.repinEntryIds);
@@ -1409,6 +1448,7 @@ function toCharacterRecord(row: CharacterRow): CharacterRecord {
     placementGeneration: row.placement_generation,
     returnOwnerId: row.return_owner_id,
     systemVersionId: row.system_version_id,
+    extensions: row.extensions_json ?? [],
     entityDefinitionId: row.entity_definition_id,
     name: row.name,
     revision: row.revision,

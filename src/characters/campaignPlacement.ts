@@ -752,6 +752,15 @@ export function createCampaignPlacement(input: CreateCampaignPlacementInput): Ca
         if (character.system_version_id !== campaign.system_version_id) {
           return { ok: false, error: errors.bad_request("The character version does not match the pinned campaign version. Migrate it first.") };
         }
+        // Design 6.8: campaign compositions (stage E4) will merge a character's
+        // extensions into the campaign; until then such characters stay standalone.
+        const extensionCount = await client.query<{ count: string }>(
+          "SELECT count(*) FROM character_extensions WHERE character_id = $1",
+          [character.id],
+        );
+        if (Number(extensionCount.rows[0]?.count ?? 0) > 0) {
+          return { ok: false, error: errors.conflict("Characters built with extensions cannot join a campaign yet.", character.revision) };
+        }
         if (character.revision !== adoptInput.expectedCharacterRevision) {
           return {
             ok: false, error: errors.conflict(

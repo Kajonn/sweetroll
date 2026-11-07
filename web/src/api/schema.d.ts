@@ -7613,6 +7613,12 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     systemVersionId: string;
+                    extensions?: {
+                        /** Format: uuid */
+                        extensionId: string;
+                        /** Format: uuid */
+                        versionId: string;
+                    }[];
                     entityDefinitionId: string;
                     name: string;
                     initialValues?: {
@@ -7640,6 +7646,12 @@ export interface operations {
                             name: string;
                             /** Format: uuid */
                             systemVersionId: string;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                            }[];
                             entityDefinitionId: string;
                             revision: number;
                             lifecycle: "active" | "archived";
@@ -7668,6 +7680,8 @@ export interface operations {
                                         };
                                         slotId: string;
                                         templateId: string | null;
+                                        /** Format: uuid */
+                                        extensionId?: string;
                                         source?: {
                                             /** @constant */
                                             kind: "personal";
@@ -7675,6 +7689,7 @@ export interface operations {
                                             /** @constant */
                                             kind: "system";
                                             templateId: string;
+                                            extensionId?: string;
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
@@ -7899,6 +7914,7 @@ export interface operations {
                                                     /** @constant */
                                                     kind: "system";
                                                     templateId: string;
+                                                    extensionId?: string;
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
@@ -7909,6 +7925,8 @@ export interface operations {
                                                 };
                                                 entryId: string;
                                                 templateId: string | null;
+                                                /** Format: uuid */
+                                                extensionId?: string;
                                                 label: string;
                                                 values: {
                                                     [key: string]: unknown;
@@ -8544,6 +8562,12 @@ export interface operations {
                             name: string;
                             /** Format: uuid */
                             systemVersionId: string;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                            }[];
                             entityDefinitionId: string;
                             revision: number;
                             lifecycle: "active" | "archived";
@@ -8572,6 +8596,8 @@ export interface operations {
                                         };
                                         slotId: string;
                                         templateId: string | null;
+                                        /** Format: uuid */
+                                        extensionId?: string;
                                         source?: {
                                             /** @constant */
                                             kind: "personal";
@@ -8579,6 +8605,7 @@ export interface operations {
                                             /** @constant */
                                             kind: "system";
                                             templateId: string;
+                                            extensionId?: string;
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
@@ -8803,6 +8830,7 @@ export interface operations {
                                                     /** @constant */
                                                     kind: "system";
                                                     templateId: string;
+                                                    extensionId?: string;
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
@@ -8813,6 +8841,8 @@ export interface operations {
                                                 };
                                                 entryId: string;
                                                 templateId: string | null;
+                                                /** Format: uuid */
+                                                extensionId?: string;
                                                 label: string;
                                                 values: {
                                                     [key: string]: unknown;
@@ -9015,6 +9045,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -9043,6 +9079,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -9050,6 +9088,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -9274,6 +9313,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -9284,6 +9324,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -9635,6 +9677,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -9663,6 +9711,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -9670,6 +9720,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -9894,6 +9945,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -9904,6 +9956,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -10255,6 +10309,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -10283,6 +10343,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -10290,6 +10352,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -10514,6 +10577,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -10524,6 +10588,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -11402,6 +11468,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -11430,6 +11502,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -11437,6 +11511,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -11661,6 +11736,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -11671,6 +11747,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -12034,6 +12112,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -12062,6 +12146,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -12069,6 +12155,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -12293,6 +12380,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -12303,6 +12391,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -12636,6 +12726,7 @@ export interface operations {
                             /** @constant */
                             kind: "system";
                             templateId: string;
+                            extensionId?: string;
                         } | {
                             /** @constant */
                             kind: "campaign";
@@ -12648,6 +12739,8 @@ export interface operations {
                         entryId: string;
                         slotId: string;
                         templateId: string | null;
+                        /** Format: uuid */
+                        extensionId?: string;
                         values: {
                             [key: string]: unknown;
                         };
@@ -12677,6 +12770,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -12705,6 +12804,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -12712,6 +12813,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -12936,6 +13038,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -12946,6 +13049,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -13296,6 +13401,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -13324,6 +13435,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -13331,6 +13444,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -13555,6 +13669,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -13565,6 +13680,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -13919,6 +14036,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -13947,6 +14070,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -13954,6 +14079,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -14178,6 +14304,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -14188,6 +14315,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -14526,6 +14655,7 @@ export interface operations {
                                 /** @constant */
                                 kind: "system";
                                 templateId: string;
+                                extensionId?: string;
                             } | {
                                 /** @constant */
                                 kind: "campaign";
@@ -14534,6 +14664,8 @@ export interface operations {
                                 templateRevision: number;
                                 contentRevision: number;
                             };
+                            /** Format: uuid */
+                            extensionId?: string;
                             defaultQuantity?: number;
                             id: string;
                             label: string;
@@ -14823,6 +14955,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -14851,6 +14989,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -14858,6 +14998,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -15082,6 +15223,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -15092,6 +15234,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -15976,6 +16120,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -16004,6 +16154,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -16011,6 +16163,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -16235,6 +16388,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -16245,6 +16399,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -16592,6 +16748,12 @@ export interface operations {
                             name: string;
                             /** Format: uuid */
                             systemVersionId: string;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                            }[];
                             entityDefinitionId: string;
                             revision: number;
                             lifecycle: "active" | "archived";
@@ -16620,6 +16782,8 @@ export interface operations {
                                         };
                                         slotId: string;
                                         templateId: string | null;
+                                        /** Format: uuid */
+                                        extensionId?: string;
                                         source?: {
                                             /** @constant */
                                             kind: "personal";
@@ -16627,6 +16791,7 @@ export interface operations {
                                             /** @constant */
                                             kind: "system";
                                             templateId: string;
+                                            extensionId?: string;
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
@@ -16851,6 +17016,7 @@ export interface operations {
                                                     /** @constant */
                                                     kind: "system";
                                                     templateId: string;
+                                                    extensionId?: string;
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
@@ -16861,6 +17027,8 @@ export interface operations {
                                                 };
                                                 entryId: string;
                                                 templateId: string | null;
+                                                /** Format: uuid */
+                                                extensionId?: string;
                                                 label: string;
                                                 values: {
                                                     [key: string]: unknown;
@@ -17382,6 +17550,12 @@ export interface operations {
                         updatedAt: string;
                         /** Format: uuid */
                         systemVersionId: string;
+                        extensions?: {
+                            /** Format: uuid */
+                            extensionId: string;
+                            /** Format: uuid */
+                            versionId: string;
+                        }[];
                         packageChecksum: string;
                         revision: number;
                         state: {
@@ -17404,6 +17578,8 @@ export interface operations {
                                     };
                                     slotId: string;
                                     templateId: string | null;
+                                    /** Format: uuid */
+                                    extensionId?: string;
                                     source?: {
                                         /** @constant */
                                         kind: "personal";
@@ -17411,6 +17587,7 @@ export interface operations {
                                         /** @constant */
                                         kind: "system";
                                         templateId: string;
+                                        extensionId?: string;
                                     } | {
                                         /** @constant */
                                         kind: "campaign";
@@ -24511,6 +24688,12 @@ export interface operations {
                             name: string;
                             /** Format: uuid */
                             systemVersionId: string;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                            }[];
                             entityDefinitionId: string;
                             revision: number;
                             lifecycle: "active" | "archived";
@@ -24539,6 +24722,8 @@ export interface operations {
                                         };
                                         slotId: string;
                                         templateId: string | null;
+                                        /** Format: uuid */
+                                        extensionId?: string;
                                         source?: {
                                             /** @constant */
                                             kind: "personal";
@@ -24546,6 +24731,7 @@ export interface operations {
                                             /** @constant */
                                             kind: "system";
                                             templateId: string;
+                                            extensionId?: string;
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
@@ -24770,6 +24956,7 @@ export interface operations {
                                                     /** @constant */
                                                     kind: "system";
                                                     templateId: string;
+                                                    extensionId?: string;
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
@@ -24780,6 +24967,8 @@ export interface operations {
                                                 };
                                                 entryId: string;
                                                 templateId: string | null;
+                                                /** Format: uuid */
+                                                extensionId?: string;
                                                 label: string;
                                                 values: {
                                                     [key: string]: unknown;
@@ -25060,6 +25249,12 @@ export interface operations {
                             name: string;
                             /** Format: uuid */
                             systemVersionId: string;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                            }[];
                             entityDefinitionId: string;
                             revision: number;
                             lifecycle: "active" | "archived";
@@ -25088,6 +25283,8 @@ export interface operations {
                                         };
                                         slotId: string;
                                         templateId: string | null;
+                                        /** Format: uuid */
+                                        extensionId?: string;
                                         source?: {
                                             /** @constant */
                                             kind: "personal";
@@ -25095,6 +25292,7 @@ export interface operations {
                                             /** @constant */
                                             kind: "system";
                                             templateId: string;
+                                            extensionId?: string;
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
@@ -25319,6 +25517,7 @@ export interface operations {
                                                     /** @constant */
                                                     kind: "system";
                                                     templateId: string;
+                                                    extensionId?: string;
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
@@ -25329,6 +25528,8 @@ export interface operations {
                                                 };
                                                 entryId: string;
                                                 templateId: string | null;
+                                                /** Format: uuid */
+                                                extensionId?: string;
                                                 label: string;
                                                 values: {
                                                     [key: string]: unknown;
@@ -25513,6 +25714,12 @@ export interface operations {
                             name: string;
                             /** Format: uuid */
                             systemVersionId: string;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                            }[];
                             entityDefinitionId: string;
                             revision: number;
                             lifecycle: "active" | "archived";
@@ -25541,6 +25748,8 @@ export interface operations {
                                         };
                                         slotId: string;
                                         templateId: string | null;
+                                        /** Format: uuid */
+                                        extensionId?: string;
                                         source?: {
                                             /** @constant */
                                             kind: "personal";
@@ -25548,6 +25757,7 @@ export interface operations {
                                             /** @constant */
                                             kind: "system";
                                             templateId: string;
+                                            extensionId?: string;
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
@@ -25772,6 +25982,7 @@ export interface operations {
                                                     /** @constant */
                                                     kind: "system";
                                                     templateId: string;
+                                                    extensionId?: string;
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
@@ -25782,6 +25993,8 @@ export interface operations {
                                                 };
                                                 entryId: string;
                                                 templateId: string | null;
+                                                /** Format: uuid */
+                                                extensionId?: string;
                                                 label: string;
                                                 values: {
                                                     [key: string]: unknown;
@@ -25968,6 +26181,12 @@ export interface operations {
                             name: string;
                             /** Format: uuid */
                             systemVersionId: string;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                            }[];
                             entityDefinitionId: string;
                             revision: number;
                             lifecycle: "active" | "archived";
@@ -25996,6 +26215,8 @@ export interface operations {
                                         };
                                         slotId: string;
                                         templateId: string | null;
+                                        /** Format: uuid */
+                                        extensionId?: string;
                                         source?: {
                                             /** @constant */
                                             kind: "personal";
@@ -26003,6 +26224,7 @@ export interface operations {
                                             /** @constant */
                                             kind: "system";
                                             templateId: string;
+                                            extensionId?: string;
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
@@ -26227,6 +26449,7 @@ export interface operations {
                                                     /** @constant */
                                                     kind: "system";
                                                     templateId: string;
+                                                    extensionId?: string;
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
@@ -26237,6 +26460,8 @@ export interface operations {
                                                 };
                                                 entryId: string;
                                                 templateId: string | null;
+                                                /** Format: uuid */
+                                                extensionId?: string;
                                                 label: string;
                                                 values: {
                                                     [key: string]: unknown;

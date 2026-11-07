@@ -64,6 +64,7 @@ const RuntimeStateDto = Type.Object({
     image: Type.Optional(ImageDescriptorSchema),
     slotId: Type.String(),
     templateId: Type.Union([Type.String(), Type.Null()]),
+    extensionId: Type.Optional(Type.String({ format: UUID_FORMAT })),
     source:Type.Optional(EntrySourceSchema),snapshot:Type.Optional(EntrySnapshotSchema),
     values: Type.Object({}, { additionalProperties: true }),
     quantity: Type.Optional(Type.Integer({ minimum: 1 })),
@@ -144,6 +145,7 @@ const ProjectionSlotEntryDto = Type.Object({
   source:Type.Optional(EntrySourceSchema),
   entryId: Type.String(),
   templateId: Type.Union([Type.String(), Type.Null()]),
+  extensionId: Type.Optional(Type.String({ format: UUID_FORMAT })),
   label: Type.String(),
   values: Type.Object({}, { additionalProperties: true }),
   quantity: Type.Optional(Type.Integer({ minimum: 1 })),
@@ -219,6 +221,12 @@ const ProjectionDto = Type.Object({
  * I6 Task 9: shared with the Campaigns adapter so placement responses reuse
  * the exact standalone wire shape (single source of truth, no DTO drift).
  */
+// Design 6.8: extension versions a character is built on (identity only).
+export const ExtensionRefsDto = Type.Array(Type.Object({
+  extensionId: Type.String({ format: UUID_FORMAT }),
+  versionId: Type.String({ format: UUID_FORMAT }),
+}, { additionalProperties: false }), { maxItems: 16 });
+
 export const CharacterViewDto = Type.Object({
   characterId: Type.String({ format: UUID_FORMAT }),
   // I6 Task 5 ownership union: standalone views populate ownerId with NULL
@@ -232,6 +240,7 @@ export const CharacterViewDto = Type.Object({
   returnOwnerId: Type.Union([Type.String({ format: UUID_FORMAT }), Type.Null()]),
   name: Type.String(),
   systemVersionId: Type.String({ format: UUID_FORMAT }),
+  extensions: ExtensionRefsDto,
   entityDefinitionId: Type.String(),
   revision: Type.Integer(),
   lifecycle: Type.Union([Type.Literal("active"), Type.Literal("archived")]),
@@ -335,6 +344,7 @@ const CharacterExportDto = Type.Object({
   createdAt: Type.String({ format: DATE_TIME_FORMAT }),
   updatedAt: Type.String({ format: DATE_TIME_FORMAT }),
   systemVersionId: Type.String({ format: UUID_FORMAT }),
+  extensions: Type.Optional(ExtensionRefsDto),
   packageChecksum: Type.String(),
   revision: Type.Integer(),
   state: RuntimeStateDto,
@@ -386,6 +396,7 @@ const ErrorResponses = {
 
 const CreateCharacterBody = Type.Object({
   systemVersionId: Type.String({ format: UUID_FORMAT }),
+  extensions: Type.Optional(ExtensionRefsDto),
   entityDefinitionId: Type.String({ minLength: 1 }),
   name: Type.String({ minLength: 1 }),
   initialValues: Type.Optional(Type.Object({}, { additionalProperties: true })),
@@ -463,6 +474,7 @@ const CharacterEntryBody = Type.Object({
   entryId: Type.String({ format: UUID_FORMAT }),
   slotId: Type.String({ minLength: 1 }),
   templateId: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+  extensionId: Type.Optional(Type.String({ format: UUID_FORMAT })),
   values: Type.Object({}, { additionalProperties: true }),
   quantity: Type.Optional(Type.Integer({ minimum: 1 })),
 },{additionalProperties:false});
@@ -495,6 +507,7 @@ const EntryGrantedActionInputDto = Type.Object({
 });
 const EntryTemplateDto = Type.Object({
   source:Type.Optional(EntrySourceSchema),
+  extensionId: Type.Optional(Type.String({ format: UUID_FORMAT })),
   defaultQuantity:Type.Optional(Type.Integer()),
   id: Type.String(),
   label: Type.String(),
@@ -1034,6 +1047,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
       post_characters: async (request, reply) => {
         const body = request.body as {
           systemVersionId: string;
+          extensions?: Array<{ extensionId: string; versionId: string }>;
           entityDefinitionId: string;
           name: string;
           initialValues?: Record<string, unknown>;
@@ -1041,6 +1055,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         };
         const result = await characters.create(ctxOf(request), {
           systemVersionId: body.systemVersionId,
+          ...(body.extensions === undefined ? {} : { extensions: body.extensions }),
           entityDefinitionId: body.entityDefinitionId,
           name: body.name,
           ...(body.initialValues === undefined ? {} : { initialValues: body.initialValues }),
@@ -1190,6 +1205,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
             entryId: string;
             slotId: string;
             templateId: string | null;
+            extensionId?: string;
             values: Record<string, unknown>;
             quantity?: number;
           };
@@ -1204,6 +1220,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
             ...(body.entry.source === undefined ? {} : {source:body.entry.source}),
             slotId: body.entry.slotId,
             templateId: body.entry.templateId,
+            ...(body.entry.extensionId === undefined ? {} : { extensionId: body.entry.extensionId }),
             values: body.entry.values,
             ...(body.entry.quantity === undefined ? {} : { quantity: body.entry.quantity }),
           },

@@ -368,6 +368,7 @@ function fakeCharacterView(): CharacterView {
     returnOwnerId: null,
     name: "Placed Hero",
     systemVersionId,
+    extensions: [],
     entityDefinitionId: "character",
     revision: 2,
     lifecycle: "active",

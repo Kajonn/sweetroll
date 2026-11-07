@@ -14,7 +14,7 @@ import {
   seedReferenceTemplates,
 } from "../systems/implementation/persistence/index.js";
 import { createSystemRuntime } from "../systems/runtime.js";
-import { createPostgresPublishedPackageLoader } from "../systems/implementation/runtime/package-loader.js";
+import { createPostgresPublishedExtensionLoader, createPostgresPublishedPackageLoader } from "../systems/implementation/runtime/package-loader.js";
 import { buildPublicApi, publicApiPrefix } from "../transport/http/public-api/index.js";
 import { buildPersonalTokenRoutes } from "../transport/http/personal-tokens.js";
 import { buildAuthHook } from "../transport/http/auth-hook.js";
@@ -101,6 +101,7 @@ const extensionAuthoring = createExtensionAuthoringModule({ pool, repo: systemRe
 
 const runtime = createSystemRuntime({
   loadPackage: createPostgresPublishedPackageLoader(pool),
+  loadExtensionPackage: createPostgresPublishedExtensionLoader(pool),
   authoritativeRollSecret: config.authoritativeRollSecret,
 });
 
@@ -109,6 +110,7 @@ const characters = createCharactersModule({
   pool,
   runtime,
   authorizeVersionUse: authoring.authorizeVersionUse,
+  authorizeExtensionUse: extensionAuthoring.authorizeExtensionUse,
   listAuthorizedVersions: authoring.listAuthorizedVersions,
   listUpgradeTargets: authoring.listUpgradeTargets,
   describeVersionChoices: authoring.describeVersionChoices,

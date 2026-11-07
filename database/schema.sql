@@ -266,6 +266,16 @@ CREATE INDEX characters_owner_page_idx
   ON characters (owner_id, lifecycle, updated_at DESC, id DESC);
 
 -- Character-owned immutable safe art; authorization always follows a parent link.
+-- Design 6.8: extension versions a character is built on (one version per
+-- extension). Published versions are immutable; RESTRICT keeps used versions.
+CREATE TABLE character_extensions (
+  character_id         uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+  extension_id         uuid NOT NULL REFERENCES systems(id) ON DELETE RESTRICT,
+  extension_version_id uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  PRIMARY KEY (character_id, extension_id)
+);
+CREATE INDEX character_extensions_by_version ON character_extensions (extension_version_id);
+
 CREATE TABLE character_image_assets (
   id uuid PRIMARY KEY,
   created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,

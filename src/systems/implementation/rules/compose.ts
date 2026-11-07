@@ -132,3 +132,70 @@ function sortExtensions(extensions: readonly ExtensionPackageV1[]): ExtensionPac
 function fail(code: string, path: string, message: string): CompileResult<never> {
   return { ok: false, diagnostics: [{ code, path, message }] };
 }
+
+// ---------------------------------------------------------------------------
+// Effective package (stage E3)
+// ---------------------------------------------------------------------------
+//
+// The character runtime works on one `SystemPackageV1`. For a composition it
+// receives an in-memory *effective package*: the base package with each
+// extension's templates and expressions appended under origin-qualified keys
+// `<extensionId>:<id>`. ':' cannot occur in a definition ID, so qualified keys
+// never collide with base IDs or with each other (decision X5). Template field
+// and granted-action IDs stay unqualified because they are scoped to their
+// template. Effective packages are never stored, exported or sent to clients;
+// stored entries keep the plain `templateId` plus `extensionId`, and
+// `templateKey(entry)` maps them to the qualified key. The base `versionId` and
+// `integrity.checksum` are kept, so campaign-derived bases still match.
+
+export type ExtensionRef = { extensionId: string; versionId: string };
+
+const ORIGIN_SEPARATOR = ":";
+
+export function qualifiedId(origin: RulesOrigin | undefined, id: string): string {
+  return origin === null || origin === undefined ? id : `${origin}${ORIGIN_SEPARATOR}${id}`;
+}
+
+/** Splits a qualified key back into its origin and plain definition ID. */
+export function unqualifiedId(key: string): { origin: RulesOrigin; id: string } {
+  const index = key.indexOf(ORIGIN_SEPARATOR);
+  return index < 0 ? { origin: null, id: key } : { origin: key.slice(0, index), id: key.slice(index + 1) };
+}
+
+const effectiveCompositions = new WeakMap<SystemPackageV1, { identity: CompositionIdentity; compositionChecksum: string }>();
+
+export function effectivePackage(rules: ComposedRules): SystemPackageV1 {
+  if (rules.extensions.length === 0) return rules.base;
+  const qualifyTemplate = (origin: string, template: ObjectTemplateV1): ObjectTemplateV1 => ({
+    ...template,
+    id: qualifiedId(origin, template.id),
+    fields: template.fields.map((field) => field.kind === "computed"
+      ? { ...field, expressionId: qualifiedId(origin, field.expressionId) }
+      : field),
+    grantedActions: template.grantedActions.map((action) => action.kind === "roll"
+      ? { ...action, expressionId: qualifiedId(origin, action.expressionId) }
+      : action),
+  });
+  const effective: SystemPackageV1 = {
+    ...rules.base,
+    expressions: [
+      ...rules.base.expressions,
+      ...rules.extensions.flatMap((extension) => extension.expressions.map((expression) => ({
+        ...expression,
+        id: qualifiedId(extension.extensionId, expression.id),
+      }))),
+    ],
+    templates: [
+      ...(rules.base.templates ?? []),
+      ...rules.extensions.flatMap((extension) =>
+        extension.templates.map((template) => qualifyTemplate(extension.extensionId, template))),
+    ],
+  };
+  effectiveCompositions.set(effective, { identity: rules.identity, compositionChecksum: rules.compositionChecksum });
+  return effective;
+}
+
+/** Composition of an effective package; `undefined` for a plain base package. */
+export function compositionOf(pkg: SystemPackageV1): { identity: CompositionIdentity; compositionChecksum: string } | undefined {
+  return effectiveCompositions.get(pkg);
+}

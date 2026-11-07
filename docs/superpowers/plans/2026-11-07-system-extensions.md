@@ -107,7 +107,8 @@ checksum-verified) and builds the view.
 ### Entries
 
 `CharacterEntryV1` gains optional `extensionId` (absent means base system).
-`source` gains `{ kind: "extension", extensionId, templateId }`. Campaign
+The `system` source gains an optional `extensionId` (as implemented in E3; a
+separate `extension` source kind was not needed). Campaign
 derived bases gain optional `extensionId` and `extensionVersionId` with the
 extension package checksum. Every place that resolves `effectiveTemplateId`
 resolves `(origin, templateId)` instead. Granted action identity in rolls,
@@ -189,19 +190,49 @@ the design document updated (red → green, per existing plans).
   deprecation; no extension of an extension; referenced base cannot be deleted;
   template art upload, ownership and frozen published bytes.
 
-### E3 — Character composition
+### E3 — Character composition — done
 
-- [ ] Schema baseline: `character_extensions`, `characters.previous_composition_json`.
-- [ ] `CompositionLoader` and `ComposedRules` adopted in `SystemRuntime`,
-  entries, action evaluation, pushes, export and projection.
-- [ ] Character creation accepts `extensions: [{ extensionId, versionId }]`;
-  each must be usable by the actor (X2) and valid with the base (X4).
-- [ ] Placement from an extension template; entries store `extensionId`.
-- [ ] Character export includes composition identity only (IDs, versions,
-  checksums), no extension content.
-- [ ] Tests: create, place, roll, push, offline replay with an extension entry;
-  same template ID in base and extension on one sheet; revoked sharing keeps an
-  existing character working.
+- [x] Schema baseline: `character_extensions(character_id, extension_id,
+  extension_version_id)`, one version per extension, FK `RESTRICT` on the
+  extension and version so used extensions cannot be deleted. Every character
+  read returns the sorted list (`CharacterRecord.extensions`). The previous
+  composition for revert moves to E5 with the composition commands.
+- [x] Runtime: `RuntimeRequest.extensions` and `describeVersion({ extensions })`;
+  `createEffectivePackageLoader` (`runtime/composition-loader.ts`) loads the
+  base and extension packages, runs `composeRules` and memoizes an in-memory
+  *effective package* (`effectivePackage` in `rules/compose.ts`): extension
+  templates and expressions are appended under `<extensionId>:<id>` keys, which
+  no definition ID can collide with; base `versionId` and checksum are kept so
+  campaign-derived bases still match. Entries map to their key with
+  `templateKey(entry)`; effective packages are never stored or returned.
+  Push contexts store the plain expression ID plus `extensionId` and a
+  `compositionChecksum`, so a changed composition reads as `rules_changed`.
+  Projected slot entries and described templates carry `extensionId`.
+- [x] Characters: `POST /characters` accepts `extensions`; each must be a
+  published version of an active extension of the character's system that the
+  actor may use, at most 16, one version per extension; the runtime rejects
+  compositions that do not fit. Every runtime call passes the record's
+  extensions. `GET /characters/:id/templates` lists extension templates with
+  `extensionId` and a `system` source; adding an entry accepts `extensionId`
+  only for an extension of the character. Duplicates copy the composition.
+- [x] Export: `extensions` (IDs and versions only) next to `systemVersionId`,
+  omitted when empty; no extension content.
+- [x] Public API v1: read-only `extensions` on the character sheet and
+  `extensionId` on entries. Placing extension items through v1 is not included
+  (X12, E7).
+- [x] Guards until later stages: rules-version change returns 409 for
+  characters with extensions (E5); campaign adoption returns 409 for them (E4).
+- [x] Tests: `src/systems/runtime-extensions.test.ts` (same-ID base and
+  extension templates on one sheet, entry without its extension, unknown
+  version, missing loader, extension push and `rules_changed` after a different
+  extension version, described templates) and
+  `tests/integration/character-extensions.test.ts` (create with idempotent
+  replay and mismatch, template list, placement of both swords, foreign
+  extension rejected, roll with replay, base roll, push, export, duplicate,
+  version change blocked; private/link authorization; revoked sharing keeps an
+  existing character playable; two versions of one extension, other system,
+  unknown version, system version used as extension version; used extension
+  cannot be deleted).
 
 ### E4 — Campaign composition
 

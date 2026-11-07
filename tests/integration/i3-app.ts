@@ -12,7 +12,7 @@ import { createExtensionAuthoringModule, type ExtensionAuthoring } from "../../s
 import {
   createSystemPersistenceRepository,
 } from "../../src/systems/implementation/persistence/index.js";
-import { createPostgresPublishedPackageLoader } from "../../src/systems/implementation/runtime/package-loader.js";
+import { createPostgresPublishedExtensionLoader, createPostgresPublishedPackageLoader } from "../../src/systems/implementation/runtime/package-loader.js";
 import {
   createSystemRuntime,
   type SystemRuntime,
@@ -118,6 +118,7 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
 
   const runtime = createSystemRuntime({
     loadPackage: createPostgresPublishedPackageLoader(input.pool),
+  loadExtensionPackage: createPostgresPublishedExtensionLoader(input.pool),
     authoritativeRollSecret: rollSecret,
   });
 
@@ -129,6 +130,7 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
     pool: input.pool,
     runtime: effectiveRuntime,
     authorizeVersionUse: authoring.authorizeVersionUse,
+  authorizeExtensionUse: extensions.authorizeExtensionUse,
     listAuthorizedVersions: authoring.listAuthorizedVersions,
     listUpgradeTargets: authoring.listUpgradeTargets,
     describeVersionChoices: authoring.describeVersionChoices,

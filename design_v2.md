@@ -345,10 +345,14 @@ composition). A campaign's composition is the union of the extensions it chose a
 those used by its attached characters. Scope, access, ID scoping, campaign-union,
 removal and upgrade rules are decisions X1–X13 in the
 [system extensions plan](docs/superpowers/plans/2026-11-07-system-extensions.md),
-which also tracks implementation stages E1–E8. E1 (package contract) and E2
+which also tracks implementation stages E1–E8. E1 (package contract), E2
 (authoring and publishing under `/systems/:systemId/extensions` and
-`/extensions/:extensionId`) are implemented; an extension is a `systems` row of
-kind `extension` whose versions record the base version they were built against.
+`/extensions/:extensionId`) and E3 (standalone characters) are implemented; an
+extension is a `systems` row of kind `extension` whose versions record the base
+version they were built against. A character stores its extension versions in
+`character_extensions`; entries from extension templates carry `extensionId`.
+Until E4/E5, characters with extensions cannot join a campaign or change rules
+version.
 
 **Future feature (recorded 2026-11-07, not authorized):** an extension catalog for
 discovering and previewing published extensions. It depends on OD-07 and needs its
@@ -638,6 +642,7 @@ Use Node.js LTS, TypeScript, Fastify, a thin PostgreSQL driver, explicit current
 | campaigns           | pinned version; members; characters; content | id, system_version_id, owner_id, settings_json, status              |
 | campaign_members    | user in campaign                             | role, membership_status, joined_at, permissions_override            |
 | characters          | owner(s); optional campaign; pinned version  | id, revision, state_json, visibility, archived_at                   |
+| character_extensions| character; extension; extension version (6.8)| character_id, extension_id, extension_version_id                   |
 | content_items       | campaign; creator; optional file             | kind, title, body, audience, revision                               |
 | content_grants      | content to selected member                   | content_id, member_id                                               |
 | file_objects        | content/avatar/system asset                  | storage_key, media_type, size, scan_status, checksum                |

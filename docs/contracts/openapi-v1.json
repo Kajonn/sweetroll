@@ -15350,6 +15350,28 @@
                     "format": "uuid",
                     "type": "string"
                   },
+                  "extensions": {
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "extensionId",
+                        "versionId"
+                      ],
+                      "properties": {
+                        "extensionId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "versionId": {
+                          "format": "uuid",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
                   "entityDefinitionId": {
                     "minLength": 1,
                     "type": "string"
@@ -15395,6 +15417,7 @@
                         "returnOwnerId",
                         "name",
                         "systemVersionId",
+                        "extensions",
                         "entityDefinitionId",
                         "revision",
                         "lifecycle",
@@ -15462,6 +15485,28 @@
                         "systemVersionId": {
                           "format": "uuid",
                           "type": "string"
+                        },
+                        "extensions": {
+                          "maxItems": 16,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "extensionId",
+                              "versionId"
+                            ],
+                            "properties": {
+                              "extensionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "versionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              }
+                            }
+                          }
                         },
                         "entityDefinitionId": {
                           "type": "string"
@@ -15603,6 +15648,10 @@
                                         }
                                       ]
                                     },
+                                    "extensionId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
                                     "source": {
                                       "anyOf": [
                                         {
@@ -15632,6 +15681,10 @@
                                             },
                                             "templateId": {
                                               "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            },
+                                            "extensionId": {
+                                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                               "type": "string"
                                             }
                                           }
@@ -16932,6 +16985,10 @@
                                                                 "templateId": {
                                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                   "type": "string"
+                                                                },
+                                                                "extensionId": {
+                                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                  "type": "string"
                                                                 }
                                                               }
                                                             },
@@ -16982,6 +17039,10 @@
                                                               "type": "null"
                                                             }
                                                           ]
+                                                        },
+                                                        "extensionId": {
+                                                          "format": "uuid",
+                                                          "type": "string"
                                                         },
                                                         "label": {
                                                           "type": "string"
@@ -20074,6 +20135,7 @@
                         "returnOwnerId",
                         "name",
                         "systemVersionId",
+                        "extensions",
                         "entityDefinitionId",
                         "revision",
                         "lifecycle",
@@ -20141,6 +20203,28 @@
                         "systemVersionId": {
                           "format": "uuid",
                           "type": "string"
+                        },
+                        "extensions": {
+                          "maxItems": 16,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "extensionId",
+                              "versionId"
+                            ],
+                            "properties": {
+                              "extensionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "versionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              }
+                            }
+                          }
                         },
                         "entityDefinitionId": {
                           "type": "string"
@@ -20282,6 +20366,10 @@
                                         }
                                       ]
                                     },
+                                    "extensionId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
                                     "source": {
                                       "anyOf": [
                                         {
@@ -20311,6 +20399,10 @@
                                             },
                                             "templateId": {
                                               "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            },
+                                            "extensionId": {
+                                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                               "type": "string"
                                             }
                                           }
@@ -21611,6 +21703,10 @@
                                                                 "templateId": {
                                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                   "type": "string"
+                                                                },
+                                                                "extensionId": {
+                                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                  "type": "string"
                                                                 }
                                                               }
                                                             },
@@ -21661,6 +21757,10 @@
                                                               "type": "null"
                                                             }
                                                           ]
+                                                        },
+                                                        "extensionId": {
+                                                          "format": "uuid",
+                                                          "type": "string"
                                                         },
                                                         "label": {
                                                           "type": "string"
@@ -22426,6 +22526,7 @@
                             "returnOwnerId",
                             "name",
                             "systemVersionId",
+                            "extensions",
                             "entityDefinitionId",
                             "revision",
                             "lifecycle",
@@ -22493,6 +22594,28 @@
                             "systemVersionId": {
                               "format": "uuid",
                               "type": "string"
+                            },
+                            "extensions": {
+                              "maxItems": 16,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "extensionId",
+                                  "versionId"
+                                ],
+                                "properties": {
+                                  "extensionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "versionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  }
+                                }
+                              }
                             },
                             "entityDefinitionId": {
                               "type": "string"
@@ -22634,6 +22757,10 @@
                                             }
                                           ]
                                         },
+                                        "extensionId": {
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
                                         "source": {
                                           "anyOf": [
                                             {
@@ -22663,6 +22790,10 @@
                                                 },
                                                 "templateId": {
                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                },
+                                                "extensionId": {
+                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                                   "type": "string"
                                                 }
                                               }
@@ -23963,6 +24094,10 @@
                                                                     "templateId": {
                                                                       "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                       "type": "string"
+                                                                    },
+                                                                    "extensionId": {
+                                                                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                      "type": "string"
                                                                     }
                                                                   }
                                                                 },
@@ -24013,6 +24148,10 @@
                                                                   "type": "null"
                                                                 }
                                                               ]
+                                                            },
+                                                            "extensionId": {
+                                                              "format": "uuid",
+                                                              "type": "string"
                                                             },
                                                             "label": {
                                                               "type": "string"
@@ -25570,6 +25709,7 @@
                             "returnOwnerId",
                             "name",
                             "systemVersionId",
+                            "extensions",
                             "entityDefinitionId",
                             "revision",
                             "lifecycle",
@@ -25637,6 +25777,28 @@
                             "systemVersionId": {
                               "format": "uuid",
                               "type": "string"
+                            },
+                            "extensions": {
+                              "maxItems": 16,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "extensionId",
+                                  "versionId"
+                                ],
+                                "properties": {
+                                  "extensionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "versionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  }
+                                }
+                              }
                             },
                             "entityDefinitionId": {
                               "type": "string"
@@ -25778,6 +25940,10 @@
                                             }
                                           ]
                                         },
+                                        "extensionId": {
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
                                         "source": {
                                           "anyOf": [
                                             {
@@ -25807,6 +25973,10 @@
                                                 },
                                                 "templateId": {
                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                },
+                                                "extensionId": {
+                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                                   "type": "string"
                                                 }
                                               }
@@ -27107,6 +27277,10 @@
                                                                     "templateId": {
                                                                       "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                       "type": "string"
+                                                                    },
+                                                                    "extensionId": {
+                                                                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                      "type": "string"
                                                                     }
                                                                   }
                                                                 },
@@ -27157,6 +27331,10 @@
                                                                   "type": "null"
                                                                 }
                                                               ]
+                                                            },
+                                                            "extensionId": {
+                                                              "format": "uuid",
+                                                              "type": "string"
                                                             },
                                                             "label": {
                                                               "type": "string"
@@ -28725,6 +28903,7 @@
                             "returnOwnerId",
                             "name",
                             "systemVersionId",
+                            "extensions",
                             "entityDefinitionId",
                             "revision",
                             "lifecycle",
@@ -28792,6 +28971,28 @@
                             "systemVersionId": {
                               "format": "uuid",
                               "type": "string"
+                            },
+                            "extensions": {
+                              "maxItems": 16,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "extensionId",
+                                  "versionId"
+                                ],
+                                "properties": {
+                                  "extensionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "versionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  }
+                                }
+                              }
                             },
                             "entityDefinitionId": {
                               "type": "string"
@@ -28933,6 +29134,10 @@
                                             }
                                           ]
                                         },
+                                        "extensionId": {
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
                                         "source": {
                                           "anyOf": [
                                             {
@@ -28962,6 +29167,10 @@
                                                 },
                                                 "templateId": {
                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                },
+                                                "extensionId": {
+                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                                   "type": "string"
                                                 }
                                               }
@@ -30262,6 +30471,10 @@
                                                                     "templateId": {
                                                                       "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                       "type": "string"
+                                                                    },
+                                                                    "extensionId": {
+                                                                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                      "type": "string"
                                                                     }
                                                                   }
                                                                 },
@@ -30312,6 +30525,10 @@
                                                                   "type": "null"
                                                                 }
                                                               ]
+                                                            },
+                                                            "extensionId": {
+                                                              "format": "uuid",
+                                                              "type": "string"
                                                             },
                                                             "label": {
                                                               "type": "string"
@@ -34164,6 +34381,7 @@
                             "returnOwnerId",
                             "name",
                             "systemVersionId",
+                            "extensions",
                             "entityDefinitionId",
                             "revision",
                             "lifecycle",
@@ -34231,6 +34449,28 @@
                             "systemVersionId": {
                               "format": "uuid",
                               "type": "string"
+                            },
+                            "extensions": {
+                              "maxItems": 16,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "extensionId",
+                                  "versionId"
+                                ],
+                                "properties": {
+                                  "extensionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "versionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  }
+                                }
+                              }
                             },
                             "entityDefinitionId": {
                               "type": "string"
@@ -34372,6 +34612,10 @@
                                             }
                                           ]
                                         },
+                                        "extensionId": {
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
                                         "source": {
                                           "anyOf": [
                                             {
@@ -34401,6 +34645,10 @@
                                                 },
                                                 "templateId": {
                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                },
+                                                "extensionId": {
+                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                                   "type": "string"
                                                 }
                                               }
@@ -35701,6 +35949,10 @@
                                                                     "templateId": {
                                                                       "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                       "type": "string"
+                                                                    },
+                                                                    "extensionId": {
+                                                                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                      "type": "string"
                                                                     }
                                                                   }
                                                                 },
@@ -35751,6 +36003,10 @@
                                                                   "type": "null"
                                                                 }
                                                               ]
+                                                            },
+                                                            "extensionId": {
+                                                              "format": "uuid",
+                                                              "type": "string"
                                                             },
                                                             "label": {
                                                               "type": "string"
@@ -37355,6 +37611,7 @@
                             "returnOwnerId",
                             "name",
                             "systemVersionId",
+                            "extensions",
                             "entityDefinitionId",
                             "revision",
                             "lifecycle",
@@ -37422,6 +37679,28 @@
                             "systemVersionId": {
                               "format": "uuid",
                               "type": "string"
+                            },
+                            "extensions": {
+                              "maxItems": 16,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "extensionId",
+                                  "versionId"
+                                ],
+                                "properties": {
+                                  "extensionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "versionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  }
+                                }
+                              }
                             },
                             "entityDefinitionId": {
                               "type": "string"
@@ -37563,6 +37842,10 @@
                                             }
                                           ]
                                         },
+                                        "extensionId": {
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
                                         "source": {
                                           "anyOf": [
                                             {
@@ -37592,6 +37875,10 @@
                                                 },
                                                 "templateId": {
                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                },
+                                                "extensionId": {
+                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                                   "type": "string"
                                                 }
                                               }
@@ -38892,6 +39179,10 @@
                                                                     "templateId": {
                                                                       "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                       "type": "string"
+                                                                    },
+                                                                    "extensionId": {
+                                                                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                      "type": "string"
                                                                     }
                                                                   }
                                                                 },
@@ -38942,6 +39233,10 @@
                                                                   "type": "null"
                                                                 }
                                                               ]
+                                                            },
+                                                            "extensionId": {
+                                                              "format": "uuid",
+                                                              "type": "string"
                                                             },
                                                             "label": {
                                                               "type": "string"
@@ -40476,6 +40771,10 @@
                               "templateId": {
                                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                 "type": "string"
+                              },
+                              "extensionId": {
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                "type": "string"
                               }
                             }
                           },
@@ -40532,6 +40831,10 @@
                             "type": "null"
                           }
                         ]
+                      },
+                      "extensionId": {
+                        "format": "uuid",
+                        "type": "string"
                       },
                       "values": {
                         "additionalProperties": true,
@@ -40597,6 +40900,7 @@
                             "returnOwnerId",
                             "name",
                             "systemVersionId",
+                            "extensions",
                             "entityDefinitionId",
                             "revision",
                             "lifecycle",
@@ -40664,6 +40968,28 @@
                             "systemVersionId": {
                               "format": "uuid",
                               "type": "string"
+                            },
+                            "extensions": {
+                              "maxItems": 16,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "extensionId",
+                                  "versionId"
+                                ],
+                                "properties": {
+                                  "extensionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "versionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  }
+                                }
+                              }
                             },
                             "entityDefinitionId": {
                               "type": "string"
@@ -40805,6 +41131,10 @@
                                             }
                                           ]
                                         },
+                                        "extensionId": {
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
                                         "source": {
                                           "anyOf": [
                                             {
@@ -40834,6 +41164,10 @@
                                                 },
                                                 "templateId": {
                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                },
+                                                "extensionId": {
+                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                                   "type": "string"
                                                 }
                                               }
@@ -42134,6 +42468,10 @@
                                                                     "templateId": {
                                                                       "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                       "type": "string"
+                                                                    },
+                                                                    "extensionId": {
+                                                                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                      "type": "string"
                                                                     }
                                                                   }
                                                                 },
@@ -42184,6 +42522,10 @@
                                                                   "type": "null"
                                                                 }
                                                               ]
+                                                            },
+                                                            "extensionId": {
+                                                              "format": "uuid",
+                                                              "type": "string"
                                                             },
                                                             "label": {
                                                               "type": "string"
@@ -43739,6 +44081,7 @@
                             "returnOwnerId",
                             "name",
                             "systemVersionId",
+                            "extensions",
                             "entityDefinitionId",
                             "revision",
                             "lifecycle",
@@ -43806,6 +44149,28 @@
                             "systemVersionId": {
                               "format": "uuid",
                               "type": "string"
+                            },
+                            "extensions": {
+                              "maxItems": 16,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "extensionId",
+                                  "versionId"
+                                ],
+                                "properties": {
+                                  "extensionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "versionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  }
+                                }
+                              }
                             },
                             "entityDefinitionId": {
                               "type": "string"
@@ -43947,6 +44312,10 @@
                                             }
                                           ]
                                         },
+                                        "extensionId": {
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
                                         "source": {
                                           "anyOf": [
                                             {
@@ -43976,6 +44345,10 @@
                                                 },
                                                 "templateId": {
                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                },
+                                                "extensionId": {
+                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                                   "type": "string"
                                                 }
                                               }
@@ -45276,6 +45649,10 @@
                                                                     "templateId": {
                                                                       "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                       "type": "string"
+                                                                    },
+                                                                    "extensionId": {
+                                                                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                      "type": "string"
                                                                     }
                                                                   }
                                                                 },
@@ -45326,6 +45703,10 @@
                                                                   "type": "null"
                                                                 }
                                                               ]
+                                                            },
+                                                            "extensionId": {
+                                                              "format": "uuid",
+                                                              "type": "string"
                                                             },
                                                             "label": {
                                                               "type": "string"
@@ -46889,6 +47270,7 @@
                             "returnOwnerId",
                             "name",
                             "systemVersionId",
+                            "extensions",
                             "entityDefinitionId",
                             "revision",
                             "lifecycle",
@@ -46956,6 +47338,28 @@
                             "systemVersionId": {
                               "format": "uuid",
                               "type": "string"
+                            },
+                            "extensions": {
+                              "maxItems": 16,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "extensionId",
+                                  "versionId"
+                                ],
+                                "properties": {
+                                  "extensionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "versionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  }
+                                }
+                              }
                             },
                             "entityDefinitionId": {
                               "type": "string"
@@ -47097,6 +47501,10 @@
                                             }
                                           ]
                                         },
+                                        "extensionId": {
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
                                         "source": {
                                           "anyOf": [
                                             {
@@ -47126,6 +47534,10 @@
                                                 },
                                                 "templateId": {
                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                },
+                                                "extensionId": {
+                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                                   "type": "string"
                                                 }
                                               }
@@ -48426,6 +48838,10 @@
                                                                     "templateId": {
                                                                       "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                       "type": "string"
+                                                                    },
+                                                                    "extensionId": {
+                                                                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                      "type": "string"
                                                                     }
                                                                   }
                                                                 },
@@ -48476,6 +48892,10 @@
                                                                   "type": "null"
                                                                 }
                                                               ]
+                                                            },
+                                                            "extensionId": {
+                                                              "format": "uuid",
+                                                              "type": "string"
                                                             },
                                                             "label": {
                                                               "type": "string"
@@ -50023,6 +50443,10 @@
                                   "templateId": {
                                     "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                     "type": "string"
+                                  },
+                                  "extensionId": {
+                                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                    "type": "string"
                                   }
                                 }
                               },
@@ -50060,6 +50484,10 @@
                                 }
                               }
                             ]
+                          },
+                          "extensionId": {
+                            "format": "uuid",
+                            "type": "string"
                           },
                           "defaultQuantity": {
                             "type": "integer"
@@ -51292,6 +51720,7 @@
                             "returnOwnerId",
                             "name",
                             "systemVersionId",
+                            "extensions",
                             "entityDefinitionId",
                             "revision",
                             "lifecycle",
@@ -51359,6 +51788,28 @@
                             "systemVersionId": {
                               "format": "uuid",
                               "type": "string"
+                            },
+                            "extensions": {
+                              "maxItems": 16,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "extensionId",
+                                  "versionId"
+                                ],
+                                "properties": {
+                                  "extensionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "versionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  }
+                                }
+                              }
                             },
                             "entityDefinitionId": {
                               "type": "string"
@@ -51500,6 +51951,10 @@
                                             }
                                           ]
                                         },
+                                        "extensionId": {
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
                                         "source": {
                                           "anyOf": [
                                             {
@@ -51529,6 +51984,10 @@
                                                 },
                                                 "templateId": {
                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                },
+                                                "extensionId": {
+                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                                   "type": "string"
                                                 }
                                               }
@@ -52829,6 +53288,10 @@
                                                                     "templateId": {
                                                                       "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                       "type": "string"
+                                                                    },
+                                                                    "extensionId": {
+                                                                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                      "type": "string"
                                                                     }
                                                                   }
                                                                 },
@@ -52879,6 +53342,10 @@
                                                                   "type": "null"
                                                                 }
                                                               ]
+                                                            },
+                                                            "extensionId": {
+                                                              "format": "uuid",
+                                                              "type": "string"
                                                             },
                                                             "label": {
                                                               "type": "string"
@@ -56618,6 +57085,7 @@
                             "returnOwnerId",
                             "name",
                             "systemVersionId",
+                            "extensions",
                             "entityDefinitionId",
                             "revision",
                             "lifecycle",
@@ -56685,6 +57153,28 @@
                             "systemVersionId": {
                               "format": "uuid",
                               "type": "string"
+                            },
+                            "extensions": {
+                              "maxItems": 16,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "extensionId",
+                                  "versionId"
+                                ],
+                                "properties": {
+                                  "extensionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "versionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  }
+                                }
+                              }
                             },
                             "entityDefinitionId": {
                               "type": "string"
@@ -56826,6 +57316,10 @@
                                             }
                                           ]
                                         },
+                                        "extensionId": {
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
                                         "source": {
                                           "anyOf": [
                                             {
@@ -56855,6 +57349,10 @@
                                                 },
                                                 "templateId": {
                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                },
+                                                "extensionId": {
+                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                                   "type": "string"
                                                 }
                                               }
@@ -58155,6 +58653,10 @@
                                                                     "templateId": {
                                                                       "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                       "type": "string"
+                                                                    },
+                                                                    "extensionId": {
+                                                                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                      "type": "string"
                                                                     }
                                                                   }
                                                                 },
@@ -58205,6 +58707,10 @@
                                                                   "type": "null"
                                                                 }
                                                               ]
+                                                            },
+                                                            "extensionId": {
+                                                              "format": "uuid",
+                                                              "type": "string"
                                                             },
                                                             "label": {
                                                               "type": "string"
@@ -59739,6 +60245,7 @@
                         "returnOwnerId",
                         "name",
                         "systemVersionId",
+                        "extensions",
                         "entityDefinitionId",
                         "revision",
                         "lifecycle",
@@ -59806,6 +60313,28 @@
                         "systemVersionId": {
                           "format": "uuid",
                           "type": "string"
+                        },
+                        "extensions": {
+                          "maxItems": 16,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "extensionId",
+                              "versionId"
+                            ],
+                            "properties": {
+                              "extensionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "versionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              }
+                            }
+                          }
                         },
                         "entityDefinitionId": {
                           "type": "string"
@@ -59947,6 +60476,10 @@
                                         }
                                       ]
                                     },
+                                    "extensionId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
                                     "source": {
                                       "anyOf": [
                                         {
@@ -59976,6 +60509,10 @@
                                             },
                                             "templateId": {
                                               "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            },
+                                            "extensionId": {
+                                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                               "type": "string"
                                             }
                                           }
@@ -61276,6 +61813,10 @@
                                                                 "templateId": {
                                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                   "type": "string"
+                                                                },
+                                                                "extensionId": {
+                                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                  "type": "string"
                                                                 }
                                                               }
                                                             },
@@ -61326,6 +61867,10 @@
                                                               "type": "null"
                                                             }
                                                           ]
+                                                        },
+                                                        "extensionId": {
+                                                          "format": "uuid",
+                                                          "type": "string"
                                                         },
                                                         "label": {
                                                           "type": "string"
@@ -63567,6 +64112,28 @@
                       "format": "uuid",
                       "type": "string"
                     },
+                    "extensions": {
+                      "maxItems": 16,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "extensionId",
+                          "versionId"
+                        ],
+                        "properties": {
+                          "extensionId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "versionId": {
+                            "format": "uuid",
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
                     "packageChecksum": {
                       "type": "string"
                     },
@@ -63676,6 +64243,10 @@
                                     }
                                   ]
                                 },
+                                "extensionId": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
                                 "source": {
                                   "anyOf": [
                                     {
@@ -63705,6 +64276,10 @@
                                         },
                                         "templateId": {
                                           "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "extensionId": {
+                                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                           "type": "string"
                                         }
                                       }
@@ -85121,6 +85696,7 @@
                         "returnOwnerId",
                         "name",
                         "systemVersionId",
+                        "extensions",
                         "entityDefinitionId",
                         "revision",
                         "lifecycle",
@@ -85188,6 +85764,28 @@
                         "systemVersionId": {
                           "format": "uuid",
                           "type": "string"
+                        },
+                        "extensions": {
+                          "maxItems": 16,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "extensionId",
+                              "versionId"
+                            ],
+                            "properties": {
+                              "extensionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "versionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              }
+                            }
+                          }
                         },
                         "entityDefinitionId": {
                           "type": "string"
@@ -85329,6 +85927,10 @@
                                         }
                                       ]
                                     },
+                                    "extensionId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
                                     "source": {
                                       "anyOf": [
                                         {
@@ -85358,6 +85960,10 @@
                                             },
                                             "templateId": {
                                               "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            },
+                                            "extensionId": {
+                                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                               "type": "string"
                                             }
                                           }
@@ -86658,6 +87264,10 @@
                                                                 "templateId": {
                                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                   "type": "string"
+                                                                },
+                                                                "extensionId": {
+                                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                  "type": "string"
                                                                 }
                                                               }
                                                             },
@@ -86708,6 +87318,10 @@
                                                               "type": "null"
                                                             }
                                                           ]
+                                                        },
+                                                        "extensionId": {
+                                                          "format": "uuid",
+                                                          "type": "string"
                                                         },
                                                         "label": {
                                                           "type": "string"
@@ -87534,6 +88148,7 @@
                         "returnOwnerId",
                         "name",
                         "systemVersionId",
+                        "extensions",
                         "entityDefinitionId",
                         "revision",
                         "lifecycle",
@@ -87601,6 +88216,28 @@
                         "systemVersionId": {
                           "format": "uuid",
                           "type": "string"
+                        },
+                        "extensions": {
+                          "maxItems": 16,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "extensionId",
+                              "versionId"
+                            ],
+                            "properties": {
+                              "extensionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "versionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              }
+                            }
+                          }
                         },
                         "entityDefinitionId": {
                           "type": "string"
@@ -87742,6 +88379,10 @@
                                         }
                                       ]
                                     },
+                                    "extensionId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
                                     "source": {
                                       "anyOf": [
                                         {
@@ -87771,6 +88412,10 @@
                                             },
                                             "templateId": {
                                               "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            },
+                                            "extensionId": {
+                                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                               "type": "string"
                                             }
                                           }
@@ -89071,6 +89716,10 @@
                                                                 "templateId": {
                                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                   "type": "string"
+                                                                },
+                                                                "extensionId": {
+                                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                  "type": "string"
                                                                 }
                                                               }
                                                             },
@@ -89121,6 +89770,10 @@
                                                               "type": "null"
                                                             }
                                                           ]
+                                                        },
+                                                        "extensionId": {
+                                                          "format": "uuid",
+                                                          "type": "string"
                                                         },
                                                         "label": {
                                                           "type": "string"
@@ -89668,6 +90321,7 @@
                         "returnOwnerId",
                         "name",
                         "systemVersionId",
+                        "extensions",
                         "entityDefinitionId",
                         "revision",
                         "lifecycle",
@@ -89735,6 +90389,28 @@
                         "systemVersionId": {
                           "format": "uuid",
                           "type": "string"
+                        },
+                        "extensions": {
+                          "maxItems": 16,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "extensionId",
+                              "versionId"
+                            ],
+                            "properties": {
+                              "extensionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "versionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              }
+                            }
+                          }
                         },
                         "entityDefinitionId": {
                           "type": "string"
@@ -89876,6 +90552,10 @@
                                         }
                                       ]
                                     },
+                                    "extensionId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
                                     "source": {
                                       "anyOf": [
                                         {
@@ -89905,6 +90585,10 @@
                                             },
                                             "templateId": {
                                               "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            },
+                                            "extensionId": {
+                                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                               "type": "string"
                                             }
                                           }
@@ -91205,6 +91889,10 @@
                                                                 "templateId": {
                                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                   "type": "string"
+                                                                },
+                                                                "extensionId": {
+                                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                  "type": "string"
                                                                 }
                                                               }
                                                             },
@@ -91255,6 +91943,10 @@
                                                               "type": "null"
                                                             }
                                                           ]
+                                                        },
+                                                        "extensionId": {
+                                                          "format": "uuid",
+                                                          "type": "string"
                                                         },
                                                         "label": {
                                                           "type": "string"
@@ -91807,6 +92499,7 @@
                         "returnOwnerId",
                         "name",
                         "systemVersionId",
+                        "extensions",
                         "entityDefinitionId",
                         "revision",
                         "lifecycle",
@@ -91874,6 +92567,28 @@
                         "systemVersionId": {
                           "format": "uuid",
                           "type": "string"
+                        },
+                        "extensions": {
+                          "maxItems": 16,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "extensionId",
+                              "versionId"
+                            ],
+                            "properties": {
+                              "extensionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "versionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              }
+                            }
+                          }
                         },
                         "entityDefinitionId": {
                           "type": "string"
@@ -92015,6 +92730,10 @@
                                         }
                                       ]
                                     },
+                                    "extensionId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
                                     "source": {
                                       "anyOf": [
                                         {
@@ -92044,6 +92763,10 @@
                                             },
                                             "templateId": {
                                               "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            },
+                                            "extensionId": {
+                                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                               "type": "string"
                                             }
                                           }
@@ -93344,6 +94067,10 @@
                                                                 "templateId": {
                                                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                                                   "type": "string"
+                                                                },
+                                                                "extensionId": {
+                                                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                                                  "type": "string"
                                                                 }
                                                               }
                                                             },
@@ -93394,6 +94121,10 @@
                                                               "type": "null"
                                                             }
                                                           ]
+                                                        },
+                                                        "extensionId": {
+                                                          "format": "uuid",
+                                                          "type": "string"
                                                         },
                                                         "label": {
                                                           "type": "string"

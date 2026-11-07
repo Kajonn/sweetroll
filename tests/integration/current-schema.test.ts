@@ -81,6 +81,7 @@ describeWithDatabase("current database schema", () => {
       "character_command_executions",
       "character_controllers",
       "character_entry_images",
+      "character_extensions",
       "character_image_assets",
       "character_image_receipts",
       "character_placements",

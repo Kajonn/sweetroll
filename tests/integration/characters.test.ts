@@ -78,6 +78,12 @@ const DDL = `
     created_at           timestamptz NOT NULL DEFAULT now(),
     updated_at           timestamptz NOT NULL DEFAULT now()
   );
+  CREATE TABLE character_extensions (
+    character_id uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    extension_id uuid NOT NULL REFERENCES systems(id),
+    extension_version_id uuid NOT NULL REFERENCES system_versions(id),
+    PRIMARY KEY (character_id, extension_id)
+  );
   CREATE INDEX characters_owner_page_idx
     ON characters (owner_id, lifecycle, updated_at DESC, id DESC);
   -- Portrait links are empty in this standalone command fixture. Image

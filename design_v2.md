@@ -335,17 +335,21 @@ defines the delivery stages.
 Character activity uses readable action names and local date/time formatting.
 A published system version updates the open editor's status immediately.
 
-## 6.8 System extensions (proposed 2026-11-07, awaiting owner approval)
+## 6.8 System extensions (owner-approved 2026-11-07)
 
-Owner request: systems can be extended with new items and abilities through
-separately published **extensions**. A character or campaign is built on a system
-version plus a set of extension versions (its composition). A campaign's
-composition is the union of the extensions it chose and those used by its attached
-characters. The proposed scope (templates and their roll expressions only; no new
-fields, slots or sheets), access, clash, campaign-union, removal and upgrade rules
-are open decisions X1–X13 in the [system extensions plan](docs/superpowers/plans/2026-11-07-system-extensions.md).
-Nothing in this section is implemented or authorized until the owner approves that
-plan.
+Systems can be extended with new items and abilities through separately published
+**extensions**: immutable packages of templates (item, spell, talent, effect) with
+their granted actions and expressions, owned and shared like systems. A character
+or campaign is built on a system version plus a set of extension versions (its
+composition). A campaign's composition is the union of the extensions it chose and
+those used by its attached characters. Scope, access, ID scoping, campaign-union,
+removal and upgrade rules are decisions X1–X13 in the
+[system extensions plan](docs/superpowers/plans/2026-11-07-system-extensions.md),
+which also tracks implementation stages E1–E8.
+
+**Future feature (recorded 2026-11-07, not authorized):** an extension catalog for
+discovering and previewing published extensions. It depends on OD-07 and needs its
+own plan and approval.
 
 # 7. Campaign and play specification
 

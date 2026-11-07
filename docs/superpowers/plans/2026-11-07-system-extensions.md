@@ -1,6 +1,6 @@
 # Sweetroll system extensions
 
-**Implementation plan · 7 November 2026 · Proposed, awaiting owner approval**
+**Implementation plan · 7 November 2026 · Owner-approved 2026-11-07 (X1–X13 as recommended)**
 
 ## Goal
 
@@ -22,11 +22,11 @@ schema baseline, and disposable test databases are recreated.
 > system + extensions. Campaigns add all extensions that characters use + the ones
 > the campaign uses.
 
-## Proposed decisions (need owner confirmation before E1)
+## Decisions (owner-approved 2026-11-07)
 
 | # | Question | Recommendation |
 |---|----------|----------------|
-| X1 | What may an extension contain? | Only templates (`item`, `spell`, `talent`, `effect`) with their fields, granted actions and image, plus the `roll` expressions those granted actions use. No entities, character fields, sheets, slots, entity actions, validations, reference data or presentation. "Abilities" are `spell`/`talent` templates. New stats or slots still need a new system version. |
+| X1 | What may an extension contain? | Only templates (`item`, `spell`, `talent`, `effect`) with their fields, granted actions and image, plus the expressions those templates use (`roll` for granted actions, `computed` for template fields; never `validation`). No entities, character fields, sheets, slots, entity actions, validations, reference data or presentation. "Abilities" are `spell`/`talent` templates. New stats or slots still need a new system version. |
 | X2 | Who can author one? | Any signed-in user, for any system they can use (owner, `public` or `link` access). The extension has its own owner, `private`/`link`/`public` sharing and lifecycle, like systems. Authoring an extension gives no rights over the base system. |
 | X3 | Which system versions does an extension work with? | An extension version is published against one base version (`builtAgainst`). It can be combined with any version of the same system for which the composition validates (X4). The creator picks the base version used for preview and validation. |
 | X4 | When is a composition valid? | Every extension validates against the base version: its granted actions and expressions typecheck against the character entity's fields, referenced resources exist, and at least one base slot accepts each template kind (warning, not error, when none does). Extensions never see each other. |
@@ -38,7 +38,7 @@ schema baseline, and disposable test databases are recreated.
 | X10 | Access through a campaign | Campaign members may use the templates of every extension in the campaign composition inside that campaign, even a private one, through the campaign's pinned snapshot. This grants no access to the extension outside the campaign and no authoring rights. Returned characters keep the composition they had, like pinned versions today. |
 | X11 | Upgrades and revert | Section 6.7 extends to compositions: upgrading or reverting the base system, upgrading one extension to a later version of the same extension, adding and removing extensions all use the same check, commit and single-step revert. The recorded previous state becomes the previous composition. |
 | X12 | Public API v1 | Read-only composition fields on character and campaign responses in this plan. Writing compositions through `/api/v1` is a later, separately approved stage (E7). |
-| X13 | Not included | Extensions of extensions, dependencies between extensions, extensions that override or remove base templates, breaking extension upgrades, field mapping, cross-system extensions, a public extension catalog/marketplace (OD-07) and automatic extension upgrades. |
+| X13 | Not included | Extensions of extensions, dependencies between extensions, extensions that override or remove base templates, breaking extension upgrades, field mapping, cross-system extensions, a public extension catalog/marketplace (see *Future features*) and automatic extension upgrades. |
 
 ## Current model (baseline facts)
 
@@ -69,7 +69,7 @@ extensionPackage:
   baseSystemId: uuid
   builtAgainstVersionId: uuid
   metadata: { name, description, language }
-  expressions: [ compiled roll expressions used by granted actions ]
+  expressions: [ compiled roll/computed expressions owned by its templates ]
   templates: [ ObjectTemplateV1 ]
   effectiveLimits, integrity: { checksum }
 ```
@@ -118,19 +118,38 @@ receipts, pushes and activity records the origin.
 Each stage ends with unit, contract and PostgreSQL integration tests passing and
 the design document updated (red → green, per existing plans).
 
-### E1 — Extension package contract (pure)
+### E1 — Extension package contract (pure) — done
 
-- [ ] TypeBox schemas for the extension document and package; codec, canonical
-  form and checksum.
-- [ ] `validateExtensionAgainst(base, extension)` (X4): expression typecheck with
-  base entity bindings, resource references, slot acceptance warnings, limits.
-- [ ] `composeRules(base, extensions)` → `ComposedRules`, with
-  `compositionChecksum`.
-- [ ] `compareExtensionPackages(prev, next)` reusing the template part of
-  `comparePackages` for publish-time breaking-change findings.
-- [ ] Tests: valid/invalid extensions, ID clash between base and extension and
-  between two extensions resolved by origin, extension referencing a field the
-  base version lacks, limits.
+- [x] TypeBox schemas `ExtensionDocumentV1` and `ExtensionPackageV1`
+  (`src/systems/implementation/package/schema/extension.ts`); codec
+  `decodeExtensionDocument`/`decodeExtensionPackage` with structural checks and
+  checksum (`package/extension.ts`); `signExtensionPackage` and
+  `canonicalChecksum` (`package/canonical.ts`). Structural checks reuse the
+  system ones (unique IDs, references, budgets, push policies). Extension
+  expressions always compile with grammar 0.2.
+- [x] `compileExtensionDocument(document, base, opts)` and
+  `validateExtensionAgainst(base, extension)` (X4) in
+  `rules/compile-extension.ts`. Computed template fields read only their
+  template's fields; granted rolls also read the character fields the base
+  exposes to that template kind (`grantedEntityFieldsForKind`, now shared with
+  `compileDocument`) and their inputs. A different system is
+  `extension_base_mismatch`; an expression that no longer typechecks is
+  `extension_incompatible`; a kind no placed base slot accepts is a
+  `template_kind_unplaceable` warning (its rolls then see no character fields).
+- [x] `composeRules(base, extensions)` → `ComposedRules` (`rules/compose.ts`)
+  with origin-scoped `template`/`expression` lookups (`null` = base),
+  `templates()`, warnings, `identity` and an order-independent
+  `compositionChecksum`; rejects more than 16 extensions
+  (`PACKAGE_LIMITS.extensionsPerComposition`) and two versions of one extension.
+- [x] `compareExtensionPackages(prev, next)` reusing the template and expression
+  rules of `comparePackages` (refactored into shared helpers), plus
+  `extension_identity_changed`.
+- [x] Tests (`rules/compile-extension.test.ts`): compile and decode round trip,
+  tampered checksum, unknown character field, computed field isolation,
+  unplaceable-kind warning, validation expressions, duplicate IDs, shared
+  expressions, push policies, later compatible base, base that no longer
+  exposes a field, other system, same template ID in base and two extensions,
+  checksum stability, duplicate/too many extensions, extension comparison.
 
 ### E2 — Authoring and publishing
 
@@ -227,6 +246,16 @@ Follow the [GUI integration plan](2026-09-08-gui-integration.md) gates.
   extension X is upgraded campaign-wide; revert; removal blocked then allowed.
 - [ ] Isolated hosted journey with the same steps and independent cleanup.
 - [ ] No G9 release gate is closed by this feature.
+
+## Future features (recorded, not authorized)
+
+- **Extension catalog (owner request 2026-11-07).** A browsable catalog where
+  users discover, preview and pick published extensions for a system (search,
+  filter by system and kind, descriptions, item previews, and later ratings or
+  curation). Until then, extensions are found through the per-system
+  **Extensions** list (owned plus `public`) and by direct link. The catalog
+  depends on the public-content moderation decision (design OD-07) and needs its
+  own plan and owner approval before any work starts.
 
 ## Design document changes
 

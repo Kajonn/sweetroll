@@ -29205,6 +29205,21 @@ export interface operations {
                     };
                 };
             };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
             500: {
                 headers: {
                     [name: string]: unknown;

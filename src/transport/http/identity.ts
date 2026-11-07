@@ -53,7 +53,6 @@ export type BuildIdentityRoutesInput = {
   identity: Identity;
   cookieName: string;
   secure: boolean;
-  allowedOrigins?: ReadonlyArray<string>;
 };
 
 type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
@@ -119,22 +118,8 @@ export const identityRouteDefinitions: readonly IdentityRouteDefinition[] = [
   },
 ];
 
-export function isSameOrigin(origin: string, request: FastifyRequest, allowedOrigins: ReadonlyArray<string>): boolean {
-  if (allowedOrigins.includes(origin)) return true;
-  try {
-    // Compare the Origin host (including port) against the request Host header.
-    // Scheme is deliberately ignored: behind a TLS-terminating proxy (and in
-    // tests) the request protocol is reported as http even though the
-    // originating request is https, so a strict scheme comparison would reject
-    // legitimate same-origin requests.
-    return new URL(origin).host === request.host;
-  } catch {
-    return false;
-  }
-}
-
 export const buildIdentityRoutes: (input: BuildIdentityRoutesInput) => FastifyPluginCallback =
-  ({ identity, cookieName, secure, allowedOrigins = [] }) =>
+  ({ identity, cookieName, secure }) =>
   fp(async (app) => {
     app.addHook("onSend", async (request, reply) => {
       reply.header("x-request-id", request.id);
@@ -185,18 +170,11 @@ export const buildIdentityRoutes: (input: BuildIdentityRoutesInput) => FastifyPl
       "/signout",
       { schema: { response: { "204": Type.Null(), "403": ErrorEnvelopeDto } } },
       async (request, reply) => {
-        const origin = request.headers.origin;
-        if (origin !== undefined && !isSameOrigin(origin, request, allowedOrigins)) {
-          return reply.code(403).send({
-            error: { code: "forbidden", message: "Cross-origin sign-out is not allowed." },
-            requestId: request.id,
-          });
-        }
         const token = request.cookies[cookieName];
         if (token !== undefined && token.length > 0) {
           await identity.signOut(token);
+          reply.clearCookie(cookieName, clearCookieOptions);
         }
-        reply.clearCookie(cookieName, clearCookieOptions);
         return reply.code(204).send();
       },
     );

@@ -16,6 +16,7 @@ export type CreateSessionInput = {
   userId: UserId;
   tokenHash: string;
   expiresAt: Date;
+  previousTokenHash?: string | undefined;
 };
 
 /** Account-level theme default. Null means no default is set. */
@@ -47,8 +48,12 @@ export function createIdentityRepository(pool: Pool): IdentityRepository {
 
     async createSession(input) {
       const result = await pool.query<{ id: string }>(
-        "INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3) RETURNING id",
-        [input.userId, input.tokenHash, input.expiresAt],
+        `WITH revoked AS (
+           UPDATE sessions SET revoked_at = now() WHERE token_hash = $4 AND revoked_at IS NULL
+         )
+         INSERT INTO sessions (user_id, token_hash, expires_at)
+         VALUES ($1, $2, $3) RETURNING id`,
+        [input.userId, input.tokenHash, input.expiresAt, input.previousTokenHash ?? null],
       );
       const row = result.rows[0];
       if (row === undefined) {
@@ -65,7 +70,9 @@ export function createIdentityRepository(pool: Pool): IdentityRepository {
         expires_at: Date;
         revoked_at: Date | null;
       }>(
-        "SELECT id, user_id, token_hash, expires_at, revoked_at FROM sessions WHERE token_hash = $1",
+        `SELECT s.id, s.user_id, s.token_hash, s.expires_at, s.revoked_at
+         FROM sessions s JOIN users u ON u.id = s.user_id
+         WHERE s.token_hash = $1 AND u.status = 'active'`,
         [tokenHash],
       );
       const row = result.rows[0];

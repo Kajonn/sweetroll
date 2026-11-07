@@ -61,6 +61,7 @@ export default defineConfig({
         DATABASE_URL: databaseUrl,
         AUTHORITATIVE_ROLL_SECRET: rollSecret,
         NODE_ENV: "production",
+        COOKIE_SECURE: "false", // This production build runs over local HTTP.
         SWEETROLL_TEST_AUTH: "1",
         PORT: backendPort,
         SWEETROLL_CLAMD_HOST: scannerHost,

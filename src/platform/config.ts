@@ -149,6 +149,8 @@ export type AppConfig = {
   databaseUrl: string;
   host: string;
   logLevel: LogLevel;
+  metricsToken?: string;
+  trustedProxyCidrs?: string[];
   nodeEnv: NodeEnv;
   port: number;
   sessionCookieName: string;
@@ -176,8 +178,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error("SESSION_TTL_DAYS must be an integer from 1 through 365");
   }
 
-  const cookieSecure = env.COOKIE_SECURE === "true";
-
   const allowedOrigins = (env.ALLOWED_ORIGINS ?? "")
     .split(",")
     .map((origin) => origin.trim())
@@ -187,6 +187,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   if (nodeEnvRaw !== "development" && nodeEnvRaw !== "production" && nodeEnvRaw !== "test") {
     throw new Error("NODE_ENV must be development, production, or test");
   }
+
+  const cookieSecureSetting = env.COOKIE_SECURE;
+  if (cookieSecureSetting !== undefined && cookieSecureSetting !== "true" && cookieSecureSetting !== "false") {
+    throw new Error("COOKIE_SECURE must be true or false");
+  }
+  const cookieSecure = cookieSecureSetting === undefined ? nodeEnvRaw === "production" : cookieSecureSetting === "true";
+  const metricsToken = env.METRICS_TOKEN;
+  if (metricsToken && !/^[^\s,]+$/.test(metricsToken)) {
+    throw new Error("METRICS_TOKEN must be a single bearer token");
+  }
+  const trustedProxyCidrs = (env.TRUSTED_PROXY_CIDRS ?? "").split(",").map((value) => value.trim()).filter(Boolean);
 
   const authoritativeRollSecret = env.AUTHORITATIVE_ROLL_SECRET ?? "";
   if (nodeEnvRaw !== "test" && authoritativeRollSecret.length === 0) {
@@ -203,6 +214,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     databaseUrl,
     host: env.HOST ?? "0.0.0.0",
     logLevel: logLevel as LogLevel,
+    ...(metricsToken ? { metricsToken } : {}),
+    ...(trustedProxyCidrs.length > 0 ? { trustedProxyCidrs } : {}),
     nodeEnv: nodeEnvRaw,
     port,
     sessionCookieName: env.SESSION_COOKIE_NAME ?? "session",

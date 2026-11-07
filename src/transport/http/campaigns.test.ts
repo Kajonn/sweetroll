@@ -45,7 +45,7 @@ const fakeIdentity: Identity = {
   signOut: async () => ({ ok: true, value: undefined }),
 } as unknown as Identity;
 
-const cookie = { cookie: "session=t" };
+const cookie = { cookie: "session=t", "sec-fetch-site": "same-origin" };
 const apps: ReturnType<typeof Fastify>[] = [];
 
 function campaignView(overrides: Partial<CampaignView> = {}): CampaignView {
@@ -434,7 +434,6 @@ async function build(input?: {
         : fakeIdentity,
       cookieName: "session",
       secure: true,
-      maxAgeSeconds: 3600,
     }),
   );
   registerApiRoutes(app, [

@@ -754,6 +754,22 @@ caller. Hosted acceptance still depends on real provider sign-in.
 | Privilege abuse              | Audited admin tooling; least privilege; support access requires reason and time-bounded grant       |
 | Sensitive logs               | Structured allow-list logging; redact tokens, content bodies, character state, and signed URLs      |
 
+Browser sessions use one fixed expiry in PostgreSQL and the session cookie.
+Re-authentication atomically replaces the previous session, and only active
+users resolve to a browser identity. Cookie-authenticated writes require an
+exact allowed origin or browser same-origin Fetch Metadata when Origin is
+absent. Bearer-token operations authenticate independently.
+
+API and web responses deny framing and referrer disclosure. The content
+security policy limits resources to the app origin, allows local image
+previews and authorizes the pre-paint theme script by hash. HTTPS deployments
+send HSTS. Metrics require a separate scraper token and are off by default.
+
+The browser and public API share account request and image-upload budgets
+in PostgreSQL. Display redemption has per-IP and process limits. Each
+campaign can have five live pairing codes, and each display credential can
+open two scene streams per process.
+
 ## 14.1 Privacy defaults
 
 - Systems are private until explicitly shared; campaigns are never discoverable by default.

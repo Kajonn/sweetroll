@@ -105,7 +105,7 @@ async function build(authoring: SystemAuthoring): Promise<ReturnType<typeof Fast
   const app = Fastify({ genReqId: () => randomUUID(), loggerInstance: pino({ enabled: false }) });
   await app.register(cookie);
   await app.register(
-    buildAuthHook({ identity: fakeIdentity, cookieName: "session", secure: true, maxAgeSeconds: 3600 }),
+    buildAuthHook({ identity: fakeIdentity, cookieName: "session", secure: true }),
   );
   await app.register(buildSystemsRoutes({ authoring }));
   await app.ready();
@@ -131,7 +131,6 @@ describe("systems HTTP routes", () => {
         } as unknown as Identity,
         cookieName: "session",
         secure: true,
-        maxAgeSeconds: 3600,
       }),
     );
     await app.register(buildSystemsRoutes({ authoring: makeAuthoring() }));
@@ -158,7 +157,7 @@ describe("systems HTTP routes", () => {
     const response = await app.inject({
       method: "POST",
       url: "/systems",
-      headers: { cookie: "session=t" },
+      headers: { cookie: "session=t", "sec-fetch-site": "same-origin" },
       payload: { source: { kind: "blank", name: "New" }, idempotencyKey: "key-1" },
     });
     expect(response.statusCode).toBe(201);
@@ -172,7 +171,7 @@ describe("systems HTTP routes", () => {
     const response = await app.inject({
       method: "POST",
       url: "/systems",
-      headers: { cookie: "session=t" },
+      headers: { cookie: "session=t", "sec-fetch-site": "same-origin" },
       payload: { source: { kind: "wat" }, idempotencyKey: "key-1" },
     });
     expect(response.statusCode).toBe(400);
@@ -194,7 +193,7 @@ describe("systems HTTP routes", () => {
     const ok = await app.inject({
       method: "GET",
       url: "/systems?limit=5&cursor=abc",
-      headers: { cookie: "session=t" },
+      headers: { cookie: "session=t", "sec-fetch-site": "same-origin" },
     });
     expect(ok.statusCode).toBe(200);
     expect(ok.json()).toEqual({ systems: [], nextCursor: null, requestId: expect.any(String) });
@@ -203,7 +202,7 @@ describe("systems HTTP routes", () => {
     const bad = await app.inject({
       method: "GET",
       url: "/systems?limit=999",
-      headers: { cookie: "session=t" },
+      headers: { cookie: "session=t", "sec-fetch-site": "same-origin" },
     });
     expect(bad.statusCode).toBe(400);
   });
@@ -227,7 +226,7 @@ describe("systems HTTP routes", () => {
       }),
     );
     apps.push(app);
-    const headers = { cookie: "session=t" };
+    const headers = { cookie: "session=t", "sec-fetch-site": "same-origin" };
 
     const missing = await app.inject({ method: "GET", url: `/systems/${randomUUID()}`, headers });
     expect(missing.statusCode).toBe(404);
@@ -261,7 +260,7 @@ describe("systems HTTP routes", () => {
   it("maps preview, lifecycle, and export routes", async () => {
     const app = await build(makeAuthoring());
     apps.push(app);
-    const headers = { cookie: "session=t" };
+    const headers = { cookie: "session=t", "sec-fetch-site": "same-origin" };
 
     const preview = await app.inject({ method: "POST", url: `/systems/${randomUUID()}/preview`, headers, payload: {} });
     expect(preview.statusCode).toBe(200);
@@ -322,7 +321,7 @@ describe("systems HTTP routes", () => {
       }),
     );
     apps.push(app);
-    const headers = { cookie: "session=t" };
+    const headers = { cookie: "session=t", "sec-fetch-site": "same-origin" };
 
     const ok = await app.inject({
       method: "PATCH",
@@ -363,7 +362,7 @@ describe("systems HTTP routes", () => {
     );
     apps.push(app);
     const url = `/systems/${randomUUID()}/publish`;
-    const headers = { cookie: "session=t" };
+    const headers = { cookie: "session=t", "sec-fetch-site": "same-origin" };
     const payload = {
       expectedRevision: 2,
       semanticVersion: "2.0.0",
@@ -401,7 +400,7 @@ describe("systems HTTP routes", () => {
       }),
     );
     apps.push(app);
-    const headers = { cookie: "session=t" };
+    const headers = { cookie: "session=t", "sec-fetch-site": "same-origin" };
     const systemId = randomUUID();
 
     const ok = await app.inject({ method: "DELETE", url: `/systems/${systemId}`, headers });
@@ -453,7 +452,7 @@ describe("systems HTTP routes", () => {
       }),
     );
     apps.push(app);
-    const headers = { cookie: "session=t" };
+    const headers = { cookie: "session=t", "sec-fetch-site": "same-origin" };
     const systemId = randomUUID();
 
     const ok = await app.inject({ method: "GET", url: `/systems/${systemId}/versions`, headers });

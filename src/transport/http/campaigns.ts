@@ -1523,6 +1523,7 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
         },
         "400": CampaignErrorEnvelope,
         "404": CampaignErrorEnvelope,
+        "429": CampaignErrorEnvelope,
         "500": CampaignErrorEnvelope,
         "503": CampaignErrorEnvelope,
       },
@@ -2702,6 +2703,7 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
               requestId: request.id,
             });
           }
+          if (opened.error.code === "rate_limited") reply.header("retry-after", "2");
           return sendError(reply, opened.error, request.id);
         }
         const stream = opened.value;
@@ -2779,8 +2781,9 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         // Campaign backgrounds and token art carry up to 5 MiB as base64
         // inside JSON. Match the other image routes without raising the
         // default limit for unrelated campaign commands.
-        ...(route.operationId === "post_campaigns_id_images" ? { bodyLimit: 8 * 1024 * 1024 } : {}),
-        ...(route.path.includes("/image") && (route.path.includes("/item-templates") || route.path.includes("/item-proposals")) ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); }, ...(route.method === "put" ? { bodyLimit: 8 * 1024 * 1024 } : {}) } : {}),
+        ...(route.operationId === "post_displays_redeem" ? { config: { displayRedeem: true } } : {}),
+        ...(route.operationId === "post_campaigns_id_images" ? { bodyLimit: 8 * 1024 * 1024, config: { browserRateBucket: "upload" } } : {}),
+        ...(route.path.includes("/image") && (route.path.includes("/item-templates") || route.path.includes("/item-proposals")) ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); }, ...(route.method === "put" ? { bodyLimit: 8 * 1024 * 1024, config: { browserRateBucket: "upload" } } : {}) } : {}),
       }, handlers[route.operationId]!);
     }
   };

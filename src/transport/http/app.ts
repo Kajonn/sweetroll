@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 
 import cookie from "@fastify/cookie";
 import Fastify, {
@@ -12,12 +12,31 @@ import type { Logger } from "pino";
 
 import { createHttpMetrics } from "../../platform/metrics.js";
 
-export function buildHttpApp(input: { logger: Logger; pool: Pool; authHook: FastifyPluginCallback }): FastifyInstance {
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  // The pre-paint theme initializer in web/index.html.
+  "script-src 'self' 'sha256-OWklNvkjFbeof/NxSsTtco9Ub/P8Sf5i97VsA3sTRCE='",
+  "img-src 'self' blob: data:",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join("; ");
+
+export function buildHttpApp(input: {
+  logger: Logger;
+  pool: Pool;
+  authHook: FastifyPluginCallback;
+  metricsToken?: string | undefined;
+  hsts?: boolean;
+  trustedProxyCidrs?: string[];
+}): FastifyInstance {
   const logger: FastifyBaseLogger = input.logger;
   const app = Fastify({
     genReqId: () => randomUUID(),
     logController: new LogController({ disableRequestLogging: true }),
     loggerInstance: logger,
+    trustProxy: input.trustedProxyCidrs?.length ? input.trustedProxyCidrs : false,
   });
   const metrics = createHttpMetrics();
   const startedAt = new WeakMap<object, bigint>();
@@ -38,6 +57,11 @@ export function buildHttpApp(input: { logger: Logger; pool: Pool; authHook: Fast
 
   app.addHook("onSend", async (request, reply) => {
     reply.header("x-request-id", request.id);
+    reply.header("content-security-policy", contentSecurityPolicy);
+    reply.header("x-frame-options", "DENY");
+    reply.header("referrer-policy", "no-referrer");
+    reply.header("x-content-type-options", "nosniff");
+    if (input.hsts) reply.header("strict-transport-security", "max-age=31536000");
   });
 
   app.addHook("onResponse", async (request, reply) => {
@@ -75,10 +99,18 @@ export function buildHttpApp(input: { logger: Logger; pool: Pool; authHook: Fast
     }
   });
 
-  app.get("/metrics", async (_request, reply) => {
-    reply.type(metrics.registry.contentType);
-    return metrics.registry.metrics();
-  });
+  if (input.metricsToken) {
+    const expected = createHash("sha256").update(input.metricsToken).digest();
+    app.get("/metrics", { config: { bearerOnly: true } }, async (request, reply) => {
+      reply.header("cache-control", "no-store");
+      const token = /^Bearer ([^\s,]+)$/i.exec(request.headers.authorization ?? "")?.[1];
+      if (!token || !timingSafeEqual(createHash("sha256").update(token).digest(), expected)) {
+        return reply.code(401).header("www-authenticate", "Bearer").send({ status: "unauthorized" });
+      }
+      reply.type(metrics.registry.contentType);
+      return metrics.registry.metrics();
+    });
+  }
 
   void app.register(input.authHook);
 

@@ -669,7 +669,7 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
       app[route.method](route.path, { schema,
         ...(route.path === "/systems" && route.method === "post" ? { bodyLimit: 18 * 1024 * 1024 } : {}),
         ...(route.path.includes("/image") ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); }, validatorCompiler: strictInputCompiler,
-          ...(route.method === "put" ? { bodyLimit: 8 * 1024 * 1024 } : {}) } : {}),
+          ...(route.method === "put" ? { bodyLimit: 8 * 1024 * 1024, config: { browserRateBucket: "upload" } } : {}) } : {}),
       }, handlers[route.operationId]!);
     }
   };

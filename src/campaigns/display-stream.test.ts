@@ -258,6 +258,25 @@ describe("display streams", () => {
     streams.closeAll();
   });
 
+  it("bounds concurrent streams per authorized display and frees a slot on close", async () => {
+    const { hub } = fakeHub();
+    const streams = createDisplayStreams({
+      hub, loadSnapshot: async (request) => request.secret === REQUEST.secret ? snapshot(1) : NOT_FOUND,
+    });
+    const opened = await Promise.all([
+      streams.open(REQUEST),
+      streams.open({ ...REQUEST, sceneId: "scene-2" }),
+      streams.open({ ...REQUEST, sceneId: "scene-3" }),
+    ]);
+    expect(opened.filter((result) => result.ok)).toHaveLength(2);
+    expect(opened.find((result) => !result.ok)).toMatchObject({ error: { code: "rate_limited" } });
+    expect(await streams.open({ ...REQUEST, secret: "wrong" })).toMatchObject({ error: { code: "not_found" } });
+    expect((await streams.open({ ...REQUEST, displayId: "display-2" })).ok).toBe(true);
+    for (const result of opened) if (result.ok) result.value.close();
+    expect((await streams.open(REQUEST)).ok).toBe(true);
+    streams.closeAll();
+  });
+
   it("sends heartbeats without loading snapshots", async () => {
     const { hub } = fakeHub();
     const loadSnapshot = vi.fn(async () => snapshot(1));

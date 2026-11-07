@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { createTemplateRepository } from "../../src/campaigns/templatePersistence.js";
 import { Client, Pool } from "pg";
 import pino from "pino";
+import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyPluginCallback } from "fastify";
 
 import { createTestOidcClient } from "../../src/identity/adapters/test.js";
@@ -129,11 +130,15 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
     describeVersionChoices: authoring.describeVersionChoices,
   });
 
-  const authHook = buildAuthHook({
-    identity,
-    cookieName: "session",
-    secure: false,
-    maxAgeSeconds: 3600,
+  const authHook = fp(async (app) => {
+    // Injected requests model same-origin browser traffic unless a test
+    // supplies its own Origin or Fetch Metadata header.
+    app.addHook("onRequest", async (request) => {
+      if (request.headers.origin === undefined && request.headers["sec-fetch-site"] === undefined) {
+        request.headers = { "sec-fetch-site": "same-origin" };
+      }
+    });
+    await app.register(buildAuthHook({ identity, cookieName: "session", secure: false }));
   });
 
   const app = buildHttpApp({
@@ -151,7 +156,6 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
       nodeEnv: "test",
       cookieName: "session",
       secure: false,
-      maxAgeSeconds: 3600,
     }),
   );
 

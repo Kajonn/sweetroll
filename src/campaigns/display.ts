@@ -74,6 +74,7 @@ const PAIRING_CODE_TTL_MS = 5 * 60 * 1000;
 const CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const CODE_LENGTH = 6;
 const MAX_MINT_ATTEMPTS = 8;
+const MAX_LIVE_PAIRING_CODES = 5;
 
 const NOT_FOUND_MESSAGE = "The requested display resource does not exist.";
 
@@ -519,31 +520,29 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
         if (!checkPresent(pairInput.campaignId)) {
           return { ok: false, error: errors.bad_request("campaignId must be a non-empty string.") };
         }
-        const authorized = await withClient(async (client) => {
-          const campaign = await repo.openCampaign(client, pairInput.campaignId);
-          const membership =
-            campaign === null ? null : await repo.loadMembership(client, pairInput.campaignId, ctx.actorId);
-          if (campaign === null || !canManageCampaign(campaign, membership)) return false;
-          return true;
-        });
-        if (!authorized) return { ok: false, error: errors.not_found() };
-
-        // Each call mints a fresh code (no idempotency): the UNIQUE hash
-        // retries on the (astronomically unlikely) collision instead of
-        // failing the pairing attempt.
-        const paired = await withTransaction(async (client) => {
+        return await withTransaction<CampaignResult<PairDisplaySuccess>>(async (client) => {
+          // Serialize concurrent mints while allowing an in-flight redemption
+          // to take the foreign key's KEY SHARE lock on the campaign.
+          const campaign = await repo.lockCampaign(client, pairInput.campaignId, "NO KEY UPDATE");
+          const membership = campaign === null ? null : await repo.loadMembership(client, pairInput.campaignId, ctx.actorId);
+          if (campaign === null || !canManageCampaign(campaign, membership)) {
+            return { ok: false, error: errors.not_found() };
+          }
+          const issuedAt = now();
+          if (await repo.countLiveDisplayCodes(client, pairInput.campaignId, issuedAt) >= MAX_LIVE_PAIRING_CODES) {
+            return { ok: false, error: { code: "conflict", message: "Redeem a pairing code or wait for one to expire." } };
+          }
           for (let attempt = 0; attempt < MAX_MINT_ATTEMPTS; attempt++) {
             const code = generateDisplayCode();
             const inserted = await repo.insertDisplayCode(client, {
               codeHash: hashToken(code),
               campaignId: pairInput.campaignId,
-              expiresAt: new Date(now().getTime() + PAIRING_CODE_TTL_MS),
+              expiresAt: new Date(issuedAt.getTime() + PAIRING_CODE_TTL_MS),
             });
-            if (inserted !== null) return code;
+            if (inserted !== null) return { ok: true, value: { code } };
           }
           throw new Error("display code mint collided repeatedly");
         });
-        return { ok: true, value: { code: paired } };
       } catch {
         return { ok: false, error: errors.internal() };
       }

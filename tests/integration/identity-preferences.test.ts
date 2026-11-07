@@ -105,3 +105,25 @@ describeWithDatabase("account theme default (GET/PATCH /me/preferences)", () => 
     expect(anonymousPatch.statusCode, anonymousPatch.body).toBe(401);
   });
 });
+
+describeWithDatabase("browser sessions", () => {
+  it("sets the session cookie expiry once and revokes the prior cookie on sign-in", async () => {
+    app = await makeApp();
+    const { app: http, users } = app;
+    const signIn = await http.inject({
+      method: "POST", url: "/dev/signin",
+      headers: { cookie: users.bob.cookie, "sec-fetch-site": "same-origin" },
+      payload: { code: "code-bob", redirectUri: "http://localhost/cb" },
+    });
+    expect(signIn.statusCode).toBe(200);
+    const sessionCookie = signIn.cookies.find((cookie) => cookie.name === "session");
+    const { expiresAt } = signIn.json<{ expiresAt: string }>();
+    expect(sessionCookie?.expires?.getTime()).toBe(Math.floor(Date.parse(expiresAt) / 1000) * 1000);
+    expect(sessionCookie?.maxAge).toBeUndefined();
+    const old = await http.inject({ url: "/me", headers: { cookie: users.bob.cookie } });
+    expect(old.json()).toEqual({ state: "anonymous" });
+    const current = await http.inject({ url: "/me", headers: { cookie: `session=${sessionCookie?.value}` } });
+    expect(current.json().state).toBe("authenticated");
+    expect(current.headers["set-cookie"]).toBeUndefined();
+  });
+});

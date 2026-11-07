@@ -2,6 +2,9 @@ import type { FastifyInstance, FastifyPluginAsync, FastifyPluginCallback } from 
 import fastifyStatic from "@fastify/static";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import type { Pool } from "pg";
+
+import { registerBrowserRateLimits } from "./browser-rate-limit.js";
 
 export const registerStaticServing: FastifyPluginAsync<{
   distDir: string;
@@ -29,8 +32,10 @@ export function registerApiRoutes(
   app: FastifyInstance,
   routes: ReadonlyArray<FastifyPluginCallback>,
   serveStatic: boolean,
+  rateLimits?: { pool: Pool },
 ): void {
   void app.register(async (api) => {
+    if (rateLimits) registerBrowserRateLimits(api, rateLimits.pool);
     for (const route of routes) void api.register(route);
   }, { prefix: serveStatic ? "/api" : "" });
 }

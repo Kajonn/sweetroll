@@ -145,11 +145,14 @@ const campaigns = createCampaignsModule({
 const app = buildHttpApp({
   logger,
   pool,
+  metricsToken: config.metricsToken,
+  hsts: config.cookieSecure || config.nodeEnv === "production",
+  trustedProxyCidrs: config.trustedProxyCidrs ?? [],
   authHook: buildAuthHook({
     identity,
     cookieName: config.sessionCookieName,
     secure: config.cookieSecure,
-    maxAgeSeconds: config.sessionTtlDays * 86_400,
+    allowedOrigins: config.allowedOrigins,
   }),
 });
 
@@ -165,13 +168,12 @@ registerApiRoutes(app, [
     identity,
     cookieName: config.sessionCookieName,
     secure: config.cookieSecure,
-    allowedOrigins: config.allowedOrigins,
   }),
-  buildPersonalTokenRoutes({ identity, allowedOrigins: config.allowedOrigins }),
+  buildPersonalTokenRoutes({ identity }),
   buildSystemsRoutes({ authoring }),
   buildCharactersRoutes({ characters }),
   buildCampaignsRoutes({ campaigns, characters, runtime, identity }),
-], serveStatic);
+], serveStatic, { pool });
 void app.register(buildPublicApi({ identity, authoring, characters, pool, campaigns, runtime }), { prefix: publicApiPrefix });
 void app.register(
   buildDevSignInRoutes({
@@ -179,7 +181,6 @@ void app.register(
     nodeEnv: config.nodeEnv,
     cookieName: config.sessionCookieName,
     secure: config.cookieSecure,
-    maxAgeSeconds: config.sessionTtlDays * 86_400,
     allowInProduction: testAuthEnabled,
   }),
 );

@@ -84,6 +84,8 @@ Roles are contextual capabilities, not account types. The same user can create a
 - Autosave drafts, show the last saved state, and never make a user guess whether data persisted.
 - Place in-session actions before administrative controls; destructive operations require confirmation and clear scope.
 - Use progressive disclosure. Basic creation should not expose formulas, validation, or visibility logic until needed.
+- Normal views show readable names and actionable state. Account → Developer tools offers an off-by-default device-local “Show debug information” preference for technical IDs, revisions, checksums, diagnostic paths/codes and expression ASTs. It changes presentation only, never authorization or data fetching. Identifier editing, field constraints, appearance and precise token positioning remain available through collapsed native disclosures that preserve values. Missing reference labels remain explicit repair fallbacks. See the [GUI disclosure plan](docs/superpowers/plans/2026-11-05-gui-progressive-disclosure.md).
+- The creator has one save indicator, one diagnostics action and one version-history action; publication blocking reasons remain visible. Roll group totals, push availability and relevant face outcomes stay visible; per-die calculations are available through roll details. Appearance preferences are edited in Account while the shell continues applying the effective device/account/OS theme.
 - Keep state and rules distinct: definitions describe what a field means; character and campaign records contain current values.
 - Every visibility control states its audience in plain language and offers a preview-as-player check.
 - Provide undo for builder operations and recoverable deletion for user content where practical.
@@ -260,7 +262,7 @@ A published system version updates the open editor's status immediately.
 
 The campaign workspace combines member management, content, characters, and an in-session activity feed. The **Session view** is a curated mobile surface: pinned content, recent rolls, quick character access, and reveal/hide controls.
 
-Campaign creation distinguishes versions with the same display name and semantic version by showing their publication date and a short version identifier. The campaign's pinned version supplies character creation choices automatically; players and GMs should not need to enter an internal version ID. A GM's roster access is labelled as GM access when they do not control a character. Campaign and Session activity show local dates and readable actor labels; the exact actor identifier remains available for identification. Sheet previews show a section title once when its first heading repeats that title.
+Campaign creation distinguishes versions with the same display name and semantic version by showing their publication date and a short version identifier. The campaign's pinned version supplies character creation choices automatically; players and GMs should not need to enter an internal version ID. A GM's roster access is labelled as GM access when they do not control a character. Member, sharing and content-preview controls use existing roster display names. Duplicate or absent names have an identifying suffix; short-ID collisions use full IDs, and debug mode shows full IDs. Requests retain exact user IDs and membership generations. Campaign and Session activity show local dates and readable actor labels; the exact actor identifier remains available for identification. Sheet previews show a section title once when its first heading repeats that title.
 
 ## 7.2 GM session board
 
@@ -297,6 +299,8 @@ I6/I7 deliver **text notes** with visibility levels and basic tags. I7b adds aut
 ## 7.7 Simple scenes and player display
 
 A scene consists of a background image, a manually edited fog mask, and GM-positioned tokens with simple labels/images and visibility. Provide fit/pan/zoom, reveal/conceal, local undo, and drag or tap-to-place/move controls, with keyboard alternatives. Use normalized scene coordinates and revision-checked edits. There are no tactical grids, movement rules, initiative, automatic vision, or combat automation.
+
+**Delivery status (2026-11-06):** Background upload/create/replace, numeric fog/token operations and restricted display are delivered. V1 uploaded token-image selection/rendering is implemented in PR #34 and accepted through hosted/redeploy verification ([evidence](docs/acceptance/scene-image-tokens-2026-11-05.md)). PR #36 implements V2 direct drag/tap token placement/movement with explicit pan/placement modes, cancellable local previews and shared revision/idempotency recovery; numeric controls remain available. Local and hosted mouse/touch browser acceptance passed on `84c23fd`; see [V2 evidence](docs/acceptance/scene-token-gestures-2026-11-06.md). V3 on-image Reveal/Conceal brushing is implemented with bounded local drafts, stroke undo, explicit commit and revision/idempotency recovery; local and hosted mouse/touch acceptance passed on `637a60f` ([V3 evidence](docs/acceptance/scene-fog-brush-2026-11-06.md)). These are existing I7b/G8 requirements; follow the [scene visual-controls completion plan](docs/superpowers/plans/2026-11-05-scene-visual-controls.md). Numeric controls remain accessible precision alternatives and do not satisfy the direct visual controls gate. M3 background acceptance alone does not close these gaps. V4 combined acceptance now passes in PR #38 on deployed `3a35a5f` ([combined evidence](docs/acceptance/scene-visual-controls-2026-11-06.md)); the I7b/G8 visual-controls feature gate is complete. G9 physical-device, provider-login, human and table/remote gates remain open.
 
 A separate tablet or remote player receives only an authorized display projection. Fog-covered pixels must be removed from server-generated display imagery (or safe tiles); sending the original image under a client-only overlay does not protect secrets. Filter hidden tokens and GM metadata before delivery. Pairing credentials are revocable and cannot read campaign administration, GM notes, or originals. Clear privileged browser state when entering display mode, and blank the display when authorization is uncertain or revoked. Previously revealed information cannot be retracted from screenshots. See the GUI plan G8 for acceptance cases.
 
@@ -353,7 +357,16 @@ Use role-based permissions for coarse capabilities and resource-level policy che
 
 ## 10.2 Player mobile sheet
 
-- Sticky character identity and primary-resource summary without excessive vertical space.
+The app's `/` landing view is Systems, and its primary navigation label is
+“Systems”. The shared header uses a single compact row: primary links are inline
+on desktop and available through a keyboard-accessible navigation disclosure
+below 1024px, with its trigger immediately after the Sweetroll logo on the left.
+Phone bottom navigation remains available. Creator and campaign
+tabs use one horizontally scrollable row with 44px targets instead of wrapping
+into several rows. Navigation and viewport changes preserve the active view's
+state; Escape closes the disclosure and restores focus to its trigger.
+
+- Character identity, save/offline status and resource sections scroll with the rest of the sheet; the character header must not stick over fields or actions on small screens.
 - Platform-owned bottom navigation for Characters, Activity, and Account; Campaigns is added in I6. System creators cannot add navigation destinations or divide the linear sheet into tabs.
 - Prominent action buttons and resource controls; numeric entry supports direct input and step controls.
 - Optimistic updates with visible pending/error state and automatic retry only when idempotent (offline-safe).
@@ -602,6 +615,28 @@ The owner approved the recommended [pre-upgrade remediation](docs/superpowers/pl
 
 Detailed contracts and required regression matrices are in the [I6 backend spec](docs/superpowers/specs/2026-09-09-i6-campaign-backend-design.md) Sections 3.5 and 4.1.1 and the claim/recovery plans. Their implementation, ordinary-player journey, durable recovery, cache/privacy and release gates remain unverified by this docs-only change.
 
+## 13.3 Public API v1 (2026-11-07)
+
+The separate `/api/v1` contract covers system authoring and standalone
+character setup. Users can create, clone or import a draft, validate and preview
+it, attach template artwork, publish a version, export it, and set its sharing.
+Character setup includes version and inventory discovery, creation or duplication,
+field and resource edits, slot placement and moves, portraits and entry artwork.
+Both local and combined HTTP serving expose the same prefix and public OpenAPI
+document.
+Browser routes keep cookie authentication. The API uses scoped personal
+access tokens and checks current resource permissions for every request,
+including receipt replay. Characters owns the standalone-only policy and
+checks custody at the write boundary. Character pins are immutable.
+
+Identity stores token digests and handles issuance, expiration and revocation
+through the signed-in Account surface. Hosted issuance depends on a real
+provider. Local development can opt in with `SWEETROLL_LOCAL_API_TOKENS=1`.
+Authenticated request quotas use PostgreSQL counters shared across replicas.
+The [API plan](docs/superpowers/plans/2026-11-07-public-api-v1.md) defines the
+scope and hosted acceptance. The [quickstart](docs/api/v1.md) documents the
+wire contract and retry windows.
+
 # 14. Security, privacy, and abuse prevention
 
 | **Risk**                     | **Required control**                                                                                |
@@ -684,6 +719,13 @@ deployments are test environments until the first application release Git tag
 (`v*.*.*`, used by the release workflow). App/database migration and support for
 multiple app versions are required only for changes after that tag. This policy takes
 precedence over historical plans, specifications and unchecked compatibility gates.
+
+**Owner clarification (2026-11-05):** Until the first application release tag,
+all app/database state may be cleared completely. The owner explicitly permits
+deleting and recreating the development app and its database when necessary;
+retaining old test state is optional. Do not ask again solely because a
+pre-release reset would discard test state. Check release-tag status first;
+after the first release tag, follow the released-data migration/recovery policy.
 
 | Phase | Required behavior |
 |---|---|
@@ -897,7 +939,18 @@ The first GM app is a responsive web surface within the shared PWA. Native packa
 
 ## 17.9a I7b - Simple scenes and restricted player display
 
-**Status:** Landed 2026-09-15 per GUI plan G8: media/scene/display contracts and persistence, authorized image storage with safe rendering, revision-controlled manual fog and token operations, revocable display pairing with server-filtered projections, touch/keyboard scene controls and the minimal display shell. Exit e2e `web/tests/e2e/sceneDisplayJourney.spec.ts` + acceptance `docs/acceptance/gui-2026-09-14-i7b-scenes.md`; the four findings from that record are closed on `main` (campaign-leave staleness, client-nav heading, offline bundle self-hit, document-editor-360 drift), each re-verified isolated. Production-auth and real-device gates stay open under G9.
+**Status: visual-controls feature gate accepted 2026-11-06 in PR #38.** The
+foundation delivery established authorized media, revision-controlled numeric
+fog/token operations, revocable pairing and server-filtered display projections.
+V1–V3 supply uploaded image tokens, direct mouse/touch placement/movement and an
+on-image brush. The [combined V4 evidence](docs/acceptance/scene-visual-controls-2026-11-06.md)
+now closes the reopened I7b/G8 visual-controls gate: ordered hosted GUI acceptance
+passes on deployed `3a35a5f`, terminal SUCCESS `f33cf328`, with exact pixel/art,
+privacy, recovery and cleanup proof. The historical numeric-only journey remains
+foundation evidence. This is feature acceptance; physical devices, real provider
+login, human visual approval and actual table/remote G9 release gates remain open.
+
+**V1 update (PR #34):** Uploaded image tokens and their scene-relative rendering now pass component, privacy, responsive hosted and redeploy acceptance ([evidence](docs/acceptance/scene-image-tokens-2026-11-05.md)). V2 direct placement/movement is implemented in PR #36 with local and hosted mouse/touch acceptance passed on `84c23fd` ([V2 evidence](docs/acceptance/scene-token-gestures-2026-11-06.md)). V3 brushing is implemented in PR #37 with local and hosted mouse/touch acceptance passed on `637a60f` ([V3 evidence](docs/acceptance/scene-fog-brush-2026-11-06.md)). V4 combined local/hosted acceptance now passes in PR #38 ([evidence](docs/acceptance/scene-visual-controls-2026-11-06.md)); I7b/G8 visual-controls feature acceptance is complete. Separate G9 release gates remain open.
 
 Complete GUI plan G8: define media/scene/display contracts and persistence; add safe authorized image storage and rendering; implement revision-controlled manual fog and token operations; implement revocable display pairing and server-filtered scene projections; then build touch/keyboard scene controls and the minimal display shell. Keep this within the modular application. Do not add a second rules engine or expose GM credentials on a shared tablet.
 
@@ -934,7 +987,7 @@ The two tracks are independent; preserve their internal stage order. T1 builds o
 - **I5:** A player can manage and play personal characters in a mobile browser or installed PWA with no campaign dependency.
 - **I6:** A player can join an HTTP-provisioned campaign, create or claim a character, and access only authorized content; guessed identifiers, revoked memberships, and replayed invitations disclose nothing.
 - **I7:** A GM can use the mobile-first web app to create a campaign from a shipped open-license template, invite four players, manage content visibility, verify each player's view, and run a session across two devices.
-- **I7b:** A GM phone and restricted tablet/remote display support simple images, manual fog, and tokens, with no GM secrets in display responses or caches.
+- **I7b (visual-controls feature gate accepted):** A GM phone supports uploaded image tokens, direct drag/tap placement/movement and on-image reveal/conceal brushing, with numeric/keyboard alternatives; a restricted tablet/remote display receives only revealed pixels and permitted tokens. The V4 combined hosted journey passes ([evidence](docs/acceptance/scene-visual-controls-2026-11-06.md)); G9 physical-device/provider/human/playtest gates remain separate.
 - **GUI release:** Apply G9 to each migrated view and final release: actual routed visual review, real phone/iPad checks, built frontend/API deployment, and physical-table/remote playtests.
 - Publishing a new system version never changes an existing character or campaign; using a different snapshot requires creating a new test character/campaign.
 - Users can export system, character, and campaign data in documented formats.
@@ -958,6 +1011,14 @@ The two tracks are independent; preserve their internal stage order. T1 builds o
 > **Note.** Offline support is now a requirement (Section 8), not an open decision.
 
 ## 18.2 Immediate next actions
+
+**Visual scene controls complete (2026-11-06; PR #38):** V4 combines image-token
+authoring, direct mouse/touch movement and on-image fog in one hosted ordered
+journey, closing the I7b/G8 visual-controls feature gate. See the
+[acceptance record](docs/acceptance/scene-visual-controls-2026-11-06.md).
+PR #36 includes #37; merge #36 before #38. The existing G9 release-readiness
+gates and proposed real-login plan remain separate; this completion selects no
+new feature or authentication provider.
 
 **Real-login planning (2026-11-05):** The owner requested a concrete [real-login implementation and acceptance plan](docs/superpowers/plans/2026-11-05-real-login.md). This reopens planning for OD-05 after its earlier deferral. Google-first is a recommendation awaiting the provider decision, not implemented authentication. Reuse Identity/session ownership, add server-side one-use OIDC transactions and PKCE validation, then validate real accounts on acceptance before enabling the normal app. Email magic links remain a later proposed increment; existing provider/device/playtest gates remain open.
 

@@ -1,162 +1,46 @@
-// GM fog toolbar: owns the uncommitted stroke (mode + dabs entered through
-// numeric inputs, the keyboard alternative to painting) with undo + commit
-// dispatch. Commits mint a fresh idempotency key; 409 re-reads first and
-// offers an explicit retry, never revision guessing.
-import { useState } from "react";
-
+import { useEffect, useState } from "react";
 import { t } from "../i18n/index.js";
 import { Button, FormField, Panel, Select } from "../ui/index.js";
+import { Disclosure } from "../ui/Disclosure.js";
 import type { CampaignsApi } from "./api.js";
-import { randomUUID } from "../utils/uuid";
-
-type FogMode = "reveal" | "conceal";
-
-type Dab = { x: number; y: number; r: number };
-
-function isConflict(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const record = error as { code?: unknown; status?: unknown };
-  return record.status === 409 || record.code === "conflict";
+import { useFogEditor, MAX_FOG_DABS, type FogEditor, type FogMode } from "./useFogEditor.js";
+type Props = {
+  api: Pick<CampaignsApi,"applyFogEdit">; sceneId: string; sceneRevision: number;
+  online?: boolean | undefined; disabled?: boolean | undefined;
+  onChanged?: (()=>void | number | Promise<void | number>) | undefined;
+  editor?: FogEditor | undefined; onPaint?: (()=>void) | undefined;
+};
+export function FogToolbarView(props: Props) {
+  return <FogToolbarScope key={`${props.sceneId}:${props.online ?? true}`} {...props} />;
 }
-
-function isNotFound(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const record = error as { code?: unknown; status?: unknown };
-  return record.status === 404 || record.code === "not_found";
-}
-
-function parseUnit(raw: string): number | null {
-  const value = Number(raw);
-  if (!Number.isFinite(value) || value < 0 || value > 1) return null;
-  return value;
-}
-
-export function FogToolbarView(props: {
-  api: Pick<CampaignsApi, "applyFogEdit">;
-  sceneId: string;
-  sceneRevision: number;
-  online?: boolean | undefined;
-  onChanged?: (() => void) | undefined;
-}) {
-  const online = props.online ?? true;
-  const [mode, setMode] = useState<FogMode>("reveal");
-  const [x, setX] = useState("0.5");
-  const [y, setY] = useState("0.5");
-  const [radius, setRadius] = useState("0.1");
-  const [stroke, setStroke] = useState<Dab[]>([]);
-  const [pending, setPending] = useState(false);
-  const [conflict, setConflict] = useState(false);
-  const [unavailable, setUnavailable] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [committed, setCommitted] = useState(false);
-
-  const addDab = (): void => {
-    const dabX = parseUnit(x);
-    const dabY = parseUnit(y);
-    const dabR = parseUnit(radius);
-    if (dabX === null || dabY === null || dabR === null) return;
-    setStroke((current) => [...current, { x: dabX, y: dabY, r: dabR }]);
-    setCommitted(false);
-  };
-
-  const commit = async (): Promise<void> => {
-    if (pending || stroke.length === 0) return;
-    setPending(true);
-    setError(null);
-    setConflict(false);
-    setCommitted(false);
-    // Caller-minted idempotency key, fresh on every attempt.
-    const idempotencyKey = randomUUID();
-    try {
-      await props.api.applyFogEdit(props.sceneId, {
-        expectedSceneRevision: props.sceneRevision,
-        op: { mode, runs: stroke },
-        idempotencyKey,
-      });
-      setStroke([]);
-      setCommitted(true);
-      props.onChanged?.();
-    } catch (cause) {
-      if (isNotFound(cause)) {
-        setUnavailable(true);
-      } else if (isConflict(cause)) {
-        // 409 → re-read first (the stroke is kept), then offer an explicit
-        // retry with a fresh key. Never revision guessing.
-        setConflict(true);
-        props.onChanged?.();
-      } else {
-        setError(t("campaign.detail.scenes.fog.error"));
-      }
-    } finally {
-      setPending(false);
-    }
-  };
-
-  return (
-    <Panel title={t("campaign.detail.scenes.fog.title")}>
-      <Select
-        label={t("campaign.detail.scenes.fog.modeLabel")}
-        value={mode}
-        onChange={(event) => setMode(event.target.value as FogMode)}
-        options={[
-          { value: "reveal", label: t("campaign.detail.scenes.fog.mode.reveal") },
-          { value: "conceal", label: t("campaign.detail.scenes.fog.mode.conceal") },
-        ]}
-      />
-      <FormField label={t("campaign.detail.scenes.fog.xLabel")}>
-        <input type="number" min={0} max={1} step={0.01} value={x} onChange={(event) => setX(event.target.value)} />
-      </FormField>
-      <FormField label={t("campaign.detail.scenes.fog.yLabel")}>
-        <input type="number" min={0} max={1} step={0.01} value={y} onChange={(event) => setY(event.target.value)} />
-      </FormField>
-      <FormField label={t("campaign.detail.scenes.fog.radiusLabel")}>
-        <input
-          type="number"
-          min={0}
-          max={1}
-          step={0.01}
-          value={radius}
-          onChange={(event) => setRadius(event.target.value)}
-        />
-      </FormField>
-      <Button variant="secondary" disabled={!online} onClick={addDab}>
-        {t("campaign.detail.scenes.fog.addDab")}
-      </Button>{" "}
-      <Button
-        variant="secondary"
-        disabled={stroke.length === 0}
-        onClick={() => {
-          setStroke([]);
-          setCommitted(false);
-        }}
-      >
-        {t("campaign.detail.scenes.fog.undo")}
-      </Button>
-      {stroke.length === 0 ? (
-        <p role="status">{t("campaign.detail.scenes.fog.strokeEmpty")}</p>
-      ) : (
-        <p role="status">{t("campaign.detail.scenes.fog.strokeCount", { count: stroke.length })}</p>
-      )}
-      {conflict ? <p role="alert">{t("campaign.detail.scenes.fog.conflict")}</p> : null}
-      {unavailable ? <p role="alert">{t("campaign.detail.scenes.fog.unavailable")}</p> : null}
-      {error !== null ? <p role="alert">{error}</p> : null}
-      {committed ? <p role="status">{t("campaign.detail.scenes.fog.committed")}</p> : null}
-      {!online ? <p role="status">{t("campaign.detail.scenes.offline")}</p> : null}
-      {conflict ? (
-        <Button variant="primary" pending={pending} onClick={() => void commit()}>
-          {t("campaign.detail.scenes.fog.retry")}
-        </Button>
-      ) : (
-        <Button
-          variant="primary"
-          pending={pending}
-          pendingText={t("campaign.detail.scenes.fog.committing")}
-          disabled={!online || stroke.length === 0}
-          onClick={() => void commit()}
-        >
-          {t("campaign.detail.scenes.fog.commit")}
-        </Button>
-      )}
-    </Panel>
-  );
+function FogToolbarScope(props: Props) {
+  const local = useFogEditor(props), editor = props.editor ?? local, online = props.online ?? true;
+  const [x,setX]=useState("0.5"), [y,setY]=useState("0.5"), [radius,setRadius]=useState(String(editor.radius));
+  useEffect(()=>setRadius(String(editor.radius)),[editor.radius]);
+  const radiusValid = radius.trim() !== "" && Number(radius)>0 && Number(radius)<=1 && Number.isFinite(Number(radius));
+  const disabled = !online || Boolean(props.disabled) || editor.blocked;
+  const addDab=()=> { const a=Number(x),b=Number(y); if (!disabled && radiusValid && x.trim() && y.trim() && Number.isFinite(a) && Number.isFinite(b) && a>=0 && a<=1 && b>=0 && b<=1) editor.addStroke([{x:a,y:b,r:editor.radius}]); };
+  return <Panel title={t("campaign.detail.scenes.fog.title")}>
+    <Select label={t("campaign.detail.scenes.fog.modeLabel")} value={editor.mode} disabled={disabled || editor.draft.length>0} onChange={e=>editor.setMode(e.target.value as FogMode)} options={[{value:"reveal",label:t("campaign.detail.scenes.fog.mode.reveal")},{value:"conceal",label:t("campaign.detail.scenes.fog.mode.conceal")}]} />
+    <FormField label={t("campaign.detail.scenes.fog.radiusLabel")}><input type="number" min={.01} max={1} step={.01} value={radius} aria-invalid={!radiusValid} disabled={disabled} onChange={e=>{setRadius(e.target.value);editor.setRadius(Number(e.target.value));}}/></FormField>
+    {props.onPaint ? <Button variant="secondary" disabled={disabled || !radiusValid || editor.draft.length>=MAX_FOG_DABS} onClick={props.onPaint}>{t("scene.fog.paintOnScene")}</Button> : null}
+    <Disclosure label={t("scene.fog.precision")}>
+      <FormField label={t("campaign.detail.scenes.fog.xLabel")}><input type="number" min={0} max={1} step={.01} value={x} disabled={disabled} onChange={e=>setX(e.target.value)}/></FormField>
+      <FormField label={t("campaign.detail.scenes.fog.yLabel")}><input type="number" min={0} max={1} step={.01} value={y} disabled={disabled} onChange={e=>setY(e.target.value)}/></FormField>
+      <Button variant="secondary" disabled={disabled || !radiusValid || editor.draft.length>=MAX_FOG_DABS} onClick={addDab}>{t("campaign.detail.scenes.fog.addDab")}</Button>
+    </Disclosure>
+    <Button variant="secondary" disabled={disabled || !editor.draft.length} onClick={editor.undo}>{t("campaign.detail.scenes.fog.undo")}</Button>{" "}
+    {editor.draft.length ? <Button variant="secondary" disabled={disabled && editor.status!=="conflict"} onClick={editor.discard}>{t("scene.fog.discard")}</Button> : null}
+    <p role="status">{t(editor.draft.length ? "campaign.detail.scenes.fog.strokeCount" : "campaign.detail.scenes.fog.strokeEmpty",{count:editor.draft.length})}</p>
+    {editor.draft.length ? <p>{t("scene.fog.draftNotice")}</p> : null}
+    {editor.draft.length>=MAX_FOG_DABS ? <p role="status">{t("scene.fog.limit")}</p> : null}
+    {editor.status==="conflict" ? <p role="alert">{t(editor.refreshed ? "campaign.detail.scenes.fog.conflict" : "scene.fog.refresh")}</p> : null}
+    {editor.status==="uncertain" ? <p role="alert">{t("scene.fog.uncertain")}</p> : null}
+    {editor.status==="refresh" ? <p role="alert">{t("scene.fog.refresh")}</p> : null}
+    {editor.status==="rejected" ? <><p role="alert">{t("scene.fog.rejected")}</p><Button disabled={!online} onClick={editor.reviewRejected}>{t("scene.fog.review")}</Button></> : null}
+    {editor.status==="unavailable" ? <p role="alert">{t("campaign.detail.scenes.fog.unavailable")}</p> : null}
+    {editor.status==="applied" ? <p role="status">{t("campaign.detail.scenes.fog.committed")}</p> : null}
+    {!online ? <p role="status">{t("campaign.detail.scenes.offline")}</p> : null}
+    {["conflict","uncertain","refresh"].includes(editor.status) ? <Button pending={editor.status==="pending"} disabled={!online || Boolean(props.disabled)} onClick={()=>void editor.retry()}>{t(editor.status==="conflict"&&editor.refreshed ? "campaign.detail.scenes.fog.retry" : "scene.fog.recover")}</Button> : <Button variant="primary" pending={editor.status==="pending"} pendingText={t("campaign.detail.scenes.fog.committing")} disabled={disabled || !editor.draft.length} onClick={()=>void editor.commit()}>{t("campaign.detail.scenes.fog.commit")}</Button>}
+  </Panel>;
 }

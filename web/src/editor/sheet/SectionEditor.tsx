@@ -1,3 +1,4 @@
+import { DebugOnly } from "../../ui/debugMode.js";
 import { SystemDialogContent, SystemDialogOverlay } from "../../theme/SystemPresentation.js";
 import * as Dialog from "@radix-ui/react-dialog";
 
@@ -149,7 +150,7 @@ export function SectionEditor({
           {t("editor.sheet.moveDown")}
         </Button>
         <div className={styles.sectionMeta}>
-          <span className={styles.monoLabel}>id: {section.id}</span>
+          <DebugOnly><span className={styles.monoLabel}>ID: {section.id}</span></DebugOnly>
           <RemoveSectionButton section={section} onRemove={onRemove} />
         </div>
       </div>
@@ -166,9 +167,7 @@ export function SectionEditor({
             />
           </FormField>
         </div>
-        <div className={styles.elementField}>
-          <span className={styles.monoLabel}>ID: {section.id}</span>
-        </div>
+
       </div>
       <div className={styles.elementsHeader}>
         <h4 className={styles.elementsTitle}>{t("editor.section.elements")}</h4>
@@ -240,7 +239,7 @@ export function SectionEditor({
                     {t("editor.sheet.moveDown")}
                   </Button>
                   <div className={styles.elementMeta}>
-                    <span className={styles.monoLabel}>id: {element.id}</span>
+                    <DebugOnly><span className={styles.monoLabel}>ID: {element.id}</span></DebugOnly>
                     <RemoveElementButton
                       element={element}
                       sectionId={section.id}

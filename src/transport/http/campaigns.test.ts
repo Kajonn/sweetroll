@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import cookiePlugin from "@fastify/cookie";
 import Fastify, { type FastifyBaseLogger } from "fastify";
 import pino from "pino";
+import sharp from "sharp";
 import { afterAll, describe, expect, it } from "vitest";
 
 import type {
@@ -32,6 +33,7 @@ import { registerApiRoutes } from "./static.js";
 const actorId = randomUUID();
 
 const fakeIdentity: Identity = {
+  personalTokens: {} as Identity["personalTokens"],
   completeSignIn: async () => {
     throw new Error("not used");
   },
@@ -1252,6 +1254,31 @@ describe("campaign media/scene/display HTTP routes (I7b Task 4)", () => {
     for (const app of apps) await app.close();
   });
 
+  it("accepts multi-megabyte image JSON without raising other campaign body limits", async () => {
+    const campaignId = randomUUID();
+    // A real PNG below the advertised 5 MiB cap, large enough that its
+    // base64 JSON exceeds Fastify's default 1 MiB request limit.
+    const png = await sharp({ create: { width: 1280, height: 1024, channels: 3, background: "#235477" } })
+      .png({ compressionLevel: 0 }).toBuffer();
+    expect(png.length).toBeLessThanOrEqual(5 * 1024 * 1024);
+    const payload = { name: "Large scene artwork", contentType: "image/png", dataBase64: png.toString("base64"), idempotencyKey: randomUUID() };
+    expect(Buffer.byteLength(JSON.stringify(payload))).toBeGreaterThan(1024 * 1024);
+    let received: unknown;
+    const app = await build({ campaigns: makeCampaigns({ uploadImage: async (_ctx, input) => {
+      received = input;
+      return { ok: true, value: mediaFileView({ campaignId }) };
+    } }) });
+    const upload = await app.inject({ method: "POST", url: `/campaigns/${campaignId}/images`, headers: cookie, payload });
+    expect(upload.statusCode).toBe(200);
+    expect(received).toEqual({ campaignId, ...payload });
+
+    const anonymous = await app.inject({ method: "POST", url: `/campaigns/${campaignId}/images`, payload });
+    expect(anonymous.statusCode).toBe(401);
+    const otherCommand = await app.inject({ method: "POST", url: "/campaigns", headers: cookie,
+      payload: { title: "A".repeat(2 * 1024 * 1024), systemVersionId: randomUUID(), idempotencyKey: randomUUID() } });
+    expect(otherCommand.statusCode).toBe(413);
+  });
+
   it("uploads images with exact field mapping and leak-free responses", async () => {
     const campaignId = randomUUID();
     const fileId = randomUUID();
@@ -1333,7 +1360,7 @@ describe("campaign media/scene/display HTTP routes (I7b Task 4)", () => {
       method: "POST",
       url: `/campaigns/${campaignId}/images`,
       headers: cookie,
-      payload: { name: "cave", contentType: "image/png", dataBase64: "A".repeat(2 * 1024 * 1024), idempotencyKey },
+      payload: { name: "cave", contentType: "image/png", dataBase64: "A".repeat(9 * 1024 * 1024), idempotencyKey },
     });
     expect(oversized.statusCode).toBe(413);
     expect(oversized.json().error.code).toBe("too_large");

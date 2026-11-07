@@ -24,6 +24,14 @@ PR #29 adds the [2026-11-03 hosted G9 protocol and evidence](docs/acceptance/gui
 The app is unreleased and databases contain only disposable test data. Follow the
 [development database policy](database/README.md): update the current schema
 baseline instead of adding migrations or repair code for obsolete app versions.
+
+**Owner clarification (2026-11-05):** Until the first application release tag,
+all app/database state may be cleared completely. The owner explicitly permits
+deleting and recreating the development app and its database when necessary;
+retaining old test state is optional. Do not ask again solely because a
+pre-release reset would discard test state. Check release-tag status first;
+after the first release tag, follow the released-data migration/recovery policy.
+
 Character/campaign version upgrades, mapping previews and rollback are also out of scope.
 Keep published rules identifiers and immutable snapshots; do not add conversion paths.
 Application-version migrations and support for older app/API/package/cache/client
@@ -42,3 +50,17 @@ verification after redeploy and CI #219 on application `d62a9f8`. See the
 [completed staged plan](docs/superpowers/plans/2026-11-03-system-themes-and-images.md)
 and [scene evidence](docs/acceptance/scene-backgrounds-2026-11-04.md). Physical
 devices, real provider login and human/playtest G9 gates remain open.
+
+I7b/G8 visual scene controls passed combined V4 feature acceptance in PR #38 on
+2026-11-06. PR #36 contains V2 direct gestures and merged V3 fog brushing from
+#37; merge #36 before #38. V1 image-token rendering was delivered in #34.
+[Combined evidence](docs/acceptance/scene-visual-controls-2026-11-06.md) records
+one ordered local/hosted GUI journey at deployed `3a35a5f`, terminal SUCCESS
+`f33cf328`, with mouse/native emulated touch/keyboard at 360/768/1280px, exact
+redacted pixels/art, privacy, conflicts/idempotency recovery, reopen, offline,
+background reset, revocation and independent cleanup readback. Follow the
+[completed visual-controls plan](docs/superpowers/plans/2026-11-05-scene-visual-controls.md).
+The G8 visual-control feature gate is complete; physical-device/provider-login,
+human visual approval and actual table/remote G9 release gates remain open.
+Emulated touch must not be reported as physical-device acceptance. This record
+selects no new feature; final-head CI is tracked in PR #38.

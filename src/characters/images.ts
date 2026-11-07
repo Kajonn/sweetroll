@@ -42,8 +42,8 @@ export type PortraitError = {
 export type PortraitResult<T> =
   | { ok: true; value: T }
   | { ok: false; error: PortraitError };
-export type PortraitCommand = {
-  characterId: string;
+type PortraitLocation = { characterId: string; standaloneOnly?: boolean };
+export type PortraitCommand = PortraitLocation & {
   expectedCharacterRevision: number;
   expectedPortraitRevision: number;
   idempotencyKey: string;
@@ -56,7 +56,7 @@ export type SetPortraitInput = PortraitCommand & {
 export interface CharacterImages {
   openPortrait(
     ctx: RequestContext,
-    input: { characterId: string },
+    input: PortraitLocation,
   ): Promise<PortraitResult<PortraitState>>;
   setPortrait(
     ctx: RequestContext,
@@ -121,7 +121,7 @@ export function createCharacterImages(options: {
   ): Promise<T> {
     const client = await pool.connect();
     try {
-      await client.query(write ? "BEGIN" : "BEGIN READ ONLY");
+      await client.query(write ? "BEGIN" : "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
       const value = await work(client);
       await client.query("COMMIT");
       return value;
@@ -132,8 +132,8 @@ export function createCharacterImages(options: {
       client.release();
     }
   }
-  async function authority(client: PoolClient, actorId: string, id: string, lock: boolean): Promise<Authority> {
-    const result = await authorizeCharacterImage(client, actorId, id, lock);
+  async function authority(client: PoolClient, actorId: string, location: PortraitLocation, lock: boolean): Promise<Authority> {
+    const result = await authorizeCharacterImage(client, actorId, location.characterId, lock, location.standaloneOnly);
     return result ?? missing();
   }
   async function current(
@@ -299,7 +299,7 @@ export function createCharacterImages(options: {
         const auth = await authority(
           client,
           ctx.actorId,
-          command.characterId,
+          command,
           false,
         );
         const { state } = await current(client, command.characterId);
@@ -332,7 +332,7 @@ export function createCharacterImages(options: {
         const auth = await authority(
           client,
           ctx.actorId,
-          command.characterId,
+          command,
           true,
         );
         const { state } = await current(client, command.characterId);
@@ -419,7 +419,7 @@ export function createCharacterImages(options: {
         return {
           ok: true,
           value: await transaction(false, async (client) => {
-            await authority(client, ctx.actorId, input.characterId, false);
+            await authority(client, ctx.actorId, input, false);
             return (await current(client, input.characterId)).state;
           }),
         };
@@ -432,7 +432,7 @@ export function createCharacterImages(options: {
     async openPortraitImage(ctx, input) {
       try {
         const asset = await transaction(false, async (client) => {
-          await authority(client, ctx.actorId, input.characterId, false);
+          await authority(client, ctx.actorId, input, false);
           const v = await current(client, input.characterId);
           if (!v.asset || (input.fileId && v.asset.id !== input.fileId))
             return missing();
@@ -452,7 +452,7 @@ export function createCharacterImages(options: {
         )
           return missing();
         await transaction(false, async (client) => {
-          await authority(client, ctx.actorId, input.characterId, false);
+          await authority(client, ctx.actorId, input, false);
           if ((await current(client, input.characterId)).asset?.id !== asset.id)
             return missing();
         });

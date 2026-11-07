@@ -1,0 +1,126 @@
+{
+  "deployedCommit": "3a35a5f0fb381aa1b1986c857f2b6ba41cf004b5",
+  "deployment": {
+    "id": "f33cf328-a585-49d2-bf17-f2c3237f80c4",
+    "status": "SUCCESS",
+    "project": "sweetroll-d2-acceptance",
+    "environment": "preview",
+    "service": "sweetroll-d2"
+  },
+  "build": {
+    "target": "https://sweetroll-d2-preview.up.railway.app",
+    "health": "{\"status\":\"ok\"}",
+    "assets": [
+      {
+        "path": "/assets/index-YVS7s7JI.js",
+        "sha256": "9c903a9a37aedea0883b040246b8b13d556abf599902ffa49a9aedd22db8e571"
+      },
+      {
+        "path": "/assets/index-DF3Bkxz_.css",
+        "sha256": "8d74655dc84143613f866c3f90298313a931a8f380e4c4b7927744f389421a55"
+      }
+    ]
+  },
+  "hosted": {
+    "stats": {
+      "startTime": "2026-11-06T21:59:43.719Z",
+      "duration": 89078.565,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "errors": [],
+    "retries": 0,
+    "cleanup": {
+      "campaignId": "000796ec-598a-49d6-af4a-299357d26eb9",
+      "displayRevoked": true,
+      "campaignStatus": "archived"
+    }
+  },
+  "local": {
+    "stats": {
+      "startTime": "2026-11-06T22:00:01.739Z",
+      "duration": 40582.460999999996,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "frontendTests": 1277,
+    "postgresIntegrationTests": 39,
+    "typechecks": "passed",
+    "productionBuild": "passed",
+    "contracts": "passed"
+  },
+  "coverage": {
+    "widths": [
+      360,
+      768,
+      1280
+    ],
+    "input": [
+      "mouse",
+      "native emulated CDP touch",
+      "keyboard"
+    ],
+    "physicalDevice": false,
+    "orderedProtocol": "sceneVisualControls.spec.ts"
+  },
+  "screenshots": [
+    {
+      "path": "assets/scene-visual-controls-2026-11-06/combined-display-1280.png",
+      "sha256": "0d5dea1073bda76ae0289182660a1f53f3c5adfbc0eb6c314ac6e0f7b4b5f905"
+    },
+    {
+      "path": "assets/scene-visual-controls-2026-11-06/combined-display-360.png",
+      "sha256": "616bf1b6803b0d2a9fbb5a54207a65e66c38933c8ee617f7103e0f5f720d9eea"
+    },
+    {
+      "path": "assets/scene-visual-controls-2026-11-06/combined-display-768.png",
+      "sha256": "78f40dd64635a525eaf1bbd64e011a5f9fd6f9fe1b9d271ca0a50e85e73d90d3"
+    },
+    {
+      "path": "assets/scene-visual-controls-2026-11-06/combined-token-1280.png",
+      "sha256": "9744c46ded9ea7af7bfc57ab165b75e06f82412038471e3b3fc58f5d29c47af1"
+    },
+    {
+      "path": "assets/scene-visual-controls-2026-11-06/combined-token-360.png",
+      "sha256": "ea4746ee5c4b466b9a7223f89c655f9a5e777dd1cd43d8394984b10b1344ab68"
+    },
+    {
+      "path": "assets/scene-visual-controls-2026-11-06/combined-token-768.png",
+      "sha256": "e7edbbb3c733d9e450f3c04dfa4277873b3c58aecaeafe2086da9c5b0a76b957"
+    },
+    {
+      "path": "assets/scene-visual-controls-2026-11-06/fog-1280-mouse.png",
+      "sha256": "17a74d68fd6dddbbd8e64e6403dcc9b26cdd80dae8a8710915d27ce7329cf69c"
+    },
+    {
+      "path": "assets/scene-visual-controls-2026-11-06/fog-1280-touch.png",
+      "sha256": "0a57c70a5c435fecd6662d4b31236df747529868743f946f707a625f6142131c"
+    },
+    {
+      "path": "assets/scene-visual-controls-2026-11-06/fog-360-mouse.png",
+      "sha256": "f9cb6c01dfca6ba2df6c4cb200ac3e4ffad4c759f1845eb18522aa828fab5dd2"
+    },
+    {
+      "path": "assets/scene-visual-controls-2026-11-06/fog-360-touch.png",
+      "sha256": "bd8c1ea4c3378add67612a05feb38a9feb68e35aae2472948af3e093507e3ceb"
+    },
+    {
+      "path": "assets/scene-visual-controls-2026-11-06/fog-768-mouse.png",
+      "sha256": "5fcd84bb5555482de50804078eab75d0b3ec78f95bb983eec8f6d811887313ec"
+    },
+    {
+      "path": "assets/scene-visual-controls-2026-11-06/fog-768-touch.png",
+      "sha256": "871cd2153819d14c5265c1083aef727ccaeba707bd7fe92fd6ad704fe083f689"
+    }
+  ],
+  "limitations": [
+    "physical devices/PWA",
+    "real provider login",
+    "human visual approval",
+    "actual table/remote playtest"
+  ]
+}

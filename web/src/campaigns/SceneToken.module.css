@@ -1,0 +1,52 @@
+.token {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  aspect-ratio: 1;
+  text-align: center;
+}
+.token img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.marker {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+/* The art keeps its scene-relative size; the hit area remains at least 44px. */
+.marker::after {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+}
+.label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 12rem;
+  overflow-wrap: anywhere;
+  padding: 0.15rem 0.3rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.marker[aria-pressed="true"] {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}

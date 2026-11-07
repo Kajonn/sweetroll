@@ -16,6 +16,7 @@ function makeStatefulIdentity() {
   const validToken = randomUUID();
   let themeDefault: "light" | "dark" | "system" | null = null;
   const identity: Identity = {
+    personalTokens: {} as Identity["personalTokens"],
     completeSignIn: async () => {
       throw new Error("not used");
     },
@@ -40,6 +41,7 @@ function makeStatefulIdentity() {
 
 function makeAnonymousIdentity() {
   const identity: Identity = {
+    personalTokens: {} as Identity["personalTokens"],
     completeSignIn: async () => {
       throw new Error("not used");
     },
@@ -94,6 +96,7 @@ describe("identity HTTP routes", () => {
 
   it("GET /me returns session_expired distinctly while preferences stay 401", async () => {
     const expired: Identity = {
+      personalTokens: {} as Identity["personalTokens"],
       completeSignIn: async () => {
         throw new Error("not used");
       },

@@ -1,10 +1,14 @@
+import type { ReactNode } from "react";
+import { Disclosure } from "../ui/Disclosure.js";
 import type { RollBreakdown as Breakdown, DieResult, PushResult } from "@sweetroll/rules";
 import { t } from "../i18n/index.js";
 
 /** One shared view for authoritative results, history, GM and non-factual previews. */
 export function RollBreakdown({
   roll,
+  children,
 }: {
+  children?: ReactNode;
   roll: {
     push?:PushResult | undefined;
     dice: DieResult[];
@@ -46,70 +50,33 @@ export function RollBreakdown({
     return `${term.operation}(${args.join(", ")})`;
   };
   return (
-    <section
-      aria-label={t("roll.groups.breakdown")}
-      data-testid="roll-breakdown"
-      style={{ overflowWrap: "anywhere", minWidth: 0 }}
-    >
-      {roll.push?<p>{roll.push.attempt===0?`Original roll · up to ${roll.push.maxAttempts} pushes`:`Push ${roll.push.attempt} of ${roll.push.maxAttempts}`} · Original saved pool</p>:null}
+    <section aria-label={t("roll.groups.breakdown")} data-testid="roll-breakdown" style={{ overflowWrap: "anywhere", minWidth: 0 }}>
+      {roll.push ? <p>{roll.push.attempt === 0 ? `Original roll · up to ${roll.push.maxAttempts} pushes` : `Push ${roll.push.attempt} of ${roll.push.maxAttempts}`}</p> : null}
       <ul>
-        {b.groups.map((group) => (
-          <li key={group.id} data-testid={`roll-group-${group.id}`}>
-            <strong>{group.label}</strong>
-            {": "}
-            {group.count}d{group.sides}
-            {" · "}
-            {group.operation === "successCount"
-              ? `${t("roll.groups.successes")} ≥ ${group.threshold}`
-              : group.operation === "sum"
-                ? t("roll.groups.sum")
-                : t(
-                    group.operation === "keepHighest"
-                      ? "roll.groups.keepHighest"
-                      : "roll.groups.keepLowest",
-                  )}
-            {": "}
-            {group.total}
-            {group.diceIds.length === 0 ? (
-              <span>
-                {" · "}
-                {t("roll.groups.empty")}
-              </span>
-            ) : (
-              <ul>
-                {roll.dice
-                  .filter((die) => die.groupId === group.id)
-                  .map((die) => (
-                    <li key={die.id}>
-                      d{die.sides}={die.value}
-                      {roll.push&&roll.push.attempt>0?` · ${roll.push.rerolledDiceIds.includes(die.id??"")?"Rerolled":"Retained"}`:null}
-                      {" · "}
-                      {t(
-                        die.kept ? "roll.groups.kept" : "roll.groups.discarded",
-                      )}
-                      {die.success === undefined ? null : (
-                        <>
-                          {" "}
-                          ·{" "}
-                          {t(
-                            die.success
-                              ? "roll.groups.success"
-                              : "roll.groups.failure",
-                          )}
-                        </>
-                      )}
-                    </li>
-                  ))}
-              </ul>
-            )}
-          </li>
-        ))}
+        {b.groups.map(group => <li key={group.id} data-testid={`roll-group-${group.id}`}>
+          <strong>{group.label}</strong>: {group.count}d{group.sides} · {group.operation === "successCount"
+            ? `${t("roll.groups.successes")} ≥ ${group.threshold}`
+            : t(group.operation === "sum" ? "roll.groups.sum" : group.operation === "keepHighest" ? "roll.groups.keepHighest" : "roll.groups.keepLowest")}: {group.total}
+          {group.diceIds.length === 0 ? ` · ${t("roll.groups.empty")}` : null}
+        </li>)}
       </ul>
-      {roll.push?.faceOutcomes.map(o=><p key={`${o.groupId}:${o.face}`}>{groups.get(o.groupId)?.label??o.groupId} face {o.face}: {o.combinedCount} in combined pool, {o.rerolledCount} newly rolled. Manual bookkeeping only.</p>)}
-      <p>
-        {t("roll.groups.calculation")}: {explain(b.rootId)} ={" "}
-        {String(terms.get(b.rootId)?.value ?? roll.total ?? "?")}
-      </p>
+      {roll.push?.faceOutcomes.map(outcome => <p key={`${outcome.groupId}:${outcome.face}`}>{groups.get(outcome.groupId)?.label ?? outcome.groupId} face {outcome.face}: {outcome.combinedCount} in combined pool, {outcome.rerolledCount} newly rolled. Manual bookkeeping only.</p>)}
+      <Disclosure label={t("character.rollResult.showDetails")}>
+        {roll.push ? <p>Original saved pool</p> : null}
+        <ul>
+          {b.groups.map(group => <li key={group.id}>
+            <strong>{group.label}</strong>
+            <ul>{roll.dice.filter(die => die.groupId === group.id).map(die => <li key={die.id}>
+              d{die.sides}={die.value}
+              {roll.push && roll.push.attempt > 0 ? ` · ${roll.push.rerolledDiceIds.includes(die.id ?? "") ? "Rerolled" : "Retained"}` : null}
+              {" · "}{t(die.kept ? "roll.groups.kept" : "roll.groups.discarded")}
+              {die.success === undefined ? null : ` · ${t(die.success ? "roll.groups.success" : "roll.groups.failure")}`}
+            </li>)}</ul>
+          </li>)}
+        </ul>
+        <p>{t("roll.groups.calculation")}: {explain(b.rootId)} = {String(terms.get(b.rootId)?.value ?? roll.total ?? "?")}</p>
+        {children}
+      </Disclosure>
     </section>
   );
 }

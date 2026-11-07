@@ -1,3 +1,4 @@
+import { useDebugMode } from "../ui/debugMode.js";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { t } from "../i18n/index.js";
@@ -39,16 +40,33 @@ function serverValue(snapshot: CharacterSnapshot, fieldId: string): string {
   return value === undefined || value === null ? "—" : String(value);
 }
 
-function entryLabel(entry: CharacterSnapshot["entries"][number]): string {
-  if (entry.intent.kind === "setField") return `${entry.intent.fieldId} → ${String(entry.intent.value)}`;
-  if (entry.intent.kind === "bumpResource") return `${entry.intent.resourceId} ${entry.intent.direction}`;
+function definitionLabel(snapshot: CharacterSnapshot, id: string, debug: boolean): string {
+  const projection = snapshot.confirmed?.projection;
+  const elements = [
+    ...(projection?.completionFields ?? []),
+    ...(projection?.sheets.flatMap(sheet => sheet.sections.flatMap(section => section.elements)) ?? []),
+  ];
+  const element = elements.find(element => (element.kind === "field" && element.fieldId === id)
+    || (element.kind === "resource" && element.resourceId === id)
+    || (element.kind === "action" && element.actionId === id)
+    || (element.kind === "slot" && element.slotId === id));
+  const label = element && "label" in element ? element.label : id;
+  return debug && label !== id ? `${label} (${id})` : label;
+}
+
+function entryLabel(entry: CharacterSnapshot["entries"][number], snapshot: CharacterSnapshot, debug: boolean): string {
+  const label = (id: string) => definitionLabel(snapshot, id, debug);
+  if (entry.intent.kind === "setField") return `${label(entry.intent.fieldId)} → ${String(entry.intent.value)}`;
+  if (entry.intent.kind === "bumpResource") return `${label(entry.intent.resourceId)} ${entry.intent.direction}`;
   if (entry.intent.kind === "addEntry") {
-    const template = entry.intent.entry.source?.kind === "campaign" ? t("character.review.campaignTemplate",{revision:entry.intent.entry.source.contentRevision}) : entry.intent.entry.templateId ?? t("character.slot.customEntry");
-    return t("character.review.addEntry", { template, slot: entry.intent.entry.slotId });
+    const template = entry.intent.entry.source?.kind === "campaign"
+      ? debug ? t("character.review.campaignTemplate", { revision: entry.intent.entry.source.contentRevision }) : t("character.review.campaignItem")
+      : entry.intent.entry.templateId ?? t("character.slot.customEntry");
+    return t("character.review.addEntry", { template, slot: label(entry.intent.entry.slotId) });
   }
   if (entry.intent.kind === "removeEntry") return t("character.review.removeEntry", { entry: entry.intent.entryId });
   if (entry.intent.kind === "updateEntryValues") return t("character.review.updateEntry", { entry: entry.intent.entryId });
-  return `${entry.intent.actionId}`;
+  return label(entry.intent.actionId);
 }
 
 type ProjectedFieldConstraints = {
@@ -159,6 +177,7 @@ function defaultDraft(entry: CharacterSnapshot["entries"][number]): string {
  * unknown-outcome review resolves it.
  */
 export function ConflictReview({ snapshot, onResolve, onClose, now: nowProp, onReviewExpiredAttempt }: ConflictReviewProps) {
+  const debug = useDebugMode();
   const [selected, setSelected] = useState<string[]>([]);
   const [corrections, setCorrections] = useState<Record<string, string>>({});
   const [pendingMode, setPendingMode] = useState<PendingMode>(null);
@@ -352,7 +371,7 @@ export function ConflictReview({ snapshot, onResolve, onClose, now: nowProp, onR
       ) : null}
       <ul>
         {snapshot.entries.map((entry) => {
-          const label = entryLabel(entry);
+          const label = entryLabel(entry, snapshot, debug);
           const server =
             entry.intent.kind === "setField"
               ? serverValue(snapshot, entry.intent.fieldId)
@@ -380,9 +399,9 @@ export function ConflictReview({ snapshot, onResolve, onClose, now: nowProp, onR
               {isInvalid && correctable ? (
                 entry.intent.kind === "bumpResource" ? (
                   <label>
-                    <span>{t("character.conflict.correctValue", { field: fieldId })}</span>
+                    <span>{t("character.conflict.correctValue", { field: definitionLabel(snapshot, fieldId, debug) })}</span>
                     <select
-                      aria-label={t("character.conflict.correctValue", { field: fieldId })}
+                      aria-label={t("character.conflict.correctValue", { field: definitionLabel(snapshot, fieldId, debug) })}
                       className={styles.dialogField}
                       value={draftFor(entry)}
                       onChange={(event) => setCorrections((current) => ({ ...current, [entry.id]: event.target.value }))}
@@ -393,9 +412,9 @@ export function ConflictReview({ snapshot, onResolve, onClose, now: nowProp, onR
                   </label>
                 ) : allowed.length > 0 ? (
                   <label>
-                    <span>{t("character.conflict.correctValue", { field: fieldId })}</span>
+                    <span>{t("character.conflict.correctValue", { field: definitionLabel(snapshot, fieldId, debug) })}</span>
                     <select
-                      aria-label={t("character.conflict.correctValue", { field: fieldId })}
+                      aria-label={t("character.conflict.correctValue", { field: definitionLabel(snapshot, fieldId, debug) })}
                       className={styles.dialogField}
                       value={draftFor(entry)}
                       onChange={(event) => setCorrections((current) => ({ ...current, [entry.id]: event.target.value }))}
@@ -409,10 +428,10 @@ export function ConflictReview({ snapshot, onResolve, onClose, now: nowProp, onR
                   </label>
                 ) : (
                   <label>
-                    <span>{t("character.conflict.correctValue", { field: fieldId })}</span>
+                    <span>{t("character.conflict.correctValue", { field: definitionLabel(snapshot, fieldId, debug) })}</span>
                     <input
                       type="text"
-                      aria-label={t("character.conflict.correctValue", { field: fieldId })}
+                      aria-label={t("character.conflict.correctValue", { field: definitionLabel(snapshot, fieldId, debug) })}
                       className={styles.dialogField}
                       value={draftFor(entry)}
                       onChange={(event) => setCorrections((current) => ({ ...current, [entry.id]: event.target.value }))}

@@ -1,3 +1,4 @@
+import { useDebugMode } from "../../ui/debugMode.js";
 import { useId } from "react";
 
 /** Reference IDs are chosen by name; the document still stores the stable ID. */
@@ -18,6 +19,7 @@ export function DefinitionReferenceSelect({
   onChange: (next: string) => void;
   label: string;
 }) {
+  const debug = useDebugMode();
   const inputId = useId();
   const found = options.some((option) => option.id === value);
   return (
@@ -34,7 +36,7 @@ export function DefinitionReferenceSelect({
           <option value={value} disabled>Missing definition ({value})</option>
         ) : null}
         {options.map((option) => (
-          <option key={option.id} value={option.id}>{option.label} ({option.id})</option>
+          <option key={option.id} value={option.id}>{option.label}{debug || options.filter(candidate => candidate.label === option.label).length > 1 ? ` (${option.id})` : ""}</option>
         ))}
       </select>
       {value && !found ? <p role="alert">Reference not found: {value}</p> : null}

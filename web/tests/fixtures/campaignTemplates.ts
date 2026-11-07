@@ -69,7 +69,7 @@ export async function campaignTemplateReviewJourney(
     await page.getByTestId("slot-add-confirm-inventory").click();
     expect((await selected).postDataJSON().entry.source).toMatchObject({ kind: "campaign", templateRevision: 1, contentRevision: 1 });
     await expect(page.getByText(/campaign template has changed/)).toBeVisible();
-    await page.getByRole("checkbox", { name: /Campaign template revision/ }).check();
+    await page.getByRole("checkbox", { name: /Campaign item/ }).check();
     await page.getByRole("button", { name: "Discard", exact: true }).click();
     await page.getByRole("button", { name: "Confirm discard", exact: true }).click();
     const recovered = (await post(gm.request, `/api/campaigns/${campaignId}/item-templates/${template.templateId}/recover`, { expectedTemplateRevision: 2, idempotencyKey: uid() })).template;

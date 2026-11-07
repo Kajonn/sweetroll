@@ -1,3 +1,4 @@
+import { DebugOnly } from "../ui/debugMode.js";
 import { useState, type ReactNode } from "react";
 
 import type { ApiClient } from "../api/client.js";
@@ -281,9 +282,9 @@ function TemplateDetail({
           data-testid={`template-kind-${template.id}`}
           options={TEMPLATE_KINDS.map((kind) => ({ value: kind, label: t(`editor.templates.kind.${kind}`) }))}
         />
-        <span data-testid={`template-id-${template.id}`}>
+        <DebugOnly><span data-testid={`template-id-${template.id}`}>
           {t("editor.entity.idLabel")} {template.id}
-        </span>
+        </span></DebugOnly>
         <Button
           variant="secondary"
           className={styles.removeButton}
@@ -549,9 +550,9 @@ function SlotDetail({
             data-testid={`slot-label-${slot.id}`}
           />
         </FormField>
-        <span data-testid={`slot-id-${slot.id}`}>
+        <DebugOnly><span data-testid={`slot-id-${slot.id}`}>
           {t("editor.entity.idLabel")} {slot.id}
-        </span>
+        </span></DebugOnly>
         <Button
           variant="secondary"
           className={styles.removeButton}

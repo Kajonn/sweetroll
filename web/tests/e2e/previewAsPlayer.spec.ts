@@ -205,8 +205,9 @@ test("preview-as-player: member parity, read-only banner, exit restores, removed
       await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
       await page.getByRole("tab", { name: "Content" }).click({ timeout: STEP_TIMEOUT });
       await expect(page.getByLabel("Preview as")).toBeVisible({ timeout: STEP_TIMEOUT });
+      const recipientName = await page.getByLabel("Preview as").locator(`option[value="${inviteeUserId!}"]`).innerText();
       await page.getByLabel("Preview as").selectOption(inviteeUserId!);
-      const banner = `Previewing as ${inviteeUserId!} — read-only`;
+      const banner = `Previewing as ${recipientName} — read-only`;
       await expect(page.getByText(banner)).toBeVisible({ timeout: STEP_TIMEOUT });
       await expect(page.getByRole("button", { name: "Exit preview" })).toBeVisible({ timeout: STEP_TIMEOUT });
       const previewRows = await contentRowTexts(page);
@@ -263,14 +264,14 @@ test("preview-as-player: member parity, read-only banner, exit restores, removed
           timeout: STEP_TIMEOUT,
         });
         await ownerSecond.getByRole("tab", { name: "Members" }).click({ timeout: STEP_TIMEOUT });
-        const removalRow = ownerSecond.locator("li", { hasText: inviteeUserId! });
+        const removalRow = ownerSecond.getByTestId(`campaign-member-${inviteeUserId!}`);
         await expect(removalRow).toBeVisible({ timeout: STEP_TIMEOUT });
-        await removalRow.getByRole("button", { name: `Remove ${inviteeUserId!}` }).click({ timeout: STEP_TIMEOUT });
+        await removalRow.getByRole("button", { name: /^Remove / }).click({ timeout: STEP_TIMEOUT });
         await expect(ownerSecond.getByRole("dialog")).toBeVisible({ timeout: STEP_TIMEOUT });
         await ownerSecond.getByRole("dialog").getByRole("button", { name: "Confirm removal" }).click({
           timeout: STEP_TIMEOUT,
         });
-        await expect(ownerSecond.getByText(inviteeUserId!)).toHaveCount(0);
+        await expect(ownerSecond.getByTestId(`campaign-member-${inviteeUserId!}`)).toHaveCount(0);
         await ownerSecond.close();
       } finally {
         await ownerSecondContext.close();

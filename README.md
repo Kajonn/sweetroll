@@ -27,6 +27,11 @@ Sweetroll is the modular TypeScript application described in `design_v2.md`.
 The HTTP process exposes liveness at `/health/live`, PostgreSQL readiness at
 `/health/ready`, and Prometheus-format metrics at `/metrics`.
 
+## Public API
+
+See the [public API v1 quickstart](docs/api/v1.md) for creating systems and
+standalone characters with curl or Python.
+
 ## Verification
 
 Run `npm test`, `npm run test:integration`, `npm run typecheck`, and `npm run build`.

@@ -112,6 +112,8 @@ jobs:
           node-version-file: .nvmrc
       - run: npm ci
         working-directory: web
+      - name: Bound browser dependency downloads
+        run: sudo bash scripts/ci-browser-deps.sh
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - run: npm run test:e2e -- --suite=${{ matrix.suite }} ${{ matrix.shard }}
@@ -158,11 +160,21 @@ jobs:
           node-version-file: .nvmrc
       - run: npm ci
         working-directory: web
+      - name: Bound browser dependency downloads
+        run: sudo bash scripts/ci-browser-deps.sh
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - run: psql postgres://sweetroll:sweetroll@localhost:5432/sweetroll -c "CREATE DATABASE sweetroll_offline;"
       - run: npm run web:build
       - run: npm --prefix web run test:offline
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: offline-failure-evidence
+          path: |
+            web/test-results/
+            web/tests/offline/evidence/
+          retention-days: 7
 
   deploy:
     name: Deploy production

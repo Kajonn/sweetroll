@@ -72,6 +72,21 @@ describe("DisplayView", () => {
     });
   });
   afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+  it("fetches token art only with the display credential and blanks/revokes its URL on revocation", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const api = failingApi();
+    const payload = projectionPayload(); payload.projection.tokens = [{ tokenId:"t1",label:"Alpha",x:.25,y:.5,size:.12,imageUrl:"/displays/d1/scenes/s1/tokens/t1/image?rev=3" }] as never;
+    api.getDisplayProjection.mockResolvedValue(payload);
+    renderDisplay(<DisplayView api={api as never} sceneId="s1" online pollMs={50} storage={memoryStorage(seedCredential())} />, qc);
+    await waitFor(() => expect(screen.getByText("Alpha").closest("li")?.querySelector("img")).not.toBeNull());
+    const image = screen.getByText("Alpha").closest("li")!.querySelector("img")!;
+    expect(image.closest("li")).toHaveStyle({width:"12%",left:"25%",top:"50%"});
+    expect(fetch).toHaveBeenCalledWith("/api/displays/d1/scenes/s1/tokens/t1/image?rev=3", expect.objectContaining({credentials:"omit",headers:{"x-display-secret":"s3cr3t"}}));
+    api.getDisplayProjection.mockRejectedValue({ status:404 });
+    await screen.findByText(/this display is unavailable/i);
+    expect(screen.queryByRole("img")).toBeNull(); expect(URL.revokeObjectURL).toHaveBeenCalled();
+  });
+
   it("redeems the entered code and renders the image with visible tokens", async () => {
     const user = userEvent.setup();
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -105,8 +120,8 @@ describe("DisplayView", () => {
     expect(image).toHaveAttribute("src", "blob:redacted");
     expect(fetch).toHaveBeenCalledWith("/api/displays/d1/scenes/s1/image?rev=3",expect.objectContaining({headers:{"x-display-secret":"s3cr3t"},credentials:"omit"}));
     const alpha = await screen.findByText("Alpha");
-    expect(alpha.style.left).toBe("25%");
-    expect(alpha.style.top).toBe("50%");
+    expect(alpha.closest("li")?.style.left).toBe("25%");
+    expect(alpha.closest("li")?.style.top).toBe("50%");
 
     // The restricted shell never touches GM endpoints.
     expect(api.openCampaign).not.toHaveBeenCalled();

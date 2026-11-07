@@ -21,6 +21,7 @@ import { buildCharactersRoutes } from "./characters.js";
 const actorId = randomUUID();
 
 const fakeIdentity: Identity = {
+  personalTokens: {} as Identity["personalTokens"],
   completeSignIn: async () => {
     throw new Error("not used");
   },

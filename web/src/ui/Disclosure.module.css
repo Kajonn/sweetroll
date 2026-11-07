@@ -1,0 +1,5 @@
+.disclosure { min-width: 0; margin-block: var(--space-2); overflow-wrap: anywhere; }
+.disclosure > summary { cursor: pointer; min-height: 44px; display: list-item; align-content: center; color: var(--text-muted); font-size: 0.875rem; }
+.disclosure > summary:focus-visible { outline: var(--focus-ring); outline-offset: 2px; border-radius: var(--radius-control); }
+.body { min-width: 0; padding-block: var(--space-2); }
+.body pre { max-width: 100%; overflow: auto; }

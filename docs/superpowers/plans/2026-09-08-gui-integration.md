@@ -195,11 +195,22 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 
 **New capability:** plan its contracts and persistence before implementing canvas controls. Keep it within the modular application and publish versioned HTTP contracts.
 
-*Landed 2026-09-15 per the [I7b plan](2026-09-14-i7b-scenes-display.md) Tasks 1–8 (`6ae140d`–`45613f6` plus review fixes through `8616b28`); exit e2e `sceneDisplayJourney` + acceptance `docs/acceptance/gui-2026-09-14-i7b-scenes.md`. The four findings from that record (campaign-leave staleness, client-nav heading, offline bundle self-hit, document-editor-360 drift) are closed on `main` (`f7e16ab`, `064412c`, `2e50025`, `9ff7830`), each re-verified isolated before close.*
+*Visual-controls feature gate accepted 2026-11-06 in PR #38. The V4 combined
+[hosted acceptance](../../acceptance/scene-visual-controls-2026-11-06.md) now
+proves the image-token, direct gesture and brush interactions that the historical
+numeric/foundation journey did not cover. The four historical regression findings
+remain closed. Physical devices, real provider login, human visual approval and
+actual table/remote playtests remain separate open G9 release gates.*
 
 - [x] Introduce authorized image upload/storage with bounded file size/dimensions, validated decoding, safe rendering derivatives, ownership checks, and deletion. GM originals must not use public asset URLs. General document uploads remain outside this increment.
 - [x] Persist a scene's background reference, revision, manual fog mask, and simple token records: image/label, normalized position, size, and visibility. Scene edits use revision checks and an explicit single-writer/conflict flow; do not silently merge concurrent brush operations.
-- [x] Build SceneViewport, FogToolbar, TokenTray, and display-status controls. Support fit/pan/zoom, manually reveal/conceal parts of fog, undo the latest local operation, and drag or tap-to-place/move tokens. Provide keyboard/non-drag alternatives. No grid, movement measurement, initiative, vision, or automated token actions.
+- [x] Deliver SceneViewport, FogToolbar, TokenTray and display status with fit/pan/zoom, numeric reveal/conceal dabs, local undo and numeric token placement/movement.
+**V1 update (PR #34):** Token-art upload/selection and proportional GM/display rendering pass [hosted/redeploy acceptance](../../acceptance/scene-image-tokens-2026-11-05.md). The aggregate visual-control checkboxes were retained until the V4 combined gesture journey passed, as specified in the completion plan. V2 direct gestures are implemented in PR #36 with local and hosted mouse/touch acceptance passed on `84c23fd` ([evidence](../../acceptance/scene-token-gestures-2026-11-06.md)). V3 brushing is implemented in PR #37 with local and hosted acceptance passed on `637a60f` ([V3 evidence](../../acceptance/scene-fog-brush-2026-11-06.md)). V4 combined ordered acceptance has now passed in PR #38; the feature checkboxes below are complete.
+
+- [x] Complete token-image authoring: select/upload authorized campaign art, place labelled image tokens, and render the image and scene-relative size in both GM and permitted display views.
+- [x] Implement direct tap-to-place/move and pointer/touch drag-to-move, with correct coordinates under zoom/pan, cancellation, and existing numeric/keyboard alternatives.
+- [x] Implement an on-image reveal/conceal brush with adjustable radius, local preview/undo and explicit revision-checked commit. Keep precision numeric controls available.
+- [x] Pass the visual-controls hosted journey with pointer and touch input, image tokens, brush gestures, paired-display privacy and save/reopen evidence. Coordinate-only tests cannot close these items. No grid, movement measurement, initiative, vision or automated token actions.
 - [x] Define token visibility explicitly: GM-visible hidden tokens never reach players; tokens covered by fog are omitted or safely clipped by the server projection. Store coordinates in scene space so phone/tablet viewports agree.
 - [x] Implement short-lived pairing and revocable credentials scoped to one campaign's display projection. Display clients cannot read GM notes, character sheets, member settings, originals, hidden tokens, or mutation endpoints, even if the device was previously used by a GM.
 - [x] Before entering display mode, remove GM/account views and caches from that browser context. A CSS-hidden GM route is not a player display. Back navigation, reload, error screens, and reconnect must not reveal privileged data.

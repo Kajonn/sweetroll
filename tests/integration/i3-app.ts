@@ -68,6 +68,7 @@ export type I3AppHandle = {
 };
 
 export type BuildI3AppInput = {
+  allowPersonalTokens?: boolean;
   scanImage?: import("../../src/platform/image-processing.js").ImageScanner;
   pool: Pool;
   /** Wraps the runtime (e.g. to count resolve calls); defaults to identity. */
@@ -99,6 +100,7 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
     ),
     pool: input.pool,
     sessionTtlMs: 3_600_000,
+    allowPersonalTokens: input.allowPersonalTokens ?? false,
   });
 
   const authoring = createSystemAuthoringModule({

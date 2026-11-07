@@ -24,6 +24,7 @@ export default defineConfig({
       // header. The backend distinguishes same-origin sign-out by comparing the
       // Origin host against this untouched Host header, so changing it here
       // would reject legitimate same-origin requests.
+      "^/api/v1(?:/|$)": { target: backendTarget },
       "/api": { target: backendTarget, rewrite: (p) => p.replace(/^\/api/, "") },
       "/dev": { target: backendTarget },
       "/health": { target: backendTarget },
@@ -33,6 +34,7 @@ export default defineConfig({
     port: previewPort,
     strictPort: true,
     proxy: {
+      "^/api/v1(?:/|$)": { target: backendTarget },
       "/api": { target: backendTarget, rewrite: (p) => p.replace(/^\/api/, "") },
       "/dev": { target: backendTarget },
       "/health": { target: backendTarget },

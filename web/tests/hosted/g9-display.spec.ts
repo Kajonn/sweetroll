@@ -42,6 +42,7 @@ test("hosted scene controls, redacted pixels, display reconnect and revocation",
     await page.goto(sceneUrl);
     await expect(page.getByRole("img", { name: "Scene background" })).toBeVisible();
     const fog = page.getByRole("region", { name: "Fog of war" });
+    if (!await fog.getByLabel(/x \(0–1\)/i).isVisible()) await fog.getByText("Precise fog position", { exact: true }).click();
     await fog.getByLabel(/fog mode/i).selectOption("reveal");
     for (const [label, value] of [[/x \(0–1\)/i,"0.25"],[/y \(0–1\)/i,"0.5"],[/radius \(0–1\)/i,"0.32"]] as const) await fog.getByLabel(label).fill(value);
     await fog.getByRole("button", { name: "Add fog dab" }).click();
@@ -54,7 +55,7 @@ test("hosted scene controls, redacted pixels, display reconnect and revocation",
       await tray.getByLabel(/x \(0–1\)/i).fill(x); await tray.getByLabel(/y \(0–1\)/i).fill("0.5");
       await tray.getByLabel(/visible to the display/i).setChecked(visible);
       await tray.getByRole("button", { name: "Place token", exact: true }).click();
-      await expect(tray.getByText("Token placed.")).toBeVisible();
+      await expect(page.getByText("Token placed.")).toBeVisible();
       await page.reload(); await expect(page.getByRole("img", { name: "Scene background" })).toBeVisible();
     }
     await test.info().attach("gm-scene-phone", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });

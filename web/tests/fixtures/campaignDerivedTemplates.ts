@@ -172,7 +172,7 @@ export async function campaignDerivedJourney(
       ).toBeVisible();
       expect(Object.keys((await open()).state.entries)).toHaveLength(1);
       await page
-        .getByRole("checkbox", { name: /Campaign template revision/ })
+        .getByRole("checkbox", { name: /Campaign item/ })
         .check();
       await page.getByRole("button", { name: "Discard", exact: true }).click();
       await page

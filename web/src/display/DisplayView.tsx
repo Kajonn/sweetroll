@@ -1,3 +1,4 @@
+import tokenStyles from "../campaigns/SceneToken.module.css";
 // Restricted display shell: code entry → credential-scoped projection.
 // Runs outside the GM chrome (the /display route skips AppShell): no
 // identity gate and no campaign endpoints — only redeemDisplay plus the
@@ -289,20 +290,23 @@ export function DisplayView(props: {
   return (
     <section aria-label={t("display.title")}>
       <h1>{t("display.title")}</h1>
-      <div style={{ position: "relative" }}>
+      <div style={{ position: "relative", overflow: "hidden" }}>
         <DisplayImage key={`${credential.displayId}:${shown.imageUrl}`} path={shown.imageUrl} secret={credential.secret} alt={t("display.imageAlt")} />
         <ul aria-label={t("display.tokensLabel")} style={{ listStyle: "none", margin: 0, padding: 0 }}>
           {shown.tokens.map((token) => (
             <li
               key={token.tokenId}
+              className={tokenStyles.token}
               style={{
+                width: `${token.size * 100}%`,
                 position: "absolute",
                 left: `${token.x * 100}%`,
                 top: `${token.y * 100}%`,
                 transform: "translate(-50%, -50%)",
               }}
             >
-              {token.label}
+              {token.imageUrl ? <DisplayImage key={`${credential.displayId}:${token.imageUrl}`} path={token.imageUrl} secret={credential.secret} alt="" /> : null}
+              <span className={tokenStyles.label}>{token.label}</span>
             </li>
           ))}
         </ul>

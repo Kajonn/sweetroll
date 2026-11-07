@@ -1,5 +1,12 @@
 # I7b Scenes & Restricted Display Implementation Plan
 
+**V1 update (PR #34, 2026-11-05):** Image-token upload/selection and proportional
+GM/restricted-display rendering passed hosted and redeploy acceptance on `34ed283`
+with CI #248 green. See [evidence](../../acceptance/scene-image-tokens-2026-11-05.md).
+PR #36 implements V2 direct tap/drag token placement/movement with local and hosted browser
+acceptance passed on `84c23fd`; see [V2 evidence](../../acceptance/scene-token-gestures-2026-11-06.md). Fog brushing (V3) is next, followed by the combined V4 journey. Aggregate I7b/G8 and G9 gates remain open.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A GM uploads images, composes fog/token scenes, and pairs a restricted display that shows only revealed pixels and visible tokens.
@@ -9,6 +16,27 @@
 **Tech Stack:** PostgreSQL, Campaigns Module, Fastify/OpenAPI + TypeBox, generated TypeScript (`docs/contracts/openapi-v1.json`, `web/src/api/schema.d.ts`), React + TanStack Query, shared `web/src/ui/` controls, `sharp` for image decode/composite, Vitest, Playwright Chromium.
 
 **Spec:** `docs/superpowers/specs/2026-09-14-i7b-scenes-display-design.md`; `design_v2.md` §§7.6–7.7, 17.9a; GUI plan G8.
+
+## Current delivery status — corrected 2026-11-05
+
+The foundation delivered in September and the M3 background work remain valid.
+The earlier overall completion claim did not cover all of the approved visual UI.
+The task recipes below are historical implementation steps, not a current
+completion checklist. This status table and the
+[visual-controls completion plan](2026-11-05-scene-visual-controls.md) govern the
+remaining work.
+
+| Area | Current status |
+| --- | --- |
+| Media, scene persistence, revisions and numeric fog/token operations | Delivered; reuse existing contracts and Module boundaries. |
+| Background upload/create/replace | Delivered and accepted under M3. |
+| Pairing, redacted background and hidden-token filtering | Delivered; retain privacy regressions. |
+| Task 6: GM scene UI | V1 image selection/rendering and forms/zoom/pan delivered; V2 direct token gestures implemented and hosted accepted; V3 brush painting remains open. |
+| Task 7: restricted display | Foundation plus V1 permitted token-image/size rendering delivered and accepted. |
+| Task 8: exit journey | Foundation and V1 hosted/redeploy evidence pass; combined visual-control gesture acceptance remains open. |
+
+- [ ] Complete V1–V4 in the linked plan before closing I7b/G8.
+- [ ] Keep G9 physical-device, provider-login and human/playtest gates separate.
 
 ## Global Constraints
 
@@ -260,6 +288,10 @@ expect(JSON.stringify(res.json())).not.toContain("storage_key");
 
 ### Task 6: GM scene UI + Display pairing section
 
+**Partial delivery:** existing forms do not complete the approved image-token,
+drag/tap or fog-brush requirements. Finish V1–V3 in the
+[visual-controls plan](2026-11-05-scene-visual-controls.md).
+
 **Files:**
 - Create: `web/src/campaigns/SceneViewport.tsx`, `SceneViewport.test.tsx`
 - Create: `web/src/campaigns/FogToolbar.tsx`, `FogToolbar.test.tsx`
@@ -282,6 +314,9 @@ expect(JSON.stringify(res.json())).not.toContain("storage_key");
 
 ### Task 7: Restricted display shell
 
+**Partial delivery:** pairing/redaction are delivered; permitted token-image
+rendering and scene-relative size still need V1 acceptance.
+
 **Files:**
 - Create: `web/src/display/DisplayView.tsx`, `DisplayView.test.tsx`
 - Modify: `web/src/router.tsx` (`/display` route, no GM chrome)
@@ -300,6 +335,10 @@ expect(JSON.stringify(res.json())).not.toContain("storage_key");
 ---
 
 ### Task 8: Exit e2e + acceptance record
+
+**Acceptance scope correction:** the historical journey exercises numeric
+operations. It does not close direct visual interactions. Add the V4 hosted
+journey from the [visual-controls plan](2026-11-05-scene-visual-controls.md).
 
 **Files:**
 - Create: `web/tests/e2e/sceneDisplayJourney.spec.ts`

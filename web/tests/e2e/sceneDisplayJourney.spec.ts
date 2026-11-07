@@ -79,6 +79,7 @@ async function signInViaPanel(page: Page, code: string) {
 /** Commit one fog stroke (mode + single dab), retrying once on 409. */
 async function commitFogStroke(page: Page, mode: "Conceal" | "Reveal", x: string, y: string, r: string) {
   const fog = page.getByRole("region", { name: "Fog of war" });
+  if (!await fog.getByLabel(/x \(0–1\)/i).isVisible()) await fog.getByText("Precise fog position", { exact: true }).click();
   await fog.getByLabel(/fog mode/i).selectOption(mode === "Conceal" ? "conceal" : "reveal");
   await fog.getByLabel(/x \(0–1\)/i).fill(x);
   await fog.getByLabel(/y \(0–1\)/i).fill(y);
@@ -98,6 +99,7 @@ async function commitFogStroke(page: Page, mode: "Conceal" | "Reveal", x: string
 async function placeToken(page: Page, label: string, x: string, y: string, visible: boolean) {
   const tray = page.getByRole("region", { name: "Tokens" });
   await tray.getByLabel(/token label/i).fill(label);
+  await tray.getByText("Position and size", { exact: true }).click();
   await tray.getByLabel(/x \(0–1\)/i).fill(x);
   await tray.getByLabel(/y \(0–1\)/i).fill(y);
   const box = tray.getByLabel(/visible to the display/i);
@@ -105,11 +107,11 @@ async function placeToken(page: Page, label: string, x: string, y: string, visib
     await box.click();
   }
   await tray.getByRole("button", { name: "Place token", exact: true }).click();
-  const placed = tray.getByText("Token placed.");
-  const conflict = tray.getByText(/latest version was reloaded/);
+  const placed = page.getByText("Token placed.");
+  const conflict = page.getByText(/latest version was reloaded/);
   await expect(placed.or(conflict)).toBeVisible({ timeout: STEP_TIMEOUT });
   if (await conflict.isVisible()) {
-    await tray.getByRole("button", { name: "Retry placing token" }).click();
+    await page.getByRole("button", { name: "Retry placing token" }).click();
     await expect(placed).toBeVisible({ timeout: STEP_TIMEOUT });
   }
 }
@@ -233,7 +235,7 @@ test("I7b exit: restricted scene display shows only revealed areas and visible t
       await expect(displayImage).toBeVisible({ timeout: STEP_TIMEOUT });
       const displayTokens = displayPage.getByRole("list", { name: "Display tokens" });
       await expect(displayTokens.getByText("Alpha")).toBeVisible({ timeout: STEP_TIMEOUT });
-      await expect(displayTokens.getByText("Alpha")).toHaveAttribute("style", /left:\s*25%/);
+      await expect(displayTokens.getByText("Alpha").locator("..")).toHaveAttribute("style", /left:\s*25%/);
       await expect(displayPage.getByText("Ghost")).toHaveCount(0);
 
       // 5. Isolation: no GM endpoints, no original bytes, no hidden token,
@@ -288,7 +290,7 @@ test("I7b exit: restricted scene display shows only revealed areas and visible t
         y: 0.5,
         idempotencyKey: randomUUID(),
       });
-      await expect(displayTokens.getByText("Alpha")).toHaveAttribute("style", /left:\s*55%/, { timeout: POLL_TIMEOUT });
+      await expect(displayTokens.getByText("Alpha").locator("..")).toHaveAttribute("style", /left:\s*55%/, { timeout: POLL_TIMEOUT });
 
       // 7. The display follows a scene change: a second scene renders with
       // no stale tokens once navigated to with its own ?sceneId=.
@@ -313,7 +315,7 @@ test("I7b exit: restricted scene display shows only revealed areas and visible t
 
       // Back on scene A the moved token is where the poll left it.
       await displayPage.goto(`/display?sceneId=${encodeURIComponent(sceneId)}`);
-      await expect(displayTokens.getByText("Alpha")).toHaveAttribute("style", /left:\s*55%/, { timeout: STEP_TIMEOUT });
+      await expect(displayTokens.getByText("Alpha").locator("..")).toHaveAttribute("style", /left:\s*55%/, { timeout: STEP_TIMEOUT });
 
       // 8. GM revokes the credential through the settings UI; the display
       // blanks on poll (no frozen frame) with a disconnect affordance.

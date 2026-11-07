@@ -1,0 +1,67 @@
+{
+  "date": "2026-11-06",
+  "applicationCommit": "84c23fd4221e6de3ef263e44057bc97d18daa8ba",
+  "deploymentId": "f8dcab88-4e0a-461d-b1ce-f2f79380740f",
+  "deploymentStatus": "SUCCESS",
+  "build": {
+    "target": "https://sweetroll-d2-preview.up.railway.app",
+    "health": "{\"status\":\"ok\"}",
+    "assets": [
+      {
+        "path": "/assets/index-D7nX4OBN.js",
+        "sha256": "5be5d1559e76eff415ba40df7e41977becfe481941ccf046630fed5e1e93c76a"
+      },
+      {
+        "path": "/assets/index-DF3Bkxz_.css",
+        "sha256": "8d74655dc84143613f866c3f90298313a931a8f380e4c4b7927744f389421a55"
+      }
+    ]
+  },
+  "hosted": {
+    "stats": {
+      "startTime": "2026-11-06T19:54:22.467Z",
+      "duration": 63575.621,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "retries": 0,
+    "mouse": true,
+    "emulatedNativeTouch": true,
+    "physicalDevices": false,
+    "conflictExplicitRetry": true,
+    "lostResponseExactRetry": true,
+    "previewRequestCount": 0,
+    "cancelRequestCount": 0,
+    "keyboard": true,
+    "reopen": true,
+    "pairedDisplay": true,
+    "offlineReconnect": true,
+    "revocation": true,
+    "campaignArchiveReadback": true,
+    "validationRejectionCorrection": true
+  },
+  "interruptedFixtureCleanup": {
+    "archivedInterruptedFixtures": 1,
+    "scope": "V2 gestures prefixed test campaigns only",
+    "verified": true
+  },
+  "screenshots": [
+    {
+      "width": 360,
+      "path": "docs/acceptance/assets/scene-token-gestures-2026-11-06/scene-360.png",
+      "sha256": "546418f96ee08b873e48bc9272ca685d15d04850dc453f76890f8d07ecaf1e2d"
+    },
+    {
+      "width": 768,
+      "path": "docs/acceptance/assets/scene-token-gestures-2026-11-06/scene-768.png",
+      "sha256": "98423cf3dbf6106018b8986caaaf442c28453b44a0e0a0c1f6d124f5c9376c29"
+    },
+    {
+      "width": 1280,
+      "path": "docs/acceptance/assets/scene-token-gestures-2026-11-06/scene-1280.png",
+      "sha256": "1571759b29fce3a11c2449e0b1b2146b2bee70f55c3220d820e0def9a9ce4080"
+    }
+  ]
+}

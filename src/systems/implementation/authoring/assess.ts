@@ -61,6 +61,20 @@ export function assessDocument(input: unknown): AssessedDocument {
   return { ok: true, document: decoded.value, assessment: { ok: true, diagnostics: [] } };
 }
 
+export function documentDiagnosticPointers(
+  document: SystemDocumentV1 | null,
+  diagnostics: PackageDiagnostic[],
+): PackageDiagnostic[] {
+  const expressionIndexes = new Map(document?.expressions.map(({ id }, index) => [id, index]));
+  return diagnostics.map((diagnostic) => {
+    // The browser editor uses expression IDs as navigation targets.
+    // Public clients receive the location in the submitted JSON document.
+    if (diagnostic.path === "" || diagnostic.path.startsWith("/")) return diagnostic;
+    const index = expressionIndexes.get(diagnostic.path);
+    return { ...diagnostic, path: index === undefined ? "" : `/expressions/${index}/source` };
+  });
+}
+
 export function documentFromPackage(pkg: SystemPackageV1): SystemDocumentV1 {
   return {
     schemaVersion: pkg.schemaVersion,

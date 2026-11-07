@@ -45,6 +45,18 @@ function routeProps(overrides = {}) {
 }
 
 describe("SceneViewportView", () => {
+  it("renders campaign token art at its normalized size and keeps a label on image failure", () => {
+    const artScene = scene({ tokens: [{ tokenId: "t1", label: "Wren", x: .25, y: .5, size: .12, visible: true, imageFileId: "portrait" }] });
+    render(<SceneViewportView scene={artScene} imageUrl="/background" />);
+    const token = screen.getByRole("button", { name: "Token Wren" });
+    expect(token.parentElement).toHaveStyle({ width: "12%", left: "25%", top: "50%" });
+    const art = token.querySelector("img")!;
+    expect(art).toHaveAttribute("alt", "");
+    expect(art).toHaveAttribute("src", "/api/campaigns/c1/images/portrait/original");
+    fireEvent.error(art);
+    expect(token.querySelector("img")).toBeNull();
+    expect(token).toHaveTextContent("Wren");
+  });
   it("shows the scene image with token markers at normalized positions", () => {
     const onSelectToken = vi.fn();
     render(
@@ -88,6 +100,14 @@ describe("CampaignSceneView", () => {
     expect(props.api.openScene).toHaveBeenCalledWith("s1");
   });
 
+  it("clears protected scene content when a token command loses authorization", async () => {
+    const props = routeProps(); props.api.moveToken.mockRejectedValue({ status: 403 });
+    render(<CampaignSceneView {...props} />, { wrapper: wrapper() });
+    await screen.findByRole("button", { name: "Token Alpha" });
+    fireEvent.click(screen.getByRole("button", { name: "Move Alpha" }));
+    await waitFor(() => expect(screen.queryByRole("img", { name: /scene background/i })).toBeNull());
+    expect(screen.queryByRole("button", { name: "Token Alpha" })).toBeNull();
+  });
   it("discards uncommitted fog coordinates after background replacement", async () => {
     const props = routeProps(), client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<CampaignSceneView {...props} />, { wrapper: wrapper(client) });

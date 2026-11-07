@@ -1,5 +1,5 @@
 import { d20Package, pbta2d6Package, d6SuccessPoolPackage } from "../package/fixtures/index.js";
-import type { CompatibilityFinding } from "../package/compatibility.js";
+import { comparePackages, type CompatibilityFinding } from "../package/compatibility.js";
 import type { SystemPackageV1 } from "../package/schema/index.js";
 import type { Pool, PoolClient } from "pg";
 import { saveSystemImages } from "./image-references.js";
@@ -59,6 +59,7 @@ export type PublishVersionInput = {
   package: unknown;
   releaseNotes: string;
   compatibilityFindings: CompatibilityFinding[];
+  compatibilityBaseVersionId?: VersionId | null;
   acknowledgeBreaking: boolean;
   actorId: UserId;
   requestId: string;
@@ -68,7 +69,7 @@ export type PublishVersionResult =
   | { ok: true; version: VersionRecord }
   | { ok: false; code: "stale_revision"; latestRevision: number | null }
   | { ok: false; code: "breaking_version"; findings: CompatibilityFinding[] }
-  | { ok: false; code: "duplicate_version" };
+  | { ok: false; code: "duplicate_version" | "not_found" | "archived" };
 
 export type AuthorizedVersionUse = {
   systemId: SystemId;
@@ -106,7 +107,10 @@ export function decodeCreationVersionsCursor(cursor: string | null): CreationVer
       typeof payload.name !== "string" ||
       typeof payload.createdAt !== "string" ||
       typeof payload.versionId !== "string" ||
-      Number.isNaN(Date.parse(payload.createdAt))
+      !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(payload.versionId) ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.(?:\d{3}|\d{6})Z$/.test(payload.createdAt) ||
+      Number.isNaN(Date.parse(payload.createdAt)) ||
+      new Date(payload.createdAt).toISOString().slice(0, 19) !== payload.createdAt.slice(0, 19)
     ) {
       return null;
     }
@@ -173,7 +177,16 @@ export type RecordReceiptResult =
   | { ok: true; reused: boolean; receipt: IdempotencyReceipt }
   | { ok: false; code: "idempotency_mismatch" };
 
+type ReceiptCommand = Omit<RecordReceiptInput, "result">;
+type ReceiptResult<T, E> = { ok: true; value: T } | { ok: false; error: E };
+type ReceiptTransaction = Pick<SystemPersistenceRepository, "createSystem" | "appendAudit" | "saveDraft" | "publishVersion">;
+
 export interface SystemPersistenceRepository {
+  executeWithReceipt<T, E>(
+    input: ReceiptCommand,
+    execute: (transaction: ReceiptTransaction) => Promise<ReceiptResult<T, E>>,
+  ): Promise<ReceiptResult<T, E> | { ok: true; value: T; replayed: true } | { ok: false; mismatch: true }>;
+
   createSystem(input: { ownerId: UserId; name: string }): Promise<SystemRecord>;
   listSystems(ownerId: UserId): Promise<SystemRecord[]>;
   openSystem(systemId: SystemId): Promise<SystemRecord | null>;
@@ -224,10 +237,12 @@ export interface SystemPersistenceRepository {
     systemId: SystemId,
     lifecycle: "active" | "archived",
   ): Promise<SystemRecord | null>;
-  updateSystemAccess(
-    systemId: SystemId,
-    access: "private" | "link" | "public",
-  ): Promise<SystemRecord | null>;
+  updateSystemAccess(input: {
+    systemId: SystemId;
+    actorId: UserId;
+    access: "private" | "link" | "public";
+    requestId: string;
+  }): Promise<SystemRecord | null>;
   updateVersionLifecycle(
     versionId: VersionId,
     lifecycle: "published" | "deprecated",
@@ -245,14 +260,23 @@ export interface SystemPersistenceRepository {
 
 export function createSystemPersistenceRepository(pool: Pool): SystemPersistenceRepository {
   return {
-    async createSystem(input) {
-      const result = await pool.query<SystemRow>(
-        `INSERT INTO systems (owner_id, name)
-         VALUES ($1, $2)
-         RETURNING id, owner_id, name, access, lifecycle, created_at, updated_at`,
-        [input.ownerId, input.name],
-      );
-      return toSystemRecord(requireRow(result.rows[0], "createSystem"));
+    ...transactionMethods(pool),
+
+    async executeWithReceipt<T, E>(
+      input: ReceiptCommand,
+      execute: (transaction: ReceiptTransaction) => Promise<ReceiptResult<T, E>>,
+    ) {
+      return inTransaction(pool, async (client) => {
+        await lockReceipt(client, input);
+        const receipt = await loadReceipt(client, input);
+        if (receipt !== null) {
+          if (receipt.inputHash !== input.inputHash) return { ok: false, mismatch: true };
+          return { ok: true, value: receipt.result as T, replayed: true };
+        }
+        const result = await execute(transactionMethods(client));
+        if (result.ok) await recordReceipt(client, { ...input, result: result.value });
+        return result;
+      });
     },
 
     async listSystems(ownerId) {
@@ -275,10 +299,6 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
       );
       const row = result.rows[0];
       return row === undefined ? null : toSystemRecord(row);
-    },
-
-    async saveDraft(input) {
-      return saveDraftImpl(pool, input);
     },
 
     async loadDraft(systemId) {
@@ -367,7 +387,8 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
       params.push(page.limit + 1);
       const result = await pool.query<AuthorizedCreationVersionRow>(
         `SELECT v.id AS version_id, s.id AS system_id, s.name AS system_name,
-                v.semantic_version, v.created_at
+                v.semantic_version, v.created_at,
+                to_char(v.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at_cursor
            FROM system_versions v
            JOIN systems s ON s.id = v.system_id
           WHERE v.lifecycle = 'published'
@@ -392,7 +413,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
           hasMore && last !== undefined
             ? encodeCreationVersionsCursor({
                 name: last.system_name,
-                createdAt: last.created_at.toISOString(),
+                createdAt: last.created_at_cursor,
                 versionId: last.version_id,
               })
             : null,
@@ -400,28 +421,14 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
     },
 
     async recordReceipt(input) {
-      return recordReceiptImpl(pool, input);
+      return inTransaction(pool, async (client) => {
+        await lockReceipt(client, input);
+        return recordReceipt(client, input);
+      });
     },
 
     async loadReceipt(input) {
-      const result = await pool.query<ReceiptRow>(
-        `SELECT id, actor_id, command_kind, key, input_hash, result_json, created_at, expires_at
-           FROM idempotency_receipts
-          WHERE actor_id = $1 AND command_kind = $2 AND key = $3 AND expires_at > now()`,
-        [input.actorId, input.commandKind, input.key],
-      );
-      const row = result.rows[0];
-      return row === undefined ? null : toReceipt(row);
-    },
-
-    async appendAudit(input) {
-      const result = await pool.query<AuditRow>(
-        `INSERT INTO system_audit_records (system_id, actor_id, kind, summary, request_id)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, system_id, actor_id, kind, summary, occurred_at, request_id`,
-        [input.systemId, input.actorId, input.kind, input.summary, input.requestId],
-      );
-      return toAuditRecord(requireRow(result.rows[0], "appendAudit"));
+      return loadReceipt(pool, input);
     },
 
     async listAudit(systemId) {
@@ -467,15 +474,30 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
       return row === undefined ? null : toSystemRecord(row);
     },
 
-    async updateSystemAccess(systemId, access) {
-      const result = await pool.query<SystemRow>(
-        `UPDATE systems SET access = $2, updated_at = now()
-          WHERE id = $1
-          RETURNING id, owner_id, name, access, lifecycle, created_at, updated_at`,
-        [systemId, access],
-      );
-      const row = result.rows[0];
-      return row === undefined ? null : toSystemRecord(row);
+    async updateSystemAccess(input) {
+      return inTransaction(pool, async (client) => {
+        const current = await client.query<SystemRow>(
+          `SELECT id, owner_id, name, access, lifecycle, created_at, updated_at
+             FROM systems WHERE id = $1 AND owner_id = $2 FOR UPDATE`,
+          [input.systemId, input.actorId],
+        );
+        const system = current.rows[0];
+        if (system === undefined) return null;
+        if (system.access === input.access) return toSystemRecord(system);
+        const updated = await client.query<SystemRow>(
+          `UPDATE systems SET access = $2, updated_at = now() WHERE id = $1
+           RETURNING id, owner_id, name, access, lifecycle, created_at, updated_at`,
+          [input.systemId, input.access],
+        );
+        await transactionMethods(client).appendAudit({
+          systemId: input.systemId,
+          actorId: input.actorId,
+          kind: "system_sharing_changed",
+          summary: `System sharing changed to ${input.access}`,
+          requestId: input.requestId,
+        });
+        return toSystemRecord(requireRow(updated.rows[0], "updateSystemAccess"));
+      });
     },
 
     async updateVersionLifecycle(versionId, lifecycle) {
@@ -494,7 +516,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
       let where = "owner_id = $1";
       if (page.cursor !== null) {
         params.push(page.cursor);
-        where += ` AND (created_at, id) < (SELECT created_at, id FROM systems WHERE id = $${params.length})`;
+        where += ` AND (created_at, id) < (SELECT created_at, id FROM systems WHERE id = $${params.length} AND owner_id = $1)`;
       }
       const result = await pool.query<SystemRow>(
         `SELECT id, owner_id, name, access, lifecycle, created_at, updated_at
@@ -511,10 +533,6 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
         systems: pageRows.map(toSystemRecord),
         nextCursor: hasMore && last !== undefined ? last.id : null,
       };
-    },
-
-    async publishVersion(input) {
-      return publishVersionImpl(pool, input);
     },
 
     async deleteOwnedSystem(systemId, ownerId) {
@@ -577,6 +595,7 @@ type AuthorizedCreationVersionRow = {
   system_name: string;
   semantic_version: string;
   created_at: Date;
+  created_at_cursor: string;
 };
 
 type PreviewRow = {
@@ -688,60 +707,98 @@ function toAuditRecord(row: AuditRow): AuditRecord {
   };
 }
 
-async function saveDraftImpl(pool: Pool, input: SaveDraftInput): Promise<DraftSaveResult> {
-  const candidateName = (input.document as { metadata?: { name?: unknown } } | null)?.metadata?.name;
-  const draftName = typeof candidateName === "string" && candidateName.trim() !== "" ? candidateName : null;
+function transactionMethods(connection: Pool | PoolClient): ReceiptTransaction {
+  return {
+    async createSystem(input) {
+      const result = await connection.query<SystemRow>(
+        `INSERT INTO systems (owner_id, name)
+         VALUES ($1, $2)
+         RETURNING id, owner_id, name, access, lifecycle, created_at, updated_at`,
+        [input.ownerId, input.name],
+      );
+      return toSystemRecord(requireRow(result.rows[0], "createSystem"));
+    },
+    async appendAudit(input) {
+      const result = await connection.query<AuditRow>(
+        `INSERT INTO system_audit_records (system_id, actor_id, kind, summary, request_id)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, system_id, actor_id, kind, summary, occurred_at, request_id`,
+        [input.systemId, input.actorId, input.kind, input.summary, input.requestId],
+      );
+      return toAuditRecord(requireRow(result.rows[0], "appendAudit"));
+    },
+    async saveDraft(input) {
+      return "release" in connection
+        ? saveDraft(connection, input)
+        : inTransaction(connection, (client) => saveDraft(client, input));
+    },
+    async publishVersion(input) {
+      return "release" in connection
+        ? publishVersion(connection, input)
+        : inTransaction(connection, (client) => publishVersion(client, input));
+    },
+  };
+}
+
+async function inTransaction<T>(pool: Pool, execute: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    // Image changes and ordinary saves share the system-before-draft lock order.
-    await client.query("SELECT id FROM systems WHERE id=$1 FOR UPDATE", [input.systemId]);
-    const existing = await client.query<DraftRow>(
-      `SELECT system_id, revision, document_json, source_checksum, updated_by, updated_at
-         FROM system_drafts
-        WHERE system_id = $1
-        FOR UPDATE`,
-      [input.systemId],
-    );
-    const row = existing.rows[0];
-    if (row === undefined) {
-      if (input.expectedRevision !== null) {
-        await client.query("COMMIT");
-        return { ok: false, code: "stale_revision", latestRevision: null };
-      }
-      await saveSystemImages(client, input.systemId, input.document as SystemDocumentV1, input.newImages, input.retainedImageIds);
-      const inserted = await client.query<DraftRow>(
-        `INSERT INTO system_drafts (system_id, revision, document_json, source_checksum, updated_by)
-         VALUES ($1, 1, $2::jsonb, $3, $4)
-         RETURNING system_id, revision, document_json, source_checksum, updated_by, updated_at`,
-        [input.systemId, JSON.stringify(input.document), input.sourceChecksum, input.updatedBy],
-      );
-      const draft = toDraftRecord(requireRow(inserted.rows[0], "saveDraft"));
-      if (draftName !== null) {
-        await client.query(`UPDATE systems SET name = $2, updated_at = now() WHERE id = $1`,
-          [input.systemId, draftName]);
-      }
-      await client.query(
-        `INSERT INTO system_audit_records (system_id, actor_id, kind, summary, request_id)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [input.systemId, input.updatedBy, "draft_saved", `Draft revision ${draft.revision} saved`, input.requestId],
-      );
-      await client.query("COMMIT");
-      return { ok: true, draft };
-    }
-    if (row.revision !== input.expectedRevision) {
-      await client.query("COMMIT");
-      return { ok: false, code: "stale_revision", latestRevision: row.revision };
+    const result = await execute(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function lockReceipt(client: PoolClient, input: Pick<ReceiptCommand, "actorId" | "commandKind" | "key">) {
+  const lockKey = JSON.stringify([input.actorId, input.commandKind, input.key]);
+  await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [lockKey]);
+}
+
+async function loadReceipt(
+  connection: Pool | PoolClient,
+  input: Pick<ReceiptCommand, "actorId" | "commandKind" | "key">,
+): Promise<IdempotencyReceipt | null> {
+  const result = await connection.query<ReceiptRow>(
+    `SELECT id, actor_id, command_kind, key, input_hash, result_json, created_at, expires_at
+       FROM idempotency_receipts
+      WHERE actor_id = $1 AND command_kind = $2 AND key = $3 AND expires_at > statement_timestamp()`,
+    [input.actorId, input.commandKind, input.key],
+  );
+  const row = result.rows[0];
+  return row === undefined ? null : toReceipt(row);
+}
+
+async function saveDraft(client: PoolClient, input: SaveDraftInput): Promise<DraftSaveResult> {
+  const candidateName = (input.document as { metadata?: { name?: unknown } } | null)?.metadata?.name;
+  const draftName = typeof candidateName === "string" && candidateName.trim() !== "" ? candidateName : null;
+  // Image changes and ordinary saves share the system-before-draft lock order.
+  await client.query("SELECT id FROM systems WHERE id=$1 FOR UPDATE", [input.systemId]);
+  const existing = await client.query<DraftRow>(
+    `SELECT system_id, revision, document_json, source_checksum, updated_by, updated_at
+       FROM system_drafts
+      WHERE system_id = $1
+      FOR UPDATE`,
+    [input.systemId],
+  );
+  const row = existing.rows[0];
+  if (row === undefined) {
+    if (input.expectedRevision !== null) {
+      return { ok: false, code: "stale_revision", latestRevision: null };
     }
     await saveSystemImages(client, input.systemId, input.document as SystemDocumentV1, input.newImages, input.retainedImageIds);
-    const updated = await client.query<DraftRow>(
-      `UPDATE system_drafts
-          SET revision = revision + 1, document_json = $2::jsonb, source_checksum = $3, updated_by = $4, updated_at = now()
-        WHERE system_id = $1
-        RETURNING system_id, revision, document_json, source_checksum, updated_by, updated_at`,
+    const inserted = await client.query<DraftRow>(
+      `INSERT INTO system_drafts (system_id, revision, document_json, source_checksum, updated_by)
+       VALUES ($1, 1, $2::jsonb, $3, $4)
+       RETURNING system_id, revision, document_json, source_checksum, updated_by, updated_at`,
       [input.systemId, JSON.stringify(input.document), input.sourceChecksum, input.updatedBy],
     );
-    const draft = toDraftRecord(requireRow(updated.rows[0], "saveDraft"));
+    const draft = toDraftRecord(requireRow(inserted.rows[0], "saveDraft"));
     if (draftName !== null) {
       await client.query(`UPDATE systems SET name = $2, updated_at = now() WHERE id = $1`,
         [input.systemId, draftName]);
@@ -751,134 +808,121 @@ async function saveDraftImpl(pool: Pool, input: SaveDraftInput): Promise<DraftSa
        VALUES ($1, $2, $3, $4, $5)`,
       [input.systemId, input.updatedBy, "draft_saved", `Draft revision ${draft.revision} saved`, input.requestId],
     );
-    await client.query("COMMIT");
     return { ok: true, draft };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
   }
+  if (row.revision !== input.expectedRevision) {
+    return { ok: false, code: "stale_revision", latestRevision: row.revision };
+  }
+  await saveSystemImages(client, input.systemId, input.document as SystemDocumentV1, input.newImages, input.retainedImageIds);
+  const updated = await client.query<DraftRow>(
+    `UPDATE system_drafts
+        SET revision = revision + 1, document_json = $2::jsonb, source_checksum = $3, updated_by = $4, updated_at = now()
+      WHERE system_id = $1
+      RETURNING system_id, revision, document_json, source_checksum, updated_by, updated_at`,
+    [input.systemId, JSON.stringify(input.document), input.sourceChecksum, input.updatedBy],
+  );
+  const draft = toDraftRecord(requireRow(updated.rows[0], "saveDraft"));
+  if (draftName !== null) {
+    await client.query(`UPDATE systems SET name = $2, updated_at = now() WHERE id = $1`,
+      [input.systemId, draftName]);
+  }
+  await client.query(
+    `INSERT INTO system_audit_records (system_id, actor_id, kind, summary, request_id)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [input.systemId, input.updatedBy, "draft_saved", `Draft revision ${draft.revision} saved`, input.requestId],
+  );
+  return { ok: true, draft };
 }
 
-async function recordReceiptImpl(pool: Pool, input: RecordReceiptInput): Promise<RecordReceiptResult> {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const existing = await client.query<ReceiptRow>(
-      `SELECT id, actor_id, command_kind, key, input_hash, result_json, created_at, expires_at
-         FROM idempotency_receipts
-        WHERE actor_id = $1 AND command_kind = $2 AND key = $3
-        FOR UPDATE`,
-      [input.actorId, input.commandKind, input.key],
-    );
-    const row = existing.rows[0];
-    if (row !== undefined && row.expires_at.getTime() > Date.now()) {
-      if (row.input_hash !== input.inputHash) {
-        await client.query("COMMIT");
-        return { ok: false, code: "idempotency_mismatch" };
-      }
-      await client.query("COMMIT");
-      return { ok: true, reused: true, receipt: toReceipt(row) };
-    }
-    if (row !== undefined) {
-      await client.query(
-        "DELETE FROM idempotency_receipts WHERE id = $1",
-        [row.id],
-      );
-    }
-    const inserted = await client.query<ReceiptRow>(
-      `INSERT INTO idempotency_receipts (actor_id, command_kind, key, input_hash, result_json, expires_at)
-       VALUES ($1, $2, $3, $4, $5::jsonb, $6)
-       RETURNING id, actor_id, command_kind, key, input_hash, result_json, created_at, expires_at`,
-      [input.actorId, input.commandKind, input.key, input.inputHash, JSON.stringify(input.result), input.expiresAt],
-    );
-    await client.query("COMMIT");
-    return { ok: true, reused: false, receipt: toReceipt(requireRow(inserted.rows[0], "recordReceipt")) };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
+async function recordReceipt(client: PoolClient, input: RecordReceiptInput): Promise<RecordReceiptResult> {
+  const existing = await loadReceipt(client, input);
+  if (existing !== null) {
+    if (existing.inputHash !== input.inputHash) return { ok: false, code: "idempotency_mismatch" };
+    return { ok: true, reused: true, receipt: existing };
   }
+  const inserted = await client.query<ReceiptRow>(
+    `INSERT INTO idempotency_receipts (actor_id, command_kind, key, input_hash, result_json, expires_at)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6)
+     ON CONFLICT (actor_id, command_kind, key) DO UPDATE SET
+       input_hash = EXCLUDED.input_hash, result_json = EXCLUDED.result_json,
+       created_at = EXCLUDED.created_at, expires_at = EXCLUDED.expires_at
+     RETURNING id, actor_id, command_kind, key, input_hash, result_json, created_at, expires_at`,
+    [input.actorId, input.commandKind, input.key, input.inputHash, JSON.stringify(input.result), input.expiresAt],
+  );
+  return { ok: true, reused: false, receipt: toReceipt(requireRow(inserted.rows[0], "recordReceipt")) };
 }
 
-async function publishVersionImpl(pool: Pool, input: PublishVersionInput): Promise<PublishVersionResult> {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const existing = await client.query<DraftRow>(
-      `SELECT system_id, revision, document_json, source_checksum, updated_by, updated_at
-         FROM system_drafts
-        WHERE system_id = $1
-        FOR UPDATE`,
-      [input.systemId],
-    );
-    const draft = existing.rows[0];
-    if (
-      draft === undefined ||
-      draft.revision !== input.expectedRevision ||
-      draft.source_checksum !== input.sourceChecksum
-    ) {
-      await client.query("COMMIT");
-      return { ok: false, code: "stale_revision", latestRevision: draft?.revision ?? null };
-    }
-    const latestVersion = await client.query<Pick<VersionRow, "semantic_version">>(
-      `SELECT semantic_version
-         FROM system_versions
-        WHERE system_id = $1
-        ORDER BY created_at DESC, id DESC
-        LIMIT 1`,
-      [input.systemId],
-    );
-    const latest = latestVersion.rows[0];
-    if (input.compatibilityFindings.length > 0 && latest !== undefined) {
-      const nextMajor = Number(input.semanticVersion.split(".")[0]);
-      const latestMajor = Number(latest.semantic_version.split(".")[0]);
-      if (!input.acknowledgeBreaking || nextMajor <= latestMajor) {
-        await client.query("COMMIT");
-        return { ok: false, code: "breaking_version", findings: input.compatibilityFindings };
-      }
-    }
-    let inserted: VersionRow | undefined;
-    try {
-      const result = await client.query<VersionRow>(
-        `INSERT INTO system_versions
-           (id, system_id, semantic_version, checksum, package_json, release_notes, compatibility_findings_json)
-          VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::jsonb)
-          RETURNING id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at`,
-        [
-          input.versionId,
-          input.systemId,
-          input.semanticVersion,
-          input.checksum,
-          JSON.stringify(input.package),
-          input.releaseNotes,
-          JSON.stringify(input.compatibilityFindings),
-        ],
-      );
-      inserted = result.rows[0];
-    } catch (error) {
-      if ((error as { code?: string }).code === "23505") {
-        await client.query("ROLLBACK");
-        return { ok: false, code: "duplicate_version" };
-      }
-      throw error;
-    }
-    const version = toVersionRecord(requireRow(inserted, "publishVersion"));
-    await client.query(
-      `INSERT INTO system_audit_records (system_id, actor_id, kind, summary, request_id)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [input.systemId, input.actorId, "version_published", `Published version ${input.semanticVersion}`, input.requestId],
-    );
-    await client.query("COMMIT");
-    return { ok: true, version };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
+async function publishVersion(client: PoolClient, input: PublishVersionInput): Promise<PublishVersionResult> {
+  const system = await client.query<{ owner_id: string | null; lifecycle: string }>(
+    "SELECT owner_id, lifecycle FROM systems WHERE id = $1 FOR UPDATE",
+    [input.systemId],
+  );
+  if (system.rows[0] === undefined) return { ok: false, code: "stale_revision", latestRevision: null };
+  if (system.rows[0].owner_id !== input.actorId) return { ok: false, code: "not_found" };
+  if (system.rows[0].lifecycle === "archived") return { ok: false, code: "archived" };
+  const existing = await client.query<DraftRow>(
+    `SELECT system_id, revision, document_json, source_checksum, updated_by, updated_at
+       FROM system_drafts
+      WHERE system_id = $1
+      FOR UPDATE`,
+    [input.systemId],
+  );
+  const draft = existing.rows[0];
+  if (
+    draft === undefined ||
+    draft.revision !== input.expectedRevision ||
+    draft.source_checksum !== input.sourceChecksum
+  ) {
+    return { ok: false, code: "stale_revision", latestRevision: draft?.revision ?? null };
   }
+  const latestVersion = await client.query<Pick<VersionRow, "id" | "semantic_version" | "package_json">>(
+    `SELECT id, semantic_version, package_json
+       FROM system_versions
+      WHERE system_id = $1
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1`,
+    [input.systemId],
+  );
+  const latest = latestVersion.rows[0];
+  // Retain the breaking changes the author acknowledged against the assessed
+  // base. A concurrent version can also make a previously compatible draft
+  // breaking, so compare again when the assessed base has moved.
+  const findings = input.compatibilityFindings.length === 0 && latest !== undefined
+    && input.compatibilityBaseVersionId !== undefined && input.compatibilityBaseVersionId !== latest.id
+    ? comparePackages(latest.package_json as SystemPackageV1, input.package as SystemPackageV1).findings
+    : input.compatibilityFindings;
+  if (findings.length > 0 && latest !== undefined) {
+    const nextMajor = Number(input.semanticVersion.split(".")[0]);
+    const latestMajor = Number(latest.semantic_version.split(".")[0]);
+    if (!input.acknowledgeBreaking || nextMajor <= latestMajor) {
+      return { ok: false, code: "breaking_version", findings };
+    }
+  }
+  const result = await client.query<VersionRow>(
+    `INSERT INTO system_versions
+       (id, system_id, semantic_version, checksum, package_json, release_notes, compatibility_findings_json)
+      VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::jsonb)
+      ON CONFLICT DO NOTHING
+      RETURNING id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at`,
+    [
+      input.versionId,
+      input.systemId,
+      input.semanticVersion,
+      input.checksum,
+      JSON.stringify(input.package),
+      input.releaseNotes,
+      JSON.stringify(findings),
+    ],
+  );
+  const inserted = result.rows[0];
+  if (inserted === undefined) return { ok: false, code: "duplicate_version" };
+  const version = toVersionRecord(inserted);
+  await client.query(
+    `INSERT INTO system_audit_records (system_id, actor_id, kind, summary, request_id)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [input.systemId, input.actorId, "version_published", `Published version ${input.semanticVersion}`, input.requestId],
+  );
+  return { ok: true, version };
 }
 
 // ---------------------------------------------------------------------------

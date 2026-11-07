@@ -1438,21 +1438,29 @@ describe("CharacterSession online operations", () => {
   });
 
   it("replays the identical frozen archive body after an ambiguous outcome", async () => {
+    // This case exercises an explicit retry before automatic backoff fires.
+    // Keep the retry clock paused so slow CI storage cannot race a third send.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const { api, store, session } = await makeHarness();
-    api.scriptOpenView(viewFor("char-1", 3));
-    await session.open();
-    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
-    api.scriptSend(async () => ({ error: new TypeError("network down") }));
-    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
-    await expect(session.archive()).rejects.toThrow();
-    const first = api.sent[0];
-    expect(await store.readOnlineAttempts(ARM)).toHaveLength(1);
-    await session.archive();
-    expect(api.sent).toHaveLength(2);
-    expect(api.sent[1]?.body).toEqual(first?.body);
-    expect(api.sent[1]?.path).toBe(first?.path);
-    session.dispose();
-    await store.close();
+    try {
+      api.scriptOpenView(viewFor("char-1", 3));
+      await session.open();
+      api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+      api.scriptSend(async () => ({ error: new TypeError("network down") }));
+      api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+      await expect(session.archive()).rejects.toThrow();
+      const first = api.sent[0];
+      expect(await store.readOnlineAttempts(ARM)).toHaveLength(1);
+      await session.archive();
+      expect(api.sent).toHaveLength(2);
+      expect(api.sent[1]?.body).toEqual(first?.body);
+      expect(api.sent[1]?.path).toBe(first?.path);
+      expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+    } finally {
+      session.dispose();
+      await store.close();
+      vi.useRealTimers();
+    }
   });
 
   it("refuses online-only lifecycle work while edits are pending or offline", async () => {
@@ -1840,29 +1848,35 @@ describe("CharacterSession uncertain online outcomes", () => {
   );
 
   it("pauses with retry guidance on an unexpected 500 and retries with the same key", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const { api, store, session } = await makeHarness();
-    api.scriptOpenView(viewFor("char-1", 3));
-    await session.open();
-    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
-    api.scriptSend(async () => ({
-      error: new ApiError({ status: 500, code: "internal", message: "boom", requestId: "r", latestRevision: null, diagnostics: [] }),
-    }));
-    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
-    const failure = await session.archive().catch((error: unknown) => error);
-    expect(String(failure instanceof Error ? failure.message : failure)).toMatch(/retr|same key|duplicate/i);
-    // The attempt is retained verbatim: a 500 proves nothing about the outcome.
-    const retained = await store.readOnlineAttempts(ARM);
-    expect(retained).toHaveLength(1);
-    expect(retained[0]?.request.body).toEqual(api.sent[0]?.body);
-    // A newer command cannot overtake the uncertain attempt.
-    await expect(session.recover()).rejects.toThrow(/uncertain|resolve/i);
-    expect(api.sent).toHaveLength(1);
-    await session.whenIdle();
-    expect(api.sent).toHaveLength(2);
-    expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
-    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
-    session.dispose();
-    await store.close();
+    try {
+      api.scriptOpenView(viewFor("char-1", 3));
+      await session.open();
+      api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+      api.scriptSend(async () => ({
+        error: new ApiError({ status: 500, code: "internal", message: "boom", requestId: "r", latestRevision: null, diagnostics: [] }),
+      }));
+      api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
+      const failure = await session.archive().catch((error: unknown) => error);
+      expect(String(failure instanceof Error ? failure.message : failure)).toMatch(/retr|same key|duplicate/i);
+      // The attempt is retained verbatim: a 500 proves nothing about the outcome.
+      const retained = await store.readOnlineAttempts(ARM);
+      expect(retained).toHaveLength(1);
+      expect(retained[0]?.request.body).toEqual(api.sent[0]?.body);
+      // A newer command cannot overtake the uncertain attempt.
+      await expect(session.recover()).rejects.toThrow(/uncertain|resolve/i);
+      expect(api.sent).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      await session.whenIdle();
+      expect(api.sent).toHaveLength(2);
+      expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
+      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    } finally {
+      session.dispose();
+      await store.close();
+      vi.useRealTimers();
+    }
   });
 
   it("stops on idempotency_mismatch without advancing or retrying the same key", async () => {

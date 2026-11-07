@@ -63,7 +63,8 @@ for (const width of [360, 768, 1280]) for (const theme of ["light", "dark"] as c
     await page.setViewportSize({ width, height: 900 });
     await page.emulateMedia({ colorScheme: theme });
     await signIn(page);
-    await page.getByLabel("Theme",{exact:true}).first().selectOption(theme);
+    await page.goto("/account");
+    await page.getByLabel("Theme",{exact:true}).selectOption(theme);
     const f = await fixture(page);
     const records: unknown[] = [];
     const errors: string[] = [];

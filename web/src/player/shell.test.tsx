@@ -313,9 +313,10 @@ describe("Account screen (G6 Task 3)", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     renderAccount();
     expect(await screen.findByRole("heading", { name: "Account" })).toBeInTheDocument();
-    expect(await screen.findByText(ACTOR)).toBeInTheDocument();
-    expect(screen.getByText(/locale/i)).toBeInTheDocument();
-    expect(screen.getByText(/this device/i)).toBeInTheDocument();
+    expect(await screen.findByText("This device")).toBeInTheDocument();
+    expect(screen.queryByText(ACTOR)).not.toBeInTheDocument();
+    expect(screen.queryByText(/locale/i)).not.toBeInTheDocument();
+    expect(screen.getByText("This device")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
     // Task 4 owns the theme-default control; this task only provides the mount.
     expect(screen.getByTestId("account-theme-section")).toBeInTheDocument();
@@ -351,15 +352,15 @@ describe("Account screen (G6 Task 3)", () => {
 
   it("reuses the offline texts for storage/sync/recovery guidance", async () => {
     renderAccount();
-    await screen.findByText(ACTOR);
+    await screen.findByText("This device");
     expect(screen.getByText("Online")).toBeInTheDocument();
-    expect(screen.getByText("Open a character to archive or recover it.")).toBeInTheDocument();
+    expect(screen.queryByText("Open a character to archive or recover it.")).not.toBeInTheDocument();
   });
 
   it("signs out through the existing session with confirmation", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const identity = renderAccount();
-    await screen.findByText(ACTOR);
+    await screen.findByText("This device");
     await userEvent.setup().click(screen.getByRole("button", { name: "Sign out" }));
     expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/unsynchronized/i));
     expect(identity.signOut).toHaveBeenCalledTimes(1);

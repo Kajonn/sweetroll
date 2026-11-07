@@ -199,7 +199,7 @@ test("I7 exit: co-GM shared-edit conflict and independent operation", async ({
       await page.goto(campaignUrl);
       await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
       await page.getByRole("tab", { name: "Members" }).click({ timeout: STEP_TIMEOUT });
-      const memberRow = page.locator("li", { hasText: inviteeUserId! });
+      const memberRow = page.getByTestId(`campaign-member-${inviteeUserId!}`);
       await expect(memberRow).toBeVisible({ timeout: STEP_TIMEOUT });
       await memberRow.locator("select").selectOption("co_gm");
       await memberRow.getByRole("button", { name: "Change role" }).click({ timeout: STEP_TIMEOUT });

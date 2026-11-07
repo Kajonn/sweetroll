@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 import Fastify from "fastify";
+import openapiTS from "openapi-typescript";
 import type { Pool } from "pg";
 
 import { SystemDocumentV1Schema } from "../src/systems/implementation/package/schema/document.js";
@@ -85,7 +86,9 @@ async function emitOpenApi(): Promise<void> {
     emitJson("docs/contracts/openapi-v1.json", buildOpenApiDocument(app));
     const response = await app.inject(`${publicApiPrefix}/openapi.json`);
     if (response.statusCode !== 200) throw new Error("Public API contract route failed.");
-    emitJson("docs/contracts/public-api-v1.json", response.json());
+    const publicContract = response.json();
+    await openapiTS(publicContract);
+    emitJson("docs/contracts/public-api-v1.json", publicContract);
   } finally {
     await app.close();
   }

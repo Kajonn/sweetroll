@@ -237,10 +237,12 @@ export interface SystemPersistenceRepository {
     systemId: SystemId,
     lifecycle: "active" | "archived",
   ): Promise<SystemRecord | null>;
-  updateSystemAccess(
-    systemId: SystemId,
-    access: "private" | "link" | "public",
-  ): Promise<SystemRecord | null>;
+  updateSystemAccess(input: {
+    systemId: SystemId;
+    actorId: UserId;
+    access: "private" | "link" | "public";
+    requestId: string;
+  }): Promise<SystemRecord | null>;
   updateVersionLifecycle(
     versionId: VersionId,
     lifecycle: "published" | "deprecated",
@@ -472,15 +474,30 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
       return row === undefined ? null : toSystemRecord(row);
     },
 
-    async updateSystemAccess(systemId, access) {
-      const result = await pool.query<SystemRow>(
-        `UPDATE systems SET access = $2, updated_at = now()
-          WHERE id = $1
-          RETURNING id, owner_id, name, access, lifecycle, created_at, updated_at`,
-        [systemId, access],
-      );
-      const row = result.rows[0];
-      return row === undefined ? null : toSystemRecord(row);
+    async updateSystemAccess(input) {
+      return inTransaction(pool, async (client) => {
+        const current = await client.query<SystemRow>(
+          `SELECT id, owner_id, name, access, lifecycle, created_at, updated_at
+             FROM systems WHERE id = $1 AND owner_id = $2 FOR UPDATE`,
+          [input.systemId, input.actorId],
+        );
+        const system = current.rows[0];
+        if (system === undefined) return null;
+        if (system.access === input.access) return toSystemRecord(system);
+        const updated = await client.query<SystemRow>(
+          `UPDATE systems SET access = $2, updated_at = now() WHERE id = $1
+           RETURNING id, owner_id, name, access, lifecycle, created_at, updated_at`,
+          [input.systemId, input.access],
+        );
+        await transactionMethods(client).appendAudit({
+          systemId: input.systemId,
+          actorId: input.actorId,
+          kind: "system_sharing_changed",
+          summary: `System sharing changed to ${input.access}`,
+          requestId: input.requestId,
+        });
+        return toSystemRecord(requireRow(updated.rows[0], "updateSystemAccess"));
+      });
     },
 
     async updateVersionLifecycle(versionId, lifecycle) {

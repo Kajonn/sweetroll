@@ -617,10 +617,13 @@ Detailed contracts and required regression matrices are in the [I6 backend spec]
 
 ## 13.3 Public API v1 (2026-11-07)
 
-The separate `/api/v1` contract lets an account validate, create, save, and
-publish private system drafts and discover versions, create standalone
-characters, read their values, and edit individual fields. Both local and
-combined HTTP serving expose the same prefix and public OpenAPI document.
+The separate `/api/v1` contract covers system authoring and standalone
+character setup. Users can create, clone or import a draft, validate and preview
+it, attach template artwork, publish a version, export it, and set its sharing.
+Character setup includes version and inventory discovery, creation or duplication,
+field and resource edits, slot placement and moves, portraits and entry artwork.
+Both local and combined HTTP serving expose the same prefix and public OpenAPI
+document.
 Browser routes keep cookie authentication. The API uses scoped personal
 access tokens and checks current resource permissions for every request,
 including receipt replay. Characters owns the standalone-only policy and

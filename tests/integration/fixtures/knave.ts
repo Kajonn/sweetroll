@@ -48,7 +48,6 @@ const fields: FieldV1[] = [
   integer("copper", "Copper pieces", 0, 0, 1_000_000),
   { kind: "resource", id: "hp", label: "Hit points", default: { current: 1, max: 1 }, min: -1, max: 80, step: 1, resetTo: "max" },
   { kind: "text", id: "background", label: "Background", default: "", required: false, minLength: 0, maxLength: 120 },
-  { kind: "text", id: "gear_notes", label: "Starting gear notes", default: "", required: false, minLength: 0, maxLength: 500 },
 ];
 
 const templates: ObjectTemplateV1[] = [
@@ -137,8 +136,9 @@ export const knaveDocument: SystemDocumentV1 = {
       {
         id: "equipment", label: "Equipment and spellbooks",
         elements: [
-          ...sheetFields(["item_capacity", "copper", "gear_notes"]),
+          ...sheetFields(["item_capacity", "copper"]),
           { kind: "slot", id: "show_pack", slotId: "pack" },
+          { kind: "slot", id: "show_readied_gear", slotId: "readied_gear" },
         ],
       },
     ],
@@ -155,7 +155,10 @@ export const knaveDocument: SystemDocumentV1 = {
   ],
   validations: [],
   templates,
-  slots: [{ id: "pack", label: "Inventory", accepts: ["item", "spell"] }],
+  slots: [
+    { id: "pack", label: "Inventory", accepts: ["item", "spell"] },
+    { id: "readied_gear", label: "Readied gear", accepts: ["item"] },
+  ],
 };
 
 export const knaveCharacter = {
@@ -173,6 +176,5 @@ export const knaveCharacter = {
     copper: 0,
     hp: { current: 6, max: 6 },
     background: "Former ferryman",
-    gear_notes: "Dagger, brigandine, rope, and two days of rations.",
   },
 };

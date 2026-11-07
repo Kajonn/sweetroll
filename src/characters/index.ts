@@ -1,7 +1,7 @@
 import { createCharacterImages, type CharacterImages } from "./images.js";
 import { createCharacterEntryImages, type CharacterEntryImages } from "./entry-images.js";
 import {canPlaceTemplate} from "../campaigns/templatePolicy.js";
-import {materializeDefaults,templateApplicable,validDefaults} from "../systems/implementation/runtime/effective-entry.js";
+import { materializeDefaults, slotsForEntity, templateApplicable, validDefaults } from "../systems/implementation/runtime/effective-entry.js";
 import {readPushRoll,mayReadPush,narrowerAudience,type StoredPushRoll} from "./push.js";
 import {pushEligibility} from "../systems/implementation/rules/push.js";
 import { mapRuntimeError, isFinalizableRuntimeError } from "./runtime-errors.js";
@@ -339,6 +339,7 @@ export type CharacterUpdateEntryValuesCommand = {
   entryId: string;
   values: Record<string, unknown>;
   quantity?: number;
+  slotId?: DefinitionId;
   expectedRevision: number;
   idempotencyKey: string;
 };
@@ -1026,6 +1027,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     resultScope: StoredResultScope,
     executionId: string,
     replayExpiresAt: Date,
+    standaloneOnly: boolean,
   ): Promise<CharacterResult<CharacterCommandResult>> {
     const fail = async (error: CharacterError): Promise<CharacterResult<CharacterCommandResult>> => {
       await repo.finalizeExecutionError({
@@ -1040,6 +1042,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     if (!packaged.ok) return packaged;
     const packageValue=packaged.value;
     const slots: SlotDefinitionV1[] = packaged.value.slots ?? [];
+    const allowedSlots = standaloneOnly ? slotsForEntity(packageValue, resolveSource.entityDefinitionId) : slots;
     const templates: ObjectTemplateV1[] = packaged.value.templates ?? [];
     // RuntimeStateV1.entries is optional: legacy rows decode without it.
     const storedEntries: Record<string, CharacterEntryV1> = resolveSource.state.entries ?? {};
@@ -1120,7 +1123,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         ...(quantity === undefined ? {} : {quantity}),
       };
       const siblingCount = Object.values(storedEntries).filter((entry) => entry.slotId === candidate.slotId).length;
-      const validation = validateEntryForSlot(candidate, slots, templates, siblingCount);
+      const validation = validateEntryForSlot(candidate, allowedSlots, templates, siblingCount);
       if (!validation.ok) return fail(errors.invalid_value(validation.message));
       if (candidate.templateId !== null) {
         const template = templates.find((candidateTemplate) => candidateTemplate.id === candidate.templateId);
@@ -1167,19 +1170,21 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       const candidate: CharacterEntryV1 = {
         ...stored,
         values: merged,
+        slotId: command.slotId ?? stored.slotId,
         ...(command.quantity === undefined ? {} : { quantity: command.quantity }),
       };
       const siblingCount = Object.values(storedEntries).filter(
-        (entry) => entry.slotId === stored.slotId && entry.entryId !== stored.entryId,
+        (entry) => entry.slotId === candidate.slotId && entry.entryId !== stored.entryId,
       ).length;
-      const validation = validateEntryForSlot(candidate, slots, templates, siblingCount);
+      const validation = validateEntryForSlot(candidate, allowedSlots, templates, siblingCount);
       if (!validation.ok) return fail(errors.invalid_value(validation.message));
       nextEntries = { ...storedEntries, [stored.entryId]: candidate };
       activityKind = "entry_updated";
-      activityFields = { entryId: stored.entryId, slotId: stored.slotId, values: command.values,
+      activityFields = { entryId: stored.entryId, slotId: candidate.slotId, values: command.values,
         ...(command.quantity === undefined ? {} : { quantity: command.quantity }) };
-      changedDefinitionIds = [stored.slotId];
-      stateChanged = JSON.stringify(merged) !== JSON.stringify(stored.values)
+      const moved = candidate.slotId !== stored.slotId;
+      changedDefinitionIds = moved ? [stored.slotId, candidate.slotId] : [stored.slotId];
+      stateChanged = moved || JSON.stringify(merged) !== JSON.stringify(stored.values)
         || candidate.quantity !== stored.quantity;
     }
 
@@ -1250,6 +1255,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       expectedRevision: command.expectedRevision,
       attachedCampaignId,
       resultScope,
+      standaloneOnly,
       executionId,
       replayExpiresAt,
     });
@@ -1786,7 +1792,12 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
                   ? { entry: command.entry }
                   : command.kind === "removeEntry"
                     ? { entryId: command.entryId }
-                    : { entryId: command.entryId, values: command.values };
+                    : {
+                      entryId: command.entryId,
+                      values: command.values,
+                      ...(command.slotId === undefined ? {} : { slotId: command.slotId }),
+                      ...(command.quantity === undefined ? {} : { quantity: command.quantity }),
+                    };
         // I6 Task 8: the requested audience (or its omission) is part of the
         // input hash. The effective default is NOT hashed: an omitted
         // audience replays from the recorded receipt even after the campaign
@@ -1916,19 +1927,6 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           }
         }
 
-        // Task 7: entry writes validate against the version package (slots,
-        // templates) instead of running a runtime mutation intent. Claim,
-        // auth/scope, campaign/archived gates above are shared with the
-        // sibling commands; outcome handling is shared via finishCommandTx.
-        if (
-          command.kind === "addEntry"
-          || command.kind === "removeEntry"
-          || command.kind === "updateEntryValues"
-        ) {
-          const resolveSource: CharacterRecord = attachedRecord ?? snapshot!;
-          return applyEntryCommand(ctx, command, resolveSource, attachedCampaignId, resultScope, executionId, replayExpiresAt);
-        }
-
         const resolveSource: CharacterRecord = attachedRecord ?? snapshot!;
         if (access?.standaloneOnly && resolveSource.revision !== command.expectedRevision) {
           return finishCommandTx({
@@ -1936,6 +1934,14 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             characterId: command.characterId, expectedRevision: command.expectedRevision,
             attachedCampaignId, resultScope, executionId, replayExpiresAt,
           });
+        }
+
+        // Entry writes validate against the pinned package's slots and templates.
+        if (command.kind === "addEntry" || command.kind === "removeEntry" || command.kind === "updateEntryValues") {
+          return applyEntryCommand(
+            ctx, command, resolveSource, attachedCampaignId, resultScope, executionId, replayExpiresAt,
+            access?.standaloneOnly ?? false,
+          );
         }
 
         let pushParent:StoredPushRoll|null=null;

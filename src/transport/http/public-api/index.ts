@@ -4,10 +4,15 @@ import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import type { Pool } from "pg";
 
 import type { CharacterError, Characters, CharacterView } from "../../../characters/index.js";
+import type { ImageAttachmentError } from "../../../platform/image-attachment.js";
+import { ExpressionAstV1Schema } from "../../../systems/implementation/package/schema/expression.js";
+import { SystemPackageV1Schema } from "../../../systems/implementation/package/schema/package.js";
+import { SystemExportV1Schema } from "../../../systems/implementation/package/schema/export.js";
 import type { Identity } from "../../../identity/index.js";
 import type { PersonalTokenScope } from "../../../identity/personal-tokens.js";
 import type { AppError, AuthoringWorkspace, RequestContext, SystemAuthoring } from "../../../systems/authoring.js";
 import { documentDiagnosticPointers } from "../../../systems/implementation/authoring/assess.js";
+import { REFERENCE_TEMPLATES } from "../../../systems/implementation/persistence/index.js";
 import { PACKAGE_LIMITS } from "../../../systems/implementation/package/limits.js";
 import { SystemDocumentV1Schema } from "../../../systems/implementation/package/schema/document.js";
 import { strictInputCompiler } from "../strictValidation.js";
@@ -17,6 +22,7 @@ import * as s from "./schemas.js";
 export const publicApiPrefix = "/api/v1";
 const documentBodyLimit = PACKAGE_LIMITS.encodedBytes + 4096;
 const commandBodyLimit = 128 * 1024;
+const imageBodyLimit = 8 * 1024 * 1024;
 const bodyValidator = new Ajv({ strict: false });
 bodyValidator.addFormat("uuid", /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i);
 
@@ -54,18 +60,30 @@ const errorResponses = Object.fromEntries(Object.entries(errorStatuses).map(([st
 }));
 
 const outputSchemas = {
-  SystemPage: s.systemPage, Workspace: s.workspace, Assessment: s.assessment, Publication: s.publication,
+  SystemPage: s.systemPage, StarterTemplates: s.starterTemplates, Sharing: s.sharing, Workspace: s.workspace, Assessment: s.assessment, Publication: s.publication,
   CreationVersions: s.creationVersions, CreationOptions: s.creationOptions,
   CharacterPage: s.characterPage, CharacterSheet: s.characterSheet, CharacterMutation: s.characterMutation,
+  ImageState: s.imageState, PortraitState: s.portraitState, SystemExport: SystemExportV1Schema, Preview: s.preview,
 };
 
 const schemaRef = (name: string) => ({ $ref: `#/components/schemas/${name}` });
+
+// Runtime JSON Schemas use TypeBox's recursive $id. OpenAPI consumers need
+// document-local component references to compile the same recursive type.
+const { $id: astId, ...ast } = ExpressionAstV1Schema;
+const astReference = schemaRef("ExpressionAst");
+const openApiPackageSchemas = {
+  SystemPackage: JSON.parse(JSON.stringify(SystemPackageV1Schema, (_key, value) =>
+    value?.$id === astId ? astReference : value)),
+  ExpressionAst: JSON.parse(JSON.stringify(ast, (key, value) =>
+    key === "$ref" && value === astId ? astReference.$ref : value)),
+};
 
 type Dependencies = { identity: Identity; authoring: SystemAuthoring; characters: Characters; pool: Pool };
 type InputSchema = { params?: TSchema; querystring?: TSchema; body?: TSchema };
 type Infer<S, K extends keyof InputSchema> = S extends Record<K, TSchema> ? Static<S[K]> : never;
 type Operation<S> = {
-  method: "GET" | "POST" | "PUT";
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   path: string;
   id: string;
   description: string;
@@ -74,11 +92,12 @@ type Operation<S> = {
   output: keyof typeof outputSchemas;
   created?: true;
   document?: true;
+  bodyLimit?: number;
   example?: unknown;
   bucket?: RateBucket;
   fieldErrorPath?: "initialValues" | "value";
 };
-type Failure = AppError | CharacterError;
+type Failure = AppError | CharacterError | ImageAttachmentError;
 type Result<T> = { ok: true; value: T } | { ok: false; error: Failure };
 
 function failure(reply: FastifyReply, requestId: string, status: number, code: string, message: string) {
@@ -105,7 +124,7 @@ function sendResult<T>(
     result_unavailable: 409, internal: 500, temporarily_unavailable: 503,
   };
   const code = error.code === "conflict" && error.latestRevision !== undefined ? "stale_revision" : error.code;
-  const diagnostics = (error.diagnostics ?? []).map((entry) => "path" in entry
+  const diagnostics = (("diagnostics" in error ? error.diagnostics : undefined) ?? []).map((entry) => "path" in entry
     ? packageDiagnostic(entry)
     : { code: entry.validationId, severity: entry.severity, path: "", message: entry.message });
   if (fieldErrorPath !== undefined && "definitionId" in error && error.definitionId !== undefined) {
@@ -150,6 +169,9 @@ function characterSheet(character: CharacterView) {
   return {
     characterId, systemVersionId, entityDefinitionId, name, revision, lifecycle, createdAt, updatedAt,
     values: character.state.values, derivedValues, validations,
+    entries: Object.values(character.state.entries ?? {}).map(({ entryId, slotId, templateId, values, quantity }) => ({
+      entryId, slotId, templateId, values, ...(quantity === undefined ? {} : { quantity }),
+    })),
   };
 }
 
@@ -183,6 +205,7 @@ export function buildPublicApi({ identity, authoring, characters, pool }: Depend
       }) => Result<T> | Promise<Result<T>>,
     ) {
       const success = operation.created ? 201 : 200;
+      const bodyLimit = operation.bodyLimit ?? (operation.document ? documentBodyLimit : commandBodyLimit);
       const statuses = Object.entries(errorStatuses);
       const response = { [success]: outputSchemas[operation.output], ...Object.fromEntries(statuses.map(([code]) => [code, s.errorEnvelope])) };
       const path = operation.path.replace(/:([a-zA-Z]+)/g, "{$1}");
@@ -203,7 +226,7 @@ export function buildPublicApi({ identity, authoring, characters, pool }: Depend
         security: [{ bearerAuth: [] }], "x-required-scope": operation.scope,
         ...(parameters.length > 0 ? { parameters } : {}),
         ...(body ? {
-          "x-max-body-bytes": operation.document ? documentBodyLimit : commandBodyLimit,
+          "x-max-body-bytes": bodyLimit,
           requestBody: { required: true, content: { "application/json": {
             schema: body, ...(operation.example ? { example: operation.example } : {}),
           } } },
@@ -220,7 +243,7 @@ export function buildPublicApi({ identity, authoring, characters, pool }: Depend
       app.route<{ Params: Infer<S, "params">; Querystring: Infer<S, "querystring">; Body: Infer<S, "body"> }>({
         method: operation.method, url: operation.path, schema,
         config: { bearerOnly: true },
-        bodyLimit: operation.document ? documentBodyLimit : commandBodyLimit,
+        bodyLimit,
         validatorCompiler: (input) => input.httpPart === "body" ? bodyValidator.compile(input.schema) : strictInputCompiler(input),
         async onRequest(request, reply) {
           const token = /^Bearer ([^\s,]+)$/i.exec(request.headers.authorization ?? "")?.[1];
@@ -258,17 +281,52 @@ export function buildPublicApi({ identity, authoring, characters, pool }: Depend
     }, (ctx, { query }) => authoring.list(ctx, { limit: query.limit ?? 25, cursor: query.cursor ?? null }));
 
     route({
-      method: "POST", path: "/systems", id: "createSystem", description: "Create a private system and blank draft.",
+      method: "POST", path: "/systems", id: "createSystem", description: "Create a private system from a blank draft, an authorized version, or a Sweetroll export.",
       scope: "systems:write", input: { body: s.createSystem }, output: "Workspace", created: true,
+      bodyLimit: 18 * 1024 * 1024,
       example: { name: "Wayfarer", idempotencyKey: "system-create-1" },
     }, async (ctx, { body }) => map(await authoring.createDraft(ctx, {
-      source: { kind: "blank", name: body.name }, idempotencyKey: body.idempotencyKey,
+      source: "source" in body ? body.source : { kind: "blank", name: body.name }, idempotencyKey: body.idempotencyKey,
     }), workspace));
 
     route({
       method: "GET", path: "/systems/:systemId", id: "readSystem", description: "Read the current draft and published versions of an owned system.",
       scope: "systems:read", input: { params: s.systemId }, output: "Workspace",
     }, async (ctx, { params }) => map(await authoring.open(ctx, params.systemId), workspace));
+
+    route({
+      method: "GET", path: "/templates", id: "listStarterTemplates", description: "List the built-in starter versions available for cloning.",
+      scope: "systems:read", input: {}, output: "StarterTemplates",
+    }, () => ({
+      ok: true, value: { templates: REFERENCE_TEMPLATES.map(({ versionId, name }) => ({ versionId, name })) },
+    }));
+
+    route({
+      method: "PUT", path: "/systems/:systemId/sharing", id: "setSystemSharing", description: "Set the visibility of an owned system and its published versions.",
+      scope: "systems:write", input: { params: s.systemId, body: s.changeSharing }, output: "Sharing",
+    }, (ctx, { params, body }) => authoring.changeSharing(ctx, { ...params, ...body }));
+
+    route({
+      method: "GET", path: "/system-versions/:versionId/export", id: "exportSystemVersion",
+      description: "Download an owned published version as a Sweetroll package, including its image bundle.",
+      scope: "systems:read", input: { params: s.versionId }, output: "SystemExport",
+    }, (ctx, { params }) => authoring.exportVersion(ctx, params.versionId));
+
+    const systemImagePath = "/systems/:systemId/templates/:templateId/image";
+    route({
+      method: "GET", path: systemImagePath, id: "readSystemItemImage", description: "Read metadata for a draft template image.",
+      scope: "systems:read", input: { params: s.systemTemplate }, output: "ImageState",
+    }, (ctx, { params }) => authoring.openItemImage(ctx, params));
+
+    route({
+      method: "PUT", path: systemImagePath, id: "setSystemItemImage", description: "Upload or replace a draft template image.",
+      scope: "systems:write", input: { params: s.systemTemplate, body: s.setSystemImage }, output: "ImageState", bodyLimit: imageBodyLimit,
+    }, (ctx, { params, body }) => authoring.setItemImage(ctx, { ...params, ...body }));
+
+    route({
+      method: "DELETE", path: systemImagePath, id: "removeSystemItemImage", description: "Remove a draft template image.",
+      scope: "systems:write", input: { params: s.systemTemplate, body: s.revisionCommandBody }, output: "ImageState",
+    }, (ctx, { params, body }) => authoring.removeItemImage(ctx, { ...params, ...body }));
 
     route({
       method: "POST", path: "/systems/validate", id: "validateSystem",
@@ -280,6 +338,12 @@ export function buildPublicApi({ identity, authoring, characters, pool }: Depend
       method: "PUT", path: "/systems/:systemId/draft", id: "saveSystemDraft", description: "Replace an owned system draft at the supplied revision.",
       scope: "systems:write", input: { params: s.systemId, body: s.saveDraft }, output: "Workspace", document: true,
     }, async (ctx, { params, body }) => map(await authoring.saveDraft(ctx, { ...params, ...body }), workspace));
+
+    route({
+      method: "POST", path: "/systems/:systemId/preview", id: "previewSystemDraft",
+      description: "Compile the current owned draft into an expiring preview snapshot.",
+      scope: "systems:write", input: { params: s.systemId }, output: "Preview", bucket: "validate",
+    }, (ctx, { params }) => authoring.previewDraft(ctx, params));
 
     route({
       method: "POST", path: "/systems/:systemId/publish", id: "publishSystemVersion", description: "Publish the exact draft revision as an immutable system version.",
@@ -332,6 +396,82 @@ export function buildPublicApi({ identity, authoring, characters, pool }: Depend
       ({ character }) => characterMutation(character),
     ));
 
+    route({
+      method: "POST", path: "/characters/:characterId/resources/:resourceId/bump", id: "bumpCharacterResource",
+      description: "Adjust an owned standalone character's resource by one configured step.",
+      scope: "characters:write", input: { params: s.resourceId, body: s.bumpResource }, output: "CharacterMutation",
+    }, async (ctx, { params, body }) => map(
+      await characters.apply(ctx, { kind: "bumpResource", ...params, ...body }, { standaloneOnly: true }),
+      ({ character }) => characterMutation(character),
+    ));
+
+    route({
+      method: "POST", path: "/characters/:characterId/entries", id: "addCharacterEntry",
+      description: "Add an entry to a slot from the pinned version's catalog, or add a personal data-only entry with a null template ID.",
+      scope: "characters:write", input: { params: s.characterId, body: s.addEntry }, output: "CharacterMutation",
+    }, async (ctx, { params, body }) => {
+      const { expectedRevision, idempotencyKey, values = {}, ...entry } = body;
+      return map(await characters.apply(ctx, {
+        kind: "addEntry", ...params, expectedRevision, idempotencyKey, entry: { ...entry, values },
+      }, { standaloneOnly: true }), ({ character }) => characterMutation(character));
+    });
+
+    route({
+      method: "PATCH", path: "/characters/:characterId/entries/:entryId", id: "updateCharacterEntry",
+      description: "Move an entry to a compatible slot or update its values or quantity.",
+      scope: "characters:write", input: { params: s.entryId, body: s.updateEntry }, output: "CharacterMutation",
+    }, async (ctx, { params, body }) => map(
+      await characters.apply(ctx, { kind: "updateEntryValues", ...params, ...body, values: body.values ?? {} }, { standaloneOnly: true }),
+      ({ character }) => characterMutation(character),
+    ));
+
+    route({
+      method: "DELETE", path: "/characters/:characterId/entries/:entryId", id: "removeCharacterEntry",
+      description: "Remove an entry from an owned standalone character.",
+      scope: "characters:write", input: { params: s.entryId, body: s.revisionCommandBody }, output: "CharacterMutation",
+    }, async (ctx, { params, body }) => map(
+      await characters.apply(ctx, { kind: "removeEntry", ...params, ...body }, { standaloneOnly: true }),
+      ({ character }) => characterMutation(character),
+    ));
+
+    route({
+      method: "POST", path: "/characters/:characterId/duplicate", id: "duplicateCharacter",
+      description: "Create a standalone copy of an owned standalone character.",
+      scope: "characters:write", input: { params: s.characterId, body: s.duplicateCharacter }, output: "CharacterMutation", created: true,
+    }, async (ctx, { params, body }) => map(await characters.duplicate(ctx, { ...params, ...body }), characterMutation));
+
+    const portraitPath = "/characters/:characterId/portrait";
+    route({
+      method: "GET", path: portraitPath, id: "readCharacterPortrait", description: "Read portrait metadata and revision.",
+      scope: "characters:read", input: { params: s.characterId }, output: "PortraitState",
+    }, (ctx, { params }) => characters.openPortrait(ctx, { ...params, standaloneOnly: true }));
+
+    route({
+      method: "PUT", path: portraitPath, id: "setCharacterPortrait", description: "Upload or replace a standalone character portrait.",
+      scope: "characters:write", input: { params: s.characterId, body: s.setPortrait }, output: "PortraitState", bodyLimit: imageBodyLimit,
+    }, (ctx, { params, body }) => characters.setPortrait(ctx, { ...params, ...body, standaloneOnly: true }));
+
+    route({
+      method: "DELETE", path: portraitPath, id: "removeCharacterPortrait", description: "Remove a standalone character portrait.",
+      scope: "characters:write", input: { params: s.characterId, body: s.removePortrait }, output: "PortraitState",
+    }, (ctx, { params, body }) => characters.removePortrait(ctx, { ...params, ...body, standaloneOnly: true }));
+
+    const entryImagePath = "/characters/:characterId/entries/:entryId/image";
+    route({
+      method: "GET", path: entryImagePath, id: "readCharacterEntryImage", description: "Read the inherited or overridden image metadata for an inventory entry.",
+      scope: "characters:read", input: { params: s.entryId }, output: "ImageState",
+    }, (ctx, { params }) => characters.openEntryImage(ctx, { ...params, standaloneOnly: true }));
+
+    route({
+      method: "PUT", path: entryImagePath, id: "setCharacterEntryImage", description: "Upload custom art for a standalone inventory entry.",
+      scope: "characters:write", input: { params: s.entryId, body: s.setEntryImage }, output: "ImageState", bodyLimit: imageBodyLimit,
+    }, (ctx, { params, body }) => characters.setEntryImage(ctx, { ...params, ...body, standaloneOnly: true }));
+
+    route({
+      method: "DELETE", path: entryImagePath, id: "removeCharacterEntryImage", description: "Remove the displayed art for a standalone inventory entry.",
+      scope: "characters:write", input: { params: s.entryId, body: s.removeEntryImage }, output: "ImageState",
+    }, (ctx, { params, body }) => characters.removeEntryImage(ctx, { ...params, ...body, standaloneOnly: true }));
+
     paths["/openapi.json"] = { get: {
       operationId: "getOpenApiDocument", description: "Download the public API contract.",
       security: [], responses: { 200: { description: "OpenAPI 3.1 document", content: { "application/json": {} } } },
@@ -350,6 +490,11 @@ export function buildPublicApi({ identity, authoring, characters, pool }: Depend
           Workspace: JSON.parse(JSON.stringify(s.workspace, (key, value: unknown) =>
             key === "document" ? schemaRef("SystemDocument") : value)),
           SystemDocument: SystemDocumentV1Schema,
+          ...openApiPackageSchemas,
+          SystemExport: {
+            ...SystemExportV1Schema, properties: { ...SystemExportV1Schema.properties, package: schemaRef("SystemPackage") },
+          },
+          Preview: { ...s.preview, properties: { ...s.preview.properties, package: schemaRef("SystemPackage") } },
           Error: s.errorEnvelope,
         },
       },

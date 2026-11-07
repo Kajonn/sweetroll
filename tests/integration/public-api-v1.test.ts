@@ -1,4 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { buildPublicApi, publicApiPrefix } from "../../src/transport/http/public-api/index.js";
@@ -14,10 +18,14 @@ const databaseUrl = process.env.TEST_DATABASE_URL;
 describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
   const schema = `public_api_${randomUUID().replaceAll("-", "")}`;
   let handle: I3AppHandle;
+  let mediaDirectory: string;
+  const previousMediaDirectory = process.env.SWEETROLL_MEDIA_DIR;
   let pauseFieldEdit: (() => Promise<void>) | undefined;
   const scopes = ["systems:read", "systems:write", "characters:read", "characters:write"];
 
   beforeAll(async () => {
+    mediaDirectory = await mkdtemp(join(tmpdir(), "sweetroll-api-art-"));
+    process.env.SWEETROLL_MEDIA_DIR = mediaDirectory;
     await createI3Schema(databaseUrl!, schema);
     const pool = createI3Pool(databaseUrl!, schema);
     handle = await buildI3App({
@@ -43,6 +51,9 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
     await handle?.app.close();
     await handle?.pool.end();
     await dropI3Schema(databaseUrl!, schema);
+    if (previousMediaDirectory === undefined) delete process.env.SWEETROLL_MEDIA_DIR;
+    else process.env.SWEETROLL_MEDIA_DIR = previousMediaDirectory;
+    if (mediaDirectory) await rm(mediaDirectory, { recursive: true, force: true });
   });
 
   async function issue(cookie: string, requested = scopes) {
@@ -55,7 +66,7 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
     return response.json<{ token: string; id: string }>();
   }
 
-  function call(token: string, method: "GET" | "POST" | "PUT", path: string, payload?: object) {
+  function call(token: string, method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", path: string, payload?: object) {
     return handle.app.inject({
       method, url: `/api/v1${path}`, headers: { authorization: `Bearer ${token}` }, ...(payload ? { payload } : {}),
     });
@@ -256,6 +267,11 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
     }
     expect((await racing).statusCode).toBe(404);
     expect((await call(token, "GET", path)).statusCode).toBe(404);
+    expect((await call(token, "GET", `${path}/portrait`)).statusCode).toBe(404);
+    expect((await call(token, "POST", `${path}/entries`, {
+      entryId: randomUUID(), slotId: "pack", templateId: null, values: { name: "Rope" },
+      expectedRevision: edited.json().revision, idempotencyKey: "adopted-add",
+    })).statusCode).toBe(404);
     expect((await call(token, "POST", fieldPath, edit)).statusCode).toBe(404);
     expect((await call(token, "POST", "/characters", { ...create, initialValues: { [field.id]: 12 } })).statusCode).toBe(404);
     expect((await call(token, "GET", "/characters")).json().characters.map(
@@ -288,8 +304,25 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
     const { draft } = saved.json();
     expect(draft.document).toEqual(knaveDocument);
 
+    const image = {
+      description: "A blue test square", contentType: "image/png",
+      dataBase64: (await sharp({ create: { width: 32, height: 32, channels: 3, background: "#52636b" } })
+        .png().toBuffer()).toString("base64"),
+    };
+    const art = await call(token, "PUT", `/systems/${systemId}/templates/dagger/image`, {
+      ...image, expectedRevision: draft.revision, idempotencyKey: "knave-dagger-art",
+    });
+    expect(art.statusCode, art.body).toBe(200);
+    expect(art.json()).toMatchObject({ revision: draft.revision + 1, image: { description: image.description } });
+
+    const preview = await call(token, "POST", `/systems/${systemId}/preview`);
+    expect(preview.statusCode, preview.body).toBe(200);
+    expect(preview.json()).toMatchObject({
+      systemId, sourceRevision: art.json().revision, package: { name: "Knave 1e" },
+    });
+
     const published = await call(token, "POST", `/systems/${systemId}/publish`, {
-      expectedRevision: draft.revision,
+      expectedRevision: art.json().revision,
       semanticVersion: "1.0.0",
       idempotencyKey: "knave-publish",
     });
@@ -302,7 +335,14 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
     const options = await call(token, "GET", `/characters/creation-options?systemVersionId=${versionId}`);
     expect(options.statusCode, options.body).toBe(200);
     const [entity] = options.json().entities;
-    expect(entity).toMatchObject({ id: "knave", kind: "playable" });
+    expect(entity).toMatchObject({
+      id: "knave", kind: "playable",
+      slots: [{ id: "pack", accepts: ["item", "spell"] }, { id: "readied_gear", accepts: ["item"] }],
+    });
+    expect(options.json().templates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "dagger", kind: "item" }),
+      expect.objectContaining({ id: "brigandine", kind: "item" }),
+    ]));
     expect(entity.fields).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "constitution", kind: "integer", min: 1, max: 10 }),
       expect.objectContaining({ id: "hp", kind: "resource" }),
@@ -317,7 +357,62 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
     });
     expect(character.statusCode, character.body).toBe(201);
     const { characterId, revision } = character.json();
+    const entriesPath = `/characters/${characterId}/entries`;
+    const daggerId = randomUUID();
+    const armorId = randomUUID();
+    const dagger = { entryId: daggerId, templateId: "dagger", slotId: "pack", expectedRevision: revision, idempotencyKey: "knave-add-dagger" };
+    const equipped = await call(token, "POST", entriesPath, dagger);
+    expect(equipped.statusCode, equipped.body).toBe(200);
+    expect((await call(token, "POST", entriesPath, dagger)).json()).toEqual(equipped.json());
+    const armor = await call(token, "POST", entriesPath, {
+      entryId: armorId, templateId: "brigandine", slotId: "readied_gear",
+      expectedRevision: equipped.json().revision, idempotencyKey: "knave-equip-armor",
+    });
+    expect(armor.statusCode, armor.body).toBe(200);
+    const move = {
+      slotId: "readied_gear", expectedRevision: armor.json().revision,
+      idempotencyKey: "knave-ready-dagger", values: { dagger_quality: 2 },
+    };
+    const inheritedArt = await call(token, "GET", `${entriesPath}/${daggerId}/image`);
+    expect(inheritedArt.statusCode, inheritedArt.body).toBe(200);
+    expect(inheritedArt.json().image).toEqual(art.json().image);
+    const moved = await call(token, "PATCH", `${entriesPath}/${daggerId}`, move);
+    expect(moved.statusCode, moved.body).toBe(200);
+    expect((await call(token, "PATCH", `${entriesPath}/${daggerId}`, { ...move, slotId: "pack" })).json().error.code)
+      .toBe("idempotency_mismatch");
+    const stale = await call(token, "DELETE", `${entriesPath}/${daggerId}`, {
+      expectedRevision: armor.json().revision, idempotencyKey: "knave-stale-removal",
+    });
+    expect(stale.json().error.code).toBe("stale_revision");
 
+    const invalidSlot = await call(token, "POST", entriesPath, {
+      entryId: randomUUID(), templateId: "counterspell_book", slotId: "readied_gear",
+      expectedRevision: moved.json().revision, idempotencyKey: "knave-invalid-slot",
+    });
+    expect(invalidSlot.statusCode, invalidSlot.body).toBe(422);
+
+    const ropeId = randomUUID();
+    const rope = await call(token, "POST", entriesPath, {
+      entryId: ropeId, templateId: null, slotId: "pack", values: { name: "Rope" },
+      expectedRevision: moved.json().revision, idempotencyKey: "knave-personal-entry",
+    });
+    expect(rope.statusCode, rope.body).toBe(200);
+    const rationsId = randomUUID();
+    const rations = await call(token, "POST", entriesPath, {
+      entryId: rationsId, templateId: "rations", slotId: "pack",
+      expectedRevision: rope.json().revision, idempotencyKey: "knave-rations",
+    });
+    expect(rations.statusCode, rations.body).toBe(200);
+    const spareId = randomUUID();
+    const spare = await call(token, "POST", entriesPath, {
+      entryId: spareId, templateId: null, slotId: "pack", values: { name: "Spare torch" },
+      expectedRevision: rations.json().revision, idempotencyKey: "knave-spare-entry",
+    });
+    expect(spare.statusCode, spare.body).toBe(200);
+    const removed = await call(token, "DELETE", `${entriesPath}/${spareId}`, {
+      expectedRevision: spare.json().revision, idempotencyKey: "knave-remove-entry",
+    });
+    expect(removed.statusCode, removed.body).toBe(200);
     const sheet = await call(token, "GET", `/characters/${characterId}`);
     expect(sheet.statusCode, sheet.body).toBe(200);
     expect(sheet.json()).toMatchObject({
@@ -325,7 +420,13 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
       systemVersionId: versionId,
       entityDefinitionId: "knave",
       name: "Mara Flint",
-      revision,
+      revision: removed.json().revision,
+      entries: expect.arrayContaining([
+        { entryId: daggerId, templateId: "dagger", slotId: "readied_gear", values: { dagger_slots: 1, dagger_quality: 2 } },
+        { entryId: armorId, templateId: "brigandine", slotId: "readied_gear", values: { brigandine_slots: 2, brigandine_defense: 13, brigandine_quality: 4 } },
+        { entryId: ropeId, templateId: null, slotId: "pack", values: { name: "Rope" } },
+        { entryId: rationsId, templateId: "rations", slotId: "pack", values: { ration_days: 2 } },
+      ]),
       values: knaveCharacter.initialValues,
       derivedValues: {
         strength_defense: 12, dexterity_defense: 11, constitution_defense: 13,
@@ -334,6 +435,54 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
       },
       validations: [],
     });
+    expect(sheet.json().entries).toHaveLength(4);
+
+    const portraitPath = `/characters/${characterId}/portrait`;
+    const portrait = await call(token, "PUT", portraitPath, {
+      ...image, expectedCharacterRevision: removed.json().revision,
+      expectedPortraitRevision: 0, idempotencyKey: "knave-portrait",
+    });
+    expect(portrait.statusCode, portrait.body).toBe(200);
+    expect((await call(token, "GET", portraitPath)).json()).toMatchObject({
+      revision: 1, portrait: { description: image.description },
+    });
+
+    const entryImagePath = `${entriesPath}/${daggerId}/image`;
+    const entryImage = await call(token, "PUT", entryImagePath, {
+      ...image, description: "Custom dagger art", expectedCharacterRevision: removed.json().revision,
+      expectedImageRevision: inheritedArt.json().revision, idempotencyKey: "knave-dagger-override",
+    });
+    expect(entryImage.statusCode, entryImage.body).toBe(200);
+    expect((await call(token, "GET", entryImagePath)).json()).toMatchObject({ image: { description: "Custom dagger art" } });
+
+    const duplicate = await call(token, "POST", `/characters/${characterId}/duplicate`, { idempotencyKey: "knave-copy" });
+    expect(duplicate.statusCode, duplicate.body).toBe(201);
+    expect(duplicate.json().characterId).not.toBe(characterId);
+    const copy = await call(token, "GET", `/characters/${duplicate.json().characterId}`);
+    expect(copy.json()).toMatchObject({ systemVersionId: versionId, entries: sheet.json().entries });
+
+    const shared = await call(token, "PUT", `/systems/${systemId}/sharing`, { access: "link" });
+    expect(shared.statusCode, shared.body).toBe(200);
+    expect(shared.json()).toEqual({ systemId, access: "link" });
+
+    const clone = await call(token, "POST", "/systems", {
+      source: { kind: "clone", versionId }, idempotencyKey: "knave-clone",
+    });
+    expect(clone.statusCode, clone.body).toBe(201);
+    expect(clone.json()).toMatchObject({
+      system: { access: "private" }, assessment: { valid: true },
+      draft: { document: { metadata: knaveDocument.metadata, entities: knaveDocument.entities, slots: knaveDocument.slots } },
+    });
+
+    const exported = await call(token, "GET", `/system-versions/${versionId}/export`);
+    expect(exported.statusCode, exported.body).toBe(200);
+    const imported = await call(token, "POST", "/systems", {
+      source: { kind: "import", content: exported.body }, idempotencyKey: "knave-import",
+    });
+    expect(imported.statusCode, imported.body).toBe(201);
+    expect(imported.json()).toMatchObject({ system: { access: "private" }, assessment: { valid: true } });
+    expect(imported.json().draft.document.templates.find((t: { id: string }) => t.id === "dagger").image.fileId)
+      .not.toBe(art.json().image.fileId);
   });
 
 });

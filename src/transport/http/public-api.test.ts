@@ -27,9 +27,13 @@ describe.each([false, true])("public API with combined deployment = %s", (combin
       expect(contract.json().servers).toEqual([{ url: "/api/v1" }]);
       expect(Object.keys(contract.json().paths).sort()).toEqual([
         "/characters", "/characters/creation-options", "/characters/creation-versions",
-        "/characters/{characterId}", "/characters/{characterId}/fields/{fieldId}/set",
-        "/openapi.json", "/systems", "/systems/validate", "/systems/{systemId}",
-        "/systems/{systemId}/draft", "/systems/{systemId}/publish",
+        "/characters/{characterId}", "/characters/{characterId}/duplicate",
+        "/characters/{characterId}/entries", "/characters/{characterId}/entries/{entryId}",
+        "/characters/{characterId}/entries/{entryId}/image", "/characters/{characterId}/fields/{fieldId}/set",
+        "/characters/{characterId}/portrait", "/characters/{characterId}/resources/{resourceId}/bump",
+        "/openapi.json", "/system-versions/{versionId}/export", "/systems", "/systems/validate", "/systems/{systemId}",
+        "/systems/{systemId}/draft", "/systems/{systemId}/preview", "/systems/{systemId}/publish", "/systems/{systemId}/sharing",
+        "/systems/{systemId}/templates/{templateId}/image", "/templates",
       ]);
       const denied = await app.inject({ url: "/api/v1/systems", headers: { cookie: "session=existing" } });
       expect(denied.statusCode).toBe(401);

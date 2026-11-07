@@ -8,7 +8,7 @@ import { createClamScanner } from "../platform/image-scanner.js";
 import type { ImageAttachmentError, ImageAttachmentResult, ImageAttachmentState } from "../platform/image-attachment.js";
 import { discardPreparedItemImage, imageChecksum, imageDescriptorMatches, insertPreparedItemImage, itemImageDescriptor, ItemImageMissing, loadItemImage, prepareItemImage, readItemImageBytes, type PreparedItemImage, type ItemImageRecord } from "../platform/item-image-storage.js";
 
-type Location = { characterId: string; entryId: string };
+type Location = { characterId: string; entryId: string; standaloneOnly?: boolean };
 type Command = Location & { expectedCharacterRevision: number; expectedImageRevision: number; idempotencyKey: string };
 type Upload = Command & { description: string; contentType: ImageContentType; dataBase64: string };
 export interface CharacterEntryImages {
@@ -25,7 +25,7 @@ export function createCharacterEntryImages(options: { pool: Pool; scanImage?: Im
   function failure<T>(cause: unknown): ImageAttachmentResult<T> { return { ok: false, error: cause instanceof Denial ? cause.error : cause instanceof ImageProcessingError ? { code: cause.code, message: cause.message } : cause instanceof ItemImageMissing ? { code: "not_found", message: "The requested entry image does not exist." } : { code: "internal", message: "The entry image could not be loaded or saved. Try again later." } }; }
   async function transaction<T>(write: boolean, work: (client: PoolClient) => Promise<T>): Promise<T> {
     const client = await pool.connect();
-    try { await client.query(write ? "BEGIN" : "BEGIN READ ONLY"); const value = await work(client); await client.query("COMMIT"); return value; }
+    try { await client.query(write ? "BEGIN" : "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY"); const value = await work(client); await client.query("COMMIT"); return value; }
     catch (cause) { await client.query("ROLLBACK"); throw cause; } finally { client.release(); }
   }
   async function current(client: PoolClient, loc: Location): Promise<{ state: ImageAttachmentState; asset: ItemImageRecord | null }> {
@@ -39,7 +39,7 @@ export function createCharacterEntryImages(options: { pool: Pool; scanImage?: Im
     return { state: { revision: link?.revision ?? 0, image }, asset };
   }
   async function authority(client: PoolClient, ctx: RequestContext, loc: Location, write: boolean) {
-    const auth = await authorizeCharacterImage(client, ctx.actorId, loc.characterId, write); if (!auth) return missing();
+    const auth = await authorizeCharacterImage(client, ctx.actorId, loc.characterId, write, loc.standaloneOnly); if (!auth) return missing();
     return { auth, ...(await current(client, loc)) };
   }
   function check(auth: CharacterImageAuthority, state: ImageAttachmentState, command: Command) {

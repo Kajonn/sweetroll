@@ -780,17 +780,8 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
         if (input.access !== "private" && input.access !== "link" && input.access !== "public") {
           return { ok: false, error: errors.bad_request("access must be private, link, or public.") };
         }
-        const system = await authorizeOwner(input.systemId, ctx.actorId);
-        if (system === null) return { ok: false, error: errors.not_found() };
-        const updated = await repo.updateSystemAccess(input.systemId, input.access);
+        const updated = await repo.updateSystemAccess({ ...input, actorId: ctx.actorId, requestId: ctx.requestId });
         if (updated === null) return { ok: false, error: errors.not_found() };
-        await repo.appendAudit({
-          systemId: updated.systemId,
-          actorId: ctx.actorId,
-          kind: "system_sharing_changed",
-          summary: `System sharing changed to ${updated.access}`,
-          requestId: ctx.requestId,
-        });
         return {
           ok: true,
           value: { systemId: updated.systemId, access: updated.access },

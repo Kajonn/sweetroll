@@ -1,4 +1,4 @@
-import {derivedEntryError} from "./implementation/runtime/effective-entry.js";
+import { derivedEntryError, slotsForEntity } from "./implementation/runtime/effective-entry.js";
 import {findOwnedAction} from "./implementation/runtime/action-ownership.js";
 import {makePushContext,resolveRuntimePush} from "./implementation/runtime/push.js";
 import type {PushContext} from "./implementation/runtime/push-context.js";
@@ -12,7 +12,7 @@ import { createDeterministicRng } from "./implementation/runtime/deterministic-r
 import { buildFieldBindings, decodeRuntimeState, initializeState } from "./implementation/runtime/state.js";
 import { actionEvaluationFailure } from "./implementation/runtime/action-evaluation.js";
 import { evaluate } from "./implementation/rules/evaluate.js";
-import type { CharacterEntryV1, EntityDefinitionV1, FieldV1, SystemPackageV1, TemplateKind } from "./implementation/package/schema/index.js";
+import type { CharacterEntryV1, EntityDefinitionV1, FieldV1, ObjectTemplateV1, SlotDefinitionV1, SystemPackageV1, TemplateKind } from "./implementation/package/schema/index.js";
 
 export { resolveGrantedAction } from "./implementation/runtime/resolve-entries.js";
 export type {
@@ -289,7 +289,9 @@ export type VersionDescription = {
     label: string;
     kind: "playable" | "npc";
     fields?: Exclude<FieldV1, { kind: "computed" | "image" }>[];
+    slots?: SlotDefinitionV1[];
   }[];
+  templates?: Pick<ObjectTemplateV1, "id" | "label" | "kind" | "description" | "fields">[];
 };
 
 export interface SystemRuntime {
@@ -320,8 +322,14 @@ export function createSystemRuntime(input: {
             kind: entity.kind ?? "playable",
             ...(describeInput.includeFields ? {
               fields: entity.fields.filter((field) => field.kind !== "computed" && field.kind !== "image"),
+              slots: slotsForEntity(loaded.value, entity.id),
             } : {}),
           })),
+          ...(describeInput.includeFields ? {
+            templates: (loaded.value.templates ?? []).map(({ id, label, kind, description, fields }) => ({
+              id, label, kind, fields, ...(description === undefined ? {} : { description }),
+            })),
+          } : {}),
         },
       };
     },

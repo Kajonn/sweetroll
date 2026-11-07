@@ -12,6 +12,7 @@ export async function authorizeCharacterImage(
   actorId: string,
   id: string,
   lock: boolean,
+  standaloneOnly = false,
 ): Promise<CharacterImageAuthority | null> {
   const scope = (
     await client.query<{ campaign_id: string | null }>(
@@ -19,7 +20,7 @@ export async function authorizeCharacterImage(
       [id],
     )
   ).rows[0];
-  if (!scope) return null;
+  if (!scope || (standaloneOnly && scope.campaign_id !== null)) return null;
   let campaignActive = true;
   if (scope.campaign_id !== null) {
     const campaign = (

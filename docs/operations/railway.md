@@ -44,7 +44,9 @@ or secret variables.
 | `NODE_ENV` | `production` |
 | `HOST` | `0.0.0.0` |
 | `SWEETROLL_SERVE_STATIC` | `1` |
-| `COOKIE_SECURE` | `true` |
+| `COOKIE_SECURE` | Defaults to `true` in production. |
+| `METRICS_TOKEN` | Optional. Use a separate random secret for metrics scraping. |
+| `TRUSTED_PROXY_CIDRS` | Optional comma-separated addresses or CIDRs of trusted forwarding proxies. |
 | `SWEETROLL_MEDIA_DIR` | `/app/data/media` |
 | `AUTHORITATIVE_ROLL_SECRET` | Generate a new random secret with the command below; keep it stable across deployments. |
 | `LOG_LEVEL` | `info` |
@@ -61,6 +63,21 @@ Railway secret variable, never into a commit:
 ```sh
 node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
+
+## Metrics and display request limits
+
+`/metrics` returns 404 unless `METRICS_TOKEN` is set. Generate a separate
+random value using the command above, store it in the service and scraper
+secret settings, and send it over HTTPS as `Authorization: Bearer <token>`.
+Missing or incorrect credentials receive 401. The health endpoints remain
+available to Railway without a token.
+
+Display redemption allows 10 attempts per minute per client IP and 120 per
+minute per process. By default it uses the TCP peer address. If an ingress
+proxy shares one peer address for many clients, configure
+`TRUSTED_PROXY_CIDRS` with the actual forwarding proxy addresses and verify
+that ingress appends or replaces the client entry in `X-Forwarded-For`.
+Leave the variable unset if those addresses cannot be verified.
 
 ## Persistent images
 

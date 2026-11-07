@@ -33,7 +33,7 @@ const fakeIdentity: Identity = {
   signOut: async () => ({ ok: true, value: undefined }),
 } as unknown as Identity;
 
-const cookie = { cookie: "session=t" };
+const cookie = { cookie: "session=t", "sec-fetch-site": "same-origin" };
 
 const apps: ReturnType<typeof Fastify>[] = [];
 
@@ -182,7 +182,6 @@ async function build(characters: Characters, anonymous = false): Promise<ReturnT
         : fakeIdentity,
       cookieName: "session",
       secure: true,
-      maxAgeSeconds: 3600,
     }),
   );
   await app.register(buildCharactersRoutes({ characters }));

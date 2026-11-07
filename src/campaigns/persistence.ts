@@ -675,9 +675,13 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       return row === undefined ? null : toCampaignRecord(row);
     },
 
-    async lockCampaign(client: PoolClient, campaignId: string): Promise<CampaignRecord | null> {
+    async lockCampaign(
+      client: PoolClient,
+      campaignId: string,
+      lock: "UPDATE" | "NO KEY UPDATE" = "UPDATE",
+    ): Promise<CampaignRecord | null> {
       const result = await client.query<CampaignRow>(
-        `SELECT ${CAMPAIGN_COLUMNS} FROM campaigns WHERE id = $1 FOR UPDATE`,
+        `SELECT ${CAMPAIGN_COLUMNS} FROM campaigns WHERE id = $1 FOR ${lock}`,
         [campaignId],
       );
       const row = result.rows[0];
@@ -1865,6 +1869,15 @@ export function createCampaignPersistenceRepository(pool: Pool) {
      * nothing and returns null so the caller mints a fresh code; callers
      * always run this inside the pair transaction.
      */
+    async countLiveDisplayCodes(client: PoolClient, campaignId: string, now: Date): Promise<number> {
+      await client.query("DELETE FROM display_codes WHERE campaign_id = $1 AND expires_at <= $2", [campaignId, now]);
+      const result = await client.query(
+        "SELECT 1 FROM display_codes WHERE campaign_id = $1 AND expires_at > $2",
+        [campaignId, now],
+      );
+      return result.rowCount ?? 0;
+    },
+
     async insertDisplayCode(
       client: PoolClient,
       input: { codeHash: string; campaignId: string; expiresAt: Date },

@@ -20,8 +20,9 @@ const fakeIdentity = (resolve: (token: string) => Promise<AuthContext>): Identit
 async function build(identity: Identity) {
   const app = Fastify({ loggerInstance: pino({ enabled: false }) });
   await app.register(cookie);
-  await app.register(buildAuthHook({ identity, cookieName: "session", secure: true, maxAgeSeconds: 3600 }));
+  await app.register(buildAuthHook({ identity, cookieName: "session", secure: true }));
   app.get("/auth-test", async (request) => ({ auth: request.auth }));
+  app.post("/auth-test", async (request) => ({ auth: request.auth }));
   await app.ready();
   return app;
 }
@@ -50,6 +51,25 @@ describe("buildAuthHook", () => {
       url: "/auth-test",
     });
     expect(response.json<{ auth: AuthContext }>().auth.state).toBe("authenticated");
+    expect(response.headers["set-cookie"]).toBeUndefined();
+  });
+
+  it.each([
+    [{}, 403],
+    [{ origin: "https://preview.example.com" }, 403],
+    [{ origin: "http://app.example.com" }, 403],
+    [{ origin: "null", "sec-fetch-site": "same-origin" }, 403],
+    [{ origin: "https://app.example.com" }, 200],
+    [{ "sec-fetch-site": "same-origin" }, 200],
+  ])("requires same-origin evidence on cookie writes (%j)", async (headers, status) => {
+    const app = await build(fakeIdentity(async () => ({
+      state: "authenticated", actorId: randomUUID(), sessionId: randomUUID(),
+    })));
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST", url: "/auth-test", headers: { host: "app.example.com", cookie: "session=token", ...headers },
+    });
+    expect(response.statusCode).toBe(status);
   });
 
   it("treats a missing cookie as anonymous", async () => {

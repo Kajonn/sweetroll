@@ -1405,7 +1405,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
       const schema = response === undefined ? route.schema : { ...route.schema, response };
       app[route.method](route.path, { schema,
         ...((route.path.includes("/portrait") || route.path.includes("/image")) ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); } } : {}),
-        ...((route.path.endsWith("/portrait") || route.path.endsWith("/image")) && route.method === "put" ? { bodyLimit: 8 * 1024 * 1024 } : {}),
+        ...((route.path.endsWith("/portrait") || route.path.endsWith("/image")) && route.method === "put" ? { bodyLimit: 8 * 1024 * 1024, config: { browserRateBucket: "upload" } } : {}),
         ...((route.path.includes("/entries") || route.path.includes("/rolls/") || route.path.includes("/portrait")) ? { validatorCompiler: strictInputCompiler } : {}) }, handlers[route.operationId]!);
     }
   };

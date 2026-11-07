@@ -75,16 +75,13 @@ export function createIdentityModule(input: CreateIdentityModuleInput): Identity
           displayName: claims.displayName,
         });
 
-        if (previousToken !== undefined) {
-          await repo.revokeSessionByTokenHash(hashToken(previousToken));
-        }
-
         const token = newSessionToken();
         const expiresAt = new Date(Date.now() + input.sessionTtlMs);
         const { sessionId } = await repo.createSession({
           userId,
           tokenHash: hashToken(token),
           expiresAt,
+          previousTokenHash: previousToken === undefined ? undefined : hashToken(previousToken),
         });
 
         return { ok: true, value: { token, userId, sessionId, expiresAt } };
@@ -105,7 +102,7 @@ export function createIdentityModule(input: CreateIdentityModuleInput): Identity
         if (session === null || session.revokedAt !== null) {
           return { state: "anonymous" as const };
         }
-        if (session.expiresAt.getTime() < Date.now()) {
+        if (session.expiresAt.getTime() <= Date.now()) {
           return { state: "session_expired" as const };
         }
         return {

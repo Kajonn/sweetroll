@@ -84,6 +84,8 @@ export type CreateSceneEventHubInput = {
   logger?: { warn(obj: unknown, msg?: string): void; info(obj: unknown, msg?: string): void } | undefined;
   /** Delay before re-establishing LISTEN after a failure (default 1s, doubling to 30s). */
   retryBaseMs?: number | undefined;
+  probeIntervalMs?: number;
+  probeTimeoutMs?: number;
   /** Test seam: replaces `new Client(config)`. */
   createClient?: ((config: ClientConfig) => Client) | undefined;
 };
@@ -103,8 +105,29 @@ export function createSceneEventHub(input: CreateSceneEventHubInput): SceneEvent
   let closed = false;
   let retryTimer: NodeJS.Timeout | null = null;
   let attempt = 0;
+  let probeTimer: NodeJS.Timeout | undefined;
+  const probeIntervalMs = input.probeIntervalMs ?? 15_000;
+  const probeTimeoutMs = input.probeTimeoutMs ?? 5_000;
+
+  function scheduleProbe(connection: Client): void {
+    probeTimer = setTimeout(() => {
+      probeTimer = setTimeout(() => {
+        if (client === connection) lose(new Error("scene event listener probe timed out"));
+      }, probeTimeoutMs);
+      probeTimer.unref();
+      void connection.query("SELECT 1").then(() => {
+        if (client !== connection) return;
+        clearTimeout(probeTimer);
+        scheduleProbe(connection);
+      }, (error: unknown) => {
+        if (client === connection) lose(error);
+      });
+    }, probeIntervalMs);
+    probeTimer.unref();
+  }
 
   function lose(reason: unknown): void {
+    clearTimeout(probeTimer);
     const wasListening = listening;
     listening = false;
     const old = client;
@@ -143,9 +166,17 @@ export function createSceneEventHub(input: CreateSceneEventHubInput): SceneEvent
 
   async function connect(): Promise<void> {
     if (closed || client !== null) return;
-    const next = createClient(input.connection);
+    const next = createClient({
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10_000,
+      connectionTimeoutMillis: probeTimeoutMs,
+      query_timeout: probeTimeoutMs,
+      ...input.connection,
+    });
     client = next;
-    next.on("error", (error) => lose(error));
+    next.on("error", (error) => {
+      if (client === next) lose(error);
+    });
     next.on("end", () => {
       if (client === next) lose(new Error("scene event connection ended"));
     });
@@ -167,6 +198,7 @@ export function createSceneEventHub(input: CreateSceneEventHubInput): SceneEvent
       if (client !== next || closed) return;
       listening = true;
       attempt = 0;
+      scheduleProbe(next);
       input.logger?.info({ channel: SCENE_EVENTS_CHANNEL }, "scene event listener ready");
     } catch (error) {
       if (client === next) lose(error);
@@ -190,6 +222,7 @@ export function createSceneEventHub(input: CreateSceneEventHubInput): SceneEvent
     },
     async close() {
       closed = true;
+      clearTimeout(probeTimer);
       if (retryTimer !== null) clearTimeout(retryTimer);
       retryTimer = null;
       const old = client;

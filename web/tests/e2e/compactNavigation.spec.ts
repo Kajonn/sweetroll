@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/browserTest";
 import { createCatalogCampaign } from "../fixtures/campaignTemplates.js";
 
 for (const width of [320, 360, 768, 1280]) {

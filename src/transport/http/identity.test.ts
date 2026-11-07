@@ -64,10 +64,10 @@ async function build(identity: Identity, allowedOrigins: string[] = []): Promise
       identity,
       cookieName: COOKIE_NAME,
       secure: true,
-      maxAgeSeconds: 3600,
+      allowedOrigins,
     }),
   );
-  await app.register(buildIdentityRoutes({ identity, cookieName: COOKIE_NAME, secure: true, allowedOrigins }));
+  await app.register(buildIdentityRoutes({ identity, cookieName: COOKIE_NAME, secure: true }));
   await app.ready();
   apps.push(app);
   return app;
@@ -191,7 +191,7 @@ describe("identity HTTP routes", () => {
       headers: {
         ...cookie(validToken),
         host: "localhost:4173",
-        origin: "http://localhost:4173",
+        origin: "https://localhost:4173",
       },
     });
     expect(response.statusCode).toBe(204);

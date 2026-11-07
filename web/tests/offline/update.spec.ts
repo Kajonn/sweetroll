@@ -1,6 +1,6 @@
 import { execSync } from "node:child_process";
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/browserTest";
 
 import {
   D20_REFERENCE_SYSTEM,

@@ -49,6 +49,16 @@ describe("loadConfig", () => {
     });
   });
 
+  it("defaults production cookies to Secure while allowing explicit local opt-out", () => {
+    const env = {
+      DATABASE_URL: "postgres://localhost/sweetroll",
+      AUTHORITATIVE_ROLL_SECRET: "0123456789abcdef0123456789abcdef",
+      NODE_ENV: "production",
+    };
+    expect(loadConfig(env).cookieSecure).toBe(true);
+    expect(loadConfig({ ...env, COOKIE_SECURE: "false" }).cookieSecure).toBe(false);
+  });
+
   it("allows tests to omit the authoritative roll secret", () => {
     expect(loadConfig({ DATABASE_URL: "postgres://localhost/sweetroll", NODE_ENV: "test" }))
       .toMatchObject({ authoritativeRollSecret: "", nodeEnv: "test" });

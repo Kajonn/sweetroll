@@ -196,6 +196,46 @@ describeWithDatabase("scene streaming (SSE snapshots, image revisions, fan-out)"
     return rows.rows[0].revision as number;
   }
 
+  it("limits live pairing codes per campaign across concurrent replicas", async () => {
+    const { campaignId } = await setup();
+    const ctx = ctxFor(h.users.gm);
+    const results = await Promise.all(Array.from({ length: 8 }, (_, index) =>
+      (index % 2 ? h.campaigns : campaignsB).pairDisplay(ctx, { campaignId }),
+    ));
+    const minted = results.filter((result) => result.ok);
+    expect(minted).toHaveLength(5);
+    expect(results.filter((result) => !result.ok).map((result) => result.error.code))
+      .toEqual(["conflict", "conflict", "conflict"]);
+    expect((await h.campaigns.redeemDisplayCode({ code: minted[0]!.value.code })).ok).toBe(true);
+    expect((await h.campaigns.pairDisplay(ctx, { campaignId })).ok).toBe(true);
+    await h.pool.query("UPDATE display_codes SET expires_at = now() - interval '1 minute' WHERE campaign_id = $1", [campaignId]);
+    expect((await h.campaigns.pairDisplay(ctx, { campaignId })).ok).toBe(true);
+    const count = await h.pool.query("SELECT code_hash FROM display_codes WHERE campaign_id = $1", [campaignId]);
+    expect(count.rowCount).toBe(1);
+  });
+
+  it("releases an SSE slot when the browser abandons the response", async () => {
+    const s = await setup();
+    const first = await openStream(s.eventsUrl, s.display.secret);
+    const second = await openStream(s.eventsUrl, s.display.secret);
+    try {
+      expect(first.response.status).toBe(200);
+      expect(second.response.status).toBe(200);
+      const blocked = await openStream(s.eventsUrl, s.display.secret);
+      expect(blocked.response.status).toBe(429);
+      blocked.close();
+      first.close();
+      await expect.poll(async () => {
+        const replacement = await openStream(s.eventsUrl, s.display.secret);
+        replacement.close();
+        return replacement.response.status;
+      }).toBe(200);
+    } finally {
+      first.close();
+      second.close();
+    }
+  });
+
   it("streams complete snapshots; token moves keep the image revision and render nothing", async () => {
     const s = await setup();
     const stream = await openStream(s.eventsUrl, s.display.secret);

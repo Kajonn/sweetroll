@@ -69,7 +69,8 @@ export function formatSseEvent(event: string, data: unknown): string {
 export function createDisplayStreams(input: CreateDisplayStreamsInput): DisplayStreams {
   const heartbeatMs = input.heartbeatMs ?? DISPLAY_STREAM_HEARTBEAT_MS;
   const stallTimeoutMs = input.stallTimeoutMs ?? DISPLAY_STREAM_STALL_MS;
-  const active = new Set<{ close(): void }>();
+  const active = new Map<string, Set<{ close(): void }>>();
+  const maxStreamsPerDisplay = 2;
 
   async function open(
     request: DisplaySceneInput,
@@ -95,7 +96,9 @@ export function createDisplayStreams(input: CreateDisplayStreamsInput): DisplayS
     function close(): void {
       if (closed) return;
       closed = true;
-      active.delete(handle);
+      const streams = active.get(request.displayId);
+      streams?.delete(handle);
+      if (streams?.size === 0) active.delete(request.displayId);
       unsubscribe?.();
       unsubscribe = null;
       if (heartbeat !== null) clearInterval(heartbeat);
@@ -220,7 +223,15 @@ export function createDisplayStreams(input: CreateDisplayStreamsInput): DisplayS
       return { ok: false, error: { code: "unavailable", message: "Live display updates are unavailable." } };
     }
 
-    active.add(handle);
+    // Only count authorized streams. A request with an invalid secret must
+    // never reserve a slot or displace a legitimate display.
+    const streams = active.get(request.displayId) ?? new Set();
+    if (streams.size >= maxStreamsPerDisplay) {
+      close();
+      return { ok: false, error: { code: "rate_limited", message: "This display has too many open streams." } };
+    }
+    streams.add(handle);
+    active.set(request.displayId, streams);
     return {
       ok: true,
       value: {
@@ -252,9 +263,11 @@ export function createDisplayStreams(input: CreateDisplayStreamsInput): DisplayS
 
   return {
     open,
-    activeCount: () => active.size,
+    activeCount: () => [...active.values()].reduce((total, streams) => total + streams.size, 0),
     closeAll() {
-      for (const handle of [...active]) handle.close();
+      for (const streams of active.values()) {
+        for (const handle of streams) handle.close();
+      }
     },
   };
 }

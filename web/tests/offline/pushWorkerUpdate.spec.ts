@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../fixtures/browserTest";
 import { signIn, workspace, publish, createCharacter, cleanup, resultOf, assertChild, cachedPushState, json } from "../fixtures/configurablePush.js";
 import { expectOfflineAvailable } from "./test-auth.js";
 

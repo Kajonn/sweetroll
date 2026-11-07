@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../fixtures/browserTest";
 
 import { exportCharacter, publishOwnedClone, readActivity } from "../offline/test-auth.js";
 

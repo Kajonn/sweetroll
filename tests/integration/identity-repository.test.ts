@@ -96,6 +96,15 @@ describeWithDatabase("IdentityRepository", () => {
     expect(revoked?.revokedAt).not.toBeNull();
   });
 
+  it("does not resolve a session for an inactive user", async () => {
+    const { userId } = await upsert("test", "inactive", "inactive@example.com");
+    const repo = createIdentityRepository(pool);
+    const tokenHash = randomUUID();
+    await repo.createSession({ userId, tokenHash, expiresAt: new Date(Date.now() + 60_000) });
+    await pool.query("UPDATE users SET status = 'suspended' WHERE id = $1", [userId]);
+    expect(await repo.findSessionByTokenHash(tokenHash)).toBeNull();
+  });
+
   it("returns null for an unknown token hash", async () => {
     const repo = createIdentityRepository(pool);
     expect(await repo.findSessionByTokenHash("no-such-hash")).toBeNull();

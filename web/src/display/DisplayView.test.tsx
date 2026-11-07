@@ -147,6 +147,20 @@ describe("DisplayView", () => {
     expect(a.openScene).not.toHaveBeenCalled();
   });
 
+  it("closes the stream on page hide and opens a fresh one when the page is restored", () => {
+    const streams = fakeStreams();
+    renderDisplay(<DisplayView api={api() as never} sceneId="s1" online storage={memoryStorage(seedCredential())} openSceneStream={streams.factory} />, qc());
+
+    act(() => window.dispatchEvent(new Event("pagehide")));
+    expect(streams.opened[0]?.closed).toBe(true);
+
+    act(() => window.dispatchEvent(new Event("pageshow")));
+    expect(streams.opened).toHaveLength(1);
+    act(() => window.dispatchEvent(Object.assign(new Event("pageshow"), { persisted: true })));
+    expect(streams.opened).toHaveLength(2);
+    expect(streams.opened[1]?.options).toEqual(streams.opened[0]?.options);
+  });
+
   it("moves tokens on the current map without downloading the map again", async () => {
     const streams = fakeStreams();
     renderDisplay(<DisplayView api={api() as never} sceneId="s1" online storage={memoryStorage(seedCredential())} openSceneStream={streams.factory} />, qc());

@@ -36,13 +36,20 @@ const scannerHealthPort = String(Number(backendPort) + 11);
 const scannerHost = process.env.SWEETROLL_CLAMD_HOST ?? "127.0.0.1";
 const scannerBackendPort = process.env.SWEETROLL_CLAMD_PORT ?? scannerPort;
 
+const baseURL = `http://localhost:${previewPort}`;
+
 export default defineConfig({
   testDir: "./tests/offline",
   fullyParallel: false,
   workers: 1,
   retries: 0,
   timeout: 180_000,
-  use: { baseURL: `http://localhost:${previewPort}`, trace: "retain-on-failure" },
+  use: {
+    baseURL,
+    // Playwright's APIRequestContext sends browser cookies without Origin by default.
+    extraHTTPHeaders: { Origin: baseURL },
+    trace: "retain-on-failure",
+  },
   webServer: [
     ...(process.env.SWEETROLL_CLAMD_HOST ? [] : [{
       command: "node scripts/image-scan-fixture.mjs",
@@ -61,6 +68,7 @@ export default defineConfig({
         DATABASE_URL: databaseUrl,
         AUTHORITATIVE_ROLL_SECRET: rollSecret,
         NODE_ENV: "production",
+        COOKIE_SECURE: "false", // This production build runs over local HTTP.
         SWEETROLL_TEST_AUTH: "1",
         PORT: backendPort,
         SWEETROLL_CLAMD_HOST: scannerHost,

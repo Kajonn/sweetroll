@@ -1,4 +1,4 @@
-import { test, expect, type APIRequestContext, type Browser, type Page } from "@playwright/test";
+import { test, expect, type APIRequestContext, type Browser, type Page } from "../fixtures/browserTest";
 import { uid } from "../offline/test-auth.js";
 import { JOURNEY_CODES, JOURNEY_ACTION_LABELS, publishJourneySystem } from "./tableJourneySystem.js";
 

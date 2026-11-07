@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/browserTest";
 
 /**
  * Task 11 character responsive/a11y cases (dev-server E2E): every reference

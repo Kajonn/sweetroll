@@ -766,7 +766,9 @@ previews and authorizes the pre-paint theme script by hash. HTTPS deployments
 send HSTS. Metrics require a separate scraper token and are off by default.
 
 The browser and public API share account request and image-upload budgets
-in PostgreSQL. Display redemption has per-IP and process limits. Each
+in PostgreSQL. The general budget allows up to 120 writes or public API
+requests, or 600 browser reads per minute. Browser reads spend one fifth of
+the budget used by a write. Display redemption has per-IP and process limits. Each
 campaign can have five live pairing codes, and each display credential can
 open two scene streams per process.
 

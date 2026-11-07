@@ -5,6 +5,7 @@ import { expect, it, vi } from "vitest";
 import { registerApiRoutes } from "./static.js";
 
 it("checks browser account and upload quotas and bounds anonymous redeem attempts by client IP", async () => {
+  const clock = vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
   const app = Fastify({ trustProxy: ["127.0.0.1"] });
   const query = vi.fn().mockResolvedValue({ rowCount: 1 });
   app.addHook("onRequest", async (request) => {
@@ -14,6 +15,7 @@ it("checks browser account and upload quotas and bounds anonymous redeem attempt
   });
   const write = vi.fn(async () => ({ ok: true }));
   registerApiRoutes(app, [(api, _opts, done) => {
+    api.get("/read", async () => ({ ok: true }));
     api.post("/write", write);
     api.put("/image", { config: { browserRateBucket: "upload" } }, write);
     api.post("/displays/redeem", { config: { displayRedeem: true } }, write);
@@ -22,12 +24,14 @@ it("checks browser account and upload quotas and bounds anonymous redeem attempt
   try {
     const headers = { cookie: "session=valid" };
     expect((await app.inject({ method: "POST", url: "/api/write", headers })).statusCode).toBe(200);
-    expect(query.mock.calls[0]?.[1]).toEqual(["account-id", "general", 120]);
+    expect(query.mock.calls[0]?.[1]).toEqual(["account-id", "general", 600, 5]);
+    expect((await app.inject({ method: "GET", url: "/api/read", headers })).statusCode).toBe(200);
+    expect(query.mock.calls[1]?.[1]).toEqual(["account-id", "general", 600, 1]);
     query.mockResolvedValueOnce({ rowCount: 1 }).mockResolvedValueOnce({ rowCount: 0 });
     const blocked = await app.inject({ method: "PUT", url: "/api/image", headers });
     expect(blocked.statusCode).toBe(429);
     expect(blocked.headers["retry-after"]).toBe("60");
-    expect(query.mock.calls[2]?.[1]).toEqual(["account-id", "upload", 30]);
+    expect(query.mock.calls[3]?.[1]).toEqual(["account-id", "upload", 30, 1]);
     expect(write).toHaveBeenCalledTimes(1);
 
     for (let attempt = 1; attempt <= 11; attempt++) {
@@ -41,6 +45,7 @@ it("checks browser account and upload quotas and bounds anonymous redeem attempt
       method: "POST", url: "/api/displays/redeem", headers: { "x-forwarded-for": "198.51.100.2" },
     })).statusCode).toBe(200);
   } finally {
+    clock.mockRestore();
     await app.close();
   }
 });

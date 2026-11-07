@@ -37,7 +37,8 @@ export function registerBrowserRateLimits(api: FastifyInstance, pool: Pool): voi
       allowed = consumeRedeem(request.ip);
     } else if (request.auth?.state === "authenticated") {
       const { actorId } = request.auth;
-      allowed = await consumeRequest(pool, actorId, "general")
+      const kind = request.method === "GET" || request.method === "HEAD" ? "browser_read" : "ordinary";
+      allowed = await consumeRequest(pool, actorId, "general", kind)
         && (browserRateBucket === undefined || await consumeRequest(pool, actorId, browserRateBucket));
     }
     if (!allowed) {

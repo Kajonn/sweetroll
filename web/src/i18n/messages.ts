@@ -330,7 +330,6 @@ export const defaultMessages: MessageTable = {
   "editor.readiness.noPublished": "Not published yet",
   "editor.readiness.viewVersions": "View version history",
   "editor.readiness.ready": "Ready to publish — no blocking issues.",
-  "editor.bodyPlaceholder": "This tab is not yet implemented.",
   "editor.metadata.systemStyle": "System style",
   "editor.metadata.style.default": "Default · Soft panels",
   "editor.metadata.style.classic": "Classic · Ink and serif headings",

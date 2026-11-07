@@ -41,6 +41,10 @@ export function activityKindLabel(kind: CampaignActivityEvent["kind"]): string {
       return t("campaign.activity.system_version_upgraded");
     case "system_version_reverted":
       return t("campaign.activity.system_version_reverted");
+    case "extension_added":
+      return t("campaign.activity.extension_added");
+    case "extension_removed":
+      return t("campaign.activity.extension_removed");
   }
 }
 

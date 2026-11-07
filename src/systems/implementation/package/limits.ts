@@ -7,6 +7,7 @@ export const PACKAGE_LIMITS = {
   expressionAstNodes: 256,
   expressionBytes: 1024,
   expressions: 1024,
+  extensionsPerComposition: 16,
   fields: 512,
   grantedActions: 256,
   referenceDataSets: 64,

@@ -1,5 +1,5 @@
 import { DEFAULT_SLOT_MAX_ENTRIES } from "../runtime/entries.js";
-import type { SystemPackageV1 } from "./schema/index.js";
+import type { CompiledExpressionV1, ExtensionPackageV1, ObjectTemplateV1, SystemPackageV1 } from "./schema/index.js";
 
 export type CompatibilityCode =
   | "breaking_type_change"
@@ -16,7 +16,8 @@ export type CompatibilityCode =
   | "template_field_required_added"
   | "slot_removed"
   | "slot_kind_narrowed"
-  | "slot_capacity_reduced";
+  | "slot_capacity_reduced"
+  | "extension_identity_changed";
 
 export type CompatibilityFinding = {
   code: CompatibilityCode;
@@ -119,8 +120,83 @@ export function comparePackages(prev: SystemPackageV1, next: SystemPackageV1): C
   // without them compare exactly as before. Adding templates, slots, or
   // granted actions is non-breaking; removals and slot-kind narrowing break
   // live entries and take the acknowledge-breaking path.
-  const prevTemplates = indexById(prev.templates ?? []);
-  const nextTemplates = indexById(next.templates ?? []);
+  compareTemplates(prev.templates ?? [], next.templates ?? [], findings);
+
+  const prevSlots = indexById(prev.slots ?? []);
+  const nextSlots = indexById(next.slots ?? []);
+  for (const [id, prevSlot] of prevSlots) {
+    const nextSlot = nextSlots.get(id);
+    if (nextSlot === undefined) {
+      findings.push({
+        code: "slot_removed",
+        path: `/slots/${id}`,
+        message: `Slot "${id}" was removed.`,
+      });
+      continue;
+    }
+    const narrowed = prevSlot.accepts.filter((kind) => !nextSlot.accepts.includes(kind));
+    if (narrowed.length > 0) {
+      findings.push({
+        code: "slot_kind_narrowed",
+        path: `/slots/${id}/accepts`,
+        message: `Slot "${id}" no longer accepts ${narrowed.map((kind) => `"${kind}"`).join(", ")}.`,
+      });
+    }
+    const prevCapacity = prevSlot.maxEntries ?? DEFAULT_SLOT_MAX_ENTRIES;
+    const nextCapacity = nextSlot.maxEntries ?? DEFAULT_SLOT_MAX_ENTRIES;
+    if (nextCapacity < prevCapacity) {
+      findings.push({
+        code: "slot_capacity_reduced",
+        path: `/slots/${id}/maxEntries`,
+        message: `Slot "${id}" capacity was reduced from ${prevCapacity} to ${nextCapacity}.`,
+      });
+    }
+  }
+
+  compareExpressions(prev.expressions, next.expressions, findings);
+
+  findings.sort((a, b) => a.path.localeCompare(b.path) || a.code.localeCompare(b.code));
+
+  return {
+    compatible: findings.length === 0,
+    findings,
+  };
+}
+
+/**
+ * Publish-time comparison of two versions of one system extension (plan
+ * 2026-11-07-system-extensions). Extensions only carry templates and their
+ * expressions, so the template and expression rules of `comparePackages`
+ * apply unchanged.
+ */
+export function compareExtensionPackages(
+  prev: ExtensionPackageV1,
+  next: ExtensionPackageV1,
+): CompatibilityReport {
+  const findings: CompatibilityFinding[] = [];
+  if (prev.extensionId !== next.extensionId || prev.baseSystemId !== next.baseSystemId) {
+    findings.push({
+      code: "extension_identity_changed",
+      path: "/extensionId",
+      message: "Versions belong to different extensions or systems.",
+    });
+  }
+  compareTemplates(prev.templates, next.templates, findings);
+  compareExpressions(prev.expressions, next.expressions, findings);
+  findings.sort((a, b) => a.path.localeCompare(b.path) || a.code.localeCompare(b.code));
+  return { compatible: findings.length === 0, findings };
+}
+
+// Dynamic sheet objects: adding templates or granted actions is non-breaking;
+// removals and field changes break live entries and take the
+// acknowledge-breaking path.
+function compareTemplates(
+  prevList: readonly ObjectTemplateV1[],
+  nextList: readonly ObjectTemplateV1[],
+  findings: CompatibilityFinding[],
+): void {
+  const prevTemplates = indexById(prevList);
+  const nextTemplates = indexById(nextList);
   for (const [id, prevTemplate] of prevTemplates) {
     const nextTemplate = nextTemplates.get(id);
     if (nextTemplate === undefined) {
@@ -168,41 +244,16 @@ export function comparePackages(prev: SystemPackageV1, next: SystemPackageV1): C
       }
     }
   }
+}
 
-  const prevSlots = indexById(prev.slots ?? []);
-  const nextSlots = indexById(next.slots ?? []);
-  for (const [id, prevSlot] of prevSlots) {
-    const nextSlot = nextSlots.get(id);
-    if (nextSlot === undefined) {
-      findings.push({
-        code: "slot_removed",
-        path: `/slots/${id}`,
-        message: `Slot "${id}" was removed.`,
-      });
-      continue;
-    }
-    const narrowed = prevSlot.accepts.filter((kind) => !nextSlot.accepts.includes(kind));
-    if (narrowed.length > 0) {
-      findings.push({
-        code: "slot_kind_narrowed",
-        path: `/slots/${id}/accepts`,
-        message: `Slot "${id}" no longer accepts ${narrowed.map((kind) => `"${kind}"`).join(", ")}.`,
-      });
-    }
-    const prevCapacity = prevSlot.maxEntries ?? DEFAULT_SLOT_MAX_ENTRIES;
-    const nextCapacity = nextSlot.maxEntries ?? DEFAULT_SLOT_MAX_ENTRIES;
-    if (nextCapacity < prevCapacity) {
-      findings.push({
-        code: "slot_capacity_reduced",
-        path: `/slots/${id}/maxEntries`,
-        message: `Slot "${id}" capacity was reduced from ${prevCapacity} to ${nextCapacity}.`,
-      });
-    }
-  }
-
-  const prevExpressions = indexById(prev.expressions);
+function compareExpressions(
+  prevList: readonly CompiledExpressionV1[],
+  nextList: readonly CompiledExpressionV1[],
+  findings: CompatibilityFinding[],
+): void {
+  const prevExpressions = indexById(prevList);
   for (const [id, prevExpression] of prevExpressions) {
-    const nextExpression = next.expressions.find((e) => e.id === id);
+    const nextExpression = nextList.find((e) => e.id === id);
     if (nextExpression === undefined) continue;
     if (prevExpression.context !== nextExpression.context) {
       findings.push({
@@ -219,11 +270,4 @@ export function comparePackages(prev: SystemPackageV1, next: SystemPackageV1): C
       });
     }
   }
-
-  findings.sort((a, b) => a.path.localeCompare(b.path) || a.code.localeCompare(b.code));
-
-  return {
-    compatible: findings.length === 0,
-    findings,
-  };
 }

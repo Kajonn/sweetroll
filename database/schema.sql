@@ -64,9 +64,16 @@ CREATE TABLE systems (
   name       text NOT NULL,
   access     text NOT NULL DEFAULT 'private',
   lifecycle  text NOT NULL DEFAULT 'active',
+  -- System extensions (design 6.8): an extension is a systems row of kind
+  -- 'extension' that adds templates to exactly one base system.
+  kind       text NOT NULL DEFAULT 'system' CHECK (kind IN ('system', 'extension')),
+  base_system_id uuid REFERENCES systems(id) ON DELETE RESTRICT,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK ((kind = 'extension') = (base_system_id IS NOT NULL))
 );
+CREATE INDEX systems_extensions_by_base ON systems (base_system_id, created_at DESC, id DESC)
+  WHERE kind = 'extension';
 
 CREATE TABLE system_drafts (
   system_id       uuid PRIMARY KEY REFERENCES systems(id) ON DELETE CASCADE,
@@ -86,9 +93,15 @@ CREATE TABLE system_versions (
   release_notes    text NOT NULL DEFAULT '',
   lifecycle        text NOT NULL DEFAULT 'published',
   compatibility_findings_json jsonb NOT NULL DEFAULT '[]'::jsonb,
+  -- Extension versions: the base system version they were compiled against.
+  built_against_version_id uuid REFERENCES system_versions(id) ON DELETE RESTRICT,
   created_at       timestamptz NOT NULL DEFAULT now(),
   UNIQUE (system_id, semantic_version)
 );
+
+-- Extension drafts: the base system version used for preview and validation.
+ALTER TABLE system_drafts
+  ADD COLUMN base_version_id uuid REFERENCES system_versions(id) ON DELETE RESTRICT;
 
 CREATE TABLE idempotency_receipts (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -177,6 +190,19 @@ CREATE TABLE campaigns (
 CREATE INDEX campaigns_owner_page_idx
   ON campaigns (owner_id, created_at DESC, id DESC);
 
+-- Design 6.8 (decision X7): the campaign composition. Attached characters'
+-- character_extensions always equal this set. `added_by` records whether the
+-- GM chose the extension or an adopted character brought it.
+CREATE TABLE campaign_extensions (
+  campaign_id           uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  extension_id          uuid NOT NULL REFERENCES systems(id) ON DELETE RESTRICT,
+  extension_version_id  uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  added_by              text NOT NULL CHECK (added_by IN ('campaign', 'character')),
+  added_by_character_id uuid, -- informational; the character may later leave or be purged
+  added_at              timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (campaign_id, extension_id)
+);
+
 CREATE TABLE campaign_members (
   campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -253,6 +279,16 @@ CREATE INDEX characters_owner_page_idx
   ON characters (owner_id, lifecycle, updated_at DESC, id DESC);
 
 -- Character-owned immutable safe art; authorization always follows a parent link.
+-- Design 6.8: extension versions a character is built on (one version per
+-- extension). Published versions are immutable; RESTRICT keeps used versions.
+CREATE TABLE character_extensions (
+  character_id         uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+  extension_id         uuid NOT NULL REFERENCES systems(id) ON DELETE RESTRICT,
+  extension_version_id uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  PRIMARY KEY (character_id, extension_id)
+);
+CREATE INDEX character_extensions_by_version ON character_extensions (extension_version_id);
+
 CREATE TABLE character_image_assets (
   id uuid PRIMARY KEY,
   created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -543,7 +579,9 @@ CREATE TABLE campaign_activity_events (
     'template_archive',
     'template_recover',
     'system_version_upgraded',
-    'system_version_reverted'
+    'system_version_reverted',
+    'extension_added',
+    'extension_removed'
   ))
 );
 

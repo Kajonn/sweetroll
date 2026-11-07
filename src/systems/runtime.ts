@@ -4,7 +4,10 @@ import {makePushContext,resolveRuntimePush} from "./implementation/runtime/push.
 import type {PushContext} from "./implementation/runtime/push-context.js";
 export type {PushContext} from "./implementation/runtime/push-context.js";
 import type { DieResult, RollBreakdown } from "./implementation/rules/result.js";
-import { PublishedPackageCorruptError, type PublishedPackageLoader } from "./implementation/runtime/package-loader.js";
+import { PublishedPackageCorruptError, type PublishedExtensionLoader, type PublishedPackageLoader } from "./implementation/runtime/package-loader.js";
+import { createEffectivePackageLoader, type EffectivePackageLoader } from "./implementation/runtime/composition-loader.js";
+import { unqualifiedId, type ExtensionRef } from "./implementation/rules/compose.js";
+export type { ExtensionRef } from "./implementation/rules/compose.js";
 import { buildCharacterProjection } from "./implementation/runtime/projection.js";
 import { decodeActionInputs, resolveGrantedAction } from "./implementation/runtime/resolve-entries.js";
 import { resolveObservedValues } from "./implementation/runtime/resolve.js";
@@ -68,6 +71,8 @@ export type RuntimeIntent =
 
 export type RuntimeRequest = {
   versionId: VersionId;
+  /** Design 6.8: extension versions the character is built on (none = base only). */
+  extensions?: readonly ExtensionRef[];
   entityId: DefinitionId;
   state?: RuntimeStateV1;
   intent: RuntimeIntent;
@@ -214,6 +219,8 @@ export type CharacterProjectionSlotEntry = {
   metadata?: {name:string;description?:string;notes?:string};
   entryId: string;
   templateId: DefinitionId | null;
+  /** Design 6.8: extension of the entry's template; absent for base templates. */
+  extensionId?: string;
   label: string;
   values: Record<string, unknown>;
   quantity?: number;
@@ -298,12 +305,17 @@ export type VersionDescription = {
     fields?: Exclude<FieldV1, { kind: "computed" | "image" }>[];
     slots?: SlotDefinitionV1[];
   }[];
-  templates?: Pick<ObjectTemplateV1, "id" | "label" | "kind" | "description" | "fields">[];
+  /** Base templates first; extension templates carry their plain `id` plus `extensionId`. */
+  templates?: Array<Pick<ObjectTemplateV1, "id" | "label" | "kind" | "description" | "fields"> & { extensionId?: string }>;
 };
 
 export interface SystemRuntime {
   resolve(input: RuntimeRequest): Promise<RuntimeResult<RuntimeResolution>>;
-  describeVersion(input: { versionId: VersionId; includeFields?: boolean }): Promise<RuntimeResult<VersionDescription>>;
+  describeVersion(input: {
+    versionId: VersionId;
+    extensions?: readonly ExtensionRef[];
+    includeFields?: boolean;
+  }): Promise<RuntimeResult<VersionDescription>>;
   /** Design 6.7 dry run: verify a stored state against another version of its system. */
   checkVersionChange(input: {
     fromVersionId: VersionId;
@@ -316,11 +328,17 @@ export interface SystemRuntime {
 
 export function createSystemRuntime(input: {
   loadPackage: PublishedPackageLoader;
+  /** Design 6.8: required to resolve characters built with extensions. */
+  loadExtensionPackage?: PublishedExtensionLoader;
   authoritativeRollSecret: string;
 }): SystemRuntime {
   if (Buffer.byteLength(input.authoritativeRollSecret, "utf8") < 32) {
     throw new Error("Authoritative roll secret must be at least 32 UTF-8 bytes.");
   }
+  const loadEffective = createEffectivePackageLoader({
+    loadPackage: input.loadPackage,
+    ...(input.loadExtensionPackage === undefined ? {} : { loadExtensionPackage: input.loadExtensionPackage }),
+  });
 
   return {
     async checkVersionChange(checkInput) {
@@ -341,7 +359,7 @@ export function createSystemRuntime(input: {
     },
 
     async describeVersion(describeInput) {
-      const loaded = await loadPublishedPackage(input.loadPackage, describeInput.versionId);
+      const loaded = await loadEffectivePackage(loadEffective, describeInput.versionId, describeInput.extensions);
       if (!loaded.ok) return loaded;
       return {
         ok: true,
@@ -358,16 +376,21 @@ export function createSystemRuntime(input: {
             } : {}),
           })),
           ...(describeInput.includeFields ? {
-            templates: (loaded.value.templates ?? []).map(({ id, label, kind, description, fields }) => ({
-              id, label, kind, fields, ...(description === undefined ? {} : { description }),
-            })),
+            templates: (loaded.value.templates ?? []).map(({ id, label, kind, description, fields }) => {
+              const key = unqualifiedId(id);
+              return {
+                id: key.id, label, kind, fields,
+                ...(key.origin === null ? {} : { extensionId: key.origin }),
+                ...(description === undefined ? {} : { description }),
+              };
+            }),
           } : {}),
         },
       };
     },
 
     async resolve(request) {
-      const loaded = await loadPublishedPackage(input.loadPackage, request.versionId);
+      const loaded = await loadEffectivePackage(loadEffective, request.versionId, request.extensions);
       if (!loaded.ok) return loaded;
       const packageValue = loaded.value;
 
@@ -552,6 +575,15 @@ export function createSystemRuntime(input: {
       };
     },
   };
+}
+
+async function loadEffectivePackage(
+  loadEffective: EffectivePackageLoader,
+  versionId: VersionId,
+  extensions: readonly ExtensionRef[] | undefined,
+): Promise<RuntimeResult<SystemPackageV1>> {
+  const loaded = await loadEffective(versionId, extensions);
+  return loaded.ok ? loaded : { ok: false, error: { code: loaded.error.code, message: loaded.error.message } };
 }
 
 async function loadPublishedPackage(

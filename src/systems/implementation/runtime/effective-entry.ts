@@ -6,14 +6,16 @@ import type {
   ObjectTemplateV1,
   SystemPackageV1,
 } from "../package/schema/index.js";
-import { validEntryValue, validateEntryForSlot } from "./entries.js";
+import { templateKey, validEntryValue, validateEntryForSlot } from "./entries.js";
 
 export function effectiveEntryDefinition(
   pkg: SystemPackageV1,
   entry: CharacterEntryV1,
 ): ObjectTemplateV1 | undefined {
-  if (entry.templateId !== null)
-    return (pkg.templates ?? []).find((t) => t.id === entry.templateId);
+  if (entry.templateId !== null) {
+    const key = templateKey(entry);
+    return (pkg.templates ?? []).find((t) => t.id === key);
+  }
   const snapshot = entry.snapshot;
   if (
     entry.source?.kind !== "campaign" ||

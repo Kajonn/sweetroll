@@ -23,6 +23,7 @@ export function buildCharacterExportDocument(
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
     systemVersionId: record.systemVersionId,
+    ...(record.extensions === undefined || record.extensions.length === 0 ? {} : { extensions: record.extensions }),
     packageChecksum,
     revision: record.revision,
     state: record.state,
@@ -45,7 +46,7 @@ export function buildAttachedCharacterExportDocument(
   record: Pick<
     CharacterRecord,
     "characterId" | "name" | "entityDefinitionId" | "lifecycle" | "createdAt" | "updatedAt" | "systemVersionId" | "revision" | "state"
-  >,
+  > & Partial<Pick<CharacterRecord, "extensions">>,
   packageChecksum: string,
 ): CharacterExportV1 {
   return {
@@ -58,6 +59,7 @@ export function buildAttachedCharacterExportDocument(
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
     systemVersionId: record.systemVersionId,
+    ...(record.extensions === undefined || record.extensions.length === 0 ? {} : { extensions: record.extensions }),
     packageChecksum,
     revision: record.revision,
     state: record.state,

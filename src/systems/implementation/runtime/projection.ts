@@ -146,6 +146,7 @@ function projectSlot(
     return {
       entryId: entry.entryId,
       templateId: entry.templateId,
+      ...(entry.extensionId === undefined ? {} : { extensionId: entry.extensionId }),
       ...(entry.source === undefined ? {} : {source:structuredClone(entry.source)}),
       label: entry.snapshot && "base" in entry.snapshot ? entry.snapshot.values.name : template?.label ?? customEntryLabel(entry.values),
       ...(entry.snapshot && "base" in entry.snapshot && template ? {definition:projectEntryDefinition(template), metadata:structuredClone(entry.snapshot.values)} : {}),

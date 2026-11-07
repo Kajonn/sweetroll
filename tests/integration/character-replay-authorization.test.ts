@@ -38,6 +38,8 @@ const DDL = `
     name text NOT NULL,
     access text NOT NULL DEFAULT 'private',
     lifecycle text NOT NULL DEFAULT 'active',
+    kind text NOT NULL DEFAULT 'system',
+    base_system_id uuid REFERENCES systems(id),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
   );
@@ -50,6 +52,7 @@ const DDL = `
     release_notes text NOT NULL DEFAULT '',
     lifecycle text NOT NULL DEFAULT 'published',
     compatibility_findings_json jsonb NOT NULL DEFAULT '[]'::jsonb,
+    built_against_version_id uuid,
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (system_id, semantic_version)
   );
@@ -70,6 +73,12 @@ const DDL = `
     archived_at          timestamptz,
     created_at           timestamptz NOT NULL DEFAULT now(),
     updated_at           timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE TABLE character_extensions (
+    character_id uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    extension_id uuid NOT NULL REFERENCES systems(id),
+    extension_version_id uuid NOT NULL REFERENCES system_versions(id),
+    PRIMARY KEY (character_id, extension_id)
   );
   CREATE INDEX characters_owner_page_idx
     ON characters (owner_id, lifecycle, updated_at DESC, id DESC);

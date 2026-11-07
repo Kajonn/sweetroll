@@ -39,7 +39,12 @@ export const EntrySourceSchema = Type.Union([
     { additionalProperties: false },
   ),
   Type.Object(
-    { kind: Type.Literal("system"), templateId: DefinitionIdSchema },
+    {
+      kind: Type.Literal("system"),
+      templateId: DefinitionIdSchema,
+      // Design 6.8: a template from one of the character's extensions.
+      extensionId: Type.Optional(Type.String({ pattern: UUID_PATTERN })),
+    },
     { additionalProperties: false },
   ),
   Type.Object(
@@ -106,6 +111,9 @@ export const CharacterEntryV1Schema = Type.Object(
     image: Type.Optional(ImageDescriptorSchema),
     slotId: DefinitionIdSchema,
     templateId: Type.Union([DefinitionIdSchema, Type.Null()]),
+    // Design 6.8 (decision X5): template IDs are scoped by origin. Absent means
+    // the base system; otherwise the extension the template belongs to.
+    extensionId: Type.Optional(Type.String({ pattern: UUID_PATTERN })),
     source: Type.Optional(EntrySourceSchema),
     snapshot: Type.Optional(EntrySnapshotSchema),
     values: Type.Record(Type.String(), Type.Unknown()),

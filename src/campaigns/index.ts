@@ -3,6 +3,7 @@ import { createSceneLibraryCommands, type SceneLibraryCommands } from "./scene-l
 import { createProposalCommands, type ProposalCommands } from "./proposals.js";
 import { createCampaignItemImages, type CampaignItemImages } from "./item-images.js";
 import { createTemplateCommands, type TemplateCommands } from "./templates.js";
+import { createCampaignExtensionCommands, type CampaignExtensionCommands } from "./extensions.js";
 import { createTemplateRepository } from "./templatePersistence.js";
 import { applyCampaignVersionPlan, loadPreviousCampaignVersion, planCampaignVersionChange } from "./version-change.js";
 import { randomUUID } from "node:crypto";
@@ -333,7 +334,7 @@ export type ChangeCampaignVersionInput = {
   idempotencyKey: string;
 };
 
-export interface Campaigns extends TemplateCommands, ProposalCommands, CampaignItemImages, SceneLibraryCommands {
+export interface Campaigns extends TemplateCommands, ProposalCommands, CampaignItemImages, SceneLibraryCommands, CampaignExtensionCommands {
   listVersionOptions(ctx: RequestContext, input: { campaignId: CampaignId }): Promise<CampaignResult<CampaignVersionOptions>>;
   checkVersionChange(
     ctx: RequestContext,
@@ -570,6 +571,8 @@ export type CreateCampaignsModuleInput = {
   displayStream?: { heartbeatMs?: number; stallTimeoutMs?: number } | undefined;
   scanImage?: import("../platform/image-processing.js").ImageScanner;
   loadTemplatePackage?: import("../systems/templates.js").PublishedPackageLoader;
+  /** Design 6.8; GMs cannot add extensions without it. */
+  authorizeExtensionUse?: import("../systems/extensions.js").ExtensionAuthoring["authorizeExtensionUse"];
   /** Design 6.7 version choices; campaign version changes are unavailable without them. */
   listUpgradeTargets?: import("../systems/authoring.js").SystemAuthoring["listUpgradeTargets"];
   describeVersionChoices?: import("../systems/authoring.js").SystemAuthoring["describeVersionChoices"];
@@ -867,6 +870,15 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     campaign: CampaignRecord,
     targetVersionId: string,
   ): Promise<{ value: "upgrade" | "revert" } | { failure: CampaignError }> {
+    // Design 6.8: composition changes (stage E5) will cover campaigns with
+    // extensions; until then their rules version cannot change.
+    const extensionCount = await client.query<{ count: string }>(
+      "SELECT count(*) FROM campaign_extensions WHERE campaign_id = $1",
+      [campaign.campaignId],
+    );
+    if (Number(extensionCount.rows[0]?.count ?? 0) > 0) {
+      return { failure: errors.conflict("Campaigns with extensions cannot change rules version yet.", campaign.revision) };
+    }
     if (input.listUpgradeTargets === undefined || input.loadTemplatePackage === undefined) {
       return { failure: errors.internal() };
     }
@@ -1017,8 +1029,14 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     }
   }
 
+  const extensions = createCampaignExtensionCommands({
+    pool: input.pool, repo, now, newId,
+    ...(input.authorizeExtensionUse === undefined ? {} : { authorizeExtensionUse: input.authorizeExtensionUse }),
+  });
+
   return {
     ...templates,
+    ...extensions,
     ...createCampaignItemImages({ pool: input.pool, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
     ...createProposalCommands({ pool: input.pool, now, newId }),
     issueInvitation: invitations.issueInvitation,

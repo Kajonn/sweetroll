@@ -4,6 +4,7 @@ import { loadCampaignLimits } from "../platform/config.js";
 import { createIdentityModule } from "../identity/index.js";
 import { createTestOidcClient } from "../identity/adapters/test.js";
 import { createSystemAuthoringModule } from "../systems/authoring.js";
+import { createExtensionAuthoringModule } from "../systems/extensions.js";
 import { createCharactersModule } from "../characters/index.js";
 import { createCampaignPlacement } from "../characters/campaignPlacement.js";
 import { createCampaignsModule } from "../campaigns/index.js";
@@ -13,7 +14,7 @@ import {
   seedReferenceTemplates,
 } from "../systems/implementation/persistence/index.js";
 import { createSystemRuntime } from "../systems/runtime.js";
-import { createPostgresPublishedPackageLoader } from "../systems/implementation/runtime/package-loader.js";
+import { createPostgresPublishedExtensionLoader, createPostgresPublishedPackageLoader } from "../systems/implementation/runtime/package-loader.js";
 import { buildPublicApi, publicApiPrefix } from "../transport/http/public-api/index.js";
 import { buildPersonalTokenRoutes } from "../transport/http/personal-tokens.js";
 import { buildAuthHook } from "../transport/http/auth-hook.js";
@@ -91,13 +92,16 @@ const identity = createIdentityModule({
   allowPersonalTokens: config.nodeEnv !== "production" && process.env.SWEETROLL_LOCAL_API_TOKENS === "1",
 });
 
+const systemRepository = createSystemPersistenceRepository(pool);
 const authoring = createSystemAuthoringModule({
   pool,
-  repo: createSystemPersistenceRepository(pool),
+  repo: systemRepository,
 });
+const extensionAuthoring = createExtensionAuthoringModule({ pool, repo: systemRepository });
 
 const runtime = createSystemRuntime({
   loadPackage: createPostgresPublishedPackageLoader(pool),
+  loadExtensionPackage: createPostgresPublishedExtensionLoader(pool),
   authoritativeRollSecret: config.authoritativeRollSecret,
 });
 
@@ -106,6 +110,7 @@ const characters = createCharactersModule({
   pool,
   runtime,
   authorizeVersionUse: authoring.authorizeVersionUse,
+  authorizeExtensionUse: extensionAuthoring.authorizeExtensionUse,
   listAuthorizedVersions: authoring.listAuthorizedVersions,
   listUpgradeTargets: authoring.listUpgradeTargets,
   describeVersionChoices: authoring.describeVersionChoices,
@@ -138,6 +143,7 @@ const campaigns = createCampaignsModule({
   limits: placementLimits,
   charactersPlacement: placement,
     loadTemplatePackage:createPostgresPublishedPackageLoader(pool),
+    authorizeExtensionUse: extensionAuthoring.authorizeExtensionUse,
     listUpgradeTargets: authoring.listUpgradeTargets,
     describeVersionChoices: authoring.describeVersionChoices,
 });
@@ -170,7 +176,7 @@ registerApiRoutes(app, [
     secure: config.cookieSecure,
   }),
   buildPersonalTokenRoutes({ identity }),
-  buildSystemsRoutes({ authoring }),
+  buildSystemsRoutes({ authoring, extensions: extensionAuthoring }),
   buildCharactersRoutes({ characters }),
   buildCampaignsRoutes({ campaigns, characters, runtime, identity }),
 ], serveStatic, { pool });

@@ -2495,6 +2495,10 @@
                           "templateId": {
                             "pattern": "^[a-z][a-z0-9_]{0,63}$",
                             "type": "string"
+                          },
+                          "extensionId": {
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -14789,6 +14793,7 @@
           "createdAt",
           "ownerId",
           "campaign",
+          "extensions",
           "values",
           "entries",
           "derivedValues",
@@ -14894,6 +14899,29 @@
                 "type": "null"
               }
             ]
+          },
+          "extensions": {
+            "maxItems": 16,
+            "description": "Extension versions the character is built on, in addition to systemVersionId. Read-only in v1.",
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "extensionId",
+                "versionId"
+              ],
+              "properties": {
+                "extensionId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "versionId": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
           },
           "values": {
             "maxProperties": 512,
@@ -15029,6 +15057,11 @@
                   "maximum": 9007199254740991,
                   "type": "integer"
                 },
+                "extensionId": {
+                  "format": "uuid",
+                  "type": "string",
+                  "description": "Extension of the entry's template; absent for base-system templates."
+                },
                 "source": {
                   "anyOf": [
                     {
@@ -15058,6 +15091,10 @@
                         },
                         "templateId": {
                           "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
+                        "extensionId": {
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                           "type": "string"
                         }
                       }
@@ -16545,6 +16582,10 @@
                         },
                         "templateId": {
                           "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
+                        "extensionId": {
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                           "type": "string"
                         }
                       }

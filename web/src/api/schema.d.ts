@@ -84,6 +84,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/systems/{systemId}/extensions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_systems_extensions"];
+        put?: never;
+        post: operations["post_systems_extensions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/extensions/{extensionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_extension"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/extensions/{extensionId}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["put_extensions_draft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/extensions/{extensionId}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_extensions_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/extensions/{extensionId}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_extensions_publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/templates": {
         parameters: {
             query?: never;
@@ -1087,6 +1167,38 @@ export interface paths {
         put?: never;
         post: operations["post_campaigns_id_version"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/extensions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaigns_id_extensions"];
+        put?: never;
+        post: operations["post_campaigns_id_extensions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/extensions/{extensionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_campaigns_id_extensions_extensionId"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2740,6 +2852,1093 @@ export interface operations {
                             code: string;
                             message: string;
                             latestRevision?: number;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_systems_extensions: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                systemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        extensions: {
+                            /** Format: uuid */
+                            extensionId: string;
+                            /** Format: uuid */
+                            baseSystemId: string;
+                            name: string;
+                            access: string;
+                            lifecycle: string;
+                            owned: boolean;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                            latestVersion: {
+                                /** Format: uuid */
+                                versionId: string;
+                                /** Format: uuid */
+                                extensionId: string;
+                                semanticVersion: string;
+                                checksum: string;
+                                releaseNotes: string;
+                                lifecycle: string;
+                                /** Format: uuid */
+                                builtAgainstVersionId: string;
+                                /** Format: date-time */
+                                createdAt: string;
+                            } | null;
+                        }[];
+                        nextCursor: string | null;
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_systems_extensions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                systemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    baseVersionId: string;
+                    name: string;
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        workspace: {
+                            extension: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                baseSystemId: string;
+                                name: string;
+                                access: string;
+                                lifecycle: string;
+                                owned: boolean;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                            };
+                            draft: {
+                                revision: number;
+                                document: {
+                                    [key: string]: unknown;
+                                };
+                                /** Format: uuid */
+                                baseVersionId: string;
+                                sourceChecksum: string;
+                                /** Format: uuid */
+                                updatedBy: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                            } | null;
+                            versions: {
+                                /** Format: uuid */
+                                versionId: string;
+                                /** Format: uuid */
+                                extensionId: string;
+                                semanticVersion: string;
+                                checksum: string;
+                                releaseNotes: string;
+                                lifecycle: string;
+                                /** Format: uuid */
+                                builtAgainstVersionId: string;
+                                /** Format: date-time */
+                                createdAt: string;
+                            }[];
+                            assessment: {
+                                ok: boolean;
+                                diagnostics: {
+                                    code: string;
+                                    path: string;
+                                    message: string;
+                                }[];
+                                warnings: {
+                                    code: string;
+                                    path: string;
+                                    message: string;
+                                }[];
+                            };
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_extension: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                extensionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        workspace: {
+                            extension: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                baseSystemId: string;
+                                name: string;
+                                access: string;
+                                lifecycle: string;
+                                owned: boolean;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                            };
+                            draft: {
+                                revision: number;
+                                document: {
+                                    [key: string]: unknown;
+                                };
+                                /** Format: uuid */
+                                baseVersionId: string;
+                                sourceChecksum: string;
+                                /** Format: uuid */
+                                updatedBy: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                            } | null;
+                            versions: {
+                                /** Format: uuid */
+                                versionId: string;
+                                /** Format: uuid */
+                                extensionId: string;
+                                semanticVersion: string;
+                                checksum: string;
+                                releaseNotes: string;
+                                lifecycle: string;
+                                /** Format: uuid */
+                                builtAgainstVersionId: string;
+                                /** Format: date-time */
+                                createdAt: string;
+                            }[];
+                            assessment: {
+                                ok: boolean;
+                                diagnostics: {
+                                    code: string;
+                                    path: string;
+                                    message: string;
+                                }[];
+                                warnings: {
+                                    code: string;
+                                    path: string;
+                                    message: string;
+                                }[];
+                            };
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    put_extensions_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                extensionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    expectedRevision: number;
+                    document: {
+                        [key: string]: unknown;
+                    };
+                    /** Format: uuid */
+                    baseVersionId?: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        workspace: {
+                            extension: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                baseSystemId: string;
+                                name: string;
+                                access: string;
+                                lifecycle: string;
+                                owned: boolean;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                            };
+                            draft: {
+                                revision: number;
+                                document: {
+                                    [key: string]: unknown;
+                                };
+                                /** Format: uuid */
+                                baseVersionId: string;
+                                sourceChecksum: string;
+                                /** Format: uuid */
+                                updatedBy: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                            } | null;
+                            versions: {
+                                /** Format: uuid */
+                                versionId: string;
+                                /** Format: uuid */
+                                extensionId: string;
+                                semanticVersion: string;
+                                checksum: string;
+                                releaseNotes: string;
+                                lifecycle: string;
+                                /** Format: uuid */
+                                builtAgainstVersionId: string;
+                                /** Format: date-time */
+                                createdAt: string;
+                            }[];
+                            assessment: {
+                                ok: boolean;
+                                diagnostics: {
+                                    code: string;
+                                    path: string;
+                                    message: string;
+                                }[];
+                                warnings: {
+                                    code: string;
+                                    path: string;
+                                    message: string;
+                                }[];
+                            };
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_extensions_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                extensionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        preview: {
+                            /** Format: uuid */
+                            baseVersionId: string;
+                            package: {
+                                [key: string]: unknown;
+                            };
+                            warnings: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_extensions_publish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                extensionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    expectedRevision: number;
+                    semanticVersion: string;
+                    releaseNotes: string;
+                    idempotencyKey: string;
+                    acknowledgeBreaking: boolean;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: {
+                            /** Format: uuid */
+                            versionId: string;
+                            /** Format: uuid */
+                            extensionId: string;
+                            semanticVersion: string;
+                            checksum: string;
+                            releaseNotes: string;
+                            lifecycle: string;
+                            /** Format: uuid */
+                            builtAgainstVersionId: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                            package: {
+                                [key: string]: unknown;
+                            };
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                code: string;
+                                path: string;
+                                message: string;
+                            }[];
                         };
                         requestId: string;
                     };
@@ -6446,6 +7645,12 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     systemVersionId: string;
+                    extensions?: {
+                        /** Format: uuid */
+                        extensionId: string;
+                        /** Format: uuid */
+                        versionId: string;
+                    }[];
                     entityDefinitionId: string;
                     name: string;
                     initialValues?: {
@@ -6473,6 +7678,12 @@ export interface operations {
                             name: string;
                             /** Format: uuid */
                             systemVersionId: string;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                            }[];
                             entityDefinitionId: string;
                             revision: number;
                             lifecycle: "active" | "archived";
@@ -6501,6 +7712,8 @@ export interface operations {
                                         };
                                         slotId: string;
                                         templateId: string | null;
+                                        /** Format: uuid */
+                                        extensionId?: string;
                                         source?: {
                                             /** @constant */
                                             kind: "personal";
@@ -6508,6 +7721,7 @@ export interface operations {
                                             /** @constant */
                                             kind: "system";
                                             templateId: string;
+                                            extensionId?: string;
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
@@ -6732,6 +7946,7 @@ export interface operations {
                                                     /** @constant */
                                                     kind: "system";
                                                     templateId: string;
+                                                    extensionId?: string;
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
@@ -6742,6 +7957,8 @@ export interface operations {
                                                 };
                                                 entryId: string;
                                                 templateId: string | null;
+                                                /** Format: uuid */
+                                                extensionId?: string;
                                                 label: string;
                                                 values: {
                                                     [key: string]: unknown;
@@ -7377,6 +8594,12 @@ export interface operations {
                             name: string;
                             /** Format: uuid */
                             systemVersionId: string;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                            }[];
                             entityDefinitionId: string;
                             revision: number;
                             lifecycle: "active" | "archived";
@@ -7405,6 +8628,8 @@ export interface operations {
                                         };
                                         slotId: string;
                                         templateId: string | null;
+                                        /** Format: uuid */
+                                        extensionId?: string;
                                         source?: {
                                             /** @constant */
                                             kind: "personal";
@@ -7412,6 +8637,7 @@ export interface operations {
                                             /** @constant */
                                             kind: "system";
                                             templateId: string;
+                                            extensionId?: string;
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
@@ -7636,6 +8862,7 @@ export interface operations {
                                                     /** @constant */
                                                     kind: "system";
                                                     templateId: string;
+                                                    extensionId?: string;
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
@@ -7646,6 +8873,8 @@ export interface operations {
                                                 };
                                                 entryId: string;
                                                 templateId: string | null;
+                                                /** Format: uuid */
+                                                extensionId?: string;
                                                 label: string;
                                                 values: {
                                                     [key: string]: unknown;
@@ -7848,6 +9077,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -7876,6 +9111,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -7883,6 +9120,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -8107,6 +9345,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -8117,6 +9356,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -8468,6 +9709,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -8496,6 +9743,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -8503,6 +9752,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -8727,6 +9977,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -8737,6 +9988,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -9088,6 +10341,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -9116,6 +10375,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -9123,6 +10384,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -9347,6 +10609,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -9357,6 +10620,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -10235,6 +11500,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -10263,6 +11534,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -10270,6 +11543,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -10494,6 +11768,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -10504,6 +11779,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -10867,6 +12144,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -10895,6 +12178,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -10902,6 +12187,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -11126,6 +12412,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -11136,6 +12423,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -11469,6 +12758,7 @@ export interface operations {
                             /** @constant */
                             kind: "system";
                             templateId: string;
+                            extensionId?: string;
                         } | {
                             /** @constant */
                             kind: "campaign";
@@ -11481,6 +12771,8 @@ export interface operations {
                         entryId: string;
                         slotId: string;
                         templateId: string | null;
+                        /** Format: uuid */
+                        extensionId?: string;
                         values: {
                             [key: string]: unknown;
                         };
@@ -11510,6 +12802,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -11538,6 +12836,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -11545,6 +12845,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -11769,6 +13070,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -11779,6 +13081,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -12129,6 +13433,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -12157,6 +13467,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -12164,6 +13476,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -12388,6 +13701,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -12398,6 +13712,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -12752,6 +14068,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -12780,6 +14102,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -12787,6 +14111,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -13011,6 +14336,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -13021,6 +14347,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -13359,6 +14687,7 @@ export interface operations {
                                 /** @constant */
                                 kind: "system";
                                 templateId: string;
+                                extensionId?: string;
                             } | {
                                 /** @constant */
                                 kind: "campaign";
@@ -13367,6 +14696,8 @@ export interface operations {
                                 templateRevision: number;
                                 contentRevision: number;
                             };
+                            /** Format: uuid */
+                            extensionId?: string;
                             defaultQuantity?: number;
                             id: string;
                             label: string;
@@ -13656,6 +14987,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -13684,6 +15021,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -13691,6 +15030,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -13915,6 +15255,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -13925,6 +15266,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -14809,6 +16152,12 @@ export interface operations {
                                 name: string;
                                 /** Format: uuid */
                                 systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
                                 entityDefinitionId: string;
                                 revision: number;
                                 lifecycle: "active" | "archived";
@@ -14837,6 +16186,8 @@ export interface operations {
                                             };
                                             slotId: string;
                                             templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
                                             source?: {
                                                 /** @constant */
                                                 kind: "personal";
@@ -14844,6 +16195,7 @@ export interface operations {
                                                 /** @constant */
                                                 kind: "system";
                                                 templateId: string;
+                                                extensionId?: string;
                                             } | {
                                                 /** @constant */
                                                 kind: "campaign";
@@ -15068,6 +16420,7 @@ export interface operations {
                                                         /** @constant */
                                                         kind: "system";
                                                         templateId: string;
+                                                        extensionId?: string;
                                                     } | {
                                                         /** @constant */
                                                         kind: "campaign";
@@ -15078,6 +16431,8 @@ export interface operations {
                                                     };
                                                     entryId: string;
                                                     templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
                                                     label: string;
                                                     values: {
                                                         [key: string]: unknown;
@@ -15425,6 +16780,12 @@ export interface operations {
                             name: string;
                             /** Format: uuid */
                             systemVersionId: string;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                            }[];
                             entityDefinitionId: string;
                             revision: number;
                             lifecycle: "active" | "archived";
@@ -15453,6 +16814,8 @@ export interface operations {
                                         };
                                         slotId: string;
                                         templateId: string | null;
+                                        /** Format: uuid */
+                                        extensionId?: string;
                                         source?: {
                                             /** @constant */
                                             kind: "personal";
@@ -15460,6 +16823,7 @@ export interface operations {
                                             /** @constant */
                                             kind: "system";
                                             templateId: string;
+                                            extensionId?: string;
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
@@ -15684,6 +17048,7 @@ export interface operations {
                                                     /** @constant */
                                                     kind: "system";
                                                     templateId: string;
+                                                    extensionId?: string;
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
@@ -15694,6 +17059,8 @@ export interface operations {
                                                 };
                                                 entryId: string;
                                                 templateId: string | null;
+                                                /** Format: uuid */
+                                                extensionId?: string;
                                                 label: string;
                                                 values: {
                                                     [key: string]: unknown;
@@ -16215,6 +17582,12 @@ export interface operations {
                         updatedAt: string;
                         /** Format: uuid */
                         systemVersionId: string;
+                        extensions?: {
+                            /** Format: uuid */
+                            extensionId: string;
+                            /** Format: uuid */
+                            versionId: string;
+                        }[];
                         packageChecksum: string;
                         revision: number;
                         state: {
@@ -16237,6 +17610,8 @@ export interface operations {
                                     };
                                     slotId: string;
                                     templateId: string | null;
+                                    /** Format: uuid */
+                                    extensionId?: string;
                                     source?: {
                                         /** @constant */
                                         kind: "personal";
@@ -16244,6 +17619,7 @@ export interface operations {
                                         /** @constant */
                                         kind: "system";
                                         templateId: string;
+                                        extensionId?: string;
                                     } | {
                                         /** @constant */
                                         kind: "campaign";
@@ -21596,6 +22972,460 @@ export interface operations {
             };
         };
     };
+    get_campaigns_id_extensions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        extensions: {
+                            /** Format: uuid */
+                            campaignId: string;
+                            revision: number;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                                name: string;
+                                semanticVersion: string;
+                                addedBy: "campaign" | "character";
+                                addedByCharacterId: string | null;
+                                /** Format: date-time */
+                                addedAt: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_campaigns_id_extensions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    extensionId: string;
+                    /** Format: uuid */
+                    versionId: string;
+                    expectedCampaignRevision: number;
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        extensions: {
+                            /** Format: uuid */
+                            campaignId: string;
+                            revision: number;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                                name: string;
+                                semanticVersion: string;
+                                addedBy: "campaign" | "character";
+                                addedByCharacterId: string | null;
+                                /** Format: date-time */
+                                addedAt: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    delete_campaigns_id_extensions_extensionId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                extensionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    expectedCampaignRevision: number;
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        extensions: {
+                            /** Format: uuid */
+                            campaignId: string;
+                            revision: number;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                                name: string;
+                                semanticVersion: string;
+                                addedBy: "campaign" | "character";
+                                addedByCharacterId: string | null;
+                                /** Format: date-time */
+                                addedAt: string;
+                            }[];
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     post_campaigns_id_recover: {
         parameters: {
             query?: never;
@@ -23344,6 +25174,12 @@ export interface operations {
                             name: string;
                             /** Format: uuid */
                             systemVersionId: string;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                            }[];
                             entityDefinitionId: string;
                             revision: number;
                             lifecycle: "active" | "archived";
@@ -23372,6 +25208,8 @@ export interface operations {
                                         };
                                         slotId: string;
                                         templateId: string | null;
+                                        /** Format: uuid */
+                                        extensionId?: string;
                                         source?: {
                                             /** @constant */
                                             kind: "personal";
@@ -23379,6 +25217,7 @@ export interface operations {
                                             /** @constant */
                                             kind: "system";
                                             templateId: string;
+                                            extensionId?: string;
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
@@ -23603,6 +25442,7 @@ export interface operations {
                                                     /** @constant */
                                                     kind: "system";
                                                     templateId: string;
+                                                    extensionId?: string;
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
@@ -23613,6 +25453,8 @@ export interface operations {
                                                 };
                                                 entryId: string;
                                                 templateId: string | null;
+                                                /** Format: uuid */
+                                                extensionId?: string;
                                                 label: string;
                                                 values: {
                                                     [key: string]: unknown;
@@ -23893,6 +25735,12 @@ export interface operations {
                             name: string;
                             /** Format: uuid */
                             systemVersionId: string;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                            }[];
                             entityDefinitionId: string;
                             revision: number;
                             lifecycle: "active" | "archived";
@@ -23921,6 +25769,8 @@ export interface operations {
                                         };
                                         slotId: string;
                                         templateId: string | null;
+                                        /** Format: uuid */
+                                        extensionId?: string;
                                         source?: {
                                             /** @constant */
                                             kind: "personal";
@@ -23928,6 +25778,7 @@ export interface operations {
                                             /** @constant */
                                             kind: "system";
                                             templateId: string;
+                                            extensionId?: string;
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
@@ -24152,6 +26003,7 @@ export interface operations {
                                                     /** @constant */
                                                     kind: "system";
                                                     templateId: string;
+                                                    extensionId?: string;
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
@@ -24162,6 +26014,8 @@ export interface operations {
                                                 };
                                                 entryId: string;
                                                 templateId: string | null;
+                                                /** Format: uuid */
+                                                extensionId?: string;
                                                 label: string;
                                                 values: {
                                                     [key: string]: unknown;
@@ -24346,6 +26200,12 @@ export interface operations {
                             name: string;
                             /** Format: uuid */
                             systemVersionId: string;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                            }[];
                             entityDefinitionId: string;
                             revision: number;
                             lifecycle: "active" | "archived";
@@ -24374,6 +26234,8 @@ export interface operations {
                                         };
                                         slotId: string;
                                         templateId: string | null;
+                                        /** Format: uuid */
+                                        extensionId?: string;
                                         source?: {
                                             /** @constant */
                                             kind: "personal";
@@ -24381,6 +26243,7 @@ export interface operations {
                                             /** @constant */
                                             kind: "system";
                                             templateId: string;
+                                            extensionId?: string;
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
@@ -24605,6 +26468,7 @@ export interface operations {
                                                     /** @constant */
                                                     kind: "system";
                                                     templateId: string;
+                                                    extensionId?: string;
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
@@ -24615,6 +26479,8 @@ export interface operations {
                                                 };
                                                 entryId: string;
                                                 templateId: string | null;
+                                                /** Format: uuid */
+                                                extensionId?: string;
                                                 label: string;
                                                 values: {
                                                     [key: string]: unknown;
@@ -24801,6 +26667,12 @@ export interface operations {
                             name: string;
                             /** Format: uuid */
                             systemVersionId: string;
+                            extensions: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                /** Format: uuid */
+                                versionId: string;
+                            }[];
                             entityDefinitionId: string;
                             revision: number;
                             lifecycle: "active" | "archived";
@@ -24829,6 +26701,8 @@ export interface operations {
                                         };
                                         slotId: string;
                                         templateId: string | null;
+                                        /** Format: uuid */
+                                        extensionId?: string;
                                         source?: {
                                             /** @constant */
                                             kind: "personal";
@@ -24836,6 +26710,7 @@ export interface operations {
                                             /** @constant */
                                             kind: "system";
                                             templateId: string;
+                                            extensionId?: string;
                                         } | {
                                             /** @constant */
                                             kind: "campaign";
@@ -25060,6 +26935,7 @@ export interface operations {
                                                     /** @constant */
                                                     kind: "system";
                                                     templateId: string;
+                                                    extensionId?: string;
                                                 } | {
                                                     /** @constant */
                                                     kind: "campaign";
@@ -25070,6 +26946,8 @@ export interface operations {
                                                 };
                                                 entryId: string;
                                                 templateId: string | null;
+                                                /** Format: uuid */
+                                                extensionId?: string;
                                                 label: string;
                                                 values: {
                                                     [key: string]: unknown;
@@ -26418,7 +28296,7 @@ export interface operations {
                         events: {
                             /** Format: uuid */
                             eventId: string;
-                            kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted";
+                            kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted" | "extension_added" | "extension_removed";
                             /** Format: uuid */
                             actorId: string;
                             sourceContentId: string | null;
@@ -26640,7 +28518,7 @@ export interface operations {
                             activity: {
                                 /** Format: uuid */
                                 eventId: string;
-                                kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted";
+                                kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted" | "extension_added" | "extension_removed";
                                 /** Format: uuid */
                                 actorId: string;
                                 sourceContentId: string | null;

@@ -63,7 +63,9 @@ export type ActivityEventKind =
   | "content_grants_replaced"
   | "roll_executed"
   | "system_version_upgraded"
-  | "system_version_reverted";
+  | "system_version_reverted"
+  | "extension_added"
+  | "extension_removed";
 
 export type ActivityEventRecord = {
   eventId: string;
@@ -448,6 +450,8 @@ function toActivityEventRecord(row: ActivityEventRow): ActivityEventRecord {
     case "roll_executed":
     case "system_version_upgraded":
     case "system_version_reverted":
+    case "extension_added":
+    case "extension_removed":
       break;
     default:
       throw new Error(`Unknown activity kind: ${row.kind}`);
@@ -624,6 +628,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
           WHERE v.id = $2
             AND v.lifecycle = 'published'
             AND s.lifecycle = 'active'
+            AND s.kind = 'system'
             AND (s.owner_id = $1 OR s.access IN ('public', 'link'))`,
         [actorId, versionId],
       );

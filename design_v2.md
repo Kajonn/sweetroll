@@ -335,6 +335,32 @@ defines the delivery stages.
 Character activity uses readable action names and local date/time formatting.
 A published system version updates the open editor's status immediately.
 
+## 6.8 System extensions (owner-approved 2026-11-07)
+
+Systems can be extended with new items and abilities through separately published
+**extensions**: immutable packages of templates (item, spell, talent, effect) with
+their granted actions and expressions, owned and shared like systems. A character
+or campaign is built on a system version plus a set of extension versions (its
+composition). A campaign's composition is the union of the extensions it chose and
+those used by its attached characters. Scope, access, ID scoping, campaign-union,
+removal and upgrade rules are decisions X1–X13 in the
+[system extensions plan](docs/superpowers/plans/2026-11-07-system-extensions.md),
+which also tracks implementation stages E1–E8. E1 (package contract), E2
+(authoring and publishing under `/systems/:systemId/extensions` and
+`/extensions/:extensionId`), E3 (standalone characters) and E4 (campaigns) are
+implemented; an extension is a `systems` row of kind `extension` whose versions
+record the base version they were built against. A character stores its
+extension versions in `character_extensions`; entries from extension templates
+carry `extensionId`. A campaign stores its set in `campaign_extensions`
+(GM-added or brought by an adopted character) and every attached character
+uses exactly that set. Until E5, characters and campaigns with extensions
+cannot change rules version; campaign templates based on extension templates
+are a deferred follow-up (E4b).
+
+**Future feature (recorded 2026-11-07, not authorized):** an extension catalog for
+discovering and previewing published extensions. It depends on OD-07 and needs its
+own plan and approval.
+
 # 7. Campaign and play specification
 
 ## 7.1 Campaign workspace
@@ -610,7 +636,7 @@ Use Node.js LTS, TypeScript, Fastify, a thin PostgreSQL driver, explicit current
 | **Aggregate/table** | **Key relationships**                        | **Important fields**                                                |
 |---------------------|----------------------------------------------|---------------------------------------------------------------------|
 | users               | external_identities, owned resources         | id, display_name, locale, status, created_at                        |
-| systems             | creator; drafts; versions; collaborators     | id, owner_id, name, access, lifecycle                               |
+| systems             | creator; drafts; versions; collaborators     | id, owner_id, name, access, lifecycle, kind, base_system_id (6.8)   |
 | system_drafts       | one current draft per system                 | system_id, revision, document_json, source_checksum, updated_by     |
 | system_versions     | immutable child of system                    | version_id, semantic_version, checksum, package_json, release_notes |
 | preview_snapshots   | immutable expiring draft preview             | snapshot_id, system_id, source_revision, package_json, expires_at   |
@@ -619,6 +645,8 @@ Use Node.js LTS, TypeScript, Fastify, a thin PostgreSQL driver, explicit current
 | campaigns           | pinned version; members; characters; content | id, system_version_id, owner_id, settings_json, status              |
 | campaign_members    | user in campaign                             | role, membership_status, joined_at, permissions_override            |
 | characters          | owner(s); optional campaign; pinned version  | id, revision, state_json, visibility, archived_at                   |
+| character_extensions| character; extension; extension version (6.8)| character_id, extension_id, extension_version_id                   |
+| campaign_extensions | campaign; extension; extension version (6.8) | campaign_id, extension_id, extension_version_id, added_by           |
 | content_items       | campaign; creator; optional file             | kind, title, body, audience, revision                               |
 | content_grants      | content to selected member                   | content_id, member_id                                               |
 | file_objects        | content/avatar/system asset                  | storage_key, media_type, size, scan_status, checksum                |

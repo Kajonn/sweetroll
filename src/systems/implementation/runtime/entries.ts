@@ -40,6 +40,12 @@ export function validateEntryForSlot(
   if (Math.max(0, siblingCount) >= capacity) {
     return invalid("slot_full", "Slot has reached its maximum entries.", slot.id);
   }
+  if (entry.extensionId !== undefined && entry.templateId === null) {
+    return invalid("entry_values_invalid", "Extension entries require a template.");
+  }
+  if (entry.source?.kind === "system" && entry.source.extensionId !== entry.extensionId) {
+    return invalid("entry_values_invalid", "Entry source contradicts its extension.");
+  }
   if (entry.source?.kind === "campaign") {
     if (entry.templateId !== null || entry.snapshot === undefined) return invalid("entry_values_invalid", "Campaign entries require a data-only snapshot.");
     if (!slot.accepts.includes(entry.snapshot.kind)) return invalid("kind_not_accepted", "Campaign template kind is not accepted by the slot.");
@@ -67,7 +73,8 @@ export function validateEntryForSlot(
     }
     return { ok: true };
   }
-  const template = templates.find((candidate) => candidate.id === effectiveTemplateId(entry));
+  const key = templateKey(entry);
+  const template = templates.find((candidate) => candidate.id === key);
   if (template === undefined) {
     return invalid("entry_values_invalid", "Entry template is unknown.");
   }
@@ -174,6 +181,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Metadata never supplies executable authority; callers verify provenance against the package. */
+/**
+ * Lookup key of the entry's template in an effective package (design 6.8):
+ * the plain template ID for base templates, `<extensionId>:<templateId>` for
+ * extension templates.
+ */
+export function templateKey(entry: CharacterEntryV1): string | null {
+  const id = effectiveTemplateId(entry);
+  return id === null || entry.extensionId === undefined ? id : `${entry.extensionId}:${id}`;
+}
+
 export function effectiveTemplateId(entry: CharacterEntryV1): string | null {
   return entry.templateId ?? (entry.source?.kind === "campaign" && entry.snapshot && "base" in entry.snapshot ? entry.snapshot.base.templateId : null);
 }

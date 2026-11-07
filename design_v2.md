@@ -282,15 +282,28 @@ when the pin moves. Character-specific entry values stay as entered.
 or co-GM upgrades the campaign; the dry run covers every attached character and
 every campaign template with a system base, and the commit moves all of them
 together or none. Campaign template bases are re-pinned to the target version and
-checksum; derived entries already placed on sheets keep their copied defaults.
+checksum. Any character that fails the dry run blocks the whole campaign upgrade; derived entries already placed on sheets keep their copied defaults.
 A standalone or returned character is upgraded by its owner. A standalone
 character can be adopted only at the campaign's exact version, so its owner may
 first upgrade it to that version.
 
-**Excluded.** Breaking upgrades, field mapping or renaming, downgrades and
-rollback, moving between different systems, automatic upgrades on publish and
-lineage tables. A blocked character stays on its version; create a new character
-to use a breaking version. Version selection shows only later, compatible
+**Revert (owner decision 2026-11-07).** A character or campaign can return to
+the version it used before its most recent upgrade. The upgrade stores that
+version as `previous_system_version_id`; a revert clears it, so a second revert is
+not possible until the next upgrade. Revert uses the same dry run and commit as an
+upgrade, but against the previous version and without the package-level check,
+because undoing additions always reads as removals. Current values are kept by
+identifier, so play since the upgrade (damage, resources, notes) is not lost.
+Values of fields that do not exist in the previous version are dropped and listed
+in the preview. An entry whose template or slot does not exist in the previous
+version, or whose values no longer verify, blocks the revert; the owner removes or
+edits it first. A campaign reverts with all attached characters and template bases
+or not at all, and any blocker blocks the campaign.
+
+**Excluded.** Breaking upgrades, field mapping or renaming, reverting to any
+version other than the recorded previous one, moving between different systems,
+automatic upgrades on publish and lineage tables. A blocked character stays on its
+version; create a new character to use a breaking version. Version selection shows only later, compatible
 versions. The [system version upgrade plan](docs/superpowers/plans/2026-11-07-system-version-upgrades.md)
 defines the delivery stages.
 
@@ -752,7 +765,7 @@ browser shows the same caller.
 
 Maintain three internal reference systems as acceptance fixtures: a minimal rules-light system, a class-and-level fantasy system with derived statistics and inventory, and a dice-pool system with resources. They must exercise every supported field, sheet element, formula feature, action, visibility path and mobile breakpoint. Where an open license permits, the shipped templates correspond to these fixtures.
 
-> **Current scope (2026-11-07):** non-breaking character/campaign system-version upgrades with a dry-run preview are in scope (Section 6.7). Breaking upgrades, field mapping and rollback remain excluded. Application/database migration is separate (Sections 12.4 and 17.0).
+> **Current scope (2026-11-07):** non-breaking character/campaign system-version upgrades and revert to the previous version, each with a dry-run preview, are in scope (Section 6.7). Breaking upgrades and field mapping remain excluded. Application/database migration is separate (Sections 12.4 and 17.0).
 
 # 17. Delivery plan
 

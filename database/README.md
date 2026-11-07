@@ -25,7 +25,8 @@ conversion code.
 Published rules versions remain immutable. Moving a character or campaign to a
 later non-breaking system version is a product feature that rewrites only its
 version ID and state (design Section 6.7); it is not a database migration.
-Breaking upgrades, field mapping and rollback are not supported.
+A revert to the version recorded before the most recent upgrade is supported the
+same way. Breaking upgrades and field mapping are not supported.
 
 The app and database remain under development until the first application release
 Git tag (`v*.*.*`, used by the release workflow). The

@@ -1,17 +1,28 @@
-# Sweetroll non-breaking system version upgrades
+# Sweetroll system version upgrades and revert
 
-**Implementation plan · 7 November 2026 · Baseline `1475b6a` · Scope set by owner 2026-11-07, plan awaiting approval**
+**Implementation plan · 7 November 2026 · Baseline `1475b6a` · Owner-approved 2026-11-07**
 
 ## Goal
 
 Let an owner move a character, or a GM move a campaign with its characters, to a
-later non-breaking published version of the same system. Systems will often add
-items, spells and talents and change item stats, so play must not require new
-characters for every release. The design contract is
+later non-breaking published version of the same system, and revert to the
+version used before the most recent upgrade. Systems will often add items, spells
+and talents and change item stats, so play must not require new characters for
+every release. The design contract is
 [design Section 6.7](../../../design_v2.md#67-pinned-rules-and-non-breaking-version-upgrades-owner-decision-2026-11-07).
 
 This is a rules-version feature. It is not application/database migration and
-adds no schema migration chain (Sections 12.4 and 17.0 are unchanged).
+adds no schema migration chain (Sections 12.4 and 17.0 are unchanged). The new
+columns are added to the current schema baseline.
+
+## Owner decisions (2026-11-07)
+
+1. A campaign upgrade or revert is blocked when any attached character, or any
+   campaign template base, fails the dry run.
+2. Revert is required: back to the version recorded before the most recent upgrade.
+3. Forward upgrades require a package comparison with no breaking findings (not
+   separately answered; the planned default stands). Revert skips that check and
+   relies on the per-character dry run.
 
 ## Why this is small
 
@@ -25,73 +36,72 @@ adds no schema migration chain (Sections 12.4 and 17.0 are unchanged).
   `templateApplicable` already validate a state against a package on every write.
   Running them against the target package is the "verify the build" dry run.
 
-## Stage 1 — Upgrade check (read only)
+## Stage 1 — Version check (pure, read only)
 
-- [ ] `SystemRuntime.checkUpgrade(pkgFrom, pkgTo, entityId, state)`: run
-  `comparePackages(from, to)`; then decode the state against the target entity,
-  filling declared defaults for new non-computed fields; validate every entry
-  (template exists, slot accepts kind, slot `maxEntries`, entry values valid for
-  the target template fields, campaign-derived `base` still applicable); run
-  target validations. Return `{ upgradable, blockers[], addedFields[],
-  changedTemplates[], nextState }`. Pure function, no I/O.
-- [ ] Extend `comparePackages` with gaps that matter to existing characters but
-  are not caught today: template field removed or kind changed, template field
-  made required, slot `maxEntries` lowered. Classify them as breaking for publish
-  too (they already break live entries).
-- [ ] `GET /characters/:id/upgrade-options`: later published versions of the same
-  system that the actor may use, each with its package-level compatibility.
-  `GET /characters/:id/upgrade-check?targetVersionId=` returns the dry-run report.
-  Same authorization as reading the sheet.
-- [ ] Unit tests: additive template/spell, item stat change, new field with
-  default, removed template in use (blocked), removed template not in use
-  (package-breaking, therefore blocked), slot narrowed, value out of new range,
-  different system, older version.
+- [ ] `checkVersionChange({ from, to, entityId, state, direction })` in the
+  runtime: for `upgrade`, run `comparePackages(from, to)` and block on any
+  finding; for both directions, rebuild the state against the target entity
+  (keep values by ID, default new non-computed fields, drop values of fields the
+  target lacks), validate every entry (template exists, slot exists and accepts
+  the kind, slot `maxEntries`, entry values valid for the target template fields,
+  campaign-derived `base` still applicable) and run the target's error
+  validations. Return `{ ok, blockers[], addedFields[], droppedFields[],
+  changedTemplates[], nextState }`.
+- [ ] Extend `comparePackages` with gaps that break live entries but are not
+  caught today: template field removed or kind changed, template field made
+  required, slot `maxEntries` lowered. They become breaking at publish too.
+- [ ] Unit tests: added template/spell, item stat change, new field with default,
+  removed template in use, slot narrowed, value outside a new range, revert after
+  an additive upgrade with and without a new item taken, revert dropping a new
+  field's value.
 
-## Stage 2 — Character upgrade commit
+## Stage 2 — Character upgrade and revert
 
-- [ ] `POST /characters/:id/upgrade` with `{ targetVersionId, expectedRevision }`
-  and an idempotency key. In one transaction: lock, recheck revision and
-  authorization, rerun the check, write `system_version_id`, `state_json`, bump
-  `revision`, append activity/audit `system_version_upgraded` with from/to
-  versions. Reject attached characters (campaign path only).
-- [ ] Standalone and returned characters only; owner authorization.
-- [ ] Tests: success, revision conflict, replay returns the original result,
-  blocked report returns 409 with blockers, offline cache gets `replace`.
+- [ ] Schema baseline: `characters.previous_system_version_id uuid NULL
+  REFERENCES system_versions(id)`.
+- [ ] `GET /characters/:id/version-options`: later published versions of the same
+  system the actor may use with package compatibility, plus the revert target if
+  one is recorded.
+- [ ] `GET /characters/:id/version-check?targetVersionId=`: dry-run report. The
+  direction is `revert` only when the target equals the recorded previous version.
+- [ ] `POST /characters/:id/version` with `{ targetVersionId, expectedRevision }`
+  and an idempotency key. One transaction: lock, recheck revision and
+  authorization, rerun the check, write the version, state and
+  `previous_system_version_id` (set on upgrade, cleared on revert), bump revision,
+  record activity/audit `system_version_upgraded` / `system_version_reverted`.
+  Standalone and returned characters, owner only; attached characters use the
+  campaign path.
+- [ ] Tests: upgrade, revert, second revert rejected, revision conflict, replay,
+  blocked report returns 409 with blockers, cache disposition `replace`, rolls and
+  activity kept.
 
-## Stage 3 — Campaign upgrade
+## Stage 3 — Campaign upgrade and revert
 
-- [ ] `GET /campaigns/:id/upgrade-check?targetVersionId=`: dry run for each
-  attached character and each campaign item template with a system base.
-- [ ] `POST /campaigns/:id/upgrade`: active GM/co-GM; one transaction moves the
+- [ ] Schema baseline: `campaigns.previous_system_version_id`.
+- [ ] `GET /campaigns/:id/version-check?targetVersionId=`: dry run for every
+  attached character and every campaign template with a system base.
+- [ ] `POST /campaigns/:id/version`: active GM/co-GM; one transaction moves the
   campaign, all attached characters and template bases (`versionId`,
   `packageChecksum`) or nothing. Campaign and per-character activity.
 - [ ] Tests: all pass, one blocked character blocks all, concurrent sheet edit
-  conflicts, player cannot upgrade, adoption at the new version works.
+  conflicts, player denied, revert after a template using a new base was created
+  is blocked, adoption at the new version works.
 
 ## Stage 4 — GUI
 
-- [ ] Character sheet menu and campaign settings: **Upgrade rules version**,
-  listing compatible later versions with publication date, short ID and release
-  notes. Preview shows added fields, changed items in this character's inventory
-  and blockers in plain language; confirm commits.
+- [ ] Character sheet menu and campaign settings: **Rules version** shows the
+  current version, compatible later versions (publication date, short ID, release
+  notes) and **Revert to …** when available. The preview lists added and dropped
+  fields, changed items in this character's inventory and blockers in plain
+  language; confirm commits.
 - [ ] Standalone adoption into a campaign on a newer version offers the upgrade
   first.
 - [ ] e2e at 360/1280 px: author publishes an additive version with a changed
-  item stat, owner upgrades, sheet shows the new stat and roll result uses it.
+  item stat, owner upgrades, the sheet shows the new stat and a roll uses it,
+  owner reverts and the old stat returns with current values kept.
 
 ## Out of scope
 
-Breaking upgrades, field mapping/renaming, downgrade or rollback, moving between
-systems, automatic upgrade on publish, upgrading campaign-derived entries already
-placed on sheets, version lineage tables.
-
-## Open questions for the owner
-
-1. Should a campaign upgrade be blocked by one non-verifying character (planned),
-   or upgrade the others and detach/leave that one?
-2. Is a revert to the previous version needed? It is excluded here; the previous
-   version stays available for new characters.
-3. Should a package-breaking change that does not touch a given character (for
-   example a removed spell the character never took) still block that character?
-   Planned: yes, any breaking package finding blocks. The alternative is to let the
-   per-character dry run decide.
+Breaking upgrades, field mapping/renaming, reverting to any version other than the
+recorded previous one, moving between systems, automatic upgrade on publish,
+updating campaign-derived entries already placed on sheets, version lineage tables.

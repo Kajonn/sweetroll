@@ -35,7 +35,8 @@ after the first release tag, follow the released-data migration/recovery policy.
 System (rules) versions are not application versions. Owner decision 2026-11-07:
 characters and campaigns may be upgraded forward to a later non-breaking version of
 the same system after a per-character dry run (design Section 6.7, [plan](docs/superpowers/plans/2026-11-07-system-version-upgrades.md)).
-Breaking upgrades, field mapping, downgrade/rollback and cross-system moves remain
+Reverting to the version recorded before the most recent upgrade is in scope.
+Breaking upgrades, field mapping, other downgrades and cross-system moves remain
 out of scope. Keep published rules identifiers and immutable snapshots.
 Application-version migrations and support for older app/API/package/cache/client
 versions are required only after the first application release Git tag (`v*.*.*`) for supported released versions.

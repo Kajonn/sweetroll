@@ -233,6 +233,9 @@ Decisions made while implementing, all within the approved scope:
   idempotency keys.
 - **`PATCH /systems/{systemId}`** accepts `lifecycle`, `access` or both, and
   `PATCH /system-versions/{versionId}` accepts only `lifecycle: "deprecated"`.
+- **Campaign items on sheets.** `POST /characters/{characterId}/entries` accepts the
+  browser's optional entry `source`, so a script can place a campaign template
+  offered by `GET /characters/{characterId}/templates`. Sheet entries echo `source`.
 - **Image uploads** go through the deployment's image scanner. A server without
   one returns `503 temporarily_unavailable`; the campaign quickstart has
   `--no-scene` for that case.
@@ -240,7 +243,13 @@ Decisions made while implementing, all within the approved scope:
 Verification on the implementation branch: `npm run typecheck`, `npm test`,
 `npm run contracts:check`, the web Account test and `npm run test:integration`
 (42 files, 398 tests, including the new
-`tests/integration/public-api-campaigns.test.ts`). Both quickstarts ran against
+`tests/integration/public-api-campaigns.test.ts`).
+`tests/integration/public-api-knave-campaign.test.ts` then added a complete
+API-only Knave campaign with six accounts (system creator, GM, four players):
+authoring and publishing, four equipped characters, a campaign with items, an
+NPC and two scenes, invitations and adoption, and a session with token moves,
+fog, campaign and proposal items placed on sheets, damage, and rolls from all
+five table accounts checked against each reader's activity feed and the GM export. Both quickstarts ran against
 a local server with `SWEETROLL_LOCAL_API_TOKENS=1`; the campaign quickstart ran
 with `--no-scene` because no image scanner was available locally.
 

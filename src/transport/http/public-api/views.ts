@@ -10,8 +10,9 @@ export function characterSheet(character: CharacterView) {
       placementGeneration: character.placementGeneration, returnOwnerId: character.returnOwnerId,
     },
     values: character.state.values, derivedValues, validations,
-    entries: Object.values(character.state.entries ?? {}).map(({ entryId, slotId, templateId, values, quantity }) => ({
+    entries: Object.values(character.state.entries ?? {}).map(({ entryId, slotId, templateId, values, quantity, source }) => ({
       entryId, slotId, templateId, values, ...(quantity === undefined ? {} : { quantity }),
+      ...(source === undefined ? {} : { source }),
     })),
   };
 }

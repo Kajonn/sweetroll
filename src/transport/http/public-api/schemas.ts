@@ -8,6 +8,7 @@ import {
 } from "../../../systems/implementation/package/schema/document.js";
 import { SystemPackageV1Schema } from "../../../systems/implementation/package/schema/package.js";
 import { DefinitionIdSchema } from "../../../systems/implementation/package/schema/common.js";
+import { EntrySourceSchema } from "../../../systems/implementation/package/schema/dynamic.js";
 
 export const object = <P extends TProperties>(properties: P) => Type.Object(properties, { additionalProperties: false });
 export const nullable = <T extends ReturnType<typeof Type.String> | ReturnType<typeof Type.Integer>>(schema: T) =>
@@ -134,9 +135,15 @@ const entryProperties = {
   entryId: uuid, slotId: definitionId, templateId: nullable(definitionId), values,
   quantity: Type.Optional(quantity),
 };
-export const entry = object(entryProperties);
+const entrySource = Type.Optional(EntrySourceSchema);
+export const entry = object({ ...entryProperties, source: entrySource });
 export const entryId = object({ characterId: uuid, entryId: uuid });
-export const addEntry = object({ ...entryProperties, values: Type.Optional(values), ...revisionCommand });
+export const addEntry = object({
+  ...entryProperties, values: Type.Optional(values), ...revisionCommand,
+  source: Type.Optional(Type.Union(EntrySourceSchema.anyOf, {
+    description: "Campaign items: send the source from GET /characters/{characterId}/templates with a null templateId and no values or quantity.",
+  })),
+});
 export const updateEntry = object({
   slotId: Type.Optional(definitionId), values: Type.Optional(values), quantity: Type.Optional(quantity),
   ...revisionCommand,

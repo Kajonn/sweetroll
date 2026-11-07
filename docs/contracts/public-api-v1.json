@@ -2463,6 +2463,75 @@
                     "maxLength": 128,
                     "pattern": "\\S",
                     "type": "string"
+                  },
+                  "source": {
+                    "description": "Campaign items: send the source from GET /characters/{characterId}/templates with a null templateId and no values or quantity.",
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "kind"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "personal",
+                            "type": "string"
+                          }
+                        }
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "kind",
+                          "templateId"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "system",
+                            "type": "string"
+                          },
+                          "templateId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          }
+                        }
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "kind",
+                          "campaignId",
+                          "templateId",
+                          "templateRevision",
+                          "contentRevision"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "campaign",
+                            "type": "string"
+                          },
+                          "campaignId": {
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                            "type": "string"
+                          },
+                          "templateId": {
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                            "type": "string"
+                          },
+                          "templateRevision": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "contentRevision": {
+                            "minimum": 1,
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    ]
                   }
                 }
               }
@@ -14958,6 +15027,74 @@
                   "minimum": 1,
                   "maximum": 9007199254740991,
                   "type": "integer"
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "kind"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "personal",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "kind",
+                        "templateId"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "system",
+                          "type": "string"
+                        },
+                        "templateId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "kind",
+                        "campaignId",
+                        "templateId",
+                        "templateRevision",
+                        "contentRevision"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "campaign",
+                          "type": "string"
+                        },
+                        "campaignId": {
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                          "type": "string"
+                        },
+                        "templateId": {
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                          "type": "string"
+                        },
+                        "templateRevision": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "contentRevision": {
+                          "minimum": 1,
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  ]
                 }
               }
             }

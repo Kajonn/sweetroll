@@ -895,6 +895,8 @@ export const defaultMessages: MessageTable = {
   "campaign.version.confirmDescription": "This changes the rules version for the campaign and its {characters} character(s) at once.",
   "campaign.activity.system_version_upgraded": "Rules version upgraded",
   "campaign.activity.system_version_reverted": "Rules version reverted",
+  "campaign.activity.extension_added": "Extension added",
+  "campaign.activity.extension_removed": "Extension removed",
   "character.activity.character_exported": "Character exported",
   "character.activity.character_campaign_created": "Added to campaign",
   "character.activity.character_adopted": "Character adopted",

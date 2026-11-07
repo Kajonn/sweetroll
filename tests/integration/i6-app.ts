@@ -153,7 +153,7 @@ export async function buildI6Harness(input?: {
     pool,
     wrapRuntime: input?.wrapRuntime,
     allowPersonalTokens: input?.publicApi ?? false,
-    extraRoutes: ({ authoring, characters, runtime, identity }) => {
+    extraRoutes: ({ authoring, extensions, characters, runtime, identity }) => {
       const limits = input?.limits ?? DEFAULT_CAMPAIGN_LIMITS;
       placement = createCampaignPlacement({
         pool,
@@ -169,6 +169,7 @@ export async function buildI6Harness(input?: {
         limits,
         charactersPlacement: placement,
     loadTemplatePackage:createPostgresPublishedPackageLoader(pool),
+    authorizeExtensionUse: extensions.authorizeExtensionUse,
     listUpgradeTargets: authoring.listUpgradeTargets,
     describeVersionChoices: authoring.describeVersionChoices,
       });

@@ -234,26 +234,59 @@ the design document updated (red → green, per existing plans).
   unknown version, system version used as extension version; used extension
   cannot be deleted).
 
-### E4 — Campaign composition
+### E4 — Campaign composition — done (one item deferred to E4b)
 
-- [ ] Schema baseline: `campaign_extensions`, `campaigns.previous_composition_json`.
-- [ ] Campaign creation and Settings: GM/co-GM add extensions (`added_by =
-  'campaign'`).
-- [ ] Campaign character creation, assign, claim and adoption: one
-  transaction merges the character's extensions into the campaign set
-  (`added_by = 'character'`), blocks on a different version (X8), dry-runs every
-  attached character against the new composition and writes all or nothing. The
-  adoption disclosure lists extensions that will be added.
-- [ ] Attached characters read the campaign composition; return keeps the
-  composition at the time of return (X10).
-- [ ] Campaign templates with a system base may use an extension template base.
-- [ ] Members access campaign-composition extension content only through the
-  campaign (X10).
-- [ ] Activity: `campaign_extension_added`, `campaign_extension_removed` with IDs
-  and versions only.
-- [ ] Tests: union rule with two players using different extensions, version
-  conflict blocked, private extension usable inside the campaign only, removal
-  blocked while used, concurrent adoption.
+- [x] Schema baseline: `campaign_extensions(campaign_id, extension_id,
+  extension_version_id, added_by, added_by_character_id, added_at)`; activity
+  kinds `extension_added`/`extension_removed`. The previous composition moves
+  to E5 with the composition commands.
+- [x] Invariant: every attached character's `character_extensions` equals the
+  campaign set, so the E3 character and runtime paths need no campaign lookup
+  (`src/characters/campaign-extensions.ts`).
+- [x] GM/co-GM commands (`src/campaigns/extensions.ts`), revisioned and
+  idempotent like other campaign commands: `GET /campaigns/:id/extensions`
+  (any active member; names and versions), `POST /campaigns/:id/extensions`
+  (`added_by = 'campaign'`; the GM must be allowed to use the extension, it must
+  extend the campaign's system and fit the composition; a second version of an
+  included extension is 409) and `DELETE /campaigns/:id/extensions/:extensionId`
+  (409 while an attached character has an entry from it or a campaign template
+  is based on it, X9). Both write every attached character and bump the
+  campaign revision and access revision. **Deviation:** extensions are added
+  after campaign creation with the same command rather than in the create
+  request; the GUI can do both in one flow (E6).
+- [x] Campaign-created characters copy the campaign set. Adoption merges the
+  character's extensions into the campaign (`added_by = 'character'`) in the
+  adoption transaction, checks the merged composition, writes all attached
+  characters and records `extension_added`; a different version of an
+  included extension is 409 (X8). Assign and claim move already-attached
+  characters and need no change. Returned characters keep their rows (X10).
+- [x] Members use campaign-composition extensions only through campaign
+  characters: the runtime loads them without a use check, while standalone
+  creation, GM add and extension authoring routes still require access (X10).
+- [x] Campaign rules-version changes return 409 while a campaign has
+  extensions (E5). Campaign creation no longer accepts extension versions as a
+  base (`loadAccessibleVersion` selects `kind = 'system'`; fixes an E2 gap).
+- [x] Web: activity labels for the new kinds; web fixtures carry
+  `extensions` (E3 follow-up).
+- [x] Tests (`tests/integration/campaign-extensions.test.ts`): union of GM and
+  character extensions shared with an earlier campaign character, the adoptee
+  and a later campaign-created character (template list shows both packs);
+  non-GM add refused; campaign version change refused; X8 sequential and
+  concurrent adoption (the race resolves through the campaign lock and
+  revision); private extension placed and rolled inside the campaign but not
+  usable outside it or by another campaign; removal blocked while used, then
+  allowed, removing from attached characters; activity kinds; idempotent add
+  replay and key reuse; extension of another system refused.
+
+### E4b — Campaign templates based on extension templates (deferred)
+
+- [ ] A campaign template's system base may name an extension template:
+  derived base `{ versionId, packageChecksum, templateId, extensionId,
+  extensionVersionId, extensionChecksum }`, base picker over the campaign
+  composition, placement and derived-entry checks by `templateKey`, re-pinning
+  in E5. Deferred from E4 because it touches derived-entry pinning, the
+  picker, placement, proposals and version re-pinning; removal already
+  counts such templates as usage (X9).
 
 ### E5 — Composition changes (Section 6.7 extension)
 

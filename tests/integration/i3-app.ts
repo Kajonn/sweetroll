@@ -85,6 +85,7 @@ export type BuildI3AppInput = {
   extraRoutes?: (modules: {
     identity: Identity;
     authoring: SystemAuthoring;
+    extensions: ExtensionAuthoring;
     characters: Characters;
     runtime: SystemRuntime;
   }) => FastifyPluginCallback | FastifyPluginCallback[];
@@ -166,7 +167,7 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
   );
 
   if (input.extraRoutes !== undefined) {
-    const routes = input.extraRoutes({ authoring, characters, runtime, identity });
+    const routes = input.extraRoutes({ authoring, extensions, characters, runtime, identity });
     for (const plugin of Array.isArray(routes) ? routes : [routes]) {
       void app.register(plugin);
     }

@@ -190,6 +190,19 @@ CREATE TABLE campaigns (
 CREATE INDEX campaigns_owner_page_idx
   ON campaigns (owner_id, created_at DESC, id DESC);
 
+-- Design 6.8 (decision X7): the campaign composition. Attached characters'
+-- character_extensions always equal this set. `added_by` records whether the
+-- GM chose the extension or an adopted character brought it.
+CREATE TABLE campaign_extensions (
+  campaign_id           uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  extension_id          uuid NOT NULL REFERENCES systems(id) ON DELETE RESTRICT,
+  extension_version_id  uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  added_by              text NOT NULL CHECK (added_by IN ('campaign', 'character')),
+  added_by_character_id uuid, -- informational; the character may later leave or be purged
+  added_at              timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (campaign_id, extension_id)
+);
+
 CREATE TABLE campaign_members (
   campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -566,7 +579,9 @@ CREATE TABLE campaign_activity_events (
     'template_archive',
     'template_recover',
     'system_version_upgraded',
-    'system_version_reverted'
+    'system_version_reverted',
+    'extension_added',
+    'extension_removed'
   ))
 );
 

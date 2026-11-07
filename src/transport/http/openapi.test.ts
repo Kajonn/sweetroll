@@ -57,6 +57,8 @@ describe("buildOpenApiDocument", () => {
       "/campaigns/{id}/display-credentials",
       "/campaigns/{id}/displays/{displayId}/revoke",
       "/campaigns/{id}/exports",
+      "/campaigns/{id}/extensions",
+      "/campaigns/{id}/extensions/{extensionId}",
       "/campaigns/{id}/images",
       "/campaigns/{id}/images/{fileId}",
       "/campaigns/{id}/images/{fileId}/original",

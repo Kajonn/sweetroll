@@ -236,6 +236,7 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
     openTemplateImage: unavailable, setTemplateImage: unavailable, removeTemplateImage: unavailable,
     openProposalImage: unavailable, setProposalImage: unavailable, removeProposalImage: unavailable,
     listVersionOptions: unavailable, checkVersionChange: unavailable, changeVersion: unavailable,
+    listExtensions: unavailable, addExtension: unavailable, removeExtension: unavailable,
     openCampaignItemImageBytes: unavailable,
     shareTemplate:unavailable,previewTemplates:unavailable,
     submitProposal:unavailable, openProposal:unavailable, listProposals:unavailable, approveProposal:unavailable, rejectProposal:unavailable,

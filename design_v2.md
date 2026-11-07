@@ -24,7 +24,7 @@ The core strength versus existing VTTs is:
 - **System-agnostic.** Unlike D&D Beyond, it supports any rules system. Because copyrighted systems cannot be shipped, the MVP ships **pre-built open-license templates** plus a **minimal no-code creator**.
 - **Not a simulation.** It captures the basics to make rolls and show results, then hands freedom back to the GM and players to update stats.
 
-The MVP is a modular monolith backed by PostgreSQL and object storage. System definitions are declarative, versioned documents. Math and dice expressions are parsed into a lightweight AST and evaluated by the platform; creator-supplied executable code is never run. Published system versions are immutable; campaigns and characters pin to an immutable published version. Version upgrades are excluded by the development policy in Sections 6.7 and 12.4.
+The MVP is a modular monolith backed by PostgreSQL and object storage. System definitions are declarative, versioned documents. Math and dice expressions are parsed into a lightweight AST and evaluated by the platform; creator-supplied executable code is never run. Published system versions are immutable; campaigns and characters pin to an immutable published version. A character or campaign may move forward to a later, non-breaking version of the same system after its state verifies against that version (Section 6.7); this is unrelated to application-version migration (Sections 12.4 and 17.0).
 
 > **MVP scope.** Build a trustworthy shared-character-sheet and campaign platform — not a full virtual tabletop and not an auto-applying rules simulator. The first Player and GM applications are mobile-first web apps delivered as an installable PWA. Native binaries and app-store distribution are post-MVP. Simple background images, manually edited fog, GM-positioned tokens, and a restricted player display are included in I7b. Video, voice, tactical movement, dynamic lighting, marketplace payments, and arbitrary scripting are excluded from the first release tag.
 
@@ -135,7 +135,7 @@ A GM may use **multiple devices in the same session simultaneously**, with each 
 
 **D1 implementation (PR #26; hosted acceptance passed):** [Player proposal contract](docs/superpowers/specs/2026-10-31-player-template-proposals.md) and [execution plan](docs/superpowers/plans/2026-10-31-player-template-proposals.md) specify private player submissions and one atomic GM approval that publishes a data-only catalog template. The source personal entry remains unchanged. C is merged as `455f967`. Proposal routes, private generation-bound reads, atomic approval/rejection and online-only scoped GUI are implemented; Passing hosted journeys, exact served-asset verification, private recovery and independent cleanup are tracked in [D1 acceptance](docs/acceptance/player-template-proposals-2026-10-31.md). Restricted catalog audiences are implemented separately in D2 ([PR #27 acceptance](docs/acceptance/restricted-template-audiences-2026-11-01.md)).
 
-**Implemented and accepted on the isolated preview (2026-10-31):** [Campaign templates with inherited actions — adventure slice C](docs/superpowers/plans/2026-10-31-campaign-inherited-actions.md), planned against `main` `ba8200b`. A derived template uses a server-validated base from the campaign's pinned published package; only presentation, typed field defaults and item quantity are editable. Placed copies keep their exact catalog revision, reuse existing roll/nominal/entry-resource actions and push policies, and remain usable after catalog archive or authorized character return without a live catalog lookup. Personal/blank campaign entries remain data-only. Base changes, instance conversion and character/campaign version upgrades are excluded; follow Section 17.0. The implementation is published in PR #25. Application `58c71a1` passes all CI #158 verification jobs and both isolated hosted journeys, including offline/returned-sheet recovery. Deployment `5a090554-1e7d-4a06-98e2-3a6e1f0a886d`, served asset identity and independent cleanup are verified. C7 is complete; unperformed G9 release gates remain open.
+**Implemented and accepted on the isolated preview (2026-10-31):** [Campaign templates with inherited actions — adventure slice C](docs/superpowers/plans/2026-10-31-campaign-inherited-actions.md), planned against `main` `ba8200b`. A derived template uses a server-validated base from the campaign's pinned published package; only presentation, typed field defaults and item quantity are editable. Placed copies keep their exact catalog revision, reuse existing roll/nominal/entry-resource actions and push policies, and remain usable after catalog archive or authorized character return without a live catalog lookup. Personal/blank campaign entries remain data-only. Base changes and instance conversion are excluded; non-breaking rules-version upgrades follow Section 6.7. The implementation is published in PR #25. Application `58c71a1` passes all CI #158 verification jobs and both isolated hosted journeys, including offline/returned-sheet recovery. Deployment `5a090554-1e7d-4a06-98e2-3a6e1f0a886d`, served asset identity and independent cleanup are verified. C7 is complete; unperformed G9 release gates remain open.
 
 1. A player or authorized GM adds a personal custom entry to a character's compatible sheet slot and records its name, description, quantity and notes without changing the published system.
 2. A GM or co-GM may create a reusable campaign template for an item, spell, ability or effect. Data-only templates can start blank; a template based on the campaign's pinned system version may inherit that system item's validated actions.
@@ -215,7 +215,7 @@ Slice A was merged as PR #21; B was merged as PR #22 (`759323a`). B passed all s
 
 The [2026-10-27 scoped acceptance](docs/acceptance/configurable-push-rolls-2026-10-27.md) passed nine fresh-system journeys on isolated deployment `90462834-5fbd-4aea-865c-2f9cdc9680b5`, exact application `dfae37f`, including two independent authors, current permission/scope changes, early Activity and durable offline recovery. All five served artifacts matched the source rebuild; CI 135 passed. The report distinguishes PostgreSQL default-policy evidence from the unperformed live internal setting change.
 
-**Pre-release scope decision (2026-10-27):** The owner confirms there has been no release and there are no existing users. Character/campaign version upgrades have been removed. Application/database migration and historical-client compatibility are deferred until after the first release tag under Section 17.0. Fresh system authoring/publishing, play, permissions, saved-pool pushes and offline recovery remain in scope. Existing version checks remain defensive constraints; no upgrade workflow is added by this decision.
+**Pre-release scope decision (2026-10-27):** The owner confirms there has been no release and there are no existing users. Character/campaign version upgrades were removed on that date and reinstated for non-breaking system versions on 2026-11-07 (Section 6.7). Application/database migration and historical-client compatibility are deferred until after the first release tag under Section 17.0. Fresh system authoring/publishing, play, permissions, saved-pool pushes and offline recovery remain in scope. Existing version checks remain defensive constraints; no upgrade workflow is added by this decision.
 
 ## 6.5 Draft, validation, and publishing
 
@@ -244,14 +244,76 @@ Templates are exported declarative packages that users can clone and customize w
 
 I1 contract validation uses three original, license-neutral reference fixtures: a d20 ability/check family, a 2d6 PbtA-style move family, and a d6 counted-success pool family. These fixtures define the capability ceiling without being represented as reviewed launch templates. Shipping any named open-license template still requires the separate license review.
 
-## 6.7 Pinned rules; no version upgrades (2026-10-27)
+## 6.7 Pinned rules and non-breaking version upgrades (owner decision 2026-11-07)
 
-Campaigns and characters retain the exact published rules snapshot chosen at
-creation. Publishing a new snapshot does not change existing play. The owner has
-removed version migration from the current scope: there are no mapping/default
-previews, upgrade commits, rollback commands, lineage tables or upgrade UI.
-Create a new test character/campaign to use a different snapshot. Existing
-publication, immutable version IDs, character saves and dice history remain.
+This section is about **system (rules) versions**. It is independent of
+application/database versions, which follow Sections 12.4 and 17.0.
+
+Campaigns and characters store the exact published system version they use.
+Publishing a new version never changes existing play by itself. Systems are
+expected to grow: new items, spells, talents and other templates are common, and
+so are stat changes on existing templates. An owner can therefore move a
+character or campaign **forward** to a later published version of the **same
+system** when the change is non-breaking for that character:
+
+1. **Package check.** The publish-time comparison (Section 6.5) runs between the
+   current pin and the target. Adding entities, fields with defaults, templates,
+   slots, actions or granted actions and changing template stats, labels,
+   expressions with the same context and result type, or presentation are
+   non-breaking. A breaking finding blocks only when it touches this character
+   (owner decision 2026-11-07): its own character type, an action on its sheet, a
+   template or slot used by one of its entries, or an expression behind its
+   computed fields or those actions. Breaking changes elsewhere, such as a removed
+   item nobody on this sheet has, are listed in the preview but do not block.
+2. **Character check (dry run).** The server decodes the character's stored state
+   and every entry against the target package, using the existing write-time
+   validators. Field values, entry values, slot acceptance and limits, system-base
+   references of campaign-derived entries and validations must all pass. New
+   non-computed fields receive their declared defaults. The result is a preview
+   listing the fields added or dropped, stats updated or kept on this character's
+   entries, the target's validation messages and any blocking problems.
+3. **Commit.** The upgrade stores the target version ID, the defaulted state and a
+   revision bump in one revision-checked, idempotent transaction, and records an
+   activity/audit event with the source and target versions. Rolls, activity and
+   history are retained unchanged. Nothing is converted or remapped: stable
+   definition identifiers carry the values across.
+
+Stored values are kept by identifier. Granted actions and expressions come from
+the pinned package. Placing an item copies its template field defaults (its
+stats) into the entry, so a version change moves each entry value that still
+equals the old template default to the new default, and keeps values the player
+or campaign changed; the preview lists both. New template fields receive their
+default, and the item's art follows the template unless it was changed.
+Campaign-derived entries re-pin their system base to the target version.
+
+**Campaigns.** A campaign and its attached characters share one pin. An active GM
+or co-GM upgrades the campaign; the dry run covers every attached character and
+every campaign template with a system base, and the commit moves all of them
+together or none. Campaign template bases are re-pinned to the target version and
+checksum. Any character that fails the dry run blocks the whole campaign upgrade; derived entries already placed on sheets keep their copied defaults.
+A standalone or returned character is upgraded by its owner. A standalone
+character can be adopted only at the campaign's exact version, so its owner may
+first upgrade it to that version.
+
+**Revert (owner decision 2026-11-07).** A character or campaign can return to
+the version it used before its most recent upgrade. The upgrade stores that
+version as `previous_system_version_id`; a revert clears it, so a second revert is
+not possible until the next upgrade. Revert uses the same dry run and commit as an
+upgrade, but against the previous version and without the package-level check,
+because undoing additions always reads as removals. Current values are kept by
+identifier, so play since the upgrade (damage, resources, notes) is not lost.
+Values of fields that do not exist in the previous version are dropped and listed
+in the preview. An entry whose template or slot does not exist in the previous
+version, or whose values no longer verify, blocks the revert; the owner removes or
+edits it first. A campaign reverts with all attached characters and template bases
+or not at all, and any blocker blocks the campaign.
+
+**Excluded.** Breaking upgrades, field mapping or renaming, reverting to any
+version other than the recorded previous one, moving between different systems,
+automatic upgrades on publish and lineage tables. A blocked character stays on its
+version; create a new character to use a breaking version. Version selection shows
+later versions with whether this character can move to them. The [system version upgrade plan](docs/superpowers/plans/2026-11-07-system-version-upgrades.md)
+defines the delivery stages.
 
 Character activity uses readable action names and local date/time formatting.
 A published system version updates the open editor's status immediately.
@@ -571,7 +633,8 @@ There is no migration history/checksum ledger, incremental migration runner,
 backfill, repair, old-client conversion or automatic reset. Edit the current schema
 and recreate disposable test databases when it changes. Seed missing reference
 templates without rewriting existing immutable versions. Character/campaign
-rules-version upgrades and rollback are also excluded. See [database policy](database/README.md).
+rules-version upgrades are a separate, supported feature (Section 6.7) and need no
+database migration. See [database policy](database/README.md).
 
 Application-version migrations and compatibility with older app builds become
 requirements only after the first application release tag. Before then, update the
@@ -718,7 +781,7 @@ caller. Hosted acceptance still depends on real provider sign-in.
 
 Maintain three internal reference systems as acceptance fixtures: a minimal rules-light system, a class-and-level fantasy system with derived statistics and inventory, and a dice-pool system with resources. They must exercise every supported field, sheet element, formula feature, action, visibility path and mobile breakpoint. Where an open license permits, the shipped templates correspond to these fixtures.
 
-> **Current scope (2026-10-27):** character/campaign version migration, upgrade previews/commits and rollback have been removed at the owner's request. Historical implementation/acceptance notes below do not reintroduce them. See Sections 6.7 and 12.4.
+> **Current scope (2026-11-07):** non-breaking character/campaign system-version upgrades and revert to the previous version, each with a dry-run preview, are in scope (Section 6.7). Breaking upgrades and field mapping remain excluded. Application/database migration is separate (Sections 12.4 and 17.0).
 
 # 17. Delivery plan
 
@@ -760,9 +823,8 @@ Current-version schema validation, unsupported-input rejection, authorization,
 transactional integrity, exact-request retry/reload recovery and offline behavior
 remain required. Supported browser vendors/versions are a separate platform
 requirement. Creator-published rules snapshots and pinning remain supported.
-The owner also removed character/campaign upgrade previews, commits and rollback
-from the current app scope (Section 6.7); recreate test characters/campaigns when
-changing their published rules snapshot.
+System (rules) version upgrades of characters and campaigns are a product feature,
+not application migration, and are allowed before the tag (Section 6.7).
 The [post-tag migration plan](docs/superpowers/plans/2026-10-27-application-migration-policy.md) defines the strategy now: a frozen tagged baseline, ordered migrations for later changes, released-data/client compatibility, validation and recovery. Implement no transition code or tests before the first release tag. Dated verification records are evidence, not tasks to repeat.
 
 ## 17.1 Increment definition of done
@@ -955,7 +1017,7 @@ The first GM app is a responsive web surface within the shared PWA. Native packa
 6. Build one-tap authorized resource bumps across characters with optimistic status, idempotent retry, and immediate revision-conflict recovery.
 7. Implement disclosed GM character visibility, character oversight, roll-audience controls, and audit views without granting system creators campaign access.
 8. Support simultaneous GM devices and co-GMs through polling/revision refresh, authorized activity updates, and clear conflict handling without a single-session lock.
-9. Campaign version upgrades are excluded by the current owner decision in Section 6.7.
+9. Non-breaking campaign version upgrades follow Section 6.7.
 10. Complete WCAG 2.2 AA review, responsive testing, cross-campaign authorization tests, session load/soak tests, SLO dashboards, alerting, backup restoration drill, and incident runbook exercise.
 
 **Acceptance demonstration:** A GM creates a campaign without direct HTTP tools, invites four players, manages visibility, previews each player's view, runs the session board from a phone while showing content on a second device, resolves a concurrent edit, and verifies that publishing preserves every campaign pin.
@@ -1012,7 +1074,7 @@ The two tracks are independent; preserve their internal stage order. T1 builds o
 - **I7:** A GM can use the mobile-first web app to create a campaign from a shipped open-license template, invite four players, manage content visibility, verify each player's view, and run a session across two devices.
 - **I7b (visual-controls feature gate accepted):** A GM phone supports uploaded image tokens, direct drag/tap placement/movement and on-image reveal/conceal brushing, with numeric/keyboard alternatives; a restricted tablet/remote display receives only revealed pixels and permitted tokens. The V4 combined hosted journey passes ([evidence](docs/acceptance/scene-visual-controls-2026-11-06.md)); G9 physical-device/provider/human/playtest gates remain separate.
 - **GUI release:** Apply G9 to each migrated view and final release: actual routed visual review, real phone/iPad checks, built frontend/API deployment, and physical-table/remote playtests.
-- Publishing a new system version never changes an existing character or campaign; using a different snapshot requires creating a new test character/campaign.
+- Publishing a new system version never changes an existing character or campaign by itself; an owner may upgrade to a later non-breaking version after a passing dry run (Section 6.7).
 - Users can export system, character, and campaign data in documented formats.
 - Backup restoration, monitoring, alerting, load testing, and an incident runbook have been exercised before public beta.
 

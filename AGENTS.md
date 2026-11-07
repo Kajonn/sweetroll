@@ -32,14 +32,18 @@ retaining old test state is optional. Do not ask again solely because a
 pre-release reset would discard test state. Check release-tag status first;
 after the first release tag, follow the released-data migration/recovery policy.
 
-Character/campaign version upgrades, mapping previews and rollback are also out of scope.
-Keep published rules identifiers and immutable snapshots; do not add conversion paths.
+System (rules) versions are not application versions. Owner decision 2026-11-07:
+characters and campaigns may be upgraded forward to a later non-breaking version of
+the same system after a per-character dry run (design Section 6.7, [plan](docs/superpowers/plans/2026-11-07-system-version-upgrades.md)).
+Reverting to the version recorded before the most recent upgrade is in scope.
+Breaking upgrades, field mapping, other downgrades and cross-system moves remain
+out of scope. Keep published rules identifiers and immutable snapshots.
 Application-version migrations and support for older app/API/package/cache/client
 versions are required only after the first application release Git tag (`v*.*.*`) for supported released versions.
 Follow [design Section 17.0](design_v2.md#170-release-status-and-application-version-policy);
 older compatibility checklists must not introduce pre-release acceptance or merge gates.
 
-Before that tag, no app/database or character/campaign migration tasks or
+Before that tag, no app/database migration tasks or
 transition tests belong in implementation plans or suites. The strategy is agreed
 now in [the post-tag migration plan](docs/superpowers/plans/2026-10-27-application-migration-policy.md); implement transition code/tests only for changes after the tag.
 

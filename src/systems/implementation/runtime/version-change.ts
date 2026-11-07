@@ -8,7 +8,7 @@ import type {
   ObjectTemplateV1,
   SystemPackageV1,
 } from "../package/schema/index.js";
-import { derivedEntryError, slotsForEntity } from "./effective-entry.js";
+import { derivedEntryError, slotsForEntity, templateApplicable, validDefaults } from "./effective-entry.js";
 import { validateEntryForSlot } from "./entries.js";
 import { resolveObservedValues } from "./resolve.js";
 import { decodeRuntimeState, initializeState } from "./state.js";
@@ -298,7 +298,7 @@ function fieldDefault(field: FieldV1 | undefined): unknown {
  * so it follows the new default. Changed values are kept. New template fields
  * receive their default; values of fields the target lacks are dropped.
  */
-function followDefaults(
+export function followDefaults(
   values: Record<string, unknown>,
   fromTemplate: ObjectTemplateV1 | undefined,
   toTemplate: ObjectTemplateV1,
@@ -330,4 +330,55 @@ function followDefaults(
     }
   }
   return next;
+}
+
+export type TemplateBaseChange = {
+  ok: boolean;
+  blockers: VersionChangeBlocker[];
+  /** Rebased base pin and defaults; null when blocked. */
+  next: { base: { versionId: string; packageChecksum: string; templateId: string }; defaultValues: Record<string, unknown> } | null;
+};
+
+/**
+ * Design 6.7 campaign path: re-pin a campaign template's system base to the
+ * target package. Defaults that still equal the old base default follow the
+ * new one. On upgrade, a breaking finding on the base template blocks.
+ */
+export function checkTemplateBaseChange(input: {
+  from: SystemPackageV1;
+  to: SystemPackageV1;
+  kind: string;
+  base: { templateId: string };
+  defaultValues: Record<string, unknown>;
+  direction: VersionChangeDirection;
+}): TemplateBaseChange {
+  const { from, to, base } = input;
+  const blockers: VersionChangeBlocker[] = [];
+  if (input.direction === "upgrade") {
+    for (const finding of comparePackages(from, to).findings) {
+      const [, kind, id] = finding.path.split("/");
+      if (kind === "templates" && id === base.templateId) {
+        blockers.push({ code: "breaking_change", message: finding.message, definitionId: finding.path });
+      }
+    }
+  }
+  const fromTemplate = (from.templates ?? []).find((t) => t.id === base.templateId);
+  const toTemplate = (to.templates ?? []).find((t) => t.id === base.templateId && t.kind === input.kind);
+  if (toTemplate === undefined) {
+    blockers.push({ code: "entry_template_missing", message: `Template "${base.templateId}" does not exist in the target version.`, definitionId: base.templateId });
+    return { ok: false, blockers, next: null };
+  }
+  const defaultValues = followDefaults(input.defaultValues, fromTemplate, toTemplate, null);
+  if (!validDefaults(toTemplate, defaultValues) || !to.entities.some((entity) => templateApplicable(to, entity, toTemplate))) {
+    blockers.push({ code: "entry_invalid", message: `Template "${base.templateId}" cannot be used as a base in the target version.`, definitionId: base.templateId });
+  }
+  if (blockers.length > 0) return { ok: false, blockers, next: null };
+  return {
+    ok: true,
+    blockers,
+    next: {
+      base: { versionId: to.versionId, packageChecksum: to.integrity.checksum, templateId: base.templateId },
+      defaultValues,
+    },
+  };
 }

@@ -157,6 +157,8 @@ CREATE TABLE campaigns (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id          uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   system_version_id uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  -- Design 6.7: the version used before the most recent upgrade; the only revert target.
+  previous_system_version_id uuid REFERENCES system_versions(id) ON DELETE RESTRICT,
   title             text NOT NULL,
   description       text NOT NULL DEFAULT '',
   status            text NOT NULL DEFAULT 'active',

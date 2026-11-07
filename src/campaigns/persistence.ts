@@ -714,6 +714,23 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       return row === undefined ? null : toCampaignRecord(row);
     },
 
+    /** Design 6.7: move the campaign pin; the caller verified and moved attached characters. */
+    async updateCampaignVersion(
+      client: PoolClient,
+      input: { campaignId: string; fromVersionId: string; toVersionId: string; previousVersionId: string | null; expectedRevision: number; now: Date },
+    ): Promise<CampaignRecord | null> {
+      const result = await client.query<CampaignRow>(
+        `UPDATE campaigns
+            SET system_version_id = $2, previous_system_version_id = $3,
+                revision = revision + 1, updated_at = $4::timestamptz
+          WHERE id = $1 AND revision = $5 AND system_version_id = $6
+          RETURNING ${CAMPAIGN_COLUMNS}`,
+        [input.campaignId, input.toVersionId, input.previousVersionId, input.now.toISOString(), input.expectedRevision, input.fromVersionId],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toCampaignRecord(row);
+    },
+
     async bumpCampaignRevisionForMembership(
       client: PoolClient,
       input: { campaignId: string; expectedRevision: number; now: Date },

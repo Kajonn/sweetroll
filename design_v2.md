@@ -316,7 +316,14 @@ later authorized versions and the revert target; choosing one runs the check for
 this character before anything is saved. Standalone characters use
 `GET /characters/:id/version-options`, `GET /characters/:id/version-check?targetVersionId=`
 and `POST /characters/:id/version` (`{ targetVersionId, expectedRevision, idempotencyKey }`);
-attached characters move only with their campaign. A blocked change returns 409,
+attached characters move only with their campaign, through the GM/co-GM routes
+`GET /campaigns/:id/version-options`, `GET /campaigns/:id/version-check?targetVersionId=`
+and `POST /campaigns/:id/version` (`{ targetVersionId, expectedCampaignRevision, idempotencyKey }`).
+The campaign check lists every attached character and every system-based campaign
+template with its blockers; the commit locks the campaign, then its characters and
+templates, re-verifies them and writes the campaign pin, each character and a new
+template content revision with the re-pinned base in one transaction. A campaign
+records `previous_system_version_id` like a character. A blocked change returns 409,
 and activity records `system_version_upgraded` or `system_version_reverted` with
 version and definition identifiers only. The [system version upgrade plan](docs/superpowers/plans/2026-11-07-system-version-upgrades.md)
 defines the delivery stages.

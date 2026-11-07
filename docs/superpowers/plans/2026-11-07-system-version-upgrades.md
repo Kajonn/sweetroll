@@ -91,17 +91,34 @@ columns are added to the current schema baseline.
   newer-only item, revert after removing it, breaking change blocking only the
   affected character, other users denied, older/foreign/current targets rejected.
 
-## Stage 3 — Campaign upgrade and revert
+## Stage 3 — Campaign upgrade and revert — done
 
-- [ ] Schema baseline: `campaigns.previous_system_version_id`.
-- [ ] `GET /campaigns/:id/version-check?targetVersionId=`: dry run for every
-  attached character and every campaign template with a system base.
-- [ ] `POST /campaigns/:id/version`: active GM/co-GM; one transaction moves the
-  campaign, all attached characters and template bases (`versionId`,
-  `packageChecksum`) or nothing. Campaign and per-character activity.
-- [ ] Tests: all pass, one blocked character blocks all, concurrent sheet edit
-  conflicts, player denied, revert after a template using a new base was created
-  is blocked, adoption at the new version works.
+- [x] Schema baseline: `campaigns.previous_system_version_id`.
+- [x] Systems facade (`src/systems/templates.ts`) exports `checkVersionChange` and
+  `checkTemplateBaseChange` (re-pin a template base, follow unchanged defaults,
+  block on a breaking finding for that base, on a missing base or invalid
+  defaults) so the campaign transaction verifies locked rows itself.
+- [x] `GET /campaigns/:id/version-options` and
+  `GET /campaigns/:id/version-check?targetVersionId=` (active GM/co-GM; others
+  404): per-character reports and per-template blockers, overall `ok`.
+- [x] `POST /campaigns/:id/version` (`{ targetVersionId, expectedCampaignRevision,
+  idempotencyKey }`): active GM/co-GM, active campaign. Locks the campaign, then
+  attached characters and templates; rechecks revision and direction; any blocker
+  returns 409 and writes nothing. Otherwise moves every attached character
+  (version, state, previous version, revision, campaign-scoped activity, audit),
+  appends a template content revision with the re-pinned base for each
+  system-based template, moves the campaign pin and records campaign audit and an
+  idempotency receipt in one transaction.
+- [x] Integration tests (`tests/integration/campaign-version-change.test.ts`):
+  player denied, options/check, stale revision 409, upgrade moving two characters
+  and a template base with the campaign override kept, placement working after
+  the upgrade, attached characters refused on the standalone route, revert,
+  one breaking template blocking the whole campaign with nothing written, and a
+  breaking version allowed when nothing in the campaign uses the change.
+- Not done here: a campaign activity-feed entry. Campaign activity kinds are a
+  checked enum rendered by the web app; add `system_version_upgraded` /
+  `system_version_reverted` there in stage 4. Audit and per-character activity
+  are recorded now.
 
 ## Stage 4 — GUI
 

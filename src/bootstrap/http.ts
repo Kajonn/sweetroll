@@ -138,6 +138,8 @@ const campaigns = createCampaignsModule({
   limits: placementLimits,
   charactersPlacement: placement,
     loadTemplatePackage:createPostgresPublishedPackageLoader(pool),
+    listUpgradeTargets: authoring.listUpgradeTargets,
+    describeVersionChoices: authoring.describeVersionChoices,
 });
 
 const app = buildHttpApp({

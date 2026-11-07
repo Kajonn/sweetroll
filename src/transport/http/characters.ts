@@ -531,7 +531,7 @@ const TransferOwnershipBody = Type.Object({
   idempotencyKey: Type.String({ minLength: 1 }),
 });
 // Design 6.7: system version upgrade and revert.
-const VersionChoiceDto = Type.Object({
+export const VersionChoiceDto = Type.Object({
   versionId: Type.String({ format: UUID_FORMAT }),
   systemId: Type.String({ format: UUID_FORMAT }),
   semanticVersion: Type.String(),
@@ -543,40 +543,41 @@ const CharacterVersionOptionsDto = Type.Object({
   revertTo: Type.Union([VersionChoiceDto, Type.Null()]),
   upgrades: Type.Array(VersionChoiceDto),
 });
-const VersionChangeDirectionDto = Type.Union([Type.Literal("upgrade"), Type.Literal("revert")]);
+export const VersionChangeDirectionDto = Type.Union([Type.Literal("upgrade"), Type.Literal("revert")]);
+export const VersionChangeReportDto = Type.Object({
+  ok: Type.Boolean(),
+  direction: VersionChangeDirectionDto,
+  fromVersionId: Type.String(),
+  toVersionId: Type.String(),
+  packageFindings: Type.Array(Type.Object({
+    code: Type.String(),
+    path: Type.String(),
+    message: Type.String(),
+    affectsCharacter: Type.Boolean(),
+  })),
+  blockers: Type.Array(Type.Object({
+    code: Type.String(),
+    message: Type.String(),
+    definitionId: Type.Optional(Type.String()),
+    entryId: Type.Optional(Type.String()),
+  })),
+  addedFields: Type.Array(Type.String()),
+  droppedFields: Type.Array(Type.String()),
+  changedEntries: Type.Array(Type.Object({
+    entryId: Type.String(),
+    templateId: Type.String(),
+    updatedFields: Type.Array(Type.String()),
+    keptFields: Type.Array(Type.String()),
+    addedFields: Type.Array(Type.String()),
+    droppedFields: Type.Array(Type.String()),
+    imageUpdated: Type.Boolean(),
+  })),
+  validations: Type.Array(RuntimeValidationDto),
+});
 const CharacterVersionCheckDto = Type.Object({
   revision: Type.Integer(),
   direction: VersionChangeDirectionDto,
-  report: Type.Object({
-    ok: Type.Boolean(),
-    direction: VersionChangeDirectionDto,
-    fromVersionId: Type.String(),
-    toVersionId: Type.String(),
-    packageFindings: Type.Array(Type.Object({
-      code: Type.String(),
-      path: Type.String(),
-      message: Type.String(),
-      affectsCharacter: Type.Boolean(),
-    })),
-    blockers: Type.Array(Type.Object({
-      code: Type.String(),
-      message: Type.String(),
-      definitionId: Type.Optional(Type.String()),
-      entryId: Type.Optional(Type.String()),
-    })),
-    addedFields: Type.Array(Type.String()),
-    droppedFields: Type.Array(Type.String()),
-    changedEntries: Type.Array(Type.Object({
-      entryId: Type.String(),
-      templateId: Type.String(),
-      updatedFields: Type.Array(Type.String()),
-      keptFields: Type.Array(Type.String()),
-      addedFields: Type.Array(Type.String()),
-      droppedFields: Type.Array(Type.String()),
-      imageUpdated: Type.Boolean(),
-    })),
-    validations: Type.Array(RuntimeValidationDto),
-  }),
+  report: VersionChangeReportDto,
 });
 const VersionCheckQuery = Type.Object(
   { targetVersionId: Type.String({ format: UUID_FORMAT }) },

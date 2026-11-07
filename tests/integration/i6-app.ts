@@ -169,6 +169,8 @@ export async function buildI6Harness(input?: {
         limits,
         charactersPlacement: placement,
     loadTemplatePackage:createPostgresPublishedPackageLoader(pool),
+    listUpgradeTargets: authoring.listUpgradeTargets,
+    describeVersionChoices: authoring.describeVersionChoices,
       });
       const browser = buildCampaignsRoutes({ campaigns, characters, runtime, identity });
       if (!input?.publicApi) return browser;

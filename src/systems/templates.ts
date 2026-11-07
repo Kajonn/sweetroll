@@ -8,6 +8,13 @@ import {
   templateApplicable,
 } from "./implementation/runtime/effective-entry.js";
 export type { PublishedPackageLoader } from "./implementation/runtime/package-loader.js";
+// Design 6.7: version changes that campaigns apply inside their own transaction.
+export { checkTemplateBaseChange, checkVersionChange } from "./implementation/runtime/version-change.js";
+export type {
+  TemplateBaseChange,
+  VersionChangeDirection,
+  VersionChangeReport,
+} from "./implementation/runtime/version-change.js";
 export function resolveTemplateBase(
   pkg: SystemPackageV1,
   id: string,

@@ -1219,6 +1219,8 @@ export const defaultMessages: MessageTable = {
   "account.tokens.scope.systems:write": "Write systems",
   "account.tokens.scope.characters:read": "Read characters",
   "account.tokens.scope.characters:write": "Write characters",
+  "account.tokens.scope.campaigns:read": "Read campaigns",
+  "account.tokens.scope.campaigns:write": "Write campaigns",
   "account.tokens.create": "Create token",
   "account.tokens.revoke": "Revoke {label}",
   "account.tokens.secret": "Token secret",

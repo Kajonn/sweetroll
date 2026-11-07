@@ -1,7 +1,9 @@
 import type { Pool } from "pg";
 import { hashToken, newSessionToken } from "./util.js";
 
-export const personalTokenScopes = ["systems:read", "systems:write", "characters:read", "characters:write"] as const;
+export const personalTokenScopes = [
+  "systems:read", "systems:write", "characters:read", "characters:write", "campaigns:read", "campaigns:write",
+] as const;
 export type PersonalTokenScope = (typeof personalTokenScopes)[number];
 
 type TokenMetadata = {

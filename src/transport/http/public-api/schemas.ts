@@ -8,26 +8,27 @@ import {
 } from "../../../systems/implementation/package/schema/document.js";
 import { SystemPackageV1Schema } from "../../../systems/implementation/package/schema/package.js";
 import { DefinitionIdSchema } from "../../../systems/implementation/package/schema/common.js";
+import { EntrySourceSchema } from "../../../systems/implementation/package/schema/dynamic.js";
 
 export const object = <P extends TProperties>(properties: P) => Type.Object(properties, { additionalProperties: false });
-const nullable = <T extends ReturnType<typeof Type.String> | ReturnType<typeof Type.Integer>>(schema: T) =>
+export const nullable = <T extends ReturnType<typeof Type.String> | ReturnType<typeof Type.Integer>>(schema: T) =>
   Type.Union([schema, Type.Null()]);
-const page = (cursor: ReturnType<typeof Type.String>) => ({
+export const page = (cursor: ReturnType<typeof Type.String>) => ({
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
   cursor: Type.Optional(cursor),
 });
 
 export const uuid = Type.String({ format: "uuid" });
 export const definitionId = DefinitionIdSchema;
-const text = Type.String();
-const dateTime = Type.String({ format: "date-time" });
-const lifecycle = Type.Union([Type.Literal("active"), Type.Literal("archived")]);
-const cursor = Type.String({ minLength: 1, maxLength: 2048 });
-const revision = Type.Integer({ minimum: 1, maximum: 2_147_483_647 });
-const key = Type.String({ minLength: 1, maxLength: 128, pattern: "\\S" });
-const scalar = Type.Union([text, Type.Number(), Type.Boolean(), Type.Null()]);
-const value = Type.Union([scalar, Type.Array(Type.String()), ResourceValueV1Schema]);
-const values = Type.Record(definitionId, value, { maxProperties: 512, additionalProperties: false });
+export const text = Type.String();
+export const dateTime = Type.String({ format: "date-time" });
+export const lifecycle = Type.Union([Type.Literal("active"), Type.Literal("archived")]);
+export const cursor = Type.String({ minLength: 1, maxLength: 2048 });
+export const revision = Type.Integer({ minimum: 1, maximum: 2_147_483_647 });
+export const key = Type.String({ minLength: 1, maxLength: 128, pattern: "\\S" });
+export const scalar = Type.Union([text, Type.Number(), Type.Boolean(), Type.Null()]);
+export const value = Type.Union([scalar, Type.Array(Type.String()), ResourceValueV1Schema]);
+export const values = Type.Record(definitionId, value, { maxProperties: 512, additionalProperties: false });
 
 const diagnostic = object({
   code: text,
@@ -128,15 +129,21 @@ export const createCharacter = object({
 });
 export const characterId = object({ characterId: uuid });
 export const fieldId = object({ characterId: uuid, fieldId: definitionId });
-const revisionCommand = { expectedRevision: revision, idempotencyKey: key };
+export const revisionCommand = { expectedRevision: revision, idempotencyKey: key };
 const quantity = Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER });
 const entryProperties = {
   entryId: uuid, slotId: definitionId, templateId: nullable(definitionId), values,
   quantity: Type.Optional(quantity),
 };
-const entry = object(entryProperties);
+const entrySource = Type.Optional(EntrySourceSchema);
+export const entry = object({ ...entryProperties, source: entrySource });
 export const entryId = object({ characterId: uuid, entryId: uuid });
-export const addEntry = object({ ...entryProperties, values: Type.Optional(values), ...revisionCommand });
+export const addEntry = object({
+  ...entryProperties, values: Type.Optional(values), ...revisionCommand,
+  source: Type.Optional(Type.Union(EntrySourceSchema.anyOf, {
+    description: "Campaign items: send the source from GET /characters/{characterId}/templates with a null templateId and no values or quantity.",
+  })),
+});
 export const updateEntry = object({
   slotId: Type.Optional(definitionId), values: Type.Optional(values), quantity: Type.Optional(quantity),
   ...revisionCommand,
@@ -146,8 +153,8 @@ export const resourceId = object({ characterId: uuid, resourceId: definitionId }
 export const bumpResource = object({
   direction: Type.Union([Type.Literal("up"), Type.Literal("down")]), ...revisionCommand,
 });
-const attachmentRevision = Type.Integer({ minimum: 0, maximum: 2_147_483_647 });
-const imageUpload = {
+export const attachmentRevision = Type.Integer({ minimum: 0, maximum: 2_147_483_647 });
+export const imageUpload = {
   description: Type.String({ minLength: 1, maxLength: 500 }),
   contentType: ImageDescriptorSchema.properties.contentType,
   dataBase64: Type.String({ minLength: 1, maxLength: Math.ceil(MAX_IMAGE_BYTES / 3) * 4 }),
@@ -167,14 +174,24 @@ export const portraitState = object({ revision: attachmentRevision, portrait: Ty
 export const imageState = object({ revision: attachmentRevision, image: Type.Union([ImageDescriptorSchema, Type.Null()]) });
 export const duplicateCharacter = object({ idempotencyKey: key });
 export const setField = object({ value, expectedRevision: revision, idempotencyKey: key });
-const characterSummary = object({
+export const characterSummary = object({
   characterId: uuid, name: text, systemVersionId: uuid, entityDefinitionId: definitionId,
   revision, lifecycle, updatedAt: dateTime,
 });
 export const characterPage = object({ characters: Type.Array(characterSummary), nextCursor: nullable(cursor) });
+export const characterPlacement = object({
+  campaignId: uuid,
+  controllers: Type.Array(uuid, { description: "Active members who control the attached character." }),
+  placementGeneration: Type.Integer({ minimum: 0 }),
+  returnOwnerId: Type.Union([uuid, Type.Null()], {
+    description: "Account the adopted character returns to on departure; null for campaign-created sheets.",
+  }),
+});
 export const characterSheet = object({
   ...characterSummary.properties,
   createdAt: dateTime,
+  ownerId: Type.Union([uuid, Type.Null()], { description: "Standalone owner; null while attached to a campaign." }),
+  campaign: Type.Union([characterPlacement, Type.Null()], { description: "Campaign placement; null for standalone characters." }),
   values,
   entries: Type.Array(entry),
   derivedValues: Type.Record(definitionId, scalar),

@@ -80,6 +80,7 @@ async function emitOpenApi(): Promise<void> {
   );
   await app.register(buildPublicApi({
     identity, pool: {} as Pool, authoring: {} as SystemAuthoring, characters: {} as Characters,
+    campaigns: {} as Campaigns, runtime: {} as SystemRuntime,
   }), { prefix: publicApiPrefix });
   await app.ready();
   try {

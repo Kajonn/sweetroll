@@ -682,17 +682,25 @@ Detailed contracts and required regression matrices are in the [I6 backend spec]
 
 ## 13.3 Public API v1 (2026-11-07)
 
-The separate `/api/v1` contract covers system authoring and standalone
-character setup. Users can create, clone or import a draft, validate and preview
-it, attach template artwork, publish a version, export it, and set its sharing.
-Character setup includes version and inventory discovery, creation or duplication,
-field and resource edits, slot placement and moves, portraits and entry artwork.
+The separate `/api/v1` contract covers everything the signed-in web app can do
+outside browser sessions and token management. Users can create, clone or import
+a draft, validate and preview it, attach template artwork, publish, deprecate,
+export and share versions, and archive or delete systems. Characters can be
+created, duplicated, edited, equipped, renamed, archived, exported and
+transferred; they roll and push with the same server-side dice and audiences as
+the browser. Campaign scripts manage campaigns, members, invitations, attached
+characters, content, item templates and proposals, media, scenes with fog and
+tokens, and display pairing and revocation.
 Both local and combined HTTP serving expose the same prefix and public OpenAPI
 document.
 Browser routes keep cookie authentication. The API uses scoped personal
 access tokens and checks current resource permissions for every request,
-including receipt replay. Characters owns the standalone-only policy and
-checks custody at the write boundary. Character pins are immutable.
+including receipt replay. Each operation calls the same module command as the
+browser route, so attached characters follow the browser Characters policy
+(controllers, GM visibility, roll audiences) and campaign data follows the
+Campaigns policy. Inaccessible IDs read as `404`; a member whose role does not
+permit a command receives `403 forbidden`, distinct from `403 insufficient_scope`.
+Character and campaign pins are immutable.
 
 Identity stores token digests and handles issuance, expiration and revocation
 through the signed-in Account surface. Hosted issuance depends on a real
@@ -702,18 +710,18 @@ The [API plan](docs/superpowers/plans/2026-11-07-public-api-v1.md) defines the
 scope and hosted acceptance. The [quickstart](docs/api/v1.md) documents the
 wire contract and retry windows.
 
-**Planned completion (owner-approved 2026-11-07, not yet implemented):** Part B
-of the API plan extends v1 to everything the signed-in web app can do. This
-covers system and version lifecycle, art bytes, character rolls, pushes,
-activity, exports and ownership transfer, and campaign-attached characters under
-the browser's Characters policy. It also covers the full campaign surface:
-campaigns, members, invitations, characters, content, item templates and
-proposals, media, scenes with fog and tokens, and display pairing and
-revocation. New scopes are `campaigns:read` and `campaigns:write`. Commands that
-change both a character and its campaign need both write scopes. Browser session
-routes, token management, display-credential routes (including the scene event
-stream), webhooks and SDKs stay outside v1. Responses are never wider than the
-browser shows the same caller.
+**Completion implemented (owner-approved 2026-11-07):** Part B of the API plan
+is implemented for local testing. Scopes are `systems:*`, `characters:*` and
+`campaigns:read`/`campaigns:write`; commands that change both a character and
+its campaign (campaign character creation, assign, claim and adopt) need both
+write scopes. Tokens hold up to six scopes, and earlier four-scope tokens keep
+their scopes. Uploads share an `upload` quota of 30 per minute. Binary art and
+media reads accept Bearer tokens and are `private, no-store`. Each successful
+v1 command writes an audit log line with operation, account and request ID,
+never request bodies. Browser session routes, token management,
+display-credential routes (including the scene event stream), webhooks and SDKs
+stay outside v1. Responses are never wider than the browser shows the same
+caller. Hosted acceptance still depends on real provider sign-in.
 
 # 14. Security, privacy, and abuse prevention
 
@@ -1089,12 +1097,13 @@ The two tracks are independent; preserve their internal stage order. T1 builds o
 
 ## 18.2 Immediate next actions
 
-**Public API completion planned (2026-11-07):** the owner asked for v1 to be
-complete and to include campaigns. The [API plan](docs/superpowers/plans/2026-11-07-public-api-v1.md)
-now adds Part B stages B1–B6 (scopes, systems and characters completion,
-campaign lifecycle and membership, campaign characters/content/templates/proposals,
-media/scenes/displays, docs and hosted acceptance). B1 lands first; hosted
-acceptance still depends on real provider sign-in.
+**Public API completion implemented locally (2026-11-07):** Part B stages B1–B5
+of the [API plan](docs/superpowers/plans/2026-11-07-public-api-v1.md) and the
+local parts of B6 (campaign quickstart, documented limits and audit lines) are
+implemented. Unit, contract and PostgreSQL integration suites pass, including
+two-token campaign journeys and an API-edited scene reaching a paired display
+stream. The hosted B6 journey still depends on real provider sign-in and has
+not run.
 
 **Scene streaming implemented (2026-11-07; owner-approved):** stages 1–3 of the [scene streaming plan](docs/superpowers/plans/2026-11-07-scene-streaming.md) are implemented on branch `claude/repo-next-steps-pzi9kv`: image revisions, SSE display stream with `LISTEN`/`NOTIFY`, removal of the polled projection route, and response-adopting single-command gestures (Section 7.7). Unit, integration (including two application instances on one database and listener loss) and local browser scene journeys pass. The isolated hosted journey and the 200-table load comparison in plan stage 4 have not been run; this does not close any G9 gate.
 

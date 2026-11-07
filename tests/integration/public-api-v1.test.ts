@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildPublicApi, publicApiPrefix } from "../../src/transport/http/public-api/index.js";
 import { buildPersonalTokenRoutes } from "../../src/transport/http/personal-tokens.js";
 import { DEFAULT_CAMPAIGN_LIMITS } from "../../src/platform/config.js";
-import { createCampaignsModule } from "../../src/campaigns/index.js";
+import { createCampaignsModule, type Campaigns } from "../../src/campaigns/index.js";
 import { createCampaignPlacement } from "../../src/characters/campaignPlacement.js";
 import { knaveDocument, knaveCharacter } from "./fixtures/knave.js";
 import { d20Document } from "../../src/systems/implementation/package/fixtures/index.js";
@@ -40,7 +40,7 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
       }),
       extraRoutes: (modules) => [
         (app, _opts, done) => {
-          void app.register(buildPublicApi({ ...modules, pool }), { prefix: publicApiPrefix });
+          void app.register(buildPublicApi({ ...modules, pool, campaigns: {} as Campaigns }), { prefix: publicApiPrefix });
           done();
         },
         buildPersonalTokenRoutes({ identity: modules.identity }),
@@ -119,7 +119,7 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
     }
   });
 
-  it("validates without writes, publishes exact revisions and creates and edits pinned standalone sheets", async () => {
+  it("validates without writes, publishes exact revisions and follows the browser policy after adoption", async () => {
     const { users: { ada, bob }, pool, authoring } = handle;
     const { token } = await issue(ada.cookie);
     const other = (await issue(bob.cookie)).token;
@@ -265,18 +265,25 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
       pauseFieldEdit = undefined;
       resume();
     }
+    // Part B: v1 follows the browser Characters policy, so the adopting GM
+    // keeps reading and editing the attached sheet. The racing edit lost to
+    // the placement revision and must not overwrite it.
+    // The edit resolved against the standalone scope and never commits.
     expect((await racing).statusCode).toBe(404);
-    expect((await call(token, "GET", path)).statusCode).toBe(404);
-    expect((await call(token, "GET", `${path}/portrait`)).statusCode).toBe(404);
-    expect((await call(token, "POST", `${path}/entries`, {
-      entryId: randomUUID(), slotId: "pack", templateId: null, values: { name: "Rope" },
-      expectedRevision: edited.json().revision, idempotencyKey: "adopted-add",
-    })).statusCode).toBe(404);
-    expect((await call(token, "POST", fieldPath, edit)).statusCode).toBe(404);
-    expect((await call(token, "POST", "/characters", { ...create, initialValues: { [field.id]: 12 } })).statusCode).toBe(404);
+    const attached = await call(token, "GET", path);
+    expect(attached.statusCode, attached.body).toBe(200);
+    expect(attached.json()).toMatchObject({
+      ownerId: null, values: { [field.id]: 14 },
+      campaign: { campaignId: campaign.value.campaignId, controllers: [ada.actorId], returnOwnerId: ada.actorId },
+    });
+    expect((await call(token, "GET", `${path}/portrait`)).statusCode).toBe(200);
+    // The standalone list stays limited to standalone sheets, as in the browser.
     expect((await call(token, "GET", "/characters")).json().characters.map(
       (character: { characterId: string }) => character.characterId,
     )).toEqual([secondId]);
+    const outsider = await issue(handle.users.bob.cookie);
+    expect((await call(outsider.token, "GET", path)).statusCode).toBe(404);
+    expect((await call(outsider.token, "POST", fieldPath, edit)).statusCode).toBe(404);
     const browserSheet = await handle.app.inject({ url: path, headers: { cookie: ada.cookie } });
     expect(browserSheet.statusCode).toBe(200);
     expect(browserSheet.json().character.state.values[field.id]).toBe(14);

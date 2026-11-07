@@ -20,9 +20,9 @@ columns are added to the current schema baseline.
 1. A campaign upgrade or revert is blocked when any attached character, or any
    campaign template base, fails the dry run.
 2. Revert is required: back to the version recorded before the most recent upgrade.
-3. Forward upgrades require a package comparison with no breaking findings (not
-   separately answered; the planned default stands). Revert skips that check and
-   relies on the per-character dry run.
+3. A breaking package change blocks an upgrade only when it affects the
+   character (its entity, sheet actions, used templates/slots, or expressions they
+   depend on). Revert skips the package comparison and relies on the dry run.
 
 ## Why this is small
 
@@ -40,8 +40,9 @@ columns are added to the current schema baseline.
 ## Stage 1 — Version check (pure, read only) — done
 
 - [x] `checkVersionChange({ from, to, entityId, state, direction })` in
-  `src/systems/implementation/runtime/version-change.ts`. `upgrade` blocks on any
-  `comparePackages` finding; both directions rebuild the state against the target
+  `src/systems/implementation/runtime/version-change.ts`. `upgrade` runs
+  `comparePackages` and blocks only on findings that touch the character
+  (`affectsCharacter` on each reported finding); both directions rebuild the state against the target
   entity (keep values by ID, default new stored fields, drop fields the target
   lacks), move entries (follow unchanged template defaults and art, keep changed
   values, add new template fields, re-pin derived campaign bases), validate every
@@ -54,7 +55,8 @@ columns are added to the current schema baseline.
   `slot_capacity_reduced` (also breaking at publish).
 - [x] Unit tests: additive upgrade with followed and kept item stats, new
   character field, campaign-derived entry re-pinned with its override kept,
-  breaking template field removal, value outside a narrowed range, same version,
+  breaking template field removal blocking only an owner of that item, unused
+  item/slot removal allowed, own entity field removal blocked, value outside a narrowed range, same version,
   other system, revert keeping play values and dropping a new field, revert
   blocked by a newer-only item.
 

@@ -256,11 +256,15 @@ so are stat changes on existing templates. An owner can therefore move a
 character or campaign **forward** to a later published version of the **same
 system** when the change is non-breaking for that character:
 
-1. **Package check.** The publish-time comparison (Section 6.5) between the
-   current pin and the target must report no breaking findings. Adding entities,
-   fields with defaults, templates, slots, actions or granted actions and changing
-   template stats, labels, expressions with the same context and result type, or
-   presentation are non-breaking.
+1. **Package check.** The publish-time comparison (Section 6.5) runs between the
+   current pin and the target. Adding entities, fields with defaults, templates,
+   slots, actions or granted actions and changing template stats, labels,
+   expressions with the same context and result type, or presentation are
+   non-breaking. A breaking finding blocks only when it touches this character
+   (owner decision 2026-11-07): its own character type, an action on its sheet, a
+   template or slot used by one of its entries, or an expression behind its
+   computed fields or those actions. Breaking changes elsewhere, such as a removed
+   item nobody on this sheet has, are listed in the preview but do not block.
 2. **Character check (dry run).** The server decodes the character's stored state
    and every entry against the target package, using the existing write-time
    validators. Field values, entry values, slot acceptance and limits, system-base
@@ -307,8 +311,8 @@ or not at all, and any blocker blocks the campaign.
 **Excluded.** Breaking upgrades, field mapping or renaming, reverting to any
 version other than the recorded previous one, moving between different systems,
 automatic upgrades on publish and lineage tables. A blocked character stays on its
-version; create a new character to use a breaking version. Version selection shows only later, compatible
-versions. The [system version upgrade plan](docs/superpowers/plans/2026-11-07-system-version-upgrades.md)
+version; create a new character to use a breaking version. Version selection shows
+later versions with whether this character can move to them. The [system version upgrade plan](docs/superpowers/plans/2026-11-07-system-version-upgrades.md)
 defines the delivery stages.
 
 Character activity uses readable action names and local date/time formatting.

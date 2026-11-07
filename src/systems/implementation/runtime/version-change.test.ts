@@ -129,14 +129,43 @@ describe("checkVersionChange", () => {
     });
   });
 
-  it("blocks an upgrade with breaking package changes", () => {
+  it("blocks a breaking change only for characters it affects", () => {
     const next = baseDocument();
     next.templates = [sword({ fields: [sword().fields[0]!] })];
     const v2 = compile(next, V2, "2.0.0");
+
+    const owner = checkVersionChange({ from: v1, to: v2, entityId: "character", state: characterState(v1, { [SWORD]: swordEntry() }), direction: "upgrade" });
+    expect(owner.ok).toBe(false);
+    expect(owner.nextState).toBeNull();
+    expect(owner.blockers).toContainEqual(expect.objectContaining({ code: "breaking_change", definitionId: "/templates/longsword/fields/weight" }));
+
+    const other = checkVersionChange({ from: v1, to: v2, entityId: "character", state: characterState(v1, {}), direction: "upgrade" });
+    expect(other.blockers).toEqual([]);
+    expect(other.ok).toBe(true);
+    expect(other.packageFindings).toEqual([expect.objectContaining({ code: "template_field_removed", affectsCharacter: false })]);
+  });
+
+  it("allows removing an item, slot or validation the character does not use", () => {
+    const next = baseDocument();
+    next.templates = [];
+    next.slots = [];
+    next.sheets[0]!.sections[0]!.elements = next.sheets[0]!.sections[0]!.elements.filter((element) => element.kind !== "slot");
+    next.expressions = next.expressions.filter((expression) => expression.id !== "longsword_attack_expr");
+    const v2 = compile(next, V2, "2.0.0");
     const report = checkVersionChange({ from: v1, to: v2, entityId: "character", state: characterState(v1, {}), direction: "upgrade" });
+    expect(report.blockers).toEqual([]);
+    expect(report.packageFindings.length).toBeGreaterThan(0);
+    expect(report.packageFindings.every((finding) => !finding.affectsCharacter)).toBe(true);
+  });
+
+  it("blocks removal of a field on the character's own entity", () => {
+    const withLuck = baseDocument();
+    withLuck.entities[0]!.fields.push({ kind: "integer", id: "luck", label: "Luck", default: 5, required: false, min: 0, max: 10, step: 1 });
+    const from = compile(withLuck, V1, "1.0.0");
+    const to = compile(baseDocument(), V2, "2.0.0");
+    const report = checkVersionChange({ from, to, entityId: "character", state: characterState(from, {}), direction: "upgrade" });
     expect(report.ok).toBe(false);
-    expect(report.nextState).toBeNull();
-    expect(report.blockers).toContainEqual(expect.objectContaining({ code: "breaking_change", definitionId: "/templates/longsword/fields/weight" }));
+    expect(report.blockers).toEqual([expect.objectContaining({ code: "breaking_change", definitionId: "/entities/character/fields/luck" })]);
   });
 
   it("blocks when a kept value is outside a narrowed range", () => {

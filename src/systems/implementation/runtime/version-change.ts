@@ -15,9 +15,10 @@ import { decodeRuntimeState, initializeState } from "./state.js";
 
 /**
  * Design Section 6.7: moving a character between published versions of one
- * system. `upgrade` requires a package comparison without breaking findings;
- * `revert` (back to the recorded previous version) skips it because undoing
- * additions always reads as removals. Both directions then rebuild and verify
+ * system. On `upgrade`, a breaking package finding blocks only when it touches
+ * this character (owner decision 2026-11-07); `revert` (back to the recorded
+ * previous version) skips the comparison because undoing additions always reads
+ * as removals. Both directions then rebuild and verify
  * this character's state against the target package. Nothing is remapped:
  * values travel by stable definition ID.
  */
@@ -53,12 +54,15 @@ export type EntryVersionChange = {
   imageUpdated: boolean;
 };
 
+export type VersionChangeFinding = CompatibilityFinding & { affectsCharacter: boolean };
+
 export type VersionChangeReport = {
   ok: boolean;
   direction: VersionChangeDirection;
   fromVersionId: string;
   toVersionId: string;
-  packageFindings: CompatibilityFinding[];
+  /** Breaking findings between the two packages; only affecting ones block. */
+  packageFindings: VersionChangeFinding[];
   blockers: VersionChangeBlocker[];
   addedFields: string[];
   droppedFields: string[];
@@ -99,13 +103,6 @@ export function checkVersionChange(input: {
   if (from.versionId === to.versionId) {
     return block({ code: "same_version", message: "The character already uses this version." });
   }
-  if (direction === "upgrade") {
-    report.packageFindings = comparePackages(from, to).findings;
-    for (const finding of report.packageFindings) {
-      report.blockers.push({ code: "breaking_change", message: finding.message, definitionId: finding.path });
-    }
-  }
-
   const fromEntity = from.entities.find((entity) => entity.id === entityId);
   const toEntity = to.entities.find((entity) => entity.id === entityId);
   if (fromEntity === undefined || toEntity === undefined) {
@@ -118,6 +115,18 @@ export function checkVersionChange(input: {
       message: current.error.message,
       ...(current.error.definitionId === undefined ? {} : { definitionId: current.error.definitionId }),
     });
+  }
+  if (direction === "upgrade") {
+    const affects = characterFootprint(from, fromEntity.id, Object.values(current.value.entries ?? {}));
+    report.packageFindings = comparePackages(from, to).findings.map((finding) => ({
+      ...finding,
+      affectsCharacter: affects(finding.path),
+    }));
+    for (const finding of report.packageFindings) {
+      if (finding.affectsCharacter) {
+        report.blockers.push({ code: "breaking_change", message: finding.message, definitionId: finding.path });
+      }
+    }
   }
 
   // Character fields: keep by ID, default new fields, drop absent ones.
@@ -184,6 +193,49 @@ export function checkVersionChange(input: {
   report.ok = report.blockers.length === 0;
   if (!report.ok) report.nextState = null;
   return report;
+}
+
+/**
+ * Which package paths this character depends on in its current version: its own
+ * entity, the actions on its sheets, the templates and slots of its entries and
+ * the expressions behind its computed fields and those actions. Findings
+ * elsewhere (another entity, an unused item or slot, a removed validation) do
+ * not touch it.
+ */
+function characterFootprint(
+  pkg: SystemPackageV1,
+  entityId: string,
+  entries: CharacterEntryV1[],
+): (path: string) => boolean {
+  const entity = pkg.entities.find((candidate) => candidate.id === entityId)!;
+  const templateIds = new Set(entries.flatMap((entry) => {
+    const snapshot = entry.snapshot;
+    const id = entry.templateId ?? (snapshot !== undefined && "base" in snapshot ? snapshot.base.templateId : null);
+    return id === null ? [] : [id];
+  }));
+  const slotIds = new Set(entries.map((entry) => entry.slotId));
+  const actionIds = new Set(pkg.sheets
+    .filter((sheet) => sheet.targetEntityId === entityId)
+    .flatMap((sheet) => sheet.sections.flatMap((section) =>
+      section.elements.flatMap((element) => (element.kind === "action" ? [element.actionId] : [])))));
+  const expressionIds = new Set<string>();
+  for (const field of entity.fields) if (field.kind === "computed") expressionIds.add(field.expressionId);
+  for (const action of pkg.actions) if (actionIds.has(action.id) && action.kind === "roll") expressionIds.add(action.expressionId);
+  for (const template of pkg.templates ?? []) {
+    if (!templateIds.has(template.id)) continue;
+    for (const action of template.grantedActions) if (action.kind === "roll") expressionIds.add(action.expressionId);
+  }
+  return (path) => {
+    const [, kind, id] = path.split("/");
+    switch (kind) {
+      case "entities": return id === entityId;
+      case "actions": return id !== undefined && actionIds.has(id);
+      case "templates": return id !== undefined && templateIds.has(id);
+      case "slots": return id !== undefined && slotIds.has(id);
+      case "expressions": return id !== undefined && expressionIds.has(id);
+      default: return false;
+    }
+  };
 }
 
 type MovedEntry =

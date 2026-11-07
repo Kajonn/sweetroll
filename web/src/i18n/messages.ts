@@ -1162,6 +1162,7 @@ export const defaultMessages: MessageTable = {
   "campaign.detail.session.contentHeading": "Latest content",
   "campaign.detail.session.activityHeading": "Recent activity",
   "campaign.detail.session.charactersHeading": "Characters",
+  "campaign.detail.session.charactersTruncated": "Showing the first {count} characters; this campaign has more characters than the board can load.",
   "campaign.detail.session.search.label": "Filter characters",
   "campaign.detail.session.search.placeholder": "Name contains…",
   "campaign.detail.session.open": "Open {name}",

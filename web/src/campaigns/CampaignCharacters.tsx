@@ -14,6 +14,7 @@ import { Button, Dialog, EmptyState, FormField, Panel, Select } from "../ui/inde
 import type { CampaignsApi } from "./api.js";
 import {
   campaignCharactersKey,
+  listAllCampaignCharacters,
   campaignClaimableCharactersKey,
   useClaimableCharacters,
 } from "./campaignQueries.js";
@@ -473,7 +474,7 @@ export function CampaignCharactersTab(props: {
   const online = props.online ?? true;
   const characters = useQuery({
     queryKey: campaignCharactersKey(props.campaignId, props.actorId ?? null, generation),
-    queryFn: () => props.api.listCampaignCharacters(props.campaignId),
+    queryFn: () => listAllCampaignCharacters(props.api, props.campaignId),
     enabled: props.actorId !== null && props.actorId !== undefined,
   });
   const claimable = useClaimableCharacters(

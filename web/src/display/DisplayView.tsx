@@ -104,24 +104,42 @@ export function DisplayView(props: {
     setShown(null);
     setLoadedMapUrl(null);
     if (credential === null || props.sceneId === "" || !online) return undefined;
-    setStatus("connecting");
-    const handle = openStream(
-      { displayId: credential.displayId, sceneId: props.sceneId, secret: credential.secret },
-      {
-        onSnapshot: (projection) => setShown(projection),
-        onStatus: (next) => {
-          setStatus(next);
-          if (next !== "open") {
-            setShown(null);
-            setLoadedMapUrl(null);
-          }
+    const start = () => {
+      if (streamRef.current !== null) return;
+      setStatus("connecting");
+      streamRef.current = openStream(
+        { displayId: credential.displayId, sceneId: props.sceneId, secret: credential.secret },
+        {
+          onSnapshot: (projection) => setShown(projection),
+          onStatus: (next) => {
+            setStatus(next);
+            if (next !== "open") {
+              setShown(null);
+              setLoadedMapUrl(null);
+            }
+          },
         },
-      },
-    );
-    streamRef.current = handle;
+      );
+    };
+    const stop = () => {
+      streamRef.current?.close();
+      streamRef.current = null;
+    };
+    const hide = () => {
+      stop();
+      setShown(null);
+      setLoadedMapUrl(null);
+    };
+    const restore = (event: PageTransitionEvent) => {
+      if (event.persisted) start();
+    };
+    start();
+    window.addEventListener("pagehide", hide);
+    window.addEventListener("pageshow", restore);
     return () => {
-      handle.close();
-      if (streamRef.current === handle) streamRef.current = null;
+      window.removeEventListener("pagehide", hide);
+      window.removeEventListener("pageshow", restore);
+      stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [credential?.displayId, credential?.secret, props.sceneId, online]);

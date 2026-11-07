@@ -214,6 +214,28 @@ describeWithDatabase("scene streaming (SSE snapshots, image revisions, fan-out)"
     expect(count.rowCount).toBe(1);
   });
 
+  it("releases an SSE slot when the browser abandons the response", async () => {
+    const s = await setup();
+    const first = await openStream(s.eventsUrl, s.display.secret);
+    const second = await openStream(s.eventsUrl, s.display.secret);
+    try {
+      expect(first.response.status).toBe(200);
+      expect(second.response.status).toBe(200);
+      const blocked = await openStream(s.eventsUrl, s.display.secret);
+      expect(blocked.response.status).toBe(429);
+      blocked.close();
+      first.close();
+      await expect.poll(async () => {
+        const replacement = await openStream(s.eventsUrl, s.display.secret);
+        replacement.close();
+        return replacement.response.status;
+      }).toBe(200);
+    } finally {
+      first.close();
+      second.close();
+    }
+  });
+
   it("streams complete snapshots; token moves keep the image revision and render nothing", async () => {
     const s = await setup();
     const stream = await openStream(s.eventsUrl, s.display.secret);

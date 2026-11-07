@@ -2707,11 +2707,17 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
           return sendError(reply, opened.error, request.id);
         }
         const stream = opened.value;
+        // An SSE request body is already complete while the response is open.
+        // Track the response socket so navigation and aborted reads free slots.
+        if (reply.raw.destroyed) {
+          stream.close();
+          return reply;
+        }
         const body = new PassThrough();
         const end = (): void => {
           stream.close();
         };
-        request.raw.once("close", end);
+        reply.raw.once("close", end);
         body.once("close", end);
         body.once("error", end);
         reply

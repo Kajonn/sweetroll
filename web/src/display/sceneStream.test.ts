@@ -54,10 +54,22 @@ describe("scene stream client", () => {
     return { handle, snapshots, statuses };
   }
 
+  it("skips opening a request when the handle is closed in the same turn", async () => {
+    const fetchImpl = vi.fn<typeof fetch>();
+    const handle = connectSceneStream(
+      { displayId: "d1", sceneId: "s1", secret: "secret", fetchImpl },
+      { onSnapshot: vi.fn(), onStatus: vi.fn() },
+    );
+    handle.close();
+    await flush();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("requests the credential-scoped stream without cookies and parses complete snapshots", async () => {
     const stream = streamingResponse();
     const fetchImpl = vi.fn().mockResolvedValue(stream.response);
     const { handle, snapshots, statuses } = connect(fetchImpl);
+    await flush();
     expect(fetchImpl).toHaveBeenCalledWith(
       "/api/displays/d1/scenes/s1/events",
       expect.objectContaining({

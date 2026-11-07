@@ -200,7 +200,11 @@ export const connectSceneStream: SceneStreamFactory = (options, handlers) => {
   }
 
   setStatus("connecting");
-  void connect();
+  // React may dispose and remount the effect in the same turn. Avoid
+  // opening a socket for the discarded handle.
+  queueMicrotask(() => {
+    if (controller === null) void connect();
+  });
 
   return {
     close() {

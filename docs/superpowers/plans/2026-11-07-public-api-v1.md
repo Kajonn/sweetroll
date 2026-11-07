@@ -8,10 +8,12 @@ check and quickstarts. Hosted token issuance and the real-provider Railway
 acceptance remain gated on provider sign-in. The local opt-in and usage
 examples are in the [API quickstart](../../api/v1.md).
 
-Part B is approved by the owner (2026-11-07) and not yet implemented. It
-completes v1 so that a script can do everything the signed-in web app can do,
-including campaigns. The exclusions are listed under "Outside v1". Part B
-supersedes the earlier exclusion of campaign play and roll execution.
+Part B is approved by the owner (2026-11-07). Stages B1–B5 and the local parts
+of B6 are implemented for local testing; see "Part B implementation record"
+below. It completes v1 so that a script can do everything the signed-in web app
+can do, including campaigns. The exclusions are listed under "Outside v1". Part B
+supersedes the earlier exclusion of campaign play and roll execution. The hosted
+B6 journey has not run and still depends on real provider sign-in.
 
 ## Goal
 
@@ -200,6 +202,47 @@ reruns the affected HTTP, integration and browser suites. Each stage regenerates
 
 B1 must land first. B2–B5 are independent once B1 is in. Hosted acceptance
 depends on real provider sign-in, as in Part A.
+
+### Part B implementation record (2026-11-07)
+
+| Stage | Local result |
+|---|---|
+| B1 | Done. Six scopes in Identity, the baseline CHECK (1–6 scopes) and Account → API tokens. The shared route definition accepts several required scopes (`x-required-scopes` in OpenAPI), binary image responses and the 8 MiB upload body. Uploads use a new `upload` bucket of 30 per minute. |
+| B2 | Done. The standalone-only policy is removed from v1; every character route calls the browser Characters policy. Sheets add `ownerId` and a `campaign` placement (`campaignId`, `controllers`, `placementGeneration`, `returnOwnerId`) or `null`. |
+| B3 | Done. Invitation tokens travel only in request bodies and are never listed or logged. |
+| B4 | Done. |
+| B5 | Done. Scene commands publish the existing `NOTIFY` events; the integration suite shows an API token move reaching a paired display stream without a new render, and API revocation ending the stream. |
+| B6 | Local parts done: [campaign quickstart](../../../scripts/public-api-campaign-quickstart.py), documented limits, scopes and retries in the [API quickstart](../../api/v1.md), and an audit log line for each successful v1 command. The hosted journey is open. |
+
+Decisions made while implementing, all within the approved scope:
+
+- **Roll IDs.** As in the browser, only push-tracked rolls (actions with a push
+  policy) can be read or pushed by ID. Command results carry `roll.rollId` for
+  those and `null` otherwise; the character and campaign activity feeds carry
+  the saved roll ID of every roll the reader may see.
+- **Current-art thumbnails.** `GET .../portrait` and `GET .../entries/{entryId}/image`
+  keep returning Part A metadata, so current-art bytes are read at
+  `.../thumbnail`, `.../{fileId}` and `.../{fileId}/thumbnail`, as in the browser.
+- **Role denials.** Campaign commands that the caller's role does not permit
+  (for example a player approving a proposal, or a player previewing content)
+  return `403 forbidden`, as in the browser. `403 insufficient_scope` remains
+  the token-scope denial. Inaccessible IDs still read as `404`.
+- **Campaign export** is GM and co-GM only, as in the Campaigns module.
+- **New templates and proposals** do not send an expected revision; v1 supplies
+  the module's zero revision. Media and scene commands keep the browser's UUID
+  idempotency keys.
+- **`PATCH /systems/{systemId}`** accepts `lifecycle`, `access` or both, and
+  `PATCH /system-versions/{versionId}` accepts only `lifecycle: "deprecated"`.
+- **Image uploads** go through the deployment's image scanner. A server without
+  one returns `503 temporarily_unavailable`; the campaign quickstart has
+  `--no-scene` for that case.
+
+Verification on the implementation branch: `npm run typecheck`, `npm test`,
+`npm run contracts:check`, the web Account test and `npm run test:integration`
+(42 files, 398 tests, including the new
+`tests/integration/public-api-campaigns.test.ts`). Both quickstarts ran against
+a local server with `SWEETROLL_LOCAL_API_TOKENS=1`; the campaign quickstart ran
+with `--no-scene` because no image scanner was available locally.
 
 ## Wire behavior (both parts)
 

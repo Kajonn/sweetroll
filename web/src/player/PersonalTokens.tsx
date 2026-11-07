@@ -6,7 +6,9 @@ import { Button, Checkbox, FormField, Select } from "../ui/index.js";
 import { Disclosure } from "../ui/Disclosure.js";
 
 const path = "/me/personal-tokens";
-const scopes = ["systems:read", "systems:write", "characters:read", "characters:write"] as const;
+const scopes = [
+  "systems:read", "systems:write", "characters:read", "characters:write", "campaigns:read", "campaigns:write",
+] as const;
 type Scope = (typeof scopes)[number];
 type Token = { id: string; label: string; scopes: Scope[]; expiresAt: string };
 type TokenList = { enabled: boolean; tokens: Token[] };

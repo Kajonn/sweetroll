@@ -36,10 +36,12 @@ it("creates and revokes a scoped API token and only shows its secret on creation
   fireEvent.click(await screen.findByText("API tokens"));
   fireEvent.change(screen.getByRole("textbox", { name: "Token label" }), { target: { value: "My script" } });
   fireEvent.click(screen.getByRole("checkbox", { name: "Read systems" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Read campaigns" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Write campaigns" }));
   fireEvent.click(screen.getByRole("button", { name: "Create token" }));
   expect(await screen.findByDisplayValue(secret)).toBeVisible();
   expect(fetch).toHaveBeenCalledWith("POST", "/me/personal-tokens", {
-    body: { label: "My script", scopes: ["systems:read"], expiresInDays: 30 },
+    body: { label: "My script", scopes: ["systems:read", "campaigns:read", "campaigns:write"], expiresInDays: 30 },
   });
   fireEvent.click(screen.getByRole("button", { name: "Hide token secret" }));
   expect(screen.queryByDisplayValue(secret)).not.toBeInTheDocument();

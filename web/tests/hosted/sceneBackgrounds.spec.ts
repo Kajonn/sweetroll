@@ -11,6 +11,7 @@ async function request(page: Page, method: string, path: string, data?: unknown)
 async function json(page: Page, method: string, path: string, data?: unknown) { const r = await request(page, method, path, data); expect(r.status, `${method} ${path}: ${r.body?.error?.message ?? ""}`).toBeGreaterThanOrEqual(200); expect(r.status, `${method} ${path}: ${r.body?.error?.message ?? ""}`).toBeLessThan(300); return r.body; }
 async function fog(page: Page) {
   const panel = page.getByRole("region", { name: "Fog of war", exact: true });
+  if (!await panel.getByLabel(/x \(0–1\)/i).isVisible()) await panel.getByText("Precise fog position", { exact: true }).click();
   await panel.getByLabel(/fog mode/i).selectOption("reveal");
   for (const [label, value] of [[/x \(0–1\)/i, "0.25"], [/y \(0–1\)/i, "0.5"], [/radius \(0–1\)/i, "0.2"]] as const) await panel.getByLabel(label).fill(value);
   await panel.getByRole("button", { name: "Add fog dab", exact: true }).click(); await panel.getByRole("button", { name: "Commit fog edit", exact: true }).click(); await expect(panel.getByText("Fog edit committed.")).toBeVisible();
@@ -58,7 +59,7 @@ test("M3 GUI background upload, confirmed safe replacement and restricted displa
     const sceneId = new URL(gm.url()).searchParams.get("sceneId")!; await expect(gm.getByRole("img", { name: "Scene background", exact: true })).toBeVisible();
     await fog(gm);
     for (const [label, visible] of [["Visible explorer", true], ["Hidden GM marker", false]] as const) {
-      const tray = gm.getByRole("region", { name: "Tokens", exact: true }); await tray.getByLabel(/token label/i).fill(label); await tray.getByLabel(/x \(0–1\)/i).fill("0.25"); await tray.getByLabel(/y \(0–1\)/i).fill("0.5"); await tray.getByLabel(/visible to the display/i).setChecked(visible); await tray.getByRole("button", { name: "Place token", exact: true }).click(); await expect(tray.getByText("Token placed.")).toBeVisible();
+      const tray = gm.getByRole("region", { name: "Tokens", exact: true }); await tray.getByLabel(/token label/i).fill(label); await tray.getByLabel(/x \(0–1\)/i).fill("0.25"); await tray.getByLabel(/y \(0–1\)/i).fill("0.5"); await tray.getByLabel(/visible to the display/i).setChecked(visible); await tray.getByRole("button", { name: "Place token", exact: true }).click(); await expect(gm.getByText("Token placed.")).toBeVisible();
       await gm.reload(); await expect(gm.getByRole("img", { name: "Scene background", exact: true })).toBeVisible();
     }
     const seen: string[] = []; dp.on("request", r => { if (r.url().startsWith(baseURL)) seen.push(new URL(r.url()).pathname); });

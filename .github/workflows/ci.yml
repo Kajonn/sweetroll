@@ -112,6 +112,8 @@ jobs:
           node-version-file: .nvmrc
       - run: npm ci
         working-directory: web
+      - name: Bound browser dependency downloads
+        run: sudo bash scripts/ci-browser-deps.sh
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - run: npm run test:e2e -- --suite=${{ matrix.suite }} ${{ matrix.shard }}
@@ -158,6 +160,8 @@ jobs:
           node-version-file: .nvmrc
       - run: npm ci
         working-directory: web
+      - name: Bound browser dependency downloads
+        run: sudo bash scripts/ci-browser-deps.sh
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - run: psql postgres://sweetroll:sweetroll@localhost:5432/sweetroll -c "CREATE DATABASE sweetroll_offline;"

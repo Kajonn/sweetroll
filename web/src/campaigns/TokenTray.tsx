@@ -1,31 +1,18 @@
 import { SceneLibrary } from "./SceneLibrary.js";
 import { Disclosure } from "../ui/Disclosure.js";
-// GM token tray: owns the place form plus one move form per token.
+// GM token tray: placement and precision forms share the gesture command owner.
 // The committing keyboard alternative to dragging is the numeric X/Y
 // inputs plus the Move button (nudge buttons only stage coordinates).
-// Commits mint fresh idempotency keys; 409
-// re-reads first and offers an explicit retry, never revision guessing.
-import { useState } from "react";
+// Unknown outcomes retain the exact request; confirmed conflicts require a read and explicit retry.
+import { useEffect, useState } from "react";
+import { useTokenCommands, type TokenCommands } from "./useTokenCommands.js";
 
 import { t } from "../i18n/index.js";
 import { Button, Checkbox, FormField, Panel } from "../ui/index.js";
 import type { CampaignsApi, SceneLibraryApi } from "./api.js";
 import type { SceneView } from "./types.js";
-import { randomUUID } from "../utils/uuid";
 
 type Token = SceneView["tokens"][number];
-
-function isConflict(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const record = error as { code?: unknown; status?: unknown };
-  return record.status === 409 || record.code === "conflict";
-}
-
-function isNotFound(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const record = error as { code?: unknown; status?: unknown };
-  return record.status === 404 || record.code === "not_found";
-}
 
 function parseUnit(raw: string): number | null {
   const value = Number(raw);
@@ -44,62 +31,25 @@ function clampUnit(value: number): number {
 }
 
 function TokenMoveRow(props: {
-  api: Pick<CampaignsApi, "moveToken">;
-  sceneId: string;
-  sceneRevision: number;
+  commands: TokenCommands;
   token: Token;
   online: boolean;
-  onChanged: (() => void) | undefined;
-  onUnavailable: () => void;
 }) {
   const [x, setX] = useState(formatUnit(props.token.x));
   const [y, setY] = useState(formatUnit(props.token.y));
-  const [pending, setPending] = useState(false);
-  const [conflict, setConflict] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [moved, setMoved] = useState(false);
-
+  useEffect(() => { setX(formatUnit(props.token.x)); setY(formatUnit(props.token.y)); }, [props.token.x, props.token.y]);
+  const disabled = !props.online || props.commands.blocked;
   const nudge = (dx: number, dy: number): void => {
     const currentX = parseUnit(x) ?? props.token.x;
     const currentY = parseUnit(y) ?? props.token.y;
     setX(formatUnit(clampUnit(currentX + dx)));
     setY(formatUnit(clampUnit(currentY + dy)));
-    setMoved(false);
   };
 
-  const move = async (): Promise<void> => {
-    const targetX = parseUnit(x);
-    const targetY = parseUnit(y);
-    if (pending || targetX === null || targetY === null) return;
-    setPending(true);
-    setError(null);
-    setConflict(false);
-    setMoved(false);
-    // Caller-minted idempotency key, fresh on every attempt.
-    const idempotencyKey = randomUUID();
-    try {
-      await props.api.moveToken(props.sceneId, props.token.tokenId, {
-        expectedSceneRevision: props.sceneRevision,
-        x: targetX,
-        y: targetY,
-        idempotencyKey,
-      });
-      setMoved(true);
-      props.onChanged?.();
-    } catch (cause) {
-      if (isNotFound(cause)) {
-        props.onUnavailable();
-      } else if (isConflict(cause)) {
-        // 409 → re-read first, then offer an explicit retry with a fresh
-        // key. Never revision guessing.
-        setConflict(true);
-        props.onChanged?.();
-      } else {
-        setError(t("campaign.detail.scenes.tokens.error"));
-      }
-    } finally {
-      setPending(false);
-    }
+  const move = (): void => {
+    const targetX = parseUnit(x), targetY = parseUnit(y);
+    if (disabled || targetX === null || targetY === null) return;
+    props.commands.move(props.token.tokenId, props.token.label, { x: targetX, y: targetY });
   };
 
   const moveLabel = t("campaign.detail.scenes.tokens.move", { label: props.token.label });
@@ -113,7 +63,7 @@ function TokenMoveRow(props: {
           max={1}
           step={0.01}
           value={x}
-          disabled={!props.online}
+          disabled={disabled}
           onChange={(event) => setX(event.target.value)}
         />
       </FormField>
@@ -124,43 +74,26 @@ function TokenMoveRow(props: {
           max={1}
           step={0.01}
           value={y}
-          disabled={!props.online}
+          disabled={disabled}
           onChange={(event) => setY(event.target.value)}
         />
       </FormField>
       <div>
-        <Button variant="secondary" disabled={!props.online} onClick={() => nudge(0, -NUDGE_STEP)}>
+        <Button variant="secondary" disabled={disabled} onClick={() => nudge(0, -NUDGE_STEP)}>
           {t("campaign.detail.scenes.tokens.nudgeUp", { label: props.token.label })}
         </Button>{" "}
-        <Button variant="secondary" disabled={!props.online} onClick={() => nudge(0, NUDGE_STEP)}>
+        <Button variant="secondary" disabled={disabled} onClick={() => nudge(0, NUDGE_STEP)}>
           {t("campaign.detail.scenes.tokens.nudgeDown", { label: props.token.label })}
         </Button>{" "}
-        <Button variant="secondary" disabled={!props.online} onClick={() => nudge(-NUDGE_STEP, 0)}>
+        <Button variant="secondary" disabled={disabled} onClick={() => nudge(-NUDGE_STEP, 0)}>
           {t("campaign.detail.scenes.tokens.nudgeLeft", { label: props.token.label })}
         </Button>{" "}
-        <Button variant="secondary" disabled={!props.online} onClick={() => nudge(NUDGE_STEP, 0)}>
+        <Button variant="secondary" disabled={disabled} onClick={() => nudge(NUDGE_STEP, 0)}>
           {t("campaign.detail.scenes.tokens.nudgeRight", { label: props.token.label })}
         </Button>
       </div>
       </Disclosure>
-      {conflict ? <p role="alert">{t("campaign.detail.scenes.tokens.conflict")}</p> : null}
-      {error !== null ? <p role="alert">{error}</p> : null}
-      {moved ? <p role="status">{t("campaign.detail.scenes.tokens.moved")}</p> : null}
-      {conflict ? (
-        <Button variant="primary" pending={pending} onClick={() => void move()}>
-          {t("campaign.detail.scenes.tokens.retryMove", { label: props.token.label })}
-        </Button>
-      ) : (
-        <Button
-          variant="primary"
-          pending={pending}
-          pendingText={t("campaign.detail.scenes.tokens.moving")}
-          disabled={!props.online}
-          onClick={() => void move()}
-        >
-          {moveLabel}
-        </Button>
-      )}
+      <Button variant="primary" disabled={disabled} onClick={move}>{moveLabel}</Button>
     </div>
   );
 }
@@ -175,7 +108,10 @@ export function TokenTrayView(props: {
   sceneRevision: number;
   tokens: Token[];
   online?: boolean | undefined;
-  onChanged?: (() => void) | undefined;
+  onChanged?: (() => void | number | Promise<void | number>) | undefined;
+  commands?: TokenCommands | undefined;
+  disabled?: boolean | undefined;
+  onPlaceOnScene?: ((draft: { label: string; size: number; visible: boolean; imageFileId: string | null }) => void) | undefined;
 }) {
   const online = props.online ?? true;
   const [label, setLabel] = useState("");
@@ -184,64 +120,26 @@ export function TokenTrayView(props: {
   const [size, setSize] = useState("0.1");
   const [imageFileId, setImageFileId] = useState<string | null>(null);
   const [visible, setVisible] = useState(true);
-  const [pending, setPending] = useState(false);
-  const [conflict, setConflict] = useState(false);
-  const [unavailable, setUnavailable] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [placed, setPlaced] = useState(false);
-
-  const place = async (): Promise<void> => {
-    const targetX = parseUnit(x);
-    const targetY = parseUnit(y);
-    const targetSize = Number(size);
-    if (!online || unavailable || pending || targetSize <= 0 || targetSize > 1 || label.trim() === "" || targetX === null || targetY === null || !Number.isFinite(targetSize)) return;
-    setPending(true);
-    setError(null);
-    setConflict(false);
-    setPlaced(false);
-    // Caller-minted idempotency key, fresh on every attempt.
-    const idempotencyKey = randomUUID();
-    try {
-      await props.api.placeToken(props.sceneId, {
-        expectedSceneRevision: props.sceneRevision,
-        label: label.trim(),
-        x: targetX,
-        y: targetY,
-        size: targetSize,
-        visible,
-        imageFileId,
-        idempotencyKey,
-      });
-      setPlaced(true);
-      props.onChanged?.();
-    } catch (cause) {
-      if (isNotFound(cause)) {
-        setUnavailable(true);
-      } else if (isConflict(cause)) {
-        // 409 → re-read first, then offer an explicit retry with a fresh
-        // key. Never revision guessing.
-        setConflict(true);
-        props.onChanged?.();
-      } else {
-        setError(t("campaign.detail.scenes.tokens.error"));
-      }
-    } finally {
-      setPending(false);
-    }
+  const localCommands = useTokenCommands(props);
+  const commands = props.commands ?? localCommands;
+  const pending = commands.status === "pending", unavailable = commands.status === "unavailable";
+  const disabled = !online || commands.blocked || Boolean(props.disabled);
+  const draft = () => ({ label: label.trim(), size: Number(size), visible, imageFileId });
+  const valid = label.trim() !== "" && Number(size) > 0 && Number(size) <= 1 && Number.isFinite(Number(size));
+  const place = (): void => {
+    const targetX = parseUnit(x), targetY = parseUnit(y);
+    if (!disabled && valid && targetX !== null && targetY !== null) commands.place({ ...draft(), x: targetX, y: targetY });
   };
-
-  const markUnavailable = (): void => setUnavailable(true);
-
   return (
     <Panel title={t("campaign.detail.scenes.tokens.title")}>
       <FormField label={t("campaign.detail.scenes.tokens.labelLabel")}>
-        <input type="text" value={label} disabled={!online} onChange={(event) => setLabel(event.target.value)} />
+        <input type="text" value={label} disabled={disabled} onChange={(event) => setLabel(event.target.value)} />
       </FormField>
       {props.mediaApi && props.campaignId ? <>
         <p>{t(imageFileId ? "scene.tokens.selected" : "scene.tokens.labelOnly")}</p>
-        {imageFileId ? <Button variant="secondary" disabled={!online || pending} onClick={() => setImageFileId(null)}>{t("scene.tokens.clear")}</Button> : null}
+        {imageFileId ? <Button variant="secondary" disabled={disabled} onClick={() => setImageFileId(null)}>{t("scene.tokens.clear")}</Button> : null}
         <Disclosure label={t("scene.tokens.artwork")}>
-          <SceneLibrary api={props.mediaApi} campaignId={props.campaignId} actorId={props.actorId ?? null} generation={props.generation ?? 0} online={online && !pending && !unavailable} selection={{ fileId: imageFileId, onSelect: fileId => setImageFileId(fileId || null) }} onChanged={() => {}} onOpenScene={() => {}} />
+          <SceneLibrary api={props.mediaApi} campaignId={props.campaignId} actorId={props.actorId ?? null} generation={props.generation ?? 0} online={!disabled} selection={{ fileId: imageFileId, onSelect: fileId => setImageFileId(fileId || null) }} onChanged={() => {}} onOpenScene={() => {}} />
         </Disclosure>
       </> : null}
       <Disclosure label={t("disclosure.position")}>
@@ -252,7 +150,7 @@ export function TokenTrayView(props: {
           max={1}
           step={0.01}
           value={x}
-          disabled={!online}
+          disabled={disabled}
           onChange={(event) => setX(event.target.value)}
         />
       </FormField>
@@ -263,40 +161,24 @@ export function TokenTrayView(props: {
           max={1}
           step={0.01}
           value={y}
-          disabled={!online}
+          disabled={disabled}
           onChange={(event) => setY(event.target.value)}
         />
       </FormField>
       <FormField label={t("campaign.detail.scenes.tokens.sizeLabel")}>
-        <input type="number" min={0.01} max={1} step={0.01} value={size} disabled={!online} onChange={(event) => setSize(event.target.value)} />
+        <input type="number" min={0.01} max={1} step={0.01} value={size} disabled={disabled} onChange={(event) => setSize(event.target.value)} />
       </FormField>
       </Disclosure>
       <Checkbox
         label={t("campaign.detail.scenes.tokens.visibleLabel")}
         checked={visible}
-        disabled={!online}
+        disabled={disabled}
         onChange={(event) => setVisible(event.target.checked)}
       />
-      {conflict ? <p role="alert">{t("campaign.detail.scenes.tokens.conflict")}</p> : null}
-      {unavailable ? <p role="alert">{t("campaign.detail.scenes.tokens.unavailable")}</p> : null}
-      {error !== null ? <p role="alert">{error}</p> : null}
-      {placed ? <p role="status">{t("campaign.detail.scenes.tokens.placed")}</p> : null}
+      {!props.commands ? <TokenCommandFeedback commands={commands} online={online} /> : null}
       {!online ? <p role="status">{t("campaign.detail.scenes.offline")}</p> : null}
-      {conflict ? (
-        <Button variant="primary" pending={pending} disabled={!online || unavailable} onClick={() => void place()}>
-          {t("campaign.detail.scenes.tokens.retryPlace")}
-        </Button>
-      ) : (
-        <Button
-          variant="primary"
-          pending={pending}
-          pendingText={t("campaign.detail.scenes.tokens.placing")}
-          disabled={!online || unavailable || label.trim() === "" || Number(size) <= 0 || Number(size) > 1 || !Number.isFinite(Number(size))}
-          onClick={() => void place()}
-        >
-          {t("campaign.detail.scenes.tokens.place")}
-        </Button>
-      )}
+      {props.onPlaceOnScene ? <Button variant="secondary" disabled={disabled || !valid} onClick={() => props.onPlaceOnScene?.(draft())}>{t("scene.gestures.place")}</Button> : null}
+      <Button variant="primary" pending={pending} pendingText={t("campaign.detail.scenes.tokens.placing")} disabled={disabled || !valid} onClick={place}>{t("campaign.detail.scenes.tokens.place")}</Button>
       {props.tokens.length === 0 ? (
         <p role="status">{t("campaign.detail.scenes.tokens.empty")}</p>
       ) : (
@@ -304,13 +186,9 @@ export function TokenTrayView(props: {
           {props.tokens.map((token) => (
             <li key={token.tokenId}>
               <TokenMoveRow
-                api={props.api}
-                sceneId={props.sceneId}
-                sceneRevision={props.sceneRevision}
+                commands={commands}
                 token={token}
-                online={online}
-                onChanged={props.onChanged}
-                onUnavailable={markUnavailable}
+                online={online && !unavailable && !props.disabled}
               />
             </li>
           ))}
@@ -318,4 +196,20 @@ export function TokenTrayView(props: {
       )}
     </Panel>
   );
+}
+
+export function TokenCommandFeedback({ commands, online }: { commands: TokenCommands; online: boolean }) {
+  const op = commands.operation;
+  const retryLabel = commands.status === "conflict" && commands.refreshed ? op?.kind === "move" ? t("campaign.detail.scenes.tokens.retryMove", { label: op.label }) : t("campaign.detail.scenes.tokens.retryPlace") : t("scene.gestures.retry");
+  return <>
+    {op && ["conflict", "uncertain"].includes(commands.status) ? <p>{t("scene.gestures.destination", { label: op.kind === "move" ? op.label : op.body.label, x: op.body.x, y: op.body.y })}</p> : null}
+    {commands.status === "pending" ? <p role="status">{t("scene.gestures.saving")}</p> : null}
+    {commands.status === "applied" ? <p role="status">{t(op?.kind === "place" ? "campaign.detail.scenes.tokens.placed" : "campaign.detail.scenes.tokens.moved")}</p> : null}
+    {commands.status === "conflict" ? <p role="alert">{t(commands.refreshed ? "campaign.detail.scenes.tokens.conflict" : "scene.gestures.refresh")}</p> : null}
+    {commands.status === "uncertain" || commands.status === "refresh" ? <p role="alert">{t(commands.status === "uncertain" ? "scene.gestures.uncertain" : "scene.gestures.refresh")}</p> : null}
+    {commands.status === "rejected" ? <p role="alert">{t("scene.gestures.rejected")}</p> : null}
+    {commands.status === "unavailable" ? <p role="alert">{t("campaign.detail.scenes.tokens.unavailable")}</p> : null}
+    {["conflict", "uncertain", "refresh"].includes(commands.status) ? <Button disabled={!online} onClick={() => void commands.retry()}>{retryLabel}</Button> : null}
+    {["conflict", "rejected"].includes(commands.status) ? <Button variant="secondary" onClick={commands.discard}>{t("scene.gestures.discard")}</Button> : null}
+  </>;
 }

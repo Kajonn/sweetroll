@@ -100,6 +100,14 @@ describe("CampaignSceneView", () => {
     expect(props.api.openScene).toHaveBeenCalledWith("s1");
   });
 
+  it("clears protected scene content when a token command loses authorization", async () => {
+    const props = routeProps(); props.api.moveToken.mockRejectedValue({ status: 403 });
+    render(<CampaignSceneView {...props} />, { wrapper: wrapper() });
+    await screen.findByRole("button", { name: "Token Alpha" });
+    fireEvent.click(screen.getByRole("button", { name: "Move Alpha" }));
+    await waitFor(() => expect(screen.queryByRole("img", { name: /scene background/i })).toBeNull());
+    expect(screen.queryByRole("button", { name: "Token Alpha" })).toBeNull();
+  });
   it("discards uncommitted fog coordinates after background replacement", async () => {
     const props = routeProps(), client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<CampaignSceneView {...props} />, { wrapper: wrapper(client) });

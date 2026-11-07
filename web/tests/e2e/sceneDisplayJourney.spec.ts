@@ -79,6 +79,7 @@ async function signInViaPanel(page: Page, code: string) {
 /** Commit one fog stroke (mode + single dab), retrying once on 409. */
 async function commitFogStroke(page: Page, mode: "Conceal" | "Reveal", x: string, y: string, r: string) {
   const fog = page.getByRole("region", { name: "Fog of war" });
+  if (!await fog.getByLabel(/x \(0–1\)/i).isVisible()) await fog.getByText("Precise fog position", { exact: true }).click();
   await fog.getByLabel(/fog mode/i).selectOption(mode === "Conceal" ? "conceal" : "reveal");
   await fog.getByLabel(/x \(0–1\)/i).fill(x);
   await fog.getByLabel(/y \(0–1\)/i).fill(y);
@@ -106,11 +107,11 @@ async function placeToken(page: Page, label: string, x: string, y: string, visib
     await box.click();
   }
   await tray.getByRole("button", { name: "Place token", exact: true }).click();
-  const placed = tray.getByText("Token placed.");
-  const conflict = tray.getByText(/latest version was reloaded/);
+  const placed = page.getByText("Token placed.");
+  const conflict = page.getByText(/latest version was reloaded/);
   await expect(placed.or(conflict)).toBeVisible({ timeout: STEP_TIMEOUT });
   if (await conflict.isVisible()) {
-    await tray.getByRole("button", { name: "Retry placing token" }).click();
+    await page.getByRole("button", { name: "Retry placing token" }).click();
     await expect(placed).toBeVisible({ timeout: STEP_TIMEOUT });
   }
 }

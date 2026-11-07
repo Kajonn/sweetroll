@@ -6,6 +6,7 @@ import { buildPersonalTokenRoutes } from "../../src/transport/http/personal-toke
 import { DEFAULT_CAMPAIGN_LIMITS } from "../../src/platform/config.js";
 import { createCampaignsModule } from "../../src/campaigns/index.js";
 import { createCampaignPlacement } from "../../src/characters/campaignPlacement.js";
+import { knaveDocument, knaveCharacter } from "./fixtures/knave.js";
 import { d20Document } from "../../src/systems/implementation/package/fixtures/index.js";
 import { buildI3App, createI3Pool, createI3Schema, dropI3Schema, type I3AppHandle } from "./i3-app.js";
 
@@ -265,4 +266,74 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
     expect(browserSheet.json().character.state.values[field.id]).toBe(14);
 
   });
+
+  it("authors Knave 1e and creates a playable character through API v1", async () => {
+    const { token } = await issue(handle.users.bob.cookie);
+    const assessment = await call(token, "POST", "/systems/validate", { document: knaveDocument });
+    expect(assessment.statusCode, assessment.body).toBe(200);
+    expect(assessment.json()).toEqual({ valid: true, diagnostics: [] });
+
+    const created = await call(token, "POST", "/systems", {
+      name: knaveDocument.metadata.name,
+      idempotencyKey: "knave-create-system",
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    const { system: { systemId }, draft: blank } = created.json();
+
+    const saved = await call(token, "PUT", `/systems/${systemId}/draft`, {
+      expectedRevision: blank.revision,
+      document: knaveDocument,
+    });
+    expect(saved.statusCode, saved.body).toBe(200);
+    const { draft } = saved.json();
+    expect(draft.document).toEqual(knaveDocument);
+
+    const published = await call(token, "POST", `/systems/${systemId}/publish`, {
+      expectedRevision: draft.revision,
+      semanticVersion: "1.0.0",
+      idempotencyKey: "knave-publish",
+    });
+    expect(published.statusCode, published.body).toBe(201);
+    const { versionId } = published.json();
+
+    const versions = await call(token, "GET", `/characters/creation-versions?systemId=${systemId}`);
+    expect(versions.statusCode, versions.body).toBe(200);
+    expect(versions.json().versions).toEqual([expect.objectContaining({ versionId, systemId })]);
+    const options = await call(token, "GET", `/characters/creation-options?systemVersionId=${versionId}`);
+    expect(options.statusCode, options.body).toBe(200);
+    const [entity] = options.json().entities;
+    expect(entity).toMatchObject({ id: "knave", kind: "playable" });
+    expect(entity.fields).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "constitution", kind: "integer", min: 1, max: 10 }),
+      expect.objectContaining({ id: "hp", kind: "resource" }),
+    ]));
+    expect(entity.fields.map((field: { id: string }) => field.id)).not.toContain("item_capacity");
+
+    const character = await call(token, "POST", "/characters", {
+      ...knaveCharacter,
+      systemVersionId: versionId,
+      entityDefinitionId: entity.id,
+      idempotencyKey: "knave-create-character",
+    });
+    expect(character.statusCode, character.body).toBe(201);
+    const { characterId, revision } = character.json();
+
+    const sheet = await call(token, "GET", `/characters/${characterId}`);
+    expect(sheet.statusCode, sheet.body).toBe(200);
+    expect(sheet.json()).toMatchObject({
+      characterId,
+      systemVersionId: versionId,
+      entityDefinitionId: "knave",
+      name: "Mara Flint",
+      revision,
+      values: knaveCharacter.initialValues,
+      derivedValues: {
+        strength_defense: 12, dexterity_defense: 11, constitution_defense: 13,
+        intelligence_defense: 11, wisdom_defense: 12, charisma_defense: 11,
+        armor_defense: 13, item_capacity: 13,
+      },
+      validations: [],
+    });
+  });
+
 });

@@ -1084,6 +1084,12 @@ export function createCampaignPlacement(input: CreateCampaignPlacementInput): Ca
         if (character === null || character.campaign_id !== campaign.id) {
           return { ok: false, error: errors.not_found() };
         }
+        // Design 13.2: archived rows are explanatory only. The rejection rolls
+        // back like the other conflicts here, so the designation survives. No
+        // latestRevision: retrying with a newer revision cannot succeed.
+        if (character.lifecycle === "archived") {
+          return { ok: false, error: errors.conflict("Recover the character before claiming it.") };
+        }
         if (character.revision !== claimInput.expectedCharacterRevision) {
           return {
             ok: false, error: errors.conflict(

@@ -91,7 +91,7 @@ describe.skipIf(!databaseUrl)("public API v1 campaigns, play and scenes", () => 
   let displayDir: string;
   let pngBase64: string;
   const renders: string[] = [];
-  const tokens = {} as Record<"gm" | "player" | "other" | "outsider" | "readOnly" | "legacy" | "noCharacters", string>;
+  const tokens = {} as Record<"gm" | "player" | "other" | "outsider" | "readOnly" | "legacy" | "noCharacters" | "writeOnly", string>;
 
   beforeAll(async () => {
     mediaDir = await mkdtemp(join(tmpdir(), "sweetroll-api-campaign-media-"));
@@ -119,6 +119,7 @@ describe.skipIf(!databaseUrl)("public API v1 campaigns, play and scenes", () => 
     tokens.readOnly = await issue(h.users.gm, ["characters:read", "campaigns:read"]);
     tokens.legacy = await issue(h.users.gm, ["systems:read", "systems:write", "characters:read", "characters:write"]);
     tokens.noCharacters = await issue(h.users.player, ["campaigns:read", "campaigns:write"]);
+    tokens.writeOnly = await issue(h.users.gm, ["campaigns:write", "characters:write"]);
     // Players create standalone sheets on the campaign version before adopting them.
     await json(tokens.gm, "PUT", `/systems/${h.systemId}/sharing`, { access: "link" });
   });
@@ -204,6 +205,10 @@ describe.skipIf(!databaseUrl)("public API v1 campaigns, play and scenes", () => 
     const campaign = await createCampaign("Scopes");
     expect((await call(tokens.noCharacters, "POST", `/campaigns/${campaign.campaignId}/characters`, {
       name: "Blocked", entityDefinitionId: "character", expectedCampaignRevision: campaign.revision, idempotencyKey: randomUUID(),
+    })).json()).toMatchObject({ error: { code: "insufficient_scope" } });
+    // Placement returns the sheet, so write-only tokens cannot use it to read sheets.
+    expect((await call(tokens.writeOnly, "POST", `/campaigns/${campaign.campaignId}/characters`, {
+      name: "Write only", entityDefinitionId: "character", expectedCampaignRevision: campaign.revision, idempotencyKey: randomUUID(),
     })).json()).toMatchObject({ error: { code: "insufficient_scope" } });
 
     const unauthenticated = await h.app.inject(`/api/v1/campaigns/${campaign.campaignId}/images/${randomUUID()}/original`);

@@ -18,7 +18,9 @@ type Dependencies = {
 const asWire = <T>(result: Result<T>) => map(result, wire);
 const page = (query: { limit?: number; cursor?: string }) => ({ limit: query.limit ?? 25, cursor: query.cursor ?? null });
 const campaignWrite = ["campaigns:write"] as const;
-const placementScopes = ["campaigns:write", "characters:write"] as const;
+// Placement changes the character and its campaign and returns the full sheet,
+// so it also needs `characters:read`: a write-only token must not read sheets.
+const placementScopes = ["campaigns:write", "characters:write", "characters:read"] as const;
 
 export function registerCampaignRoutes(route: Route, { campaigns, characters, runtime, identity }: Dependencies) {
   /**

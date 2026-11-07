@@ -7356,7 +7356,8 @@
         ],
         "x-required-scopes": [
           "campaigns:write",
-          "characters:write"
+          "characters:write",
+          "characters:read"
         ],
         "parameters": [
           {
@@ -7616,7 +7617,8 @@
         ],
         "x-required-scopes": [
           "campaigns:write",
-          "characters:write"
+          "characters:write",
+          "characters:read"
         ],
         "parameters": [
           {
@@ -7750,7 +7752,8 @@
         ],
         "x-required-scopes": [
           "campaigns:write",
-          "characters:write"
+          "characters:write",
+          "characters:read"
         ],
         "parameters": [
           {
@@ -7865,7 +7868,8 @@
         ],
         "x-required-scopes": [
           "campaigns:write",
-          "characters:write"
+          "characters:write",
+          "characters:read"
         ],
         "parameters": [
           {

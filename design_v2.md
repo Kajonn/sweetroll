@@ -266,17 +266,21 @@ system** when the change is non-breaking for that character:
    validators. Field values, entry values, slot acceptance and limits, system-base
    references of campaign-derived entries and validations must all pass. New
    non-computed fields receive their declared defaults. The result is a preview
-   listing the fields added, templates whose stats changed for this character's
-   entries, and any blocking problems.
+   listing the fields added or dropped, stats updated or kept on this character's
+   entries, the target's validation messages and any blocking problems.
 3. **Commit.** The upgrade stores the target version ID, the defaulted state and a
    revision bump in one revision-checked, idempotent transaction, and records an
    activity/audit event with the source and target versions. Rolls, activity and
    history are retained unchanged. Nothing is converted or remapped: stable
    definition identifiers carry the values across.
 
-Stored values are kept by identifier, and system-template entries resolve their
-fields and granted actions from the pinned package, so stat changes take effect
-when the pin moves. Character-specific entry values stay as entered.
+Stored values are kept by identifier. Granted actions and expressions come from
+the pinned package. Placing an item copies its template field defaults (its
+stats) into the entry, so a version change moves each entry value that still
+equals the old template default to the new default, and keeps values the player
+or campaign changed; the preview lists both. New template fields receive their
+default, and the item's art follows the template unless it was changed.
+Campaign-derived entries re-pin their system base to the target version.
 
 **Campaigns.** A campaign and its attached characters share one pin. An active GM
 or co-GM upgrades the campaign; the dry run covers every attached character and

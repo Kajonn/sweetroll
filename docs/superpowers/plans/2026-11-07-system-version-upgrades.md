@@ -27,33 +27,36 @@ columns are added to the current schema baseline.
 ## Why this is small
 
 - Character state is stored by stable definition ID (`state_json.values`,
-  `state_json.entries`), and system-template entries store only `templateId` plus
-  per-instance values. Template fields and granted actions are resolved from the
-  pinned package, so a template stat change takes effect when the pin moves.
+  `state_json.entries`). Granted actions and expressions resolve from the pinned
+  package. Placing an item copies its template field defaults into the entry, so
+  the check moves values that still equal the old default to the new default and
+  keeps changed values (the preview reports both).
 - `comparePackages` (`src/systems/implementation/package/compatibility.ts`)
   already classifies breaking changes at publish time.
 - `decodeRuntimeState`, `validateEntryForSlot`, `validDefaults` and
   `templateApplicable` already validate a state against a package on every write.
   Running them against the target package is the "verify the build" dry run.
 
-## Stage 1 — Version check (pure, read only)
+## Stage 1 — Version check (pure, read only) — done
 
-- [ ] `checkVersionChange({ from, to, entityId, state, direction })` in the
-  runtime: for `upgrade`, run `comparePackages(from, to)` and block on any
-  finding; for both directions, rebuild the state against the target entity
-  (keep values by ID, default new non-computed fields, drop values of fields the
-  target lacks), validate every entry (template exists, slot exists and accepts
-  the kind, slot `maxEntries`, entry values valid for the target template fields,
-  campaign-derived `base` still applicable) and run the target's error
-  validations. Return `{ ok, blockers[], addedFields[], droppedFields[],
-  changedTemplates[], nextState }`.
-- [ ] Extend `comparePackages` with gaps that break live entries but are not
-  caught today: template field removed or kind changed, template field made
-  required, slot `maxEntries` lowered. They become breaking at publish too.
-- [ ] Unit tests: added template/spell, item stat change, new field with default,
-  removed template in use, slot narrowed, value outside a new range, revert after
-  an additive upgrade with and without a new item taken, revert dropping a new
-  field's value.
+- [x] `checkVersionChange({ from, to, entityId, state, direction })` in
+  `src/systems/implementation/runtime/version-change.ts`. `upgrade` blocks on any
+  `comparePackages` finding; both directions rebuild the state against the target
+  entity (keep values by ID, default new stored fields, drop fields the target
+  lacks), move entries (follow unchanged template defaults and art, keep changed
+  values, add new template fields, re-pin derived campaign bases), validate every
+  entry (sheet slot, slot acceptance and capacity, template values, derived base)
+  and evaluate the target. Returns `{ ok, blockers[], packageFindings[],
+  addedFields[], droppedFields[], changedEntries[], validations[], nextState }`.
+  Target validation messages are reported, not blocking, as on normal saves.
+- [x] `comparePackages` now also flags `template_field_removed`,
+  `template_field_kind_changed`, `template_field_required_added` and
+  `slot_capacity_reduced` (also breaking at publish).
+- [x] Unit tests: additive upgrade with followed and kept item stats, new
+  character field, campaign-derived entry re-pinned with its override kept,
+  breaking template field removal, value outside a narrowed range, same version,
+  other system, revert keeping play values and dropping a new field, revert
+  blocked by a newer-only item.
 
 ## Stage 2 — Character upgrade and revert
 

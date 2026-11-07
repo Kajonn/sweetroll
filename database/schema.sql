@@ -37,8 +37,9 @@ CREATE TABLE personal_access_tokens (
   user_id    uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   token_hash text NOT NULL UNIQUE,
   label      text NOT NULL CHECK (char_length(label) BETWEEN 1 AND 80),
-  scopes     text[] NOT NULL CHECK (cardinality(scopes) BETWEEN 1 AND 4
-    AND scopes <@ ARRAY['systems:read', 'systems:write', 'characters:read', 'characters:write']),
+  scopes     text[] NOT NULL CHECK (cardinality(scopes) BETWEEN 1 AND 6
+    AND scopes <@ ARRAY['systems:read', 'systems:write', 'characters:read', 'characters:write',
+                        'campaigns:read', 'campaigns:write']),
   created_at timestamptz NOT NULL DEFAULT now(),
   expires_at timestamptz NOT NULL,
   revoked_at timestamptz
@@ -49,7 +50,7 @@ CREATE INDEX personal_access_tokens_user_active_idx
 
 CREATE TABLE public_api_rate_limits (
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  bucket      text NOT NULL CHECK (bucket IN ('general', 'validate', 'publish')),
+  bucket      text NOT NULL CHECK (bucket IN ('general', 'validate', 'publish', 'upload')),
   window_at   timestamptz NOT NULL,
   hits        integer NOT NULL CHECK (hits > 0),
   PRIMARY KEY (user_id, bucket)

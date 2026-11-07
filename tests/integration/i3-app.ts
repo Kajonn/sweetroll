@@ -96,6 +96,8 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
         ["code-bob", { provider: "test", subject: "subBob", email: "bob@example.com", displayName: "Bob" }],
         ["code-cara", { provider: "test", subject: "subCara", email: "cara@example.com", displayName: "Cara" }],
         ["code-dan", { provider: "test", subject: "subDan", email: "dan@example.com", displayName: "Dan" }],
+        ["code-eve", { provider: "test", subject: "subEve", email: "eve@example.com", displayName: "Eve" }],
+        ["code-finn", { provider: "test", subject: "subFinn", email: "finn@example.com", displayName: "Finn" }],
       ]),
     ),
     pool: input.pool,

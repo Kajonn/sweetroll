@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 
-const perMinute = { general: 120, validate: 12, publish: 6 } as const;
+const perMinute = { general: 120, validate: 12, publish: 6, upload: 30 } as const;
 export type RateBucket = keyof typeof perMinute;
 
 // A single bounded row per account and bucket keeps counters shared across

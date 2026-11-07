@@ -71,3 +71,10 @@ snapshots over SSE (`GET /displays/:id/scenes/:sceneId/events`, PostgreSQL
 `LISTEN`/`NOTIFY`), and the old polled projection route was removed with all its
 client code. Do not reintroduce display polling. The hosted journey and the
 200-table load comparison (stage 4) remain open.
+
+The owner approved Part B of the [public API plan](docs/superpowers/plans/2026-11-07-public-api-v1.md)
+on 2026-11-07. Stages B1–B5 and the local parts of B6 are implemented: six token
+scopes including `campaigns:read`/`campaigns:write`, browser-policy character
+access, rolls and pushes, and the full campaign, media, scene and display-pairing
+surface under `/api/v1`. See the plan's implementation record before changing v1.
+The hosted B6 journey depends on real provider sign-in and remains open.

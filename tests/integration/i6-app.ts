@@ -12,6 +12,8 @@ import {
   type CampaignPlacement,
 } from "../../src/characters/campaignPlacement.js";
 import { buildCampaignsRoutes } from "../../src/transport/http/campaigns.js";
+import { buildPersonalTokenRoutes } from "../../src/transport/http/personal-tokens.js";
+import { buildPublicApi, publicApiPrefix } from "../../src/transport/http/public-api/index.js";
 import type { Characters } from "../../src/characters/index.js";
 import { DEFAULT_CAMPAIGN_LIMITS, type CampaignLimits } from "../../src/platform/config.js";
 import type { RequestContext } from "../../src/systems/authoring.js";
@@ -127,6 +129,8 @@ export async function buildI6Harness(input?: {
   sceneEvents?: SceneEventHub | null;
   displayObserver?: DisplayObserver;
   displayStream?: { heartbeatMs?: number; stallTimeoutMs?: number };
+  /** Registers public API v1 and cookie token issuance at /me/personal-tokens. */
+  publicApi?: boolean;
 }): Promise<I6Harness> {
   const databaseUrl = process.env.TEST_DATABASE_URL;
   if (databaseUrl === undefined || databaseUrl.length === 0) {
@@ -148,6 +152,7 @@ export async function buildI6Harness(input?: {
     ...(input?.scanImage ? { scanImage: input.scanImage } : {}),
     pool,
     wrapRuntime: input?.wrapRuntime,
+    allowPersonalTokens: input?.publicApi ?? false,
     extraRoutes: ({ authoring, characters, runtime, identity }) => {
       const limits = input?.limits ?? DEFAULT_CAMPAIGN_LIMITS;
       placement = createCampaignPlacement({
@@ -165,7 +170,16 @@ export async function buildI6Harness(input?: {
         charactersPlacement: placement,
     loadTemplatePackage:createPostgresPublishedPackageLoader(pool),
       });
-      return buildCampaignsRoutes({ campaigns, characters, runtime, identity });
+      const browser = buildCampaignsRoutes({ campaigns, characters, runtime, identity });
+      if (!input?.publicApi) return browser;
+      return [
+        browser,
+        buildPersonalTokenRoutes({ identity }),
+        (app, _opts, done) => {
+          void app.register(buildPublicApi({ identity, authoring, characters, runtime, campaigns, pool }), { prefix: publicApiPrefix });
+          done();
+        },
+      ];
     },
   });
 

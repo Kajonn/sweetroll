@@ -1,45 +1,27 @@
-import type { Static, TSchema } from "@sinclair/typebox";
-import { Ajv } from "ajv";
-import type { FastifyPluginAsync, FastifyReply } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import type { Pool } from "pg";
 
-import type { CharacterError, Characters, CharacterView } from "../../../characters/index.js";
-import type { ImageAttachmentError } from "../../../platform/image-attachment.js";
+import type { Campaigns } from "../../../campaigns/index.js";
+import type { Characters } from "../../../characters/index.js";
 import { ExpressionAstV1Schema } from "../../../systems/implementation/package/schema/expression.js";
 import { SystemPackageV1Schema } from "../../../systems/implementation/package/schema/package.js";
 import { SystemExportV1Schema } from "../../../systems/implementation/package/schema/export.js";
 import type { Identity } from "../../../identity/index.js";
-import type { PersonalTokenScope } from "../../../identity/personal-tokens.js";
-import type { AppError, AuthoringWorkspace, RequestContext, SystemAuthoring } from "../../../systems/authoring.js";
+import type { AuthoringWorkspace, SystemAuthoring } from "../../../systems/authoring.js";
+import type { SystemRuntime } from "../../../systems/runtime.js";
 import { documentDiagnosticPointers } from "../../../systems/implementation/authoring/assess.js";
 import { REFERENCE_TEMPLATES } from "../../../systems/implementation/persistence/index.js";
-import { PACKAGE_LIMITS } from "../../../systems/implementation/package/limits.js";
 import { SystemDocumentV1Schema } from "../../../systems/implementation/package/schema/document.js";
-import { strictInputCompiler } from "../strictValidation.js";
-import { consumeRequest, type RateBucket } from "./rate-limit.js";
+import { registerCampaignRoutes } from "./campaigns.js";
+import * as cs from "./campaign-schemas.js";
+import { registerCharacterRoutes } from "./characters.js";
+import { createRouter, errorStatuses, failure, imageBodyLimit, map, packageDiagnostic, schemaRef } from "./router.js";
+import { registerSceneRoutes } from "./scenes.js";
 import * as s from "./schemas.js";
+import { registerSystemRoutes } from "./systems.js";
+import { characterMutation, characterSheet } from "./views.js";
 
 export const publicApiPrefix = "/api/v1";
-const documentBodyLimit = PACKAGE_LIMITS.encodedBytes + 4096;
-const commandBodyLimit = 128 * 1024;
-const imageBodyLimit = 8 * 1024 * 1024;
-const bodyValidator = new Ajv({ strict: false });
-bodyValidator.addFormat("uuid", /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i);
-
-const errorStatuses = {
-  400: "Invalid request",
-  401: "Missing, expired, revoked or invalid bearer credential",
-  403: "Token lacks the required scope",
-  404: "Resource is missing or inaccessible",
-  409: "Revision, idempotency or lifecycle conflict",
-  413: "Payload exceeds the allowed size",
-  415: "Unsupported media type",
-  422: "Document or field value failed validation",
-  429: "Account request limit exceeded",
-  500: "Internal error",
-  503: "Temporarily unavailable",
-};
-
 const errorExamples: Partial<Record<keyof typeof errorStatuses, { code: string; message: string; latestRevision?: number }>> = {
   401: { code: "unauthorized", message: "A valid bearer token is required." },
   403: { code: "insufficient_scope", message: "The token lacks the required scope." },
@@ -64,9 +46,9 @@ const outputSchemas = {
   CreationVersions: s.creationVersions, CreationOptions: s.creationOptions,
   CharacterPage: s.characterPage, CharacterSheet: s.characterSheet, CharacterMutation: s.characterMutation,
   ImageState: s.imageState, PortraitState: s.portraitState, SystemExport: SystemExportV1Schema, Preview: s.preview,
+  ...cs.outputSchemas,
 };
-
-const schemaRef = (name: string) => ({ $ref: `#/components/schemas/${name}` });
+export type OutputName = keyof typeof outputSchemas;
 
 // Runtime JSON Schemas use TypeBox's recursive $id. OpenAPI consumers need
 // document-local component references to compile the same recursive type.
@@ -79,71 +61,10 @@ const openApiPackageSchemas = {
     key === "$ref" && value === astId ? astReference.$ref : value)),
 };
 
-type Dependencies = { identity: Identity; authoring: SystemAuthoring; characters: Characters; pool: Pool };
-type InputSchema = { params?: TSchema; querystring?: TSchema; body?: TSchema };
-type Infer<S, K extends keyof InputSchema> = S extends Record<K, TSchema> ? Static<S[K]> : never;
-type Operation<S> = {
-  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  path: string;
-  id: string;
-  description: string;
-  scope: PersonalTokenScope;
-  input: S;
-  output: keyof typeof outputSchemas;
-  created?: true;
-  document?: true;
-  bodyLimit?: number;
-  example?: unknown;
-  bucket?: RateBucket;
-  fieldErrorPath?: "initialValues" | "value";
+type Dependencies = {
+  identity: Identity; authoring: SystemAuthoring; characters: Characters; pool: Pool;
+  campaigns: Campaigns; runtime: SystemRuntime;
 };
-type Failure = AppError | CharacterError | ImageAttachmentError;
-type Result<T> = { ok: true; value: T } | { ok: false; error: Failure };
-
-function failure(reply: FastifyReply, requestId: string, status: number, code: string, message: string) {
-  return reply.code(status).send({ error: { code, message }, requestId });
-}
-
-function packageDiagnostic(diagnostic: { code: string; path: string; message: string }) {
-  const path = diagnostic.path.startsWith("/") ? diagnostic.path : "";
-  return { ...diagnostic, path, severity: "error" as const };
-}
-
-function sendResult<T>(
-  reply: FastifyReply,
-  requestId: string,
-  status: number,
-  result: Result<T>,
-  fieldErrorPath?: "initialValues" | "value",
-) {
-  if (result.ok) return reply.code(status).send(result.value);
-  const error = result.error;
-  const statuses: Record<Failure["code"], number> = {
-    bad_request: 400, too_large: 413, unprocessable: 422, invalid_package: 422, invalid_value: 422,
-    not_found: 404, conflict: 409, idempotency_mismatch: 409, command_in_progress: 409,
-    result_unavailable: 409, internal: 500, temporarily_unavailable: 503,
-  };
-  const code = error.code === "conflict" && error.latestRevision !== undefined ? "stale_revision" : error.code;
-  const diagnostics = (("diagnostics" in error ? error.diagnostics : undefined) ?? []).map((entry) => "path" in entry
-    ? packageDiagnostic(entry)
-    : { code: entry.validationId, severity: entry.severity, path: "", message: entry.message });
-  if (fieldErrorPath !== undefined && "definitionId" in error && error.definitionId !== undefined) {
-    const field = error.definitionId.replaceAll("~", "~0").replaceAll("/", "~1");
-    const path = fieldErrorPath === "initialValues" ? `/initialValues/${field}` : "/value";
-    diagnostics.push(packageDiagnostic({ code, message: error.message, path }));
-  }
-  return reply.code(statuses[error.code]).send({
-    requestId,
-    error: {
-      code, message: error.message, latestRevision: error.latestRevision,
-      ...(diagnostics.length ? { diagnostics } : {}),
-    },
-  });
-}
-
-function map<T, U>(result: Result<T>, project: (value: T) => U): Result<U> {
-  return result.ok ? { ok: true, value: project(result.value) } : result;
-}
 
 function assessment({ ok, diagnostics }: ReturnType<SystemAuthoring["validateDocument"]>) {
   return { valid: ok, diagnostics: diagnostics.map(packageDiagnostic) };
@@ -164,24 +85,8 @@ function workspace(value: AuthoringWorkspace) {
   };
 }
 
-function characterSheet(character: CharacterView) {
-  const { characterId, systemVersionId, entityDefinitionId, name, revision, lifecycle, createdAt, updatedAt, derivedValues, validations } = character;
-  return {
-    characterId, systemVersionId, entityDefinitionId, name, revision, lifecycle, createdAt, updatedAt,
-    values: character.state.values, derivedValues, validations,
-    entries: Object.values(character.state.entries ?? {}).map(({ entryId, slotId, templateId, values, quantity }) => ({
-      entryId, slotId, templateId, values, ...(quantity === undefined ? {} : { quantity }),
-    })),
-  };
-}
-
-function characterMutation({ characterId, revision }: CharacterView) {
-  return { characterId, revision };
-}
-
-export function buildPublicApi({ identity, authoring, characters, pool }: Dependencies): FastifyPluginAsync {
+export function buildPublicApi({ identity, authoring, characters, pool, campaigns, runtime }: Dependencies): FastifyPluginAsync {
   return async (app) => {
-    const paths: Record<string, Record<string, unknown>> = {};
     app.addHook("onRequest", async (_request, reply) => {
       reply.header("cache-control", "no-store");
     });
@@ -198,82 +103,7 @@ export function buildPublicApi({ identity, authoring, characters, pool }: Depend
       return failure(reply, request.id, status, code, error.validation ? "The request does not match the API schema." : "The request could not be parsed.");
     });
 
-    function route<S extends InputSchema, T>(
-      operation: Operation<S>,
-      run: (ctx: RequestContext, request: {
-        params: Infer<S, "params">; query: Infer<S, "querystring">; body: Infer<S, "body">;
-      }) => Result<T> | Promise<Result<T>>,
-    ) {
-      const success = operation.created ? 201 : 200;
-      const bodyLimit = operation.bodyLimit ?? (operation.document ? documentBodyLimit : commandBodyLimit);
-      const statuses = Object.entries(errorStatuses);
-      const response = { [success]: outputSchemas[operation.output], ...Object.fromEntries(statuses.map(([code]) => [code, s.errorEnvelope])) };
-      const path = operation.path.replace(/:([a-zA-Z]+)/g, "{$1}");
-      const schema = { ...operation.input, response };
-      const body = operation.document && schema.body
-        ? { ...schema.body, properties: { ...schema.body.properties, document: schemaRef("SystemDocument") } }
-        : schema.body;
-      const parameters = (["params", "querystring"] as const).flatMap((location) => {
-        const parameterSchema = schema[location];
-        return Object.entries(parameterSchema?.properties ?? {}).map(([name, property]) => ({
-          name, in: location === "params" ? "path" : "query",
-          required: parameterSchema?.required?.includes(name) ?? false, schema: property,
-        }));
-      });
-      paths[path] ??= {};
-      paths[path][operation.method.toLowerCase()] = {
-        operationId: operation.id, description: operation.description,
-        security: [{ bearerAuth: [] }], "x-required-scope": operation.scope,
-        ...(parameters.length > 0 ? { parameters } : {}),
-        ...(body ? {
-          "x-max-body-bytes": bodyLimit,
-          requestBody: { required: true, content: { "application/json": {
-            schema: body, ...(operation.example ? { example: operation.example } : {}),
-          } } },
-        } : {}),
-        responses: {
-          [success]: { description: operation.created ? "Created" : "OK", content: { "application/json": { schema: schemaRef(operation.output) } } },
-          ...Object.fromEntries(statuses.map(([status]) => [
-            status, { $ref: `#/components/responses/${status}` },
-          ])),
-        },
-      };
-
-      const actors = new WeakMap<object, string>();
-      app.route<{ Params: Infer<S, "params">; Querystring: Infer<S, "querystring">; Body: Infer<S, "body"> }>({
-        method: operation.method, url: operation.path, schema,
-        config: { bearerOnly: true },
-        bodyLimit,
-        validatorCompiler: (input) => input.httpPart === "body" ? bodyValidator.compile(input.schema) : strictInputCompiler(input),
-        async onRequest(request, reply) {
-          const token = /^Bearer ([^\s,]+)$/i.exec(request.headers.authorization ?? "")?.[1];
-          const credential = token === undefined ? null : await identity.personalTokens.resolve(token);
-          if (credential === null) {
-            reply.header("www-authenticate", "Bearer");
-            return failure(reply, request.id, 401, "unauthorized", "A valid bearer token is required.");
-          }
-          if (!credential.scopes.includes(operation.scope)) {
-            return failure(reply, request.id, 403, "insufficient_scope", "The token lacks the required scope.");
-          }
-          if (!await consumeRequest(pool, credential.actorId, "general")
-            || (operation.bucket && !await consumeRequest(pool, credential.actorId, operation.bucket))) {
-            reply.header("retry-after", "60");
-            return failure(reply, request.id, 429, "rate_limited", "The account request limit was reached.");
-          }
-          actors.set(request, credential.actorId);
-        },
-        async handler(request, reply) {
-          const actorId = actors.get(request);
-          if (actorId === undefined) throw new Error("Public API request has no authorized actor.");
-          const result = await run({ actorId, requestId: request.id }, {
-            params: request.params as Infer<S, "params">,
-            query: request.query as Infer<S, "querystring">,
-            body: request.body as Infer<S, "body">,
-          });
-          return sendResult(reply, request.id, success, result, operation.fieldErrorPath);
-        },
-      });
-    }
+    const { route, paths } = createRouter({ app, identity, pool, outputSchemas });
 
     route({
       method: "GET", path: "/systems", id: "listSystems", description: "List systems owned by the account.",
@@ -320,7 +150,7 @@ export function buildPublicApi({ identity, authoring, characters, pool }: Depend
 
     route({
       method: "PUT", path: systemImagePath, id: "setSystemItemImage", description: "Upload or replace a draft template image.",
-      scope: "systems:write", input: { params: s.systemTemplate, body: s.setSystemImage }, output: "ImageState", bodyLimit: imageBodyLimit,
+      scope: "systems:write", input: { params: s.systemTemplate, body: s.setSystemImage }, output: "ImageState", bodyLimit: imageBodyLimit, bucket: "upload",
     }, (ctx, { params, body }) => authoring.setItemImage(ctx, { ...params, ...body }));
 
     route({
@@ -381,27 +211,27 @@ export function buildPublicApi({ identity, authoring, characters, pool }: Depend
     }, async (ctx, { body }) => map(await characters.create(ctx, body), characterMutation));
 
     route({
-      method: "GET", path: "/characters/:characterId", id: "readCharacter", description: "Read the stored and derived sheet values of an owned standalone character.",
+      method: "GET", path: "/characters/:characterId", id: "readCharacter", description: "Read the stored and derived sheet values of a character the caller may read, including its campaign placement.",
       scope: "characters:read", input: { params: s.characterId }, output: "CharacterSheet",
-    }, async (ctx, { params }) => map(await characters.open(ctx, params.characterId, { standaloneOnly: true }), characterSheet));
+    }, async (ctx, { params }) => map(await characters.open(ctx, params.characterId), characterSheet));
 
     route({
       method: "POST", path: "/characters/:characterId/fields/:fieldId/set", id: "setCharacterField",
-      description: "Set one editable field on an owned standalone character at the supplied revision.",
+      description: "Set one editable field on a character the caller may edit, at the supplied revision.",
       scope: "characters:write", input: { params: s.fieldId, body: s.setField }, output: "CharacterMutation",
       fieldErrorPath: "value",
       example: { value: 14, expectedRevision: 1, idempotencyKey: "field-set-1" },
     }, async (ctx, { params, body }) => map(
-      await characters.apply(ctx, { kind: "setField", ...params, ...body }, { standaloneOnly: true }),
+      await characters.apply(ctx, { kind: "setField", ...params, ...body }),
       ({ character }) => characterMutation(character),
     ));
 
     route({
       method: "POST", path: "/characters/:characterId/resources/:resourceId/bump", id: "bumpCharacterResource",
-      description: "Adjust an owned standalone character's resource by one configured step.",
+      description: "Adjust a character resource by one configured step.",
       scope: "characters:write", input: { params: s.resourceId, body: s.bumpResource }, output: "CharacterMutation",
     }, async (ctx, { params, body }) => map(
-      await characters.apply(ctx, { kind: "bumpResource", ...params, ...body }, { standaloneOnly: true }),
+      await characters.apply(ctx, { kind: "bumpResource", ...params, ...body }),
       ({ character }) => characterMutation(character),
     ));
 
@@ -413,7 +243,7 @@ export function buildPublicApi({ identity, authoring, characters, pool }: Depend
       const { expectedRevision, idempotencyKey, values = {}, ...entry } = body;
       return map(await characters.apply(ctx, {
         kind: "addEntry", ...params, expectedRevision, idempotencyKey, entry: { ...entry, values },
-      }, { standaloneOnly: true }), ({ character }) => characterMutation(character));
+      }), ({ character }) => characterMutation(character));
     });
 
     route({
@@ -421,22 +251,22 @@ export function buildPublicApi({ identity, authoring, characters, pool }: Depend
       description: "Move an entry to a compatible slot or update its values or quantity.",
       scope: "characters:write", input: { params: s.entryId, body: s.updateEntry }, output: "CharacterMutation",
     }, async (ctx, { params, body }) => map(
-      await characters.apply(ctx, { kind: "updateEntryValues", ...params, ...body, values: body.values ?? {} }, { standaloneOnly: true }),
+      await characters.apply(ctx, { kind: "updateEntryValues", ...params, ...body, values: body.values ?? {} }),
       ({ character }) => characterMutation(character),
     ));
 
     route({
       method: "DELETE", path: "/characters/:characterId/entries/:entryId", id: "removeCharacterEntry",
-      description: "Remove an entry from an owned standalone character.",
+      description: "Remove an entry from a character the caller may edit.",
       scope: "characters:write", input: { params: s.entryId, body: s.revisionCommandBody }, output: "CharacterMutation",
     }, async (ctx, { params, body }) => map(
-      await characters.apply(ctx, { kind: "removeEntry", ...params, ...body }, { standaloneOnly: true }),
+      await characters.apply(ctx, { kind: "removeEntry", ...params, ...body }),
       ({ character }) => characterMutation(character),
     ));
 
     route({
       method: "POST", path: "/characters/:characterId/duplicate", id: "duplicateCharacter",
-      description: "Create a standalone copy of an owned standalone character.",
+      description: "Create a standalone copy of a character the caller may duplicate.",
       scope: "characters:write", input: { params: s.characterId, body: s.duplicateCharacter }, output: "CharacterMutation", created: true,
     }, async (ctx, { params, body }) => map(await characters.duplicate(ctx, { ...params, ...body }), characterMutation));
 
@@ -444,33 +274,38 @@ export function buildPublicApi({ identity, authoring, characters, pool }: Depend
     route({
       method: "GET", path: portraitPath, id: "readCharacterPortrait", description: "Read portrait metadata and revision.",
       scope: "characters:read", input: { params: s.characterId }, output: "PortraitState",
-    }, (ctx, { params }) => characters.openPortrait(ctx, { ...params, standaloneOnly: true }));
+    }, (ctx, { params }) => characters.openPortrait(ctx, { ...params }));
 
     route({
-      method: "PUT", path: portraitPath, id: "setCharacterPortrait", description: "Upload or replace a standalone character portrait.",
-      scope: "characters:write", input: { params: s.characterId, body: s.setPortrait }, output: "PortraitState", bodyLimit: imageBodyLimit,
-    }, (ctx, { params, body }) => characters.setPortrait(ctx, { ...params, ...body, standaloneOnly: true }));
+      method: "PUT", path: portraitPath, id: "setCharacterPortrait", description: "Upload or replace a character portrait.",
+      scope: "characters:write", input: { params: s.characterId, body: s.setPortrait }, output: "PortraitState", bodyLimit: imageBodyLimit, bucket: "upload",
+    }, (ctx, { params, body }) => characters.setPortrait(ctx, { ...params, ...body }));
 
     route({
-      method: "DELETE", path: portraitPath, id: "removeCharacterPortrait", description: "Remove a standalone character portrait.",
+      method: "DELETE", path: portraitPath, id: "removeCharacterPortrait", description: "Remove a character portrait.",
       scope: "characters:write", input: { params: s.characterId, body: s.removePortrait }, output: "PortraitState",
-    }, (ctx, { params, body }) => characters.removePortrait(ctx, { ...params, ...body, standaloneOnly: true }));
+    }, (ctx, { params, body }) => characters.removePortrait(ctx, { ...params, ...body }));
 
     const entryImagePath = "/characters/:characterId/entries/:entryId/image";
     route({
       method: "GET", path: entryImagePath, id: "readCharacterEntryImage", description: "Read the inherited or overridden image metadata for an inventory entry.",
       scope: "characters:read", input: { params: s.entryId }, output: "ImageState",
-    }, (ctx, { params }) => characters.openEntryImage(ctx, { ...params, standaloneOnly: true }));
+    }, (ctx, { params }) => characters.openEntryImage(ctx, { ...params }));
 
     route({
-      method: "PUT", path: entryImagePath, id: "setCharacterEntryImage", description: "Upload custom art for a standalone inventory entry.",
-      scope: "characters:write", input: { params: s.entryId, body: s.setEntryImage }, output: "ImageState", bodyLimit: imageBodyLimit,
-    }, (ctx, { params, body }) => characters.setEntryImage(ctx, { ...params, ...body, standaloneOnly: true }));
+      method: "PUT", path: entryImagePath, id: "setCharacterEntryImage", description: "Upload custom art for an inventory entry.",
+      scope: "characters:write", input: { params: s.entryId, body: s.setEntryImage }, output: "ImageState", bodyLimit: imageBodyLimit, bucket: "upload",
+    }, (ctx, { params, body }) => characters.setEntryImage(ctx, { ...params, ...body }));
 
     route({
-      method: "DELETE", path: entryImagePath, id: "removeCharacterEntryImage", description: "Remove the displayed art for a standalone inventory entry.",
+      method: "DELETE", path: entryImagePath, id: "removeCharacterEntryImage", description: "Remove the displayed art for an inventory entry.",
       scope: "characters:write", input: { params: s.entryId, body: s.removeEntryImage }, output: "ImageState",
-    }, (ctx, { params, body }) => characters.removeEntryImage(ctx, { ...params, ...body, standaloneOnly: true }));
+    }, (ctx, { params, body }) => characters.removeEntryImage(ctx, { ...params, ...body }));
+
+    registerSystemRoutes(route, { authoring });
+    registerCharacterRoutes(route, { characters });
+    registerCampaignRoutes(route, { campaigns, characters, runtime, identity });
+    registerSceneRoutes(route, { campaigns });
 
     paths["/openapi.json"] = { get: {
       operationId: "getOpenApiDocument", description: "Download the public API contract.",

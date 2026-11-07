@@ -639,6 +639,19 @@ The [API plan](docs/superpowers/plans/2026-11-07-public-api-v1.md) defines the
 scope and hosted acceptance. The [quickstart](docs/api/v1.md) documents the
 wire contract and retry windows.
 
+**Planned completion (owner-approved 2026-11-07, not yet implemented):** Part B
+of the API plan extends v1 to everything the signed-in web app can do. This
+covers system and version lifecycle, art bytes, character rolls, pushes,
+activity, exports and ownership transfer, and campaign-attached characters under
+the browser's Characters policy. It also covers the full campaign surface:
+campaigns, members, invitations, characters, content, item templates and
+proposals, media, scenes with fog and tokens, and display pairing and
+revocation. New scopes are `campaigns:read` and `campaigns:write`. Commands that
+change both a character and its campaign need both write scopes. Browser session
+routes, token management, display-credential routes (including the scene event
+stream), webhooks and SDKs stay outside v1. Responses are never wider than the
+browser shows the same caller.
+
 # 14. Security, privacy, and abuse prevention
 
 | **Risk**                     | **Required control**                                                                                |
@@ -1013,6 +1026,13 @@ The two tracks are independent; preserve their internal stage order. T1 builds o
 > **Note.** Offline support is now a requirement (Section 8), not an open decision.
 
 ## 18.2 Immediate next actions
+
+**Public API completion planned (2026-11-07):** the owner asked for v1 to be
+complete and to include campaigns. The [API plan](docs/superpowers/plans/2026-11-07-public-api-v1.md)
+now adds Part B stages B1–B6 (scopes, systems and characters completion,
+campaign lifecycle and membership, campaign characters/content/templates/proposals,
+media/scenes/displays, docs and hosted acceptance). B1 lands first; hosted
+acceptance still depends on real provider sign-in.
 
 **Scene streaming implemented (2026-11-07; owner-approved):** stages 1–3 of the [scene streaming plan](docs/superpowers/plans/2026-11-07-scene-streaming.md) are implemented on branch `claude/repo-next-steps-pzi9kv`: image revisions, SSE display stream with `LISTEN`/`NOTIFY`, removal of the polled projection route, and response-adopting single-command gestures (Section 7.7). Unit, integration (including two application instances on one database and listener loss) and local browser scene journeys pass. The isolated hosted journey and the 200-table load comparison in plan stage 4 have not been run; this does not close any G9 gate.
 

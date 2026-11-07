@@ -60,25 +60,36 @@ columns are added to the current schema baseline.
   other system, revert keeping play values and dropping a new field, revert
   blocked by a newer-only item.
 
-## Stage 2 — Character upgrade and revert
+## Stage 2 — Character upgrade and revert — done
 
-- [ ] Schema baseline: `characters.previous_system_version_id uuid NULL
+- [x] Schema baseline: `characters.previous_system_version_id uuid NULL
   REFERENCES system_versions(id)`.
-- [ ] `GET /characters/:id/version-options`: later published versions of the same
-  system the actor may use with package compatibility, plus the revert target if
-  one is recorded.
-- [ ] `GET /characters/:id/version-check?targetVersionId=`: dry-run report. The
-  direction is `revert` only when the target equals the recorded previous version.
-- [ ] `POST /characters/:id/version` with `{ targetVersionId, expectedRevision }`
-  and an idempotency key. One transaction: lock, recheck revision and
-  authorization, rerun the check, write the version, state and
-  `previous_system_version_id` (set on upgrade, cleared on revert), bump revision,
-  record activity/audit `system_version_upgraded` / `system_version_reverted`.
-  Standalone and returned characters, owner only; attached characters use the
-  campaign path.
-- [ ] Tests: upgrade, revert, second revert rejected, revision conflict, replay,
-  blocked report returns 409 with blockers, cache disposition `replace`, rolls and
-  activity kept.
+- [x] Systems: `SystemRuntime.checkVersionChange` loads both packages and runs the
+  stage 1 check; `SystemAuthoring.listUpgradeTargets` returns later published
+  versions of the same system the actor may use (owner or `public`/`link`
+  access, active system); `describeVersionChoices` describes pinned versions.
+- [x] `GET /characters/:id/version-options`: `{ current, revertTo, upgrades }`.
+  It lists choices only; the dry run runs for the chosen target (no package is
+  loaded per listed version).
+- [x] `GET /characters/:id/version-check?targetVersionId=`: `{ revision,
+  direction, report }` without the next state. `revert` only when the target is
+  the recorded previous version; any other target must be a listed upgrade (404
+  otherwise, 422 for the current version).
+- [x] `POST /characters/:id/version` with `{ targetVersionId, expectedRevision,
+  idempotencyKey }`: management command `changeVersion`. The dry run uses the
+  record only when its revision equals `expectedRevision`; the transaction locks
+  the row, rechecks revision, version and standalone placement, writes version,
+  state and `previous_system_version_id` (set on upgrade, cleared on revert),
+  bumps revision and records activity/audit `system_version_upgraded` /
+  `system_version_reverted`. A blocked report returns 409. The result view has
+  cache disposition `replace`.
+- [x] Standalone and returned characters, owner only; attached characters are
+  denied like ownership transfer and move with their campaign (stage 3).
+- [x] Integration tests (`tests/integration/character-version-change.test.ts`,
+  full schema): options, check, stale revision 409, upgrade with followed item
+  stat and new field, idempotent replay, activity payload, revert blocked by a
+  newer-only item, revert after removing it, breaking change blocking only the
+  affected character, other users denied, older/foreign/current targets rejected.
 
 ## Stage 3 — Campaign upgrade and revert
 

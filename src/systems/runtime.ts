@@ -12,6 +12,13 @@ import { createDeterministicRng } from "./implementation/runtime/deterministic-r
 import { buildFieldBindings, decodeRuntimeState, initializeState } from "./implementation/runtime/state.js";
 import { actionEvaluationFailure } from "./implementation/runtime/action-evaluation.js";
 import { evaluate } from "./implementation/rules/evaluate.js";
+import {
+  checkVersionChange,
+  type VersionChangeDirection,
+  type VersionChangeReport,
+} from "./implementation/runtime/version-change.js";
+
+export type { VersionChangeDirection, VersionChangeReport } from "./implementation/runtime/version-change.js";
 import type { CharacterEntryV1, EntityDefinitionV1, FieldV1, ObjectTemplateV1, SlotDefinitionV1, SystemPackageV1, TemplateKind } from "./implementation/package/schema/index.js";
 
 export { resolveGrantedAction } from "./implementation/runtime/resolve-entries.js";
@@ -297,6 +304,14 @@ export type VersionDescription = {
 export interface SystemRuntime {
   resolve(input: RuntimeRequest): Promise<RuntimeResult<RuntimeResolution>>;
   describeVersion(input: { versionId: VersionId; includeFields?: boolean }): Promise<RuntimeResult<VersionDescription>>;
+  /** Design 6.7 dry run: verify a stored state against another version of its system. */
+  checkVersionChange(input: {
+    fromVersionId: VersionId;
+    toVersionId: VersionId;
+    entityId: DefinitionId;
+    state: unknown;
+    direction: VersionChangeDirection;
+  }): Promise<RuntimeResult<VersionChangeReport>>;
 }
 
 export function createSystemRuntime(input: {
@@ -308,6 +323,23 @@ export function createSystemRuntime(input: {
   }
 
   return {
+    async checkVersionChange(checkInput) {
+      const from = await loadPublishedPackage(input.loadPackage, checkInput.fromVersionId);
+      if (!from.ok) return from;
+      const to = await loadPublishedPackage(input.loadPackage, checkInput.toVersionId);
+      if (!to.ok) return to;
+      return {
+        ok: true,
+        value: checkVersionChange({
+          from: from.value,
+          to: to.value,
+          entityId: checkInput.entityId,
+          state: checkInput.state,
+          direction: checkInput.direction,
+        }),
+      };
+    },
+
     async describeVersion(describeInput) {
       const loaded = await loadPublishedPackage(input.loadPackage, describeInput.versionId);
       if (!loaded.ok) return loaded;

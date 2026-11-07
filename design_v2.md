@@ -311,8 +311,14 @@ or not at all, and any blocker blocks the campaign.
 **Excluded.** Breaking upgrades, field mapping or renaming, reverting to any
 version other than the recorded previous one, moving between different systems,
 automatic upgrades on publish and lineage tables. A blocked character stays on its
-version; create a new character to use a breaking version. Version selection shows
-later versions with whether this character can move to them. The [system version upgrade plan](docs/superpowers/plans/2026-11-07-system-version-upgrades.md)
+version; create a new character to use a breaking version. Version selection lists
+later authorized versions and the revert target; choosing one runs the check for
+this character before anything is saved. Standalone characters use
+`GET /characters/:id/version-options`, `GET /characters/:id/version-check?targetVersionId=`
+and `POST /characters/:id/version` (`{ targetVersionId, expectedRevision, idempotencyKey }`);
+attached characters move only with their campaign. A blocked change returns 409,
+and activity records `system_version_upgraded` or `system_version_reverted` with
+version and definition identifiers only. The [system version upgrade plan](docs/superpowers/plans/2026-11-07-system-version-upgrades.md)
 defines the delivery stages.
 
 Character activity uses readable action names and local date/time formatting.

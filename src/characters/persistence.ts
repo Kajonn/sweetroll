@@ -185,7 +185,19 @@ export type ManagementMutation =
   | { kind: "rename"; name: string }
   | { kind: "transferOwnership"; toUserId: UserId }
   | { kind: "archive" }
-  | { kind: "recover" };
+  | { kind: "recover" }
+  /**
+   * Design 6.7: move to another version of the same system. Standalone only;
+   * the module verified `nextState` against the target at `expectedRevision`.
+   * `previousVersionId` is stored as the revert target (null after a revert).
+   */
+  | {
+      kind: "changeVersion";
+      fromVersionId: VersionId;
+      toVersionId: VersionId;
+      previousVersionId: VersionId | null;
+      nextState: RuntimeStateV1;
+    };
 
 export type ApplyManagementCommandInput = {
   executionId: ExecutionId;
@@ -327,6 +339,9 @@ export interface CharacterPersistenceRepository {
    * row does not exist. Attached rows (campaignId non-null) must never
    * authorize owner-only paths; standalone receipts must never replay them.
    */
+  /** Design 6.7 revert target; null when there is none or the row is missing. */
+  loadPreviousSystemVersionId(characterId: CharacterId): Promise<VersionId | null>;
+
   loadCharacterScope(characterId: CharacterId): Promise<{
     characterId: CharacterId;
     ownerId: UserId | null;
@@ -628,6 +643,9 @@ async function applyManagementCampaignTx(
         [input.characterId],
       );
       break;
+    default:
+      // Transfer and version changes are standalone-only; the module denies them first.
+      throw new Error(`applyManagementCampaignTx: unsupported mutation ${input.mutation.kind}`);
   }
   const updatedRow = requireRow(updated.rows[0], "applyManagementCampaignTx.update");
 
@@ -850,6 +868,14 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       );
       const row = result.rows[0];
       return row === undefined ? null : toCharacterRecord(row);
+    },
+
+    async loadPreviousSystemVersionId(characterId) {
+      const result = await pool.query<{ previous_system_version_id: string | null }>(
+        `SELECT previous_system_version_id FROM characters WHERE id = $1`,
+        [characterId],
+      );
+      return result.rows[0]?.previous_system_version_id ?? null;
     },
 
     async loadCharacterScope(characterId) {
@@ -1177,6 +1203,20 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
                 WHERE id = $1
               RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
               [input.characterId],
+            );
+            break;
+          case "changeVersion":
+            if (charRow.system_version_id !== input.mutation.fromVersionId || charRow.campaign_id !== null) {
+              await client.query("ROLLBACK");
+              return { kind: "conflict", latestRevision: charRow.revision };
+            }
+            updated = await client.query<CharacterRow>(
+              `UPDATE characters
+                  SET system_version_id = $1, previous_system_version_id = $2, state_json = $3::jsonb,
+                      revision = revision + 1, updated_at = now()
+                WHERE id = $4
+              RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at`,
+              [input.mutation.toVersionId, input.mutation.previousVersionId, JSON.stringify(input.mutation.nextState), input.characterId],
             );
             break;
         }

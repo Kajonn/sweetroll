@@ -71,6 +71,15 @@ export type PublishVersionResult =
   | { ok: false; code: "breaking_version"; findings: CompatibilityFinding[] }
   | { ok: false; code: "duplicate_version" | "not_found" | "archived" };
 
+/** Design 6.7: a published version shown as an upgrade or revert target. */
+export type VersionChoice = {
+  versionId: VersionId;
+  systemId: SystemId;
+  semanticVersion: string;
+  releaseNotes: string;
+  createdAt: Date;
+};
+
 export type AuthorizedVersionUse = {
   systemId: SystemId;
   versionId: VersionId;
@@ -204,6 +213,10 @@ export interface SystemPersistenceRepository {
   loadVersion(versionId: VersionId): Promise<VersionRecord | null>;
   listVersions(systemId: SystemId): Promise<VersionRecord[]>;
   authorizeVersionUse(actorId: UserId, versionId: VersionId): Promise<AuthorizedVersionUse | null>;
+  /** Published versions of the same system created after `fromVersionId` that the actor may use. */
+  listLaterAuthorizedVersions(actorId: UserId, fromVersionId: VersionId): Promise<VersionChoice[]>;
+  /** Metadata of versions already pinned by a record; no use authorization. */
+  describeVersionChoices(versionIds: VersionId[]): Promise<VersionChoice[]>;
   listAuthorizedVersions(
     actorId: UserId,
     page: { limit: number; cursor: CreationVersionsCursor | null; q: string | null; systemId: string | null },
@@ -359,6 +372,34 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
       return row === undefined
         ? null
         : { systemId: row.system_id, versionId: row.version_id, checksum: row.checksum };
+    },
+
+    async listLaterAuthorizedVersions(actorId, fromVersionId) {
+      const result = await pool.query<VersionChoiceRow>(
+        `SELECT v.id, v.system_id, v.semantic_version, v.release_notes, v.created_at
+           FROM system_versions current_version
+           JOIN system_versions v ON v.system_id = current_version.system_id
+           JOIN systems s ON s.id = v.system_id
+          WHERE current_version.id = $2
+            AND (v.created_at, v.id) > (current_version.created_at, current_version.id)
+            AND v.lifecycle = 'published'
+            AND s.lifecycle = 'active'
+            AND (s.owner_id = $1 OR s.access IN ('public', 'link'))
+          ORDER BY v.created_at DESC, v.id DESC
+          LIMIT 50`,
+        [actorId, fromVersionId],
+      );
+      return result.rows.map(toVersionChoice);
+    },
+
+    async describeVersionChoices(versionIds) {
+      if (versionIds.length === 0) return [];
+      const result = await pool.query<VersionChoiceRow>(
+        `SELECT id, system_id, semantic_version, release_notes, created_at
+           FROM system_versions WHERE id = ANY($1::uuid[])`,
+        [versionIds],
+      );
+      return result.rows.map(toVersionChoice);
     },
 
     async listAuthorizedVersions(actorId, page) {
@@ -582,6 +623,24 @@ type VersionRow = {
   lifecycle: string;
   created_at: Date;
 };
+
+type VersionChoiceRow = {
+  id: string;
+  system_id: string;
+  semantic_version: string;
+  release_notes: string;
+  created_at: Date;
+};
+
+function toVersionChoice(row: VersionChoiceRow): VersionChoice {
+  return {
+    versionId: row.id,
+    systemId: row.system_id,
+    semanticVersion: row.semantic_version,
+    releaseNotes: row.release_notes,
+    createdAt: row.created_at,
+  };
+}
 
 type AuthorizedVersionUseRow = {
   system_id: string;

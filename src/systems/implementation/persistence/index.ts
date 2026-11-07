@@ -4,6 +4,7 @@ export {
   REFERENCE_TEMPLATES,
   seedReferenceTemplates,
   type AuthorizedVersionUse,
+  type VersionChoice,
   type AuthorizedCreationVersion,
   type CreationVersionsCursor,
   type AuditRecord,

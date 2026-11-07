@@ -8,6 +8,8 @@ Update design document if any changes is made to the design.
 
 The GUI delivery checklist is [GUI integration plan](docs/superpowers/plans/2026-09-08-gui-integration.md), linked from design Sections 10 and 17. Follow its dependencies and acceptance gates for frontend work.
 
+For scripted API sessions, start with the [scenario authoring guide](tests/integration/scenarios/README.md). It gives you a copyable test, the API contract lookup, and the command for running a single scenario. Add new scenarios as `tests/integration/scenarios/*.test.ts`.
+
 Multi-user remediation F1-F3 and test-target preflight E1 passed on the isolated
 preview on 2026-11-02. The full ordered
 [one-GM/three-player protocol](docs/acceptance/multi-user-journey-protocol.md)

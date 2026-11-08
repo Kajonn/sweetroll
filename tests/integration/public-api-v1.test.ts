@@ -100,6 +100,41 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
     expect((await call(expired.token, "GET", "/systems")).statusCode).toBe(401);
   });
 
+  it("keeps concurrent issue requests within the 20-active-token limit", async () => {
+    const { identity, pool, users: { bob } } = handle;
+    const active = async () => (await pool.query(
+      "SELECT count(*)::int AS n FROM personal_access_tokens WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()",
+      [bob.actorId],
+    )).rows[0].n as number;
+    try {
+      await pool.query("UPDATE personal_access_tokens SET revoked_at = now() WHERE user_id = $1", [bob.actorId]);
+      for (let index = 0; index < 19; index++) {
+        expect(await identity.personalTokens.issue(bob.actorId, { label: "Filler", scopes: ["systems:read"], expiresInDays: 1 })).not.toBeNull();
+      }
+      // A concurrent issuance holds the account lock with its uncommitted
+      // 20th token. Under READ COMMITTED a count alone would miss that row.
+      const concurrent = await pool.connect();
+      try {
+        await concurrent.query("BEGIN");
+        await concurrent.query("SELECT id FROM users WHERE id = $1 FOR UPDATE", [bob.actorId]);
+        await concurrent.query(
+          "INSERT INTO personal_access_tokens (user_id, token_hash, label, scopes, expires_at) VALUES ($1, $2, 'Race', $3, now() + interval '1 day')",
+          [bob.actorId, randomUUID(), ["systems:read"]],
+        );
+        const pending = Promise.all(Array.from({ length: 4 }, () =>
+          identity.personalTokens.issue(bob.actorId, { label: "Race", scopes: ["systems:read"], expiresInDays: 1 })));
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        await concurrent.query("COMMIT");
+        expect(await pending).toEqual([null, null, null, null]);
+      } finally {
+        concurrent.release();
+      }
+      expect(await active()).toBe(20);
+    } finally {
+      await pool.query("UPDATE personal_access_tokens SET revoked_at = now() WHERE user_id = $1", [bob.actorId]);
+    }
+  });
+
   it("shares validation quotas across tokens owned by the same account", async () => {
     const { users: { ada, bob }, pool } = handle;
     const first = (await issue(ada.cookie)).token;

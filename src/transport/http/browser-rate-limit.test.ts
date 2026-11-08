@@ -27,11 +27,20 @@ it("checks browser account and upload quotas and bounds anonymous redeem attempt
     expect(query.mock.calls[0]?.[1]).toEqual(["account-id", "general", 600, 5]);
     expect((await app.inject({ method: "GET", url: "/api/read", headers })).statusCode).toBe(200);
     expect(query.mock.calls[1]?.[1]).toEqual(["account-id", "general", 600, 1]);
-    query.mockResolvedValueOnce({ rowCount: 1 }).mockResolvedValueOnce({ rowCount: 0 });
+    // The upload bucket is checked first; rejecting it spends no general budget.
+    query.mockResolvedValueOnce({ rowCount: 0 });
     const blocked = await app.inject({ method: "PUT", url: "/api/image", headers });
     expect(blocked.statusCode).toBe(429);
     expect(blocked.headers["retry-after"]).toBe("60");
-    expect(query.mock.calls[3]?.[1]).toEqual(["account-id", "upload", 30, 1]);
+    expect(query.mock.calls[2]?.[1]).toEqual(["account-id", "upload", 30, 1]);
+    expect(query).toHaveBeenCalledTimes(3);
+    // When the general budget rejects an accepted upload, the upload unit is refunded.
+    const windowAt = new Date(1_700_000_000_000);
+    query.mockResolvedValueOnce({ rowCount: 1, rows: [{ window_at: windowAt }] }).mockResolvedValueOnce({ rowCount: 0 });
+    expect((await app.inject({ method: "PUT", url: "/api/image", headers })).statusCode).toBe(429);
+    expect(query.mock.calls[4]?.[1]).toEqual(["account-id", "general", 600, 5]);
+    expect(String(query.mock.calls[5]?.[0])).toContain("hits - 1");
+    expect(query.mock.calls[5]?.[1]).toEqual(["account-id", "upload", windowAt]);
     expect(write).toHaveBeenCalledTimes(1);
 
     for (let attempt = 1; attempt <= 11; attempt++) {

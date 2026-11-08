@@ -1,11 +1,11 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Pool } from "pg";
 
-import { consumeRequest, type RateBucket } from "./public-api/rate-limit.js";
+import { consumeRequestBudgets, type RateBucket } from "./public-api/rate-limit.js";
 
 declare module "fastify" {
   interface FastifyContextConfig {
-    browserRateBucket?: RateBucket;
+    browserRateBucket?: Exclude<RateBucket, "general">;
     displayRedeem?: boolean;
   }
 }
@@ -62,8 +62,7 @@ export function registerBrowserRateLimits(api: FastifyInstance, pool: Pool): voi
     } else if (request.auth?.state === "authenticated") {
       const { actorId } = request.auth;
       const kind = request.method === "GET" || request.method === "HEAD" ? "browser_read" : "ordinary";
-      allowed = await consumeRequest(pool, actorId, "general", kind)
-        && (browserRateBucket === undefined || await consumeRequest(pool, actorId, browserRateBucket));
+      allowed = await consumeRequestBudgets(pool, actorId, kind, browserRateBucket);
     }
     if (!allowed) return reply.code(429).header("retry-after", "60").send(rateLimitedBody(request));
   });

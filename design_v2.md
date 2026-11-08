@@ -820,7 +820,10 @@ send HSTS. Metrics require a separate scraper token and are off by default.
 The browser and public API share account request and image-upload budgets
 in PostgreSQL. The general budget allows up to 120 writes or public API
 requests, or 600 browser reads per minute. Browser reads spend one fifth of
-the budget used by a write. `POST /displays/redeem` (unauthenticated) allows 10 attempts per client IP per
+the budget used by a write. Upload, validate and publish requests also have
+their own bucket, which is checked first: a request it rejects spends nothing
+from the general budget, and a request the general budget rejects is refunded
+to its bucket (issue #67). `POST /displays/redeem` (unauthenticated) allows 10 attempts per client IP per
 minute, counting every attempt, and 120 failed redemptions (wrong, expired or
 unknown code) per process per minute. A correct code always redeems, so
 attackers cannot block pairing; when the failure budget is spent, invalid codes

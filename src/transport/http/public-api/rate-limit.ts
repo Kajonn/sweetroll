@@ -9,12 +9,12 @@ export type RateBucket = keyof typeof perMinute;
 
 // A single bounded row per account and bucket keeps counters shared across
 // replicas. Database time makes each replica use the same fixed minute window.
-export async function consumeRequest(
+async function charge(
   pool: Pool,
   actorId: string,
   bucket: RateBucket,
-  kind: "ordinary" | "browser_read" = "ordinary",
-): Promise<boolean> {
+  kind: "ordinary" | "browser_read",
+): Promise<{ windowAt: Date } | null> {
   const cost = bucket === "general" && kind === "ordinary" ? generalRequestCost : 1;
   const result = await pool.query(
     `INSERT INTO public_api_rate_limits (user_id, bucket, window_at, hits)
@@ -26,8 +26,34 @@ export async function consumeRequest(
      WHERE public_api_rate_limits.window_at < EXCLUDED.window_at
         OR (public_api_rate_limits.window_at = EXCLUDED.window_at
             AND public_api_rate_limits.hits + EXCLUDED.hits <= $3)
-     RETURNING hits`,
+     RETURNING window_at`,
     [actorId, bucket, perMinute[bucket], cost],
   );
-  return result.rowCount === 1;
+  return result.rowCount === 1 ? { windowAt: result.rows?.[0]?.window_at as Date } : null;
+}
+
+/**
+ * Charges the operation's own bucket and the shared general budget as
+ * separate budgets (design Section 14). The specific bucket is checked first,
+ * so a request it rejects spends nothing from the general budget. When the
+ * general budget then rejects the request, the specific charge is refunded
+ * in the same minute window.
+ */
+export async function consumeRequestBudgets(
+  pool: Pool,
+  actorId: string,
+  kind: "ordinary" | "browser_read",
+  bucket?: Exclude<RateBucket, "general">,
+): Promise<boolean> {
+  const specific = bucket === undefined ? undefined : await charge(pool, actorId, bucket, kind);
+  if (specific === null) return false;
+  if (await charge(pool, actorId, "general", kind) !== null) return true;
+  if (specific !== undefined && bucket !== undefined) {
+    await pool.query(
+      `UPDATE public_api_rate_limits SET hits = greatest(hits - 1, 0)
+       WHERE user_id = $1 AND bucket = $2 AND window_at = $3`,
+      [actorId, bucket, specific.windowAt],
+    );
+  }
+  return false;
 }

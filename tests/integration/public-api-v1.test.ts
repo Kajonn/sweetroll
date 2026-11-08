@@ -119,6 +119,32 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
     }
   });
 
+  it("does not spend the general budget on requests rejected by their own bucket", async () => {
+    const { users: { ada }, pool } = handle;
+    const { token } = await issue(ada.cookie);
+    const hits = async (bucket: string) => (await pool.query(
+      "SELECT hits FROM public_api_rate_limits WHERE user_id = $1 AND bucket = $2", [ada.actorId, bucket],
+    )).rows[0]?.hits as number | undefined;
+    const { rows: [{ window_at }] } = await pool.query("SELECT date_trunc('minute', now()) AS window_at");
+    try {
+      await pool.query("INSERT INTO public_api_rate_limits VALUES ($1, 'validate', $2, 12)", [ada.actorId, window_at]);
+      for (let attempt = 0; attempt < 3; attempt++) {
+        expect((await call(token, "POST", "/systems/validate", { document: {} })).statusCode).toBe(429);
+      }
+      expect(await hits("general")).toBeUndefined();
+
+      // A request its bucket accepts but the general budget rejects is
+      // refunded from the bucket.
+      await pool.query("UPDATE public_api_rate_limits SET hits = 5 WHERE user_id = $1 AND bucket = 'validate'", [ada.actorId]);
+      await pool.query("INSERT INTO public_api_rate_limits VALUES ($1, 'general', $2, 600)", [ada.actorId, window_at]);
+      expect((await call(token, "POST", "/systems/validate", { document: {} })).statusCode).toBe(429);
+      expect(await hits("validate")).toBe(5);
+      expect(await hits("general")).toBe(600);
+    } finally {
+      await pool.query("DELETE FROM public_api_rate_limits");
+    }
+  });
+
   it("validates without writes, publishes exact revisions and follows the browser policy after adoption", async () => {
     const { users: { ada, bob }, pool, authoring } = handle;
     const { token } = await issue(ada.cookie);

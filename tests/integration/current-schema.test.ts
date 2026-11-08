@@ -151,7 +151,10 @@ describeWithDatabase("current database schema", () => {
     // Schema initialization creates no placeholder data; seed real fixtures separately.
     expect(lifecycles.rows).toEqual([]);
     const seeded = await seedReferenceTemplates(client);
-    expect(seeded).toMatchObject({ systemsInserted: 3, versionsInserted: 3 });
+    expect(seeded).toEqual({
+      systemsInserted: REFERENCE_TEMPLATES.length,
+      versionsInserted: REFERENCE_TEMPLATES.length,
+    });
     const reseeded = await client.query<{ id: string; lifecycle: string }>(
       "SELECT id, lifecycle FROM system_versions ORDER BY id",
     );

@@ -8,7 +8,7 @@ import { randomUUID } from "../utils/uuid";
 import styles from "./CloneFromTemplate.module.css";
 
 type TemplateSpec = {
-  templateKey: "d20" | "pbta2d6" | "d6SuccessPool";
+  templateKey: "d20" | "pbta2d6" | "d6SuccessPool" | "forgedInTheDark";
   systemId: string;
   versionId: string;
 };
@@ -28,6 +28,11 @@ const TEMPLATES: ReadonlyArray<TemplateSpec> = [
     templateKey: "d6SuccessPool",
     systemId: "c0000000-0000-5000-8000-000000000001",
     versionId: "c0000000-0000-5000-8000-000000000002",
+  },
+  {
+    templateKey: "forgedInTheDark",
+    systemId: "d0000000-0000-5000-8000-000000000001",
+    versionId: "d0000000-0000-5000-8000-000000000002",
   },
 ];
 

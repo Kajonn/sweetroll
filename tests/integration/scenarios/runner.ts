@@ -7,6 +7,7 @@ import sharp from "sharp";
 import { expect, it, vi } from "vitest";
 
 import type { PersonalTokenScope } from "../../../src/identity/personal-tokens.js";
+import { seedReferenceTemplates } from "../../../src/systems/implementation/persistence/index.js";
 import { buildI6Harness, type I6Harness } from "../i6-app.js";
 
 type TestUser = "ada" | "bob" | "cara" | "dan" | "eve" | "finn";
@@ -94,6 +95,7 @@ export function scenario(name: string, play: (context: ScenarioContext) => Promi
       vi.stubEnv("SWEETROLL_MEDIA_DIR", join(storage, "media"));
       vi.stubEnv("SWEETROLL_DISPLAY_DIR", join(storage, "display"));
       harness = await buildI6Harness({ publicApi: true });
+      await seedReferenceTemplates(harness.pool);
       const { context, timeline } = scenarioContext(harness);
       const verbose = process.env.SWEETROLL_SCENARIO_TRACE === "1";
       try {

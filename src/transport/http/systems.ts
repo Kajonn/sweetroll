@@ -1,3 +1,4 @@
+import { forgedInTheDarkPackage } from "../../systems/implementation/package/fixtures/forged-in-the-dark.js";
 import { Type, type TSchema } from "@sinclair/typebox";
 import { systemImageHandlers, systemImageRoutes } from "./systemImages.js";
 import { extensionHandlers, extensionRouteDefinitions } from "./extensions.js";
@@ -494,6 +495,11 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
             templateId: "d6success",
             label: "d6 success pool sample",
             versionId: "c0000000-0000-5000-8000-000000000002",
+          },
+          {
+            templateId: "forgedInTheDark",
+            label: "Forged in the Dark",
+            versionId: forgedInTheDarkPackage.versionId,
           },
         ],
         requestId: request.id,

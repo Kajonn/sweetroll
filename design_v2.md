@@ -242,7 +242,7 @@ The MVP ships pre-built **starter templates from open-licensed systems** so a GM
 
 Templates are exported declarative packages that users can clone and customize with the minimal creator. They double as the platform's acceptance fixtures (see Testing).
 
-I1 contract validation uses three original, license-neutral reference fixtures: a d20 ability/check family, a 2d6 PbtA-style move family, and a d6 counted-success pool family. These fixtures define the capability ceiling without being represented as reviewed launch templates. Shipping any named open-license template still requires the separate license review.
+I1 contract validation uses three original, license-neutral reference fixtures: a d20 ability/check family, a 2d6 PbtA-style move family, and a d6 counted-success pool family. These fixtures define the capability ceiling without being represented as reviewed launch templates. Named open-license templates require a review of the material and its license. The [Forged in the Dark template](docs/forged-in-the-dark.md) uses the CC BY 3.0 Blades SRD and original playbooks, gear, and setting material. It ships cloneable scoundrel, crew, and clock sheets with GM-adjudicated consequences and downtime.
 
 ## 6.7 Pinned rules and non-breaking version upgrades (owner decision 2026-11-07)
 

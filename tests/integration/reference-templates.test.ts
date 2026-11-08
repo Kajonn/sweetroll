@@ -118,7 +118,7 @@ describeWithDatabase("reference template seeding", () => {
   });
 
   it("seeds once and preserves existing immutable versions on subsequent boots", async () => {
-    expect(await seedReferenceTemplates(pool)).toEqual({ systemsInserted: 3, versionsInserted: 3 });
+    expect(await seedReferenceTemplates(pool)).toEqual({ systemsInserted: REFERENCE_TEMPLATES.length, versionsInserted: REFERENCE_TEMPLATES.length });
     const before = (await pool.query("SELECT * FROM system_versions ORDER BY id")).rows;
     expect(await seedReferenceTemplates(pool)).toEqual({ systemsInserted: 0, versionsInserted: 0 });
     expect((await pool.query("SELECT * FROM system_versions ORDER BY id")).rows).toEqual(before);

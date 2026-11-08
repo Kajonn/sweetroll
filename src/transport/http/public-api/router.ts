@@ -11,7 +11,7 @@ import type { ImageAttachmentError } from "../../../platform/image-attachment.js
 import type { AppError, RequestContext } from "../../../systems/authoring.js";
 import { PACKAGE_LIMITS } from "../../../systems/implementation/package/limits.js";
 import { strictInputCompiler } from "../strictValidation.js";
-import { consumeRequest, type RateBucket } from "./rate-limit.js";
+import { consumeRequestBudgets, type RateBucket } from "./rate-limit.js";
 import * as s from "./schemas.js";
 
 export const documentBodyLimit = PACKAGE_LIMITS.encodedBytes + 4096;
@@ -56,7 +56,7 @@ export type Operation<S, O extends string> = {
   document?: true;
   bodyLimit?: number;
   example?: unknown;
-  bucket?: RateBucket;
+  bucket?: Exclude<RateBucket, "general">;
   fieldErrorPath?: "initialValues" | "value";
 };
 
@@ -204,8 +204,7 @@ export function createRouter({ app, identity, pool, outputSchemas }: RouterInput
         if (!scopes.every((scope) => grantsScope(credential.scopes, scope))) {
           return failure(reply, request.id, 403, "insufficient_scope", "The token lacks the required scope.");
         }
-        if (!await consumeRequest(pool, credential.actorId, "general")
-          || (operation.bucket && !await consumeRequest(pool, credential.actorId, operation.bucket))) {
+        if (!await consumeRequestBudgets(pool, credential.actorId, "ordinary", operation.bucket)) {
           reply.header("retry-after", "60");
           return failure(reply, request.id, 429, "rate_limited", "The account request limit was reached.");
         }

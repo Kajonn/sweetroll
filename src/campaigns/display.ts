@@ -11,7 +11,7 @@ import { hashToken, newSessionToken } from "../identity/util.js";
 import type { CampaignPersistenceRepository } from "./persistence.js";
 import { canManageCampaign } from "./policy.js";
 import type { CampaignError, CampaignResult } from "./index.js";
-import { resolveMediaRoot } from "./media.js";
+import { resolveMediaRoot } from "../platform/image-storage.js";
 import type { FogOp, TokenRecord } from "./scenes.js";
 
 export type DisplayProjection = {
@@ -118,9 +118,37 @@ export function displayDerivativePath(sceneId: string, imageRevision: number): s
   return join(resolveDisplayRoot(), `${sceneId}-rev${imageRevision}.png`);
 }
 
+/** Longest side of a cached token-art derivative; smaller images keep their size. */
+export const DISPLAY_TOKEN_IMAGE_MAX_SIDE = 1024;
+
+/**
+ * Token-art derivative cache key: one PNG per (fileId, media revision),
+ * independent of the scene, so moves and other displays reuse it. Media
+ * bytes never change in place; deleting the file removes its derivatives.
+ */
+export function displayTokenDerivativePath(fileId: string, mediaRevision: number): string {
+  return join(resolveDisplayRoot(), "tokens", `${fileId}-rev${mediaRevision}.png`);
+}
+
+/** Best-effort removal of a deleted media file's token-art derivatives. */
+export async function removeDisplayTokenDerivatives(fileId: string): Promise<void> {
+  const directory = join(resolveDisplayRoot(), "tokens");
+  let names: string[];
+  try {
+    names = await readdir(directory);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (!name.startsWith(`${fileId}-rev`) || !name.endsWith(".png")) continue;
+    await unlink(join(directory, name)).catch(() => {});
+  }
+}
+
 /** Observability seam (tests and load comparison): renders and served map bytes. */
 export type DisplayObserver = {
   onRender?(sceneId: string, imageRevision: number): void;
+  onTokenImageRender?(fileId: string, mediaRevision: number): void;
   onSceneImageServed?(sceneId: string, imageRevision: number, bytes: number): void;
 };
 
@@ -328,6 +356,59 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
       renders.delete(key);
     });
     renders.set(key, work);
+    return work;
+  }
+
+  /** One in-flight token-art render per (file, media revision) per process. */
+  const tokenRenders = new Map<string, Promise<Buffer | null>>();
+
+  async function readCachedTokenDerivative(fileId: string, mediaRevision: number): Promise<Buffer | null> {
+    try {
+      return await readFile(displayTokenDerivativePath(fileId, mediaRevision));
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Cache-miss token-art render: PNG, at most DISPLAY_TOKEN_IMAGE_MAX_SIDE
+   * on the longest side, written atomically. Returns null when the original
+   * bytes are missing from disk (fail closed).
+   */
+  function renderTokenDerivative(fileId: string, mediaRevision: number, storageKey: string): Promise<Buffer | null> {
+    const key = `${fileId}:${mediaRevision}`;
+    const pending = tokenRenders.get(key);
+    if (pending !== undefined) return pending;
+    const work = (async () => {
+      const finished = await readCachedTokenDerivative(fileId, mediaRevision);
+      if (finished !== null) return finished;
+      const original = await readBackgroundBytes(storageKey);
+      if (original === null) return null;
+      input.observer?.onTokenImageRender?.(fileId, mediaRevision);
+      const derivative = await sharp(original)
+        .resize({
+          width: DISPLAY_TOKEN_IMAGE_MAX_SIDE,
+          height: DISPLAY_TOKEN_IMAGE_MAX_SIDE,
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .png()
+        .toBuffer();
+      const derivativePath = displayTokenDerivativePath(fileId, mediaRevision);
+      const temporary = `${derivativePath}.${randomUUID()}.tmp`;
+      try {
+        await mkdir(dirname(derivativePath), { recursive: true });
+        await writeFile(temporary, derivative, { mode: 0o600 });
+        await rename(temporary, derivativePath);
+      } catch {
+        // Caching is an optimization: the authorized bytes are still served.
+        await unlink(temporary).catch(() => {});
+      }
+      return derivative;
+    })().finally(() => {
+      tokenRenders.delete(key);
+    });
+    tokenRenders.set(key, work);
     return work;
   }
 
@@ -768,13 +849,30 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
         if (image === null || image.campaignId !== scene.campaignId) {
           return { ok: false, error: errors.not_found() };
         }
-        const bytes = await readBackgroundBytes(image.storageKey);
-        if (bytes === null) {
+        // Token images normalize to PNG (like the scene derivative), so the
+        // documented `image/png` holds for every admitted upload type. The
+        // derivative is cached per (file, media revision); visibility and
+        // fog were checked above, before any cached bytes are read.
+        const cached = await readCachedTokenDerivative(image.fileId, image.revision);
+        const normalized = cached ?? await renderTokenDerivative(image.fileId, image.revision, image.storageKey);
+        if (normalized === null) {
           return { ok: false, error: errors.not_found() };
         }
-        // Token images normalize to PNG (like the scene derivative), so the
-        // documented `image/png` holds for every admitted upload type.
-        const normalized = await sharp(bytes).png().toBuffer();
+        if (cached === null) {
+          // A slow render may outlive a revocation, a hide or a conceal:
+          // recheck access and the token before any bytes leave.
+          const rechecked = await resolveDisplayScene(tokenImageInput);
+          const still = rechecked === null ? undefined : parseStoredTokens(rechecked.scene.tokens).find(
+            (candidate) => candidate.tokenId === tokenImageInput.tokenId,
+          );
+          if (
+            rechecked === null || still === undefined || !still.visible ||
+            !isPointRevealed(still.x, still.y, parseStoredFog(rechecked.scene.fog)) ||
+            still.imageFileId !== image.fileId
+          ) {
+            return { ok: false, error: errors.not_found() };
+          }
+        }
         return { ok: true, value: { contentType: "image/png", bytes: normalized, revision: scene.revision } };
       } catch {
         return { ok: false, error: errors.internal() };

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdtemp, readdir, readFile, rm, unlink } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,7 +7,12 @@ import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { buildI6Harness, ctxFor, type I6Harness } from "./i6-app.js";
-import { createDisplayCommands, type DisplaySceneInput } from "../../src/campaigns/display.js";
+import {
+  createDisplayCommands,
+  DISPLAY_TOKEN_IMAGE_MAX_SIDE,
+  displayTokenDerivativePath,
+  type DisplaySceneInput,
+} from "../../src/campaigns/display.js";
 import { createCampaignPersistenceRepository } from "../../src/campaigns/persistence.js";
 
 /** The display's projection, as the scene stream loads it for each snapshot. */
@@ -1258,6 +1263,86 @@ describeWithDatabase("Task 4 transport support reads (openScene, openImage, cred
     if (!image.ok) throw new Error("expected token image");
     expect(image.value.contentType).toBe("image/png");
     expect(image.value.bytes.subarray(0, 4)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  });
+
+  it("getDisplayTokenImage caches a size-capped derivative per file and still checks fog before serving it", async () => {
+    const campaignId = await createCampaign();
+    const { fileId } = await uploadBackground(campaignId);
+    const large = await sharp({
+      create: { width: 2000, height: 1000, channels: 4, background: { r: 10, g: 90, b: 200, alpha: 1 } },
+    }).png().toBuffer();
+    const uploaded = await h.campaigns.uploadImage(ctxFor(h.users.gm), {
+      campaignId,
+      name: "big token",
+      contentType: "image/png",
+      dataBase64: large.toString("base64"),
+      idempotencyKey: randomUUID(),
+    });
+    expect(uploaded.ok).toBe(true);
+    if (!uploaded.ok) throw new Error("token upload failed");
+    const { sceneId } = await createScene(campaignId, fileId);
+    const revealed = await h.campaigns.applyFogEdit(ctxFor(h.users.gm), {
+      sceneId,
+      expectedSceneRevision: 1,
+      op: { mode: "reveal", runs: [{ x: 0.5, y: 0.5, r: 0.3 }] },
+      idempotencyKey: randomUUID(),
+    });
+    if (!revealed.ok) throw new Error("expected fog reveal");
+    const placed = await h.campaigns.placeToken(ctxFor(h.users.gm), {
+      sceneId,
+      expectedSceneRevision: revealed.value.revision,
+      label: "Giant",
+      x: 0.5,
+      y: 0.5,
+      size: 0.5,
+      visible: true,
+      imageFileId: uploaded.value.fileId,
+      idempotencyKey: randomUUID(),
+    });
+    if (!placed.ok) throw new Error("expected place");
+    const tokenId = placed.value.tokens[0]!.tokenId;
+    const { displayId, secret } = await pairAndRedeem(campaignId);
+
+    const first = await h.campaigns.getDisplayTokenImage({ displayId, secret, sceneId, tokenId });
+    if (!first.ok) throw new Error("expected token image");
+    expect(await sharp(first.value.bytes).metadata()).toMatchObject({
+      format: "png", width: DISPLAY_TOKEN_IMAGE_MAX_SIDE, height: DISPLAY_TOKEN_IMAGE_MAX_SIDE / 2,
+    });
+    const cachePath = displayTokenDerivativePath(uploaded.value.fileId, uploaded.value.revision);
+    expect((await readFile(cachePath)).equals(first.value.bytes)).toBe(true);
+
+    // Later requests serve the cached derivative instead of re-encoding.
+    const marker = await sharp({
+      create: { width: 2, height: 2, channels: 4, background: { r: 0, g: 255, b: 0, alpha: 1 } },
+    }).png().toBuffer();
+    await writeFile(cachePath, marker);
+    const second = await h.campaigns.getDisplayTokenImage({ displayId, secret, sceneId, tokenId });
+    if (!second.ok) throw new Error("expected cached token image");
+    expect(second.value.bytes.equals(marker)).toBe(true);
+
+    // A cached derivative never bypasses the fog check.
+    const moved = await h.campaigns.moveToken(ctxFor(h.users.gm), {
+      sceneId,
+      tokenId,
+      expectedSceneRevision: placed.value.revision,
+      x: 0.05,
+      y: 0.05,
+      idempotencyKey: randomUUID(),
+    });
+    if (!moved.ok) throw new Error("expected move");
+    expect(await h.campaigns.getDisplayTokenImage({ displayId, secret, sceneId, tokenId }))
+      .toEqual({ ok: false, error: expect.objectContaining({ code: "not_found" }) });
+
+    // Deleting the media file removes its derivative.
+    const removed = await h.campaigns.removeToken(ctxFor(h.users.gm), {
+      sceneId, tokenId, expectedSceneRevision: moved.value.revision, idempotencyKey: randomUUID(),
+    });
+    if (!removed.ok) throw new Error("expected remove");
+    const deleted = await h.campaigns.deleteImage(ctxFor(h.users.gm), {
+      fileId: uploaded.value.fileId, expectedRevision: uploaded.value.revision, idempotencyKey: randomUUID(),
+    });
+    expect(deleted.ok).toBe(true);
+    await expect(readFile(cachePath)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("revoke purges cached derivatives and the next credential regenerates them lazily", async () => {

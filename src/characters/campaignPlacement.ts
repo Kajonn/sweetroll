@@ -800,6 +800,12 @@ export function createCampaignPlacement(input: CreateCampaignPlacementInput): Ca
         }
 
         const timestamp = now();
+        // Characters already attached get the merged set, with a revision bump
+        // and activity where it changes (issue #60). The adoptee is not yet
+        // attached; its own adoption revision covers its new composition below.
+        if (merged.added.length > 0) {
+          await syncAttachedCharacterExtensions(client, campaign.id, merged.merged, { requestId: ctx.requestId });
+        }
         const updated = await client.query<CharacterRow>(
           `UPDATE characters
               SET owner_id = NULL, campaign_id = $2, return_owner_id = $3,
@@ -829,7 +835,7 @@ export function createCampaignPlacement(input: CreateCampaignPlacementInput): Ca
         }
         // Every attached character, the adoptee included, uses the campaign set.
         if (merged.added.length > 0 || campaignExtensions.length > 0) {
-          await syncAttachedCharacterExtensions(client, campaign.id, merged.merged);
+          await writeCharacterExtensions(client, character.id, merged.merged);
         }
         await client.query(
           `INSERT INTO character_placements (character_id, generation, campaign_id, return_owner_id)

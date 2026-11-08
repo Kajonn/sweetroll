@@ -2,7 +2,7 @@ import type { PoolClient } from "pg";
 
 import type { EffectivePackageLoader } from "../systems/implementation/runtime/composition-loader.js";
 import type { ExtensionRef } from "../systems/runtime.js";
-import { sortExtensionRefs, writeCharacterExtensions } from "./persistence.js";
+import { CHARACTER_EXTENSIONS_COLUMN, sortExtensionRefs, writeCharacterExtensions } from "./persistence.js";
 
 // System extensions, stage E4 (design 6.8, decisions X7–X10). A campaign's
 // composition is stored in `campaign_extensions`; every attached character's
@@ -100,17 +100,49 @@ export async function insertCampaignExtension(
   );
 }
 
-/** Writes `extensions` to every character attached to the campaign. */
+/** Activity kind recorded on a character whose composition changed. */
+export const EXTENSIONS_CHANGED_KIND = "extensions_changed";
+
+const refKey = (ref: ExtensionRef) => `${ref.extensionId}@${ref.versionId}`;
+
+/**
+ * Writes `extensions` to every character attached to the campaign. A
+ * composition change is a character change (issue #60): each character whose
+ * set actually changes gets a new revision and an `extensions_changed`
+ * activity event (identifiers only), so stale writes are refused and clients
+ * reconciling by revision notice the new rules. The caller holds the campaign
+ * lock; characters are locked after it, in ID order.
+ */
 export async function syncAttachedCharacterExtensions(
   client: PoolClient,
   campaignId: string,
   extensions: readonly ExtensionRef[],
+  cause: { requestId: string },
 ): Promise<void> {
-  const attached = await client.query<{ id: string }>(
-    "SELECT id FROM characters WHERE campaign_id = $1 ORDER BY id FOR UPDATE",
+  const target = sortExtensionRefs(extensions);
+  const targetKeys = new Set(target.map(refKey));
+  const attached = await client.query<{ id: string; extensions_json: ExtensionRef[] }>(
+    `SELECT id, ${CHARACTER_EXTENSIONS_COLUMN} FROM characters WHERE campaign_id = $1 ORDER BY id FOR UPDATE`,
     [campaignId],
   );
-  for (const row of attached.rows) await writeCharacterExtensions(client, row.id, extensions);
+  for (const row of attached.rows) {
+    const currentKeys = new Set(row.extensions_json.map(refKey));
+    const added = target.filter((ref) => !currentKeys.has(refKey(ref)));
+    const removed = sortExtensionRefs(row.extensions_json.filter((ref) => !targetKeys.has(refKey(ref))));
+    if (added.length === 0 && removed.length === 0) continue;
+    await writeCharacterExtensions(client, row.id, target);
+    const bumped = await client.query<{ revision: number }>(
+      "UPDATE characters SET revision = revision + 1, updated_at = now() WHERE id = $1 RETURNING revision",
+      [row.id],
+    );
+    const revision = bumped.rows[0]?.revision;
+    if (revision === undefined) throw new Error("syncAttachedCharacterExtensions lost a locked character");
+    await client.query(
+      `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, request_id, scope_campaign_id)
+       VALUES ($1, $2, $3, $4::jsonb, $5, $6)`,
+      [row.id, revision, EXTENSIONS_CHANGED_KIND, JSON.stringify({ added, removed }), cause.requestId, campaignId],
+    );
+  }
 }
 
 /**

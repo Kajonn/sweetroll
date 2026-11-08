@@ -250,7 +250,7 @@ export function createCampaignExtensionCommands(deps: {
         const problem = await compositionProblem(loadEffective, client, campaign.systemVersionId, next);
         if (problem !== null) return fail("unprocessable", problem);
         await insertCampaignExtension(client, campaign.campaignId, { extensionId: input.extensionId, versionId: input.versionId }, "campaign", null);
-        await syncAttachedCharacterExtensions(client, campaign.campaignId, next);
+        await syncAttachedCharacterExtensions(client, campaign.campaignId, next, { requestId: ctx.requestId });
         await record(client, ctx, campaign.campaignId, "extension_added", "Campaign extension added");
         return null;
       });
@@ -269,7 +269,7 @@ export function createCampaignExtensionCommands(deps: {
           return fail("conflict", `The extension is still used by ${usage.characterIds.length} character(s) and ${usage.templateIds.length} campaign template(s). Remove those entries first.`, campaign.revision);
         }
         await client.query("DELETE FROM campaign_extensions WHERE campaign_id = $1 AND extension_id = $2", [campaign.campaignId, input.extensionId]);
-        await syncAttachedCharacterExtensions(client, campaign.campaignId, current.filter((extension) => extension.extensionId !== input.extensionId));
+        await syncAttachedCharacterExtensions(client, campaign.campaignId, current.filter((extension) => extension.extensionId !== input.extensionId), { requestId: ctx.requestId });
         await record(client, ctx, campaign.campaignId, "extension_removed", "Campaign extension removed");
         return null;
       });

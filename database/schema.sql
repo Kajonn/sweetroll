@@ -31,6 +31,9 @@ CREATE TABLE sessions (
 );
 
 CREATE INDEX sessions_user_id_idx ON sessions (user_id);
+-- Expired-row pruning (src/platform/prune.ts): when a session stopped working.
+CREATE INDEX sessions_unusable_at_idx
+  ON sessions ((LEAST(expires_at, COALESCE(revoked_at, 'infinity'::timestamptz))));
 
 CREATE TABLE personal_access_tokens (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -47,6 +50,8 @@ CREATE TABLE personal_access_tokens (
 
 CREATE INDEX personal_access_tokens_user_active_idx
   ON personal_access_tokens (user_id) WHERE revoked_at IS NULL;
+CREATE INDEX personal_access_tokens_unusable_at_idx
+  ON personal_access_tokens ((LEAST(expires_at, COALESCE(revoked_at, 'infinity'::timestamptz))));
 
 CREATE TABLE public_api_rate_limits (
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -114,6 +119,7 @@ CREATE TABLE idempotency_receipts (
   expires_at   timestamptz NOT NULL,
   UNIQUE (actor_id, command_kind, key)
 );
+CREATE INDEX idempotency_receipts_expiry_idx ON idempotency_receipts (expires_at);
 
 CREATE TABLE system_audit_records (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -141,6 +147,7 @@ CREATE TABLE preview_snapshots (
 
 CREATE INDEX preview_snapshots_system_id_idx
   ON preview_snapshots (system_id, created_at DESC);
+CREATE INDEX preview_snapshots_expiry_idx ON preview_snapshots (expires_at);
 
 CREATE FUNCTION system_versions_prevent_mutation() RETURNS trigger
 LANGUAGE plpgsql AS $$
@@ -319,6 +326,7 @@ CREATE TABLE character_image_receipts (
   expires_at timestamptz NOT NULL,
   PRIMARY KEY(actor_id,idempotency_key)
 );
+CREATE INDEX character_image_receipts_expiry_idx ON character_image_receipts (expires_at);
 
 -- Immutable item art is retained across published systems, campaign catalogs
 -- and disclosed character copies. Owning Modules authorize their parent links.
@@ -351,6 +359,7 @@ CREATE TABLE item_image_receipts (
   expires_at timestamptz NOT NULL,
   PRIMARY KEY(actor_id,idempotency_key)
 );
+CREATE INDEX item_image_receipts_expiry_idx ON item_image_receipts (expires_at);
 CREATE TABLE character_entry_images (
   character_id uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
   entry_id uuid NOT NULL,
@@ -519,6 +528,8 @@ CREATE TABLE campaign_invitations (
 
 CREATE INDEX campaign_invitations_campaign_page_idx
   ON campaign_invitations (campaign_id, created_at DESC, id DESC);
+CREATE INDEX campaign_invitations_pending_expiry_idx
+  ON campaign_invitations (expires_at) WHERE status = 'pending';
 
 -- Content and activity
 -- Activity stores source references; authorization is evaluated at read time.
@@ -642,6 +653,7 @@ CREATE TABLE display_codes (
   expires_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX display_codes_expiry_idx ON display_codes (expires_at);
 
 CREATE TABLE display_credentials (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -16,6 +16,7 @@ describe("loadConfig", () => {
         PORT: "4100",
         SESSION_COOKIE_NAME: "sid",
         SESSION_TTL_DAYS: "7",
+        SWEETROLL_PRUNE_INTERVAL_MS: "600000",
       }),
     ).toEqual({
       allowedOrigins: ["https://app.example.com", "https://preview.example.com"],
@@ -26,6 +27,7 @@ describe("loadConfig", () => {
       logLevel: "debug",
       nodeEnv: "production",
       port: 4100,
+      pruneIntervalMs: 600_000,
       sessionCookieName: "sid",
       sessionTtlDays: 7,
     });
@@ -44,9 +46,22 @@ describe("loadConfig", () => {
       logLevel: "info",
       nodeEnv: "development",
       port: 3000,
+      pruneIntervalMs: 3_600_000,
       sessionCookieName: "session",
       sessionTtlDays: 30,
     });
+  });
+
+  it("parses the expired-row prune interval, where 0 disables pruning", () => {
+    const env = {
+      DATABASE_URL: "postgres://localhost/sweetroll",
+      AUTHORITATIVE_ROLL_SECRET: "0123456789abcdef0123456789abcdef",
+    };
+    expect(loadConfig({ ...env, SWEETROLL_PRUNE_INTERVAL_MS: "0" }).pruneIntervalMs).toBe(0);
+    expect(loadConfig({ ...env, SWEETROLL_PRUNE_INTERVAL_MS: "" }).pruneIntervalMs).toBe(3_600_000);
+    for (const invalid of ["-1", "999", "1.5", "hourly", "2147483648"]) {
+      expect(() => loadConfig({ ...env, SWEETROLL_PRUNE_INTERVAL_MS: invalid })).toThrow(/SWEETROLL_PRUNE_INTERVAL_MS/);
+    }
   });
 
   it("defaults production cookies to Secure while allowing explicit local opt-out", () => {

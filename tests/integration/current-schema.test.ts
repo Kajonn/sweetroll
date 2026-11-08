@@ -274,6 +274,7 @@ describeWithDatabase("current database schema", () => {
       "campaign_content_items_pkey",
       "campaign_extensions_pkey",
       "campaign_invitations_campaign_page_idx",
+      "campaign_invitations_pending_expiry_idx",
       "campaign_invitations_pkey",
       "campaign_item_proposals_pkey",
       "campaign_item_template_grants_pkey",

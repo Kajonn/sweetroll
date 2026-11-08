@@ -153,9 +153,16 @@ export type AppConfig = {
   trustedProxyCidrs?: string[];
   nodeEnv: NodeEnv;
   port: number;
+  /** Expired-row prune interval (SWEETROLL_PRUNE_INTERVAL_MS); 0 disables pruning. */
+  pruneIntervalMs: number;
   sessionCookieName: string;
   sessionTtlDays: number;
 };
+
+/** Default expired-row prune interval: one hour. */
+export const DEFAULT_PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+// setTimeout() delays above 2^31-1 ms overflow and fire immediately.
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const databaseUrl = env.DATABASE_URL;
@@ -176,6 +183,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const sessionTtlDays = Number(env.SESSION_TTL_DAYS ?? "30");
   if (!Number.isInteger(sessionTtlDays) || sessionTtlDays < 1 || sessionTtlDays > 365) {
     throw new Error("SESSION_TTL_DAYS must be an integer from 1 through 365");
+  }
+
+  const pruneIntervalRaw = env.SWEETROLL_PRUNE_INTERVAL_MS;
+  const pruneIntervalMs =
+    pruneIntervalRaw === undefined || pruneIntervalRaw.length === 0
+      ? DEFAULT_PRUNE_INTERVAL_MS
+      : Number(pruneIntervalRaw);
+  if (
+    !Number.isInteger(pruneIntervalMs) ||
+    (pruneIntervalMs !== 0 && (pruneIntervalMs < 1000 || pruneIntervalMs > MAX_TIMER_DELAY_MS))
+  ) {
+    throw new Error(
+      `SWEETROLL_PRUNE_INTERVAL_MS must be 0 (disabled) or an integer from 1000 through ${MAX_TIMER_DELAY_MS}`,
+    );
   }
 
   const allowedOrigins = (env.ALLOWED_ORIGINS ?? "")
@@ -218,6 +239,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     ...(trustedProxyCidrs.length > 0 ? { trustedProxyCidrs } : {}),
     nodeEnv: nodeEnvRaw,
     port,
+    pruneIntervalMs,
     sessionCookieName: env.SESSION_COOKIE_NAME ?? "session",
     sessionTtlDays,
   };

@@ -21,6 +21,7 @@ import {
   type ReferenceSystem,
 } from "./test-auth.js";
 import { lookUpCreationVersion } from "../fixtures/lookUpCreationVersion";
+import { expectSheetSaved } from "../fixtures/sheetSaved";
 
 /**
  * Task 8 full production journey (real built app + preview + real backend):
@@ -65,9 +66,7 @@ async function createThroughUI(page: Page, versionId: string, name: string): Pro
   return match[1]!;
 }
 
-async function expectSaved(page: Page) {
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
-}
+const expectSaved = expectSheetSaved;
 
 /**
  * Complete a required field through the real completion section. The commit

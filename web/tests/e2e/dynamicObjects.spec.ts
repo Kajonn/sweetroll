@@ -1,6 +1,7 @@
 import { test, expect, type Browser, type Page } from "../fixtures/browserTest";
 
 import { readActivity, uid } from "../offline/test-auth.js";
+import { expectSheetSaved } from "../fixtures/sheetSaved";
 
 /**
  * Task 8 exit demonstration (dynamic sheet objects): creator authors item
@@ -83,9 +84,6 @@ async function expectSaved(page: Page) {
   });
 }
 
-async function expectSheetSaved(page: Page) {
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
-}
 
 /** Last data-testid suffix for a row prefix whose children share no row prefix. */
 async function lastRowId(page: Page, selector: string, prefix: string): Promise<string> {

@@ -33,6 +33,10 @@ export default defineConfig({
   preview: {
     port: previewPort,
     strictPort: true,
+    // Same-origin like production, which sends no CORS headers. Vite's CORS
+    // middleware adds `Vary: Origin`, so cached assets stop matching
+    // requests whose Origin header differs (the offline suite sets one).
+    cors: false,
     proxy: {
       "^/api/v1(?:/|$)": { target: backendTarget },
       "/api": { target: backendTarget, rewrite: (p) => p.replace(/^\/api/, "") },

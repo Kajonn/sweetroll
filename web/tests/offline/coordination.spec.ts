@@ -12,6 +12,7 @@ import {
   readCharacter,
   testSignIn,
 } from "./test-auth.js";
+import { expectSheetSaved } from "../fixtures/sheetSaved";
 
 /**
  * Task 11 tab coordination: two pages in one context contend for the real
@@ -97,7 +98,7 @@ test.describe("tab coordination over real web locks", () => {
       });
       await context.setOffline(false);
       try {
-        await expect(second.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
+        await expectSheetSaved(second);
         expect(abortedFirst).toBe(true);
         expect(bumpAttempts.length).toBeGreaterThanOrEqual(2);
         const firstBump = bumpAttempts[0]!.body as { idempotencyKey?: unknown };
@@ -216,7 +217,7 @@ test.describe("tab coordination over real web locks", () => {
       // The frozen attempt survives under the new owner and applies exactly
       // once when replays succeed.
       await first.unrouteAll({ behavior: "wait" }).catch(() => {});
-      await expect(second.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
+      await expectSheetSaved(second);
       const after = await readCharacter(second.request, characterId);
       expect(after.character.revision).toBe(before.character.revision + 1);
       expect((after.character.state.values.health as { current: number }).current).toBe(initialHealth - 1);

@@ -20,6 +20,8 @@ import {
   uid,
   type ReferenceSystem,
 } from "./test-auth.js";
+import { lookUpCreationVersion } from "../fixtures/lookUpCreationVersion";
+import { expectSheetSaved } from "../fixtures/sheetSaved";
 
 /**
  * Task 8 full production journey (real built app + preview + real backend):
@@ -54,8 +56,7 @@ async function buildId(page: Page): Promise<string> {
 
 async function createThroughUI(page: Page, versionId: string, name: string): Promise<string> {
   await page.goto(`/characters/new?systemVersionId=${versionId}`);
-  await page.getByLabel("System version ID").fill(versionId);
-  await page.getByRole("button", { name: "Look up version" }).click();
+  await lookUpCreationVersion(page, versionId);
   await page.getByLabel("Entity").selectOption("character");
   await page.getByLabel("Character name").fill(name);
   await page.getByRole("button", { name: "Create character", exact: true }).click();
@@ -65,9 +66,7 @@ async function createThroughUI(page: Page, versionId: string, name: string): Pro
   return match[1]!;
 }
 
-async function expectSaved(page: Page) {
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
-}
+const expectSaved = expectSheetSaved;
 
 /**
  * Complete a required field through the real completion section. The commit
@@ -187,14 +186,16 @@ async function runJourney(context: BrowserContext, system: ReferenceSystem) {
   const characterId = await createThroughUI(page, versionId, characterName);
   await expectSheetReady(page, characterName);
   await expect(page.getByTestId("dev-signin")).toHaveCount(0);
-  let server = await readCharacter(page.request, characterId);
+  const server = await readCharacter(page.request, characterId);
   const revisionAfterCreate = server.character.revision;
+  const serverRevision = async () => (await readCharacter(page.request, characterId)).character.revision;
 
   // 2. Required-field completion through the real completion section. The
   // section must exist: an already-complete edit would not prove this.
   await completeRequiredField(page, system);
-  server = await readCharacter(page.request, characterId);
-  expect(server.character.revision).toBe(revisionAfterCreate + 1);
+  // "Saved" is also the idle status, so it can show before the edit is
+  // queued; poll the server for the committed revision instead.
+  await expect.poll(serverRevision, { timeout: 30_000 }).toBe(revisionAfterCreate + 1);
 
   // 3. Online edit + resource bump through sheet controls.
   const editBox = page.getByLabel(system.editFieldLabel);
@@ -204,9 +205,8 @@ async function runJourney(context: BrowserContext, system: ReferenceSystem) {
   const bumpDown = system.key === "d20";
   await page.getByRole("button", { name: bumpDown ? system.decreaseButton : system.increaseButton }).click();
   await expectSaved(page);
-  const onlineState = await readCharacter(page.request, characterId);
-  const revisionOnline = onlineState.character.revision;
-  expect(revisionOnline).toBe(revisionAfterCreate + 3);
+  const revisionOnline = revisionAfterCreate + 3;
+  await expect.poll(serverRevision, { timeout: 30_000 }).toBe(revisionOnline);
 
   // 4. Authoritative roll through the UI action (online-only by design).
   await page.getByRole("button", { name: system.actionLabel, exact: true }).click();
@@ -285,12 +285,14 @@ async function runJourney(context: BrowserContext, system: ReferenceSystem) {
       }
       await reopened.getByRole("button", { name: "Reapply", exact: true }).click();
       await reopened.getByRole("button", { name: "Confirm reapply" }).click();
-      await expect(reopened.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
+      await expectSheetSaved(reopened);
 
       // 10. Final server/DB assertions: revision, resource, activity + rolls.
-      const final = await readCharacter(reopened.request, characterId);
       // Writer +1, then the three queued intentions reapplied with new keys.
-      expect(final.character.revision).toBe(revisionAfterRoll + 4);
+      await expect
+        .poll(async () => (await readCharacter(reopened.request, characterId)).character.revision, { timeout: 30_000 })
+        .toBe(revisionAfterRoll + 4);
+      const final = await readCharacter(reopened.request, characterId);
       const step = bumpDown ? -1 : 1;
       expect(resourceCurrent(final, system.resourceId)).toBe(resourceBefore + 2 * step);
       const activity = await readActivity(reopened.request, characterId);
@@ -320,7 +322,7 @@ async function runJourney(context: BrowserContext, system: ReferenceSystem) {
       await wideBump.focus();
       await expect(wideBump).toBeFocused();
       await reopened.keyboard.press("Enter");
-      await expect(reopened.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
+      await expectSheetSaved(reopened);
       const wideBuild = await buildId(reopened);
       await test.step("Capture desktop sheet", () => reopened.screenshot({ path: `${EVIDENCE_DIR}/journey-${system.key}-1280-final-${wideBuild}.png` }));
       const axe1280 = await test.step("Check desktop accessibility", () => new AxeBuilder({ page: reopened }).analyze());

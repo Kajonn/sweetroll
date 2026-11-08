@@ -12,6 +12,7 @@ import {
   newSignedInContext,
   readCharacter,
 } from "./test-auth.js";
+import { expectSheetSaved } from "../fixtures/sheetSaved";
 
 /**
  * Task 11 worker update: with a queued offline edit, an actual second
@@ -187,9 +188,7 @@ test.describe("service worker update with pending edits", () => {
         // reports the uncertain state (never a dropped queue or a loss).
         await expect(migrated.getByText("Confirming the last change…")).toBeVisible({ timeout: 60_000 });
         await context.unrouteAll({ behavior: "wait" }).catch(() => {});
-        await expect(migrated.getByText("Saved", { exact: true })).toBeVisible({
-          timeout: 120_000,
-        });
+        await expectSheetSaved(migrated, 120_000);
         const after = await readCharacter(migrated.request, characterId);
         const appliedBumpCount = before.character.revision + 1 === after.character.revision ? 1 : 0;
         expect(appliedBumpCount).toBe(1);

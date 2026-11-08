@@ -175,6 +175,10 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
       expect((await call(token, "POST", "/systems/validate", { document: {} })).statusCode).toBe(429);
       expect(await hits("validate")).toBe(5);
       expect(await hits("general")).toBe(600);
+
+      await pool.query("DELETE FROM public_api_rate_limits WHERE user_id = $1 AND bucket = 'validate'", [ada.actorId]);
+      expect((await call(token, "POST", "/systems/validate", { document: {} })).statusCode).toBe(429);
+      expect(await hits("validate")).toBeUndefined();
     } finally {
       await pool.query("DELETE FROM public_api_rate_limits");
     }

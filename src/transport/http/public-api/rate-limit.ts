@@ -50,8 +50,19 @@ export async function consumeRequestBudgets(
   if (await charge(pool, actorId, "general", kind) !== null) return true;
   if (specific !== undefined && bucket !== undefined) {
     await pool.query(
-      `UPDATE public_api_rate_limits SET hits = greatest(hits - 1, 0)
-       WHERE user_id = $1 AND bucket = $2 AND window_at = $3`,
+      `WITH locked_bucket AS MATERIALIZED (
+         SELECT hits FROM public_api_rate_limits
+         WHERE user_id = $1 AND bucket = $2 AND window_at = $3
+         FOR UPDATE
+       ), deleted AS (
+         DELETE FROM public_api_rate_limits
+         WHERE user_id = $1 AND bucket = $2 AND window_at = $3
+           AND (SELECT hits FROM locked_bucket) = 1
+         RETURNING user_id
+       )
+       UPDATE public_api_rate_limits SET hits = hits - 1
+       WHERE user_id = $1 AND bucket = $2 AND window_at = $3
+         AND (SELECT hits FROM locked_bucket) > 1`,
       [actorId, bucket, specific.windowAt],
     );
   }

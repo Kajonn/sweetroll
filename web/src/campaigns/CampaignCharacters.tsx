@@ -271,7 +271,11 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
                   {t("campaign.detail.characters.claim.button", { name: row.name })}
                 </Button>
               )}
-              {conflictIds[row.characterId] === true ? (
+              {conflictIds[row.characterId] === true && row.lifecycle === "archived" ? (
+                // The reloaded row shows the claim failed because a GM
+                // archived the character meanwhile; retrying cannot help.
+                <p role="alert">{t("campaign.detail.characters.claim.conflict.archived", { name: row.name })}</p>
+              ) : conflictIds[row.characterId] === true ? (
                 <p role="alert">
                   {t("campaign.detail.characters.claim.conflict", { name: row.name })}
                   <Button

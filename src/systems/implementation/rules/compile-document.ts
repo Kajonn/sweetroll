@@ -1,5 +1,5 @@
 import {validatePushPolicies} from "./push-policy.js";
-import type { ActionV1, FieldV1, SystemDocumentV1, SystemPackageV1, ValueType } from "../package/schema/index.js";
+import type { ActionV1, FieldV1, SystemDocumentV1, SystemPackageV1, TemplateKind, ValueType } from "../package/schema/index.js";
 import type { UnsignedSystemPackageV1 } from "../package/schema/index.js";
 import { signSystemPackage } from "../package/canonical.js";
 import { PACKAGE_LIMITS } from "../package/limits.js";
@@ -11,6 +11,46 @@ export type CompileDocumentOpts = {
   versionId: string;
   semanticVersion: string;
 };
+
+/**
+ * Character-entity fields a granted roll of a template of `kind` may read: the
+ * fields shared (same id and value type) by every entity whose sheet shows a
+ * slot accepting that kind. Works on documents and packages alike, so system
+ * extensions can be checked against a published base package.
+ */
+export function grantedEntityFieldsForKind(
+  rules: Pick<SystemDocumentV1, "entities" | "sheets" | "slots">,
+  kind: TemplateKind,
+): Record<string, ValueType> {
+  const eligibleSlots = new Set((rules.slots ?? [])
+    .filter((slot) => slot.accepts.includes(kind)).map((slot) => slot.id));
+  const targets = new Set(rules.sheets.filter((sheet) => sheet.sections.some((section) =>
+    section.elements.some((element) => element.kind === "slot" && eligibleSlots.has(element.slotId)),
+  )).map((sheet) => sheet.targetEntityId));
+  const environments = [...targets].map((id) => entityFieldTypes(rules.entities.find((entity) => entity.id === id)?.fields ?? []));
+  const common = { ...(environments[0] ?? {}) };
+  for (const fields of environments.slice(1)) {
+    for (const id of Object.keys(common)) {
+      if (common[id] !== fields[id]) delete common[id];
+    }
+  }
+  return common;
+}
+
+export function entityFieldTypes(fields: readonly FieldV1[]): Record<string, ValueType> {
+  const types: Record<string, ValueType> = {};
+  for (const field of fields) {
+    const valueType = fieldToValueType(field);
+    if (valueType !== undefined) types[field.id] = valueType;
+  }
+  return types;
+}
+
+export function actionInputTypes(inputs: readonly { id: string; valueType: string }[]): Record<string, ValueType> {
+  const types: Record<string, ValueType> = {};
+  for (const input of inputs) types[input.id] = actionInputToValueType(input);
+  return types;
+}
 
 function fieldToValueType(field: FieldV1): ValueType | undefined {
   switch (field.kind) {
@@ -107,19 +147,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
   // reference; a template may be used by more than one sheet/entity.
   const grantedEntityFields = new Map<string, Record<string, ValueType>>();
   for (const template of templates) {
-    const eligibleSlots = new Set((document.slots ?? [])
-      .filter((slot) => slot.accepts.includes(template.kind)).map((slot) => slot.id));
-    const targets = new Set(document.sheets.filter((sheet) => sheet.sections.some((section) =>
-      section.elements.some((element) => element.kind === "slot" && eligibleSlots.has(element.slotId)),
-    )).map((sheet) => sheet.targetEntityId));
-    const environments = [...targets].map((id) => entityEnvironments.get(id)?.fields ?? {});
-    const common = { ...(environments[0] ?? {}) };
-    for (const fields of environments.slice(1)) {
-      for (const id of Object.keys(common)) {
-        if (common[id] !== fields[id]) delete common[id];
-      }
-    }
-    grantedEntityFields.set(template.id, common);
+    grantedEntityFields.set(template.id, grantedEntityFieldsForKind(document, template.kind));
   }
   const validationOwners = new Map<string, Set<string>>();
   for (const validation of document.validations) {
@@ -259,7 +287,7 @@ function computedCycle(
   return undefined;
 }
 
-function cycleInComputedFields(
+export function cycleInComputedFields(
   computed: Map<string, { expressionId: string }>,
   compiledById: Map<string, CompiledExpressionBody>,
 ): string | undefined {

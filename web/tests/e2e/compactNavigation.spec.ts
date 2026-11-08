@@ -61,6 +61,9 @@ test("campaign tabs stay in one row and keyboard navigation reveals the last tab
     const page = await gm.newPage();
     await page.goto(`/campaigns/${fixture.campaignId}`);
     const tabs = page.getByRole("tablist", { name: "Campaign tabs" });
+    // GM-only tabs appear once the member roster loads; wait for them so
+    // "End" targets the final tab list rather than the pre-roster one.
+    await expect(tabs.getByRole("tab", { name: "Settings" })).toBeVisible({ timeout: 30_000 });
     for (const width of [320, 360, 768, 1280]) {
       await page.setViewportSize({ width, height: 900 });
       expect((await tabs.boundingBox())!.height).toBeLessThanOrEqual(48);

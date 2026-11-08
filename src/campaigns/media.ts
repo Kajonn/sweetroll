@@ -12,6 +12,7 @@ import type { RequestContext } from "../systems/authoring.js";
 import { hashInput } from "../systems/implementation/authoring/assess.js";
 import type { CampaignPersistenceRepository, MediaFileRecord } from "./persistence.js";
 import { canManageCampaign } from "./policy.js";
+import { removeDisplayTokenDerivatives } from "./display.js";
 import type { CampaignError, CampaignResult } from "./index.js";
 
 export type UploadImageInput = {
@@ -532,7 +533,7 @@ export function createMediaCommands(input: CreateMediaCommandsInput): MediaComma
           if (!inserted) {
             throw new ReceiptRace();
           }
-          return { committed: true as const, value, storageKey: deleted.storageKey };
+          return { committed: true as const, value, storageKey: deleted.storageKey, fileId: deleted.fileId };
         }).catch(async (error) => {
           if (error instanceof ReceiptRace) {
             const receipt = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
@@ -546,6 +547,7 @@ export function createMediaCommands(input: CreateMediaCommandsInput): MediaComma
           // Bytes are unlinked only after the row delete commits: a receipt
           // race rolls the row back, and the file must still be there.
           await removeBytes(outcome.storageKey);
+          await removeDisplayTokenDerivatives(outcome.fileId);
           return { ok: true, value: outcome.value };
         }
         return await resolveDeleteReplay(ctx, { inputHash, receipt: outcome.receipt ?? null });

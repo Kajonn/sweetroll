@@ -11,6 +11,20 @@ import type {
   VersionId,
 } from "../systems/runtime.js";
 import { isActiveMember, isGameMaster, type MembershipRecord } from "../campaigns/policy.js";
+import {
+  compositionProblem,
+  insertCampaignExtension,
+  loadCampaignExtensions,
+  loadCharacterExtensions,
+  mergeExtensionSets,
+  syncAttachedCharacterExtensions,
+} from "./campaign-extensions.js";
+import { writeCharacterExtensions } from "./persistence.js";
+import { createEffectivePackageLoader } from "../systems/implementation/runtime/composition-loader.js";
+import {
+  createPostgresPublishedExtensionLoader,
+  createPostgresPublishedPackageLoader,
+} from "../systems/implementation/runtime/package-loader.js";
 
 import { claimExecutionOnClient } from "./idempotency.js";
 
@@ -271,6 +285,11 @@ export function createCampaignPlacement(input: CreateCampaignPlacementInput): Ca
   const newId = input.newId ?? (() => randomUUID());
   const newExecutionId = input.newExecutionId ?? (() => randomUUID());
   const maxAttached = input.maxAttachedCharacters ?? 200;
+  // Design 6.8 (stage E4): campaign compositions are checked against packages.
+  const loadEffective = createEffectivePackageLoader({
+    loadPackage: createPostgresPublishedPackageLoader(input.pool),
+    loadExtensionPackage: createPostgresPublishedExtensionLoader(input.pool),
+  });
 
   const errors = {
     bad_request: (message: string): PlacementError => ({ code: "bad_request", message }),
@@ -641,6 +660,8 @@ export function createCampaignPlacement(input: CreateCampaignPlacementInput): Ca
         );
         const row = inserted.rows[0];
         if (row === undefined) throw new Error("createInCampaign returned no row");
+        // Design 6.8: campaign-created characters use the campaign composition.
+        await writeCharacterExtensions(client, characterId, await loadCampaignExtensions(client, campaign.id));
         for (const controllerId of controllers) {
           await client.query(
             `INSERT INTO character_controllers (character_id, campaign_id, user_id)
@@ -752,6 +773,20 @@ export function createCampaignPlacement(input: CreateCampaignPlacementInput): Ca
         if (character.system_version_id !== campaign.system_version_id) {
           return { ok: false, error: errors.bad_request("The character version does not match the pinned campaign version. Migrate it first.") };
         }
+        // Design 6.8 (decisions X7/X8): the character's extensions join the
+        // campaign; a different version of one the campaign already uses blocks.
+        const campaignExtensions = await loadCampaignExtensions(client, campaign.id);
+        const merged = mergeExtensionSets(campaignExtensions, await loadCharacterExtensions(client, character.id));
+        if (!merged.ok) {
+          return { ok: false, error: errors.conflict(
+            "The character uses another version of an extension this campaign already uses. Move the character to the campaign's version first.",
+            character.revision,
+          ) };
+        }
+        if (merged.added.length > 0) {
+          const problem = await compositionProblem(loadEffective, client, campaign.system_version_id, merged.merged);
+          if (problem !== null) return { ok: false, error: errors.bad_request(`The character's extensions cannot join this campaign: ${problem}`) };
+        }
         if (character.revision !== adoptInput.expectedCharacterRevision) {
           return {
             ok: false, error: errors.conflict(
@@ -765,6 +800,12 @@ export function createCampaignPlacement(input: CreateCampaignPlacementInput): Ca
         }
 
         const timestamp = now();
+        // Characters already attached get the merged set, with a revision bump
+        // and activity where it changes (issue #60). The adoptee is not yet
+        // attached; its own adoption revision covers its new composition below.
+        if (merged.added.length > 0) {
+          await syncAttachedCharacterExtensions(client, campaign.id, merged.merged, { requestId: ctx.requestId });
+        }
         const updated = await client.query<CharacterRow>(
           `UPDATE characters
               SET owner_id = NULL, campaign_id = $2, return_owner_id = $3,
@@ -784,6 +825,18 @@ export function createCampaignPlacement(input: CreateCampaignPlacementInput): Ca
            VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
           [character.id, campaign.id, ctx.actorId],
         );
+        for (const ref of merged.added) {
+          await insertCampaignExtension(client, campaign.id, ref, "character", character.id);
+          await client.query(
+            `INSERT INTO campaign_activity_events (id, campaign_id, actor_id, kind, request_id, occurred_at)
+             VALUES ($1, $2, $3, 'extension_added', $4, $5)`,
+            [newId(), campaign.id, ctx.actorId, ctx.requestId, timestamp.toISOString()],
+          );
+        }
+        // Every attached character, the adoptee included, uses the campaign set.
+        if (merged.added.length > 0 || campaignExtensions.length > 0) {
+          await writeCharacterExtensions(client, character.id, merged.merged);
+        }
         await client.query(
           `INSERT INTO character_placements (character_id, generation, campaign_id, return_owner_id)
            VALUES ($1, $2, $3, $4)`,
@@ -1036,6 +1089,12 @@ export function createCampaignPlacement(input: CreateCampaignPlacementInput): Ca
         const character = await lockCharacter(client, claimInput.characterId);
         if (character === null || character.campaign_id !== campaign.id) {
           return { ok: false, error: errors.not_found() };
+        }
+        // Design 13.2: archived rows are explanatory only. The rejection rolls
+        // back like the other conflicts here, so the designation survives. No
+        // latestRevision: retrying with a newer revision cannot succeed.
+        if (character.lifecycle === "archived") {
+          return { ok: false, error: errors.conflict("Recover the character before claiming it.") };
         }
         if (character.revision !== claimInput.expectedCharacterRevision) {
           return {

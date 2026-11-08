@@ -136,7 +136,11 @@ const entryProperties = {
   quantity: Type.Optional(quantity),
 };
 const entrySource = Type.Optional(EntrySourceSchema);
-export const entry = object({ ...entryProperties, source: entrySource });
+export const entry = object({
+  ...entryProperties,
+  extensionId: Type.Optional({ ...uuid, description: "Extension of the entry's template; absent for base-system templates." }),
+  source: entrySource,
+});
 export const entryId = object({ characterId: uuid, entryId: uuid });
 export const addEntry = object({
   ...entryProperties, values: Type.Optional(values), ...revisionCommand,
@@ -192,6 +196,10 @@ export const characterSheet = object({
   createdAt: dateTime,
   ownerId: Type.Union([uuid, Type.Null()], { description: "Standalone owner; null while attached to a campaign." }),
   campaign: Type.Union([characterPlacement, Type.Null()], { description: "Campaign placement; null for standalone characters." }),
+  extensions: Type.Array(object({ extensionId: uuid, versionId: uuid }), {
+    maxItems: 16,
+    description: "Extension versions the character is built on, in addition to systemVersionId. Read-only in v1.",
+  }),
   values,
   entries: Type.Array(entry),
   derivedValues: Type.Record(definitionId, scalar),

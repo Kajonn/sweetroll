@@ -88,6 +88,7 @@ function characterView(overrides: Partial<CharacterView> = {}): CharacterView {
     returnOwnerId: null,
     name: "Aria",
     systemVersionId,
+    extensions: [],
     entityDefinitionId: "character",
     revision: 1,
     lifecycle: "active",

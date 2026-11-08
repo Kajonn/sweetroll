@@ -1,7 +1,7 @@
 import { forgedInTheDarkPackage } from "../package/fixtures/forged-in-the-dark.js";
 import { d20Package, pbta2d6Package, d6SuccessPoolPackage } from "../package/fixtures/index.js";
-import { comparePackages, type CompatibilityFinding } from "../package/compatibility.js";
-import type { SystemPackageV1 } from "../package/schema/index.js";
+import { compareExtensionPackages, comparePackages, type CompatibilityFinding } from "../package/compatibility.js";
+import type { ExtensionPackageV1, SystemPackageV1 } from "../package/schema/index.js";
 import type { Pool, PoolClient } from "pg";
 import { saveSystemImages } from "./image-references.js";
 import type { PreparedItemImage } from "../../../platform/item-image-storage.js";
@@ -17,9 +17,14 @@ export type SystemRecord = {
   name: string;
   access: string;
   lifecycle: string;
+  /** Design 6.8: `extension` rows add templates to `baseSystemId`. */
+  kind: SystemKind;
+  baseSystemId: SystemId | null;
   createdAt: Date;
   updatedAt: Date;
 };
+
+export type SystemKind = "system" | "extension";
 
 export type DraftRecord = {
   systemId: SystemId;
@@ -28,6 +33,8 @@ export type DraftRecord = {
   sourceChecksum: string;
   updatedBy: UserId;
   updatedAt: Date;
+  /** Extension drafts: base system version used for preview and validation. */
+  baseVersionId: VersionId | null;
 };
 
 export type VersionRecord = {
@@ -38,6 +45,8 @@ export type VersionRecord = {
   package: unknown;
   releaseNotes: string;
   lifecycle: string;
+  /** Extension versions: the base system version they were compiled against. */
+  builtAgainstVersionId: VersionId | null;
   createdAt: Date;
 };
 
@@ -61,6 +70,8 @@ export type PublishVersionInput = {
   releaseNotes: string;
   compatibilityFindings: CompatibilityFinding[];
   compatibilityBaseVersionId?: VersionId | null;
+  /** Required for extension versions (design 6.8). */
+  builtAgainstVersionId?: VersionId | null;
   acknowledgeBreaking: boolean;
   actorId: UserId;
   requestId: string;
@@ -84,6 +95,13 @@ export type VersionChoice = {
 export type AuthorizedVersionUse = {
   systemId: SystemId;
   versionId: VersionId;
+  checksum: string;
+};
+
+export type AuthorizedExtensionUse = {
+  extensionId: SystemId;
+  versionId: VersionId;
+  baseSystemId: SystemId;
   checksum: string;
 };
 
@@ -168,6 +186,8 @@ export type SaveDraftInput = {
   sourceChecksum: string;
   updatedBy: UserId;
   requestId: string;
+  /** Extension drafts only; `undefined` keeps the stored value. */
+  baseVersionId?: VersionId | null;
 };
 
 export type DraftSaveResult =
@@ -197,7 +217,7 @@ export interface SystemPersistenceRepository {
     execute: (transaction: ReceiptTransaction) => Promise<ReceiptResult<T, E>>,
   ): Promise<ReceiptResult<T, E> | { ok: true; value: T; replayed: true } | { ok: false; mismatch: true }>;
 
-  createSystem(input: { ownerId: UserId; name: string }): Promise<SystemRecord>;
+  createSystem(input: { ownerId: UserId; name: string; baseSystemId?: SystemId }): Promise<SystemRecord>;
   listSystems(ownerId: UserId): Promise<SystemRecord[]>;
   openSystem(systemId: SystemId): Promise<SystemRecord | null>;
 
@@ -269,6 +289,17 @@ export interface SystemPersistenceRepository {
 
   deleteOwnedSystem(systemId: SystemId, ownerId: UserId): Promise<DeleteOwnedSystemResult>;
 
+  /** Design 6.8: extensions of a base system the actor owns, plus `public` ones. */
+  listExtensionsPage(
+    actorId: UserId,
+    baseSystemId: SystemId,
+    page: { limit: number; cursor: string | null },
+  ): Promise<{ extensions: SystemRecord[]; nextCursor: string | null }>;
+  /** Published versions of an extension, newest first. */
+  listPublishedVersions(systemId: SystemId): Promise<VersionRecord[]>;
+  /** A published extension version of an active extension the actor may use. */
+  authorizeExtensionUse(actorId: UserId, versionId: VersionId): Promise<AuthorizedExtensionUse | null>;
+
   publishVersion(input: PublishVersionInput): Promise<PublishVersionResult>;
 }
 
@@ -295,9 +326,9 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
 
     async listSystems(ownerId) {
       const result = await pool.query<SystemRow>(
-        `SELECT id, owner_id, name, access, lifecycle, created_at, updated_at
+        `SELECT id, owner_id, name, access, lifecycle, kind, base_system_id, created_at, updated_at
            FROM systems
-          WHERE owner_id = $1
+          WHERE owner_id = $1 AND kind = 'system'
           ORDER BY created_at DESC, id DESC`,
         [ownerId],
       );
@@ -306,7 +337,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
 
     async openSystem(systemId) {
       const result = await pool.query<SystemRow>(
-        `SELECT id, owner_id, name, access, lifecycle, created_at, updated_at
+        `SELECT id, owner_id, name, access, lifecycle, kind, base_system_id, created_at, updated_at
            FROM systems
           WHERE id = $1`,
         [systemId],
@@ -317,7 +348,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
 
     async loadDraft(systemId) {
       const result = await pool.query<DraftRow>(
-        `SELECT system_id, revision, document_json, source_checksum, updated_by, updated_at
+        `SELECT system_id, revision, document_json, source_checksum, updated_by, updated_at, base_version_id
            FROM system_drafts
           WHERE system_id = $1`,
         [systemId],
@@ -330,7 +361,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
       const result = await pool.query<VersionRow>(
         `INSERT INTO system_versions (system_id, semantic_version, checksum, package_json, release_notes)
          VALUES ($1, $2, $3, $4::jsonb, $5)
-         RETURNING id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at`,
+         RETURNING id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, built_against_version_id, created_at`,
         [input.systemId, input.semanticVersion, input.checksum, JSON.stringify(input.package), input.releaseNotes],
       );
       return toVersionRecord(requireRow(result.rows[0], "insertVersion"));
@@ -338,7 +369,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
 
     async loadVersion(versionId) {
       const result = await pool.query<VersionRow>(
-        `SELECT id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at
+        `SELECT id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, built_against_version_id, created_at
            FROM system_versions
           WHERE id = $1`,
         [versionId],
@@ -349,7 +380,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
 
     async listVersions(systemId) {
       const result = await pool.query<VersionRow>(
-        `SELECT id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at
+        `SELECT id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, built_against_version_id, created_at
            FROM system_versions
           WHERE system_id = $1
           ORDER BY created_at DESC, id DESC`,
@@ -366,6 +397,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
           WHERE v.id = $2
             AND v.lifecycle = 'published'
             AND s.lifecycle = 'active'
+            AND s.kind = 'system'
             AND (s.owner_id = $1 OR s.access IN ('public', 'link'))`,
         [actorId, versionId],
       );
@@ -385,6 +417,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
             AND (v.created_at, v.id) > (current_version.created_at, current_version.id)
             AND v.lifecycle = 'published'
             AND s.lifecycle = 'active'
+            AND s.kind = 'system'
             AND (s.owner_id = $1 OR s.access IN ('public', 'link'))
           ORDER BY v.created_at DESC, v.id DESC
           LIMIT 50`,
@@ -412,7 +445,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
       // cursor assumes names are stable across pages (renames-may-move: a
       // concurrent rename can shift rows between pages; not solved here).
       const params: unknown[] = [actorId];
-      let where = `(s.owner_id = $1 OR s.access = 'public')`;
+      let where = `s.kind = 'system' AND (s.owner_id = $1 OR s.access = 'public')`;
       if (page.q !== null) {
         params.push(`%${escapeLike(page.q)}%`);
         where += ` AND s.name ILIKE $${params.length}`;
@@ -509,7 +542,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
       const result = await pool.query<SystemRow>(
         `UPDATE systems SET lifecycle = $2, updated_at = now()
           WHERE id = $1
-          RETURNING id, owner_id, name, access, lifecycle, created_at, updated_at`,
+          RETURNING id, owner_id, name, access, lifecycle, kind, base_system_id, created_at, updated_at`,
         [systemId, lifecycle],
       );
       const row = result.rows[0];
@@ -519,7 +552,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
     async updateSystemAccess(input) {
       return inTransaction(pool, async (client) => {
         const current = await client.query<SystemRow>(
-          `SELECT id, owner_id, name, access, lifecycle, created_at, updated_at
+          `SELECT id, owner_id, name, access, lifecycle, kind, base_system_id, created_at, updated_at
              FROM systems WHERE id = $1 AND owner_id = $2 FOR UPDATE`,
           [input.systemId, input.actorId],
         );
@@ -528,7 +561,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
         if (system.access === input.access) return toSystemRecord(system);
         const updated = await client.query<SystemRow>(
           `UPDATE systems SET access = $2, updated_at = now() WHERE id = $1
-           RETURNING id, owner_id, name, access, lifecycle, created_at, updated_at`,
+           RETURNING id, owner_id, name, access, lifecycle, kind, base_system_id, created_at, updated_at`,
           [input.systemId, input.access],
         );
         await transactionMethods(client).appendAudit({
@@ -546,7 +579,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
       const result = await pool.query<VersionRow>(
         `UPDATE system_versions SET lifecycle = $2
           WHERE id = $1
-          RETURNING id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at`,
+          RETURNING id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, built_against_version_id, created_at`,
         [versionId, lifecycle],
       );
       const row = result.rows[0];
@@ -555,13 +588,13 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
 
     async listSystemsPage(ownerId, page) {
       const params: unknown[] = [ownerId, page.limit + 1];
-      let where = "owner_id = $1";
+      let where = "owner_id = $1 AND kind = 'system'";
       if (page.cursor !== null) {
         params.push(page.cursor);
         where += ` AND (created_at, id) < (SELECT created_at, id FROM systems WHERE id = $${params.length} AND owner_id = $1)`;
       }
       const result = await pool.query<SystemRow>(
-        `SELECT id, owner_id, name, access, lifecycle, created_at, updated_at
+        `SELECT id, owner_id, name, access, lifecycle, kind, base_system_id, created_at, updated_at
            FROM systems
           WHERE ${where}
           ORDER BY created_at DESC, id DESC
@@ -592,8 +625,63 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
         throw error;
       }
     },
+
+    async listExtensionsPage(actorId, baseSystemId, page) {
+      // Enumeration mirrors OD-01: owned plus public; link extensions stay
+      // usable by a known version ID but are not listed to other users.
+      const params: unknown[] = [actorId, baseSystemId, page.limit + 1];
+      let where = "kind = 'extension' AND base_system_id = $2 AND (owner_id = $1 OR (access = 'public' AND lifecycle = 'active'))";
+      if (page.cursor !== null) {
+        params.push(page.cursor);
+        where += ` AND (created_at, id) < (SELECT created_at, id FROM systems WHERE id = $${params.length})`;
+      }
+      const result = await pool.query<SystemRow>(
+        `SELECT ${SYSTEM_COLUMNS}
+           FROM systems
+          WHERE ${where}
+          ORDER BY created_at DESC, id DESC
+          LIMIT $3`,
+        params,
+      );
+      const hasMore = result.rows.length > page.limit;
+      const pageRows = hasMore ? result.rows.slice(0, page.limit) : result.rows;
+      const last = pageRows[pageRows.length - 1];
+      return { extensions: pageRows.map(toSystemRecord), nextCursor: hasMore && last !== undefined ? last.id : null };
+    },
+
+    async listPublishedVersions(systemId) {
+      const result = await pool.query<VersionRow>(
+        `SELECT ${VERSION_COLUMNS}
+           FROM system_versions
+          WHERE system_id = $1 AND lifecycle = 'published'
+          ORDER BY created_at DESC, id DESC`,
+        [systemId],
+      );
+      return result.rows.map(toVersionRecord);
+    },
+
+    async authorizeExtensionUse(actorId, versionId) {
+      const result = await pool.query<{ extension_id: string; version_id: string; base_system_id: string; checksum: string }>(
+        `SELECT s.id AS extension_id, v.id AS version_id, s.base_system_id, v.checksum
+           FROM system_versions v
+           JOIN systems s ON s.id = v.system_id
+          WHERE v.id = $2
+            AND v.lifecycle = 'published'
+            AND s.lifecycle = 'active'
+            AND s.kind = 'extension'
+            AND (s.owner_id = $1 OR s.access IN ('public', 'link'))`,
+        [actorId, versionId],
+      );
+      const row = result.rows[0];
+      return row === undefined
+        ? null
+        : { extensionId: row.extension_id, versionId: row.version_id, baseSystemId: row.base_system_id, checksum: row.checksum };
+    },
   };
 }
+
+const SYSTEM_COLUMNS = "id, owner_id, name, access, lifecycle, kind, base_system_id, created_at, updated_at";
+const VERSION_COLUMNS = "id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, built_against_version_id, created_at";
 
 type SystemRow = {
   id: string;
@@ -601,6 +689,8 @@ type SystemRow = {
   name: string;
   access: string;
   lifecycle: string;
+  kind: SystemKind;
+  base_system_id: string | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -612,6 +702,7 @@ type DraftRow = {
   source_checksum: string;
   updated_by: string;
   updated_at: Date;
+  base_version_id: string | null;
 };
 
 type VersionRow = {
@@ -622,6 +713,7 @@ type VersionRow = {
   package_json: unknown;
   release_notes: string;
   lifecycle: string;
+  built_against_version_id: string | null;
   created_at: Date;
 };
 
@@ -713,6 +805,8 @@ function toSystemRecord(row: SystemRow): SystemRecord {
     name: row.name,
     access: row.access,
     lifecycle: row.lifecycle,
+    kind: row.kind,
+    baseSystemId: row.base_system_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -726,6 +820,7 @@ function toDraftRecord(row: DraftRow): DraftRecord {
     sourceChecksum: row.source_checksum,
     updatedBy: row.updated_by,
     updatedAt: row.updated_at,
+    baseVersionId: row.base_version_id,
   };
 }
 
@@ -738,6 +833,7 @@ function toVersionRecord(row: VersionRow): VersionRecord {
     package: row.package_json,
     releaseNotes: row.release_notes,
     lifecycle: row.lifecycle,
+    builtAgainstVersionId: row.built_against_version_id,
     createdAt: row.created_at,
   };
 }
@@ -771,10 +867,10 @@ function transactionMethods(connection: Pool | PoolClient): ReceiptTransaction {
   return {
     async createSystem(input) {
       const result = await connection.query<SystemRow>(
-        `INSERT INTO systems (owner_id, name)
-         VALUES ($1, $2)
-         RETURNING id, owner_id, name, access, lifecycle, created_at, updated_at`,
-        [input.ownerId, input.name],
+        `INSERT INTO systems (owner_id, name, kind, base_system_id)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, owner_id, name, access, lifecycle, kind, base_system_id, created_at, updated_at`,
+        [input.ownerId, input.name, input.baseSystemId === undefined ? "system" : "extension", input.baseSystemId ?? null],
       );
       return toSystemRecord(requireRow(result.rows[0], "createSystem"));
     },
@@ -840,7 +936,7 @@ async function saveDraft(client: PoolClient, input: SaveDraftInput): Promise<Dra
   // Image changes and ordinary saves share the system-before-draft lock order.
   await client.query("SELECT id FROM systems WHERE id=$1 FOR UPDATE", [input.systemId]);
   const existing = await client.query<DraftRow>(
-    `SELECT system_id, revision, document_json, source_checksum, updated_by, updated_at
+    `SELECT system_id, revision, document_json, source_checksum, updated_by, updated_at, base_version_id
        FROM system_drafts
       WHERE system_id = $1
       FOR UPDATE`,
@@ -853,10 +949,10 @@ async function saveDraft(client: PoolClient, input: SaveDraftInput): Promise<Dra
     }
     await saveSystemImages(client, input.systemId, input.document as SystemDocumentV1, input.newImages, input.retainedImageIds);
     const inserted = await client.query<DraftRow>(
-      `INSERT INTO system_drafts (system_id, revision, document_json, source_checksum, updated_by)
-       VALUES ($1, 1, $2::jsonb, $3, $4)
-       RETURNING system_id, revision, document_json, source_checksum, updated_by, updated_at`,
-      [input.systemId, JSON.stringify(input.document), input.sourceChecksum, input.updatedBy],
+      `INSERT INTO system_drafts (system_id, revision, document_json, source_checksum, updated_by, base_version_id)
+       VALUES ($1, 1, $2::jsonb, $3, $4, $5)
+       RETURNING system_id, revision, document_json, source_checksum, updated_by, updated_at, base_version_id`,
+      [input.systemId, JSON.stringify(input.document), input.sourceChecksum, input.updatedBy, input.baseVersionId ?? null],
     );
     const draft = toDraftRecord(requireRow(inserted.rows[0], "saveDraft"));
     if (draftName !== null) {
@@ -876,10 +972,12 @@ async function saveDraft(client: PoolClient, input: SaveDraftInput): Promise<Dra
   await saveSystemImages(client, input.systemId, input.document as SystemDocumentV1, input.newImages, input.retainedImageIds);
   const updated = await client.query<DraftRow>(
     `UPDATE system_drafts
-        SET revision = revision + 1, document_json = $2::jsonb, source_checksum = $3, updated_by = $4, updated_at = now()
+        SET revision = revision + 1, document_json = $2::jsonb, source_checksum = $3, updated_by = $4, updated_at = now(),
+            base_version_id = CASE WHEN $5::boolean THEN $6::uuid ELSE base_version_id END
       WHERE system_id = $1
-      RETURNING system_id, revision, document_json, source_checksum, updated_by, updated_at`,
-    [input.systemId, JSON.stringify(input.document), input.sourceChecksum, input.updatedBy],
+      RETURNING system_id, revision, document_json, source_checksum, updated_by, updated_at, base_version_id`,
+    [input.systemId, JSON.stringify(input.document), input.sourceChecksum, input.updatedBy,
+      input.baseVersionId !== undefined, input.baseVersionId ?? null],
   );
   const draft = toDraftRecord(requireRow(updated.rows[0], "saveDraft"));
   if (draftName !== null) {
@@ -913,15 +1011,15 @@ async function recordReceipt(client: PoolClient, input: RecordReceiptInput): Pro
 }
 
 async function publishVersion(client: PoolClient, input: PublishVersionInput): Promise<PublishVersionResult> {
-  const system = await client.query<{ owner_id: string | null; lifecycle: string }>(
-    "SELECT owner_id, lifecycle FROM systems WHERE id = $1 FOR UPDATE",
+  const system = await client.query<{ owner_id: string | null; lifecycle: string; kind: SystemKind }>(
+    "SELECT owner_id, lifecycle, kind FROM systems WHERE id = $1 FOR UPDATE",
     [input.systemId],
   );
   if (system.rows[0] === undefined) return { ok: false, code: "stale_revision", latestRevision: null };
   if (system.rows[0].owner_id !== input.actorId) return { ok: false, code: "not_found" };
   if (system.rows[0].lifecycle === "archived") return { ok: false, code: "archived" };
   const existing = await client.query<DraftRow>(
-    `SELECT system_id, revision, document_json, source_checksum, updated_by, updated_at
+    `SELECT system_id, revision, document_json, source_checksum, updated_by, updated_at, base_version_id
        FROM system_drafts
       WHERE system_id = $1
       FOR UPDATE`,
@@ -947,9 +1045,13 @@ async function publishVersion(client: PoolClient, input: PublishVersionInput): P
   // Retain the breaking changes the author acknowledged against the assessed
   // base. A concurrent version can also make a previously compatible draft
   // breaking, so compare again when the assessed base has moved.
+  const isExtension = system.rows[0].kind === "extension";
+  if (isExtension !== (input.builtAgainstVersionId != null)) return { ok: false, code: "not_found" };
   const findings = input.compatibilityFindings.length === 0 && latest !== undefined
     && input.compatibilityBaseVersionId !== undefined && input.compatibilityBaseVersionId !== latest.id
-    ? comparePackages(latest.package_json as SystemPackageV1, input.package as SystemPackageV1).findings
+    ? (isExtension
+      ? compareExtensionPackages(latest.package_json as ExtensionPackageV1, input.package as ExtensionPackageV1).findings
+      : comparePackages(latest.package_json as SystemPackageV1, input.package as SystemPackageV1).findings)
     : input.compatibilityFindings;
   if (findings.length > 0 && latest !== undefined) {
     const nextMajor = Number(input.semanticVersion.split(".")[0]);
@@ -960,10 +1062,11 @@ async function publishVersion(client: PoolClient, input: PublishVersionInput): P
   }
   const result = await client.query<VersionRow>(
     `INSERT INTO system_versions
-       (id, system_id, semantic_version, checksum, package_json, release_notes, compatibility_findings_json)
-      VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::jsonb)
+       (id, system_id, semantic_version, checksum, package_json, release_notes, compatibility_findings_json,
+        built_against_version_id)
+      VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::jsonb, $8)
       ON CONFLICT DO NOTHING
-      RETURNING id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, created_at`,
+      RETURNING id, system_id, semantic_version, checksum, package_json, release_notes, lifecycle, built_against_version_id, created_at`,
     [
       input.versionId,
       input.systemId,
@@ -972,6 +1075,7 @@ async function publishVersion(client: PoolClient, input: PublishVersionInput): P
       JSON.stringify(input.package),
       input.releaseNotes,
       JSON.stringify(findings),
+      input.builtAgainstVersionId ?? null,
     ],
   );
   const inserted = result.rows[0];

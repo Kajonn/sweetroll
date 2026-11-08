@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "../fixtures/browserTest";
+import { lookUpCreationVersion } from "../fixtures/lookUpCreationVersion";
 
 /**
  * G6 Task 2 player library (dev-server E2E): create from the library seam,
@@ -20,8 +21,7 @@ async function signIn(page: Page) {
 
 async function createCharacter(page: Page, name: string): Promise<string> {
   await page.goto(`/characters/new?systemVersionId=${D20_VERSION_ID}`);
-  await page.getByLabel("System version ID").fill(D20_VERSION_ID);
-  await page.getByRole("button", { name: "Look up version" }).click();
+  await lookUpCreationVersion(page, D20_VERSION_ID);
   await page.getByLabel("Entity").selectOption("character");
   await page.getByLabel("Character name").fill(name);
   await page.getByRole("button", { name: "Create character", exact: true }).click();

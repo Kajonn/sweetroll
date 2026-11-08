@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "../fixtures/browserTest";
 
 import { exportCharacter, publishOwnedClone, readActivity } from "../offline/test-auth.js";
+import { expectSheetSaved } from "../fixtures/sheetSaved";
 
 /**
  * G6 Task 7 exit demonstration (dev-server E2E): onboarding -> system select
@@ -46,9 +47,7 @@ async function createViaPicker(page: Page, versionId: string, name: string): Pro
   return page.url().split("/").pop() ?? "";
 }
 
-async function expectSaved(page: Page) {
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
-}
+const expectSaved = expectSheetSaved;
 
 /** Complete d20's native required `Proficient` field through the completion section. */
 async function completeProficient(page: Page) {

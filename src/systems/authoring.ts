@@ -270,9 +270,17 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
     internal: (): AppError => ({ code: "internal", message: "An internal error occurred." }),
   };
 
-  async function authorizeOwner(systemId: SystemId, actorId: UserId): Promise<SystemRecord | null> {
+  // System authoring paths serve `system` rows only; extension rows (design
+  // 6.8) have their own draft format and module. Lifecycle, sharing, version
+  // deprecation and deletion are generic and accept both kinds.
+  async function authorizeOwner(
+    systemId: SystemId,
+    actorId: UserId,
+    kind: SystemRecord["kind"] | "any" = "system",
+  ): Promise<SystemRecord | null> {
     const system = await repo.openSystem(systemId);
     if (system === null || system.ownerId !== actorId) return null;
+    if (kind !== "any" && system.kind !== kind) return null;
     return system;
   }
 
@@ -372,6 +380,7 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
             if (
               version === null ||
               sourceSystem === null ||
+              sourceSystem.kind !== "system" ||
               (sourceSystem.ownerId !== null && sourceSystem.ownerId !== ctx.actorId)
             ) {
               return { ok: false, error: errors.not_found() };
@@ -721,7 +730,7 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
         const version = await repo.loadVersion(versionId);
         if (version === null) return { ok: false, error: errors.not_found() };
         const system = await repo.openSystem(version.systemId);
-        if (system === null || system.ownerId !== ctx.actorId) return { ok: false, error: errors.not_found() };
+        if (system === null || system.ownerId !== ctx.actorId || system.kind !== "system") return { ok: false, error: errors.not_found() };
         const exported: ExportedPackage = {
           schemaVersion: "1.0",
           mediaType: "application/vnd.sweetroll.system+json;version=1",
@@ -753,7 +762,7 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
     async changeLifecycle(ctx, input) {
       try {
         if (input.kind === "system") {
-          const system = await authorizeOwner(input.systemId, ctx.actorId);
+          const system = await authorizeOwner(input.systemId, ctx.actorId, "any");
           if (system === null) return { ok: false, error: errors.not_found() };
           const updated = await repo.updateSystemLifecycle(input.systemId, input.lifecycle);
           if (updated === null) return { ok: false, error: errors.not_found() };

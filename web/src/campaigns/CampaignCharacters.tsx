@@ -14,6 +14,7 @@ import { Button, Dialog, EmptyState, FormField, Panel, Select } from "../ui/inde
 import type { CampaignsApi } from "./api.js";
 import {
   campaignCharactersKey,
+  listAllCampaignCharacters,
   campaignClaimableCharactersKey,
   useClaimableCharacters,
 } from "./campaignQueries.js";
@@ -270,7 +271,11 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
                   {t("campaign.detail.characters.claim.button", { name: row.name })}
                 </Button>
               )}
-              {conflictIds[row.characterId] === true ? (
+              {conflictIds[row.characterId] === true && row.lifecycle === "archived" ? (
+                // The reloaded row shows the claim failed because a GM
+                // archived the character meanwhile; retrying cannot help.
+                <p role="alert">{t("campaign.detail.characters.claim.conflict.archived", { name: row.name })}</p>
+              ) : conflictIds[row.characterId] === true ? (
                 <p role="alert">
                   {t("campaign.detail.characters.claim.conflict", { name: row.name })}
                   <Button
@@ -473,7 +478,7 @@ export function CampaignCharactersTab(props: {
   const online = props.online ?? true;
   const characters = useQuery({
     queryKey: campaignCharactersKey(props.campaignId, props.actorId ?? null, generation),
-    queryFn: () => props.api.listCampaignCharacters(props.campaignId),
+    queryFn: () => listAllCampaignCharacters(props.api, props.campaignId),
     enabled: props.actorId !== null && props.actorId !== undefined,
   });
   const claimable = useClaimableCharacters(

@@ -126,7 +126,8 @@ describe("CampaignCharactersView", () => {
     fireEvent.click(screen.getByRole("button", { name: /claim bram/i }));
     fireEvent.click(await screen.findByRole("button", { name: /confirm claim/i }));
     const retry = await screen.findByRole("button", { name: /retry claim/i });
-    expect(screen.getByText(/someone else claimed/i)).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent(/bram changed\. the list was reloaded/i);
+    expect(screen.queryByText(/was archived/i)).toBeNull();
     expect(onChanged).toHaveBeenCalled();
     fireEvent.click(retry);
     fireEvent.click(await screen.findByRole("button", { name: /confirm claim/i }));
@@ -136,6 +137,30 @@ describe("CampaignCharactersView", () => {
     expect(typeof first.idempotencyKey).toBe("string");
     expect(typeof second.idempotencyKey).toBe("string");
     expect(second.idempotencyKey).not.toBe(first.idempotencyKey);
+  });
+
+  it("explains an archived character after a claim conflict instead of offering a retry", async () => {
+    const api = {
+      claimCharacter: vi.fn().mockRejectedValueOnce({
+        code: "conflict", status: 409, message: "Recover the character before claiming it.",
+      }),
+      createCampaignCharacter: vi.fn(),
+    };
+    // The reload after the 409 returns the row as archived.
+    const { rerender } = render(<CampaignCharactersView {...viewProps({ api, claimable: [claimRow()] })} />);
+    const onChanged = vi.fn(() => rerender(
+      <CampaignCharactersView {...viewProps({ api, onChanged, claimable: [claimRow({ lifecycle: "archived" })] })} />,
+    ));
+    rerender(<CampaignCharactersView {...viewProps({ api, onChanged, claimable: [claimRow()] })} />);
+    fireEvent.click(screen.getByRole("button", { name: /claim bram/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /confirm claim/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Bram was archived. Ask a GM to recover it before claiming.",
+    );
+    expect(onChanged).toHaveBeenCalled();
+    expect(screen.queryByText(/changed\. the list was reloaded/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /retry claim/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /claim bram/i })).toBeNull();
   });
 
   it("shows archived designations as unavailable with no claim action", () => {

@@ -8,8 +8,8 @@
 
 | Document         | Product and technical design                         |
 |------------------|------------------------------------------------------|
-| Status           | Draft v0.4; GUI delivery added                       |
-| Date             | 8 September 2026                                     |
+| Status           | Draft v0.4; GUI delivery added; reconciled with the implementation 2026-11-08 |
+| Date             | 8 September 2026 (last reconciled 8 November 2026)   |
 | Primary audience | Product owner, UX designer, implementation team      |
 | Planning horizon | MVP followed by collaboration and marketplace phases |
 
@@ -74,7 +74,7 @@ Roles are contextual capabilities, not account types. The same user can create a
 
 | **Workspace**  | **Primary navigation**                                                      | **Responsive intent**                                                                             |
 |----------------|-----------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
-| System Creator | Overview; Data Model; Sheet; Rules; Preview; Versions; Settings            | Desktop-first. Tablet supported. Mobile offers review and small edits, not full layout authoring. |
+| System Creator | Basics; Attributes; Dice; Templates; Sections; Advanced (Preview, Diagnostics and Versions are header actions) | Desktop-first. Tablet supported. Mobile offers review and small edits, not full layout authoring. |
 | Game Master    | Session; Content; Characters; Members; Campaign Settings                     | Mobile-first quick actions plus richer desktop organization.                                      |
 | Player         | Characters; Activity; Account; Campaigns after I6                            | Mobile-first with platform-owned bottom navigation and thumb-reachable controls.                   |
 | Account        | Home; Systems; Campaigns; Characters; Profile                               | Responsive launcher that reflects all roles.                                                      |
@@ -335,17 +335,52 @@ defines the delivery stages.
 Character activity uses readable action names and local date/time formatting.
 A published system version updates the open editor's status immediately.
 
+## 6.8 System extensions (owner-approved 2026-11-07)
+
+Systems can be extended with new items and abilities through separately published
+**extensions**: immutable packages of templates (item, spell, talent, effect) with
+their granted actions and expressions, owned and shared like systems. A character
+or campaign is built on a system version plus a set of extension versions (its
+composition). A campaign's composition is the union of the extensions it chose and
+those used by its attached characters. Scope, access, ID scoping, campaign-union,
+removal and upgrade rules are decisions X1–X13 in the
+[system extensions plan](docs/superpowers/plans/2026-11-07-system-extensions.md),
+which also tracks implementation stages E1–E8. E1 (package contract), E2
+(authoring and publishing under `/systems/:systemId/extensions` and
+`/extensions/:extensionId`), E3 (standalone characters) and E4 (campaigns) are
+implemented; an extension is a `systems` row of kind `extension` whose versions
+record the base version they were built against. A character stores its
+extension versions in `character_extensions`; entries from extension templates
+carry `extensionId`. A campaign stores its set in `campaign_extensions`
+(GM-added or brought by an adopted character) and every attached character
+uses exactly that set. Changing a campaign's composition (a GM add or remove,
+or an adoption that brings new extensions) is a change to every attached
+character whose extension set changes: each gets a new revision and an
+`extensions_changed` activity event carrying only extension and version
+identifiers, so commands prepared against the earlier revision are refused
+with 409 and clients reconciling by revision refetch. The campaign is locked
+before its characters, and an entry naming an extension is rechecked against
+the locked character's composition before commit (X9; issue #60). Until E5, characters and campaigns with extensions
+cannot change rules version; campaign templates based on extension templates
+are a deferred follow-up (E4b).
+
+**Future feature (recorded 2026-11-07, not authorized):** an extension catalog for
+discovering and previewing published extensions. It depends on OD-07 and needs its
+own plan and approval.
+
 # 7. Campaign and play specification
 
 ## 7.1 Campaign workspace
 
-The campaign workspace combines member management, content, characters, and an in-session activity feed. The **Session view** is a curated mobile surface: pinned content, recent rolls, quick character access, and reveal/hide controls.
+The campaign workspace combines member management, content, characters, and an in-session activity feed. The **Session view** is a curated mobile surface: recent content, recent rolls, quick character access, and reveal/hide controls. Content pinning is not implemented (reconciled 2026-11-08); the Session view shows the ten most recent permitted content items instead.
 
 Campaign creation distinguishes versions with the same display name and semantic version by showing their publication date and a short version identifier. The campaign's pinned version supplies character creation choices automatically; players and GMs should not need to enter an internal version ID. A GM's roster access is labelled as GM access when they do not control a character. Member, sharing and content-preview controls use existing roster display names. Duplicate or absent names have an identifying suffix; short-ID collisions use full IDs, and debug mode shows full IDs. Requests retain exact user IDs and membership generations. Campaign and Session activity show local dates and readable actor labels; the exact actor identifier remains available for identification. Sheet previews show a section title once when its first heading repeats that title.
 
 ## 7.2 GM session board
 
 A dedicated **GM Session board** lists all characters with their key resources at a glance (health, stress, ammo, etc.). The GM can one-tap a bump control on any resource without opening each sheet. Designed for the GM at a physical table, and works across the GM's multiple devices (Section 4.2).
+
+The board and the campaign Characters tab load every attached character by following the paged `GET /campaigns/:id/characters` list at the maximum page size (100), up to a 20-page safety cap, and show a notice when the cap cuts the list short (issue #57). Each listed character's sheet is read separately through the Characters route; there is no dedicated `GET /campaigns/{id}/session` endpoint. Content, activity and the character list refresh every 15 seconds while online. If an operator lowers `CAMPAIGN_PAGE_MAX` below 100, the server rejects that page size with 400 and the client retries once without `limit`, reading at the server's default page size (issue #71).
 
 ## 7.3 Content model and visibility
 
@@ -356,6 +391,8 @@ A dedicated **GM Session board** lists all characters with their key resources a
 | Selected players | Explicit member allow-list plus GMs                 | Dreams, secret clues, private correspondence          |
 | Owner only       | Creating player plus GMs if campaign policy permits | Personal notes or hidden character information        |
 | Public link      | Anyone with link, only if explicitly enabled        | Post-session handouts; excluded from default behavior |
+
+**Public link is post-MVP (owner decision 2026-11-08):** it would be the first unauthenticated content route and needs its own plan for link tokens, revocation, rate limits and caching. The implemented audiences are GM only, all players, selected players and owner only.
 
 Visibility is enforced in server queries and storage access, never only by hiding UI. Changing visibility writes an audit event.
 
@@ -369,7 +406,7 @@ Visibility is enforced in server queries and storage access, never only by hidin
 
 ## 7.5 Dice and activity
 
-Actions may produce private, GM-only, or campaign-visible rolls according to campaign policy and per-roll choice. Authoritative rolls are evaluated by the server and include normalized expression, individual dice, modifiers, result, actor, character, visibility, timestamp, and a request id for idempotency. Manual or physical-dice results can be logged distinctly rather than presented as verified platform rolls.
+Actions may produce private, GM-only, or campaign-visible rolls according to campaign policy and per-roll choice. Authoritative rolls are evaluated by the server and include normalized expression, individual dice, modifiers, result, actor, character, visibility, timestamp, and a request id for idempotency. Logging manual or physical-dice results distinctly from verified platform rolls is post-MVP (owner decision 2026-11-08); players announce physical rolls at the table.
 
 ## 7.6 Content types (narrowed)
 
@@ -381,7 +418,7 @@ A scene consists of a background image, a manually edited fog mask, and GM-posit
 
 **Delivery status (2026-11-06):** Background upload/create/replace, numeric fog/token operations and restricted display are delivered. V1 uploaded token-image selection/rendering is implemented in PR #34 and accepted through hosted/redeploy verification ([evidence](docs/acceptance/scene-image-tokens-2026-11-05.md)). PR #36 implements V2 direct drag/tap token placement/movement with explicit pan/placement modes, cancellable local previews and shared revision/idempotency recovery; numeric controls remain available. Local and hosted mouse/touch browser acceptance passed on `84c23fd`; see [V2 evidence](docs/acceptance/scene-token-gestures-2026-11-06.md). V3 on-image Reveal/Conceal brushing is implemented with bounded local drafts, stroke undo, explicit commit and revision/idempotency recovery; local and hosted mouse/touch acceptance passed on `637a60f` ([V3 evidence](docs/acceptance/scene-fog-brush-2026-11-06.md)). These are existing I7b/G8 requirements; follow the [scene visual-controls completion plan](docs/superpowers/plans/2026-11-05-scene-visual-controls.md). Numeric controls remain accessible precision alternatives and do not satisfy the direct visual controls gate. M3 background acceptance alone does not close these gaps. V4 combined acceptance now passes in PR #38 on deployed `3a35a5f` ([combined evidence](docs/acceptance/scene-visual-controls-2026-11-06.md)); the I7b/G8 visual-controls feature gate is complete. G9 physical-device, provider-login, human and table/remote gates remain open.
 
-**Scene streaming (2026-11-07, implemented):** the paired display no longer polls. It opens `GET /api/displays/:id/scenes/:sceneId/events` (`text/event-stream`, `Cache-Control: no-store`) with the `X-Display-Secret` header through `fetch()` with `credentials: "omit"`. Each `event: scene` message is a complete, credential-scoped projection (`sceneRevision`, `imageRevision`, map URL and the filtered token list); `event: revoked` ends the stream; `: hb` heartbeats never query PostgreSQL. Scene-write transactions issue `pg_notify` with internal IDs and the revision only, so rolled-back writes produce no event; each process holds one dedicated `LISTEN` connection separate from its request pool, subscribes before loading a stream's first snapshot, coalesces reloads, keeps only the latest pending snapshot for a slow client and disconnects a stalled one. Credential revocation and campaign media deletion also notify. On listener loss every local stream closes and new streams answer `503` until listening resumes; displays reconnect with jittered backoff and start from a fresh snapshot, and stop retrying a revoked credential until paired again. The former polled `GET /displays/:id/scenes/:sceneId/projection` route was removed. `scenes.image_revision` (schema baseline) changes only with fog edits or a different background; token-only edits keep it, so they neither download nor render a map. PNG generation happens on the image route, keyed by `(sceneId, imageRevision)`, with one in-flight render per key per process, atomic writes, removal of older image revisions and a credential/image-revision recheck after a render before bytes are sent. Token art URLs are keyed by the token's image file (`?file=`) so they stay stable across moves; display image bytes are `private, no-store`. The display clears its frame immediately on an image-revision change and shows the new map (and its tokens) only once the new bytes arrive; superseded image loads are cancelled. A disconnect or lost authorization blanks the frame. GM gestures already send one command per completed drag or committed brush (at most 512 dabs, enforced server-side), each applied in one transaction with one revision bump; the GM view adopts the command response and reads again only on conflict or uncertain outcomes. See the [scene streaming plan](docs/superpowers/plans/2026-11-07-scene-streaming.md) for remaining hosted and load gates.
+**Scene streaming (2026-11-07, implemented):** the paired display no longer polls. It opens `GET /api/displays/:id/scenes/:sceneId/events` (`text/event-stream`, `Cache-Control: no-store`) with the `X-Display-Secret` header through `fetch()` with `credentials: "omit"`. Each `event: scene` message is a complete, credential-scoped projection (`sceneRevision`, `imageRevision`, map URL and the filtered token list); `event: revoked` ends the stream; `: hb` heartbeats never query PostgreSQL. Scene-write transactions issue `pg_notify` with internal IDs and the revision only, so rolled-back writes produce no event; each process holds one dedicated `LISTEN` connection separate from its request pool, subscribes before loading a stream's first snapshot, coalesces reloads, keeps only the latest pending snapshot for a slow client and disconnects a stalled one. Credential revocation and campaign media deletion also notify. On listener loss every local stream closes and new streams answer `503` until listening resumes; displays reconnect with jittered backoff and start from a fresh snapshot, and stop retrying a revoked credential until paired again. The former polled `GET /displays/:id/scenes/:sceneId/projection` route was removed. `scenes.image_revision` (schema baseline) changes only with fog edits or a different background; token-only edits keep it, so they neither download nor render a map. PNG generation happens on the image route, keyed by `(sceneId, imageRevision)`, with one in-flight render per key per process, atomic writes, removal of older image revisions and a credential/image-revision recheck after a render before bytes are sent. Token art URLs are keyed by the token's image file (`?file=`) so they stay stable across moves. Token art is served as a PNG derivative capped at 1024 px on its longest side and cached per `(fileId, media revision)` with one in-flight render per key and atomic writes; token visibility and fog are checked before cached bytes are read and rechecked after a render, and deleting the media file removes its derivative (issue #69); display image bytes are `private, no-store`. The display clears its frame immediately on an image-revision change and shows the new map (and its tokens) only once the new bytes arrive; superseded image loads are cancelled. A disconnect or lost authorization blanks the frame. GM gestures already send one command per completed drag or committed brush (at most 512 dabs, enforced server-side), each applied in one transaction with one revision bump; the GM view adopts the command response and reads again only on conflict or uncertain outcomes. See the [scene streaming plan](docs/superpowers/plans/2026-11-07-scene-streaming.md) for remaining hosted and load gates.
 
 A separate tablet or remote player receives only an authorized display projection. Fog-covered pixels must be removed from server-generated display imagery (or safe tiles); sending the original image under a client-only overlay does not protect secrets. Filter hidden tokens and GM metadata before delivery. Pairing credentials are revocable and cannot read campaign administration, GM notes, or originals. Clear privileged browser state when entering display mode, and blank the display when authorization is uncertain or revoked. Previously revealed information cannot be retracted from screenshots. See the GUI plan G8 for acceptance cases.
 
@@ -456,7 +493,7 @@ state; Escape closes the disclosure and restores focus to its trigger.
 
 ## 10.3 GM mobile session view
 
-- Pinned handouts and notes, recent activity, member status, quick character access, and the **GM session board**.
+- Recent handouts and notes (pinning is not implemented; see Section 7.1), recent activity, member status, quick character access, and the **GM session board**.
 - One-tap reveal/hide with audience confirmation; items remain visibly marked after sharing.
 - Works simultaneously across multiple GM devices (Section 4.2).
 - Conflicts between co-GMs and the GM's own devices resolve via revision/`409` and an immediate refresh prompt.
@@ -584,7 +621,7 @@ Authoritative dice derive from a server-secret HMAC of a server-generated comman
 
 **Future character command:** the Characters Module reads a character revision, calls `SystemRuntime.resolve`, then locks and rechecks the character revision in a short transaction before storing state, roll, activity, and idempotency result. Publishing a system version can never start this flow or mutate a character or campaign.
 
-**Real-time read:** use poll-on-view plus server revision. Clients refresh permitted data when a view becomes active. Add authorized asynchronous notifications only when user research or measured polling load justifies them; secret payloads are never sent to a mixed-audience channel. The owner-approved exception (2026-11-07) is the paired scene display, which receives complete credential-scoped snapshots over server-sent events driven by PostgreSQL `LISTEN`/`NOTIFY` change signals (Section 7.7); notifications carry only internal IDs and revisions.
+**Real-time read:** use poll-on-view plus server revision. Clients refresh permitted data when a view becomes active; the GM Session view also refreshes on a 15-second interval while online (Section 7.2), and the scene-streaming load comparison should cover those reads. Add authorized asynchronous notifications only when user research or measured polling load justifies them; secret payloads are never sent to a mixed-audience channel. The owner-approved exception (2026-11-07) is the paired scene display, which receives complete credential-scoped snapshots over server-sent events driven by PostgreSQL `LISTEN`/`NOTIFY` change signals (Section 7.7); notifications carry only internal IDs and revisions.
 
 ## 11.6 I1 source layout
 
@@ -610,21 +647,32 @@ Use Node.js LTS, TypeScript, Fastify, a thin PostgreSQL driver, explicit current
 | **Aggregate/table** | **Key relationships**                        | **Important fields**                                                |
 |---------------------|----------------------------------------------|---------------------------------------------------------------------|
 | users               | external_identities, owned resources         | id, display_name, locale, status, created_at                        |
-| systems             | creator; drafts; versions; collaborators     | id, owner_id, name, access, lifecycle                               |
+| systems             | creator; drafts; versions; collaborators     | id, owner_id, name, access, lifecycle, kind, base_system_id (6.8)   |
 | system_drafts       | one current draft per system                 | system_id, revision, document_json, source_checksum, updated_by     |
 | system_versions     | immutable child of system                    | version_id, semantic_version, checksum, package_json, release_notes |
 | preview_snapshots   | immutable expiring draft preview             | snapshot_id, system_id, source_revision, package_json, expires_at   |
 | idempotency_receipts| user and command scope                       | actor_id, command_kind, key, input_hash, result_json, expires_at    |
 | system_audit_records| system authoring changes                      | system_id, actor_id, kind, summary, occurred_at, request_id         |
-| campaigns           | pinned version; members; characters; content | id, system_version_id, owner_id, settings_json, status              |
+| campaigns           | pinned version; members; characters; content | id, system_version_id, previous_system_version_id, owner_id, roll_audience_default, status, revision |
 | campaign_members    | user in campaign                             | role, membership_status, joined_at, permissions_override            |
 | characters          | owner(s); optional campaign; pinned version  | id, revision, state_json, visibility, archived_at                   |
-| content_items       | campaign; creator; optional file             | kind, title, body, audience, revision                               |
-| content_grants      | content to selected member                   | content_id, member_id                                               |
-| file_objects        | content/avatar/system asset                  | storage_key, media_type, size, scan_status, checksum                |
-| activity_events     | actor and campaign/resource                  | type, audience, payload, occurred_at, request_id                    |
-| outbox_events       | Deferred with invitation email to I6 follow-up; absent from token-only backend slice | topic, payload, attempt_count, available_at, published_at |
-| invitations         | campaign and inviter                         | token_hash, intended_role, expires_at, accepted_by                  |
+| character_extensions| character; extension; extension version (6.8)| character_id, extension_id, extension_version_id                   |
+| campaign_extensions | campaign; extension; extension version (6.8) | campaign_id, extension_id, extension_version_id, added_by           |
+| campaign_content_items | campaign; creator                         | title, body, audience, status, deleted_at, revision                 |
+| campaign_content_grants | content to selected member               | content_id, campaign_id, user_id                                    |
+| media_files         | campaign scene/token images                  | storage_key, media_type, size_bytes, width, height, checksum        |
+| character_image_assets, item_image_assets | portraits and item art (Section 7.8) | storage_key, media_type, checksum              |
+| character_activity_events, campaign_activity_events | character or campaign scope | kind, payload, occurred_at, request_id         |
+| character_rolls     | character; command execution                 | audience, result, push lineage                                      |
+| character_controllers, character_claim_designations, character_placements | campaign custody (Section 17.8) | character_id, campaign_id, user_id |
+| scenes, display_codes, display_credentials | campaign scenes and paired displays (Section 7.7) | revision, image_revision, fog, tokens; code/secret hashes |
+| campaign_item_templates, campaign_item_proposals (+ revisions, grants, images) | campaign catalog (Section 5.4) | content revision, audience |
+| personal_access_tokens, public_api_rate_limits | public API (Section 13.3) | token_hash, scopes, expires_at; per-user minute counters |
+| character_command_executions, campaign_command_executions | idempotent command results | status, lease, result_json, expires_at |
+| outbox_events       | Deferred with invitation email to I6 follow-up; not present in the schema | topic, payload, attempt_count, available_at, published_at |
+| campaign_invitations | campaign and inviter                        | token_hash, intended_role, status, expires_at, accepted membership generation |
+
+`database/schema.sql` is the authoritative list (reconciled 2026-11-08).
 
 ## 12.1 JSON document placement
 
@@ -637,7 +685,8 @@ Mutable aggregates carry an integer revision. Update requests include the expect
 ## 12.3 Retention and recovery
 
 - Daily encrypted backups with point-in-time database recovery; restoration drills at least quarterly.
-- Soft deletion for systems, campaigns, characters, and content during a configurable recovery window.
+- Archive and recover for systems, campaigns, characters, and content. A configurable recovery window with permanent purge is post-MVP (owner decision 2026-11-08); until then archived data is kept indefinitely. Permanent deletion must be planned before real users for privacy requests.
+- Expired operational records (idempotency, command and image receipts; preview snapshots; expired or revoked sessions and personal tokens; unconsumed invitations past expiry; display codes) are deleted 7 days after they become unusable. Deletion runs in bounded batches, by one replica at a time under an advisory lock, every `SWEETROLL_PRUNE_INTERVAL_MS` (default 1 h, 0 disables). Consumed and revoked invitations, audit, activity, rolls and user content are outside this policy (issue #62).
 - Immutable published packages retained while referenced by active or retained campaign data.
 - Audit/activity payloads minimize sensitive content and have an explicit retention policy.
 
@@ -670,12 +719,15 @@ Expose a versioned REST HTTP interface described by OpenAPI. Use resource-orient
 | Systems    | POST/GET /systems; GET /systems/{id}; GET /systems/{id}/versions; PUT /systems/{id}/draft; POST /systems/{id}/preview; POST /systems/{id}/publish; PATCH /systems/{id}; DELETE /systems/{id} |
 | Versions   | GET/PATCH /system-versions/{id}; GET /system-versions/{id}/export                                                                        |
 | Templates  | GET /templates; create a system with a version source to clone a template                                                               |
-| Campaigns  | POST /campaigns; GET/PATCH /campaigns/{id}; POST /campaigns/{id}/invitations; DELETE /campaigns/{id}/members/{memberId}                 |
-| Characters | POST /characters; GET /characters/creation-options; GET /characters/creation-versions; POST /campaigns/{id}/characters; GET/PATCH /characters/{id}; POST /characters/{id}/actions/{actionId} |
-| Content    | POST /campaigns/{id}/content; PATCH /content/{id}; POST /content/{id}/grants                                                            |
-| Session    | GET /campaigns/{id}/session (GM session board); POST /characters/{id}/resources/{resourceId}/bump                                        |
+| Campaigns  | POST/GET /campaigns; GET/PATCH /campaigns/{id}; POST /campaigns/{id}/archive, /recover; GET/POST /campaigns/{id}/invitations (+ /rotate, /revoke); GET /campaigns/{id}/members; PATCH/DELETE /campaigns/{id}/members/{userId}; GET /campaigns/{id}/version-options, /version-check; POST /campaigns/{id}/version; GET/POST /campaigns/{id}/extensions; DELETE /campaigns/{id}/extensions/{extensionId} |
+| Characters | POST/GET /characters; GET /characters/creation-options; GET /characters/creation-versions; GET/POST /campaigns/{id}/characters; POST /campaigns/{id}/characters/{characterId}/assign, /claim, /adopt; GET /campaigns/{id}/claimable-characters; GET/PATCH /characters/{id} (metadata); POST /characters/{id}/fields/{fieldId}/set; POST /characters/{id}/actions/{actionId}; entries, portrait, rolls/push, duplicate, ownership-transfer and version routes |
+| Content    | GET/POST /campaigns/{id}/content; GET /campaigns/{id}/content-preview; GET/PATCH/DELETE /content/{id}; POST /content/{id}/grants, /recover; campaign item templates and proposals |
+| Session    | The GM session board composes the campaign character, content and activity lists with per-character sheet reads (Section 7.2); POST /characters/{id}/resources/{resourceId}/bump |
+| Scenes     | campaign images and scenes; display codes, credentials and revoke; display SSE stream and image routes (Section 7.7) |
 | Activity   | GET /campaigns/{id}/activity; GET /characters/{id}/activity                                                                             |
-| Exports    | POST /characters/{id}/exports; POST /campaigns/{id}/exports; GET /exports/{id}                                                          |
+| Exports    | POST /characters/{id}/exports; POST /campaigns/{id}/exports (bounded synchronous responses; there is no GET /exports/{id}) |
+
+The generated OpenAPI document is the authoritative route list (reconciled 2026-11-08).
 
 `GET /characters/creation-versions` enumerates only systems owned by the actor plus explicitly discoverable (`public`) systems (OD-01 option A, unlisted/link-only). Character creation and metadata lookup from a KNOWN version ID keep their existing authorization unchanged: permission to use a version (owner or `public`/`link` access, published version, active system) never implies permission to discover it, and link-access systems remain usable when the exact version ID is known. The `/characters/new` page opened without a version shows a "Choose a system version" picker from this endpoint; the manual system-version-ID box remains as fallback, and picking a version loads its creation metadata through the unchanged lookup path.
 
@@ -685,13 +737,13 @@ System sharing (owner-approved 2026-09-14): a system owner may set system access
 
 ## 13.1 Idempotency
 
-Create, roll, action, invitation, and export commands accept an idempotency key scoped to user and endpoint. The server stores the completed result for a bounded interval. This prevents duplicated damage, resource spending, rolls, and invitations after mobile or offline retries.
+Create, roll, action, invitation, and export commands accept an idempotency key scoped to user and endpoint. The server stores the completed result for a bounded interval. This prevents duplicated damage, resource spending, rolls, and invitations after mobile or offline retries. Completed results are kept until the receipt expires (30 days for character and campaign commands, 1 day for system authoring) and for a further 7-day grace period, during which a retry receives replay-expired/result-unavailable. A background job then deletes the receipt; a retry with the same key is treated as a new command, still subject to revision and semantic-version checks (Section 12.3).
 
 ## 13.2 Approved pre-upgrade remediation contracts (2026-09-12)
 
 The owner approved the recommended [pre-upgrade remediation](docs/superpowers/plans/2026-09-12-remediation-index.md), including the two narrow discovery contracts below. Approval is not implementation or acceptance evidence. Campaigns owns authorization and pagination; existing Characters sheet authorization, placement commands, content recovery, revision/idempotency rules and standalone offline behavior remain intact. Production authentication remains owner-deferred. Campaign upgrades and scenes/display are excluded from this remediation.
 
-- **Claim discovery:** `GET /campaigns/{id}/claimable-characters` maps to `Campaigns.listClaimableCharacters(ctx, { campaignId, limit?, cursor? })`, operation ID `get_campaigns_id_claimable_characters`. It returns `{ characters, nextCursor }` plus HTTP `requestId`; each row contains exactly `characterId`, `name`, `revision`, and `lifecycle: 'active' | 'archived'`. Require active membership and an outstanding designation for the current actor, excluding sheets that actor already controls. Match campaign/character scope on every predicate, filter before bounded pagination, use stable timestamp/ID ordering, bind cursors to actor/campaign/query family, and reauthorize each page and claim. No controller IDs, other designees, sheet state/projection, inventory, rolls, audit, placement metadata or system/version details are disclosed. Discovery grants no sheet read/export/activity/mutation access; the existing roster endpoint and GM/controller sheet permissions are unchanged. Claim consumes only the caller's designation and preserves other designations/controllers. Archived rows remain explanatory with no UI Claim action; the existing command's missing character-lifecycle check is a known discrepancy, not silently changed here.
+- **Claim discovery:** `GET /campaigns/{id}/claimable-characters` maps to `Campaigns.listClaimableCharacters(ctx, { campaignId, limit?, cursor? })`, operation ID `get_campaigns_id_claimable_characters`. It returns `{ characters, nextCursor }` plus HTTP `requestId`; each row contains exactly `characterId`, `name`, `revision`, and `lifecycle: 'active' | 'archived'`. Require active membership and an outstanding designation for the current actor, excluding sheets that actor already controls. Match campaign/character scope on every predicate, filter before bounded pagination, use stable timestamp/ID ordering, bind cursors to actor/campaign/query family, and reauthorize each page and claim. No controller IDs, other designees, sheet state/projection, inventory, rolls, audit, placement metadata or system/version details are disclosed. Discovery grants no sheet read/export/activity/mutation access; the existing roster endpoint and GM/controller sheet permissions are unchanged. Claim consumes only the caller's designation and preserves other designations/controllers. Archived rows remain explanatory with no UI Claim action. The claim command rejects an archived character with `409 conflict` ("Recover the character before claiming it.", no `latestRevision`) before consuming anything; the rejection stores no idempotency result and leaves the designation, controllers, activity and revisions unchanged, so the designee can claim once a GM recovers the character (owner decision 2026-11-08, issue #58).
 - **Deleted-summary recovery:** `GET /campaigns/{id}/content` gains optional `status=active|deleted`, normalized to `active`; `ContentSummary` gains required `status`, while the result envelope and operation ID remain unchanged. Active lists retain existing readership. Deleted lists require active membership and existing management authority: creator OR a GM who may read the note, not any former recipient. Another creator's owner-only note remains inaccessible to GMs. Return existing summaries with current `revision`/`accessRevision` and status, never deleted bodies or grant lists. Filter before bounded pagination and bind normalized status, actor, campaign and query family into cursors. Ordinary `GET /content/{id}` remains active-only and returns generic 404 for deleted content. The GM Active/Hidden view supports paginated recovery after reload/new browser sessions using the listed revision and existing `POST /content/{id}/recover`; Hide means soft-delete, not GM-only audience. No deleted preview, permanent delete, retention change or player-note management UI is added. Preserve player-creator server authority and retained-editor receipt recovery. Archived campaigns still deny recovery mutations even if summaries are readable.
 - **Privacy and lifecycle:** inaccessible resources retain generic 404 collapse and protected responses remain `Cache-Control: no-store`; no campaign payload service-worker persistence is added. Scope browser queries and in-flight results by actor/generation, distinguish claim and active/deleted list families, and purge them on sign-out, account switch, leave, revocation or visibility loss. Cancel/reject late responses so private data cannot repopulate a later lifetime. Revalidate authorization on reconnect; do not claim offline erasure of information already received. Successful mutations refresh relevant summaries/roster/campaign revisions before further commands; a definite 409 requires fresh reads and explicit fresh-key retry, never guessed revisions or automatic replay of a known success.
 
@@ -768,9 +820,22 @@ send HSTS. Metrics require a separate scraper token and are off by default.
 The browser and public API share account request and image-upload budgets
 in PostgreSQL. The general budget allows up to 120 writes or public API
 requests, or 600 browser reads per minute. Browser reads spend one fifth of
-the budget used by a write. Display redemption has per-IP and process limits. Each
-campaign can have five live pairing codes, and each display credential can
-open two scene streams per process.
+the budget used by a write. Upload, validate and publish requests also have
+their own bucket, which is checked first: a request it rejects spends nothing
+from the general budget, and a request the general budget rejects is refunded
+to its bucket (issue #67). `POST /displays/redeem` (unauthenticated) allows 10 attempts per client IP per
+minute, counting every attempt, and 120 failed redemptions (wrong, expired or
+unknown code) per process per minute. A correct code always redeems, so
+attackers cannot block pairing; when the failure budget is spent, invalid codes
+receive 429 instead of 404, which reveals nothing more. Because the global
+budget no longer limits guessing, pairing codes are 8 characters drawn
+uniformly (rejection sampling) from a 36-character alphabet, live 5 minutes and
+are single-use (owner decision 2026-11-08, issue #61). The per-IP tracker is
+bounded at 10,000 addresses. Client IPs come from `X-Forwarded-For` only for
+proxies listed in `TRUSTED_PROXY_CIDRS`; if the header arrives while none are
+configured, the server logs one warning. Each campaign can have five live
+pairing codes, and each display credential can open two scene streams per
+process.
 
 ## 14.1 Privacy defaults
 

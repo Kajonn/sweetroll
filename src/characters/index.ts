@@ -20,13 +20,18 @@ import type {
   TemplateKind,
 } from "../systems/implementation/package/schema/index.js";
 import type { SystemAuthoring } from "../systems/authoring.js";
+import type { ExtensionAuthoring } from "../systems/extensions.js";
+import type { ExtensionRef } from "../systems/runtime.js";
+import { sortExtensionRefs } from "./persistence.js";
 import type { VersionChoice } from "../systems/implementation/persistence/index.js";
 import type { VersionChangeDirection, VersionChangeReport } from "../systems/runtime.js";
 import { hashInput } from "../systems/implementation/authoring/assess.js";
-import { validateEntryForSlot } from "../systems/implementation/runtime/entries.js";
+import { templateKey, validateEntryForSlot } from "../systems/implementation/runtime/entries.js";
+import { createEffectivePackageLoader } from "../systems/implementation/runtime/composition-loader.js";
+import { unqualifiedId } from "../systems/implementation/rules/compose.js";
 import {
+  createPostgresPublishedExtensionLoader,
   createPostgresPublishedPackageLoader,
-  PublishedPackageCorruptError,
 } from "../systems/implementation/runtime/package-loader.js";
 import type {
   CharacterProjectionV1,
@@ -176,6 +181,8 @@ export type CharacterView = {
   returnOwnerId: UserId | null;
   name: string;
   systemVersionId: VersionId;
+  /** Design 6.8: extension versions the character is built on. */
+  extensions: ExtensionRef[];
   entityDefinitionId: DefinitionId;
   revision: number;
   lifecycle: "active" | "archived";
@@ -206,6 +213,8 @@ export type CharacterPage = {
 
 export type CreateCharacter = {
   systemVersionId: VersionId;
+  /** Design 6.8: extension versions to build the character on (one per extension). */
+  extensions?: ExtensionRef[];
   entityDefinitionId: DefinitionId;
   name: string;
   initialValues?: Record<DefinitionId, unknown>;
@@ -320,6 +329,8 @@ export type CharacterEntryInput = {
   entryId: string;
   slotId: DefinitionId;
   templateId: DefinitionId | null;
+  /** Design 6.8: extension of `templateId`; absent for base templates. */
+  extensionId?: string;
   values: Record<string, unknown>;
   quantity?: number;
 };
@@ -357,6 +368,8 @@ export type CharacterUpdateEntryValuesCommand = {
  */
 export type EntryTemplateSummary = {
   source?: EntrySource;
+  /** Design 6.8: extension of a system template; absent for base templates. */
+  extensionId?: string;
   defaultQuantity?: number;
   id: DefinitionId;
   label: string;
@@ -488,6 +501,8 @@ export type CharacterExportV1 = {
   createdAt: string;
   updatedAt: string;
   systemVersionId: VersionId;
+  /** Design 6.8: extension versions the state is built on; omitted when none. Identity only, no content. */
+  extensions?: ExtensionRef[];
   packageChecksum: string;
   revision: number;
   state: RuntimeStateV1;
@@ -549,6 +564,8 @@ export type CreateCharactersModuleInput = {
   pool: Pool;
   runtime: SystemRuntime;
   authorizeVersionUse: SystemAuthoring["authorizeVersionUse"];
+  /** Design 6.8; characters cannot be created with extensions without it. */
+  authorizeExtensionUse?: ExtensionAuthoring["authorizeExtensionUse"];
   listAuthorizedVersions: SystemAuthoring["listAuthorizedVersions"];
   /** Design 6.7 version choices; version-change operations are unavailable without them. */
   listUpgradeTargets?: SystemAuthoring["listUpgradeTargets"];
@@ -571,6 +588,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
   // loads it directly here (precedent: the direct hashInput import above) so
   // no SystemRuntime surface changes are required.
   const loadPackage = createPostgresPublishedPackageLoader(input.pool);
+  // Design 6.8: entries are validated against the character's composition.
+  const loadEffective = createEffectivePackageLoader({
+    loadPackage,
+    loadExtensionPackage: createPostgresPublishedExtensionLoader(input.pool),
+  });
 
   const errors = {
     bad_request: (message: string): CharacterError => ({ code: "bad_request", message }),
@@ -624,6 +646,32 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     };
   }
 
+  /**
+   * Design 6.8 (decision X2/X6): every requested extension version must be a
+   * published version of an active extension of this system that the actor may
+   * use, one version per extension, at most 16. Whether the composition fits
+   * the base version is checked by the runtime when it resolves.
+   */
+  async function authorizeExtensions(
+    ctx: RequestContext,
+    systemId: string,
+    extensions: readonly ExtensionRef[],
+  ): Promise<CharacterError | null> {
+    if (extensions.length === 0) return null;
+    if (extensions.length > 16) return errors.bad_request("A character may use at most 16 extensions.");
+    if (new Set(extensions.map((ref) => ref.extensionId)).size !== extensions.length) {
+      return errors.bad_request("Use one version of each extension.");
+    }
+    if (input.authorizeExtensionUse === undefined) return errors.not_found();
+    for (const ref of extensions) {
+      const use = await input.authorizeExtensionUse(ctx, ref.versionId);
+      if (!use.ok || use.value.extensionId !== ref.extensionId || use.value.baseSystemId !== systemId) {
+        return errors.not_found();
+      }
+    }
+    return null;
+  }
+
   function toView(
     record: CharacterRecord,
     resolved: {
@@ -650,6 +698,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       returnOwnerId: record.returnOwnerId,
       name: record.name,
       systemVersionId: record.systemVersionId,
+      extensions: record.extensions,
       entityDefinitionId: record.entityDefinitionId,
       revision: record.revision,
       lifecycle: record.lifecycle,
@@ -1023,30 +1072,26 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
    * validation (slots/templates) happens before any runtime intent runs.
    */
   async function loadEntryPackage(
-    versionId: string,
+    source: Pick<CharacterRecord, "systemVersionId" | "extensions">,
     executionId: string,
     replayExpiresAt: Date,
     resultScope: StoredResultScope,
   ): Promise<{ ok: true; value: SystemPackageV1 } | { ok: false; error: CharacterError }> {
-    try {
-      const loaded = await loadPackage(versionId);
-      if (loaded === null) return { ok: false, error: errors.internal() };
-      return { ok: true, value: loaded };
-    } catch (error) {
-      if (error instanceof PublishedPackageCorruptError) {
-        const mapped = mapRuntimeError({
-          code: "invalid_package",
-          message: "Published package runtime references are invalid.",
-        });
-        await repo.finalizeExecutionError({
-          executionId,
-          resultJson: serializeCommandError(mapped, resultScope),
-          expiresAt: replayExpiresAt,
-        });
-        return { ok: false, error: mapped };
-      }
-      return { ok: false, error: errors.internal() };
+    const loaded = await loadEffective(source.systemVersionId, source.extensions);
+    if (loaded.ok) return loaded;
+    if (loaded.error.code === "invalid_package") {
+      const mapped = mapRuntimeError({
+        code: "invalid_package",
+        message: "Published package runtime references are invalid.",
+      });
+      await repo.finalizeExecutionError({
+        executionId,
+        resultJson: serializeCommandError(mapped, resultScope),
+        expiresAt: replayExpiresAt,
+      });
+      return { ok: false, error: mapped };
     }
+    return { ok: false, error: errors.internal() };
   }
 
   /**
@@ -1085,7 +1130,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       return { ok: false, error };
     };
 
-    const packaged = await loadEntryPackage(resolveSource.systemVersionId, executionId, replayExpiresAt, resultScope);
+    const packaged = await loadEntryPackage(resolveSource, executionId, replayExpiresAt, resultScope);
     if (!packaged.ok) return packaged;
     const packageValue=packaged.value;
     const slots: SlotDefinitionV1[] = packaged.value.slots ?? [];
@@ -1096,6 +1141,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
 
     let nextEntries: Record<string, CharacterEntryV1>;
     let selectedSource: Extract<EntrySource, {kind:"campaign"}> | undefined;
+    let addedExtensionId: string | undefined;
     let activityKind: "entry_added" | "entry_removed" | "entry_updated";
     let activityFields: Record<string, unknown>;
     let changedDefinitionIds: DefinitionId[];
@@ -1126,11 +1172,29 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       if (storedEntries[entryInput.entryId] !== undefined) {
         return fail(errors.bad_request("Character entry already exists."));
       }
-      if (Object.keys(entryInput).some(key => !["entryId","slotId","templateId","source","values","quantity"].includes(key))) return fail(errors.bad_request("Unknown entry input field."));
+      if (Object.keys(entryInput).some(key => !["entryId","slotId","templateId","extensionId","source","values","quantity"].includes(key))) return fail(errors.bad_request("Unknown entry input field."));
+      // Design 6.8: an extension template is named by its plain ID plus the
+      // extension, which must be part of this character's composition.
+      if (entryInput.extensionId !== undefined && (
+        typeof entryInput.extensionId !== "string"
+        || entryInput.templateId === null
+        || !resolveSource.extensions.some((ref) => ref.extensionId === entryInput.extensionId)
+      )) {
+        // Issue #60: a command prepared against an older revision (for example
+        // before a campaign removed the extension) reports the revision
+        // conflict, so the client refreshes the changed rules.
+        if (typeof entryInput.extensionId === "string" && entryInput.templateId !== null && command.expectedRevision !== resolveSource.revision) {
+          return finishCommandTx({
+            ctx, outcome: { kind: "conflict", latestRevision: resolveSource.revision }, characterId: command.characterId,
+            expectedRevision: command.expectedRevision, attachedCampaignId, resultScope, standaloneOnly, executionId, replayExpiresAt,
+          });
+        }
+        return fail(errors.invalid_value("The extension is not part of this character's rules."));
+      }
       if (entryInput.source !== undefined) {
         const source = entryInput.source;
         if (!isRecord(source) || !["personal", "system", "campaign"].includes(source.kind as string)) return fail(errors.bad_request("Invalid entry source."));
-        const keys = source.kind === "campaign" ? ["kind", "campaignId", "templateId", "templateRevision", "contentRevision"] : source.kind === "system" ? ["kind", "templateId"] : ["kind"];
+        const keys = source.kind === "campaign" ? ["kind", "campaignId", "templateId", "templateRevision", "contentRevision"] : source.kind === "system" ? ["kind", "templateId", "extensionId"] : ["kind"];
         if (Object.keys(source).some(key => !keys.includes(key))) return fail(errors.bad_request("Unknown entry source field."));
         if (source.kind === "campaign" && (typeof source.campaignId !== "string" || !ENTRY_ID_PATTERN.test(source.campaignId) || typeof source.templateId !== "string" || !ENTRY_ID_PATTERN.test(source.templateId))) return fail(errors.bad_request("Invalid campaign template reference."));
       }
@@ -1163,6 +1227,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         entryId: entryInput.entryId,
         slotId: entryInput.slotId,
         templateId: entryInput.templateId,
+        ...(typeof entryInput.extensionId === "string" ? { extensionId: entryInput.extensionId } : {}),
         values: structuredClone(values),
         ...(pinnedImage ? { image: structuredClone(pinnedImage) } : {}),
         ...(entryInput.source === undefined ? {} : {source:structuredClone(entryInput.source)}),
@@ -1173,7 +1238,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       const validation = validateEntryForSlot(candidate, allowedSlots, templates, siblingCount);
       if (!validation.ok) return fail(errors.invalid_value(validation.message));
       if (candidate.templateId !== null) {
-        const template = templates.find((candidateTemplate) => candidateTemplate.id === candidate.templateId);
+        const key = templateKey(candidate);
+        const template = templates.find((candidateTemplate) => candidateTemplate.id === key);
         if (template === undefined) return fail(errors.invalid_value("Entry template is unknown."));
         if (template.image) candidate.image = structuredClone(template.image);
         for (const field of template.fields) {
@@ -1184,9 +1250,13 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           candidate.values[field.id] = structuredClone(field.default);
         }
       }
+      addedExtensionId = candidate.extensionId;
       nextEntries = { ...storedEntries, [candidate.entryId]: candidate };
       activityKind = "entry_added";
-      activityFields = { entryId: candidate.entryId, slotId: candidate.slotId, templateId: candidate.templateId };
+      activityFields = {
+        entryId: candidate.entryId, slotId: candidate.slotId, templateId: candidate.templateId,
+        ...(candidate.extensionId === undefined ? {} : { extensionId: candidate.extensionId }),
+      };
       changedDefinitionIds = [candidate.slotId];
       stateChanged = true;
     } else if (command.kind === "removeEntry") {
@@ -1238,6 +1308,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     const nextState: RuntimeStateV1 = { ...resolveSource.state, entries: nextEntries };
     const resolved = await input.runtime.resolve({
       versionId: resolveSource.systemVersionId,
+      extensions: resolveSource.extensions,
       entityId: resolveSource.entityDefinitionId,
       state: nextState,
       intent: { kind: "observe" },
@@ -1254,6 +1325,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       return { ok: false, error };
     }
 
+    const placementSource = selectedSource;
+    const entryExtensionId = addedExtensionId;
     const outcome = await repo.applyCommandTx({
       executionId,
       characterId: command.characterId,
@@ -1261,10 +1334,20 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       expectedRevision: command.expectedRevision,
       nextState: resolved.value.state,
       stateChanged,
-      ...(selectedSource === undefined ? {} : { precondition: async (client: import("pg").PoolClient): Promise<CharacterError | null> => {
-        const current = await input.campaignTemplates!.read(client, selectedSource!);
+      ...(placementSource === undefined && entryExtensionId === undefined ? {} : { precondition: async (client: import("pg").PoolClient): Promise<CharacterError | null> => {
+        // Design 6.8 (X9), defence in depth for issue #60: the entry's
+        // extension must still be in the locked character's composition.
+        if (entryExtensionId !== undefined) {
+          const present = await client.query(
+            "SELECT 1 FROM character_extensions WHERE character_id = $1 AND extension_id = $2",
+            [command.characterId, entryExtensionId],
+          );
+          if (present.rowCount === 0) return {code:"conflict",message:"The character's rules have changed. Refresh and try again.",cacheDisposition:"replace"};
+        }
+        if (placementSource === undefined) return null;
+        const current = await input.campaignTemplates!.read(client, placementSource);
         if (current === null || current.audience !== "all_players") return errors.not_found();
-        return canPlaceTemplate(current) && current.revision === selectedSource!.templateRevision && current.contentRevision === selectedSource!.contentRevision ? null : {code:"conflict",message:"The campaign template has changed. Refresh and explicitly review the selected revision.",cacheDisposition:"replace"};
+        return canPlaceTemplate(current) && current.revision === placementSource.templateRevision && current.contentRevision === placementSource.contentRevision ? null : {code:"conflict",message:"The campaign template has changed. Refresh and explicitly review the selected revision.",cacheDisposition:"replace"};
       } }),
       roll: null,
       activity: {
@@ -1319,6 +1402,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     targetVersionId: VersionId,
   ): Promise<CharacterResult<{ direction: VersionChangeDirection; report: VersionChangeReport }>> {
     if (input.listUpgradeTargets === undefined) return { ok: false, error: errors.internal() };
+    // Design 6.8: composition changes (stage E5) will cover characters with
+    // extensions; until then their rules version cannot change.
+    if (record.extensions.length > 0) {
+      return { ok: false, error: { code: "conflict", message: "Characters built with extensions cannot change rules version yet." } };
+    }
     if (targetVersionId === record.systemVersionId) {
       return { ok: false, error: errors.invalid_value("The character already uses this version.") };
     }
@@ -1497,11 +1585,13 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     ...createCharacterImages({ pool: input.pool, now, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
     ...createCharacterEntryImages({ pool: input.pool, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
     async create(ctx, createInput) {
+      const extensions = sortExtensionRefs(createInput.extensions ?? []);
       const inputHash = hashInput({
         systemVersionId: createInput.systemVersionId,
         entityDefinitionId: createInput.entityDefinitionId,
         name: createInput.name,
         initialValues: createInput.initialValues ?? {},
+        ...(extensions.length === 0 ? {} : { extensions }),
       });
 
       async function replayCreate(): Promise<CharacterResult<CharacterView> | null> {
@@ -1527,9 +1617,12 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
 
         const authorized = await input.authorizeVersionUse(ctx, createInput.systemVersionId);
         if (!authorized.ok) return { ok: false, error: errors.not_found() };
+        const extensionCheck = await authorizeExtensions(ctx, authorized.value.systemId, extensions);
+        if (extensionCheck !== null) return { ok: false, error: extensionCheck };
 
         const resolved = await input.runtime.resolve({
           versionId: authorized.value.versionId,
+          extensions,
           entityId: createInput.entityDefinitionId,
           intent:
             createInput.initialValues === undefined
@@ -1550,6 +1643,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           placementGeneration: 1,
           returnOwnerId: null,
           systemVersionId: resolved.value.versionId,
+          extensions,
           entityDefinitionId: createInput.entityDefinitionId,
           name: createInput.name,
           revision: 1,
@@ -1583,6 +1677,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             characterId,
             ownerId: ctx.actorId,
             systemVersionId: resolved.value.versionId,
+            extensions,
             entityDefinitionId: createInput.entityDefinitionId,
             name: createInput.name,
             state: resolved.value.state,
@@ -1758,6 +1853,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
 
         const resolved = await input.runtime.resolve({
           versionId: source.systemVersionId,
+          extensions: source.extensions,
           entityId: source.entityDefinitionId,
           state: source.state,
           intent: { kind: "observe" },
@@ -1880,6 +1976,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (record !== null) {
           const resolved = await input.runtime.resolve({
             versionId: record.systemVersionId,
+            extensions: record.extensions,
             entityId: record.entityDefinitionId,
             state: record.state,
             intent: { kind: "observe" },
@@ -1926,6 +2023,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const attachedRecord = attached.auth.record;
         const resolved = await input.runtime.resolve({
           versionId: attachedRecord.systemVersionId,
+          extensions: attachedRecord.extensions,
           entityId: attachedRecord.entityDefinitionId,
           state: attachedRecord.state,
           intent: { kind: "observe" },
@@ -1982,7 +2080,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const child=await input.pool.query("SELECT id FROM character_rolls WHERE parent_roll_id=$1 LIMIT 1",[optionsInput.rollId]);
         if(child.rows.length)reason="parent_consumed";
         if(!reason){
-          const validated=await input.runtime.resolve({versionId:record.systemVersionId,entityId:record.entityDefinitionId,state:record.state,intent:{kind:"push",parent:parent.roll,context:parent.context,executionId:optionsInput.rollId,optionsOnly:true}});
+          const validated=await input.runtime.resolve({versionId:record.systemVersionId,extensions:record.extensions,entityId:record.entityDefinitionId,state:record.state,intent:{kind:"push",parent:parent.roll,context:parent.context,executionId:optionsInput.rollId,optionsOnly:true}});
           if(!validated.ok){if(validated.error.code!=="push_unavailable")return {ok:false,error:mapRuntimeError(validated.error)};reason=validated.error.pushReason??"invalid_snapshot";}
         }
         const eligible=pushEligibility(parent.context.policy,parent.roll,parent.roll.push!.attempt);
@@ -2200,6 +2298,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
 
         const resolved = await input.runtime.resolve({
           versionId: resolveSource.systemVersionId,
+          extensions: resolveSource.extensions,
           entityId: resolveSource.entityDefinitionId,
           state: resolveSource.state,
           intent,
@@ -2304,26 +2403,23 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           if (attached === null) return { ok: false, error: errors.not_found() };
           record = attached.auth.record;
         }
-        let packageValue: SystemPackageV1;
-        try {
-          const loaded = await loadPackage(record.systemVersionId);
-          if (loaded === null) return { ok: false, error: errors.internal() };
-          packageValue = loaded;
-        } catch (error) {
-          // Read path: no execution was claimed, so nothing is finalized.
-          if (error instanceof PublishedPackageCorruptError) {
-            return {
-              ok: false,
-              error: mapRuntimeError({
-                code: "invalid_package",
-                message: "Published package runtime references are invalid.",
-              }),
-            };
-          }
-          return { ok: false, error: errors.internal() };
+        // Read path: no execution was claimed, so nothing is finalized.
+        const loaded = await loadEffective(record.systemVersionId, record.extensions);
+        if (!loaded.ok) {
+          return loaded.error.code === "invalid_package"
+            ? { ok: false, error: mapRuntimeError({ code: "invalid_package", message: "Published package runtime references are invalid." }) }
+            : { ok: false, error: errors.internal() };
         }
-        const systemChoices: EntryTemplateSummary[] = (packageValue.templates ?? []).map((template) => ({
-            id: template.id,
+        const packageValue: SystemPackageV1 = loaded.value;
+        // Design 6.8: extension templates are listed by plain ID with their extension.
+        const systemChoices: EntryTemplateSummary[] = (packageValue.templates ?? []).map((template) => {
+          const key = unqualifiedId(template.id);
+          return {
+            id: key.id,
+            ...(key.origin === null ? {} : {
+              extensionId: key.origin,
+              source: { kind: "system" as const, templateId: key.id, extensionId: key.origin },
+            }),
             label: template.label,
             kind: template.kind,
             fields: template.fields.map((field) => structuredClone(field)),
@@ -2333,7 +2429,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
               actionKind: action.kind,
               inputs: action.kind === "roll" ? action.inputs.map((actionInput) => ({ ...actionInput })) : [],
             })),
-          }));
+          };
+        });
         const campaignChoices: EntryTemplateSummary[] = [];
         if (record.campaignId !== null && inputCampaignTemplates !== undefined) {
           let cursor: string | null = null;
@@ -2530,6 +2627,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         // projection from the pre-mutation snapshot (immutable pinned version/package).
         const resolved = await input.runtime.resolve({
           versionId: resolveSource!.systemVersionId,
+          extensions: resolveSource!.extensions,
           entityId: resolveSource!.entityDefinitionId,
           state: resolveSource!.state,
           intent: { kind: "observe" },
@@ -2731,6 +2829,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (record !== null) {
           const resolved = await input.runtime.resolve({
             versionId: record.systemVersionId,
+            extensions: record.extensions,
             entityId: record.entityDefinitionId,
             state: record.state,
             intent: { kind: "observe" },
@@ -2764,6 +2863,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const attachedRecord = attached.auth.record;
         const resolved = await input.runtime.resolve({
           versionId: attachedRecord.systemVersionId,
+          extensions: attachedRecord.extensions,
           entityId: attachedRecord.entityDefinitionId,
           state: attachedRecord.state,
           intent: { kind: "observe" },
@@ -2873,9 +2973,19 @@ function minimizeActivityPayload(kind: string, payload: unknown): unknown {
         addedFields: record.addedFields ?? [],
         droppedFields: record.droppedFields ?? [],
       };
+    case "extensions_changed":
+      // Issue #60: extension and version identifiers only.
+      return { added: extensionRefsOnly(record.added), removed: extensionRefsOnly(record.removed) };
     default:
       return {};
   }
+}
+
+function extensionRefsOnly(value: unknown): Array<{ extensionId: unknown; versionId: unknown }> {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((ref): ref is Record<string, unknown> => typeof ref === "object" && ref !== null)
+    .map((ref) => ({ extensionId: ref.extensionId, versionId: ref.versionId }));
 }
 
 function encodeCursor(cursor: CharacterPageCursor): string {

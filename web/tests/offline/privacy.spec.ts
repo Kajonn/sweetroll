@@ -14,6 +14,8 @@ import {
   readCharacter,
   testSignIn,
 } from "./test-auth.js";
+import { lookUpCreationVersion } from "../fixtures/lookUpCreationVersion";
+import { expectSheetSaved } from "../fixtures/sheetSaved";
 
 /**
  * Task 8 privacy: offline sign-out barrier, account switching isolation,
@@ -264,8 +266,7 @@ test.describe("offline privacy and sign-out", () => {
       const page = await context.newPage();
       await page.setViewportSize({ width: 360, height: 740 });
       await page.goto(`/characters/new?systemVersionId=${system.systemVersionId}`);
-      await page.getByLabel("System version ID").fill(system.systemVersionId);
-      await page.getByRole("button", { name: "Look up version" }).click();
+      await lookUpCreationVersion(page, system.systemVersionId);
       await page.getByLabel("Entity").selectOption("character");
       const characterName = `SignoutCreate ${Date.now().toString(36)}`;
       await page.getByLabel("Character name").fill(characterName);
@@ -410,7 +411,7 @@ test.describe("offline privacy and sign-out", () => {
       }
       await page.getByRole("button", { name: "Reapply", exact: true }).click();
       await page.getByRole("button", { name: "Confirm reapply" }).click();
-      await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
+      await expectSheetSaved(page);
       const after = await readCharacter(page.request, characterId);
       expect(after.character.revision).toBe(writerRevision + 2);
       const activity = await readActivity(page.request, characterId);

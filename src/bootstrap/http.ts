@@ -1,9 +1,11 @@
 import { createTemplateRepository } from "../campaigns/templatePersistence.js";
 import { loadConfig, createLogger, createPool } from "../platform/index.js";
 import { loadCampaignLimits } from "../platform/config.js";
+import { pruneExpiredRows, startPruneScheduler, type PruneScheduler } from "../platform/prune.js";
 import { createIdentityModule } from "../identity/index.js";
 import { createTestOidcClient } from "../identity/adapters/test.js";
 import { createSystemAuthoringModule } from "../systems/authoring.js";
+import { createExtensionAuthoringModule } from "../systems/extensions.js";
 import { createCharactersModule } from "../characters/index.js";
 import { createCampaignPlacement } from "../characters/campaignPlacement.js";
 import { createCampaignsModule } from "../campaigns/index.js";
@@ -13,7 +15,7 @@ import {
   seedReferenceTemplates,
 } from "../systems/implementation/persistence/index.js";
 import { createSystemRuntime } from "../systems/runtime.js";
-import { createPostgresPublishedPackageLoader } from "../systems/implementation/runtime/package-loader.js";
+import { createPostgresPublishedExtensionLoader, createPostgresPublishedPackageLoader } from "../systems/implementation/runtime/package-loader.js";
 import { buildPublicApi, publicApiPrefix } from "../transport/http/public-api/index.js";
 import { buildPersonalTokenRoutes } from "../transport/http/personal-tokens.js";
 import { buildAuthHook } from "../transport/http/auth-hook.js";
@@ -91,13 +93,16 @@ const identity = createIdentityModule({
   allowPersonalTokens: config.nodeEnv !== "production" && process.env.SWEETROLL_LOCAL_API_TOKENS === "1",
 });
 
+const systemRepository = createSystemPersistenceRepository(pool);
 const authoring = createSystemAuthoringModule({
   pool,
-  repo: createSystemPersistenceRepository(pool),
+  repo: systemRepository,
 });
+const extensionAuthoring = createExtensionAuthoringModule({ pool, repo: systemRepository });
 
 const runtime = createSystemRuntime({
   loadPackage: createPostgresPublishedPackageLoader(pool),
+  loadExtensionPackage: createPostgresPublishedExtensionLoader(pool),
   authoritativeRollSecret: config.authoritativeRollSecret,
 });
 
@@ -106,6 +111,7 @@ const characters = createCharactersModule({
   pool,
   runtime,
   authorizeVersionUse: authoring.authorizeVersionUse,
+  authorizeExtensionUse: extensionAuthoring.authorizeExtensionUse,
   listAuthorizedVersions: authoring.listAuthorizedVersions,
   listUpgradeTargets: authoring.listUpgradeTargets,
   describeVersionChoices: authoring.describeVersionChoices,
@@ -138,6 +144,7 @@ const campaigns = createCampaignsModule({
   limits: placementLimits,
   charactersPlacement: placement,
     loadTemplatePackage:createPostgresPublishedPackageLoader(pool),
+    authorizeExtensionUse: extensionAuthoring.authorizeExtensionUse,
     listUpgradeTargets: authoring.listUpgradeTargets,
     describeVersionChoices: authoring.describeVersionChoices,
 });
@@ -170,7 +177,7 @@ registerApiRoutes(app, [
     secure: config.cookieSecure,
   }),
   buildPersonalTokenRoutes({ identity }),
-  buildSystemsRoutes({ authoring }),
+  buildSystemsRoutes({ authoring, extensions: extensionAuthoring }),
   buildCharactersRoutes({ characters }),
   buildCampaignsRoutes({ campaigns, characters, runtime, identity }),
 ], serveStatic, { pool });
@@ -185,8 +192,22 @@ void app.register(
   }),
 );
 
+// Expired-row retention (design 12.3/13.1): every replica schedules it; the
+// advisory lock inside pruneExpiredRows lets only one prune at a time.
+let pruneScheduler: PruneScheduler | null = null;
+if (config.pruneIntervalMs > 0) {
+  pruneScheduler = startPruneScheduler({
+    intervalMs: config.pruneIntervalMs,
+    logger,
+    run: () => pruneExpiredRows(pool),
+  });
+} else {
+  logger.info({ event: "prune_disabled" }, "expired-row pruning disabled (SWEETROLL_PRUNE_INTERVAL_MS=0)");
+}
+
 const shutdown = async (signal: string) => {
   logger.info({ signal }, "shutting down HTTP process");
+  pruneScheduler?.stop();
   await app.close();
   await sceneEvents.close();
   await pool.end();
@@ -199,6 +220,7 @@ try {
   await app.listen({ host: config.host, port: config.port });
 } catch (error) {
   logger.fatal({ err: error }, "HTTP process failed to start");
+  pruneScheduler?.stop();
   await pool.end();
   process.exitCode = 1;
 }

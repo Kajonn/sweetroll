@@ -443,6 +443,80 @@ describe.skipIf(!databaseUrl)("public API v1 campaigns, play and scenes", () => 
     })).statusCode).toBe(404);
   });
 
+  it("rejects claims of archived characters on both routes without consuming the designation (issue #58)", async () => {
+    const campaign = await createCampaign("Wreck");
+    await joinCampaign(campaign.campaignId, tokens.player);
+    const created = await json<{ characterId: string; revision: number }>(
+      tokens.gm, "POST", `/campaigns/${campaign.campaignId}/characters`, {
+        name: "Drowned scout", entityDefinitionId: "character",
+        expectedCampaignRevision: await revisionOf(campaign.campaignId), idempotencyKey: randomUUID(),
+      }, 201);
+    const characterId = created.characterId;
+    const assigned = await json<{ revision: number }>(tokens.gm, "POST",
+      `/campaigns/${campaign.campaignId}/characters/${characterId}/assign`, {
+        controllerUserIds: [], designateClaimants: [h.users.player.actorId],
+        expectedCampaignRevision: await revisionOf(campaign.campaignId), expectedCharacterRevision: created.revision,
+        idempotencyKey: randomUUID(),
+      });
+    const archived = await json<{ revision: number }>(tokens.gm, "PATCH", `/characters/${characterId}`, {
+      command: "archive", expectedRevision: assigned.revision, idempotencyKey: randomUUID(),
+    });
+
+    type Claimable = { characters: Array<{ characterId: string; revision: number; lifecycle: string }> };
+    const listed = await json<Claimable>(tokens.player, "GET", `/campaigns/${campaign.campaignId}/claimable-characters`);
+    expect(listed.characters).toEqual([expect.objectContaining({ characterId, lifecycle: "archived", revision: archived.revision })]);
+
+    const snapshot = async () => {
+      const row = await h.pool.query<{ revision: number; controllers: string; designations: string; activity: string; campaign_revision: number }>(
+        `SELECT c.revision,
+                (SELECT count(*) FROM character_controllers WHERE character_id = c.id) AS controllers,
+                (SELECT count(*) FROM character_claim_designations WHERE character_id = c.id) AS designations,
+                (SELECT count(*) FROM character_activity_events WHERE character_id = c.id) AS activity,
+                (SELECT revision FROM campaigns WHERE id = c.campaign_id) AS campaign_revision
+           FROM characters c WHERE c.id = $1`, [characterId]);
+      return row.rows[0];
+    };
+    const before = await snapshot();
+    expect(before).toMatchObject({ controllers: "0", designations: "1" });
+
+    const claimBody = async () => ({
+      expectedCampaignRevision: await revisionOf(campaign.campaignId, tokens.player),
+      expectedCharacterRevision: archived.revision, idempotencyKey: randomUUID(),
+    });
+    const claimPath = `/campaigns/${campaign.campaignId}/characters/${characterId}/claim`;
+    const recoverMessage = "Recover the character before claiming it.";
+
+    // Public API: 409, and an identical retry gets the same conflict.
+    const apiBody = await claimBody();
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const rejected = await call(tokens.player, "POST", claimPath, apiBody);
+      expect(rejected.statusCode, rejected.body).toBe(409);
+      expect(rejected.json()).toMatchObject({ error: { code: "conflict", message: recoverMessage } });
+    }
+    // Browser route: the same conflict.
+    const browser = await h.app.inject({
+      method: "POST", url: claimPath, headers: { cookie: h.users.player.cookie }, payload: await claimBody(),
+    });
+    expect(browser.statusCode, browser.body).toBe(409);
+    expect(browser.json()).toMatchObject({ error: { code: "conflict", message: recoverMessage } });
+
+    // Nothing changed: designation kept, no controller, no activity or revision bump.
+    expect(await snapshot()).toEqual(before);
+    expect((await json<Claimable>(tokens.player, "GET", `/campaigns/${campaign.campaignId}/claimable-characters`)).characters
+      .map((row) => row.characterId)).toEqual([characterId]);
+
+    // Once the GM recovers the character, the kept designation claims normally.
+    const recovered = await json<{ revision: number }>(tokens.gm, "PATCH", `/characters/${characterId}`, {
+      command: "recover", expectedRevision: archived.revision, idempotencyKey: randomUUID(),
+    });
+    const claimed = await json<{ campaign: { controllers: string[] }; lifecycle: string }>(tokens.player, "POST", claimPath, {
+      expectedCampaignRevision: await revisionOf(campaign.campaignId, tokens.player),
+      expectedCharacterRevision: recovered.revision, idempotencyKey: randomUUID(),
+    });
+    expect(claimed).toMatchObject({ lifecycle: "active", campaign: { controllers: [h.users.player.actorId] } });
+    expect(await snapshot()).toMatchObject({ controllers: "1", designations: "0" });
+  });
+
   it("serves every remaining system, character and campaign operation with its public schema", async () => {
     // Systems: versions, art bytes, deprecation, lifecycle and deletion.
     const versions = await json<{ versions: Array<{ versionId: string; lifecycle: string }> }>(

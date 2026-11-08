@@ -57,6 +57,7 @@ export function makeView(overrides: Partial<CharacterView> & { characterId: stri
     returnOwnerId: null,
     name: "Aria",
     systemVersionId: "11111111-1111-4000-8000-000000000000",
+    extensions: [],
     entityDefinitionId: "hero",
     lifecycle: "active",
     archivedAt: null,

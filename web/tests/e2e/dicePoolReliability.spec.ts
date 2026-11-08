@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "../fixtures/browserTest";
 import type { SystemDocumentV1 } from "../../../src/systems/implementation/package/schema/index.js";
 import { uid } from "../offline/test-auth.js";
+import { expectSheetSaved } from "../fixtures/sheetSaved";
 
 const poolSource = "countSuccesses(dice(fields.attribute + fields.skill + inputs.bonus_dice, 6), 6)";
 
@@ -102,10 +103,10 @@ test("pool authoring, failed-roll review, zero pools and granted-action parity",
     await page.getByLabel("Bonus Dice", { exact: true }).fill("-2");
     await page.getByRole("button", { name: "Test Pool", exact: true }).click();
     await expect(page.getByText("Successes: 0", { exact: true })).toBeVisible();
-    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    await expectSheetSaved(page);
     await page.getByLabel("Bonus Dice", { exact: true }).fill("0");
     await page.getByRole("button", { name: "Test Pool", exact: true }).click();
-    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    await expectSheetSaved(page);
 
     // Add the system-authored item through the sheet, then use its action.
     await page.getByTestId("slot-add-gear").click();
@@ -119,7 +120,7 @@ test("pool authoring, failed-roll review, zero pools and granted-action parity",
     await page.getByLabel("Gear Dice", { exact: true }).fill("0");
     await page.getByRole("button", { name: "Gear Pool", exact: true }).click();
     await expect(page.getByText(/Gear successes:/).first()).toBeVisible();
-    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    await expectSheetSaved(page);
     for (const width of [320, 360, 768, 1280]) {
       await page.setViewportSize({ width, height: 900 });
       for (const colorScheme of ["light", "dark"] as const) {

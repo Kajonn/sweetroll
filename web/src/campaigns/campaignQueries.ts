@@ -1,7 +1,9 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiError } from "../api/client.js";
 import type { CampaignsApi, CampaignListQuery, ClaimableCharactersQuery } from "./api.js";
 import type {
   ApplyFogEditBody,
+  CampaignCharacterListResponse,
   MoveTokenBody,
   PlaceTokenBody,
   RemoveTokenBody,
@@ -12,6 +14,47 @@ export const CAMPAIGN_LIST_PAGE_LIMIT = 25;
 export const CLAIMABLE_CHARACTERS_PAGE_LIMIT = 25;
 
 export const CAMPAIGN_MEMBER_PAGE_LIMIT = 25;
+
+/**
+ * Default server maximum for campaign list pages (`pageMax` in
+ * src/platform/config.ts). If an operator lowers `CAMPAIGN_PAGE_MAX` the
+ * server rejects this size; `listAllCampaignCharacters` then falls back to
+ * the server's default page size.
+ */
+export const CAMPAIGN_CHARACTERS_PAGE_LIMIT = 100;
+/** Safety cap on pages followed; a non-null `nextCursor` in the result means it was hit. */
+export const CAMPAIGN_CHARACTERS_MAX_PAGES = 20;
+
+/**
+ * Reads every campaign character by following `nextCursor`. All readers of
+ * `campaignCharactersKey` use this so the shared cache entry always holds the
+ * complete list in the plain list-response shape. If the page cap is reached
+ * the remaining cursor is returned so callers can show a truncation notice.
+ * When the server rejects the page size with 400 (a lowered
+ * `CAMPAIGN_PAGE_MAX`, issue #71), the read retries once without `limit`.
+ */
+export async function listAllCampaignCharacters(
+  api: Pick<CampaignsApi, "listCampaignCharacters">,
+  campaignId: string,
+): Promise<CampaignCharacterListResponse> {
+  let limit: number | undefined = CAMPAIGN_CHARACTERS_PAGE_LIMIT;
+  const read = async (cursor: string | null) => {
+    try {
+      return await api.listCampaignCharacters(campaignId, limit === undefined ? { cursor } : { cursor, limit });
+    } catch (error) {
+      if (limit === undefined || !(error instanceof ApiError) || error.status !== 400) throw error;
+      limit = undefined;
+      return api.listCampaignCharacters(campaignId, { cursor });
+    }
+  };
+  let page = await read(null);
+  const characters = [...page.characters];
+  for (let pages = 1; page.nextCursor && pages < CAMPAIGN_CHARACTERS_MAX_PAGES; pages += 1) {
+    page = await read(page.nextCursor);
+    characters.push(...page.characters);
+  }
+  return { ...page, characters, nextCursor: page.nextCursor ?? null };
+}
 
 export function campaignDetailKey(campaignId: string): string[] {
   return ["campaigns", "detail", campaignId];

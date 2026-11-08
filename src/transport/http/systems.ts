@@ -1,6 +1,8 @@
 import { forgedInTheDarkPackage } from "../../systems/implementation/package/fixtures/forged-in-the-dark.js";
 import { Type, type TSchema } from "@sinclair/typebox";
 import { systemImageHandlers, systemImageRoutes } from "./systemImages.js";
+import { extensionHandlers, extensionRouteDefinitions } from "./extensions.js";
+import type { ExtensionAuthoring } from "../../systems/extensions.js";
 import { strictInputCompiler } from "./strictValidation.js";
 import { SystemImageManifestSchema } from "../../systems/implementation/package/schema/export.js";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
@@ -13,6 +15,8 @@ import type {
 
 export type BuildSystemsRoutesInput = {
   authoring: SystemAuthoring;
+  /** Design 6.8 extension authoring; extension routes are registered only when provided. */
+  extensions?: ExtensionAuthoring;
 };
 
 const STATUS_BY_CODE: Record<AppError["code"], number> = {
@@ -222,6 +226,7 @@ export type SystemsRouteDefinition = {
 
 export const systemsRouteDefinitions: readonly SystemsRouteDefinition[] = [
   ...systemImageRoutes,
+  ...extensionRouteDefinitions,
   {
     method: "get",
     path: "/templates",
@@ -417,7 +422,7 @@ export const systemsRouteDefinitions: readonly SystemsRouteDefinition[] = [
 // ---------------------------------------------------------------------------
 
 export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPluginCallback =
-  ({ authoring }) =>
+  ({ authoring, extensions }) =>
   async (app) => {
     app.addHook("onSend", async (request, reply) => {
       reply.header("x-request-id", request.id);
@@ -473,6 +478,7 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
     type Handler = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown> | unknown;
     const handlers: Record<string, Handler> = {
       ...systemImageHandlers(authoring),
+      ...(extensions === undefined ? {} : extensionHandlers(extensions, { ctxOf, sendError })),
       get_templates: async (request) => ({
         templates: [
           {
@@ -670,6 +676,7 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
     };
 
     for (const route of systemsRouteDefinitions) {
+      if (handlers[route.operationId] === undefined) continue;
       const response = toFastifyResponses(route.schema.response);
       const schema = response === undefined ? route.schema : { ...route.schema, response };
       app[route.method](route.path, { schema,

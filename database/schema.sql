@@ -31,6 +31,9 @@ CREATE TABLE sessions (
 );
 
 CREATE INDEX sessions_user_id_idx ON sessions (user_id);
+-- Expired-row pruning (src/platform/prune.ts): when a session stopped working.
+CREATE INDEX sessions_unusable_at_idx
+  ON sessions ((LEAST(expires_at, COALESCE(revoked_at, 'infinity'::timestamptz))));
 
 CREATE TABLE personal_access_tokens (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -47,6 +50,8 @@ CREATE TABLE personal_access_tokens (
 
 CREATE INDEX personal_access_tokens_user_active_idx
   ON personal_access_tokens (user_id) WHERE revoked_at IS NULL;
+CREATE INDEX personal_access_tokens_unusable_at_idx
+  ON personal_access_tokens ((LEAST(expires_at, COALESCE(revoked_at, 'infinity'::timestamptz))));
 
 CREATE TABLE public_api_rate_limits (
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -64,9 +69,16 @@ CREATE TABLE systems (
   name       text NOT NULL,
   access     text NOT NULL DEFAULT 'private',
   lifecycle  text NOT NULL DEFAULT 'active',
+  -- System extensions (design 6.8): an extension is a systems row of kind
+  -- 'extension' that adds templates to exactly one base system.
+  kind       text NOT NULL DEFAULT 'system' CHECK (kind IN ('system', 'extension')),
+  base_system_id uuid REFERENCES systems(id) ON DELETE RESTRICT,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK ((kind = 'extension') = (base_system_id IS NOT NULL))
 );
+CREATE INDEX systems_extensions_by_base ON systems (base_system_id, created_at DESC, id DESC)
+  WHERE kind = 'extension';
 
 CREATE TABLE system_drafts (
   system_id       uuid PRIMARY KEY REFERENCES systems(id) ON DELETE CASCADE,
@@ -86,9 +98,15 @@ CREATE TABLE system_versions (
   release_notes    text NOT NULL DEFAULT '',
   lifecycle        text NOT NULL DEFAULT 'published',
   compatibility_findings_json jsonb NOT NULL DEFAULT '[]'::jsonb,
+  -- Extension versions: the base system version they were compiled against.
+  built_against_version_id uuid REFERENCES system_versions(id) ON DELETE RESTRICT,
   created_at       timestamptz NOT NULL DEFAULT now(),
   UNIQUE (system_id, semantic_version)
 );
+
+-- Extension drafts: the base system version used for preview and validation.
+ALTER TABLE system_drafts
+  ADD COLUMN base_version_id uuid REFERENCES system_versions(id) ON DELETE RESTRICT;
 
 CREATE TABLE idempotency_receipts (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -101,6 +119,7 @@ CREATE TABLE idempotency_receipts (
   expires_at   timestamptz NOT NULL,
   UNIQUE (actor_id, command_kind, key)
 );
+CREATE INDEX idempotency_receipts_expiry_idx ON idempotency_receipts (expires_at);
 
 CREATE TABLE system_audit_records (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -128,6 +147,7 @@ CREATE TABLE preview_snapshots (
 
 CREATE INDEX preview_snapshots_system_id_idx
   ON preview_snapshots (system_id, created_at DESC);
+CREATE INDEX preview_snapshots_expiry_idx ON preview_snapshots (expires_at);
 
 CREATE FUNCTION system_versions_prevent_mutation() RETURNS trigger
 LANGUAGE plpgsql AS $$
@@ -176,6 +196,19 @@ CREATE TABLE campaigns (
 
 CREATE INDEX campaigns_owner_page_idx
   ON campaigns (owner_id, created_at DESC, id DESC);
+
+-- Design 6.8 (decision X7): the campaign composition. Attached characters'
+-- character_extensions always equal this set. `added_by` records whether the
+-- GM chose the extension or an adopted character brought it.
+CREATE TABLE campaign_extensions (
+  campaign_id           uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  extension_id          uuid NOT NULL REFERENCES systems(id) ON DELETE RESTRICT,
+  extension_version_id  uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  added_by              text NOT NULL CHECK (added_by IN ('campaign', 'character')),
+  added_by_character_id uuid, -- informational; the character may later leave or be purged
+  added_at              timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (campaign_id, extension_id)
+);
 
 CREATE TABLE campaign_members (
   campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
@@ -253,6 +286,16 @@ CREATE INDEX characters_owner_page_idx
   ON characters (owner_id, lifecycle, updated_at DESC, id DESC);
 
 -- Character-owned immutable safe art; authorization always follows a parent link.
+-- Design 6.8: extension versions a character is built on (one version per
+-- extension). Published versions are immutable; RESTRICT keeps used versions.
+CREATE TABLE character_extensions (
+  character_id         uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+  extension_id         uuid NOT NULL REFERENCES systems(id) ON DELETE RESTRICT,
+  extension_version_id uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  PRIMARY KEY (character_id, extension_id)
+);
+CREATE INDEX character_extensions_by_version ON character_extensions (extension_version_id);
+
 CREATE TABLE character_image_assets (
   id uuid PRIMARY KEY,
   created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -283,6 +326,7 @@ CREATE TABLE character_image_receipts (
   expires_at timestamptz NOT NULL,
   PRIMARY KEY(actor_id,idempotency_key)
 );
+CREATE INDEX character_image_receipts_expiry_idx ON character_image_receipts (expires_at);
 
 -- Immutable item art is retained across published systems, campaign catalogs
 -- and disclosed character copies. Owning Modules authorize their parent links.
@@ -315,6 +359,7 @@ CREATE TABLE item_image_receipts (
   expires_at timestamptz NOT NULL,
   PRIMARY KEY(actor_id,idempotency_key)
 );
+CREATE INDEX item_image_receipts_expiry_idx ON item_image_receipts (expires_at);
 CREATE TABLE character_entry_images (
   character_id uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
   entry_id uuid NOT NULL,
@@ -483,6 +528,8 @@ CREATE TABLE campaign_invitations (
 
 CREATE INDEX campaign_invitations_campaign_page_idx
   ON campaign_invitations (campaign_id, created_at DESC, id DESC);
+CREATE INDEX campaign_invitations_pending_expiry_idx
+  ON campaign_invitations (expires_at) WHERE status = 'pending';
 
 -- Content and activity
 -- Activity stores source references; authorization is evaluated at read time.
@@ -543,7 +590,9 @@ CREATE TABLE campaign_activity_events (
     'template_archive',
     'template_recover',
     'system_version_upgraded',
-    'system_version_reverted'
+    'system_version_reverted',
+    'extension_added',
+    'extension_removed'
   ))
 );
 
@@ -604,6 +653,7 @@ CREATE TABLE display_codes (
   expires_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX display_codes_expiry_idx ON display_codes (expires_at);
 
 CREATE TABLE display_credentials (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

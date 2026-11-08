@@ -1,5 +1,6 @@
 import {derivedEntryError} from "./effective-entry.js";
 import {effectiveTemplateId} from "./entries.js";
+import { compositionOf, qualifiedId, unqualifiedId } from "../rules/compose.js";
 import { Value } from "@sinclair/typebox/value";
 import type {
   CharacterEntryV1,
@@ -25,12 +26,17 @@ export function makePushContext(
   entry?: CharacterEntryV1,
 ): PushContext | undefined {
   if (!action.pushPolicy) return undefined;
+  // Design 6.8: extension expressions are stored by plain ID plus origin.
+  const expression = unqualifiedId(action.expressionId);
+  const composition = compositionOf(pkg);
   return {
     version: "1.0",
     versionId: pkg.versionId,
     packageChecksum: pkg.integrity.checksum,
     entityId,
-    expressionId: action.expressionId,
+    expressionId: expression.id,
+    ...(expression.origin === null ? {} : { extensionId: expression.origin }),
+    ...(composition === undefined ? {} : { compositionChecksum: composition.compositionChecksum }),
     outputTemplate: action.outputTemplate,
     policy: structuredClone(action.pushPolicy),
     ...(entry && effectiveTemplateId(entry)
@@ -55,6 +61,7 @@ export function validatePushSource(
   if (
     pkg.versionId !== context.versionId ||
     pkg.integrity.checksum !== context.packageChecksum ||
+    compositionOf(pkg)?.compositionChecksum !== context.compositionChecksum ||
     entity.id !== context.entityId
   )
     return "rules_changed";
@@ -99,7 +106,7 @@ export function validatePushSource(
   if (
     !action ||
     action.kind !== "roll" ||
-    action.expressionId !== context.expressionId ||
+    action.expressionId !== qualifiedId(context.extensionId, context.expressionId) ||
     action.outputTemplate !== context.outputTemplate ||
     !Value.Equal(action.pushPolicy, context.policy)
   )
@@ -131,7 +138,8 @@ export function resolveRuntimePush(input: {
   const options = pushEligibility(context.policy, parent, parent.push.attempt);
   if (!options.canPush) return fail(options.reason!);
   if (input.optionsOnly) return { ok: true, value: { roll: parent, context } };
-  const expression = pkg.expressions.find((e) => e.id === context.expressionId);
+  const expressionKey = qualifiedId(context.extensionId, context.expressionId);
+  const expression = pkg.expressions.find((e) => e.id === expressionKey);
   if (!expression) return fail("invalid_snapshot");
   const bindings = { fields: {}, inputs: {} } as {
     fields: Record<string, string | number | boolean | null>;

@@ -259,6 +259,8 @@ const ActivityEventDto = Type.Object({
     Type.Literal("roll_executed"),
     Type.Literal("system_version_upgraded"),
     Type.Literal("system_version_reverted"),
+    Type.Literal("extension_added"),
+    Type.Literal("extension_removed"),
   ]),
   actorId: Type.String({ format: UUID_FORMAT }),
   sourceContentId: Type.Union([Type.String({ format: UUID_FORMAT }), Type.Null()]),
@@ -573,6 +575,37 @@ const CampaignVersionCheckQuery = Type.Object(
   { targetVersionId: Type.String({ format: UUID_FORMAT }) },
   { additionalProperties: false },
 );
+// Design 6.8 (stage E4): the campaign composition.
+const CampaignExtensionsDto = Type.Object({
+  campaignId: Type.String({ format: UUID_FORMAT }),
+  revision: Type.Integer({ minimum: 1 }),
+  extensions: Type.Array(Type.Object({
+    extensionId: Type.String({ format: UUID_FORMAT }),
+    versionId: Type.String({ format: UUID_FORMAT }),
+    name: Type.String(),
+    semanticVersion: Type.String(),
+    addedBy: Type.Union([Type.Literal("campaign"), Type.Literal("character")]),
+    addedByCharacterId: Type.Union([Type.String({ format: UUID_FORMAT }), Type.Null()]),
+    addedAt: Type.String({ format: DATE_TIME_FORMAT }),
+  }), { maxItems: 16 }),
+});
+const AddCampaignExtensionBody = Type.Object(
+  {
+    extensionId: Type.String({ format: UUID_FORMAT }),
+    versionId: Type.String({ format: UUID_FORMAT }),
+    expectedCampaignRevision: Type.Integer({ minimum: 1 }),
+    idempotencyKey: Type.String({ minLength: 1, maxLength: 200 }),
+  },
+  { additionalProperties: false },
+);
+const RemoveCampaignExtensionBody = Type.Object(
+  {
+    expectedCampaignRevision: Type.Integer({ minimum: 1 }),
+    idempotencyKey: Type.String({ minLength: 1, maxLength: 200 }),
+  },
+  { additionalProperties: false },
+);
+
 const ChangeCampaignVersionBody = Type.Object(
   {
     targetVersionId: Type.String({ format: UUID_FORMAT }),
@@ -905,6 +938,35 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
         "200": Type.Object({ campaign: CampaignViewDto, requestId: Type.String() }),
         ...ErrorResponses,
       },
+    },
+  },
+  {
+    method: "get",
+    path: "/campaigns/:id/extensions",
+    operationId: "get_campaigns_id_extensions",
+    schema: {
+      params: CampaignIdParams,
+      response: { "200": Type.Object({ extensions: CampaignExtensionsDto, requestId: Type.String() }), ...ErrorResponses },
+    },
+  },
+  {
+    method: "post",
+    path: "/campaigns/:id/extensions",
+    operationId: "post_campaigns_id_extensions",
+    schema: {
+      params: CampaignIdParams,
+      body: AddCampaignExtensionBody,
+      response: { "200": Type.Object({ extensions: CampaignExtensionsDto, requestId: Type.String() }), ...ErrorResponses },
+    },
+  },
+  {
+    method: "delete",
+    path: "/campaigns/:id/extensions/:extensionId",
+    operationId: "delete_campaigns_id_extensions_extensionId",
+    schema: {
+      params: Type.Object({ id: Type.String({ format: UUID_FORMAT }), extensionId: Type.String({ format: UUID_FORMAT }) }),
+      body: RemoveCampaignExtensionBody,
+      response: { "200": Type.Object({ extensions: CampaignExtensionsDto, requestId: Type.String() }), ...ErrorResponses },
     },
   },
   {
@@ -1888,6 +1950,29 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { campaign: toCampaignDto(result.value), requestId: request.id };
+      },
+
+      get_campaigns_id_extensions: async (request, reply) => {
+        const params = request.params as { id: string };
+        const result = await campaigns.listExtensions(ctxOf(request), { campaignId: params.id });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { extensions: result.value, requestId: request.id };
+      },
+
+      post_campaigns_id_extensions: async (request, reply) => {
+        const params = request.params as { id: string };
+        const body = request.body as { extensionId: string; versionId: string; expectedCampaignRevision: number; idempotencyKey: string };
+        const result = await campaigns.addExtension(ctxOf(request), { campaignId: params.id, ...body });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { extensions: result.value, requestId: request.id };
+      },
+
+      delete_campaigns_id_extensions_extensionId: async (request, reply) => {
+        const params = request.params as { id: string; extensionId: string };
+        const body = request.body as { expectedCampaignRevision: number; idempotencyKey: string };
+        const result = await campaigns.removeExtension(ctxOf(request), { campaignId: params.id, extensionId: params.extensionId, ...body });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { extensions: result.value, requestId: request.id };
       },
 
       post_campaigns_id_recover: async (request, reply) => {

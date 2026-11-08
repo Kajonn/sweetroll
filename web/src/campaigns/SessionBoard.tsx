@@ -17,7 +17,7 @@ import type { CommandResultResponse, CharacterView } from "../characters/types.j
 import { t } from "../i18n/index.js";
 import { Button, EmptyState, FormField, Select } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
-import { campaignCharactersKey } from "./campaignQueries.js";
+import { campaignCharactersKey, listAllCampaignCharacters } from "./campaignQueries.js";
 import { audienceLabel } from "./CampaignContent.js";
 import { CampaignActivityLine } from "./CampaignActivity.js";
 import type { CampaignCharacterSummary } from "./types.js";
@@ -449,7 +449,7 @@ export function SessionBoard(props: SessionBoardProps) {
   });
   const characters = useQuery({
     queryKey: campaignCharactersKey(props.campaignId, props.actorId, props.generation),
-    queryFn: () => props.campaignsApi.listCampaignCharacters(props.campaignId),
+    queryFn: () => listAllCampaignCharacters(props.campaignsApi, props.campaignId),
     refetchInterval,
   });
   const [filter, setFilter] = useState("");
@@ -524,6 +524,7 @@ export function SessionBoard(props: SessionBoardProps) {
         ))}
       </ul>
       <h3>{t("campaign.detail.session.charactersHeading")}</h3>
+      {characters.data.nextCursor ? <p role="status">{t("campaign.detail.session.charactersTruncated", { count: characters.data.characters.length })}</p> : null}
       <FormField label={t("campaign.detail.session.search.label")}>
         <input
           type="text"

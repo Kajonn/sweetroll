@@ -199,7 +199,7 @@ test("I7b exit: restricted scene display shows only revealed areas and visible t
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText("Share this display code now")).toBeVisible({ timeout: STEP_TIMEOUT });
     const pairCode = ((await dialog.locator("strong").last().textContent()) ?? "").trim();
-    expect(pairCode).toMatch(/^[A-Z0-9]{6}$/);
+    expect(pairCode).toMatch(/^[A-Z0-9]{8}$/);
     await dialog.getByRole("button", { name: "Done" }).click({ timeout: STEP_TIMEOUT });
 
     // 4. Display side in a second, never-signed-in context with an explicit

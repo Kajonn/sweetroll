@@ -205,7 +205,7 @@ async function pairDisplayViaUi(page: Page, campaignTitle: string): Promise<stri
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Share this display code now")).toBeVisible({ timeout: STEP_TIMEOUT });
   const code = ((await dialog.locator("strong").last().textContent()) ?? "").trim();
-  expect(code).toMatch(/^[A-Z0-9]{6}$/);
+  expect(code).toMatch(/^[A-Z0-9]{8}$/);
   await dialog.getByRole("button", { name: "Done" }).click({ timeout: STEP_TIMEOUT });
   await expect(dialog).toHaveCount(0, { timeout: STEP_TIMEOUT });
   await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
@@ -430,7 +430,7 @@ test.describe("campaign accessibility", () => {
         timeout: STEP_TIMEOUT,
       });
       const code = ((await dialog.locator("strong").last().textContent()) ?? "").trim();
-      expect(code).toMatch(/^[A-Z0-9]{6}$/);
+      expect(code).toMatch(/^[A-Z0-9]{8}$/);
       const done = dialog.getByRole("button", { name: "Done" });
       await done.focus();
       await expect(done).toBeFocused();

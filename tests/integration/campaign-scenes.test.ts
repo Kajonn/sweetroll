@@ -682,7 +682,7 @@ describeWithDatabase("display pairing + redacted projection (Task 3 display comm
     const paired = await h.campaigns.pairDisplay(ctxFor(h.users.gm), { campaignId });
     expect(paired.ok).toBe(true);
     if (!paired.ok) throw new Error("expected pair");
-    expect(paired.value.code).toMatch(/^[A-Z0-9]{6}$/);
+    expect(paired.value.code).toMatch(/^[A-Z0-9]{8}$/);
 
     const redeemed = await h.campaigns.redeemDisplayCode({ code: paired.value.code });
     expect(redeemed.ok).toBe(true);

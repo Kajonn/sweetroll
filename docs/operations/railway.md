@@ -50,6 +50,7 @@ or secret variables.
 | `SWEETROLL_MEDIA_DIR` | `/app/data/media` |
 | `AUTHORITATIVE_ROLL_SECRET` | Generate a new random secret with the command below; keep it stable across deployments. |
 | `LOG_LEVEL` | `info` |
+| `SWEETROLL_PRUNE_INTERVAL_MS` | Optional. Expired-row prune interval in milliseconds; default `3600000` (one hour), `0` disables. See below. |
 | `RAILWAY_RUN_UID` | `0`, for Railway's root-owned media-volume mount (see below). |
 
 Allow Railway to supply `PORT`; the backend reads it. Do not copy the local
@@ -72,12 +73,30 @@ secret settings, and send it over HTTPS as `Authorization: Bearer <token>`.
 Missing or incorrect credentials receive 401. The health endpoints remain
 available to Railway without a token.
 
-Display redemption allows 10 attempts per minute per client IP and 120 per
-minute per process. By default it uses the TCP peer address. If an ingress
+Display redemption allows 10 attempts per minute per client IP and 120
+failed attempts (wrong, expired or unknown code) per minute per process. Once
+the failure budget is spent, further wrong codes receive 429, but a correct
+code still redeems. By default it uses the TCP peer address. If an ingress
 proxy shares one peer address for many clients, configure
 `TRUSTED_PROXY_CIDRS` with the actual forwarding proxy addresses and verify
 that ingress appends or replaces the client entry in `X-Forwarded-For`.
-Leave the variable unset if those addresses cannot be verified.
+Leave the variable unset if those addresses cannot be verified. While it is
+unset, the service logs one warning after the first request that carries
+`X-Forwarded-For`: "request carried X-Forwarded-For but TRUSTED_PROXY_CIDRS is
+unset". Seeing it means per-IP limits are keyed on the proxy address.
+
+## Expired-row pruning
+
+Each HTTP process deletes rows that stopped being usable more than seven days
+ago: expired idempotency and image receipts, expired command executions
+(abandoned pending claims only after their lease has also lapsed), preview
+snapshots, expired or revoked sessions and personal tokens, never-consumed
+invitations past expiry and expired display codes. It deletes at most 1000 rows
+per statement and stops after 30 seconds per run. A PostgreSQL advisory lock
+lets only one replica prune at a time. Each run logs `expired rows pruned` with
+per-table counts (`event: prune_completed`); failures log `prune_failed` and
+retry at the next interval. Audit, activity, rolls, characters, content and
+consumed or revoked invitations are never pruned.
 
 ## Persistent images
 

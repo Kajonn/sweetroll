@@ -81,7 +81,7 @@ I4a is a follow-up increment, not a claim that the new work was covered by earli
 - [x] Preserve the merged integration-file isolation fix (`6cd1c3a`): `npm run test:integration` uses `--no-file-parallelism`; request concurrency and latency budgets remain enforced.
 - [x] Web CI job is required and green: `web/` has its own lockfile cache with `npm ci`, `npm test`, `npm run typecheck`, `npm run build`; backend checks plus root `npm run contracts:check` retained. Fixed `ea9670f` (root-deps install for root-src fixture imports); CI fully green after.
 - [x] Representative routed browser tests and the production-offline suite run in CI with real database/server prerequisites (green run observed post-`ea9670f`). Deliberate-failure negative control verified per `docs/acceptance/gui-2026-09-08.md` (broken assertion fails the check; reverted after).
-- [x] Synthetic `page.setContent` visual checks replaced with real routed flows (`b5a2586`); all ten baselines regenerated from real layout and human-reviewed twice (8 approve / 2 reject with cause, then 10/10) per `docs/acceptance/gui-2026-09-09-g3-shell.md` and `task-12-report.md`.
+- [x] Synthetic `page.setContent` visual checks replaced with real routed flows (`b5a2586`); all ten baselines regenerated from real layout and human-reviewed twice (8 approve / 2 reject with cause, then 10/10) per `docs/acceptance/gui-2026-09-09-g3-shell.md` and `docs/acceptance/task-reports/task-12-report.md`.
 
 **Exit:** the route inventory and CI are reviewable. PR #12 updated and inspected actual routed screenshots; this does not close the source-mockup capture or G9 gates. The older 401 evidence above remains dated access history.
 

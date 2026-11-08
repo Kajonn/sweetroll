@@ -92,6 +92,54 @@ describe("SessionBoard", () => {
     expect(campaignsApi.listCampaignCharacters).toHaveBeenCalledTimes(1);
   });
 
+  it("lists every campaign character across pages and filters beyond the first page", async () => {
+    const row = (index: number) => ({
+      characterId: `s${index}`, campaignId: "c1", name: `Hero ${String(index).padStart(2, "0")}`,
+      entityDefinitionId: "hero", systemVersionId: "v1", revision: 1, lifecycle: "active",
+      placementGeneration: 1, controllers: [], updatedAt: "2026-09-01T00:00:00Z",
+    });
+    const all = Array.from({ length: 30 }, (_, index) => row(index + 1));
+    const campaignsApi = {
+      listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),
+      listActivity: vi.fn().mockResolvedValue({ events: [], nextCursor: null, requestId: "r1" }),
+      listCampaignCharacters: vi.fn((_campaignId: string, input?: { cursor?: string | null }) =>
+        Promise.resolve(input?.cursor === "page-2"
+          ? { characters: all.slice(25), nextCursor: null, requestId: "r3" }
+          : { characters: all.slice(0, 25), nextCursor: "page-2", requestId: "r2" })),
+    };
+    render(<SessionBoard campaignsApi={campaignsApi as never} charactersApi={{ open: vi.fn() } as never}
+      campaignId="c1" actorId="u1" generation={0} online onOpenCharacter={() => {}} onAccessRevoked={() => {}} />,
+    { wrapper: wrapper() });
+    expect(await screen.findByRole("button", { name: /hero 30/i })).toBeVisible();
+    expect(screen.getAllByRole("button", { name: /^open hero/i })).toHaveLength(30);
+    expect(campaignsApi.listCampaignCharacters).toHaveBeenCalledTimes(2);
+    expect(campaignsApi.listCampaignCharacters).toHaveBeenLastCalledWith("c1", expect.objectContaining({ cursor: "page-2" }));
+    fireEvent.change(screen.getByLabelText(/filter characters/i), { target: { value: "hero 28" } });
+    expect(screen.getByRole("button", { name: /hero 28/i })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /hero 01/i })).toBeNull();
+    expect(screen.queryByText(/more characters than/i)).toBeNull();
+  });
+
+  it("stops at the page safety cap and says the list is incomplete", async () => {
+    let next = 0;
+    const campaignsApi = {
+      listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),
+      listActivity: vi.fn().mockResolvedValue({ events: [], nextCursor: null, requestId: "r1" }),
+      listCampaignCharacters: vi.fn(() => {
+        next += 1;
+        return Promise.resolve({ characters: [
+          { characterId: `s${next}`, campaignId: "c1", name: `Hero ${next}`, entityDefinitionId: "hero", systemVersionId: "v1", revision: 1, lifecycle: "active", placementGeneration: 1, controllers: [], updatedAt: "2026-09-01T00:00:00Z" },
+        ], nextCursor: `page-${next + 1}`, requestId: `r${next}` });
+      }),
+    };
+    render(<SessionBoard campaignsApi={campaignsApi as never} charactersApi={{ open: vi.fn() } as never}
+      campaignId="c1" actorId="u1" generation={0} online={false} onOpenCharacter={() => {}} onAccessRevoked={() => {}} />,
+    { wrapper: wrapper() });
+    expect(await screen.findByText(/first 20 characters; this campaign has more characters than/i)).toBeVisible();
+    expect(campaignsApi.listCampaignCharacters).toHaveBeenCalledTimes(20);
+    expect(campaignsApi.listCampaignCharacters).toHaveBeenCalledWith("c1", { cursor: null, limit: 100 });
+  });
+
   it("disables Increase at the value bound even when the element max is higher", async () => {
     const campaignsApi = {
       listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),

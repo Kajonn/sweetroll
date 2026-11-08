@@ -141,4 +141,42 @@ describe("HTTP platform endpoints", () => {
       await secured.close();
     }
   });
+
+  it("warns once when X-Forwarded-For arrives while no proxy is trusted", async () => {
+    const build = (trustedProxyCidrs?: string[]) => {
+      const lines: string[] = [];
+      const built = buildHttpApp({
+        logger: pino({ base: null, timestamp: false }, { write: (line) => lines.push(line) }),
+        pool,
+        authHook: noopAuthHook,
+        ...(trustedProxyCidrs ? { trustedProxyCidrs } : {}),
+      });
+      const warnings = () => lines
+        .map((line) => JSON.parse(line) as Record<string, unknown>)
+        .filter((record) => record.level === 40);
+      return { built, warnings };
+    };
+    const untrusted = build();
+    const trusted = build(["127.0.0.1"]);
+    try {
+      await untrusted.built.inject({ method: "GET", url: "/health/live" });
+      expect(untrusted.warnings()).toHaveLength(0);
+      for (let index = 0; index < 3; index++) {
+        await untrusted.built.inject({
+          method: "GET", url: "/health/live", headers: { "x-forwarded-for": `203.0.113.${index}` },
+        });
+      }
+      expect(untrusted.warnings()).toHaveLength(1);
+      expect(untrusted.warnings()[0]?.msg).toContain("TRUSTED_PROXY_CIDRS");
+      expect(JSON.stringify(untrusted.warnings())).not.toContain("203.0.113");
+
+      await trusted.built.inject({
+        method: "GET", url: "/health/live", headers: { "x-forwarded-for": "203.0.113.9" },
+      });
+      expect(trusted.warnings()).toHaveLength(0);
+    } finally {
+      await untrusted.built.close();
+      await trusted.built.close();
+    }
+  });
 });

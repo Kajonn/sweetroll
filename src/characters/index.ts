@@ -1141,6 +1141,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
 
     let nextEntries: Record<string, CharacterEntryV1>;
     let selectedSource: Extract<EntrySource, {kind:"campaign"}> | undefined;
+    let addedExtensionId: string | undefined;
     let activityKind: "entry_added" | "entry_removed" | "entry_updated";
     let activityFields: Record<string, unknown>;
     let changedDefinitionIds: DefinitionId[];
@@ -1178,7 +1179,18 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         typeof entryInput.extensionId !== "string"
         || entryInput.templateId === null
         || !resolveSource.extensions.some((ref) => ref.extensionId === entryInput.extensionId)
-      )) return fail(errors.invalid_value("The extension is not part of this character's rules."));
+      )) {
+        // Issue #60: a command prepared against an older revision (for example
+        // before a campaign removed the extension) reports the revision
+        // conflict, so the client refreshes the changed rules.
+        if (typeof entryInput.extensionId === "string" && entryInput.templateId !== null && command.expectedRevision !== resolveSource.revision) {
+          return finishCommandTx({
+            ctx, outcome: { kind: "conflict", latestRevision: resolveSource.revision }, characterId: command.characterId,
+            expectedRevision: command.expectedRevision, attachedCampaignId, resultScope, standaloneOnly, executionId, replayExpiresAt,
+          });
+        }
+        return fail(errors.invalid_value("The extension is not part of this character's rules."));
+      }
       if (entryInput.source !== undefined) {
         const source = entryInput.source;
         if (!isRecord(source) || !["personal", "system", "campaign"].includes(source.kind as string)) return fail(errors.bad_request("Invalid entry source."));
@@ -1238,6 +1250,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           candidate.values[field.id] = structuredClone(field.default);
         }
       }
+      addedExtensionId = candidate.extensionId;
       nextEntries = { ...storedEntries, [candidate.entryId]: candidate };
       activityKind = "entry_added";
       activityFields = {
@@ -1312,6 +1325,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       return { ok: false, error };
     }
 
+    const placementSource = selectedSource;
+    const entryExtensionId = addedExtensionId;
     const outcome = await repo.applyCommandTx({
       executionId,
       characterId: command.characterId,
@@ -1319,10 +1334,20 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       expectedRevision: command.expectedRevision,
       nextState: resolved.value.state,
       stateChanged,
-      ...(selectedSource === undefined ? {} : { precondition: async (client: import("pg").PoolClient): Promise<CharacterError | null> => {
-        const current = await input.campaignTemplates!.read(client, selectedSource!);
+      ...(placementSource === undefined && entryExtensionId === undefined ? {} : { precondition: async (client: import("pg").PoolClient): Promise<CharacterError | null> => {
+        // Design 6.8 (X9), defence in depth for issue #60: the entry's
+        // extension must still be in the locked character's composition.
+        if (entryExtensionId !== undefined) {
+          const present = await client.query(
+            "SELECT 1 FROM character_extensions WHERE character_id = $1 AND extension_id = $2",
+            [command.characterId, entryExtensionId],
+          );
+          if (present.rowCount === 0) return {code:"conflict",message:"The character's rules have changed. Refresh and try again.",cacheDisposition:"replace"};
+        }
+        if (placementSource === undefined) return null;
+        const current = await input.campaignTemplates!.read(client, placementSource);
         if (current === null || current.audience !== "all_players") return errors.not_found();
-        return canPlaceTemplate(current) && current.revision === selectedSource!.templateRevision && current.contentRevision === selectedSource!.contentRevision ? null : {code:"conflict",message:"The campaign template has changed. Refresh and explicitly review the selected revision.",cacheDisposition:"replace"};
+        return canPlaceTemplate(current) && current.revision === placementSource.templateRevision && current.contentRevision === placementSource.contentRevision ? null : {code:"conflict",message:"The campaign template has changed. Refresh and explicitly review the selected revision.",cacheDisposition:"replace"};
       } }),
       roll: null,
       activity: {
@@ -2948,9 +2973,19 @@ function minimizeActivityPayload(kind: string, payload: unknown): unknown {
         addedFields: record.addedFields ?? [],
         droppedFields: record.droppedFields ?? [],
       };
+    case "extensions_changed":
+      // Issue #60: extension and version identifiers only.
+      return { added: extensionRefsOnly(record.added), removed: extensionRefsOnly(record.removed) };
     default:
       return {};
   }
+}
+
+function extensionRefsOnly(value: unknown): Array<{ extensionId: unknown; versionId: unknown }> {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((ref): ref is Record<string, unknown> => typeof ref === "object" && ref !== null)
+    .map((ref) => ({ extensionId: ref.extensionId, versionId: ref.versionId }));
 }
 
 function encodeCursor(cursor: CharacterPageCursor): string {

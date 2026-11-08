@@ -285,7 +285,7 @@ async function runJourney(context: BrowserContext, system: ReferenceSystem) {
       }
       await reopened.getByRole("button", { name: "Reapply", exact: true }).click();
       await reopened.getByRole("button", { name: "Confirm reapply" }).click();
-      await expect(reopened.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
+      await expectSheetSaved(reopened);
 
       // 10. Final server/DB assertions: revision, resource, activity + rolls.
       // Writer +1, then the three queued intentions reapplied with new keys.
@@ -322,7 +322,7 @@ async function runJourney(context: BrowserContext, system: ReferenceSystem) {
       await wideBump.focus();
       await expect(wideBump).toBeFocused();
       await reopened.keyboard.press("Enter");
-      await expect(reopened.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
+      await expectSheetSaved(reopened);
       const wideBuild = await buildId(reopened);
       await test.step("Capture desktop sheet", () => reopened.screenshot({ path: `${EVIDENCE_DIR}/journey-${system.key}-1280-final-${wideBuild}.png` }));
       const axe1280 = await test.step("Check desktop accessibility", () => new AxeBuilder({ page: reopened }).analyze());

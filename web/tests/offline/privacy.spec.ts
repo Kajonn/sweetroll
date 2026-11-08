@@ -15,6 +15,7 @@ import {
   testSignIn,
 } from "./test-auth.js";
 import { lookUpCreationVersion } from "../fixtures/lookUpCreationVersion";
+import { expectSheetSaved } from "../fixtures/sheetSaved";
 
 /**
  * Task 8 privacy: offline sign-out barrier, account switching isolation,
@@ -410,7 +411,7 @@ test.describe("offline privacy and sign-out", () => {
       }
       await page.getByRole("button", { name: "Reapply", exact: true }).click();
       await page.getByRole("button", { name: "Confirm reapply" }).click();
-      await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
+      await expectSheetSaved(page);
       const after = await readCharacter(page.request, characterId);
       expect(after.character.revision).toBe(writerRevision + 2);
       const activity = await readActivity(page.request, characterId);

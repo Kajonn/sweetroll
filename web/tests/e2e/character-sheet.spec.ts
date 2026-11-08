@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect } from "../fixtures/browserTest";
 import { lookUpCreationVersion } from "../fixtures/lookUpCreationVersion";
+import { expectSheetSaved } from "../fixtures/sheetSaved";
 
 /**
  * Task 11 character responsive/a11y cases (dev-server E2E): every reference
@@ -75,7 +76,7 @@ test.describe("character sheet responsive and keyboard", () => {
         await expect(
           page.getByText("Changes pending").or(page.getByText("Saved", { exact: true })),
         ).toBeVisible({ timeout: 30_000 });
-        await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
+        await expectSheetSaved(page);
 
         // No horizontal overflow at this width.
         const overflow = await page.evaluate(() => ({

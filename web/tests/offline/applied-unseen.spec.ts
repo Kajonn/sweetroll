@@ -13,6 +13,7 @@ import {
   testSignIn,
   uid,
 } from "./test-auth.js";
+import { expectSheetSaved } from "../fixtures/sheetSaved";
 
 /**
  * Task 8 critical proof: applied-but-unseen responses. Each test forwards the
@@ -86,7 +87,7 @@ test.describe("applied-but-unseen mutations", () => {
       await page.getByRole("button", { name: system.decreaseButton }).click();
       // While the outcome is uncertain, export must stay blocked.
       await expect(page.getByRole("button", { name: "Export" })).toBeDisabled();
-      await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
+      await expectSheetSaved(page);
       expect(withheldOnce).toBe(true);
       await page.unrouteAll({ behavior: "wait" });
 

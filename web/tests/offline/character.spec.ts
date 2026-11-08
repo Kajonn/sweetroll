@@ -187,14 +187,16 @@ async function runJourney(context: BrowserContext, system: ReferenceSystem) {
   const characterId = await createThroughUI(page, versionId, characterName);
   await expectSheetReady(page, characterName);
   await expect(page.getByTestId("dev-signin")).toHaveCount(0);
-  let server = await readCharacter(page.request, characterId);
+  const server = await readCharacter(page.request, characterId);
   const revisionAfterCreate = server.character.revision;
+  const serverRevision = async () => (await readCharacter(page.request, characterId)).character.revision;
 
   // 2. Required-field completion through the real completion section. The
   // section must exist: an already-complete edit would not prove this.
   await completeRequiredField(page, system);
-  server = await readCharacter(page.request, characterId);
-  expect(server.character.revision).toBe(revisionAfterCreate + 1);
+  // "Saved" is also the idle status, so it can show before the edit is
+  // queued; poll the server for the committed revision instead.
+  await expect.poll(serverRevision, { timeout: 30_000 }).toBe(revisionAfterCreate + 1);
 
   // 3. Online edit + resource bump through sheet controls.
   const editBox = page.getByLabel(system.editFieldLabel);
@@ -204,9 +206,8 @@ async function runJourney(context: BrowserContext, system: ReferenceSystem) {
   const bumpDown = system.key === "d20";
   await page.getByRole("button", { name: bumpDown ? system.decreaseButton : system.increaseButton }).click();
   await expectSaved(page);
-  const onlineState = await readCharacter(page.request, characterId);
-  const revisionOnline = onlineState.character.revision;
-  expect(revisionOnline).toBe(revisionAfterCreate + 3);
+  const revisionOnline = revisionAfterCreate + 3;
+  await expect.poll(serverRevision, { timeout: 30_000 }).toBe(revisionOnline);
 
   // 4. Authoritative roll through the UI action (online-only by design).
   await page.getByRole("button", { name: system.actionLabel, exact: true }).click();
@@ -288,9 +289,11 @@ async function runJourney(context: BrowserContext, system: ReferenceSystem) {
       await expect(reopened.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
 
       // 10. Final server/DB assertions: revision, resource, activity + rolls.
-      const final = await readCharacter(reopened.request, characterId);
       // Writer +1, then the three queued intentions reapplied with new keys.
-      expect(final.character.revision).toBe(revisionAfterRoll + 4);
+      await expect
+        .poll(async () => (await readCharacter(reopened.request, characterId)).character.revision, { timeout: 30_000 })
+        .toBe(revisionAfterRoll + 4);
+      const final = await readCharacter(reopened.request, characterId);
       const step = bumpDown ? -1 : 1;
       expect(resourceCurrent(final, system.resourceId)).toBe(resourceBefore + 2 * step);
       const activity = await readActivity(reopened.request, characterId);

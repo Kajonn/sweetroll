@@ -202,6 +202,7 @@ export async function campaignDerivedJourney(
     await expect
       .poll(
         async () => (await open()).state.entries[entryId].values.damage_bonus,
+        { timeout: 30_000 },
       )
       .toBe(6);
     for (const action of ["Hit", "Damage", "Salute", "Refuel"]) {

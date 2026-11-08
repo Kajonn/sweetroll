@@ -221,7 +221,8 @@ the design document updated (red → green, per existing plans).
   `extensionId` on entries. Placing extension items through v1 is not included
   (X12, E7).
 - [x] Guards until later stages: rules-version change returns 409 for
-  characters with extensions (E5); campaign adoption returns 409 for them (E4).
+  characters with extensions (E5). (E3 also refused campaign adoption for
+  them; E4 replaced that guard with the adoption merge below.)
 - [x] Tests: `src/systems/runtime-extensions.test.ts` (same-ID base and
   extension templates on one sheet, entry without its extension, unknown
   version, missing loader, extension push and `rules_changed` after a different
@@ -251,13 +252,22 @@ the design document updated (red → green, per existing plans).
   included extension is 409) and `DELETE /campaigns/:id/extensions/:extensionId`
   (409 while an attached character has an entry from it or a campaign template
   is based on it, X9). Both write every attached character and bump the
-  campaign revision and access revision. **Deviation:** extensions are added
+  campaign revision and access revision. **Fix (issue #60):** every attached
+  character whose composition changes also gets a new character revision and
+  an `extensions_changed` activity event (payload: `added`/`removed` extension
+  and version IDs only), so stale writes return 409 and clients reconciling by
+  revision refetch the new rules. Lock order stays campaign → characters. An
+  `addEntry` naming an extension is also rechecked against the locked
+  character's composition before commit, and a stale-revision entry whose
+  extension has since left the composition reports the revision conflict. **Deviation:** extensions are added
   after campaign creation with the same command rather than in the create
   request; the GUI can do both in one flow (E6).
 - [x] Campaign-created characters copy the campaign set. Adoption merges the
   character's extensions into the campaign (`added_by = 'character'`) in the
   adoption transaction, checks the merged composition, writes all attached
-  characters and records `extension_added`; a different version of an
+  characters (other attached characters whose set changes get a revision bump
+  and `extensions_changed`, issue #60) and records `extension_added`; a
+  different version of an
   included extension is 409 (X8). Assign and claim move already-attached
   characters and need no change. Returned characters keep their rows (X10).
 - [x] Members use campaign-composition extensions only through campaign

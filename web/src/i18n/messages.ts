@@ -855,6 +855,7 @@ export const defaultMessages: MessageTable = {
   "character.activity.character_recovered": "Character recovered",
   "character.activity.system_version_upgraded": "Rules version upgraded",
   "character.activity.system_version_reverted": "Rules version reverted",
+  "character.activity.extensions_changed": "Campaign extensions changed",
   "version.open": "Rules version",
   "version.title": "Rules version",
   "version.current": "Current version: {version}",

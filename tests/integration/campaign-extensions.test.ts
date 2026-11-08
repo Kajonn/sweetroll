@@ -119,6 +119,31 @@ describeWithDatabase("Campaigns built with extensions (E4)", () => {
 
   const ids = (refs: Ref[]) => refs.map((ref) => ref.extensionId).sort();
 
+  async function characterRevision(characterId: string): Promise<number> {
+    return (await h.pool.query<{ revision: number }>("SELECT revision FROM characters WHERE id = $1", [characterId])).rows[0]!.revision;
+  }
+
+  async function campaignCharacter(campaignId: string, name: string, controllers: TestActor[] = []): Promise<string> {
+    const created = await call("POST", `/campaigns/${campaignId}/characters`, gm, {
+      name, entityDefinitionId: "character", controllerUserIds: controllers.map((actor) => actor.actorId),
+      expectedCampaignRevision: await revision(campaignId), idempotencyKey: randomUUID(),
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    return created.json().character.characterId as string;
+  }
+
+  async function compositionEvents(characterId: string) {
+    return (await h.pool.query<{ character_revision: number; payload_json: { added: Ref[]; removed: Ref[] }; scope_campaign_id: string | null }>(
+      "SELECT character_revision, payload_json, scope_campaign_id FROM character_activity_events WHERE character_id = $1 AND kind = 'extensions_changed' ORDER BY character_revision",
+      [characterId],
+    )).rows;
+  }
+
+  async function entriesFrom(characterId: string, extensionId: string): Promise<unknown[]> {
+    const state = (await h.pool.query<{ state_json: { entries?: Record<string, { extensionId?: string }> } }>("SELECT state_json FROM characters WHERE id = $1", [characterId])).rows[0]!.state_json;
+    return Object.values(state.entries ?? {}).filter((entry) => entry.extensionId === extensionId);
+  }
+
   it("unites the GM's and the characters' extensions and shares them with every attached character", async () => {
     const gmPack = await extension(gm, "GM pack", "gm_blade");
     const playerPack = await extension(other, "Player pack", "player_blade");
@@ -239,7 +264,7 @@ describeWithDatabase("Campaigns built with extensions (E4)", () => {
     expect(removedUnused.statusCode, removedUnused.body).toBe(200);
     expect(await characterExtensions(characterId)).toEqual([used.extensionId]);
 
-    expect((await call("DELETE", `/characters/${characterId}/entries/${entryId}`, gm, { expectedRevision: 2, idempotencyKey: randomUUID() })).statusCode).toBe(200);
+    expect((await call("DELETE", `/characters/${characterId}/entries/${entryId}`, gm, { expectedRevision: await characterRevision(characterId), idempotencyKey: randomUUID() })).statusCode).toBe(200);
     expect((await removeExtension(campaignId, used.extensionId)).statusCode).toBe(200);
     expect(await characterExtensions(characterId)).toEqual([]);
 
@@ -267,5 +292,128 @@ describeWithDatabase("Campaigns built with extensions (E4)", () => {
     expect(published.statusCode, published.body).toBe(200);
     await call("PATCH", `/systems/${foreignId}`, other, { access: "public" });
     expect((await addExtension(campaignId, { extensionId: foreignId, versionId: published.json().version.versionId })).statusCode).toBe(404);
+  });
+
+  // Issue #60: a composition change is a character change. Every attached
+  // character whose composition changes gets a new revision and an activity
+  // event, so stale writes and revision-reconciling clients notice it.
+  it("bumps each attached character's revision and records activity when the composition changes", async () => {
+    const pack1 = await extension(gm, "Revision pack", "revision_blade");
+    const campaignId = await campaign();
+    const first = await campaignCharacter(campaignId, "First", [player]);
+    const second = await campaignCharacter(campaignId, "Second");
+    const before = { first: await characterRevision(first), second: await characterRevision(second) };
+
+    expect((await addExtension(campaignId, pack1)).statusCode).toBe(200);
+    expect(await characterRevision(first)).toBe(before.first + 1);
+    expect(await characterRevision(second)).toBe(before.second + 1);
+    const ref = { extensionId: pack1.extensionId, versionId: pack1.versionId };
+    expect(await compositionEvents(first)).toEqual([{ character_revision: before.first + 1, payload_json: { added: [ref], removed: [] }, scope_campaign_id: campaignId }]);
+    expect(await compositionEvents(second)).toEqual([{ character_revision: before.second + 1, payload_json: { added: [ref], removed: [] }, scope_campaign_id: campaignId }]);
+    const activity = await call("GET", `/characters/${first}/activity`, player);
+    expect(activity.statusCode, activity.body).toBe(200);
+    expect(activity.json().events[0]).toEqual(expect.objectContaining({ kind: "extensions_changed", characterRevision: before.first + 1, payload: { added: [ref], removed: [] } }));
+
+    // A command prepared against the old revision is refused.
+    const stale = await call("POST", `/characters/${first}/entries`, player, {
+      entry: { entryId: randomUUID(), slotId: "inventory", templateId: "revision_blade", extensionId: pack1.extensionId, values: {} },
+      expectedRevision: before.first, idempotencyKey: randomUUID(),
+    });
+    expect(stale.statusCode, stale.body).toBe(409);
+
+    expect((await removeExtension(campaignId, pack1.extensionId)).statusCode).toBe(200);
+    expect(await characterRevision(first)).toBe(before.first + 2);
+    expect(await characterRevision(second)).toBe(before.second + 2);
+    expect((await compositionEvents(second)).map((event) => [event.character_revision, event.payload_json]))
+      .toEqual([[before.second + 1, { added: [ref], removed: [] }], [before.second + 2, { added: [], removed: [ref] }]]);
+    const staleAfterRemoval = await call("PATCH", `/characters/${second}`, gm, { command: "rename", name: "Renamed", expectedRevision: before.second + 1, idempotencyKey: randomUUID() });
+    expect(staleAfterRemoval.statusCode, staleAfterRemoval.body).toBe(409);
+  });
+
+  it("bumps characters already attached when an adoption brings a new extension, but not unchanged ones", async () => {
+    const gmPack = await extension(gm, "Adopt GM pack", "adopt_gm_blade");
+    const brought = await extension(other, "Brought pack", "brought_blade");
+    const campaignId = await campaign();
+    expect((await addExtension(campaignId, gmPack)).statusCode).toBe(200);
+    const resident = await campaignCharacter(campaignId, "Resident");
+    const residentBefore = await characterRevision(resident);
+
+    // Adopting a character without extensions changes nobody else's composition.
+    const plain = await standalone(player, []);
+    expect((await adopt(campaignId, player, plain)).statusCode).toBe(200);
+    expect(await characterRevision(resident)).toBe(residentBefore);
+    expect(await characterExtensions(plain.characterId)).toEqual([gmPack.extensionId]);
+
+    const hero = await standalone(other, [brought]);
+    const adopted = await adopt(campaignId, other, hero);
+    expect(adopted.statusCode, adopted.body).toBe(200);
+    expect(await characterRevision(resident)).toBe(residentBefore + 1);
+    expect((await compositionEvents(resident)).at(-1)).toEqual({
+      character_revision: residentBefore + 1,
+      payload_json: { added: [{ extensionId: brought.extensionId, versionId: brought.versionId }], removed: [] },
+      scope_campaign_id: campaignId,
+    });
+    expect(adopted.json().character.revision).toBe(await characterRevision(hero.characterId));
+    expect(await characterExtensions(hero.characterId)).toEqual(ids([gmPack, brought]));
+    expect(await characterExtensions(plain.characterId)).toEqual(ids([gmPack, brought]));
+  });
+
+  it("refuses an entry prepared before its extension was removed (X9)", async () => {
+    const pack1 = await extension(gm, "Race pack", "race_blade");
+    const campaignId = await campaign();
+    expect((await addExtension(campaignId, pack1)).statusCode).toBe(200);
+    const characterId = await campaignCharacter(campaignId, "Racer", [player]);
+    const read = await call("GET", `/characters/${characterId}`, player);
+    expect(read.statusCode, read.body).toBe(200);
+    const prepared = read.json().character.revision as number;
+    expect(read.json().character.extensions.map((ref: Ref) => ref.extensionId)).toEqual([pack1.extensionId]);
+
+    expect((await removeExtension(campaignId, pack1.extensionId)).statusCode).toBe(200);
+    const placed = await call("POST", `/characters/${characterId}/entries`, player, {
+      entry: { entryId: randomUUID(), slotId: "inventory", templateId: "race_blade", extensionId: pack1.extensionId, values: {} },
+      expectedRevision: prepared, idempotencyKey: randomUUID(),
+    });
+    expect(placed.statusCode, placed.body).toBe(409);
+    expect(await entriesFrom(characterId, pack1.extensionId)).toEqual([]);
+  });
+
+  it("rechecks the entry's extension under the character lock, even without a revision change", async () => {
+    const pack1 = await extension(gm, "Locked pack", "locked_blade");
+    const campaignId = await campaign();
+    expect((await addExtension(campaignId, pack1)).statusCode).toBe(200);
+    const characterId = await campaignCharacter(campaignId, "Locked", [player]);
+    const prepared = await characterRevision(characterId);
+
+    // Hold the campaign lock while changing the composition WITHOUT a
+    // revision bump, and let the entry command (already past its
+    // pre-transaction validation) wait for that lock.
+    const blocker = await h.pool.connect();
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query("SELECT id FROM campaigns WHERE id = $1 FOR UPDATE", [campaignId]);
+      await blocker.query("DELETE FROM character_extensions WHERE character_id = $1", [characterId]);
+      await blocker.query("DELETE FROM campaign_extensions WHERE campaign_id = $1", [campaignId]);
+      const pending = call("POST", `/characters/${characterId}/entries`, player, {
+        entry: { entryId: randomUUID(), slotId: "inventory", templateId: "locked_blade", extensionId: pack1.extensionId, values: {} },
+        expectedRevision: prepared, idempotencyKey: randomUUID(),
+      });
+      const deadline = Date.now() + 5_000;
+      for (;;) {
+        const waiting = await h.pool.query<{ count: string }>(
+          "SELECT count(*) FROM pg_stat_activity WHERE application_name = $1 AND wait_event_type = 'Lock'",
+          [h.schema],
+        );
+        if (Number(waiting.rows[0]?.count) >= 1) break;
+        if (Date.now() > deadline) throw new Error("The entry command never waited for the campaign lock.");
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      await blocker.query("COMMIT");
+      const placed = await pending;
+      expect(placed.statusCode, placed.body).toBe(409);
+    } finally {
+      blocker.release();
+    }
+    expect(await characterRevision(characterId)).toBe(prepared);
+    expect(await entriesFrom(characterId, pack1.extensionId)).toEqual([]);
   });
 });

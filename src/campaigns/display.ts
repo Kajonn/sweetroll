@@ -82,10 +82,15 @@ const NOT_FOUND_MESSAGE = "The requested display resource does not exist.";
  * machine-copied from the GM screen, never hand-transcribed (0/O and 1/I
  * stay confusable by design, see CODE_ALPHABET). */
 export function generateDisplayCode(): string {
-  const bytes = randomBytes(CODE_LENGTH);
+  // Rejection sampling: bytes at or above the largest multiple of the
+  // alphabet size (252 = 7 * 36) are discarded, so `byte % 36` is uniform.
+  const limit = 256 - (256 % CODE_ALPHABET.length);
   let code = "";
-  for (const byte of bytes) {
-    code += CODE_ALPHABET[(byte as number) % CODE_ALPHABET.length];
+  while (code.length < CODE_LENGTH) {
+    for (const byte of randomBytes(CODE_LENGTH)) {
+      if (byte >= limit || code.length === CODE_LENGTH) continue;
+      code += CODE_ALPHABET[byte % CODE_ALPHABET.length];
+    }
   }
   return code;
 }

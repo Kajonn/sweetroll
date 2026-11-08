@@ -43,6 +43,19 @@ export function buildHttpApp(input: {
 
   void app.register(cookie);
 
+  if (!input.trustedProxyCidrs?.length) {
+    // Behind an ingress proxy every client shares the proxy's peer address,
+    // so per-IP limits (display redeem) would apply to all clients at once.
+    let warned = false;
+    app.addHook("onRequest", async (request) => {
+      if (warned || request.headers["x-forwarded-for"] === undefined) return;
+      warned = true;
+      input.logger.warn(
+        "request carried X-Forwarded-For but TRUSTED_PROXY_CIDRS is unset; per-IP limits use the TCP peer address",
+      );
+    });
+  }
+
   app.addHook("onRequest", async (request) => {
     startedAt.set(request, process.hrtime.bigint());
     input.logger.info(

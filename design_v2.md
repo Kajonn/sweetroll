@@ -380,7 +380,7 @@ Campaign creation distinguishes versions with the same display name and semantic
 
 A dedicated **GM Session board** lists all characters with their key resources at a glance (health, stress, ammo, etc.). The GM can one-tap a bump control on any resource without opening each sheet. Designed for the GM at a physical table, and works across the GM's multiple devices (Section 4.2).
 
-The board and the campaign Characters tab load every attached character by following the paged `GET /campaigns/:id/characters` list at the maximum page size (100), up to a 20-page safety cap, and show a notice when the cap cuts the list short (issue #57). Each listed character's sheet is read separately through the Characters route; there is no dedicated `GET /campaigns/{id}/session` endpoint. Content, activity and the character list refresh every 15 seconds while online. Lowering `CAMPAIGN_PAGE_MAX` below 100 requires lowering the client page size too.
+The board and the campaign Characters tab load every attached character by following the paged `GET /campaigns/:id/characters` list at the maximum page size (100), up to a 20-page safety cap, and show a notice when the cap cuts the list short (issue #57). Each listed character's sheet is read separately through the Characters route; there is no dedicated `GET /campaigns/{id}/session` endpoint. Content, activity and the character list refresh every 15 seconds while online. If an operator lowers `CAMPAIGN_PAGE_MAX` below 100, the server rejects that page size with 400 and the client retries once without `limit`, reading at the server's default page size (issue #71).
 
 ## 7.3 Content model and visibility
 

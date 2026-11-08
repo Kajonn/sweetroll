@@ -191,10 +191,40 @@ export async function campaignDerivedJourney(
     await page
       .getByRole("button", { name: "Save values", exact: true })
       .click();
+    // TEMPORARY diagnostics for the reconnect replay (PR #73); remove once
+    // the CI failure is understood.
+    const diag: string[] = [];
+    const diagStart = Date.now();
+    const note = (line: string) => diag.push(`${Date.now() - diagStart}ms ${line}`);
+    if (offlineReload) {
+      const apiPath = (url: string) => {
+        const { pathname } = new URL(url);
+        return pathname.startsWith("/api/") ? pathname : null;
+      };
+      page.on("console", (message) => note(`console.${message.type()} ${message.text().slice(0, 300)}`));
+      page.on("pageerror", (error) => note(`pageerror ${String(error).slice(0, 300)}`));
+      page.on("request", (request) => {
+        const path = apiPath(request.url());
+        if (path) note(`request ${request.method()} ${path}`);
+      });
+      page.on("requestfailed", (request) => {
+        const path = apiPath(request.url());
+        if (path) note(`failed ${request.method()} ${path} ${request.failure()?.errorText ?? ""}`);
+      });
+      page.on("response", (response) => {
+        const path = apiPath(response.url());
+        if (path) note(`response ${response.status()} ${response.request().method()} ${path}`);
+      });
+      await page.addInitScript(() => {
+        addEventListener("online", () => console.log(`DIAG online event onLine=${navigator.onLine}`));
+        addEventListener("offline", () => console.log(`DIAG offline event onLine=${navigator.onLine}`));
+      });
+    }
     if (offlineReload) {
       await expect(
         page.getByText("Changes pending", { exact: true }),
       ).toBeVisible();
+      note("reloading while offline");
       await page.reload();
       await expect(entry()).toContainText("Captain's sword");
       // Reconnect only once the reloaded sheet has restored its queue, as in
@@ -203,14 +233,29 @@ export async function campaignDerivedJourney(
       await expect(
         page.getByText("Changes pending", { exact: true }),
       ).toBeVisible();
+      note(`before reconnect onLine=${await page.evaluate(() => navigator.onLine)}`);
       await player.setOffline(false);
+      note("setOffline(false) returned");
+      await page.waitForTimeout(5_000);
+      const status = await page.evaluate(() =>
+        document.body.innerText
+          .split("\n")
+          .filter((line) => /offline|pending|saved|sending|confirm|review|changed|couldn|retry/i.test(line))
+          .slice(0, 20),
+      );
+      note(`5s after reconnect onLine=${await page.evaluate(() => navigator.onLine)} status=${JSON.stringify(status)}`);
     }
-    await expect
-      .poll(
-        async () => (await open()).state.entries[entryId].values.damage_bonus,
-        { timeout: 30_000 },
-      )
-      .toBe(6);
+    try {
+      await expect
+        .poll(
+          async () => (await open()).state.entries[entryId].values.damage_bonus,
+          { timeout: 30_000 },
+        )
+        .toBe(6);
+    } catch (error) {
+      if (offlineReload) console.log(`DIAG reconnect replay\n${diag.join("\n")}`);
+      throw error;
+    }
     for (const action of ["Hit", "Damage", "Salute", "Refuel"]) {
       const result = (
         await resultOf(

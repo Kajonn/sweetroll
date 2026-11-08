@@ -197,6 +197,12 @@ export async function campaignDerivedJourney(
       ).toBeVisible();
       await page.reload();
       await expect(entry()).toContainText("Captain's sword");
+      // Reconnect only once the reloaded sheet has restored its queue, as in
+      // the earlier offline reload; otherwise the online event can arrive
+      // before anything is listening for it.
+      await expect(
+        page.getByText("Changes pending", { exact: true }),
+      ).toBeVisible();
       await player.setOffline(false);
     }
     await expect

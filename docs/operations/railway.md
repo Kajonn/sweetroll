@@ -73,12 +73,17 @@ secret settings, and send it over HTTPS as `Authorization: Bearer <token>`.
 Missing or incorrect credentials receive 401. The health endpoints remain
 available to Railway without a token.
 
-Display redemption allows 10 attempts per minute per client IP and 120 per
-minute per process. By default it uses the TCP peer address. If an ingress
+Display redemption allows 10 attempts per minute per client IP and 120
+failed attempts (wrong, expired or unknown code) per minute per process. Once
+the failure budget is spent, further wrong codes receive 429, but a correct
+code still redeems. By default it uses the TCP peer address. If an ingress
 proxy shares one peer address for many clients, configure
 `TRUSTED_PROXY_CIDRS` with the actual forwarding proxy addresses and verify
 that ingress appends or replaces the client entry in `X-Forwarded-For`.
-Leave the variable unset if those addresses cannot be verified.
+Leave the variable unset if those addresses cannot be verified. While it is
+unset, the service logs one warning after the first request that carries
+`X-Forwarded-For`: "request carried X-Forwarded-For but TRUSTED_PROXY_CIDRS is
+unset". Seeing it means per-IP limits are keyed on the proxy address.
 
 ## Expired-row pruning
 

@@ -14,6 +14,7 @@ import {
   readCharacter,
   testSignIn,
 } from "./test-auth.js";
+import { lookUpCreationVersion } from "../fixtures/lookUpCreationVersion";
 
 /**
  * Task 8 privacy: offline sign-out barrier, account switching isolation,
@@ -264,8 +265,7 @@ test.describe("offline privacy and sign-out", () => {
       const page = await context.newPage();
       await page.setViewportSize({ width: 360, height: 740 });
       await page.goto(`/characters/new?systemVersionId=${system.systemVersionId}`);
-      await page.getByLabel("System version ID").fill(system.systemVersionId);
-      await page.getByRole("button", { name: "Look up version" }).click();
+      await lookUpCreationVersion(page, system.systemVersionId);
       await page.getByLabel("Entity").selectOption("character");
       const characterName = `SignoutCreate ${Date.now().toString(36)}`;
       await page.getByLabel("Character name").fill(characterName);

@@ -20,6 +20,7 @@ import {
   uid,
   type ReferenceSystem,
 } from "./test-auth.js";
+import { lookUpCreationVersion } from "../fixtures/lookUpCreationVersion";
 
 /**
  * Task 8 full production journey (real built app + preview + real backend):
@@ -54,8 +55,7 @@ async function buildId(page: Page): Promise<string> {
 
 async function createThroughUI(page: Page, versionId: string, name: string): Promise<string> {
   await page.goto(`/characters/new?systemVersionId=${versionId}`);
-  await page.getByLabel("System version ID").fill(versionId);
-  await page.getByRole("button", { name: "Look up version" }).click();
+  await lookUpCreationVersion(page, versionId);
   await page.getByLabel("Entity").selectOption("character");
   await page.getByLabel("Character name").fill(name);
   await page.getByRole("button", { name: "Create character", exact: true }).click();

@@ -72,13 +72,13 @@ const PAIRING_CODE_TTL_MS = 5 * 60 * 1000;
 // (typed once from the GM screen into the display), never hand-transcribed
 // from dictation, so readability outranks disambiguation here.
 const CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-const CODE_LENGTH = 6;
+const CODE_LENGTH = 8;
 const MAX_MINT_ATTEMPTS = 8;
 const MAX_LIVE_PAIRING_CODES = 5;
 
 const NOT_FOUND_MESSAGE = "The requested display resource does not exist.";
 
-/** 6-char pairing code over an uppercase alphanumeric alphabet. Codes are
+/** 8-char pairing code over an uppercase alphanumeric alphabet. Codes are
  * machine-copied from the GM screen, never hand-transcribed (0/O and 1/I
  * stay confusable by design, see CODE_ALPHABET). */
 export function generateDisplayCode(): string {

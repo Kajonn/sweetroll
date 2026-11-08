@@ -8,7 +8,7 @@ describe("generateDisplayCode", () => {
     const samples = 6_000;
     for (let index = 0; index < samples; index++) {
       const code = generateDisplayCode();
-      expect(code).toMatch(/^[A-Z0-9]{6}$/);
+      expect(code).toMatch(/^[A-Z0-9]{8}$/);
       for (const char of code) counts.set(char, (counts.get(char) ?? 0) + 1);
     }
     expect(counts.size).toBe(36);

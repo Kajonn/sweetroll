@@ -9,12 +9,13 @@ describe("useExportVersion", () => {
   afterEach(() => vi.restoreAllMocks());
 
   beforeEach(() => {
-    if (!("URL" in globalThis) || typeof URL.createObjectURL !== "function") {
-      Object.defineProperty(URL, "createObjectURL", {
-        value: vi.fn(() => "blob:fake"),
-        writable: true,
-      });
-      Object.defineProperty(URL, "revokeObjectURL", { value: vi.fn(), writable: true });
+    // jsdom may lack these, and Node's real implementations would mint
+    // actual blob URLs; always replace them with spies.
+    for (const [name, value] of [["createObjectURL", () => "blob:fake"], ["revokeObjectURL", () => {}]] as const) {
+      if (typeof URL[name] !== "function") {
+        Object.defineProperty(URL, name, { value, writable: true, configurable: true });
+      }
+      vi.spyOn(URL, name).mockImplementation(value as never);
     }
   });
 

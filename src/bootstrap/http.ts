@@ -1,6 +1,7 @@
 import { createTemplateRepository } from "../campaigns/templatePersistence.js";
 import { loadConfig, createLogger, createPool } from "../platform/index.js";
 import { loadCampaignLimits } from "../platform/config.js";
+import { pruneExpiredRows, startPruneScheduler, type PruneScheduler } from "../platform/prune.js";
 import { createIdentityModule } from "../identity/index.js";
 import { createTestOidcClient } from "../identity/adapters/test.js";
 import { createSystemAuthoringModule } from "../systems/authoring.js";
@@ -191,8 +192,22 @@ void app.register(
   }),
 );
 
+// Expired-row retention (design 12.3/13.1): every replica schedules it; the
+// advisory lock inside pruneExpiredRows lets only one prune at a time.
+let pruneScheduler: PruneScheduler | null = null;
+if (config.pruneIntervalMs > 0) {
+  pruneScheduler = startPruneScheduler({
+    intervalMs: config.pruneIntervalMs,
+    logger,
+    run: () => pruneExpiredRows(pool),
+  });
+} else {
+  logger.info({ event: "prune_disabled" }, "expired-row pruning disabled (SWEETROLL_PRUNE_INTERVAL_MS=0)");
+}
+
 const shutdown = async (signal: string) => {
   logger.info({ signal }, "shutting down HTTP process");
+  pruneScheduler?.stop();
   await app.close();
   await sceneEvents.close();
   await pool.end();
@@ -205,6 +220,7 @@ try {
   await app.listen({ host: config.host, port: config.port });
 } catch (error) {
   logger.fatal({ err: error }, "HTTP process failed to start");
+  pruneScheduler?.stop();
   await pool.end();
   process.exitCode = 1;
 }

@@ -50,6 +50,7 @@ or secret variables.
 | `SWEETROLL_MEDIA_DIR` | `/app/data/media` |
 | `AUTHORITATIVE_ROLL_SECRET` | Generate a new random secret with the command below; keep it stable across deployments. |
 | `LOG_LEVEL` | `info` |
+| `SWEETROLL_PRUNE_INTERVAL_MS` | Optional. Expired-row prune interval in milliseconds; default `3600000` (one hour), `0` disables. See below. |
 | `RAILWAY_RUN_UID` | `0`, for Railway's root-owned media-volume mount (see below). |
 
 Allow Railway to supply `PORT`; the backend reads it. Do not copy the local
@@ -78,6 +79,19 @@ proxy shares one peer address for many clients, configure
 `TRUSTED_PROXY_CIDRS` with the actual forwarding proxy addresses and verify
 that ingress appends or replaces the client entry in `X-Forwarded-For`.
 Leave the variable unset if those addresses cannot be verified.
+
+## Expired-row pruning
+
+Each HTTP process deletes rows that stopped being usable more than seven days
+ago: expired idempotency and image receipts, expired command executions
+(abandoned pending claims only after their lease has also lapsed), preview
+snapshots, expired or revoked sessions and personal tokens, never-consumed
+invitations past expiry and expired display codes. It deletes at most 1000 rows
+per statement and stops after 30 seconds per run. A PostgreSQL advisory lock
+lets only one replica prune at a time. Each run logs `expired rows pruned` with
+per-table counts (`event: prune_completed`); failures log `prune_failed` and
+retry at the next interval. Audit, activity, rolls, characters, content and
+consumed or revoked invitations are never pruned.
 
 ## Persistent images
 

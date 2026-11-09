@@ -13,6 +13,7 @@ test("acceptance GUI signs in and signs out", async ({ page }) => {
   expect(await (await page.request.get("/api/me")).json()).toMatchObject({ state: "authenticated" });
   page.once("dialog", (dialog) => dialog.accept());
   await signout.click();
+  await expect(page.getByText("Signed out.", { exact: true })).toBeVisible();
   await expect(signin).toBeVisible();
   expect(await (await page.request.get("/api/me")).json()).toMatchObject({ state: "anonymous" });
 });

@@ -34,6 +34,7 @@ jobs:
           cache: npm
           node-version-file: .nvmrc
       - run: npm ci
+      - run: node --test scripts/railway-deploy.test.mjs
       - run: npm test
       - run: npm run test:integration
       - run: npm run typecheck
@@ -53,6 +54,7 @@ jobs:
       - run: npm ci
       - run: npm ci
         working-directory: web
+      - run: node --test scripts/railway-deploy.test.mjs
       - run: npm test
         working-directory: web
       - run: npm run typecheck
@@ -176,20 +178,3 @@ jobs:
             web/test-results/
             web/tests/offline/evidence/
           retention-days: 7
-
-  deploy:
-    name: Deploy production
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [verify, web, web-e2e, web-offline]
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    concurrency:
-      group: railway-production
-      cancel-in-progress: false
-    container: ghcr.io/railwayapp/cli:latest
-    env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Deploy to Railway
-        run: railway up --service sweetroll --environment production --detach

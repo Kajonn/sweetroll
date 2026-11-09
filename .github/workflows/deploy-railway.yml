@@ -1,0 +1,100 @@
+name: Deploy verified main to Railway
+
+on:
+  workflow_run:
+    workflows: [CI, Deploy PR to acceptance]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Railway environment
+        type: choice
+        options: [acceptance, production]
+        required: true
+      sha:
+        description: Full verified main commit SHA (required for production)
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  acceptance:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.target == 'acceptance') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main' &&
+        ((github.event.workflow_run.name == 'CI' && github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.conclusion == 'success' && vars.RAILWAY_ACCEPTANCE_AUTODEPLOY == 'true') ||
+         (github.event.workflow_run.name == 'Deploy PR to acceptance' &&
+          contains(fromJSON('["cancelled","timed_out"]'), github.event.workflow_run.conclusion))))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: acceptance
+    concurrency:
+      group: sweetroll-acceptance
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - id: source
+        name: Resolve latest verified main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/railway-deploy.mjs select main
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          path: deploy-source
+          persist-credentials: false
+      - run: npm install --global @railway/cli@5.71.0
+      - name: Deploy and verify acceptance
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+          RAILWAY_ENVIRONMENT_ID: ${{ vars.RAILWAY_ENVIRONMENT_ID }}
+          RAILWAY_SERVICE_ID: ${{ vars.RAILWAY_SERVICE_ID }}
+          RAILWAY_APP_URL: ${{ vars.RAILWAY_APP_URL }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: node scripts/railway-deploy.mjs deploy deploy-source "$SOURCE_SHA" acceptance
+
+  production:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.target == 'production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: sweetroll-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - id: source
+        name: Verify requested main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_SHA: ${{ inputs.sha }}
+        run: node scripts/railway-deploy.mjs select production "$REQUESTED_SHA"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          path: deploy-source
+          persist-credentials: false
+      - run: npm install --global @railway/cli@5.71.0
+      - name: Deploy and verify locked production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+          RAILWAY_ENVIRONMENT_ID: ${{ vars.RAILWAY_ENVIRONMENT_ID }}
+          RAILWAY_SERVICE_ID: ${{ vars.RAILWAY_SERVICE_ID }}
+          RAILWAY_APP_URL: ${{ vars.RAILWAY_APP_URL }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: node scripts/railway-deploy.mjs deploy deploy-source "$SOURCE_SHA" production

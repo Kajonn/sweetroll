@@ -1292,3 +1292,10 @@ The frontend detects the server-owned test-auth route instead of baking the
 mode into the bundle. The button is absent when the route is disabled. This is
 an acceptance shortcut and does not satisfy the real production-authentication
 gate.
+
+The deployment split uses one Railway project with separate acceptance and
+production environments. GitHub Actions deploys verified `main` commits to
+acceptance and can temporarily deploy a reviewed PR there. Production takes an
+explicitly selected, verified `main` commit and can run locked before real
+sign-in ships. Each environment owns its own database, media and scanner.
+See the [deployment and cutover runbook](docs/operations/railway-deployment-split.md).

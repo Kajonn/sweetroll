@@ -1,5 +1,8 @@
 # Deploy Sweetroll on Railway
 
+Follow the [deployment and cutover runbook](railway-deployment-split.md) for
+the acceptance and production split, GitHub Actions settings and PR testing.
+
 This configuration targets a single app instance, a PostgreSQL service, and a
 persistent media volume. The repository-root Dockerfile builds both the frontend
 and backend. No separate frontend service or Vite server is needed.

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vitest";
 import { selectVerifiedCommit, waitForDeployment, verifyHosted } from "./railway-deploy.mjs";
 
 const sha = "a".repeat(40);

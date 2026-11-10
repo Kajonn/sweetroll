@@ -1,6 +1,6 @@
 # Sweetroll rules coverage: fixes and wider system support
 
-**Implementation plan · 10 November 2026 · Owner-requested 2026-11-10 · Decisions C1–C13 await owner confirmation**
+**Implementation plan · 10 November 2026 · Owner-requested 2026-11-10 · C1, C6, C10, C12 and C13 decided by the owner 2026-11-10; the other decisions await confirmation**
 
 ## Goal
 
@@ -77,14 +77,15 @@ player → GM browser journey.
 | C7 | Reading data | `lookup(dataset, key, column)` for exact keys and `lookupBand(dataset, number, column)` for "highest row at or below" tables (level, weight). Datasets declare a key column and typed columns. Choice fields may take their options from a dataset (`optionsFrom`), as design 6.2 already states. |
 | C8 | Reading entries | Aggregates over one slot only: `sum(slot, field)`, `count(slot)`, `sumWhere(slot, field, flagField)`, `countWhere(slot, flagField)`, `maxOf(slot, field)`. Quantity multiplies when the template opts in. No traversal into a single entry and no nesting. |
 | C9 | Dice model | Pools become first-class: a pool source (`dice`, custom dice), optional modifiers (`explode`, `rerollOnce`), then one reducer (sum, `keepHighest`, `keepLowest`, `countAtLeast`, `countAtMost`, `countEqual`). Count, sides, keep count and thresholds are integer expressions. `rolled("groupId")` reads an already rolled named group again. Explosions are capped (10 per die) and count toward the 100-dice limit. |
-| C10 | Outcomes | A roll action may carry ordered outcome bands (first match wins) and named detail values, each a non-dice expression that may read `roll.total` and `rolled(...)`. The result stores the outcome ID and label. The output template gains `{outcome}`, `{detail.<id>}`, `{fields.<id>}` and `{inputs.<id>}`. Rolls stay factual: nothing is applied to state. |
+| C10 | Outcomes (owner decision 2026-11-10) | A roll action may carry ordered outcome bands (first match wins) and named detail values, each a non-dice expression that may read `roll.total` and `rolled(...)`. The result stores the outcome ID and label. The output template gains `{outcome}`, `{detail.<id>}`, `{fields.<id>}` and `{inputs.<id>}`. Rolls never change characters: players read the result and apply effects to sheets by hand. |
 | C11 | Custom dice | A package may define up to 16 dice, each with up to 20 faces. A face has a numeric value, an optional label and optional symbol counts. `dice(n, "dieId")` rolls them; `countSymbol(pool, "symbol")` counts symbols. |
-| C12 | Opposed rolls | Campaign-only. (a) An action may declare a target of a given entity and read fields that entity marks `targetable`. (b) A response action rolls against a recorded roll and reads `opposed.total`. Target values are disclosed to the roller only through the outcome, never in the bindings shown to them. Standalone characters cannot use targeted actions. |
-| C13 | Cards | Last stage, largest change: a deck is a dataset plus stored deck state on a campaign (shared) or standalone character. `draw` and `shuffle` are new action kinds with server-side deterministic order. Recommended only after R1–R7 are accepted; may be dropped without affecting the other rows. |
+| C12 | Opposed rolls (owner decision 2026-11-10) | Campaign-only, with no extra privacy layer. (a) An action may declare a target of a given entity and read that character's fields through `target.<fieldId>`; the values it reads appear in the roll's bindings like the roller's own, to the roll's normal audience. (b) A response action rolls against a recorded roll the responder can see and reads `opposed.total`. No `targetable` marking, no hidden bindings, and no responses to rolls the responder cannot see. Standalone characters cannot use targeted actions. |
+| C13 | Cards (owner decision 2026-11-10: included, kept simple) | A system may define up to 4 decks, each a dataset of at most 200 cards. A deck has one stored state: the remaining order, per campaign (shared by the table) or per standalone character. Two action kinds only: `draw` (1–10 cards) and `shuffle` (return all cards and reorder). A draw is recorded like a roll, with the same audiences, showing each card's label and columns. No hands, discard piles, peeking, dealing to other players, returning single cards, or use of drawn cards inside formulas. |
 
 ## Not included
 
-Automatic application of roll consequences to state, effect engines, loops,
+Automatic application of roll consequences to state (owner decision 2026-11-10),
+effect engines, private target values, card hands and discard piles, loops,
 user-defined functions, executable extension points, linter/formatter tooling, cross-system references,
 initiative/turn trackers, and map-aware rules (range, line of sight). Breaking
 rules-version upgrades stay excluded (design Section 6.7).
@@ -241,31 +242,36 @@ with net successes.
 
 ### R7 — Opposed and targeted rolls (M10)
 
-1. Entity fields gain `targetable`; actions gain `target { entityId }`; scope
-   `target.<fieldId>` type-checked against targetable fields only (C12).
+1. Actions gain `target { entityId }`; scope `target.<fieldId>` is type-checked
+   against that entity's fields (C12).
 2. Command carries `targetCharacterId`; the server checks same campaign, same
    composition and current membership, reads the target under lock order
-   campaign → characters, and records the target identifier.
-3. Disclosure: target bindings are stored but shown only to GM audiences.
-4. Response actions: `respondsTo` a recorded roll with one-response uniqueness,
-   reusing push lineage storage; scope `opposed.total`.
-5. Authorization tests for design Section 9.1: non-member, former member,
-   archived target, private roll.
+   campaign → characters, and records the target identifier and the values read
+   in the roll's bindings.
+3. Response actions: `respondsTo` a recorded roll the responder can see, with
+   one response per responder, reusing push lineage storage; scope
+   `opposed.total`.
+4. Authorization tests for design Section 9.1: non-member, former member,
+   archived target, and a roll the responder cannot see.
+5. Design Section 14.1 states that a targeted roll shows the target values it
+   read to the roll's audience.
 
-Acceptance: fixture M10 runs attack against a defender's targetable defense and
-a contested roll between two players, with privacy verified for both.
+Acceptance: fixture M10 runs an attack against a defender's defense and a
+contested roll between two players.
 
 ### R8 — Cards (M9, second half; C13)
 
-1. Deck definitions over datasets; deck state table keyed by campaign or
-   standalone character; schema baseline updated.
-2. Actions `draw { count }`, `shuffle`, optional `discard`; order derived from
-   the roll secret and a per-deck shuffle ID; draws are idempotent commands.
-3. Hand visibility follows roll audiences; GM can see and reset decks.
-4. Offline: draws are online-only, like pushes.
+1. Deck definitions over datasets with the C13 limits; one deck-state table
+   keyed by deck and campaign or standalone character; schema baseline updated.
+2. Actions `draw { count }` and `shuffle`; order derived from the roll secret
+   and a per-deck shuffle ID; both are idempotent, online-only commands that
+   lock the deck state. An empty deck returns a readable error.
+3. Draw results reuse roll storage, audiences, activity and the GM board.
+4. Sheet and creator: draw and shuffle buttons, remaining-card count, a simple
+   deck editor on top of the dataset editor.
 
 Acceptance: a shared campaign deck never deals the same card twice between
-shuffles under concurrent draws.
+shuffles under concurrent draws; a standalone character has its own deck.
 
 ## Order and dependencies
 
@@ -279,7 +285,7 @@ stage (E5) lands, compositions with extensions keep their current restrictions.
 |------|------------|
 | Budget and denial-of-service surface grows with aggregates, explosions and lookups | Every new form has a compile-time cost and a runtime cap; property tests assert the caps; `sheetEvaluationNodes` is checked at publish |
 | A rewrite loses behaviour the current tests protect | Rewrite contract by contract inside the stages, keeping the existing unit, property and integration suites green after porting them to the new contract; the Year Zero fixture (M4) is the regression row for groups and pushes |
-| Target reads leak private sheet values | Only fields marked `targetable`; roller sees the outcome only; dedicated authorization tests |
+| A targeted roll shows another character's values | Accepted by the owner (C12); limited to campaign members and to the fields the system author's formula reads; stated in design 14.1 |
 | Contract size makes the creator harder to use | Builders for common shapes per stage; progressive disclosure per the GUI plan; free-form editor stays optional |
 | Scope | Eight design-changing stages; each is separately approved, shippable and reversible before the first release tag |
 

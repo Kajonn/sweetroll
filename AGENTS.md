@@ -88,4 +88,5 @@ The hosted B6 journey depends on real provider sign-in and remains open.
 The owner requested the [rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md)
 on 2026-11-10. Stage R0 fixes review defects inside the current design. Stages
 R1–R8 widen the rules contract and each needs the owner to confirm its decisions
-(C1–C13) before work starts. Nothing is implemented yet.
+before work starts; C1, C6, C10, C12 and C13 were decided on 2026-11-10 (rolls never
+change characters, opposed rolls need no privacy layer, cards are simple draw/shuffle decks). Nothing is implemented yet.

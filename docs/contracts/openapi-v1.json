@@ -15549,7 +15549,8 @@
                           "type": "object",
                           "required": [
                             "schemaVersion",
-                            "values"
+                            "values",
+                            "entries"
                           ],
                           "properties": {
                             "schemaVersion": {
@@ -20267,7 +20268,8 @@
                           "type": "object",
                           "required": [
                             "schemaVersion",
-                            "values"
+                            "values",
+                            "entries"
                           ],
                           "properties": {
                             "schemaVersion": {
@@ -22658,7 +22660,8 @@
                               "type": "object",
                               "required": [
                                 "schemaVersion",
-                                "values"
+                                "values",
+                                "entries"
                               ],
                               "properties": {
                                 "schemaVersion": {
@@ -24549,7 +24552,7 @@
                                             "type": "string"
                                           },
                                           "operandIds": {
-                                            "maxItems": 2,
+                                            "maxItems": 8,
                                             "type": "array",
                                             "items": {
                                               "minLength": 1,
@@ -24560,16 +24563,28 @@
                                           "value": {
                                             "anyOf": [
                                               {
-                                                "type": "string"
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "boolean"
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
                                               },
                                               {
-                                                "type": "number"
-                                              },
-                                              {
-                                                "type": "boolean"
-                                              },
-                                              {
-                                                "type": "null"
+                                                "uniqueItems": true,
+                                                "type": "array",
+                                                "items": {
+                                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                }
                                               }
                                             ]
                                           },
@@ -24656,16 +24671,28 @@
                                       "value": {
                                         "anyOf": [
                                           {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
                                           },
                                           {
-                                            "type": "number"
-                                          },
-                                          {
-                                            "type": "boolean"
-                                          },
-                                          {
-                                            "type": "null"
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            }
                                           }
                                         ]
                                       }
@@ -25841,7 +25868,8 @@
                               "type": "object",
                               "required": [
                                 "schemaVersion",
-                                "values"
+                                "values",
+                                "entries"
                               ],
                               "properties": {
                                 "schemaVersion": {
@@ -27732,7 +27760,7 @@
                                             "type": "string"
                                           },
                                           "operandIds": {
-                                            "maxItems": 2,
+                                            "maxItems": 8,
                                             "type": "array",
                                             "items": {
                                               "minLength": 1,
@@ -27743,16 +27771,28 @@
                                           "value": {
                                             "anyOf": [
                                               {
-                                                "type": "string"
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "boolean"
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
                                               },
                                               {
-                                                "type": "number"
-                                              },
-                                              {
-                                                "type": "boolean"
-                                              },
-                                              {
-                                                "type": "null"
+                                                "uniqueItems": true,
+                                                "type": "array",
+                                                "items": {
+                                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                }
                                               }
                                             ]
                                           },
@@ -27839,16 +27879,28 @@
                                       "value": {
                                         "anyOf": [
                                           {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
                                           },
                                           {
-                                            "type": "number"
-                                          },
-                                          {
-                                            "type": "boolean"
-                                          },
-                                          {
-                                            "type": "null"
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            }
                                           }
                                         ]
                                       }
@@ -29035,7 +29087,8 @@
                               "type": "object",
                               "required": [
                                 "schemaVersion",
-                                "values"
+                                "values",
+                                "entries"
                               ],
                               "properties": {
                                 "schemaVersion": {
@@ -30926,7 +30979,7 @@
                                             "type": "string"
                                           },
                                           "operandIds": {
-                                            "maxItems": 2,
+                                            "maxItems": 8,
                                             "type": "array",
                                             "items": {
                                               "minLength": 1,
@@ -30937,16 +30990,28 @@
                                           "value": {
                                             "anyOf": [
                                               {
-                                                "type": "string"
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "boolean"
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
                                               },
                                               {
-                                                "type": "number"
-                                              },
-                                              {
-                                                "type": "boolean"
-                                              },
-                                              {
-                                                "type": "null"
+                                                "uniqueItems": true,
+                                                "type": "array",
+                                                "items": {
+                                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                }
                                               }
                                             ]
                                           },
@@ -31033,16 +31098,28 @@
                                       "value": {
                                         "anyOf": [
                                           {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
                                           },
                                           {
-                                            "type": "number"
-                                          },
-                                          {
-                                            "type": "boolean"
-                                          },
-                                          {
-                                            "type": "null"
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            }
                                           }
                                         ]
                                       }
@@ -32220,7 +32297,8 @@
                               "type": "object",
                               "required": [
                                 "schemaVersion",
-                                "values"
+                                "values",
+                                "entries"
                               ],
                               "properties": {
                                 "schemaVersion": {
@@ -34111,7 +34189,7 @@
                                             "type": "string"
                                           },
                                           "operandIds": {
-                                            "maxItems": 2,
+                                            "maxItems": 8,
                                             "type": "array",
                                             "items": {
                                               "minLength": 1,
@@ -34122,16 +34200,28 @@
                                           "value": {
                                             "anyOf": [
                                               {
-                                                "type": "string"
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "boolean"
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
                                               },
                                               {
-                                                "type": "number"
-                                              },
-                                              {
-                                                "type": "boolean"
-                                              },
-                                              {
-                                                "type": "null"
+                                                "uniqueItems": true,
+                                                "type": "array",
+                                                "items": {
+                                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                }
                                               }
                                             ]
                                           },
@@ -34218,16 +34308,28 @@
                                       "value": {
                                         "anyOf": [
                                           {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
                                           },
                                           {
-                                            "type": "number"
-                                          },
-                                          {
-                                            "type": "boolean"
-                                          },
-                                          {
-                                            "type": "null"
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            }
                                           }
                                         ]
                                       }
@@ -35407,7 +35509,8 @@
                               "type": "object",
                               "required": [
                                 "schemaVersion",
-                                "values"
+                                "values",
+                                "entries"
                               ],
                               "properties": {
                                 "schemaVersion": {
@@ -37298,7 +37401,7 @@
                                             "type": "string"
                                           },
                                           "operandIds": {
-                                            "maxItems": 2,
+                                            "maxItems": 8,
                                             "type": "array",
                                             "items": {
                                               "minLength": 1,
@@ -37309,16 +37412,28 @@
                                           "value": {
                                             "anyOf": [
                                               {
-                                                "type": "string"
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "boolean"
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
                                               },
                                               {
-                                                "type": "number"
-                                              },
-                                              {
-                                                "type": "boolean"
-                                              },
-                                              {
-                                                "type": "null"
+                                                "uniqueItems": true,
+                                                "type": "array",
+                                                "items": {
+                                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                }
                                               }
                                             ]
                                           },
@@ -37405,16 +37520,28 @@
                                       "value": {
                                         "anyOf": [
                                           {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
                                           },
                                           {
-                                            "type": "number"
-                                          },
-                                          {
-                                            "type": "boolean"
-                                          },
-                                          {
-                                            "type": "null"
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            }
                                           }
                                         ]
                                       }
@@ -38639,7 +38766,7 @@
                                     "type": "string"
                                   },
                                   "operandIds": {
-                                    "maxItems": 2,
+                                    "maxItems": 8,
                                     "type": "array",
                                     "items": {
                                       "minLength": 1,
@@ -38650,16 +38777,28 @@
                                   "value": {
                                     "anyOf": [
                                       {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
                                       },
                                       {
-                                        "type": "number"
-                                      },
-                                      {
-                                        "type": "boolean"
-                                      },
-                                      {
-                                        "type": "null"
+                                        "uniqueItems": true,
+                                        "type": "array",
+                                        "items": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        }
                                       }
                                     ]
                                   },
@@ -38746,16 +38885,28 @@
                               "value": {
                                 "anyOf": [
                                   {
-                                    "type": "string"
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   },
                                   {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "boolean"
-                                  },
-                                  {
-                                    "type": "null"
+                                    "uniqueItems": true,
+                                    "type": "array",
+                                    "items": {
+                                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                      "type": "string"
+                                    }
                                   }
                                 ]
                               }
@@ -40885,7 +41036,8 @@
                               "type": "object",
                               "required": [
                                 "schemaVersion",
-                                "values"
+                                "values",
+                                "entries"
                               ],
                               "properties": {
                                 "schemaVersion": {
@@ -42776,7 +42928,7 @@
                                             "type": "string"
                                           },
                                           "operandIds": {
-                                            "maxItems": 2,
+                                            "maxItems": 8,
                                             "type": "array",
                                             "items": {
                                               "minLength": 1,
@@ -42787,16 +42939,28 @@
                                           "value": {
                                             "anyOf": [
                                               {
-                                                "type": "string"
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "boolean"
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
                                               },
                                               {
-                                                "type": "number"
-                                              },
-                                              {
-                                                "type": "boolean"
-                                              },
-                                              {
-                                                "type": "null"
+                                                "uniqueItems": true,
+                                                "type": "array",
+                                                "items": {
+                                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                }
                                               }
                                             ]
                                           },
@@ -42883,16 +43047,28 @@
                                       "value": {
                                         "anyOf": [
                                           {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
                                           },
                                           {
-                                            "type": "number"
-                                          },
-                                          {
-                                            "type": "boolean"
-                                          },
-                                          {
-                                            "type": "null"
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            }
                                           }
                                         ]
                                       }
@@ -44115,7 +44291,8 @@
                               "type": "object",
                               "required": [
                                 "schemaVersion",
-                                "values"
+                                "values",
+                                "entries"
                               ],
                               "properties": {
                                 "schemaVersion": {
@@ -46006,7 +46183,7 @@
                                             "type": "string"
                                           },
                                           "operandIds": {
-                                            "maxItems": 2,
+                                            "maxItems": 8,
                                             "type": "array",
                                             "items": {
                                               "minLength": 1,
@@ -46017,16 +46194,28 @@
                                           "value": {
                                             "anyOf": [
                                               {
-                                                "type": "string"
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "boolean"
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
                                               },
                                               {
-                                                "type": "number"
-                                              },
-                                              {
-                                                "type": "boolean"
-                                              },
-                                              {
-                                                "type": "null"
+                                                "uniqueItems": true,
+                                                "type": "array",
+                                                "items": {
+                                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                }
                                               }
                                             ]
                                           },
@@ -46113,16 +46302,28 @@
                                       "value": {
                                         "anyOf": [
                                           {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
                                           },
                                           {
-                                            "type": "number"
-                                          },
-                                          {
-                                            "type": "boolean"
-                                          },
-                                          {
-                                            "type": "null"
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            }
                                           }
                                         ]
                                       }
@@ -47404,7 +47605,8 @@
                               "type": "object",
                               "required": [
                                 "schemaVersion",
-                                "values"
+                                "values",
+                                "entries"
                               ],
                               "properties": {
                                 "schemaVersion": {
@@ -49295,7 +49497,7 @@
                                             "type": "string"
                                           },
                                           "operandIds": {
-                                            "maxItems": 2,
+                                            "maxItems": 8,
                                             "type": "array",
                                             "items": {
                                               "minLength": 1,
@@ -49306,16 +49508,28 @@
                                           "value": {
                                             "anyOf": [
                                               {
-                                                "type": "string"
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "boolean"
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
                                               },
                                               {
-                                                "type": "number"
-                                              },
-                                              {
-                                                "type": "boolean"
-                                              },
-                                              {
-                                                "type": "null"
+                                                "uniqueItems": true,
+                                                "type": "array",
+                                                "items": {
+                                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                }
                                               }
                                             ]
                                           },
@@ -49402,16 +49616,28 @@
                                       "value": {
                                         "anyOf": [
                                           {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
                                           },
                                           {
-                                            "type": "number"
-                                          },
-                                          {
-                                            "type": "boolean"
-                                          },
-                                          {
-                                            "type": "null"
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            }
                                           }
                                         ]
                                       }
@@ -50585,7 +50811,8 @@
                               "type": "object",
                               "required": [
                                 "schemaVersion",
-                                "values"
+                                "values",
+                                "entries"
                               ],
                               "properties": {
                                 "schemaVersion": {
@@ -52476,7 +52703,7 @@
                                             "type": "string"
                                           },
                                           "operandIds": {
-                                            "maxItems": 2,
+                                            "maxItems": 8,
                                             "type": "array",
                                             "items": {
                                               "minLength": 1,
@@ -52487,16 +52714,28 @@
                                           "value": {
                                             "anyOf": [
                                               {
-                                                "type": "string"
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "boolean"
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
                                               },
                                               {
-                                                "type": "number"
-                                              },
-                                              {
-                                                "type": "boolean"
-                                              },
-                                              {
-                                                "type": "null"
+                                                "uniqueItems": true,
+                                                "type": "array",
+                                                "items": {
+                                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                }
                                               }
                                             ]
                                           },
@@ -52583,16 +52822,28 @@
                                       "value": {
                                         "anyOf": [
                                           {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
                                           },
                                           {
-                                            "type": "number"
-                                          },
-                                          {
-                                            "type": "boolean"
-                                          },
-                                          {
-                                            "type": "null"
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            }
                                           }
                                         ]
                                       }
@@ -53774,7 +54025,8 @@
                               "type": "object",
                               "required": [
                                 "schemaVersion",
-                                "values"
+                                "values",
+                                "entries"
                               ],
                               "properties": {
                                 "schemaVersion": {
@@ -55665,7 +55917,7 @@
                                             "type": "string"
                                           },
                                           "operandIds": {
-                                            "maxItems": 2,
+                                            "maxItems": 8,
                                             "type": "array",
                                             "items": {
                                               "minLength": 1,
@@ -55676,16 +55928,28 @@
                                           "value": {
                                             "anyOf": [
                                               {
-                                                "type": "string"
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "boolean"
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
                                               },
                                               {
-                                                "type": "number"
-                                              },
-                                              {
-                                                "type": "boolean"
-                                              },
-                                              {
-                                                "type": "null"
+                                                "uniqueItems": true,
+                                                "type": "array",
+                                                "items": {
+                                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                }
                                               }
                                             ]
                                           },
@@ -55772,16 +56036,28 @@
                                       "value": {
                                         "anyOf": [
                                           {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
                                           },
                                           {
-                                            "type": "number"
-                                          },
-                                          {
-                                            "type": "boolean"
-                                          },
-                                          {
-                                            "type": "null"
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            }
                                           }
                                         ]
                                       }
@@ -58224,7 +58500,8 @@
                               "type": "object",
                               "required": [
                                 "schemaVersion",
-                                "values"
+                                "values",
+                                "entries"
                               ],
                               "properties": {
                                 "schemaVersion": {
@@ -60115,7 +60392,7 @@
                                             "type": "string"
                                           },
                                           "operandIds": {
-                                            "maxItems": 2,
+                                            "maxItems": 8,
                                             "type": "array",
                                             "items": {
                                               "minLength": 1,
@@ -60126,16 +60403,28 @@
                                           "value": {
                                             "anyOf": [
                                               {
-                                                "type": "string"
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "boolean"
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
                                               },
                                               {
-                                                "type": "number"
-                                              },
-                                              {
-                                                "type": "boolean"
-                                              },
-                                              {
-                                                "type": "null"
+                                                "uniqueItems": true,
+                                                "type": "array",
+                                                "items": {
+                                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                }
                                               }
                                             ]
                                           },
@@ -60222,16 +60511,28 @@
                                       "value": {
                                         "anyOf": [
                                           {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
                                           },
                                           {
-                                            "type": "number"
-                                          },
-                                          {
-                                            "type": "boolean"
-                                          },
-                                          {
-                                            "type": "null"
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            }
                                           }
                                         ]
                                       }
@@ -63589,7 +63890,8 @@
                               "type": "object",
                               "required": [
                                 "schemaVersion",
-                                "values"
+                                "values",
+                                "entries"
                               ],
                               "properties": {
                                 "schemaVersion": {
@@ -65480,7 +65782,7 @@
                                             "type": "string"
                                           },
                                           "operandIds": {
-                                            "maxItems": 2,
+                                            "maxItems": 8,
                                             "type": "array",
                                             "items": {
                                               "minLength": 1,
@@ -65491,16 +65793,28 @@
                                           "value": {
                                             "anyOf": [
                                               {
-                                                "type": "string"
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "type": "boolean"
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
                                               },
                                               {
-                                                "type": "number"
-                                              },
-                                              {
-                                                "type": "boolean"
-                                              },
-                                              {
-                                                "type": "null"
+                                                "uniqueItems": true,
+                                                "type": "array",
+                                                "items": {
+                                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                  "type": "string"
+                                                }
                                               }
                                             ]
                                           },
@@ -65587,16 +65901,28 @@
                                       "value": {
                                         "anyOf": [
                                           {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
                                           },
                                           {
-                                            "type": "number"
-                                          },
-                                          {
-                                            "type": "boolean"
-                                          },
-                                          {
-                                            "type": "null"
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            }
                                           }
                                         ]
                                       }
@@ -66749,7 +67075,8 @@
                           "type": "object",
                           "required": [
                             "schemaVersion",
-                            "values"
+                            "values",
+                            "entries"
                           ],
                           "properties": {
                             "schemaVersion": {
@@ -69599,7 +69926,7 @@
                                           "type": "string"
                                         },
                                         "operandIds": {
-                                          "maxItems": 2,
+                                          "maxItems": 8,
                                           "type": "array",
                                           "items": {
                                             "minLength": 1,
@@ -69610,16 +69937,28 @@
                                         "value": {
                                           "anyOf": [
                                             {
-                                              "type": "string"
+                                              "anyOf": [
+                                                {
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "type": "number"
+                                                },
+                                                {
+                                                  "type": "boolean"
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
                                             },
                                             {
-                                              "type": "number"
-                                            },
-                                            {
-                                              "type": "boolean"
-                                            },
-                                            {
-                                              "type": "null"
+                                              "uniqueItems": true,
+                                              "type": "array",
+                                              "items": {
+                                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                "type": "string"
+                                              }
                                             }
                                           ]
                                         },
@@ -69706,16 +70045,28 @@
                                     "value": {
                                       "anyOf": [
                                         {
-                                          "type": "string"
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "number"
+                                            },
+                                            {
+                                              "type": "boolean"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
                                         },
                                         {
-                                          "type": "number"
-                                        },
-                                        {
-                                          "type": "boolean"
-                                        },
-                                        {
-                                          "type": "null"
+                                          "uniqueItems": true,
+                                          "type": "array",
+                                          "items": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          }
                                         }
                                       ]
                                     }
@@ -70516,7 +70867,8 @@
                       "type": "object",
                       "required": [
                         "schemaVersion",
-                        "values"
+                        "values",
+                        "entries"
                       ],
                       "properties": {
                         "schemaVersion": {
@@ -93482,7 +93834,8 @@
                           "type": "object",
                           "required": [
                             "schemaVersion",
-                            "values"
+                            "values",
+                            "entries"
                           ],
                           "properties": {
                             "schemaVersion": {
@@ -95934,7 +96287,8 @@
                           "type": "object",
                           "required": [
                             "schemaVersion",
-                            "values"
+                            "values",
+                            "entries"
                           ],
                           "properties": {
                             "schemaVersion": {
@@ -98107,7 +98461,8 @@
                           "type": "object",
                           "required": [
                             "schemaVersion",
-                            "values"
+                            "values",
+                            "entries"
                           ],
                           "properties": {
                             "schemaVersion": {
@@ -100285,7 +100640,8 @@
                           "type": "object",
                           "required": [
                             "schemaVersion",
-                            "values"
+                            "values",
+                            "entries"
                           ],
                           "properties": {
                             "schemaVersion": {
@@ -107150,7 +107506,7 @@
                                           "type": "string"
                                         },
                                         "operandIds": {
-                                          "maxItems": 2,
+                                          "maxItems": 8,
                                           "type": "array",
                                           "items": {
                                             "minLength": 1,
@@ -107161,16 +107517,28 @@
                                         "value": {
                                           "anyOf": [
                                             {
-                                              "type": "string"
+                                              "anyOf": [
+                                                {
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "type": "number"
+                                                },
+                                                {
+                                                  "type": "boolean"
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
                                             },
                                             {
-                                              "type": "number"
-                                            },
-                                            {
-                                              "type": "boolean"
-                                            },
-                                            {
-                                              "type": "null"
+                                              "uniqueItems": true,
+                                              "type": "array",
+                                              "items": {
+                                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                "type": "string"
+                                              }
                                             }
                                           ]
                                         },

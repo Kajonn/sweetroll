@@ -50,25 +50,15 @@
         "expressions",
         "actions",
         "validations",
+        "templates",
+        "slots",
         "effectiveLimits",
         "integrity"
       ],
       "properties": {
         "schemaVersion": {
-          "anyOf": [
-            {
-              "const": "1.0",
-              "type": "string"
-            },
-            {
-              "const": "1.1",
-              "type": "string"
-            },
-            {
-              "const": "1.2",
-              "type": "string"
-            }
-          ]
+          "const": "2.0",
+          "type": "string"
         },
         "systemId": {
           "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
@@ -855,6 +845,7 @@
             "type": "object",
             "required": [
               "id",
+              "languageVersion",
               "context",
               "resultType",
               "inferredType",
@@ -869,7 +860,7 @@
                 "type": "string"
               },
               "languageVersion": {
-                "const": "0.2",
+                "const": "1.0",
                 "type": "string"
               },
               "context": {
@@ -1031,6 +1022,18 @@
                       "id": {
                         "pattern": "^[a-z][a-z0-9_]{0,63}$",
                         "type": "string"
+                      },
+                      "part": {
+                        "anyOf": [
+                          {
+                            "const": "current",
+                            "type": "string"
+                          },
+                          {
+                            "const": "max",
+                            "type": "string"
+                          }
+                        ]
                       }
                     }
                   },
@@ -1094,6 +1097,10 @@
                           },
                           {
                             "const": "/",
+                            "type": "string"
+                          },
+                          {
+                            "const": "%",
                             "type": "string"
                           },
                           {
@@ -1164,11 +1171,31 @@
                           {
                             "const": "round",
                             "type": "string"
+                          },
+                          {
+                            "const": "floor",
+                            "type": "string"
+                          },
+                          {
+                            "const": "ceil",
+                            "type": "string"
+                          },
+                          {
+                            "const": "abs",
+                            "type": "string"
+                          },
+                          {
+                            "const": "if",
+                            "type": "string"
+                          },
+                          {
+                            "const": "has",
+                            "type": "string"
                           }
                         ]
                       },
                       "arguments": {
-                        "maxItems": 2,
+                        "maxItems": 8,
                         "type": "array",
                         "items": {
                           "$ref": "ExpressionAstV1"

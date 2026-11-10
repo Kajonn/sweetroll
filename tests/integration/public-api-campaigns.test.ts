@@ -22,7 +22,7 @@ type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 /** Named dice pool with a push policy, so v1 can roll and push the same sheet. */
 function pushableDocument(): SystemDocumentV1 {
   const document = namedDicePoolDocument();
-  document.schemaVersion = "1.2";
+
   const action = document.actions.find((entry) => entry.kind === "roll");
   if (action?.kind !== "roll") throw new Error("fixture has no roll action");
   action.pushPolicy = {

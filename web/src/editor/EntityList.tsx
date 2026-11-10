@@ -1,3 +1,4 @@
+import { entityFieldTypes, type FieldBindingType } from "@sweetroll/rules";
 import { DebugOnly } from "../ui/debugMode.js";
 import { SystemDialogContent, SystemDialogOverlay } from "../theme/SystemPresentation.js";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -154,7 +155,7 @@ function FieldEditorRouter({
 }: {
   field: FieldV1;
   onChange: (next: FieldV1) => void;
-  siblings: ReadonlyArray<{ id: string; valueType: "number" | "text" | "boolean" }>;
+  siblings: ReadonlyArray<{ id: string; valueType: FieldBindingType }>;
   expressionSourceFor?: ((expressionId: string) => string) | undefined;
   expressionFallbackFor?: ((expressionId: string) => unknown) | undefined;
   onExpressionSourceChange?: ((expressionId: string, next: string) => void) | undefined;
@@ -351,27 +352,7 @@ function EntityDetail({
   const [fieldKind, setFieldKind] = useState<FieldV1["kind"]>("text");
   // Sibling fields available for formula references (fields.<id>), typed
   // for the expression environment.
-  type Sibling = { id: string; valueType: "number" | "text" | "boolean" };
-  const siblings: Sibling[] = [];
-  for (const f of entity.fields) {
-    switch (f.kind) {
-      case "integer":
-      case "decimal":
-      case "resource":
-        siblings.push({ id: f.id, valueType: "number" });
-        break;
-      case "boolean":
-        siblings.push({ id: f.id, valueType: "boolean" });
-        break;
-      case "text":
-      case "singleChoice":
-      case "multiChoice":
-        siblings.push({ id: f.id, valueType: "text" });
-        break;
-      default:
-        break;
-    }
-  }
+  const siblings = Object.entries(entityFieldTypes(entity.fields)).map(([id, valueType]) => ({ id, valueType }));
   return (
     <div className={styles.detailInner}>
       <header className={styles.detailHeader}>

@@ -3,7 +3,9 @@
   "mediaType": "application/vnd.sweetroll.system+json;version=1",
   "exportedAt": "2026-09-04T12:00:00Z",
   "package": {
-    "schemaVersion": "1.0",
+    "schemaVersion": "2.0",
+    "templates": [],
+    "slots": [],
     "systemId": "a0000000-0000-5000-8000-000000000001",
     "versionId": "a0000000-0000-5000-8000-000000000002",
     "semanticVersion": "1.0.0",
@@ -167,6 +169,7 @@
       {
         "id": "defense_expr",
         "context": "computed",
+        "languageVersion": "1.0",
         "resultType": "number",
         "inferredType": "number",
         "fallback": 10,
@@ -191,6 +194,7 @@
       {
         "id": "check_expr",
         "context": "roll",
+        "languageVersion": "1.0",
         "resultType": "number",
         "inferredType": "number",
         "fallback": 0,
@@ -229,6 +233,7 @@
       {
         "id": "ability_valid_expr",
         "context": "validation",
+        "languageVersion": "1.0",
         "resultType": "boolean",
         "inferredType": "boolean",
         "fallback": false,
@@ -324,7 +329,7 @@
       "sidesPerDie": 1000
     },
     "integrity": {
-      "checksum": "sha256:da9129a200e39ea717fcc3bddbc1b3cae0fe7747c27dfc6187e5c745f31da46d"
+      "checksum": "sha256:44a4d3930c93c2c86351e2e53a2d548ce4b7b46833a474950e60a8eceea3ad02"
     }
   }
 }

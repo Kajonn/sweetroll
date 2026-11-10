@@ -54,8 +54,8 @@ describe("typecheck arity enforcement", () => {
     if (r.ok) return;
     expect(r.diagnostics[0]!.code).toBe("invalid_expression");
   });
-  it("rejects max with 3 arguments", () => {
-    const r = inferType(ast("max(fields.ability, 1, 2)"), env);
+  it("rejects max with 9 arguments", () => {
+    const r = inferType(ast("max(fields.ability, 1, 2, 3, 4, 5, 6, 7, 8)"), env);
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.diagnostics[0]!.code).toBe("invalid_expression");

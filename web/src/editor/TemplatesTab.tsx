@@ -1,3 +1,4 @@
+import { entityFieldTypes, type FieldBindingType } from "@sweetroll/rules";
 import { DebugOnly } from "../ui/debugMode.js";
 import { useState, type ReactNode } from "react";
 
@@ -611,18 +612,8 @@ function guidedDiceKindFor(source: string): string {
 function templateFieldTypeMap(
   template: ObjectTemplateV1,
   document: SystemDocumentV1,
-): Record<string, "number" | "text" | "boolean"> {
-  const out: Record<string, "number" | "text" | "boolean"> = {};
-  for (const field of [...eligibleCharacterFields(template, document), ...template.fields]) {
-    if (field.kind === "integer" || field.kind === "decimal" || field.kind === "resource") {
-      out[field.id] = "number";
-    } else if (field.kind === "boolean") {
-      out[field.id] = "boolean";
-    } else if (field.kind === "text" || field.kind === "singleChoice" || field.kind === "multiChoice") {
-      out[field.id] = "text";
-    }
-  }
-  return out;
+): Record<string, FieldBindingType> {
+  return entityFieldTypes([...eligibleCharacterFields(template, document), ...template.fields]);
 }
 
 function templateFieldLabels(template: ObjectTemplateV1, document: SystemDocumentV1): Record<string, string> {

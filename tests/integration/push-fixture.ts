@@ -19,7 +19,7 @@ export async function makePushApp(
   const h = await buildI3App({ pool });
   const headers = { cookie: h.users.ada.cookie };
   const doc = namedDicePoolDocument();
-  doc.schemaVersion = "1.2";
+
   const a = doc.actions.find((a) => a.kind === "roll")!;
   if (a.kind !== "roll") throw Error("fixture");
   a.pushPolicy = {

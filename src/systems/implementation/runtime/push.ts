@@ -1,3 +1,4 @@
+import type { EvaluationBindings } from "../rules/evaluate.js";
 import {derivedEntryError} from "./effective-entry.js";
 import {effectiveTemplateId} from "./entries.js";
 import { compositionOf, qualifiedId, unqualifiedId } from "../rules/compose.js";
@@ -86,7 +87,7 @@ export function validatePushSource(
       )
     )
       return "source_unavailable";
-    const siblings = Object.values(state.entries ?? {}).filter(
+    const siblings = Object.values(state.entries).filter(
       (e) =>
         e.slotId === owned.entry.slotId && e.entryId !== owned.entry.entryId,
     ).length;
@@ -94,8 +95,8 @@ export function validatePushSource(
       derivedEntryError(pkg,entity,owned.entry,siblings)!==null ||
       !validateEntryForSlot(
         owned.entry,
-        pkg.slots ?? [],
-        pkg.templates ?? [],
+        pkg.slots,
+        pkg.templates,
         siblings,
       ).ok ||
       ("nominal" in owned.action && owned.action.nominal)
@@ -141,10 +142,7 @@ export function resolveRuntimePush(input: {
   const expressionKey = qualifiedId(context.extensionId, context.expressionId);
   const expression = pkg.expressions.find((e) => e.id === expressionKey);
   if (!expression) return fail("invalid_snapshot");
-  const bindings = { fields: {}, inputs: {} } as {
-    fields: Record<string, string | number | boolean | null>;
-    inputs: Record<string, string | number | boolean | null>;
-  };
+  const bindings: EvaluationBindings = { fields: {}, inputs: {} };
   for (const b of parent.bindings) bindings[b.scope][b.definitionId] = b.value;
   const result = evaluatePush({
     expression,

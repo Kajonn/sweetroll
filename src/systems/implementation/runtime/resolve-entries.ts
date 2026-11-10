@@ -1,3 +1,4 @@
+import type { EvaluationBindings } from "../rules/evaluate.js";
 import {derivedEntryError,effectiveEntryDefinition} from "./effective-entry.js";
 import {makePushContext} from "./push.js";
 import type {PushContext} from "./push-context.js";
@@ -64,7 +65,7 @@ export function findGrantedAction(
   entryId: string,
   actionId: string,
 ): GrantedActionOwnership | undefined {
-  const entry = (state.entries ?? {})[entryId];
+  const entry = state.entries[entryId];
   if (entry === undefined) return undefined;
   const template = effectiveEntryDefinition(packageValue, entry);
   if (template === undefined) return undefined;
@@ -84,7 +85,7 @@ export function findGrantedAction(
 export function resolveGrantedAction(request: GrantedActionRequest): RuntimeResult<GrantedActionOutcome> {
   const owned = findGrantedAction(request.packageValue, request.state, request.entryId, request.actionId);
   if (owned === undefined) {
-    const entry = (request.state.entries ?? {})[request.entryId];
+    const entry = request.state.entries[request.entryId];
     if (entry === undefined) {
       return badRequest("Character entry not found.", request.entryId);
     }
@@ -95,15 +96,15 @@ export function resolveGrantedAction(request: GrantedActionRequest): RuntimeResu
   }
   const { entry, template, action } = owned;
 
-  const siblings = Object.values(request.state.entries ?? {}).filter(
+  const siblings = Object.values(request.state.entries).filter(
     (candidate) => candidate.slotId === entry.slotId && candidate.entryId !== entry.entryId,
   ).length;
   const invalidDerived=derivedEntryError(request.packageValue,request.entity,entry,siblings);
   if(invalidDerived) return badRequest(invalidDerived,entry.entryId);
   const validation = validateEntryForSlot(
     entry,
-    request.packageValue.slots ?? [],
-    request.packageValue.templates ?? [],
+    request.packageValue.slots,
+    request.packageValue.templates,
     siblings,
   );
   if (!validation.ok) {
@@ -236,7 +237,7 @@ function resolveGrantedBump(
   const changed = target !== stored.current;
   const nextState = structuredClone(request.state);
   nextState.entries = {
-    ...(request.state.entries ?? {}),
+    ...request.state.entries,
     [entry.entryId]: {
       ...entry,
       values: { ...entry.values, [action.resourceId]: { current: target, max: stored.max } },
@@ -264,7 +265,7 @@ function grantedFieldScope(
   template: ObjectTemplateV1,
   entry: CharacterEntryV1,
   derivedValues: Record<string, RuntimeScalar>,
-): Record<string, RuntimeScalar> {
+): EvaluationBindings["fields"] {
   const characterFields: Record<string, unknown> = {
     ...buildFieldBindings(request.entity, request.state),
     ...derivedValues,
@@ -275,11 +276,13 @@ function grantedFieldScope(
     const field = templateFields.get(id);
     if (field?.kind === "resource" && isResourceValue(value)) {
       entryScope[id] = value.current;
+      entryScope[`${id}.current`] = value.current;
+      entryScope[`${id}.max`] = value.max;
     } else {
       entryScope[id] = value;
     }
   }
-  return buildEntryScope(characterFields, entryScope) as Record<string, RuntimeScalar>;
+  return buildEntryScope(characterFields, entryScope) as EvaluationBindings["fields"];
 }
 
 function isResourceValue(value: unknown): value is { current: number; max: number } {

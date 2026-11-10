@@ -25,7 +25,7 @@ function packageWithEveryAstVariant() {
   value.expressions.push(
     {
       id: "string_expr",
-      context: "computed",
+      context: "computed", languageVersion: "1.0",
       resultType: "text",
       inferredType: "text",
       fallback: "",
@@ -35,7 +35,7 @@ function packageWithEveryAstVariant() {
     },
     {
       id: "boolean_expr",
-      context: "computed",
+      context: "computed", languageVersion: "1.0",
       resultType: "boolean",
       inferredType: "boolean",
       fallback: false,
@@ -45,7 +45,7 @@ function packageWithEveryAstVariant() {
     },
     {
       id: "unary_expr",
-      context: "computed",
+      context: "computed", languageVersion: "1.0",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
@@ -55,7 +55,7 @@ function packageWithEveryAstVariant() {
     },
     {
       id: "min_expr",
-      context: "computed",
+      context: "computed", languageVersion: "1.0",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
@@ -72,7 +72,7 @@ function packageWithEveryAstVariant() {
     },
     {
       id: "max_expr",
-      context: "computed",
+      context: "computed", languageVersion: "1.0",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
@@ -89,7 +89,7 @@ function packageWithEveryAstVariant() {
     },
     {
       id: "round_expr",
-      context: "computed",
+      context: "computed", languageVersion: "1.0",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
@@ -104,7 +104,7 @@ function packageWithEveryAstVariant() {
     },
     {
       id: "dice_expr",
-      context: "computed",
+      context: "computed", languageVersion: "1.0",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
@@ -114,7 +114,7 @@ function packageWithEveryAstVariant() {
     },
     {
       id: "keep_high_expr",
-      context: "computed",
+      context: "computed", languageVersion: "1.0",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
@@ -129,7 +129,7 @@ function packageWithEveryAstVariant() {
     },
     {
       id: "keep_low_expr",
-      context: "computed",
+      context: "computed", languageVersion: "1.0",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
@@ -144,7 +144,7 @@ function packageWithEveryAstVariant() {
     },
     {
       id: "input_expr",
-      context: "computed",
+      context: "computed", languageVersion: "1.0",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
@@ -210,7 +210,7 @@ describe("compiled package schemas", () => {
     tooManyArguments.expressions[0]!.ast = {
       kind: "call",
       function: "max",
-      arguments: Array.from({ length: 3 }, () => ({ kind: "numberLiteral", value: 1 })),
+      arguments: Array.from({ length: 9 }, () => ({ kind: "numberLiteral", value: 1 })),
     };
     expect(validatePackage(tooManyArguments)).toBe(false);
 

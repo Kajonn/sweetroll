@@ -9,7 +9,7 @@ import { useMemo, useState } from "react";
 import { evaluateRoll } from "../../api/evaluateExpression.js";
 import type { ApiClient } from "../../api/client.js";
 import { t } from "../../i18n/index.js";
-import { additiveRollModifier, type ScalarValue, type ValueType } from "../../ports/evaluateExpression.js";
+import { additiveRollModifier, type ScalarValue, type ValueType, type BindingValue, type FieldBindingType } from "../../ports/evaluateExpression.js";
 import { Button, Checkbox, FormField, NumberInput, Select } from "../../ui/index.js";
 import { ExpressionEditor } from "../expressions/ExpressionEditor.js";
 import styles from "./RollActionEditor.module.css";
@@ -41,7 +41,7 @@ export type RollActionEditorProps = {
   onChange: (next: RollActionV1) => void;
   expressionSource: string;
   onExpressionSourceChange: (next: string) => void;
-  fieldTypes: Record<string, ValueType>;
+  fieldTypes: Record<string, FieldBindingType>;
   fieldLabels?: Record<string, string> | undefined;
   disabled?: boolean | undefined;
   /**
@@ -116,7 +116,8 @@ function coerceDefault(value: string, valueType: ActionInputV1["valueType"]): Sc
   }
 }
 
-function defaultBinding(valueType: ValueType): ScalarValue {
+function defaultBinding(valueType: FieldBindingType): BindingValue {
+  if (valueType === "choiceSet") return [];
   switch (valueType) {
     case "number":
       return 0;
@@ -147,7 +148,7 @@ export function RollActionEditor({
   onDiceKindChange,
 }: RollActionEditorProps) {
   const [tryItResult, setTryItResult] = useState<ReturnType<typeof evaluateRoll> | null>(null);
-  const [tryItBindings, setTryItBindings] = useState<Record<string, ScalarValue> | null>(null);
+  const [tryItBindings, setTryItBindings] = useState<Record<string, BindingValue> | null>(null);
   // Local custom-edit mode: picking "custom" reveals the inline formula
   // editor on the current source without persisting anything. It clears
   // when a canned kind is picked (which persists that kind instead).
@@ -198,7 +199,7 @@ export function RollActionEditor({
   const sampleBindings = tryItBindings ?? buildTryItBindings(action.inputs, fieldTypes);
 
   const showEmpty = tryItResult === null;
-  const numericFields = Object.entries(fieldTypes).filter(([, valueType]) => valueType === "number");
+  const numericFields = Object.entries(fieldTypes).filter(([id, valueType]) => !id.includes(".") && valueType === "number");
   const currentFieldModifier = selectedFieldModifier(expressionSource);
   const inputTerms = guidedInputTerms(expressionSource);
 
@@ -290,6 +291,7 @@ export function RollActionEditor({
       ]}/>
       {guided !== true || diceKind === "custom" || customEditing ? (
         <ExpressionEditor
+          references={[...Object.keys(fieldTypes).map(id => `fields.${id}`), ...Object.keys(inputTypes).map(id => `inputs.${id}`)]}
           client={client}
           systemId={systemId}
           source={expressionSource}
@@ -573,9 +575,9 @@ export function RollActionEditor({
 
 function buildTryItBindings(
   inputs: ReadonlyArray<ActionInputV1>,
-  fieldTypes: Record<string, ValueType>,
-): Record<string, ScalarValue> {
-  const out: Record<string, ScalarValue> = {};
+  fieldTypes: Record<string, FieldBindingType>,
+): Record<string, BindingValue> {
+  const out: Record<string, BindingValue> = {};
   for (const input of inputs) {
     out[input.id] = input.default;
   }

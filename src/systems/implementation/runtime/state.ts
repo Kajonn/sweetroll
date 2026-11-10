@@ -4,6 +4,7 @@ import type {
   RuntimeStateV1,
   RuntimeStoredValue,
 } from "../../runtime.js";
+import type { BindingValue } from "../rules/evaluate.js";
 import type { CharacterEntryV1, EntityDefinitionV1, FieldV1, ScalarValue } from "../package/schema/index.js";
 
 export function initializeState(
@@ -42,27 +43,17 @@ export function decodeRuntimeState(
 ): RuntimeResult<RuntimeStateV1> {
   if (
     !isRecord(input)
-    || (Object.keys(input).length !== 2 && Object.keys(input).length !== 3)
+    || Object.keys(input).length !== 3
     || input.schemaVersion !== "1.0"
     || !isRecord(input.values)
+    || !isRecord(input.entries)
   ) {
     return invalidState("State does not match runtime schema version 1.0.");
   }
-  // Legacy rows predate entries: no `entries` key decodes to the default.
-  // New rows must carry a record of entry-shaped values.
-  let entries: Record<string, CharacterEntryV1> = {};
-  if (Object.hasOwn(input, "entries")) {
-    if (!isRecord(input.entries)) {
-      return invalidState("State does not match runtime schema version 1.0.");
-    }
-    for (const [entryId, entry] of Object.entries(input.entries)) {
-      if (!isEntryShape(entry)) {
-        return invalidState("State contains an invalid character entry.", entryId);
-      }
-      entries[entryId] = entry;
-    }
-  } else if (Object.keys(input).length !== 2) {
-    return invalidState("State does not match runtime schema version 1.0.");
+  const entries: Record<string, CharacterEntryV1> = {};
+  for (const [entryId, entry] of Object.entries(input.entries)) {
+    if (!isEntryShape(entry)) return invalidState("State contains an invalid character entry.", entryId);
+    entries[entryId] = entry;
   }
 
   const stateValues = input.values;
@@ -90,15 +81,18 @@ export function decodeRuntimeState(
 export function buildFieldBindings(
   entity: EntityDefinitionV1,
   state: RuntimeStateV1,
-): Record<string, ScalarValue> {
-  const bindings: Record<string, ScalarValue> = {};
+): Record<string, BindingValue> {
+  const bindings: Record<string, BindingValue> = {};
   for (const field of entity.fields) {
-    if (field.kind === "computed") continue;
+    if (field.kind === "computed" || field.kind === "image") continue;
     const value = state.values[field.id];
     if (field.kind === "resource") {
-      bindings[field.id] = (value as RuntimeResourceValue).current;
+      const resource = value as RuntimeResourceValue;
+      bindings[field.id] = resource.current;
+      bindings[`${field.id}.current`] = resource.current;
+      bindings[`${field.id}.max`] = resource.max;
     } else if (Array.isArray(value)) {
-      bindings[field.id] = value.length === 0 ? null : value.join(",");
+      bindings[field.id] = value;
     } else {
       bindings[field.id] = value as ScalarValue;
     }

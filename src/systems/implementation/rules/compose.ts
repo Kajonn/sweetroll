@@ -93,7 +93,7 @@ export function composeRules(
   }
 
   const templateIndex = new Map<RulesOrigin, Map<string, ObjectTemplateV1>>([
-    [null, new Map((base.templates ?? []).map((template) => [template.id, template]))],
+    [null, new Map(base.templates.map((template) => [template.id, template]))],
   ]);
   const expressionIndex = new Map<RulesOrigin, Map<string, CompiledExpressionV1>>([
     [null, new Map(base.expressions.map((expression) => [expression.id, expression]))],
@@ -114,7 +114,7 @@ export function composeRules(
     expression: (origin, expressionId) => expressionIndex.get(origin)?.get(expressionId),
     extension: (extensionId) => byId.get(extensionId),
     templates: () => [
-      ...(base.templates ?? []).map((template) => ({ origin: null, template })),
+      ...base.templates.map((template) => ({ origin: null, template })),
       ...sorted.flatMap((extension) => extension.templates.map((template) => ({
         origin: extension.extensionId,
         template,
@@ -186,7 +186,7 @@ export function effectivePackage(rules: ComposedRules): SystemPackageV1 {
       }))),
     ],
     templates: [
-      ...(rules.base.templates ?? []),
+      ...rules.base.templates,
       ...rules.extensions.flatMap((extension) =>
         extension.templates.map((template) => qualifyTemplate(extension.extensionId, template))),
     ],

@@ -14,7 +14,7 @@ import { resolveObservedValues } from "./implementation/runtime/resolve.js";
 import { createDeterministicRng } from "./implementation/runtime/deterministic-rng.js";
 import { buildFieldBindings, decodeRuntimeState, initializeState } from "./implementation/runtime/state.js";
 import { actionEvaluationFailure } from "./implementation/runtime/action-evaluation.js";
-import { evaluate } from "./implementation/rules/evaluate.js";
+import { evaluate, type BindingValue } from "./implementation/rules/evaluate.js";
 import {
   checkVersionChange,
   type VersionChangeDirection,
@@ -45,9 +45,7 @@ export type RuntimeStoredValue =
 export type RuntimeStateV1 = {
   schemaVersion: "1.0";
   values: Record<DefinitionId, RuntimeStoredValue>;
-  // Optional so legacy rows and hand-built states without entries keep
-  // decoding; decodeRuntimeState/initializeState always normalize to present.
-  entries?: Record<string, CharacterEntryV1>;
+  entries: Record<string, CharacterEntryV1>;
 };
 
 export type RuntimeIntent =
@@ -94,7 +92,7 @@ export type NormalizedDie = DieResult;
 export type NormalizedRollBinding = {
   scope: "fields" | "inputs";
   definitionId: DefinitionId;
-  value: RuntimeScalar;
+  value: BindingValue;
 };
 
 /**
@@ -380,7 +378,7 @@ export function createSystemRuntime(input: {
             } : {}),
           })),
           ...(describeInput.includeFields ? {
-            templates: (loaded.value.templates ?? []).map(({ id, label, kind, description, fields }) => {
+            templates: loaded.value.templates.map(({ id, label, kind, description, fields }) => {
               const key = unqualifiedId(id);
               return {
                 id: key.id, label, kind, fields,
@@ -527,8 +525,8 @@ export function createSystemRuntime(input: {
       }
       if (!stateResult.ok) return stateResult;
 
-      for(const entry of Object.values(stateResult.value.entries ?? {})) {
-        const siblings=Object.values(stateResult.value.entries ?? {}).filter(e=>e.slotId===entry.slotId && e.entryId!==entry.entryId).length;
+      for(const entry of Object.values(stateResult.value.entries)) {
+        const siblings=Object.values(stateResult.value.entries).filter(e=>e.slotId===entry.slotId && e.entryId!==entry.entryId).length;
         const error=derivedEntryError(packageValue,entity,entry,siblings);
         if(error) return {ok:false,error:{code:"invalid_state",message:error}};
       }

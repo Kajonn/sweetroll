@@ -158,7 +158,7 @@ function placedView(overrides: Partial<PlacedCharacterView> = {}): PlacedCharact
     archivedAt: null,
     createdAt: new Date(0),
     updatedAt: new Date(0),
-    state: { schemaVersion: "1.0", values: {} },
+    state: { schemaVersion: "1.0", entries: {}, values: {} },
     replayed: false,
     ...overrides,
   };
@@ -376,7 +376,7 @@ function fakeCharacterView(): CharacterView {
     archivedAt: null,
     createdAt: new Date(0),
     updatedAt: new Date(0),
-    state: { schemaVersion: "1.0", values: {} },
+    state: { schemaVersion: "1.0", entries: {}, values: {} },
     derivedValues: {},
     validations: [],
     projection: {
@@ -412,7 +412,7 @@ function makeRuntime(): SystemRuntime {
       ok: true,
       value: {
         versionId: randomUUID(),
-        state: { schemaVersion: "1.0", values: {} },
+        state: { schemaVersion: "1.0", entries: {}, values: {} },
         packageChecksum: "checksum",
       },
     }),
@@ -791,7 +791,7 @@ describe("campaign HTTP routes", () => {
         resolveInput = input;
         return {
           ok: true,
-          value: { versionId: pinnedVersionId, state: { schemaVersion: "1.0", values: {} }, packageChecksum: "chk" },
+          value: { versionId: pinnedVersionId, state: { schemaVersion: "1.0", entries: {}, values: {} }, packageChecksum: "chk" },
         };
       },
     } as unknown as SystemRuntime;

@@ -21,7 +21,7 @@ export function resolveTemplateBase(
   kind: string,
   defaults: Record<string, unknown>,
 ): ObjectTemplateV1 | undefined {
-  const t = (pkg.templates ?? []).find((t) => t.id === id && t.kind === kind);
+  const t = pkg.templates.find((t) => t.id === id && t.kind === kind);
   return t &&
     validDefaults(t, defaults) &&
     pkg.entities.some((e) => templateApplicable(pkg, e, t))

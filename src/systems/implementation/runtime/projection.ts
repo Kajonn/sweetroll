@@ -28,8 +28,8 @@ export function buildCharacterProjection(input: {
   const { packageValue, entity, state, derivedValues, validations } = input;
   const fields = new Map(entity.fields.map((field) => [field.id, field]));
   const actions = new Map(packageValue.actions.map((action) => [action.id, action]));
-  const slots = new Map((packageValue.slots ?? []).map((slot) => [slot.id, slot]));
-  const templates = new Map((packageValue.templates ?? []).map((template) => [template.id, template]));
+  const slots = new Map(packageValue.slots.map((slot) => [slot.id, slot]));
+  const templates = new Map(packageValue.templates.map((template) => [template.id, template]));
   const validationsFor = (id: string): RuntimeValidation[] =>
     validations.filter((validation) => validation.targetDefinitionId === id);
   const entitySheets = packageValue.sheets.filter((sheet) => sheet.targetEntityId === entity.id);
@@ -138,7 +138,7 @@ function projectSlot(
   validationsFor: (id: string) => RuntimeValidation[],
 ): CharacterProjectionElement[] {
   const slot = lookups.slots.get(slotId);
-  const slotEntries = Object.values(state.entries ?? {})
+  const slotEntries = Object.values(state.entries)
     .filter((entry) => entry.slotId === slotId)
     .sort((left, right) => (left.entryId < right.entryId ? -1 : left.entryId > right.entryId ? 1 : 0));
   const projected: CharacterProjectionSlotEntry[] = slotEntries.map((entry) => {

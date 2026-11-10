@@ -1,7 +1,7 @@
 import { d20Document } from "./d20.js";
 export function derivedTemplateDocument() {
   const d = structuredClone(d20Document);
-  d.schemaVersion = "1.2";
+
   d.slots = [
     { id: "inventory", label: "Inventory", accepts: ["item"], maxEntries: 4 },
   ];

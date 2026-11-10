@@ -7,7 +7,6 @@ import type {
   ObjectTemplateV1,
   SystemPackageV1,
   UnsignedExtensionPackageV1,
-  ValueType,
 } from "../package/schema/index.js";
 import { validateExtensionDocumentStructure } from "../package/extension.js";
 import type { PackageDiagnostic } from "../package/diagnostics.js";
@@ -15,10 +14,9 @@ import { compileAst, compileExpression, type CompileResult, type CompiledExpress
 import {
   actionInputTypes,
   cycleInComputedFields,
-  entityFieldTypes,
   grantedEntityFieldsForKind,
 } from "./compile-document.js";
-import type { ExpressionCompileEnv } from "./typecheck.js";
+import { entityFieldTypes, type ExpressionCompileEnv } from "./typecheck.js";
 
 // System extensions (plan 2026-11-07-system-extensions, stage E1). An
 // extension is compiled and validated against one published base package
@@ -44,8 +42,6 @@ type ExpressionOwner =
   | { kind: "computed"; template: ObjectTemplateV1 }
   | { kind: "roll"; template: ObjectTemplateV1; action: GrantedRollActionV1 };
 
-const LANGUAGE_VERSION = "0.2" as const;
-
 export function compileExtensionDocument(
   document: ExtensionDocumentV1,
   base: SystemPackageV1,
@@ -61,7 +57,6 @@ export function compileExtensionDocument(
   for (const [index, expression] of document.expressions.entries()) {
     const result = compileExpression(expression.source, {
       env: environmentFor(owners.value.get(expression.id), base),
-      languageVersion: LANGUAGE_VERSION,
       resultType: expression.resultType,
       context: expression.context,
       fallback: expression.fallback,
@@ -90,7 +85,7 @@ export function compileExtensionDocument(
   }
 
   const unsigned: UnsignedExtensionPackageV1 = {
-    schemaVersion: "1.0",
+    schemaVersion: "2.0",
     extensionId: opts.extensionId,
     versionId: opts.versionId,
     semanticVersion: opts.semanticVersion,
@@ -134,7 +129,6 @@ export function validateExtensionAgainst(
   for (const [index, expression] of extension.expressions.entries()) {
     const result = compileAst(expression.ast, {
       env: environmentFor(owners.value.get(expression.id), base),
-      languageVersion: LANGUAGE_VERSION,
       resultType: expression.resultType,
       context: expression.context,
       fallback: expression.fallback,
@@ -207,7 +201,7 @@ function environmentFor(owner: ExpressionOwner | undefined, base: SystemPackageV
   for (const field of owner.template.fields) {
     if (field.kind === "computed") delete templateFields[field.id];
   }
-  const fields: Record<string, ValueType> = {
+  const fields = {
     ...grantedEntityFieldsForKind(base, owner.template.kind),
     ...templateFields,
   };
@@ -217,7 +211,7 @@ function environmentFor(owner: ExpressionOwner | undefined, base: SystemPackageV
 function placeableKinds(base: SystemPackageV1): Set<string> {
   const placed = new Set(base.sheets.flatMap((sheet) => sheet.sections.flatMap((section) =>
     section.elements.flatMap((element) => (element.kind === "slot" ? [element.slotId] : [])))));
-  return new Set((base.slots ?? [])
+  return new Set(base.slots
     .filter((slot) => placed.has(slot.id))
     .flatMap((slot) => slot.accepts));
 }

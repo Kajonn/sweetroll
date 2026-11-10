@@ -474,17 +474,17 @@ describe("compileDocument", () => {
       .toBe("d20 + fields.bonus + inputs.edge");
   });
 
-  it("omits optional templates and slots when the source document omits them", () => {
+  it("preserves empty template and slot collections", () => {
     const document = validDocument();
     document.expressions = document.expressions.filter((expression) => expression.id !== "title_expr");
     const result = compileDocument(document, opts);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.templates).toBeUndefined();
-    expect(result.value.slots).toBeUndefined();
-    expect(documentFromPackage(result.value).templates).toBeUndefined();
-    expect(documentFromPackage(result.value).slots).toBeUndefined();
+    expect(result.value.templates).toEqual([]);
+    expect(result.value.slots).toEqual([]);
+    expect(documentFromPackage(result.value).templates).toEqual([]);
+    expect(documentFromPackage(result.value).slots).toEqual([]);
   });
 });
 

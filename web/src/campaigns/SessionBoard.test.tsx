@@ -17,7 +17,7 @@ const sheet = (overrides = {}) => ({
   returnOwnerId: null, name: "Bram", systemVersionId: "v1", entityDefinitionId: "hero",
   revision: 7, lifecycle: "active", archivedAt: null,
   createdAt: "2026-09-01T00:00:00Z", updatedAt: "2026-09-01T00:00:00Z",
-  state: { schemaVersion: "1.0", values: {} }, derivedValues: {},
+  state: { schemaVersion: "1.0", entries: {}, values: {} }, derivedValues: {},
   validations: [],
   projection: {
     projectionVersion: "1.0", systemId: "s", versionId: "v1", packageChecksum: "p",

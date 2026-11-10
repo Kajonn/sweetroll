@@ -412,7 +412,7 @@ function actionView(revision: number, name = "Briar"): CharacterView {
     characterId: CHARACTER_ID,
     revision,
     name,
-    state: { schemaVersion: "1.0", values: { name } },
+    state: { schemaVersion: "1.0", entries: {}, values: { name } },
     projection: {
       projectionVersion: "1.0",
       systemId: "22222222-2222-4000-8000-000000000000",
@@ -538,7 +538,7 @@ describe("CharacterRoute workflows", () => {
       systemVersionId: "11111111-1111-4000-8000-000000000000",
       packageChecksum: "abc",
       revision: 1,
-      state: { schemaVersion: "1.0", values: { name: "Briar" } },
+      state: { schemaVersion: "1.0", entries: {}, values: { name: "Briar" } },
     } as unknown as CharacterExport;
     const api = makeWorkflowApi({ openView: () => actionView(1) });
     api.activity.mockResolvedValue({

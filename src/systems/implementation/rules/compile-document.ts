@@ -1,10 +1,10 @@
 import {validatePushPolicies} from "./push-policy.js";
-import type { ActionV1, FieldV1, SystemDocumentV1, SystemPackageV1, TemplateKind, ValueType } from "../package/schema/index.js";
+import type { ActionV1, SystemDocumentV1, SystemPackageV1, TemplateKind, ValueType } from "../package/schema/index.js";
 import type { UnsignedSystemPackageV1 } from "../package/schema/index.js";
 import { signSystemPackage } from "../package/canonical.js";
 import { PACKAGE_LIMITS } from "../package/limits.js";
 import { compileExpression, type CompileResult, type CompiledExpressionBody } from "./compile.js";
-import type { ExpressionCompileEnv } from "./typecheck.js";
+import { entityFieldTypes, type ExpressionCompileEnv, type FieldBindingType } from "./typecheck.js";
 
 export type CompileDocumentOpts = {
   systemId: string;
@@ -21,8 +21,8 @@ export type CompileDocumentOpts = {
 export function grantedEntityFieldsForKind(
   rules: Pick<SystemDocumentV1, "entities" | "sheets" | "slots">,
   kind: TemplateKind,
-): Record<string, ValueType> {
-  const eligibleSlots = new Set((rules.slots ?? [])
+): Record<string, FieldBindingType> {
+  const eligibleSlots = new Set(rules.slots
     .filter((slot) => slot.accepts.includes(kind)).map((slot) => slot.id));
   const targets = new Set(rules.sheets.filter((sheet) => sheet.sections.some((section) =>
     section.elements.some((element) => element.kind === "slot" && eligibleSlots.has(element.slotId)),
@@ -37,33 +37,10 @@ export function grantedEntityFieldsForKind(
   return common;
 }
 
-export function entityFieldTypes(fields: readonly FieldV1[]): Record<string, ValueType> {
-  const types: Record<string, ValueType> = {};
-  for (const field of fields) {
-    const valueType = fieldToValueType(field);
-    if (valueType !== undefined) types[field.id] = valueType;
-  }
-  return types;
-}
-
 export function actionInputTypes(inputs: readonly { id: string; valueType: string }[]): Record<string, ValueType> {
   const types: Record<string, ValueType> = {};
   for (const input of inputs) types[input.id] = actionInputToValueType(input);
   return types;
-}
-
-function fieldToValueType(field: FieldV1): ValueType | undefined {
-  switch (field.kind) {
-    case "text": return "text";
-    case "integer": return "number";
-    case "decimal": return "number";
-    case "boolean": return "boolean";
-    case "singleChoice": return "text";
-    case "multiChoice": return "text";
-    case "resource": return "number";
-    case "computed": return field.valueType;
-    case "image": return undefined;
-  }
 }
 
 function actionInputToValueType(input: { valueType: string }): ValueType {
@@ -80,13 +57,8 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
   const entityEnvironments = new Map<string, ExpressionCompileEnv>();
   const fieldOwners = new Map<string, string>();
   for (const entity of document.entities) {
-    const fields: Record<string, ValueType> = {};
-    for (const field of entity.fields) {
-      fieldOwners.set(field.id, entity.id);
-      const valueType = fieldToValueType(field);
-      if (valueType !== undefined) fields[field.id] = valueType;
-    }
-    entityEnvironments.set(entity.id, { fields, inputs: {} });
+    for (const field of entity.fields) fieldOwners.set(field.id, entity.id);
+    entityEnvironments.set(entity.id, { fields: entityFieldTypes(entity.fields), inputs: {} });
   }
 
   const actionsById = new Map(document.actions.map((action) => [action.id, action]));
@@ -129,15 +101,10 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
   // reference the same global expression pool. Templates own their expressions
   // exactly like entities — one expression id, one owner — so the shared-id
   // rejection and env scoping below apply unchanged.
-  const templates = document.templates ?? [];
+  const templates = document.templates;
   const templateEnvironments = new Map<string, ExpressionCompileEnv>();
   for (const template of templates) {
-    const fields: Record<string, ValueType> = {};
-    for (const field of template.fields) {
-      const valueType = fieldToValueType(field);
-      if (valueType !== undefined) fields[field.id] = valueType;
-    }
-    templateEnvironments.set(template.id, { fields, inputs: {} });
+    templateEnvironments.set(template.id, { fields: entityFieldTypes(template.fields), inputs: {} });
     for (const field of template.fields) {
       if (field.kind === "computed") addOwner(computedOwners, field.expressionId, template.id);
     }
@@ -145,7 +112,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
   // A granted roll runs on the character carrying its entry. Only fields
   // present on every entity that can display this template's slot are safe to
   // reference; a template may be used by more than one sheet/entity.
-  const grantedEntityFields = new Map<string, Record<string, ValueType>>();
+  const grantedEntityFields = new Map<string, Record<string, FieldBindingType>>();
   for (const template of templates) {
     grantedEntityFields.set(template.id, grantedEntityFieldsForKind(document, template.kind));
   }
@@ -208,7 +175,6 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     }
     const result = compileExpression(expr.source, {
       env,
-      languageVersion: document.schemaVersion !== "1.0" ? "0.2" : "0.1",
       resultType: expr.resultType,
       context: expr.context,
       fallback: expr.fallback,
@@ -266,8 +232,8 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     expressions: compiled.map((b, i) => ({ id: document.expressions[i]!.id, ...b })),
     actions: document.actions,
     validations: document.validations,
-    ...(document.templates !== undefined ? { templates: document.templates } : {}),
-    ...(document.slots !== undefined ? { slots: document.slots } : {}),
+    templates: document.templates,
+    slots: document.slots,
     effectiveLimits: {
       expressionBytes: PACKAGE_LIMITS.expressionBytes,
       expressionAstNodes: PACKAGE_LIMITS.expressionAstNodes,
@@ -301,7 +267,7 @@ function computedCycle(
     const cycle = cycleInComputedFields(computed, compiledById);
     if (cycle !== undefined) return cycle;
   }
-  for (const template of document.templates ?? []) {
+  for (const template of document.templates) {
     const computed = new Map(template.fields
       .filter((field) => field.kind === "computed")
       .map((field) => [field.id, field]));

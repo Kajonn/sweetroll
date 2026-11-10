@@ -5,7 +5,7 @@ import type { SystemExportV1 } from "../schema/export.js";
 import type { SystemPackageV1, UnsignedSystemPackageV1 } from "../schema/package.js";
 
 export const d6SuccessPoolDocument: SystemDocumentV1 = {
-  schemaVersion: "1.0",
+  schemaVersion: "2.0", templates: [], slots: [],
   metadata: {
     name: "D6 Success Pool",
     description: "Dice pool system counting successes on d6",
@@ -180,7 +180,7 @@ export const d6SuccessPoolDocument: SystemDocumentV1 = {
 };
 
 const unsignedPackage: UnsignedSystemPackageV1 = {
-  schemaVersion: "1.0",
+  schemaVersion: "2.0", templates: [], slots: [],
   systemId: "c0000000-0000-5000-8000-000000000001",
   versionId: "c0000000-0000-5000-8000-000000000002",
   semanticVersion: "1.0.0",
@@ -291,7 +291,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
   expressions: [
     {
       id: "pool_size_expr",
-      context: "computed",
+      context: "computed", languageVersion: "1.0",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
@@ -306,7 +306,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
     },
     {
       id: "pool_roll_expr",
-      context: "roll",
+      context: "roll", languageVersion: "1.0",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
@@ -334,7 +334,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
     },
     {
       id: "pool_valid_expr",
-      context: "validation",
+      context: "validation", languageVersion: "1.0",
       resultType: "boolean",
       inferredType: "boolean",
       fallback: false,

@@ -889,7 +889,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           `INSERT INTO character_entry_images(character_id,entry_id,pinned_asset_id,asset_id,description,overridden,revision)
            SELECT $1,entry_id,pinned_asset_id,asset_id,description,overridden,CASE WHEN overridden THEN 1 ELSE 0 END
            FROM character_entry_images WHERE character_id=$2 AND entry_id=ANY($3::uuid[])`,
-          [characterRow.id, sourceRow.id, Object.keys(input.duplicate.state.entries ?? {})],
+          [characterRow.id, sourceRow.id, Object.keys(input.duplicate.state.entries)],
         );
         await client.query(
           `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, request_id)
@@ -1279,7 +1279,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
               RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}`,
               [input.mutation.toVersionId, input.mutation.previousVersionId, JSON.stringify(input.mutation.nextState), input.characterId],
             );
-            await repinEntryImages(client, input.characterId, input.mutation.nextState.entries ?? {}, input.mutation.repinEntryIds);
+            await repinEntryImages(client, input.characterId, input.mutation.nextState.entries, input.mutation.repinEntryIds);
             break;
         }
         const updatedRow = requireRow(updated.rows[0], "applyManagementCommandTx.update");

@@ -17,7 +17,7 @@ type Ref = { extensionId: string; versionId: string };
 
 function pack(name: string, templateId: string, bonus = 1): ExtensionDocumentV1 {
   return {
-    schemaVersion: "1.0",
+    schemaVersion: "2.0",
     metadata: { name, description: "", language: "en" },
     expressions: [{ id: `${templateId}_expr`, context: "roll", resultType: "number", source: `d20 + fields.modifier + ${bonus}`, fallback: 0 }],
     templates: [{
@@ -286,7 +286,7 @@ describeWithDatabase("Campaigns built with extensions (E4)", () => {
     const created = await call("POST", `/systems/${h.otherSystemId}/extensions`, other, { baseVersionId: h.otherVersionId, name: "Foreign", idempotencyKey: randomUUID() });
     expect(created.statusCode, created.body).toBe(201);
     const foreignId = created.json().workspace.extension.extensionId as string;
-    const foreignDoc: ExtensionDocumentV1 = { schemaVersion: "1.0", metadata: { name: "Foreign", description: "", language: "en" }, expressions: [], templates: [] };
+    const foreignDoc: ExtensionDocumentV1 = { schemaVersion: "2.0", metadata: { name: "Foreign", description: "", language: "en" }, expressions: [], templates: [] };
     expect((await call("PUT", `/extensions/${foreignId}/draft`, other, { expectedRevision: 1, document: foreignDoc })).statusCode).toBe(200);
     const published = await call("POST", `/extensions/${foreignId}/publish`, other, { expectedRevision: 2, semanticVersion: "1.0.0", releaseNotes: "", acknowledgeBreaking: false, idempotencyKey: randomUUID() });
     expect(published.statusCode, published.body).toBe(200);

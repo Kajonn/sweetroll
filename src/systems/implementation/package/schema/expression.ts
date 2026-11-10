@@ -32,6 +32,7 @@ export const ExpressionAstV1Schema = Type.Recursive(
           kind: Type.Literal("reference"),
           scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs")]),
           id: DefinitionIdSchema,
+          part: Type.Optional(Type.Union([Type.Literal("current"), Type.Literal("max")])),
         },
         { additionalProperties: false },
       ),
@@ -51,6 +52,7 @@ export const ExpressionAstV1Schema = Type.Recursive(
             Type.Literal("-"),
             Type.Literal("*"),
             Type.Literal("/"),
+            Type.Literal("%"),
             Type.Literal("=="),
             Type.Literal("!="),
             Type.Literal("<"),
@@ -72,8 +74,13 @@ export const ExpressionAstV1Schema = Type.Recursive(
             Type.Literal("min"),
             Type.Literal("max"),
             Type.Literal("round"),
+            Type.Literal("floor"),
+            Type.Literal("ceil"),
+            Type.Literal("abs"),
+            Type.Literal("if"),
+            Type.Literal("has"),
           ]),
-          arguments: Type.Array(ExpressionAstV1, { maxItems: 2 }),
+          arguments: Type.Array(ExpressionAstV1, { maxItems: 8 }),
           roundMode: Type.Optional(
             Type.Union([Type.Literal("nearest"), Type.Literal("down"), Type.Literal("up")]),
           ),
@@ -114,7 +121,7 @@ export type ExpressionAstV1 = Static<typeof ExpressionAstV1Schema>;
 export const CompiledExpressionV1Schema = Type.Object(
   {
     id: DefinitionIdSchema,
-    languageVersion: Type.Optional(Type.Literal("0.2")),
+    languageVersion: Type.Literal("1.0"),
     context: Type.Union([
       Type.Literal("computed"),
       Type.Literal("roll"),

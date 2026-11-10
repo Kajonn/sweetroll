@@ -475,7 +475,7 @@ export type SystemMetadataV1 = Static<typeof SystemMetadataV1Schema>;
 
 export const SystemDocumentV1Schema = Type.Object(
   {
-    schemaVersion: Type.Union([Type.Literal("1.0"), Type.Literal("1.1"), Type.Literal("1.2")]),
+    schemaVersion: Type.Literal("2.0"),
     metadata: SystemMetadataV1Schema,
     entities: Type.Array(EntityDefinitionV1Schema, { maxItems: PACKAGE_LIMITS.entities }),
     referenceData: Type.Array(ReferenceDataV1Schema, {
@@ -489,8 +489,8 @@ export const SystemDocumentV1Schema = Type.Object(
     validations: Type.Array(ValidationV1Schema, {
       maxItems: PACKAGE_LIMITS.validations,
     }),
-    templates: Type.Optional(Type.Array(ObjectTemplateV1Schema, { maxItems: 128 })),
-    slots: Type.Optional(Type.Array(SlotDefinitionV1Schema, { maxItems: 64 })),
+    templates: Type.Array(ObjectTemplateV1Schema, { maxItems: 128 }),
+    slots: Type.Array(SlotDefinitionV1Schema, { maxItems: 64 }),
   },
   { additionalProperties: false },
 );

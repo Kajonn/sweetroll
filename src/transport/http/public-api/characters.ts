@@ -3,7 +3,7 @@ import { Type } from "@sinclair/typebox";
 import type { CharacterCommandResult, Characters } from "../../../characters/index.js";
 import { EntrySourceSchema } from "../../../systems/implementation/package/schema/dynamic.js";
 import { FieldV1Schema, TemplateKindSchema } from "../../../systems/implementation/package/schema/document.js";
-import { DieResultSchema, PushResultSchema, RollBreakdownSchema } from "../../../systems/implementation/rules/result.js";
+import { BindingValueSchema, DieResultSchema, PushResultSchema, RollBreakdownSchema } from "../../../systems/implementation/rules/result.js";
 import { map, wire, type Route } from "./router.js";
 import * as s from "./schemas.js";
 
@@ -18,8 +18,8 @@ export const roll = s.object({
   dice: Type.Array(DieResultSchema),
   bindings: Type.Array(s.object({
     scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs")]),
-    definitionId: s.definitionId,
-    value: s.scalar,
+    definitionId: Type.String({ pattern: "^[a-z][a-z0-9_]{0,63}(\\.(current|max))?$" }),
+    value: BindingValueSchema,
   })),
   total: Type.Number(),
   output: s.text,
@@ -96,7 +96,7 @@ export const characterSchemas = {
     state: s.object({
       schemaVersion: Type.Literal("1.0"),
       values: looseObject,
-      entries: Type.Optional(Type.Record(Type.String(), looseObject)),
+      entries: Type.Record(Type.String(), looseObject),
     }),
   }),
 };

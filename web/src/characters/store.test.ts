@@ -147,7 +147,7 @@ function makeView(characterId: string, revision: number): CharacterView {
     archivedAt: null,
     createdAt: "2026-09-06T00:00:00.000Z",
     updatedAt: "2026-09-06T00:00:00.000Z",
-    state: { schemaVersion: "1.0", values: { name: "Aria" } },
+    state: { schemaVersion: "1.0", entries: {}, values: { name: "Aria" } },
     derivedValues: {},
     validations: [],
     projection: {

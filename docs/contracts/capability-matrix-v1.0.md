@@ -1,4 +1,4 @@
-# Capability Matrix v0.1
+# Capability matrix for grammar 1.0
 
 | Capability | d20 fixture | 2d6 PbtA-style fixture | d6 success-pool fixture |
 |------------|-------------|------------------------|-------------------------|
@@ -12,7 +12,14 @@
 | Validation | bounded ability | bounded stat | non-negative pool |
 | Linear sheet | sections, fields, resource, roll | sections, fields, resource, move | sections, fields, resource, roll |
 
-## Excluded
+## Current rules
+
+All fixtures use document/package 2.0 and [grammar 1.0](grammar-v1.0.md).
+Formulas support typed conditionals, choice membership, resource parts, named
+dice groups, and configurable pushes. The conditional d20 scenario exercises
+the proficiency and class bonuses and the resource bindings through the public API.
+
+## Deferred
 
 | Capability | Status |
 |------------|--------|
@@ -20,5 +27,5 @@
 | Branching move outcomes | Deferred |
 | Equipment aggregation | Deferred |
 | Opposed tests | Deferred |
-| Push and reroll rules | Deferred |
+| Exploding and custom-face dice | Deferred |
 | Automated roll consequences | Deferred |

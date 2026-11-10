@@ -140,10 +140,8 @@ function validateStructure(value: StructuralValue, prefix: string): PackageDiagn
     collectId(validation.id, `/validations/${validationIndex}/id`);
   });
 
-  // Dynamic sheet objects: templates/slots are Type.Optional, so legacy
-  // documents without the arrays validate exactly as before.
-  const templates = value.templates ?? [];
-  const slots = value.slots ?? [];
+  const templates = value.templates;
+  const slots = value.slots;
   const slotIds = new Set<string>();
 
   templates.forEach((template, templateIndex) => {
@@ -268,8 +266,8 @@ function validateStructure(value: StructuralValue, prefix: string): PackageDiagn
 
 function validateBudgets(value: StructuralValue, prefix: string): PackageDiagnostic[] {
   const diagnostics: PackageDiagnostic[] = [];
-  const templates = value.templates ?? [];
-  const slots = value.slots ?? [];
+  const templates = value.templates;
+  const slots = value.slots;
 
   if (templates.length > PACKAGE_LIMITS.templates) {
     diagnostics.push({
@@ -388,8 +386,7 @@ function validatePackageBudgets(
   }
 
   value.expressions.forEach((expression, expressionIndex) => {
-    diagnostics.push(...validateDiceGroups(expression.ast, expression.languageVersion).map(d => ({...d, path: `${prefix}/expressions/${expressionIndex}/ast`})));
-    if (expression.languageVersion !== undefined && value.schemaVersion === "1.0") diagnostics.push({code: "invalid_schema",path: `${prefix}/schemaVersion`,message: "Grammar 0.2 requires package version 1.1."});
+    diagnostics.push(...validateDiceGroups(expression.ast).map(d => ({...d, path: `${prefix}/expressions/${expressionIndex}/ast`})));
     const { depth, nodes } = measureAst(expression.ast);
     const path = `${prefix}/expressions/${expressionIndex}/ast`;
     if (nodes > PACKAGE_LIMITS.expressionAstNodes) {

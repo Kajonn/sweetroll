@@ -1,5 +1,7 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "2.0",
+  "templates": [],
+  "slots": [],
   "metadata": {
     "name": "D20 System",
     "description": "Classic d20-based fantasy system",

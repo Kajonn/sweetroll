@@ -29,7 +29,7 @@ function basePackage(versionId = BASE_V1, mutate?: (document: ReturnType<typeof 
 
 function extensionDocument(): ExtensionDocumentV1 {
   return {
-    schemaVersion: "1.0",
+    schemaVersion: "2.0",
     metadata: { name: "Frost pack", description: "Cold weapons", language: "en" },
     expressions: [
       { id: "axe_hit_expr", context: "roll", resultType: "number", source: "d20 + fields.modifier + fields.edge + inputs.bonus", fallback: 0 },

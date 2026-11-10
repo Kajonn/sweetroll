@@ -7730,7 +7730,7 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
-                                entries?: {
+                                entries: {
                                     [key: string]: {
                                         entryId: string;
                                         image?: {
@@ -8646,7 +8646,7 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
-                                entries?: {
+                                entries: {
                                     [key: string]: {
                                         entryId: string;
                                         image?: {
@@ -9129,7 +9129,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -9461,7 +9461,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -9478,7 +9478,7 @@ export interface operations {
                                 bindings: {
                                     scope: "fields" | "inputs";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -9761,7 +9761,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -10093,7 +10093,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -10110,7 +10110,7 @@ export interface operations {
                                 bindings: {
                                     scope: "fields" | "inputs";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -10393,7 +10393,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -10725,7 +10725,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -10742,7 +10742,7 @@ export interface operations {
                                 bindings: {
                                     scope: "fields" | "inputs";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -11025,7 +11025,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -11357,7 +11357,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -11374,7 +11374,7 @@ export interface operations {
                                 bindings: {
                                     scope: "fields" | "inputs";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -11658,7 +11658,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -11990,7 +11990,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -12007,7 +12007,7 @@ export interface operations {
                                 bindings: {
                                     scope: "fields" | "inputs";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -12285,7 +12285,7 @@ export interface operations {
                                     id: string;
                                     operation: string;
                                     operandIds: string[];
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                     groupId?: string;
                                 }[];
                             };
@@ -12302,7 +12302,7 @@ export interface operations {
                             bindings: {
                                 scope: "fields" | "inputs";
                                 definitionId: string;
-                                value: string | number | boolean | null;
+                                value: (string | number | boolean | null) | string[];
                             }[];
                             total: number;
                             output: string;
@@ -12817,7 +12817,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -13149,7 +13149,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -13166,7 +13166,7 @@ export interface operations {
                                 bindings: {
                                     scope: "fields" | "inputs";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -13461,7 +13461,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -13793,7 +13793,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -13810,7 +13810,7 @@ export interface operations {
                                 bindings: {
                                     scope: "fields" | "inputs";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -14119,7 +14119,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -14451,7 +14451,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -14468,7 +14468,7 @@ export interface operations {
                                 bindings: {
                                     scope: "fields" | "inputs";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -14750,7 +14750,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -15082,7 +15082,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -15099,7 +15099,7 @@ export interface operations {
                                 bindings: {
                                     scope: "fields" | "inputs";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -15385,7 +15385,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -15717,7 +15717,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -15734,7 +15734,7 @@ export interface operations {
                                 bindings: {
                                     scope: "fields" | "inputs";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -16304,7 +16304,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -16636,7 +16636,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -16653,7 +16653,7 @@ export interface operations {
                                 bindings: {
                                     scope: "fields" | "inputs";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -17469,7 +17469,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -17801,7 +17801,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -17818,7 +17818,7 @@ export interface operations {
                                 bindings: {
                                     scope: "fields" | "inputs";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -18097,7 +18097,7 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
-                                entries?: {
+                                entries: {
                                     [key: string]: {
                                         entryId: string;
                                         image?: {
@@ -18663,7 +18663,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -18680,7 +18680,7 @@ export interface operations {
                                 bindings: {
                                     scope: "fields" | "inputs";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -18893,7 +18893,7 @@ export interface operations {
                             values: {
                                 [key: string]: unknown;
                             };
-                            entries?: {
+                            entries: {
                                 [key: string]: {
                                     entryId: string;
                                     image?: {
@@ -26491,7 +26491,7 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
-                                entries?: {
+                                entries: {
                                     [key: string]: {
                                         entryId: string;
                                         image?: {
@@ -27052,7 +27052,7 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
-                                entries?: {
+                                entries: {
                                     [key: string]: {
                                         entryId: string;
                                         image?: {
@@ -27517,7 +27517,7 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
-                                entries?: {
+                                entries: {
                                     [key: string]: {
                                         entryId: string;
                                         image?: {
@@ -27984,7 +27984,7 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
-                                entries?: {
+                                entries: {
                                     [key: string]: {
                                         entryId: string;
                                         image?: {
@@ -29851,7 +29851,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };

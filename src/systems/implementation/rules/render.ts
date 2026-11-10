@@ -6,7 +6,7 @@ const PREC: Record<string, number> = {
   "==": 3, "!=": 3,
   "<": 4, "<=": 4, ">": 4, ">=": 4,
   "+": 5, "-": 5,
-  "*": 6, "/": 6,
+  "*": 6, "/": 6, "%": 6,
 };
 
 const UNARY_PREC = 7;
@@ -36,11 +36,11 @@ function renderNode(ast: ExpressionAstV1): string {
     case "numberLiteral":
       return String(ast.value);
     case "stringLiteral":
-      return `"${ast.value}"`;
+      return JSON.stringify(ast.value);
     case "booleanLiteral":
       return ast.value ? "true" : "false";
     case "reference":
-      return `${ast.scope}.${ast.id}`;
+      return `${ast.scope}.${ast.id}${ast.part ? `.${ast.part}` : ""}`;
     case "unary": {
       const operand = renderOperand(ast.operand, UNARY_PREC, "right");
       return `${ast.operator}${operand}`;

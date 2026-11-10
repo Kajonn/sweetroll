@@ -41,7 +41,7 @@ export type EffectivePackageLimitsV1 = Static<typeof EffectivePackageLimitsV1Sch
 
 export const SystemPackageV1Schema = Type.Object(
   {
-    schemaVersion: Type.Union([Type.Literal("1.0"), Type.Literal("1.1"), Type.Literal("1.2")]),
+    schemaVersion: Type.Literal("2.0"),
     systemId: Type.String({ pattern: UUID_PATTERN }),
     versionId: Type.String({ pattern: UUID_PATTERN }),
     semanticVersion: Type.String({ pattern: SEMANTIC_VERSION_PATTERN }),
@@ -56,8 +56,8 @@ export const SystemPackageV1Schema = Type.Object(
     }),
     actions: Type.Array(ActionV1Schema, { maxItems: PACKAGE_LIMITS.actions }),
     validations: Type.Array(ValidationV1Schema, { maxItems: PACKAGE_LIMITS.validations }),
-    templates: Type.Optional(Type.Array(ObjectTemplateV1Schema, { maxItems: 128 })),
-    slots: Type.Optional(Type.Array(SlotDefinitionV1Schema, { maxItems: 64 })),
+    templates: Type.Array(ObjectTemplateV1Schema, { maxItems: 128 }),
+    slots: Type.Array(SlotDefinitionV1Schema, { maxItems: 64 }),
     effectiveLimits: EffectivePackageLimitsV1Schema,
     integrity: Type.Object(
       {

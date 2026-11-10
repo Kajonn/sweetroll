@@ -1,4 +1,4 @@
-import { validateDiceGroups, hasDiceGroups } from "./groups.js";
+import { validateDiceGroups } from "./groups.js";
 import { PACKAGE_LIMITS } from "../package/limits.js";
 import type { CompiledExpressionV1, ExpressionAstV1, ScalarValue, ValueType } from "../package/schema/index.js";
 import { countNodes, depthOf, parse } from "./parser.js";
@@ -10,7 +10,6 @@ export type CompileResult<T> =
   | { ok: false; diagnostics: RulesDiagnostic[] };
 
 export type CompileExpressionOpts = {
-  languageVersion?: "0.1" | "0.2";
   env: ExpressionCompileEnv;
   resultType: ValueType;
   context: "computed" | "roll" | "validation";
@@ -35,7 +34,7 @@ export function compileAst(ast: ExpressionAstV1, opts: CompileExpressionOpts): C
   if (depth > PACKAGE_LIMITS.expressionAstDepth) {
     return { ok: false, diagnostics: [{ code: "limit_exceeded", path: "", message: "expression exceeds depth budget" }] };
   }
-  const groupDiagnostics = validateDiceGroups(ast, opts.languageVersion);
+  const groupDiagnostics = validateDiceGroups(ast);
   if (groupDiagnostics.length > 0) return {ok: false, diagnostics: groupDiagnostics};
   const det = checkDeterministic(ast, opts.context);
   if (det.length > 0) return { ok: false, diagnostics: det };
@@ -53,7 +52,7 @@ export function compileAst(ast: ExpressionAstV1, opts: CompileExpressionOpts): C
   return {
     ok: true,
     value: {
-      ...(hasDiceGroups(ast) ? {languageVersion: "0.2" as const} : {}),
+      languageVersion: "1.0",
       context: opts.context,
       resultType: opts.resultType,
       inferredType: inferred.type,
@@ -66,6 +65,9 @@ export function compileAst(ast: ExpressionAstV1, opts: CompileExpressionOpts): C
 }
 
 export function compileExpression(source: string, opts: CompileExpressionOpts): CompileResult<CompiledExpressionBody> {
+  if (new TextEncoder().encode(source).length > PACKAGE_LIMITS.expressionBytes) {
+    return { ok: false, diagnostics: [{ code: "limit_exceeded", path: "", message: "expression exceeds source byte budget" }] };
+  }
   const parsed = parse(source);
   if (!parsed.ok) return { ok: false, diagnostics: parsed.diagnostics };
   return compileAst(parsed.ast, opts);

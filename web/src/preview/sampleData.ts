@@ -1,3 +1,4 @@
+import { entityFieldTypes, type BindingValue } from "@sweetroll/rules";
 import type {
   ExpressionAstV1,
   ScalarValue,
@@ -189,37 +190,15 @@ function initialSampleValue(field: FieldV1): SampleFieldValue {
   }
 }
 
-function fieldValueType(field: FieldV1): ValueType | undefined {
-  switch (field.kind) {
-    case "text":
-      return "text";
-    case "integer":
-    case "decimal":
-    case "resource":
-      return "number";
-    case "boolean":
-      return "boolean";
-    case "singleChoice":
-    case "multiChoice":
-      return "text";
-    case "computed":
-      return field.valueType;
-    case "image":
-      return undefined;
-  }
-}
-
-function buildSampleBindings(
+export function buildSampleBindings(
   fields: Record<DefinitionId, SampleFieldValue>,
-): Record<string, ScalarValue> {
-  const bindings: Record<string, ScalarValue> = {};
+): Record<string, BindingValue> {
+  const bindings: Record<string, BindingValue> = {};
   for (const [id, value] of Object.entries(fields)) {
-    if (value === null) continue;
-    if (Array.isArray(value)) {
-      continue;
-    }
-    if (typeof value === "object") {
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
       bindings[id] = value.current;
+      bindings[`${id}.current`] = value.current;
+      bindings[`${id}.max`] = value.max;
     } else {
       bindings[id] = value;
     }
@@ -256,16 +235,7 @@ export function generateSample(pkg: SystemPackageV1): SampleData {
         applyComputedFallback(field, pkg.expressions, fields);
       }
     }
-    const env: { fields: Record<string, ValueType>; inputs: Record<string, ValueType> } = {
-      fields: {},
-      inputs: {},
-    };
-    for (const field of entity.fields) {
-      const vt = fieldValueType(field);
-      if (vt !== undefined) {
-        env.fields[field.id] = vt;
-      }
-    }
+    const env = { fields: entityFieldTypes(entity.fields), inputs: {} };
     for (const field of entity.fields) {
       if (field.kind !== "computed") continue;
       const expr = pkg.expressions.find((e) => e.id === field.expressionId);

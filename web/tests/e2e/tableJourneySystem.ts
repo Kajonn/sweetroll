@@ -33,7 +33,7 @@ function abilityLabel(ability: string): string {
 }
 
 export const JOURNEY_DOCUMENT = {
-  schemaVersion: "1.0",
+  schemaVersion: "2.0", templates: [], slots: [],
   metadata: {
     name: "Table Journey System",
     description: "Original trial system for the full-table journey test: six ability scores with derived modifiers, two tracked resources, and simple combat actions.",

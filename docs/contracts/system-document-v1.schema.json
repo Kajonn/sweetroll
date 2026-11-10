@@ -9,24 +9,14 @@
     "sheets",
     "expressions",
     "actions",
-    "validations"
+    "validations",
+    "templates",
+    "slots"
   ],
   "properties": {
     "schemaVersion": {
-      "anyOf": [
-        {
-          "const": "1.0",
-          "type": "string"
-        },
-        {
-          "const": "1.1",
-          "type": "string"
-        },
-        {
-          "const": "1.2",
-          "type": "string"
-        }
-      ]
+      "const": "2.0",
+      "type": "string"
     },
     "metadata": {
       "additionalProperties": false,

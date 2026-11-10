@@ -117,7 +117,7 @@ export function checkVersionChange(input: {
     });
   }
   if (direction === "upgrade") {
-    const affects = characterFootprint(from, fromEntity.id, Object.values(current.value.entries ?? {}));
+    const affects = characterFootprint(from, fromEntity.id, Object.values(current.value.entries));
     report.packageFindings = comparePackages(from, to).findings.map((finding) => ({
       ...finding,
       affectsCharacter: affects(finding.path),
@@ -149,7 +149,7 @@ export function checkVersionChange(input: {
 
   // Entries: system and derived entries follow template defaults they never changed.
   const entries: Record<string, CharacterEntryV1> = {};
-  for (const [key, stored] of Object.entries(current.value.entries ?? {}).sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [key, stored] of Object.entries(current.value.entries).sort(([a], [b]) => a.localeCompare(b))) {
     const moved = moveEntry(stored, from, to);
     if ("blocker" in moved) {
       report.blockers.push({ ...moved.blocker, entryId: stored.entryId });
@@ -168,7 +168,7 @@ export function checkVersionChange(input: {
       report.blockers.push({ code: "entry_invalid", message: "The entry's slot is not on this character's sheet in the target version.", entryId: entry.entryId, definitionId: entry.slotId });
       continue;
     }
-    const valid = validateEntryForSlot(entry, allowedSlots, to.templates ?? [], siblings);
+    const valid = validateEntryForSlot(entry, allowedSlots, to.templates, siblings);
     if (!valid.ok) {
       report.blockers.push({
         code: "entry_invalid",
@@ -221,7 +221,7 @@ function characterFootprint(
   const expressionIds = new Set<string>();
   for (const field of entity.fields) if (field.kind === "computed") expressionIds.add(field.expressionId);
   for (const action of pkg.actions) if (actionIds.has(action.id) && action.kind === "roll") expressionIds.add(action.expressionId);
-  for (const template of pkg.templates ?? []) {
+  for (const template of pkg.templates) {
     if (!templateIds.has(template.id)) continue;
     for (const action of template.grantedActions) if (action.kind === "roll") expressionIds.add(action.expressionId);
   }
@@ -250,8 +250,8 @@ function moveEntry(stored: CharacterEntryV1, from: SystemPackageV1, to: SystemPa
   // Personal and data-only campaign entries carry no rules references.
   if (templateId === null) return { entry, change: null };
 
-  const fromTemplate = (from.templates ?? []).find((t) => t.id === templateId);
-  const toTemplate = (to.templates ?? []).find((t) => t.id === templateId);
+  const fromTemplate = from.templates.find((t) => t.id === templateId);
+  const toTemplate = to.templates.find((t) => t.id === templateId);
   if (toTemplate === undefined) {
     return { blocker: { code: "entry_template_missing", message: `Template "${templateId}" does not exist in the target version.`, definitionId: templateId } };
   }
@@ -362,8 +362,8 @@ export function checkTemplateBaseChange(input: {
       }
     }
   }
-  const fromTemplate = (from.templates ?? []).find((t) => t.id === base.templateId);
-  const toTemplate = (to.templates ?? []).find((t) => t.id === base.templateId && t.kind === input.kind);
+  const fromTemplate = from.templates.find((t) => t.id === base.templateId);
+  const toTemplate = to.templates.find((t) => t.id === base.templateId && t.kind === input.kind);
   if (toTemplate === undefined) {
     blockers.push({ code: "entry_template_missing", message: `Template "${base.templateId}" does not exist in the target version.`, definitionId: base.templateId });
     return { ok: false, blockers, next: null };

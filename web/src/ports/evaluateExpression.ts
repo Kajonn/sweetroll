@@ -11,12 +11,14 @@ import {
   type DieResult as SharedDieResult,
   type ScalarValue,
   type ValueType,
+  type BindingValue,
+  type FieldBindingType,
 } from "@sweetroll/rules";
 
-export type { ScalarValue, ValueType };
+export type { ScalarValue, ValueType, BindingValue, FieldBindingType };
 
 export type ExpressionEnv = {
-  fields: Record<string, ValueType>;
+  fields: Record<string, FieldBindingType>;
   inputs: Record<string, ValueType>;
 };
 
@@ -25,7 +27,7 @@ export type EvaluateExpressionInput = {
   env: ExpressionEnv;
   resultType: ValueType;
   fallback: ScalarValue;
-  bindings: Record<string, ScalarValue>;
+  bindings: Record<string, BindingValue>;
   rng?: Rng;
   /** Where the expression is used. Computed fields and validations may be text or boolean; rolls must be numbers. */
   context?: "computed" | "roll" | "validation";
@@ -39,10 +41,10 @@ export type DieResult = SharedDieResult;
 type EvaluateExpressionBindings = EvaluationBindings;
 
 function pickBindings(
-  all: Record<string, ScalarValue>,
-  scope: Record<string, ValueType>,
-): Record<string, ScalarValue> {
-  const picked: Record<string, ScalarValue> = {};
+  all: Record<string, BindingValue>,
+  scope: Record<string, FieldBindingType>,
+): Record<string, BindingValue> {
+  const picked: Record<string, BindingValue> = {};
   for (const id of Object.keys(all)) {
     if (Object.prototype.hasOwnProperty.call(scope, id)) picked[id] = all[id]!;
   }
@@ -65,7 +67,7 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
     env: input.env,
     resultType: input.resultType,
     context: input.context ?? "roll",
-    languageVersion: "0.2",
+
     fallback: input.fallback,
   });
   if (!compiled.ok) {

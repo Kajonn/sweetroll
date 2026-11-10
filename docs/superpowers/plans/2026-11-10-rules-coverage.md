@@ -66,7 +66,7 @@ player → GM browser journey.
 | C3 | Boolean roll expressions | Rejected at publish for every package version. A roll expression is a number; pass/fail is expressed with outcomes (R5). |
 | C4 | Resource editing | Two new atomic server commands: `adjustResource { delta }` and `setResource { current?, max? }`, both revision-checked and idempotent, bounded by the field's `min`/`max`/`step`. No client read-modify-write (design 12.2). The sheet gets direct input and an "apply amount" control; offline queuing treats them like bumps. |
 | C5 | Conditionals | `if(condition, a, b)`, both branches the same type, only the chosen branch is evaluated. Allowed in roll expressions; dice in the branch not taken are not rolled. No loops, assignment or user-defined functions. |
-| C6 | Field ID scope | From `1.3`, field, option and granted-action IDs are unique per owner (entity or template) instead of per document. Entity, template, slot, action, expression, dataset and sheet-element IDs stay document-unique. |
+| C6 | Field ID scope | From `1.3`, a field is identified by its owner path: `<entityId>.<fieldId>` or `<templateId>.<fieldId>`. Field, option, action-input and granted-action IDs need to be unique only inside their owner; two character types or two templates may both define `damage`. Formulas name the scope instead of sharing one namespace: `fields.<id>` is always the character, `item.<id>` is the entry a granted action or template formula belongs to, so nothing is shadowed. Validations and sheet bindings resolve IDs inside their entity. Stored state is unchanged: a value is already addressed by character, entry and field ID. Entity, template, slot, action, expression, dataset and sheet-element IDs stay document-unique. Packages `1.0`–`1.2` keep the document-wide rule and the merged `fields.` namespace. |
 | C7 | Reading data | `lookup(dataset, key, column)` for exact keys and `lookupBand(dataset, number, column)` for "highest row at or below" tables (level, weight). Datasets declare a key column and typed columns. Choice fields may take their options from a dataset (`optionsFrom`), as design 6.2 already states. |
 | C8 | Reading entries | Aggregates over one slot only: `sum(slot, field)`, `count(slot)`, `sumWhere(slot, field, flagField)`, `countWhere(slot, flagField)`, `maxOf(slot, field)`. Quantity multiplies when the template opts in. No traversal into a single entry and no nesting. |
 | C9 | Dice model | Pools become first-class: a pool source (`dice`, custom dice), optional modifiers (`explode`, `rerollOnce`), then one reducer (sum, `keepHighest`, `keepLowest`, `countAtLeast`, `countAtMost`, `countEqual`). Count, sides, keep count and thresholds are integer expressions. `rolled("groupId")` reads an already rolled named group again. Explosions are capped (10 per die) and count toward the 100-dice limit. |
@@ -162,7 +162,14 @@ publish and evaluate; property tests cover type soundness and budgets.
 
 ### R3 — Data: lookups, entry aggregates, computed maximum (M2)
 
-1. Scoped IDs (C6) in `structural.ts`, compile environments and the creator.
+1. Scoped IDs (C6): per-owner uniqueness in `structural.ts`; the compiler looks
+   fields up by owner instead of by bare ID; the `item.` scope for template
+   formulas and granted actions; validation targets resolved inside their
+   entity; creator pickers show `owner.field`. First task: confirm that the
+   version comparison in `compatibility.ts` matches fields inside their owner.
+   A granted action may read the character fields that every entity showing
+   its slot defines with the same ID and type; with shared IDs this set is no
+   longer empty for systems with more than one character type.
 2. Datasets: key column, typed columns, publish-time type check; `lookup`,
    `lookupBand` (C7); `optionsFrom` on choice fields. A missing row is an
    arithmetic failure with the declared fallback.

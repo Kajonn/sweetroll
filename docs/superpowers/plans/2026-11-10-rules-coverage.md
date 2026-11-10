@@ -21,6 +21,13 @@ disposable test databases are recreated.
 Stage R0 stays inside the current design and needs no further approval. Stages
 R1–R8 change the design; each starts only after its decisions below are confirmed.
 
+**Owner statement (2026-11-10):** no systems are published yet, so the whole
+engine can be rewritten. The plan therefore replaces the rules contract in place
+instead of adding a version beside it (C1). What is kept is what already works
+and is contract-independent: the HMAC dice stream with server-generated execution
+IDs, compile-time and runtime budgets, typed fallbacks, idempotent
+revision-checked commands and the audience model.
+
 ## Coverage matrix (target)
 
 | # | System family | Today | Blocked by | Stage that unblocks it |
@@ -61,12 +68,12 @@ player → GM browser journey.
 
 | # | Question | Recommendation |
 |---|----------|----------------|
-| C1 | How are the new capabilities versioned? | Package/document `1.3` and grammar `0.3`. A document uses the new forms only when it declares `1.3`. Packages `1.0`–`1.2` keep their checksums, RNG order and results. No converter: authors change the declared version in the creator. |
+| C1 | How are the new capabilities versioned? | They are not gated. Owner statement 2026-11-10: no system is published, so the engine may be rewritten. There is one current contract, document/package `2.0` with grammar `1.0`; the `1.0`/`1.1`/`1.2` literals, the `0.1`/`0.2` language switch and every legacy decode or evaluation path are removed. Reference fixtures, seeded templates, contract examples and tests are rewritten to the current contract, and test databases are recreated (design 12.4, 17.0). No converter and no compatibility tests. Published-version immutability and checksums apply from the first release tag onward. |
 | C2 | Sheet evaluation budget | Add a separate `sheetEvaluationNodes` limit (recommended 8,192) to `effectiveLimits` for all computed fields, validations and aggregates of one sheet. The 256-node limit stays per expression. Publishing rejects a document whose worst-case sheet cost exceeds the limit. |
 | C3 | Boolean roll expressions | Rejected at publish for every package version. A roll expression is a number; pass/fail is expressed with outcomes (R5). |
 | C4 | Resource editing | Two new atomic server commands: `adjustResource { delta }` and `setResource { current?, max? }`, both revision-checked and idempotent, bounded by the field's `min`/`max`/`step`. No client read-modify-write (design 12.2). The sheet gets direct input and an "apply amount" control; offline queuing treats them like bumps. |
 | C5 | Conditionals | `if(condition, a, b)`, both branches the same type, only the chosen branch is evaluated. Allowed in roll expressions; dice in the branch not taken are not rolled. No loops, assignment or user-defined functions. |
-| C6 | Field ID scope | From `1.3`, a field is identified by its owner path: `<entityId>.<fieldId>` or `<templateId>.<fieldId>`. Field, option, action-input and granted-action IDs need to be unique only inside their owner; two character types or two templates may both define `damage`. Formulas name the scope instead of sharing one namespace: `fields.<id>` is always the character, `item.<id>` is the entry a granted action or template formula belongs to, so nothing is shadowed. Validations and sheet bindings resolve IDs inside their entity. Stored state is unchanged: a value is already addressed by character, entry and field ID. Entity, template, slot, action, expression, dataset and sheet-element IDs stay document-unique. Packages `1.0`–`1.2` keep the document-wide rule and the merged `fields.` namespace. |
+| C6 | Field ID scope | A field is identified by its owner path: `<entityId>.<fieldId>` or `<templateId>.<fieldId>`. Field, option, action-input and granted-action IDs need to be unique only inside their owner; two character types or two templates may both define `damage`. Formulas name the scope instead of sharing one namespace: `fields.<id>` is always the character, `item.<id>` is the entry a granted action or template formula belongs to, so nothing is shadowed. Validations and sheet bindings resolve IDs inside their entity. Stored state is unchanged: a value is already addressed by character, entry and field ID. Entity, template, slot, action, expression, dataset and sheet-element IDs stay document-unique. The merged `fields.` namespace of granted actions is removed. |
 | C7 | Reading data | `lookup(dataset, key, column)` for exact keys and `lookupBand(dataset, number, column)` for "highest row at or below" tables (level, weight). Datasets declare a key column and typed columns. Choice fields may take their options from a dataset (`optionsFrom`), as design 6.2 already states. |
 | C8 | Reading entries | Aggregates over one slot only: `sum(slot, field)`, `count(slot)`, `sumWhere(slot, field, flagField)`, `countWhere(slot, flagField)`, `maxOf(slot, field)`. Quantity multiplies when the template opts in. No traversal into a single entry and no nesting. |
 | C9 | Dice model | Pools become first-class: a pool source (`dice`, custom dice), optional modifiers (`explode`, `rerollOnce`), then one reducer (sum, `keepHighest`, `keepLowest`, `countAtLeast`, `countAtMost`, `countEqual`). Count, sides, keep count and thresholds are integer expressions. `rolled("groupId")` reads an already rolled named group again. Explosions are capped (10 per die) and count toward the 100-dice limit. |
@@ -86,7 +93,8 @@ rules-version upgrades stay excluded (design Section 6.7).
 
 - Grammar: `rules/tokenizer.ts`, `parser.ts`, `typecheck.ts`, `evaluate.ts`,
   `groups.ts`, `render.ts`; documents compile in `rules/compile-document.ts`.
-  Language `0.2` is selected for document versions other than `1.0`.
+  Language `0.2` is selected for document versions other than `1.0`; this
+  switch and the three document versions are removed by C1.
 - Document/package schemas: `package/schema/document.ts`, `expression.ts`,
   `package.ts`, `push-policy.ts`; limits in `package/limits.ts`; ID and reference
   checks in `package/structural.ts`; change classification in
@@ -115,8 +123,6 @@ the same PR.
 2. Add `sheetEvaluationNodes` (C2). Compute each entity's worst-case cost at
    compile time (computed fields + validations + granted-action observation) and
    return `limit_exceeded` with the entity path. `resolve.ts` uses the new limit.
-   Packages published earlier read the limit from their stored `effectiveLimits`,
-   so their behaviour is unchanged.
 3. Reject roll expressions whose result type is not `number` (C3).
 4. Sheet: disable "increase" at the stored maximum, not the field cap
    (`CharacterSheet.tsx`).
@@ -141,9 +147,13 @@ rejected at publish with a located diagnostic; never published and broken.
 Acceptance: 17 damage is one command; raising the maximum on level-up works
 online, queued offline and through the public API.
 
-### R2 — Grammar 0.3 core (M1, M2)
+### R2 — Contract consolidation and grammar core (M1, M2)
 
-1. Package/document `1.3`, language `0.3` gating (C1).
+1. One contract (C1): document/package `2.0`, grammar `1.0`. Remove the version
+   unions, the language switch, legacy group gating and the optional
+   `templates`/`slots`/`entries` shapes kept for old rows. Rewrite the reference
+   fixtures, seeded templates, `docs/contracts` examples and schemas, and replace
+   `grammar-v0.1.md` and `capability-matrix-v0.1.md` with current documents.
 2. String literals as values; text equality.
 3. `if(c, a, b)` (C5); `%`; `floor`, `ceil`, `abs`; `min`/`max` with 2–8
    arguments.
@@ -189,12 +199,13 @@ from quantities, and proficiency bonus and hit-point maximum from a level table.
 
 ### R4 — Dice pools (M5–M8)
 
-1. AST: pool node with source, modifiers and reducer (C9); legacy `dice`, `keep`
-   and `successCount` nodes stay decodable and evaluate as before.
+1. AST: one pool node with source, modifiers and reducer (C9) replaces the
+   `dice`, `keep` and `successCount` nodes. `4d6kh3`, `adv(d20)` and
+   `countSuccesses(...)` remain as notation that parses to the pool node.
 2. Expression-valued sides, keep counts and thresholds with runtime bounds.
 3. `explode(pool)` / `explode(pool, n)`, `rerollOnce(pool, n)`.
 4. `countAtLeast`, `countAtMost`, `countEqual`; `rolled("groupId")`.
-5. Breakdown graph version `1.1`: explosion chains, rerolled dice and reuse are
+5. One breakdown graph format for every roll (no ungrouped legacy shape): explosion chains, rerolled dice and reuse are
    recorded per die; history, export and activity render them as text.
 6. Push policies name which pool shapes they accept; exploded dice are not
    pushable unless the policy says so.
@@ -267,7 +278,7 @@ stage (E5) lands, compositions with extensions keep their current restrictions.
 | Risk | Mitigation |
 |------|------------|
 | Budget and denial-of-service surface grows with aggregates, explosions and lookups | Every new form has a compile-time cost and a runtime cap; property tests assert the caps; `sheetEvaluationNodes` is checked at publish |
-| Reproducibility of old rolls | New forms exist only in `0.3`; legacy AST nodes keep their evaluation path and RNG order; golden-result tests for the three existing fixtures |
+| A rewrite loses behaviour the current tests protect | Rewrite contract by contract inside the stages, keeping the existing unit, property and integration suites green after porting them to the new contract; the Year Zero fixture (M4) is the regression row for groups and pushes |
 | Target reads leak private sheet values | Only fields marked `targetable`; roller sees the outcome only; dedicated authorization tests |
 | Contract size makes the creator harder to use | Builders for common shapes per stage; progressive disclosure per the GUI plan; free-form editor stays optional |
 | Scope | Eight design-changing stages; each is separately approved, shippable and reversible before the first release tag |

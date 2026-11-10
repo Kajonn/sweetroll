@@ -219,8 +219,9 @@ The [2026-10-27 scoped acceptance](docs/acceptance/configurable-push-rolls-2026-
 
 **Planned rules coverage (owner request 2026-11-10, not yet implemented):** the
 [rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md) records
-the 2026-11-10 review defects and a staged widening of this contract (package 1.3,
-grammar 0.3) so that d20 with tables and equipment, banded outcomes, d100
+the 2026-11-10 review defects and a staged widening of this contract. Because no system is published yet (owner statement
+2026-11-10), the plan replaces the contract in place (one package version 2.0,
+grammar 1.0, no legacy paths) so that d20 with tables and equipment, banded outcomes, d100
 roll-under, variable-target and exploding pools, roll-and-keep, custom dice, cards
 and opposed rolls can be implemented. Stage R0 fixes defects inside the current
 contract. Stages R1–R8 change the exclusions listed above and start only after the

@@ -1,6 +1,6 @@
 # Sweetroll rules coverage: fixes and wider system support
 
-**Implementation plan · 10 November 2026 · Owner-requested 2026-11-10 · Decisions C1–C14 await owner confirmation**
+**Implementation plan · 10 November 2026 · Owner-requested 2026-11-10 · Decisions C1–C13 await owner confirmation**
 
 ## Goal
 
@@ -53,7 +53,7 @@ player → GM browser journey.
 | F6 | Roll output substitutes only `{total}`; a boolean roll publishes and reports total 0 | R0 (reject), R5 |
 | F7 | Definition IDs are unique across the whole document, so two templates cannot share a field ID | R3 |
 | F8 | Reference data is authored but never read | R3 |
-| F9 | No linter or formatter; dense one-line code in places | R0 |
+| F9 | No linter or formatter; dense one-line code in places | Not in this plan (owner decision 2026-11-10: this plan is rules work only) |
 | F10 | Tokenizer and evaluator are hand-ported into `web/src/ports` | R2 |
 | F11 | Documentation drift (README on version upgrades, `grammar-v0.1.md` exclusions, design 6.4 on chained computed fields) | R0 |
 
@@ -74,12 +74,11 @@ player → GM browser journey.
 | C11 | Custom dice | A package may define up to 16 dice, each with up to 20 faces. A face has a numeric value, an optional label and optional symbol counts. `dice(n, "dieId")` rolls them; `countSymbol(pool, "symbol")` counts symbols. |
 | C12 | Opposed rolls | Campaign-only. (a) An action may declare a target of a given entity and read fields that entity marks `targetable`. (b) A response action rolls against a recorded roll and reads `opposed.total`. Target values are disclosed to the roller only through the outcome, never in the bindings shown to them. Standalone characters cannot use targeted actions. |
 | C13 | Cards | Last stage, largest change: a deck is a dataset plus stored deck state on a campaign (shared) or standalone character. `draw` and `shuffle` are new action kinds with server-side deterministic order. Recommended only after R1–R7 are accepted; may be dropped without affecting the other rows. |
-| C14 | Tooling | Add one formatter/linter dev dependency (recommended Biome) with a CI check, applied file by file as files are touched; no repository-wide reformat commit. |
 
 ## Not included
 
 Automatic application of roll consequences to state, effect engines, loops,
-user-defined functions, executable extension points, cross-system references,
+user-defined functions, executable extension points, linter/formatter tooling, cross-system references,
 initiative/turn trackers, and map-aware rules (range, line of sight). Breaking
 rules-version upgrades stay excluded (design Section 6.7).
 
@@ -124,7 +123,6 @@ the same PR.
 5. Documentation: correct the README statement on version upgrades, mark
    `grammar-v0.1.md` as superseded for groups and pushes, and state in design 6.4
    that computed fields may depend on other computed fields without cycles.
-6. Tooling per C14.
 
 Acceptance: a 60-computed-field document is either accepted and observable or
 rejected at publish with a located diagnostic; never published and broken.

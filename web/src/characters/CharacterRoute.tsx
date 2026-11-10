@@ -320,6 +320,8 @@ function CharacterDetailLoaded({
         onDeniedRoll={session.forgetRoll}
         onSetField={session.setField}
         onBump={session.bumpResource}
+        onAdjustResource={session.adjustResource}
+        onSetResource={session.setResource}
         onExecuteAction={session.executeAction}
         onAddEntry={(slotId, templateId, values, quantity, source) => session.addEntry(slotId, templateId, values, quantity, source)}
         onRemoveEntry={session.removeEntry}

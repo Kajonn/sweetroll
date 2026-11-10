@@ -26,6 +26,8 @@ export type EntryInput = {
 export type EditIntent =
   | { kind: "setField"; fieldId: string; value: unknown }
   | { kind: "bumpResource"; resourceId: string; direction: "up" | "down" }
+  | { kind: "adjustResource"; resourceId: string; delta: number }
+  | { kind: "setResource"; resourceId: string; current?: number; max?: number }
   | { kind: "executeAction"; actionId: string; inputs?: Record<string, unknown>; entryId?: string }
   | { kind: "addEntry"; entry: EntryInput }
   | { kind: "removeEntry"; entryId: string }

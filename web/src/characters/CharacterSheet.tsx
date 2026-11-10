@@ -7,7 +7,7 @@ import { useMemo, useState, type ReactNode } from "react";
 
 import { t } from "../i18n/index.js";
 import { Button } from "../ui/Button.js";
-import type { CharacterSnapshot } from "./session.js";
+import { resourceMaxKey, type CharacterSnapshot } from "./session.js";
 import { FieldControl, type ProjectedField } from "./FieldControl.js";
 import { SlotListControl, type SlotTemplate } from "./SlotListControl.js";
 import styles from "./characters.module.css";
@@ -15,6 +15,10 @@ import styles from "./characters.module.css";
 export type CharacterSheetCallbacks = {
   onSetField(fieldId: string, value: unknown): void | Promise<void>;
   onBump(resourceId: string, direction: "up" | "down"): void | Promise<void>;
+  /** Design 6.3: apply an amount in one command. The amount controls are hidden when absent. */
+  onAdjustResource?(resourceId: string, delta: number): void | Promise<void>;
+  /** Design 6.3: direct input of current value and maximum. The editor is hidden when absent. */
+  onSetResource?(resourceId: string, values: { current?: number; max?: number }): void | Promise<void>;
   /** Optional so standalone routes can bind fields/resources without owning action execution. */
   onExecuteAction?(actionId: string, inputs?: Record<string, unknown>): void | Promise<void>;
   /**
@@ -51,6 +55,72 @@ function resourceCurrent(snapshot: CharacterSnapshot, element: Extract<Element, 
   // ordered intentions; clamp defensively and fall back to confirmed current.
   if (typeof estimate === "number") return Math.max(element.min, Math.min(element.max, estimate));
   return element.value.current;
+}
+
+function resourceMaximum(snapshot: CharacterSnapshot, element: Extract<Element, { kind: "resource" }>): number {
+  const estimate = tentativeValue(snapshot, resourceMaxKey(element.resourceId));
+  return typeof estimate === "number" ? estimate : element.value.max;
+}
+
+function parseAmount(text: string): number | null {
+  if (text.trim() === "") return null;
+  const value = Number(text);
+  return Number.isFinite(value) ? value : null;
+}
+
+/** Amount and direct-input controls for one resource (design 6.3). */
+function ResourceEditor({ element, current, max, disabled, invoke, onAdjustResource, onSetResource }: {
+  element: Extract<Element, { kind: "resource" }>;
+  current: number;
+  max: number;
+  disabled: boolean;
+  invoke(command: () => void | Promise<void>): void;
+  onAdjustResource: CharacterSheetCallbacks["onAdjustResource"];
+  onSetResource: CharacterSheetCallbacks["onSetResource"];
+}) {
+  const [amount, setAmount] = useState("");
+  const [draft, setDraft] = useState<{ current: string; max: string } | null>(null);
+  const parsedAmount = parseAmount(amount);
+  const amountValid = parsedAmount !== null && parsedAmount > 0;
+  const apply = (sign: 1 | -1) => {
+    if (!amountValid || onAdjustResource === undefined) return;
+    invoke(() => onAdjustResource(element.resourceId, sign * parsedAmount));
+    setAmount("");
+  };
+  const draftCurrent = draft === null ? null : parseAmount(draft.current);
+  const draftMax = draft === null ? null : parseAmount(draft.max);
+  const draftValid = draftCurrent !== null && draftMax !== null
+    && draftMax >= element.min && draftMax <= element.max && draftCurrent >= element.min && draftCurrent <= draftMax;
+  const label = element.label;
+  return <>
+    {onAdjustResource ? <form className={styles.resource} onSubmit={(event) => { event.preventDefault(); apply(-1); }}>
+      <label className={styles.resourceLabel} htmlFor={`${element.id}-amount`}>{t("character.resource.amount", { label })}</label>
+      <input id={`${element.id}-amount`} className={styles.resourceInput} type="number" inputMode="decimal" min={element.step} step={element.step} value={amount} disabled={disabled} onChange={(event) => setAmount(event.target.value)} />
+      <Button type="submit" disabled={disabled || !amountValid || current <= element.min}>{t("character.resource.subtract", { label })}</Button>
+      <Button disabled={disabled || !amountValid || current >= max} onClick={() => apply(1)}>{t("character.resource.add", { label })}</Button>
+    </form> : null}
+    {onSetResource && draft === null ? <div className={styles.resource}>
+      <Button disabled={disabled} onClick={() => setDraft({ current: String(current), max: String(max) })}>{t("character.resource.edit", { label })}</Button>
+    </div> : null}
+    {onSetResource && draft !== null ? <form className={styles.resource} onSubmit={(event) => {
+      event.preventDefault();
+      if (!draftValid || disabled) return;
+      const values = {
+        ...(draftCurrent === current ? {} : { current: draftCurrent }),
+        ...(draftMax === max ? {} : { max: draftMax }),
+      };
+      if (Object.keys(values).length > 0) invoke(() => onSetResource(element.resourceId, values));
+      setDraft(null);
+    }}>
+      <label className={styles.resourceLabel} htmlFor={`${element.id}-current`}>{t("character.resource.current", { label })}</label>
+      <input id={`${element.id}-current`} className={styles.resourceInput} type="number" inputMode="decimal" min={element.min} max={draftMax ?? element.max} step={element.step} value={draft.current} disabled={disabled} onChange={(event) => setDraft({ ...draft, current: event.target.value })} />
+      <label className={styles.resourceLabel} htmlFor={`${element.id}-max`}>{t("character.resource.maximum", { label })}</label>
+      <input id={`${element.id}-max`} className={styles.resourceInput} type="number" inputMode="decimal" min={element.min} max={element.max} step={element.step} value={draft.max} disabled={disabled} onChange={(event) => setDraft({ ...draft, max: event.target.value })} />
+      <Button type="submit" variant="primary" disabled={disabled || !draftValid}>{t("character.resource.save", { label })}</Button>
+      <Button onClick={() => setDraft(null)}>{t("character.resource.cancel")}</Button>
+      {draftValid ? null : <p className={styles.stale} role="alert">{t("character.resource.range", { min: element.min, max: element.max })}</p>}
+    </form> : null}
+  </>;
 }
 
 function resourceEstimateActive(snapshot: CharacterSnapshot): boolean {
@@ -155,7 +225,7 @@ function RollResult({ roll, fieldLabels }: { roll: NonNullable<CharacterSnapshot
   </section>;
 }
 
-export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, portrait, entryImages, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {
+export function CharacterSheet({ snapshot, onSetField, onBump, onAdjustResource, onSetResource, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, portrait, entryImages, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {
   const characterIdForImages = snapshot.confirmed?.characterId;
   const imageFactory = useMemo(() => entryImages && characterIdForImages ? (id: string) => entryImages(characterIdForImages, id) : undefined, [entryImages, characterIdForImages]);
   const character = snapshot.confirmed;
@@ -232,7 +302,17 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onExecuteAction, 
       case "field": return <FieldControl key={element.id} field={element as ProjectedField} tentativeValue={tentativeValue(snapshot, element.fieldId)} disabled={!editable} pending={pending} onCommit={onSetField} />;
       case "resource": {
         const current = resourceCurrent(snapshot, element);
-        return <div key={element.id} data-system-resource className={styles.resourceGroup}><div className={styles.resource}><span className={styles.resourceLabel}>{element.label}</span><span className={styles.resourceValue}>{current} / {element.value.max}</span><Button variant="primary" disabled={!editable || current <= element.min} onClick={() => invokeCommand(() => onBump(element.resourceId, "down"))}>{t("character.resource.decrease", { label: element.label })}</Button><Button variant="primary" disabled={!editable || current >= element.value.max} onClick={() => invokeCommand(() => onBump(element.resourceId, "up"))}>{t("character.resource.increase", { label: element.label })}</Button></div><ValidationList validations={element.validations} /></div>;
+        const max = resourceMaximum(snapshot, element);
+        return <div key={element.id} data-system-resource className={styles.resourceGroup}>
+          <div className={styles.resource}>
+            <span className={styles.resourceLabel}>{element.label}</span>
+            <span className={styles.resourceValue}>{current} / {max}</span>
+            <Button variant="primary" disabled={!editable || current <= element.min} onClick={() => invokeCommand(() => onBump(element.resourceId, "down"))}>{t("character.resource.decrease", { label: element.label })}</Button>
+            <Button variant="primary" disabled={!editable || current >= max} onClick={() => invokeCommand(() => onBump(element.resourceId, "up"))}>{t("character.resource.increase", { label: element.label })}</Button>
+          </div>
+          <ResourceEditor element={element} current={current} max={max} disabled={!editable} invoke={invokeCommand} onAdjustResource={onAdjustResource} onSetResource={onSetResource} />
+          <ValidationList validations={element.validations} />
+        </div>;
       }
       case "slot": {
         // Synthetic granted-action elements (action with entryId) are owned

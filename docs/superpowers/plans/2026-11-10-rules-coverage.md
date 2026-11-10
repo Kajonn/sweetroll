@@ -61,7 +61,7 @@ player → GM browser journey.
 | F7 | Definition IDs are unique across the whole document, so two templates cannot share a field ID | R3 |
 | F8 | Reference data is authored but never read | R3 |
 | F9 | No linter or formatter; dense one-line code in places | Not in this plan (owner decision 2026-11-10: this plan is rules work only) |
-| F10 | Tokenizer and evaluator are hand-ported into `web/src/ports` | R2 |
+| F10 | ~~Tokenizer and evaluator are hand-ported into `web/src/ports`~~ Withdrawn 2026-11-10: the web already imports the server's rules modules through the `@sweetroll/rules` alias; `web/src/ports` only wraps them. No work needed. | — |
 | F11 | Documentation drift (README on version upgrades, `grammar-v0.1.md` exclusions, design 6.4 on chained computed fields) | R0 |
 
 ## Decisions (owner-approved 2026-11-10)
@@ -162,9 +162,8 @@ online, queued offline and through the public API.
    choice compares unequal instead of failing the expression.
 5. Resource parts: `fields.hp.current`, `fields.hp.max`.
 6. `compatibility.ts`: same context and result type stays non-breaking.
-7. Replace `web/src/ports` with the server's rules modules through one shared
-   source path (they have no Node-only imports), so creator diagnostics and
-   preview cannot drift (F10).
+7. (Withdrawn: the web already compiles and evaluates through the server's
+   rules modules via `@sweetroll/rules`; see F10.)
 8. Creator: expression help, autocomplete entries and diagnostics for the new
    forms.
 
@@ -309,4 +308,22 @@ stage (E5) lands, compositions with extensions keep their current restrictions.
   (1,294 tests). Not run locally: browser end-to-end suites; CI runs them, on
   PostgreSQL 17.
 
-R1–R8: not started.
+**R1 — 2026-11-10, implemented.**
+
+- Runtime intents `adjust` and `setResource` (`src/systems/runtime.ts`).
+  `adjust` clamps to the resource's minimum and the stored maximum and requires
+  a non-zero multiple of the step; `setResource` validates through
+  `decodeRuntimeState` and lowers the current value with a lowered maximum.
+- Character commands `adjustResource` and `setResource` with their receipts
+  and activity kinds; browser routes `…/resources/:id/adjust` and `…/set`;
+  `/api/v1` `POST …/adjust` and `PUT …/resources/:id`; contracts regenerated.
+- Web: queue intents with sequential estimates (pending maximum under
+  `<resourceId>.max`), sheet amount and direct-input controls, conflict review
+  labels, activity labels.
+- Tests: runtime unit tests, `scenarios/resources.test.ts`, sheet and session
+  tests.
+- Not done in R1: amount/direct-input controls on the GM session board (it
+  keeps one-tap steps; the GM can open the sheet), and corrections of these two
+  intents in conflict review (they can be reapplied or discarded, not edited).
+
+R2–R8: not started.

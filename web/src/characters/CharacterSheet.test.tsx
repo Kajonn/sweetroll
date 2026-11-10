@@ -193,6 +193,49 @@ describe("CharacterSheet", () => {
     expect(screen.getByRole("button", { name: "Decrease Health" })).toBeEnabled();
   });
 
+  it("applies an amount in one command and hides the controls without a handler", async () => {
+    const user = userEvent.setup();
+    const onAdjustResource = vi.fn();
+    const { rerender } = render(<CharacterSheet snapshot={snapshot()} onSetField={vi.fn()} onBump={vi.fn()} onAdjustResource={onAdjustResource} />);
+    const amount = screen.getByRole("spinbutton", { name: "Amount for Health" });
+    expect(screen.getByRole("button", { name: "Subtract from Health" })).toBeDisabled();
+    await user.type(amount, "3");
+    await user.click(screen.getByRole("button", { name: "Subtract from Health" }));
+    expect(onAdjustResource).toHaveBeenLastCalledWith("health", -3);
+    expect(amount).toHaveValue(null);
+    await user.type(amount, "2");
+    await user.click(screen.getByRole("button", { name: "Add to Health" }));
+    expect(onAdjustResource).toHaveBeenLastCalledWith("health", 2);
+
+    rerender(<CharacterSheet snapshot={snapshot()} onSetField={vi.fn()} onBump={vi.fn()} />);
+    expect(screen.queryByRole("spinbutton", { name: "Amount for Health" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Set Health" })).toBeNull();
+  });
+
+  it("sets current and maximum directly, sending only what changed", async () => {
+    const user = userEvent.setup();
+    const onSetResource = vi.fn();
+    render(<CharacterSheet snapshot={snapshot()} onSetField={vi.fn()} onBump={vi.fn()} onSetResource={onSetResource} />);
+    await user.click(screen.getByRole("button", { name: "Set Health" }));
+    const max = screen.getByRole("spinbutton", { name: "Maximum Health" });
+    expect(screen.getByRole("spinbutton", { name: "Current Health" })).toHaveValue(4);
+    await user.clear(max);
+    await user.type(max, "3");
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter a current value from 0 up to the maximum");
+    expect(screen.getByRole("button", { name: "Save Health" })).toBeDisabled();
+    await user.clear(max);
+    await user.type(max, "5");
+    await user.click(screen.getByRole("button", { name: "Save Health" }));
+    expect(onSetResource).toHaveBeenCalledWith("health", { max: 5 });
+    expect(screen.queryByRole("spinbutton", { name: "Maximum Health" })).toBeNull();
+  });
+
+  it("shows a pending maximum from the offline queue", () => {
+    render(<CharacterSheet snapshot={snapshot({ tentative: { health: 6, "health.max": 8 } })} onSetField={vi.fn()} onBump={vi.fn()} />);
+    expect(screen.getByText("6 / 8")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Increase Health" })).toBeEnabled();
+  });
+
   it("shows the same estimate in every duplicate resource control", () => {
     const base = snapshot({ tentative: { health: 5 } });
     const resource = base.confirmed!.projection.sheets[1]!.sections[0]!.elements.find((element): element is Extract<typeof element, { kind: "resource" }> => element.kind === "resource")!;

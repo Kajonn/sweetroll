@@ -74,6 +74,8 @@ const DUPLICATE_COMMAND_KIND = "character_duplicate";
 const COMMAND_KIND: Record<CharacterCommand["kind"], string> = {
   setField: "character_set_field",
   bumpResource: "character_bump_resource",
+  adjustResource: "character_adjust_resource",
+  setResource: "character_set_resource",
   executeAction: "character_execute_action",
   pushRoll: "character_push_roll",
   addEntry: "character_add_entry",
@@ -310,8 +312,31 @@ export type CharacterActionCommand = {
 export type CharacterPushCommand={kind:"pushRoll";characterId:CharacterId;parentRollId:string;expectedRevision:number;idempotencyKey:string};
 export type PushOptions={canPush:boolean;reason:string|null;eligibleDiceIds:string[];revision:number;nextAttempt:number;maxAttempts:number};
 
+/** Design 6.3: apply an amount (damage, healing, spending) in one atomic command. */
+export type CharacterResourceAdjustCommand = {
+  kind: "adjustResource";
+  characterId: CharacterId;
+  resourceId: DefinitionId;
+  delta: number;
+  expectedRevision: number;
+  idempotencyKey: string;
+};
+
+/** Design 6.3: direct input of a resource's current value and/or maximum. */
+export type CharacterResourceSetCommand = {
+  kind: "setResource";
+  characterId: CharacterId;
+  resourceId: DefinitionId;
+  current?: number;
+  max?: number;
+  expectedRevision: number;
+  idempotencyKey: string;
+};
+
 export type CharacterCommand =
   | CharacterPushCommand
+  | CharacterResourceAdjustCommand
+  | CharacterResourceSetCommand
   | CharacterFieldSetCommand
   | CharacterResourceBumpCommand
   | CharacterActionCommand
@@ -2110,6 +2135,10 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             ? { fieldId: command.fieldId, value: command.value }
             : command.kind === "bumpResource"
               ? { resourceId: command.resourceId, direction: command.direction }
+            : command.kind === "adjustResource"
+              ? { resourceId: command.resourceId, delta: command.delta }
+            : command.kind === "setResource"
+              ? resourceSetPayload(command)
               : command.kind === "pushRoll"
                 ? {parentRollId:command.parentRollId}
               : command.kind === "executeAction"
@@ -2288,6 +2317,10 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             ? ({ kind: "set", fieldId: command.fieldId, value: command.value } as const)
             : command.kind === "bumpResource"
               ? ({ kind: "bump", resourceId: command.resourceId, direction: command.direction } as const)
+            : command.kind === "adjustResource"
+              ? ({ kind: "adjust", resourceId: command.resourceId, delta: command.delta } as const)
+            : command.kind === "setResource"
+              ? ({ kind: "setResource", ...resourceSetPayload(command) } as const)
               : ({
                   kind: "action",
                   actionId: command.actionId,
@@ -2320,6 +2353,10 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             ? "character_field_set"
             : command.kind === "bumpResource"
               ? "character_resource_bumped"
+            : command.kind === "adjustResource"
+              ? "character_resource_adjusted"
+            : command.kind === "setResource"
+              ? "character_resource_set"
               : command.kind==="pushRoll"?"character_roll_pushed":"character_action_executed";
         const changedDefinitionIds = resolved.value.changedDefinitionIds;
         const roll = resolved.value.roll;
@@ -2939,6 +2976,14 @@ function redactRollIdForReader(
 // inputs), email, external identity, session, or idempotency keys. Only structural identifiers
 // needed to interpret "what happened" are retained; the underlying write-side payload (in
 // persistence.ts) may include more, but the read-side projection here minimizes it.
+function resourceSetPayload(command: CharacterResourceSetCommand): { resourceId: string; current?: number; max?: number } {
+  return {
+    resourceId: command.resourceId,
+    ...(command.current === undefined ? {} : { current: command.current }),
+    ...(command.max === undefined ? {} : { max: command.max }),
+  };
+}
+
 function minimizeActivityPayload(kind: string, payload: unknown): unknown {
   const record = payload as Record<string, unknown> | null | undefined;
   if (record === null || record === undefined || typeof record !== "object") return {};
@@ -2951,6 +2996,19 @@ function minimizeActivityPayload(kind: string, payload: unknown): unknown {
       return {
         resourceId: record.resourceId,
         direction: record.direction,
+        changedDefinitionIds: record.changedDefinitionIds ?? [],
+      };
+    case "character_resource_adjusted":
+      return {
+        resourceId: record.resourceId,
+        delta: record.delta,
+        changedDefinitionIds: record.changedDefinitionIds ?? [],
+      };
+    case "character_resource_set":
+      return {
+        resourceId: record.resourceId,
+        ...(record.current === undefined ? {} : { current: record.current }),
+        ...(record.max === undefined ? {} : { max: record.max }),
         changedDefinitionIds: record.changedDefinitionIds ?? [],
       };
     case "character_action_executed":

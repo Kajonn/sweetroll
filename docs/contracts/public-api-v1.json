@@ -2341,6 +2341,248 @@
         }
       }
     },
+    "/characters/{characterId}/resources/{resourceId}/adjust": {
+      "post": {
+        "operationId": "adjustCharacterResource",
+        "description": "Add an amount to a character resource, or subtract a negative one. The result stops at the resource's minimum and the character's maximum.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "characters:write"
+        ],
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "x-max-body-bytes": 131072,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "delta",
+                  "expectedRevision",
+                  "idempotencyKey"
+                ],
+                "properties": {
+                  "delta": {
+                    "minimum": -1000000000,
+                    "maximum": 1000000000,
+                    "type": "number"
+                  },
+                  "expectedRevision": {
+                    "minimum": 1,
+                    "maximum": 2147483647,
+                    "type": "integer"
+                  },
+                  "idempotencyKey": {
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "\\S",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "delta": -17,
+                "expectedRevision": 3,
+                "idempotencyKey": "damage-1"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterMutation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/characters/{characterId}/resources/{resourceId}": {
+      "put": {
+        "operationId": "setCharacterResource",
+        "description": "Set a character resource's current value, its maximum, or both. Lowering only the maximum lowers a higher current value with it.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "characters:write"
+        ],
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "x-max-body-bytes": 131072,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "expectedRevision",
+                  "idempotencyKey"
+                ],
+                "properties": {
+                  "current": {
+                    "minimum": -1000000000,
+                    "maximum": 1000000000,
+                    "type": "number"
+                  },
+                  "max": {
+                    "minimum": -1000000000,
+                    "maximum": 1000000000,
+                    "type": "number"
+                  },
+                  "expectedRevision": {
+                    "minimum": 1,
+                    "maximum": 2147483647,
+                    "type": "integer"
+                  },
+                  "idempotencyKey": {
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "\\S",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "max": 24,
+                "expectedRevision": 4,
+                "idempotencyKey": "level-up-hp"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterMutation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
     "/characters/{characterId}/entries": {
       "post": {
         "operationId": "addCharacterEntry",

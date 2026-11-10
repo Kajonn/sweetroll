@@ -21,6 +21,7 @@ import {
 import { createSystemRuntime } from "./runtime.js";
 import type {
   RuntimeErrorCode,
+  RuntimeIntent,
   RuntimeResolution,
   RuntimeResult,
   SystemRuntime,
@@ -341,6 +342,81 @@ describe("SystemRuntime contract", () => {
     if (!result.ok) return;
     expect(result.value.state.values[resourceId]).toMatchObject({ current });
     expect(result.value.changedDefinitionIds).toEqual([resourceId]);
+  });
+
+  describe("resource amounts and direct input (design 6.3)", () => {
+    const change = async (intent: RuntimeIntent, values?: Record<string, unknown>) => {
+      const runtime = createRuntime(d20Package);
+      const initialized = await runtime.resolve({
+        versionId: d20Package.versionId,
+        entityId: "character",
+        intent: { kind: "initialize", ...(values === undefined ? {} : { values }) },
+      });
+      if (!initialized.ok) throw new Error(initialized.error.message);
+      return runtime.resolve({
+        versionId: d20Package.versionId, entityId: "character", state: initialized.value.state, intent,
+      });
+    };
+
+    it("applies an amount in one command", async () => {
+      const result = await change({ kind: "adjust", resourceId: "health", delta: -7 });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.state.values.health).toEqual({ current: 3, max: 10 });
+      expect(result.value.changedDefinitionIds).toEqual(["health"]);
+    });
+
+    it.each([
+      [-17, 0],
+      [5, 10],
+    ])("stops an amount of %d at the resource's bounds", async (delta, current) => {
+      const result = await change({ kind: "adjust", resourceId: "health", delta }, { health: { current: 8, max: 10 } });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.state.values.health).toEqual({ current, max: 10 });
+    });
+
+    it.each([0, 0.5, Number.NaN, "3"])("rejects the amount %s", async (delta) => {
+      const result = await change({ kind: "adjust", resourceId: "health", delta });
+      expect(result).toMatchObject({ ok: false, error: { code: "bad_request", definitionId: "health" } });
+    });
+
+    it("raises the maximum without changing the current value", async () => {
+      const result = await change({ kind: "setResource", resourceId: "health", max: 14 });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.state.values.health).toEqual({ current: 10, max: 14 });
+    });
+
+    it("lowers the current value with a lowered maximum", async () => {
+      const result = await change({ kind: "setResource", resourceId: "health", max: 6 });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.state.values.health).toEqual({ current: 6, max: 6 });
+    });
+
+    it("sets current and maximum together and reports no change for equal values", async () => {
+      const both = await change({ kind: "setResource", resourceId: "health", current: 2, max: 12 });
+      expect(both.ok && both.value.state.values.health).toEqual({ current: 2, max: 12 });
+      const same = await change({ kind: "setResource", resourceId: "health", current: 10 });
+      expect(same.ok && same.value.changedDefinitionIds).toEqual([]);
+    });
+
+    it.each([
+      [{ current: 11 }],
+      [{ current: -1 }],
+      [{ max: 1000 }],
+      [{ current: 1.5 }],
+      [{}],
+    ])("rejects %j", async (values) => {
+      const result = await change({ kind: "setResource", resourceId: "health", ...values });
+      expect(result).toMatchObject({ ok: false, error: { code: "bad_request", definitionId: "health" } });
+    });
+
+    it("rejects a field that is not a resource", async () => {
+      const result = await change({ kind: "adjust", resourceId: "ability", delta: 1 });
+      expect(result).toMatchObject({ ok: false, error: { code: "bad_request", definitionId: "ability" } });
+    });
   });
 
   it("rejects resource bumps beyond current bounds instead of clamping", async () => {

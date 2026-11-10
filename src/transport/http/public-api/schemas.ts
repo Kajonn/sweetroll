@@ -157,6 +157,11 @@ export const resourceId = object({ characterId: uuid, resourceId: definitionId }
 export const bumpResource = object({
   direction: Type.Union([Type.Literal("up"), Type.Literal("down")]), ...revisionCommand,
 });
+const resourceNumber = Type.Number({ minimum: -1e9, maximum: 1e9 });
+export const adjustResource = object({ delta: resourceNumber, ...revisionCommand });
+export const setResource = object({
+  current: Type.Optional(resourceNumber), max: Type.Optional(resourceNumber), ...revisionCommand,
+});
 export const attachmentRevision = Type.Integer({ minimum: 0, maximum: 2_147_483_647 });
 export const imageUpload = {
   description: Type.String({ minLength: 1, maxLength: 500 }),

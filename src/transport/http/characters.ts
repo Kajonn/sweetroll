@@ -447,6 +447,17 @@ const BumpResourceBody = Type.Object({
   expectedRevision: Type.Integer(),
   idempotencyKey: Type.String({ minLength: 1 }),
 });
+const AdjustResourceBody = Type.Object({
+  delta: Type.Number(),
+  expectedRevision: Type.Integer(),
+  idempotencyKey: Type.String({ minLength: 1 }),
+});
+const SetResourceBody = Type.Object({
+  current: Type.Optional(Type.Number()),
+  max: Type.Optional(Type.Number()),
+  expectedRevision: Type.Integer(),
+  idempotencyKey: Type.String({ minLength: 1 }),
+});
 const PushParams=Type.Object({characterId:Type.String({format:"uuid"}),rollId:Type.String({format:"uuid"})},{additionalProperties:false});
 const PushBody=Type.Object({expectedRevision:Type.Integer({minimum:1}),idempotencyKey:Type.String({minLength:1,maxLength:200})},{additionalProperties:false});
 const PushOptionsDto=Type.Object({canPush:Type.Boolean(),reason:Type.Union([Type.String({maxLength:120}),Type.Null()]),eligibleDiceIds:Type.Array(Type.String({maxLength:256}),{maxItems:100}),revision:Type.Integer({minimum:1}),nextAttempt:Type.Integer({minimum:1,maximum:11}),maxAttempts:Type.Integer({minimum:1,maximum:10})});
@@ -724,6 +735,32 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
     schema: {
       params: ResourceBumpParams,
       body: BumpResourceBody,
+      response: {
+        "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/characters/:characterId/resources/:resourceId/adjust",
+    operationId: "post_characters_characterId_resources_resourceId_adjust",
+    schema: {
+      params: ResourceBumpParams,
+      body: AdjustResourceBody,
+      response: {
+        "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/characters/:characterId/resources/:resourceId/set",
+    operationId: "post_characters_characterId_resources_resourceId_set",
+    schema: {
+      params: ResourceBumpParams,
+      body: SetResourceBody,
       response: {
         "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
         ...ErrorResponses,
@@ -1156,6 +1193,37 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
           idempotencyKey: body.idempotencyKey,
         };
         const result = await characters.apply(ctxOf(request), command);
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
+      post_characters_characterId_resources_resourceId_adjust: async (request, reply) => {
+        const params = request.params as { characterId: string; resourceId: string };
+        const body = request.body as { delta: number; expectedRevision: number; idempotencyKey: string };
+        const result = await characters.apply(ctxOf(request), {
+          kind: "adjustResource",
+          characterId: params.characterId,
+          resourceId: params.resourceId,
+          delta: body.delta,
+          expectedRevision: body.expectedRevision,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
+      post_characters_characterId_resources_resourceId_set: async (request, reply) => {
+        const params = request.params as { characterId: string; resourceId: string };
+        const body = request.body as { current?: number; max?: number; expectedRevision: number; idempotencyKey: string };
+        const result = await characters.apply(ctxOf(request), {
+          kind: "setResource",
+          characterId: params.characterId,
+          resourceId: params.resourceId,
+          ...(body.current === undefined ? {} : { current: body.current }),
+          ...(body.max === undefined ? {} : { max: body.max }),
+          expectedRevision: body.expectedRevision,
+          idempotencyKey: body.idempotencyKey,
+        });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { result: toCommandResultDto(result.value), requestId: request.id };
       },

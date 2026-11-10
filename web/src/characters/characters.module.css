@@ -53,3 +53,7 @@
 /* Intrinsic input widths grow with text enlargement; keep them in the sheet. */
 .detail input, .sheet input, .sheet select { min-width: 0; max-width: 100%; }
 .header h1, .field label, .action label, .resourceLabel { overflow-wrap: anywhere; }
+.resource { flex-wrap: wrap; }
+.resourceInput { width: 6em; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-panel); color: var(--text-primary); font: inherit; }
+.resourceInput:disabled { background: var(--surface-page); color: var(--text-muted); cursor: not-allowed; }
+.resourceInput:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }

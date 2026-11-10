@@ -56,6 +56,10 @@ export type RuntimeIntent =
   | { kind: "observe" }
   | { kind: "set"; fieldId: DefinitionId; value: unknown }
   | { kind: "bump"; resourceId: DefinitionId; direction: "up" | "down" }
+  /** Design 6.3: apply an amount; the result is clamped to the resource's bounds. */
+  | { kind: "adjust"; resourceId: DefinitionId; delta: unknown }
+  /** Design 6.3: direct input of the current value and/or the character's maximum. */
+  | { kind: "setResource"; resourceId: DefinitionId; current?: unknown; max?: unknown }
   | {
       kind: "action";
       actionId: DefinitionId;
@@ -459,6 +463,16 @@ export function createSystemRuntime(input: {
           if (!bumped.ok) return bumped;
           stateResult = { ok: true, value: bumped.value };
           changedDefinitionIds = [request.intent.resourceId];
+        } else if (request.intent.kind === "adjust" || request.intent.kind === "setResource") {
+          const edited = request.intent.kind === "adjust"
+            ? adjustResource(entity, stateResult.value, request.intent.resourceId, request.intent.delta)
+            : setResource(entity, stateResult.value, request.intent.resourceId, request.intent);
+          if (!edited.ok) return edited;
+          changedDefinitionIds = sameValue(
+            stateResult.value.values[request.intent.resourceId]!,
+            edited.value.values[request.intent.resourceId]!,
+          ) ? [] : [request.intent.resourceId];
+          stateResult = { ok: true, value: edited.value };
         } else if (request.intent.kind === "action" && request.intent.entryId !== undefined) {
           const granted = resolveGrantedAction({
             packageValue,
@@ -630,6 +644,66 @@ function changeResource(
   };
   const decoded = decodeRuntimeState(entity, nextState);
   return decoded.ok ? decoded : badRequest("Resource bump exceeds its bounds.", resource.id);
+}
+
+function resourceOf(entity: EntityDefinitionV1, state: RuntimeStateV1, resourceId: string) {
+  const resource = entity.fields.find((field) => field.id === resourceId);
+  if (resource?.kind !== "resource") return undefined;
+  return { resource, value: state.values[resource.id] as RuntimeResourceValue };
+}
+
+function withResource(
+  entity: EntityDefinitionV1,
+  state: RuntimeStateV1,
+  resourceId: string,
+  value: RuntimeResourceValue,
+): RuntimeResult<RuntimeStateV1> {
+  const nextState = structuredClone(state);
+  nextState.values[resourceId] = value;
+  const decoded = decodeRuntimeState(entity, nextState);
+  return decoded.ok ? decoded : badRequest("Resource value is outside its bounds or step.", resourceId);
+}
+
+/** Applies an amount such as damage or healing; the result stops at the minimum and the stored maximum. */
+function adjustResource(
+  entity: EntityDefinitionV1,
+  state: RuntimeStateV1,
+  resourceId: string,
+  delta: unknown,
+): RuntimeResult<RuntimeStateV1> {
+  const owned = resourceOf(entity, state, resourceId);
+  if (owned === undefined) return badRequest("Resource does not belong to the entity.", resourceId);
+  if (typeof delta !== "number" || !Number.isFinite(delta) || delta === 0) {
+    return badRequest("Resource amount must be a non-zero number.", resourceId);
+  }
+  const steps = delta / owned.resource.step;
+  if (Math.abs(steps - Math.round(steps)) > 1e-9) {
+    return badRequest("Resource amount must be a multiple of the resource's step.", resourceId);
+  }
+  const current = Math.max(owned.resource.min, Math.min(owned.value.max, owned.value.current + delta));
+  return withResource(entity, state, resourceId, { current, max: owned.value.max });
+}
+
+/** Sets current and/or maximum. Lowering the maximum alone lowers a higher current value with it. */
+function setResource(
+  entity: EntityDefinitionV1,
+  state: RuntimeStateV1,
+  resourceId: string,
+  input: { current?: unknown; max?: unknown },
+): RuntimeResult<RuntimeStateV1> {
+  const owned = resourceOf(entity, state, resourceId);
+  if (owned === undefined) return badRequest("Resource does not belong to the entity.", resourceId);
+  if (input.current === undefined && input.max === undefined) {
+    return badRequest("Provide a current value, a maximum, or both.", resourceId);
+  }
+  for (const value of [input.current, input.max]) {
+    if (value !== undefined && (typeof value !== "number" || !Number.isFinite(value))) {
+      return badRequest("Resource values must be numbers.", resourceId);
+    }
+  }
+  const max = (input.max as number | undefined) ?? owned.value.max;
+  const current = (input.current as number | undefined) ?? Math.min(owned.value.current, max);
+  return withResource(entity, state, resourceId, { current, max });
 }
 
 function sameValue(left: RuntimeStoredValue, right: RuntimeStoredValue): boolean {

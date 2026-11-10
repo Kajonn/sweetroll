@@ -26036,6 +26036,7 @@
               "expressionBytes",
               "expressionAstNodes",
               "expressionAstDepth",
+              "sheetEvaluationNodes",
               "dicePerRoll",
               "sidesPerDie"
             ],
@@ -26053,6 +26054,11 @@
               "expressionAstDepth": {
                 "minimum": 1,
                 "maximum": 32,
+                "type": "integer"
+              },
+              "sheetEvaluationNodes": {
+                "minimum": 1,
+                "maximum": 8192,
                 "type": "integer"
               },
               "dicePerRoll": {

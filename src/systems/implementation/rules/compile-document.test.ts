@@ -4,6 +4,8 @@ import { validDocument } from "../package/schema/test-values.js";
 import type { SystemDocumentV1 } from "../package/schema/index.js";
 import { documentFromPackage } from "../authoring/assess.js";
 import { compileDocument } from "./compile-document.js";
+import { resolveObservedValues } from "../runtime/resolve.js";
+import { initializeState } from "../runtime/state.js";
 
 const opts = { systemId: "a0000000-0000-5000-8000-000000000001", versionId: "a0000000-0000-5000-8000-000000000002", semanticVersion: "1.0.0" };
 
@@ -568,5 +570,45 @@ describe("success-count authoring assessment", () => {
     expect(result.ok).toBe(false);
     const diagnostics = result.ok ? [] : result.diagnostics;
     expect(diagnostics).toContainEqual(expect.objectContaining({ code: "invalid_expression", path: "pool_roll_expr" }));
+  });
+});
+
+describe("sheet evaluation budget", () => {
+  // 128 leaves in a balanced tree: 255 nodes, inside the per-expression limits.
+  const balanced = (leaves: number): string =>
+    leaves === 1 ? "1" : `(${balanced(leaves / 2)}+${balanced(leaves / 2)})`;
+  const withComputedFields = (count: number): SystemDocumentV1 => {
+    const document = structuredClone(d20Document);
+    for (let index = 0; index < count; index++) {
+      document.expressions.push({
+        id: `heavy_expr_${index}`, context: "computed", resultType: "number", source: balanced(128), fallback: 0,
+      });
+      document.entities[0]!.fields.push({
+        kind: "computed", id: `heavy_${index}`, label: `Heavy ${index}`, valueType: "number", expressionId: `heavy_expr_${index}`,
+      });
+    }
+    return document;
+  };
+
+  it("accepts a sheet whose total cost is above one expression's limit and the runtime observes it", () => {
+    const compiled = compileDocument(withComputedFields(31), opts);
+    expect(compiled.ok).toBe(true);
+    if (!compiled.ok) return;
+    const entity = compiled.value.entities[0]!;
+    const state = initializeState(entity);
+    expect(state.ok).toBe(true);
+    if (!state.ok) return;
+    const observed = resolveObservedValues(compiled.value, entity, state.value);
+    expect(observed.ok).toBe(true);
+    if (!observed.ok) return;
+    expect(observed.value.derivedValues.heavy_30).toBe(128);
+  });
+
+  it("rejects a sheet that the runtime could never observe", () => {
+    const result = compileDocument(withComputedFields(33), opts);
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [expect.objectContaining({ code: "limit_exceeded", path: "/entities/0/fields" })],
+    });
   });
 });

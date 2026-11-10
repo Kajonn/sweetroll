@@ -15,6 +15,9 @@ export const PACKAGE_LIMITS = {
   referenceRecordsPerSet: 1000,
   sectionsPerSheet: 64,
   sheetElements: 1024,
+  // Total AST nodes for all computed fields and validations of one sheet
+  // (design 6.4); `expressionAstNodes` stays the per-expression ceiling.
+  sheetEvaluationNodes: 8192,
   sheets: 32,
   sidesPerDie: 1000,
   slots: 64,

@@ -1,6 +1,6 @@
 # Sweetroll rules coverage: fixes and wider system support
 
-**Implementation plan · 10 November 2026 · Owner-requested 2026-11-10 · C1, C6, C10, C12 and C13 decided by the owner 2026-11-10; the other decisions await confirmation**
+**Implementation plan · 10 November 2026 · Owner-approved 2026-11-10 (C1–C13; C6, C10, C12 and C13 as amended by the owner)**
 
 ## Goal
 
@@ -18,8 +18,8 @@ disposable test databases are recreated.
 > Plan for all the fixes and expand scope with the goal to support all systems in
 > matrix.
 
-Stage R0 stays inside the current design and needs no further approval. Stages
-R1–R8 change the design; each starts only after its decisions below are confirmed.
+The owner approved all decisions below and asked for R0 to start on 2026-11-10.
+Stages R1–R8 change the design and update `design_v2.md` as they are delivered.
 
 **Owner statement (2026-11-10):** no systems are published yet, so the whole
 engine can be rewritten. The plan therefore replaces the rules contract in place
@@ -64,7 +64,7 @@ player → GM browser journey.
 | F10 | Tokenizer and evaluator are hand-ported into `web/src/ports` | R2 |
 | F11 | Documentation drift (README on version upgrades, `grammar-v0.1.md` exclusions, design 6.4 on chained computed fields) | R0 |
 
-## Decisions (recommendations; owner confirmation needed)
+## Decisions (owner-approved 2026-11-10)
 
 | # | Question | Recommendation |
 |---|----------|----------------|
@@ -291,4 +291,21 @@ stage (E5) lands, compositions with extensions keep their current restrictions.
 
 ## Implementation record
 
-Nothing implemented yet.
+**R0 — 2026-11-10, implemented.**
+
+- `adv`/`dis` keep one die (`rules/parser.ts`); parser and evaluator tests. The
+  web port has a tokenizer and a dice-free evaluator only, so it needed no change.
+- `sheetEvaluationNodes` (8,192) in `package/limits.ts`, the effective-limits
+  schema and ceilings, both compilers and the fixtures. `compileDocument` rejects
+  an entity whose computed fields and owned validations exceed it;
+  `runtime/resolve.ts` enforces the same limit. Contract schemas and examples
+  regenerated.
+- `compileExpression` rejects roll expressions that do not produce a number, for
+  documents and extensions.
+- Sheet increase button stops at the stored maximum (`CharacterSheet.tsx`).
+- README, `grammar-v0.1.md` and design 6.4 corrected.
+- Verified: root typecheck and unit suite, `contracts:check`, web typecheck and
+  the character-sheet and port tests. Not run locally: integration and browser
+  suites (no PostgreSQL in the authoring environment); CI runs them.
+
+R1–R8: not started.

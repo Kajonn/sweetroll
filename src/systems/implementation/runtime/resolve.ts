@@ -53,7 +53,7 @@ export function resolveObservedValues(
       if (!dependencyResult.ok) return dependencyResult;
     }
     spent += expression.cost;
-    if (spent > packageValue.effectiveLimits.expressionAstNodes) return budgetExceeded();
+    if (spent > packageValue.effectiveLimits.sheetEvaluationNodes) return budgetExceeded();
     const result = evaluate(expression, bindings);
     if (!result.ok) return invalidPackage(expression.id);
     derivedValues[field.id] = result.result;
@@ -90,7 +90,7 @@ export function resolveObservedValues(
     const expression = expressions.get(validation.expressionId);
     if (expression === undefined) return invalidPackage(validation.expressionId);
     spent += expression.cost;
-    if (spent > packageValue.effectiveLimits.expressionAstNodes) return budgetExceeded();
+    if (spent > packageValue.effectiveLimits.sheetEvaluationNodes) return budgetExceeded();
     const result = evaluate(expression, bindings);
     if (!result.ok) return invalidPackage(expression.id);
     if (result.result !== true || result.diagnostics.length > 0) {

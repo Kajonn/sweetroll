@@ -158,4 +158,16 @@ describe("evaluate", () => {
       }],
     });
   });
+
+  it.each([
+    ["adv(d20)", 16],
+    ["dis(d20)", 2],
+  ])("%s keeps one of two dice instead of summing them", (source, total) => {
+    const r = evaluate(compile(source), { fields: {}, inputs: {} }, seqRng([0.8, 0.1]));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.roll?.dice.map((die) => die.value)).toEqual([16, 2]);
+    expect(r.roll?.dice.filter((die) => die.kept)).toHaveLength(1);
+    expect(r.result).toBe(total);
+  });
 });

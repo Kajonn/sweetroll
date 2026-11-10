@@ -86,4 +86,17 @@ describe("parser", () => {
     if (!r.ok) return;
     expect(countNodes(r.ast)).toBe(3);
   });
+
+  it.each([
+    ["adv(d20)", "highest"],
+    ["dis(d20)", "lowest"],
+  ])("parses %s as two dice keeping one", (source, mode) => {
+    const r = parse(source);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.ast).toEqual({
+      kind: "keep", mode, count: 1,
+      dice: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: 20 },
+    });
+  });
 });

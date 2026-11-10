@@ -28,6 +28,10 @@ export const EffectivePackageLimitsV1Schema = Type.Object(
       minimum: 1,
       maximum: PACKAGE_LIMITS.expressionAstDepth,
     }),
+    sheetEvaluationNodes: Type.Integer({
+      minimum: 1,
+      maximum: PACKAGE_LIMITS.sheetEvaluationNodes,
+    }),
     dicePerRoll: Type.Integer({ minimum: 1, maximum: PACKAGE_LIMITS.dicePerRoll }),
     sidesPerDie: Type.Integer({ minimum: 1, maximum: PACKAGE_LIMITS.sidesPerDie }),
   },

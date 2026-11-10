@@ -243,7 +243,8 @@ class Parser {
     this.take();
     const sides = t.sides;
     const diceAst: ExpressionAstV1 = { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides };
-    return { kind: "keep", mode: which === "adv" ? "highest" : "lowest", count: 2, dice: diceAst };
+    // Advantage/disadvantage: roll two dice and keep one.
+    return { kind: "keep", mode: which === "adv" ? "highest" : "lowest", count: 1, dice: diceAst };
   }
 }
 

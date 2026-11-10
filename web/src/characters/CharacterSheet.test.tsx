@@ -183,6 +183,16 @@ describe("CharacterSheet", () => {
     expect(screen.getByText("Estimates use the last saved values and limits; the server confirms the final result.")).toBeVisible();
   });
 
+  it("disables increase at the character's own maximum, below the field's upper bound", () => {
+    const base = snapshot();
+    const resource = base.confirmed!.projection.sheets[1]!.sections[0]!.elements.find((element): element is Extract<typeof element, { kind: "resource" }> => element.kind === "resource")!;
+    resource.value = { current: 4, max: 4 };
+    render(<CharacterSheet snapshot={base} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    expect(screen.getByText("4 / 4")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Increase Health" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Decrease Health" })).toBeEnabled();
+  });
+
   it("shows the same estimate in every duplicate resource control", () => {
     const base = snapshot({ tentative: { health: 5 } });
     const resource = base.confirmed!.projection.sheets[1]!.sections[0]!.elements.find((element): element is Extract<typeof element, { kind: "resource" }> => element.kind === "resource")!;

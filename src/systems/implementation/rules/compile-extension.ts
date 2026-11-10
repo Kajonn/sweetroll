@@ -105,6 +105,7 @@ export function compileExtensionDocument(
       expressionBytes: PACKAGE_LIMITS.expressionBytes,
       expressionAstNodes: PACKAGE_LIMITS.expressionAstNodes,
       expressionAstDepth: PACKAGE_LIMITS.expressionAstDepth,
+      sheetEvaluationNodes: PACKAGE_LIMITS.sheetEvaluationNodes,
       dicePerRoll: PACKAGE_LIMITS.dicePerRoll,
       sidesPerDie: PACKAGE_LIMITS.sidesPerDie,
     },

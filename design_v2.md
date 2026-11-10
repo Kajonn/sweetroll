@@ -195,7 +195,7 @@ Expressions are **math plus basic dice** only, parsed into a lightweight typed A
 - Arithmetic, comparison, and boolean composition: `+ - * /`, `== != < <= > >=`, `&& ||`, `min`, `max`, and `round`; division-by-zero fallback
 - Field access: stable identifiers of sibling fields and current action inputs only
 - Dice: standard notation (`2d6`, `d20 + 2`), keep-high/low (`4d6kh3`), advantage-style helpers, field-derived pools, and counted successes at a threshold; server-side deterministic dice
-- **No** chained derived-field dependency graphs
+- Computed fields may depend on other computed fields of the same owner; dependency cycles are rejected at publish
 - **No** lookup/aggregation over collections (`equipped.armor.bonus` is out)
 - **No** effect engine (set/increment/append) — resource changes are simple built-in "bump" actions
 - **No** `against target.defense` action chains
@@ -223,9 +223,18 @@ the 2026-11-10 review defects and a staged widening of this contract. Because no
 2026-11-10), the plan replaces the contract in place (one package version 2.0,
 grammar 1.0, no legacy paths) so that d20 with tables and equipment, banded outcomes, d100
 roll-under, variable-target and exploding pools, roll-and-keep, custom dice, cards
-and opposed rolls can be implemented. Stage R0 fixes defects inside the current
-contract. Stages R1–R8 change the exclusions listed above and start only after the
-owner confirms the remaining decisions in the plan (C1, C6, C10, C12 and C13 were decided on 2026-11-10); until then this section is unchanged.
+and opposed rolls can be implemented. The owner confirmed all decisions C1–C13 on
+2026-11-10. Stages R1–R8 change the exclusions listed above; each stage updates
+this section when it is delivered.
+
+**Rules defects, stage R0 (2026-11-10, implemented):** `adv(d20)`/`dis(d20)` roll
+two dice and keep one. A roll expression must produce a number; pass/fail results
+are a later stage (R5). All computed fields and validations of one sheet share a
+separate `sheetEvaluationNodes` limit of 8,192 AST nodes, recorded in the
+package's effective limits; publishing rejects a sheet above it with a
+`limit_exceeded` diagnostic at the entity, so a published system can no longer
+fail every character with `budget_exceeded`. The 256-node ceiling remains per
+expression. The sheet's increase control stops at the character's stored maximum.
 
 ## 6.5 Draft, validation, and publishing
 
@@ -1200,7 +1209,7 @@ The two tracks are independent; preserve their internal stage order. T1 builds o
 | OD-02 (resolved 2026-09-09) | GM visibility | Do campaign GMs always see full character state? | Yes for attached sheet state, disclosed; no I6 toggle. Owner-only notes and actor-private rolls have separate policies. See Section 17.8. |
 | OD-03 (deferred 2026-09-09) | Collaboration | Can several creators edit one system draft concurrently? | Named collaborators and multi-creator editing are deferred. Retain current creator ownership and revision-safe saves; campaign membership/co-GM roles confer no system-authoring permissions. Not a blocker for the I6 backend-only slice. |
 | OD-04  | Rules ceiling (resolved) | Grammar v0.1 covers d20, 2d6, keep-high/low, advantage helpers, and threshold-counted dynamic d6 pools. | Defer reroll, explode, push, custom faces, lookups, and effects. |
-| OD-09  | Rules coverage | Which parts of the wider rules contract are approved? | Confirm the remaining decisions (C2–C5, C7–C9, C11) in the [rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md); R0 needs no decision. Supersedes the OD-04 deferrals stage by stage. |
+| OD-09 (resolved 2026-11-10) | Rules coverage | Which parts of the wider rules contract are approved? | All of C1–C13 in the [rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md): the contract is replaced in place, rolls never change characters, opposed rolls have no privacy layer, cards are simple draw/shuffle decks. Supersedes the OD-04 deferrals stage by stage. |
 | OD-05  | Authentication | Passwordless email, social sign-in, or both?                                      | OIDC social plus email magic link.                                |
 | OD-06  | Business model | Free, subscription, paid storage, or marketplace?                                 | Do not couple MVP data ownership to an unvalidated payment model. |
 | OD-07  | Public content | What moderation/takedown is required before public discovery?                     | Keep discovery out of MVP unless staffing and process exist.      |

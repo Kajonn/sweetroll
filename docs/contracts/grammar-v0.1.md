@@ -1,5 +1,10 @@
 # Expression Grammar v0.1
 
+> **Status (2026-11-10).** This file describes the first grammar. Named dice groups
+> (grammar 0.2) and configurable pushes were added later; see design Section 6.4.
+> The [rules coverage plan](../superpowers/plans/2026-11-10-rules-coverage.md)
+> replaces this contract in stage R2, which also replaces this file.
+
 ## Values And References
 
 Literals are finite numbers, booleans, and bounded strings. References are only `fields.<id>` and `inputs.<id>`.
@@ -26,6 +31,7 @@ Literals are finite numbers, booleans, and bounded strings. References are only 
 | `round(number, mode?)` | Rounded number; mode is `nearest`, `down`, or `up` |
 | `d20`, `2d6` | Static dice result |
 | `4d6kh3`, `4d6kl1` | Keep highest/lowest dice result |
+| `adv(d20)`, `dis(d20)` | Roll two dice and keep the higher/lower one |
 | `dice(count, sides)` | Dynamic dice pool; count is an integer expression and sides is a literal |
 | `countSuccesses(dice, threshold)` | Number of dice at or above the threshold |
 
@@ -33,13 +39,14 @@ Examples: `d20 + fields.modifier`, `2d6 + fields.stat`, `4d6kh3`, and `countSucc
 
 ## Types, Fallbacks, And Limits
 
-Arithmetic and ordering require numbers. Equality operands have the same scalar type. Boolean composition requires booleans. Every expression declares a result type and same-typed fallback. Safe arithmetic failures return the fallback and a diagnostic; parse, type, reference, and budget failures reject compilation.
+Arithmetic and ordering require numbers. Equality operands have the same scalar type. Boolean composition requires booleans. Every expression declares a result type and same-typed fallback. A roll expression must produce a number. Safe arithmetic failures return the fallback and a diagnostic; parse, type, reference, and budget failures reject compilation.
 
 | Limit | Ceiling |
 |-------|---------|
 | Encoded input | 1 MiB |
 | Expression source | 1,024 UTF-8 bytes |
 | AST | 256 nodes, depth 32 |
+| All computed fields and validations of one sheet | 8,192 nodes, checked when the system is published |
 | Dice | 100 dice, 1,000 sides |
 | Entities | 32 |
 | Total fields | 512 |

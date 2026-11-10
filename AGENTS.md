@@ -85,8 +85,9 @@ access, rolls and pushes, and the full campaign, media, scene and display-pairin
 surface under `/api/v1`. See the plan's implementation record before changing v1.
 The hosted B6 journey depends on real provider sign-in and remains open.
 
-The owner requested the [rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md)
-on 2026-11-10. Stage R0 fixes review defects inside the current design. Stages
-R1–R8 widen the rules contract and each needs the owner to confirm its decisions
-before work starts; C1, C6, C10, C12 and C13 were decided on 2026-11-10 (rolls never
-change characters, opposed rolls need no privacy layer, cards are simple draw/shuffle decks). Nothing is implemented yet.
+The owner approved the [rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md)
+on 2026-11-10 with all decisions C1–C13: the rules contract is replaced in place
+(no systems are published), rolls never change characters, opposed rolls need no
+privacy layer and cards are simple draw/shuffle decks. Linter/formatter tooling is
+not part of it. Stage R0 (defect fixes) is implemented; R1–R8 follow in the plan's
+order. See the plan's implementation record before changing the rules engine.

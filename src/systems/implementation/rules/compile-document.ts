@@ -226,6 +226,29 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
   if (cycle !== undefined) {
     return scopeDiagnostic("invalid_expression", cycle, "Computed field dependency cycle detected.");
   }
+  // The runtime evaluates every computed field and owned validation of an
+  // entity on each observation (runtime/resolve.ts). Reject a sheet that could
+  // never be observed instead of publishing it.
+  const costs = new Map(document.expressions.map((expression, index) => [expression.id, compiled[index]!.cost]));
+  for (const [entityIndex, entity] of document.entities.entries()) {
+    let cost = 0;
+    for (const field of entity.fields) {
+      if (field.kind === "computed") cost += costs.get(field.expressionId) ?? 0;
+    }
+    for (const validation of document.validations) {
+      const owner = fieldOwners.get(validation.targetId)
+        ?? (entityEnvironments.has(validation.targetId) ? validation.targetId : undefined)
+        ?? actionTargets.get(validation.targetId);
+      if (owner === entity.id) cost += costs.get(validation.expressionId) ?? 0;
+    }
+    if (cost > PACKAGE_LIMITS.sheetEvaluationNodes) {
+      return scopeDiagnostic(
+        "limit_exceeded",
+        `/entities/${entityIndex}/fields`,
+        `Computed fields and validations of "${entity.label}" need ${cost} evaluation steps; the limit is ${PACKAGE_LIMITS.sheetEvaluationNodes}.`,
+      );
+    }
+  }
 
   const unsigned: UnsignedSystemPackageV1 = {
     schemaVersion: document.schemaVersion,
@@ -249,6 +272,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
       expressionBytes: PACKAGE_LIMITS.expressionBytes,
       expressionAstNodes: PACKAGE_LIMITS.expressionAstNodes,
       expressionAstDepth: PACKAGE_LIMITS.expressionAstDepth,
+      sheetEvaluationNodes: PACKAGE_LIMITS.sheetEvaluationNodes,
       dicePerRoll: PACKAGE_LIMITS.dicePerRoll,
       sidesPerDie: PACKAGE_LIMITS.sidesPerDie,
     },

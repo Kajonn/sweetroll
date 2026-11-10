@@ -319,11 +319,12 @@
       "expressionBytes": 1024,
       "expressionAstNodes": 256,
       "expressionAstDepth": 32,
+      "sheetEvaluationNodes": 8192,
       "dicePerRoll": 100,
       "sidesPerDie": 1000
     },
     "integrity": {
-      "checksum": "sha256:b383db1493dc405f506595d546628b8e22b2457cfa0a240871e14e09832a4102"
+      "checksum": "sha256:da9129a200e39ea717fcc3bddbc1b3cae0fe7747c27dfc6187e5c745f31da46d"
     }
   }
 }

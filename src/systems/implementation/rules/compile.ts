@@ -44,6 +44,9 @@ export function compileAst(ast: ExpressionAstV1, opts: CompileExpressionOpts): C
   if (inferred.type !== opts.resultType) {
     return { ok: false, diagnostics: [{ code: "invalid_expression", path: "", message: `inferred type ${inferred.type} does not match declared ${opts.resultType}` }] };
   }
+  if (opts.context === "roll" && opts.resultType !== "number") {
+    return { ok: false, diagnostics: [{ code: "invalid_expression", path: "", message: "a roll expression must produce a number" }] };
+  }
   if (!fallbackTypeMatches(opts.fallback, opts.resultType)) {
     return { ok: false, diagnostics: [{ code: "invalid_expression", path: "", message: "fallback type does not match result type" }] };
   }

@@ -94,6 +94,8 @@ media storage, environment variables, and the outstanding application-login gate
 
 The app runs only in test environments and has no users. `npm run db:init` creates
 the current schema and inserts missing reference templates. After schema changes,
-recreate the test database. Startup never upgrades or resets data. Character and
-campaign rules-version upgrades, previews and rollback are not supported. See
+recreate the test database. Startup never upgrades or resets data. Application
+and database versions are not migrated before the first release tag. Moving a
+character or campaign to a later non-breaking version of its rules system, with a
+preview and a one-step revert, is supported (design Section 6.7). See
 [development database policy](database/README.md).

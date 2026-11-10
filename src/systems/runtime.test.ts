@@ -761,7 +761,7 @@ describe("SystemRuntime contract", () => {
     const { integrity: _integrity, ...unsigned } = compiled;
     const packageValue = signSystemPackage({
       ...unsigned,
-      effectiveLimits: { ...compiled.effectiveLimits, expressionAstNodes: 1 },
+      effectiveLimits: { ...compiled.effectiveLimits, sheetEvaluationNodes: 1 },
     });
 
     const result = await createRuntime(packageValue).resolve({

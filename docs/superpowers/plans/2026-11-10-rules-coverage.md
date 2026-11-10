@@ -304,8 +304,9 @@ stage (E5) lands, compositions with extensions keep their current restrictions.
   documents and extensions.
 - Sheet increase button stops at the stored maximum (`CharacterSheet.tsx`).
 - README, `grammar-v0.1.md` and design 6.4 corrected.
-- Verified: root typecheck and unit suite, `contracts:check`, web typecheck and
-  the character-sheet and port tests. Not run locally: integration and browser
-  suites (no PostgreSQL in the authoring environment); CI runs them.
+- Verified locally: root typecheck, unit suite (561 tests) and integration suite
+  (438 tests, PostgreSQL 16), `contracts:check`, web typecheck and web unit suite
+  (1,294 tests). Not run locally: browser end-to-end suites; CI runs them, on
+  PostgreSQL 17.
 
 R1–R8: not started.

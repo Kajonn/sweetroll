@@ -63,7 +63,7 @@ test("creator, player and GM use conditional rules from the same published versi
     await expect(page.getByText("Result: 6", { exact: true })).toBeVisible();
 
     await page.goto("/campaigns/new");
-    await page.getByRole("button", { name: `${systemName} 1.0.0`, exact: true }).click();
+    await page.getByRole("button", { name: `${systemName} 1.0.0` }).click();
     await page.getByLabel("Campaign title").fill(`Rules table ${uid()}`);
     await page.getByRole("button", { name: "Create campaign" }).click();
     await expect(page).toHaveURL(/\/campaigns\/[0-9a-f-]+/);

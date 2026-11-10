@@ -30,6 +30,20 @@ describe("evaluateExpression", () => {
     expect(result.roll).toBeNull();
   });
 
+  it("previews a true/false computed field in the computed context", () => {
+    const input = {
+      source: "fields.score >= 10",
+      env: { fields: { score: "number" as const }, inputs: {} },
+      resultType: "boolean" as const,
+      fallback: false,
+      bindings: { score: 12 },
+    };
+    const computed = evaluateExpression({ ...input, context: "computed" });
+    expect(computed.ok && computed.value).toBe(true);
+    // The same expression is not a valid roll: rolls must produce a number.
+    expect(evaluateExpression(input).ok).toBe(false);
+  });
+
   it("returns a roll result with deterministic dice when given a fixed rng", () => {
     const result = evaluateExpression({
       source: "d20",

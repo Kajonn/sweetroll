@@ -27,6 +27,8 @@ export type EvaluateExpressionInput = {
   fallback: ScalarValue;
   bindings: Record<string, ScalarValue>;
   rng?: Rng;
+  /** Where the expression is used. Computed fields and validations may be text or boolean; rolls must be numbers. */
+  context?: "computed" | "roll" | "validation";
 };
 
 export type EvaluateDiagnostic = { code: string; path: string; message: string };
@@ -62,7 +64,7 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
   const compiled = compileExpression(input.source, {
     env: input.env,
     resultType: input.resultType,
-    context: "roll",
+    context: input.context ?? "roll",
     languageVersion: "0.2",
     fallback: input.fallback,
   });

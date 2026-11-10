@@ -279,6 +279,7 @@ export function generateSample(pkg: SystemPackageV1): SampleData {
         fallback: safeFallback,
         bindings,
         rng: FIXED_RNG,
+        context: "computed",
       });
       if (result.ok) {
         fields[field.id] = result.value;

@@ -121,6 +121,7 @@ export function ComputedFieldEditor({
       resultType,
       fallback: fb,
       bindings,
+      context: "computed",
     });
   }, [field, tokenizeOk, draftSource, siblingFields, fallback]);
 

@@ -84,3 +84,8 @@ scopes including `campaigns:read`/`campaigns:write`, browser-policy character
 access, rolls and pushes, and the full campaign, media, scene and display-pairing
 surface under `/api/v1`. See the plan's implementation record before changing v1.
 The hosted B6 journey depends on real provider sign-in and remains open.
+
+The owner requested the [rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md)
+on 2026-11-10. Stage R0 fixes review defects inside the current design. Stages
+R1–R8 widen the rules contract and each needs the owner to confirm its decisions
+(C1–C14) before work starts. Nothing is implemented yet.

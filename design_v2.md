@@ -217,6 +217,15 @@ The [2026-10-27 scoped acceptance](docs/acceptance/configurable-push-rolls-2026-
 
 **Pre-release scope decision (2026-10-27):** The owner confirms there has been no release and there are no existing users. Character/campaign version upgrades were removed on that date and reinstated for non-breaking system versions on 2026-11-07 (Section 6.7). Application/database migration and historical-client compatibility are deferred until after the first release tag under Section 17.0. Fresh system authoring/publishing, play, permissions, saved-pool pushes and offline recovery remain in scope. Existing version checks remain defensive constraints; no upgrade workflow is added by this decision.
 
+**Planned rules coverage (owner request 2026-11-10, not yet implemented):** the
+[rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md) records
+the 2026-11-10 review defects and a staged widening of this contract (package 1.3,
+grammar 0.3) so that d20 with tables and equipment, banded outcomes, d100
+roll-under, variable-target and exploding pools, roll-and-keep, custom dice, cards
+and opposed rolls can be implemented. Stage R0 fixes defects inside the current
+contract. Stages R1–R8 change the exclusions listed above and start only after the
+owner confirms decisions C1–C14 in the plan; until then this section is unchanged.
+
 ## 6.5 Draft, validation, and publishing
 
 | **State**          | **Mutable?**  | **Use**                                                                 |
@@ -1190,6 +1199,7 @@ The two tracks are independent; preserve their internal stage order. T1 builds o
 | OD-02 (resolved 2026-09-09) | GM visibility | Do campaign GMs always see full character state? | Yes for attached sheet state, disclosed; no I6 toggle. Owner-only notes and actor-private rolls have separate policies. See Section 17.8. |
 | OD-03 (deferred 2026-09-09) | Collaboration | Can several creators edit one system draft concurrently? | Named collaborators and multi-creator editing are deferred. Retain current creator ownership and revision-safe saves; campaign membership/co-GM roles confer no system-authoring permissions. Not a blocker for the I6 backend-only slice. |
 | OD-04  | Rules ceiling (resolved) | Grammar v0.1 covers d20, 2d6, keep-high/low, advantage helpers, and threshold-counted dynamic d6 pools. | Defer reroll, explode, push, custom faces, lookups, and effects. |
+| OD-09  | Rules coverage | Which parts of the wider rules contract are approved? | Confirm C1–C14 in the [rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md); R0 needs no decision. Supersedes the OD-04 deferrals stage by stage. |
 | OD-05  | Authentication | Passwordless email, social sign-in, or both?                                      | OIDC social plus email magic link.                                |
 | OD-06  | Business model | Free, subscription, paid storage, or marketplace?                                 | Do not couple MVP data ownership to an unvalidated payment model. |
 | OD-07  | Public content | What moderation/takedown is required before public discovery?                     | Keep discovery out of MVP unless staffing and process exist.      |

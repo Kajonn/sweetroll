@@ -38,7 +38,7 @@ scenario("Roadwardens: equip armor, carry supplies and advance a level", async (
   let { revision } = await author.command<Revision>(`POST ${path}/entries`, {
     expectedRevision: hero.revision, entryId, slotId: "equipment", templateId: "leather", quantity: 2,
   });
-  expect((await sheet()).derivedValues).toMatchObject({ defense: 14, carried: 6 });
+  expect((await sheet()).derivedValues).toMatchObject({ defense: 12, carried: 6 });
   const rolled = await author.command<Revision & { roll: { total: number; bindings: unknown[] } }>(`POST ${path}/actions/inspect_armor`, {
     entryId, expectedRevision: revision,
   });

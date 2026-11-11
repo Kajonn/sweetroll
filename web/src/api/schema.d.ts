@@ -20659,7 +20659,7 @@ export interface operations {
                             };
                             label: string;
                             kind: "item" | "spell" | "talent" | "effect";
-                            aggregateQuantity?: boolean;
+                            quantityFields?: string[];
                             description?: string;
                             fields: ({
                                 /** @constant */

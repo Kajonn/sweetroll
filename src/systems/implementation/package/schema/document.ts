@@ -429,7 +429,9 @@ export const ObjectTemplateV1Schema = Type.Object(
     image: Type.Optional(ImageDescriptorSchema),
     label: LabelSchema,
     kind: TemplateKindSchema,
-    aggregateQuantity: Type.Optional(Type.Boolean()),
+    // Numeric fields whose value is per unit: sums over a slot multiply them by
+    // the entry's quantity (weight, cost). Other fields count once per entry.
+    quantityFields: Type.Optional(Type.Array(DefinitionIdSchema, { maxItems: 64, uniqueItems: true })),
     description: Type.Optional(Type.String({ maxLength: LONG_TEXT_MAX_LENGTH })),
     fields: Type.Array(FieldV1Schema, { maxItems: 64 }),
     grantedActions: Type.Array(GrantedActionV1Schema, { maxItems: 16 }),

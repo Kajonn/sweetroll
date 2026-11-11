@@ -3,7 +3,9 @@
   "mediaType": "application/vnd.sweetroll.system+json;version=1",
   "exportedAt": "2026-09-04T12:00:00Z",
   "package": {
-    "schemaVersion": "1.0",
+    "schemaVersion": "2.0",
+    "templates": [],
+    "slots": [],
     "systemId": "c0000000-0000-5000-8000-000000000001",
     "versionId": "c0000000-0000-5000-8000-000000000002",
     "semanticVersion": "1.0.0",
@@ -174,6 +176,7 @@
       {
         "id": "pool_size_expr",
         "context": "computed",
+        "languageVersion": "1.0",
         "resultType": "number",
         "inferredType": "number",
         "fallback": 0,
@@ -200,6 +203,7 @@
       {
         "id": "pool_roll_expr",
         "context": "roll",
+        "languageVersion": "1.0",
         "resultType": "number",
         "inferredType": "number",
         "fallback": 0,
@@ -244,6 +248,7 @@
       {
         "id": "pool_valid_expr",
         "context": "validation",
+        "languageVersion": "1.0",
         "resultType": "boolean",
         "inferredType": "boolean",
         "fallback": false,
@@ -326,6 +331,7 @@
         "expressionId": "pool_valid_expr",
         "severity": "error",
         "message": "Pool size must be between 1 and 10",
+        "targetEntityId": "character",
         "targetId": "pool_size"
       }
     ],
@@ -338,7 +344,7 @@
       "sidesPerDie": 1000
     },
     "integrity": {
-      "checksum": "sha256:0e4790a6ec0dd04c86a6f8a64bd5f79ad8aa8b9dbd2eb88a6a6c57bea7861441"
+      "checksum": "sha256:e7b4d8352c366101a7a5a253459918e45ede054c75fd62ee0ab97704e30be939"
     }
   }
 }

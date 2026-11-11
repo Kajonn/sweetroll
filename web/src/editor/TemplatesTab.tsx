@@ -217,12 +217,25 @@ function TemplateDetail({
     }
   };
   const replaceField = (originalFieldId: string, field: FieldV1) => {
+    // Keep per-quantity marks pointing at number fields that still exist.
+    const numeric = field.kind === "integer" || field.kind === "decimal";
+    const marks = (template.quantityFields ?? []).flatMap((id) =>
+      id !== originalFieldId ? [id] : numeric ? [field.id] : []);
     onChange({
       fields: template.fields.map((f) => (f.id === originalFieldId ? field : f)),
+      ...(template.quantityFields === undefined ? {} : { quantityFields: marks }),
     });
   };
   const removeField = (fieldId: string) => {
-    onChange({ fields: template.fields.filter((f) => f.id !== fieldId) });
+    onChange({
+      fields: template.fields.filter((f) => f.id !== fieldId),
+      ...(template.quantityFields === undefined ? {} : { quantityFields: template.quantityFields.filter((id) => id !== fieldId) }),
+    });
+  };
+  const numberFields = template.fields.filter((field) => field.kind === "integer" || field.kind === "decimal");
+  const toggleQuantityField = (fieldId: string, checked: boolean) => {
+    const current = template.quantityFields ?? [];
+    onChange({ quantityFields: checked ? [...current.filter((id) => id !== fieldId), fieldId] : current.filter((id) => id !== fieldId) });
   };
 
   const addGrantedRoll = () => {
@@ -303,10 +316,21 @@ function TemplateDetail({
           {t("editor.sheet.removeConfirm.confirm")}
         </Button>
       </div>
-      <label>
-        <input type="checkbox" checked={template.aggregateQuantity ?? false} onChange={event => onChange({ aggregateQuantity: event.target.checked })} />
-        {t("editor.templates.aggregateQuantity")}
-      </label>
+      {numberFields.length > 0 ? (
+        <fieldset data-testid={`template-quantity-fields-${template.id}`}>
+          <legend>{t("editor.templates.quantityFields")}</legend>
+          {numberFields.map((field) => (
+            <label key={field.id}>
+              <input
+                type="checkbox"
+                checked={(template.quantityFields ?? []).includes(field.id)}
+                onChange={(event) => toggleQuantityField(field.id, event.target.checked)}
+              />
+              {field.label}
+            </label>
+          ))}
+        </fieldset>
+      ) : null}
       <FormField label={t("editor.templates.description")}>
         <input
           id={`template-description-${template.id}`}

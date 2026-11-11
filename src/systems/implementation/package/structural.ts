@@ -276,6 +276,16 @@ function validateStructure(value: StructuralValue, prefix: string, extension: bo
     for (const field of template.fields) {
       if (field.kind === "resource") templateResourceIds.add(field.id);
     }
+    (template.quantityFields ?? []).forEach((fieldId, index) => {
+      const field = template.fields.find((candidate) => candidate.id === fieldId);
+      if (field?.kind !== "integer" && field?.kind !== "decimal") {
+        diagnostics.push({
+          code: "missing_reference",
+          path: `${prefix}${templatePath}/quantityFields/${index}`,
+          message: "A per-quantity field must be a number field of this template.",
+        });
+      }
+    });
     template.fields.forEach((field, fieldIndex) => {
       validateFieldData(field, `${templatePath}/fields/${fieldIndex}`, true);
       if (field.kind === "computed") {

@@ -19,7 +19,8 @@ export type ObjectTemplateV1 = {
   id: string;
   label: string;
   kind: TemplateKind;
-  aggregateQuantity?: boolean;
+  /** Number fields whose sums multiply by the entry's quantity. */
+  quantityFields?: string[];
   description?: string;
   fields: FieldV1[];
   grantedActions: GrantedActionV1[];

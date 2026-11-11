@@ -75905,8 +75905,14 @@
                               }
                             ]
                           },
-                          "aggregateQuantity": {
-                            "type": "boolean"
+                          "quantityFields": {
+                            "maxItems": 64,
+                            "uniqueItems": true,
+                            "type": "array",
+                            "items": {
+                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                              "type": "string"
+                            }
                           },
                           "description": {
                             "maxLength": 2000,

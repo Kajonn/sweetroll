@@ -14,7 +14,12 @@ export type SlotEnvironment = Readonly<Record<string, {
   capacity: number;
   fields: Readonly<Record<string, ValueType | "unsupported" | "mixed">>;
 }>>;
-export type AggregateEntry = { values: Readonly<Record<string, unknown>>; quantity: number };
+export type AggregateEntry = {
+  values: Readonly<Record<string, unknown>>;
+  quantity: number;
+  /** Fields whose value is per unit; sums multiply only these by `quantity`. */
+  quantityFields?: ReadonlySet<string>;
+};
 export type AggregateCall = { name: AggregateFunction; slot: string; field?: string; flag?: string };
 export type Call = Extract<ExpressionAstV1, { kind: "call" }>;
 
@@ -48,16 +53,16 @@ export function aggregateKey(call: AggregateCall): string {
 export function aggregateValue(call: AggregateCall, entries: readonly AggregateEntry[]): number {
   let total = 0;
   let highest: number | undefined;
-  for (const { values, quantity } of entries) {
+  for (const { values, quantity, quantityFields } of entries) {
     if (call.flag !== undefined && values[call.flag] !== true) continue;
     if (call.field === undefined) {
-      total += quantity;
+      total += 1;
       continue;
     }
     const value = Object.hasOwn(values, call.field) ? values[call.field] : undefined;
     if (typeof value !== "number") continue;
     if (call.name === "maxOf") highest = highest === undefined ? value : Math.max(highest, value);
-    else total += value * quantity;
+    else total += value * (quantityFields?.has(call.field) ? quantity : 1);
   }
   return call.name === "maxOf" ? highest ?? 0 : total;
 }

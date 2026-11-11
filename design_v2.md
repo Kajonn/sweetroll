@@ -254,8 +254,9 @@ Tables can declare a key column and typed columns. `lookup` finds an exact
 key and `lookupBand` finds the highest numeric key at or below its argument.
 A choice field can populate its options from the IDs and labels of dataset rows.
 Slot aggregates read one slot and charge its maximum capacity against the sheet
-evaluation budget. Sums and counts multiply by entry quantity when the template
-opts in. `maxOf` selects the largest individual value. Compose checks the
+evaluation budget. A template lists its per-unit number fields (`quantityFields`, such as
+weight); sums multiply only those by the entry's quantity, so two carried armors
+weigh double but grant their bonus once. Counts count entries. `maxOf` selects the largest individual value. Compose checks the
 field types of all templates accepted by a referenced slot, including extensions.
 
 A resource's calculated maximum is rounded down to its step within its bounds.

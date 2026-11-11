@@ -396,7 +396,7 @@ export const defaultMessages: MessageTable = {
   "editor.referenceData.keyColumn": "Key column ID",
   "editor.referenceData.columns": "Column types (JSON)",
   "editor.referenceData.invalidColumns": "Enter column IDs mapped to number, text, or boolean.",
-  "editor.templates.aggregateQuantity": "Multiply aggregate contributions by entry quantity",
+  "editor.templates.quantityFields": "Per unit: totals multiply these by the entry's quantity",
   "editor.expression.grammarHelp": "Formula help",
   "editor.expression.grammarCore": 'Use if(condition, value, otherwise) for bonuses, double quotes for text and choice IDs, has(fields.skills, "climb") for multiple choices, and .current or .max for resources.',
   "editor.expression.insert": "Insert formula or reference",

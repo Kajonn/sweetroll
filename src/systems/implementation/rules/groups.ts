@@ -19,6 +19,10 @@ export function containsDice(ast: ExpressionAstV1): boolean {
   return ast.kind === "pool" || children(ast).some(containsDice);
 }
 
+function drawsDice(ast: ExpressionAstV1): boolean {
+  return (ast.kind === "pool" && ast.source.kind === "dice") || children(ast).some(drawsDice);
+}
+
 export function hasDiceGroups(ast: ExpressionAstV1): boolean {
   return (ast.kind === "pool" && ast.group !== undefined) || children(ast).some(hasDiceGroups);
 }
@@ -47,19 +51,20 @@ export function validateDiceGroups(ast: ExpressionAstV1): RulesDiagnostic[] {
       branch(node.right);
       return;
     }
-    children(node).forEach(walk);
-    if (node.kind !== "pool") return;
-    if (children(node).some(containsDice)) fail("Dice pool parameters must be deterministic.");
-    if (node.source.kind === "rolled") {
+    if (node.kind === "pool" && node.source.kind === "rolled") {
       if (!available.has(node.source.groupId)) fail(`Group '${node.source.groupId}' must be rolled before it is reused.`);
       if (node.group || node.modifiers.length) fail("Reused dice cannot be named or modified again.");
+      children(node).forEach(walk);
       return;
     }
+    children(node).forEach(walk);
+    if (node.kind !== "pool") return;
     if (node.modifiers[0]?.kind === "explode" && node.modifiers.length > 1)
       fail("Reroll once before applying explosions.");
     if (new Set(node.modifiers.map((modifier) => modifier.kind)).size !== node.modifiers.length)
       fail("Each dice pool modifier can be used only once.");
     if (!node.group) return;
+    if (children(node).some(drawsDice)) fail("Named dice pool parameters cannot draw new dice.");
     const { id, label } = node.group;
     if (!/^[a-z][a-z0-9_]{0,63}$/.test(id) || label.length < 1 || label.length > 120)
       fail("Invalid dice group ID or label.");

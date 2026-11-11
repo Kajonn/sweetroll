@@ -100,8 +100,10 @@ for a granted roll or template formula. Both scopes support resource parts.
 A pool has a source, up to one reroll and one explosion modifier, and one
 reducer. Apply rerolls before explosions, for example
 `keepHighest(explode(rerollOnce(dice(fields.pool_size, 10), 1)), fields.keep_count)`.
-Count, sides, modifier faces, keep count, and thresholds are deterministic
-integer expressions. A zero-die pool and a keep count of zero are valid.
+Count, sides, modifier faces, keep count, and thresholds are integer expressions.
+Named pool parameters can read earlier groups through `rolled` and cannot draw
+new dice. An unnamed pool can use another roll as a parameter, as in
+`dice(d6, 6)`. A zero-die pool and a keep count of zero are valid.
 Keep compares each complete explosion chain and preserves draw order for ties.
 Success reducers compare the chain totals. A die can explode up to ten times.
 Every physical draw, including discarded and replacement faces, uses the

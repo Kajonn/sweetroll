@@ -351,7 +351,7 @@ stage (E5) lands, compositions with extensions keep their current restrictions.
 
 **R4 — implemented.**
 
-- All dice syntax compiles to a pool with deterministic, integer-valued parameters.
+- All dice syntax compiles to a pool with expression-valued integer parameters.
   Rerolls run before explosions. Keep and count reducers operate on whole chains.
 - A named pool can supply its original total or its saved dice to a later reducer.
   All rolls carry a breakdown graph. Activity preserves the graph and campaign

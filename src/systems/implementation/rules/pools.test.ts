@@ -45,8 +45,25 @@ describe("R4 dice pools", () => {
     expect(roll("explode(10d6)", Array(100).fill(1))).toMatchObject({ ok: false, diagnostics: [{ code: "budget_exceeded" }] });
   });
 
+  it("preserves a rolled count in an unnamed pool", () => {
+    expect(roll("dice(d6, 6)", [0.1, 0.9])).toMatchObject({ ok: true, result: 6, roll: { breakdown: {
+      groups: [{ id: "@root.0", count: 1 }, { id: "@root", count: 1 }],
+    } } });
+  });
+
+  it("lets a named pool use a previously rolled value as its die size", () => {
+    const source = 'group("step", "Step", d6) + group("trait", "Trait", dice(1, rolled("step")))';
+    expect(roll(source, [0.55, 0.91])).toMatchObject({ ok: true, result: 8, roll: { breakdown: {
+      groups: [{ id: "step", sides: 6 }, { id: "trait", sides: 4 }],
+    } } });
+  });
+
   it("rejects forward or conditionally unavailable group references at publish", () => {
-    for (const source of ['rolled("g") + group("g", "G", d6)', 'if(fields.trait > 4, group("g", "G", d6), 0) + rolled("g")']) {
+    for (const source of [
+      'rolled("g") + group("g", "G", d6)',
+      'if(fields.trait > 4, group("g", "G", d6), 0) + rolled("g")',
+      'countAtLeast(rolled("g"), group("g", "G", d6))',
+    ]) {
       expect(compileExpression(source, { env, context: "roll", resultType: "number", fallback: 0 })).toMatchObject({ ok: false });
     }
   });

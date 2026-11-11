@@ -78,7 +78,7 @@ export type PushResult=Static<typeof PushResultSchema>;
 export const SavedPushRollSchema = Type.Object({
   actionId: Type.String({ minLength: 1 }), expression: Type.String({ minLength: 1 }),
   dice: Type.Array(DieResultSchema, { maxItems: 100 }),
-  bindings: Type.Array(Type.Object({scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs")]), definitionId: Type.String({minLength:1}), value: BindingValueSchema}), {maxItems:256}),
+  bindings: Type.Array(Type.Object({scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("aggregates")]), definitionId: Type.String({minLength:1}), value: BindingValueSchema}), {maxItems:256}),
   total: Type.Number(), output: Type.String(),
   audience: Type.Union([Type.Literal("owner_only"),Type.Literal("gm_only"),Type.Literal("campaign")]),
   breakdown: RollBreakdownSchema, push: PushResultSchema,

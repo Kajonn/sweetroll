@@ -98,7 +98,7 @@ describe("template/slot structural validation", () => {
     );
   });
 
-  it("flags a template field id colliding with the global set", () => {
+  it("allows a template field ID shared with an entity", () => {
     const diagnostics = validateDocumentStructure(
       documentWith([
         itemTemplate("torch", {
@@ -117,12 +117,7 @@ describe("template/slot structural validation", () => {
         }),
       ]),
     );
-    expect(diagnostics).toContainEqual(
-      expect.objectContaining({
-        code: "duplicate_definition_id",
-        path: "/templates/0/fields/0/id",
-      }),
-    );
+    expect(diagnostics).toEqual([]);
   });
 
   it("flags a granted roll action with a missing expression", () => {

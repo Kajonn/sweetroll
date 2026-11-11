@@ -18,11 +18,11 @@ export type EntityDefinitionV1 = {
   kind?: "playable" | "npc";
   fields: EntityFieldV1[];
 };
-export type ReferenceDataV1 = { id: string; label: string; records: unknown[] };
+export type ReferenceDataV1 = import("../editor/referenceData/ReferenceDataEditor.js").ReferenceDataV1;
 export type SheetV1 = { id: string; label: string; targetEntityId: string; sections: unknown[] };
 export type SourceExpressionV1 = { id: string; context: string; resultType: string; source: string; fallback: unknown };
 export type ActionV1 = { id: string; label: string; kind: string } & Record<string, unknown>;
-export type ValidationV1 = { id: string; expressionId: string; severity: string; message: string; targetId: string };
+export type ValidationV1 = { id: string; expressionId: string; severity: string; message: string; targetId: string; targetEntityId?: string };
 
 export type SystemDocumentV1 = {
   schemaVersion: "2.0";

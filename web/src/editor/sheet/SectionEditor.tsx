@@ -34,7 +34,7 @@ export type SectionEditorProps = {
    * to section-local allocation when absent (standalone/test use).
    */
   allocateElementId?: (() => DefinitionId) | undefined;
-  definitions?: ReadonlyArray<{kind: "field" | "resource" | "action" | "slot"; id: string; label: string}>;
+  definitions?: ReadonlyArray<{kind: "field" | "resource" | "action" | "slot"; id: string; label: string; ownerId?: string}>;
 };
 
 export function SectionEditor({

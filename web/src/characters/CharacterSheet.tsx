@@ -88,7 +88,7 @@ function ResourceEditor({ element, current, max, disabled, invoke, onAdjustResou
     setAmount("");
   };
   const draftCurrent = draft === null ? null : parseAmount(draft.current);
-  const draftMax = draft === null ? null : parseAmount(draft.max);
+  const draftMax = draft === null ? null : element.computedMaximum ? max : parseAmount(draft.max);
   const draftValid = draftCurrent !== null && draftMax !== null
     && draftMax >= element.min && draftMax <= element.max && draftCurrent >= element.min && draftCurrent <= draftMax;
   const label = element.label;
@@ -114,8 +114,10 @@ function ResourceEditor({ element, current, max, disabled, invoke, onAdjustResou
     }}>
       <label className={styles.resourceLabel} htmlFor={`${element.id}-current`}>{t("character.resource.current", { label })}</label>
       <input id={`${element.id}-current`} className={styles.resourceInput} type="number" inputMode="decimal" min={element.min} max={draftMax ?? element.max} step={element.step} value={draft.current} disabled={disabled} onChange={(event) => setDraft({ ...draft, current: event.target.value })} />
+      {element.computedMaximum ? null : <>
       <label className={styles.resourceLabel} htmlFor={`${element.id}-max`}>{t("character.resource.maximum", { label })}</label>
       <input id={`${element.id}-max`} className={styles.resourceInput} type="number" inputMode="decimal" min={element.min} max={element.max} step={element.step} value={draft.max} disabled={disabled} onChange={(event) => setDraft({ ...draft, max: event.target.value })} />
+      </>}
       <Button type="submit" variant="primary" disabled={disabled || !draftValid}>{t("character.resource.save", { label })}</Button>
       <Button onClick={() => setDraft(null)}>{t("character.resource.cancel")}</Button>
       {draftValid ? null : <p className={styles.stale} role="alert">{t("character.resource.range", { min: element.min, max: element.max })}</p>}

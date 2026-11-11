@@ -338,4 +338,15 @@ stage (E5) lands, compositions with extensions keep their current restrictions.
   bonuses, choice sets, and resource bindings through the public API.
 - Compatibility classification still uses expression context and result type.
 
-R3–R8: not started.
+**R3 — implemented.**
+
+- Scoped field, option, input, and granted-action IDs. Version comparison already
+  compares fields inside their owner, and regression tests cover shared IDs.
+- Typed datasets, exact and banded lookup, dataset choice options, and bounded
+  slot aggregates. Extension composition rechecks aggregate field types.
+- Computed resource maxima follow the character's current rules. Version dry
+  runs use target-version table data and normalize the maximum.
+- Roadwardens is the M2 fixture with an API scenario and a browser journey for
+  the creator, player sheet, and GM session.
+
+R4–R8: not started.

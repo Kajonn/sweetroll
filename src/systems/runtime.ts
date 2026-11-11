@@ -1,3 +1,4 @@
+import { characterRuleBindings } from "./implementation/runtime/rule-bindings.js";
 import { derivedEntryError, slotsForEntity } from "./implementation/runtime/effective-entry.js";
 import {findOwnedAction} from "./implementation/runtime/action-ownership.js";
 import {makePushContext,resolveRuntimePush} from "./implementation/runtime/push.js";
@@ -12,7 +13,7 @@ import { buildCharacterProjection } from "./implementation/runtime/projection.js
 import { decodeActionInputs, resolveGrantedAction } from "./implementation/runtime/resolve-entries.js";
 import { resolveObservedValues } from "./implementation/runtime/resolve.js";
 import { createDeterministicRng } from "./implementation/runtime/deterministic-rng.js";
-import { buildFieldBindings, decodeRuntimeState, initializeState } from "./implementation/runtime/state.js";
+import { decodeRuntimeState, initializeState } from "./implementation/runtime/state.js";
 import { actionEvaluationFailure } from "./implementation/runtime/action-evaluation.js";
 import { evaluate, type BindingValue } from "./implementation/rules/evaluate.js";
 import {
@@ -90,7 +91,7 @@ export type RuntimeValidation = {
 export type NormalizedDie = DieResult;
 
 export type NormalizedRollBinding = {
-  scope: "fields" | "inputs";
+  scope: "fields" | "inputs" | "item" | "aggregates";
   definitionId: DefinitionId;
   value: BindingValue;
 };
@@ -186,6 +187,7 @@ export type CharacterProjectionElement =
       max: number;
       step: number;
       resetTo: "min" | "max";
+      computedMaximum?: boolean;
       validations: RuntimeValidation[];
     }
   | {
@@ -532,14 +534,24 @@ export function createSystemRuntime(input: {
       }
       const observed = resolveObservedValues(packageValue, entity, stateResult.value);
       if (!observed.ok) return observed;
+      const observedState = observed.value.state;
+      for (const field of entity.fields) {
+        if (field.kind === "resource" && field.maxExpressionId !== undefined
+          && !sameValue(stateResult.value.values[field.id]!, observedState.values[field.id]!)
+          && !changedDefinitionIds.includes(field.id)) {
+          changedDefinitionIds.push(field.id);
+        }
+      }
+      stateResult = { ok: true, value: observedState };
       if (pendingRoll !== null) {
         const expression = packageValue.expressions.find((candidate) => candidate.id === pendingRoll.expressionId);
         if (expression === undefined || expression.context !== "roll") return invalidPackage(pendingRoll.expressionId);
-        const fields = buildFieldBindings(entity, stateResult.value);
-        Object.assign(fields, observed.value.derivedValues);
+        const bindings = characterRuleBindings(packageValue, entity, stateResult.value);
+        Object.assign(bindings.fields, observed.value.derivedValues);
+        bindings.inputs = pendingRoll.inputs;
         const evaluated = evaluate(
           expression,
-          { fields, inputs: pendingRoll.inputs },
+          bindings,
           createDeterministicRng(input.authoritativeRollSecret, pendingRoll.executionId),
           packageValue.effectiveLimits,
         );
@@ -691,6 +703,9 @@ function setResource(
 ): RuntimeResult<RuntimeStateV1> {
   const owned = resourceOf(entity, state, resourceId);
   if (owned === undefined) return badRequest("Resource does not belong to the entity.", resourceId);
+  if (owned.resource.maxExpressionId !== undefined && input.max !== undefined) {
+    return badRequest("This resource maximum is calculated by the rules.", resourceId);
+  }
   if (input.current === undefined && input.max === undefined) {
     return badRequest("Provide a current value, a maximum, or both.", resourceId);
   }

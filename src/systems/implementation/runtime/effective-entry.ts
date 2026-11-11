@@ -94,19 +94,13 @@ export function templateApplicable(
     )
   )
     return false;
-  const fields = new Set(
-    [
-      ...entity.fields,
-      ...template.fields.filter(
-        (f) => f.kind !== "computed" && f.kind !== "image",
-      ),
-    ].map((f) => f.id),
-  );
+  const fields = new Set(entity.fields.map(field => field.id));
+  const item = new Set(template.fields.filter(field => field.kind !== "image").map(field => field.id));
   function refs(node: unknown): boolean {
     if (!node || typeof node !== "object") return true;
     const n = node as Record<string, unknown>;
-    if (n.scope === "fields" && typeof n.id === "string" && !fields.has(n.id))
-      return false;
+    if (typeof n.id === "string" && ((n.scope === "fields" && !fields.has(n.id))
+      || (n.scope === "item" && !item.has(n.id)))) return false;
     return Object.values(n).every((v) =>
       Array.isArray(v) ? v.every(refs) : refs(v),
     );

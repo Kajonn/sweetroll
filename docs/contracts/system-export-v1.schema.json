@@ -377,6 +377,10 @@
                               }
                             }
                           }
+                        },
+                        "optionsFrom": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
                         }
                       }
                     },
@@ -434,6 +438,10 @@
                               }
                             }
                           }
+                        },
+                        "optionsFrom": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
                         }
                       }
                     },
@@ -487,6 +495,10 @@
                         },
                         "step": {
                           "type": "number"
+                        },
+                        "maxExpressionId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
                         },
                         "resetTo": {
                           "anyOf": [
@@ -599,6 +611,33 @@
               "label": {
                 "maxLength": 120,
                 "type": "string"
+              },
+              "keyColumn": {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              },
+              "columns": {
+                "additionalProperties": false,
+                "maxProperties": 64,
+                "type": "object",
+                "patternProperties": {
+                  "^[a-z][a-z0-9_]{0,63}$": {
+                    "anyOf": [
+                      {
+                        "const": "number",
+                        "type": "string"
+                      },
+                      {
+                        "const": "text",
+                        "type": "string"
+                      },
+                      {
+                        "const": "boolean",
+                        "type": "string"
+                      }
+                    ]
+                  }
+                }
               },
               "records": {
                 "maxItems": 1000,
@@ -1016,6 +1055,10 @@
                           {
                             "const": "inputs",
                             "type": "string"
+                          },
+                          {
+                            "const": "item",
+                            "type": "string"
                           }
                         ]
                       },
@@ -1190,6 +1233,34 @@
                           },
                           {
                             "const": "has",
+                            "type": "string"
+                          },
+                          {
+                            "const": "lookup",
+                            "type": "string"
+                          },
+                          {
+                            "const": "lookupBand",
+                            "type": "string"
+                          },
+                          {
+                            "const": "sum",
+                            "type": "string"
+                          },
+                          {
+                            "const": "count",
+                            "type": "string"
+                          },
+                          {
+                            "const": "sumWhere",
+                            "type": "string"
+                          },
+                          {
+                            "const": "countWhere",
+                            "type": "string"
+                          },
+                          {
+                            "const": "maxOf",
                             "type": "string"
                           }
                         ]
@@ -1603,6 +1674,10 @@
               "targetId": {
                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                 "type": "string"
+              },
+              "targetEntityId": {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
               }
             }
           }
@@ -1707,6 +1782,9 @@
                     "type": "string"
                   }
                 ]
+              },
+              "aggregateQuantity": {
+                "type": "boolean"
               },
               "description": {
                 "maxLength": 2000,
@@ -1932,6 +2010,10 @@
                               }
                             }
                           }
+                        },
+                        "optionsFrom": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
                         }
                       }
                     },
@@ -1989,6 +2071,10 @@
                               }
                             }
                           }
+                        },
+                        "optionsFrom": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
                         }
                       }
                     },
@@ -2042,6 +2128,10 @@
                         },
                         "step": {
                           "type": "number"
+                        },
+                        "maxExpressionId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
                         },
                         "resetTo": {
                           "anyOf": [

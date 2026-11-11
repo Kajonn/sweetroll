@@ -19,13 +19,15 @@ Formulas support typed conditionals, choice membership, resource parts, named
 dice groups, and configurable pushes. The conditional d20 scenario exercises
 the proficiency and class bonuses and the resource bindings through the public API.
 
+The Roadwardens fixture exercises class progression tables, equipment
+aggregation, calculated health maxima, and dataset-backed choices through the
+API and browser acceptance flows.
+
 ## Deferred
 
 | Capability | Status |
 |------------|--------|
-| Class progression tables | Deferred |
 | Branching move outcomes | Deferred |
-| Equipment aggregation | Deferred |
 | Opposed tests | Deferred |
 | Exploding and custom-face dice | Deferred |
 | Automated roll consequences | Deferred |

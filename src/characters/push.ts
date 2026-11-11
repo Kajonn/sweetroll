@@ -25,8 +25,8 @@ const SavedResultSchema = Type.Object({
   bindings: Type.Array(
     Type.Object(
       {
-        scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs")]),
-        definitionId: Type.String({ maxLength: 72 }),
+        scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("aggregates")]),
+        definitionId: Type.String({ maxLength: 205 }),
         value: BindingValueSchema,
       },
       { additionalProperties: false },

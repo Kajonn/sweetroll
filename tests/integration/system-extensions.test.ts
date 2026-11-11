@@ -28,7 +28,7 @@ function frostPack(): ExtensionDocumentV1 {
     schemaVersion: "2.0",
     metadata: { name: "Frost pack", description: "Cold weapons", language: "en" },
     expressions: [
-      { id: "axe_hit_expr", context: "roll", resultType: "number", source: "d20 + fields.modifier + fields.edge", fallback: 0 },
+      { id: "axe_hit_expr", context: "roll", resultType: "number", source: "d20 + fields.modifier + item.edge", fallback: 0 },
     ],
     templates: [{
       id: "frost_axe",

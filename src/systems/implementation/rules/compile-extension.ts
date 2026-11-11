@@ -1,3 +1,4 @@
+import { fieldWithDatasetOptions } from "../package/reference-data.js";
 import { signExtensionPackage } from "../package/canonical.js";
 import { PACKAGE_LIMITS } from "../package/limits.js";
 import type {
@@ -50,6 +51,15 @@ export function compileExtensionDocument(
   const structural = validateExtensionDocumentStructure(document);
   if (structural.length > 0) return { ok: false, diagnostics: structural };
 
+  for (const template of document.templates) {
+    for (const field of template.fields) {
+      if ((field.kind === "singleChoice" || field.kind === "multiChoice") && field.optionsFrom !== undefined
+        && !base.referenceData.some(dataset => dataset.id === field.optionsFrom)) {
+        return fail("missing_reference", `/templates/${template.id}/fields/${field.id}/optionsFrom`, "Dataset does not exist in the base system.");
+      }
+    }
+  }
+
   const owners = expressionOwners(document.expressions, document.templates);
   if (!owners.ok) return owners;
 
@@ -95,7 +105,7 @@ export function compileExtensionDocument(
     description: document.metadata.description,
     language: document.metadata.language,
     expressions: compiled.map((body, index) => ({ id: document.expressions[index]!.id, ...body })),
-    templates: document.templates,
+    templates: document.templates.map(template => ({ ...template, fields: template.fields.map(field => fieldWithDatasetOptions(field, base.referenceData)) })),
     effectiveLimits: {
       expressionBytes: PACKAGE_LIMITS.expressionBytes,
       expressionAstNodes: PACKAGE_LIMITS.expressionAstNodes,
@@ -123,6 +133,20 @@ export function validateExtensionAgainst(
   if (extension.baseSystemId !== base.systemId) {
     return fail("extension_base_mismatch", "/baseSystemId", "Extension belongs to a different system.");
   }
+  for (const template of extension.templates) {
+    for (const field of template.fields) {
+      if ((field.kind !== "singleChoice" && field.kind !== "multiChoice") || field.optionsFrom === undefined) continue;
+      const resolved = fieldWithDatasetOptions(field, base.referenceData);
+      const defaults = Array.isArray(field.default) ? field.default : field.default === null ? [] : [field.default];
+      if (resolved === field || !("options" in resolved)
+        || defaults.some(id => !resolved.options.some(option => option.id === id))
+        || resolved.options.length !== field.options.length
+        || resolved.options.some((option, index) => option.id !== field.options[index]?.id || option.label !== field.options[index]?.label)) {
+        return fail("extension_incompatible", `/templates/${template.id}/fields/${field.id}/optionsFrom`, "The extension choice options differ from the base dataset.");
+      }
+    }
+  }
+
   const owners = expressionOwners(extension.expressions, extension.templates);
   if (!owners.ok) return owners;
 
@@ -193,19 +217,14 @@ function expressionOwners(
 }
 
 function environmentFor(owner: ExpressionOwner | undefined, base: SystemPackageV1): ExpressionCompileEnv {
-  if (owner === undefined) return { fields: {}, inputs: {} };
-  const templateFields = entityFieldTypes(owner.template.fields);
-  if (owner.kind === "computed") return { fields: templateFields, inputs: {} };
-  // Granted rolls see stored entry values only: the entry runtime scope
-  // (`grantedFieldScope`) never evaluates computed template fields.
-  for (const field of owner.template.fields) {
-    if (field.kind === "computed") delete templateFields[field.id];
-  }
-  const fields = {
-    ...grantedEntityFieldsForKind(base, owner.template.kind),
-    ...templateFields,
+  const datasets = base.referenceData;
+  if (owner === undefined) return { fields: {}, inputs: {}, datasets };
+  const item = entityFieldTypes(owner.template.fields);
+  if (owner.kind === "computed") return { fields: {}, inputs: {}, item, datasets };
+  return {
+    fields: grantedEntityFieldsForKind(base, owner.template.kind),
+    inputs: actionInputTypes(owner.action.inputs), item, datasets,
   };
-  return { fields, inputs: actionInputTypes(owner.action.inputs) };
 }
 
 function placeableKinds(base: SystemPackageV1): Set<string> {

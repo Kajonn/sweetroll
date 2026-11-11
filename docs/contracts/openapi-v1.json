@@ -16486,6 +16486,9 @@
                                                       }
                                                     ]
                                                   },
+                                                  "computedMaximum": {
+                                                    "type": "boolean"
+                                                  },
                                                   "validations": {
                                                     "type": "array",
                                                     "items": {
@@ -21205,6 +21208,9 @@
                                                       }
                                                     ]
                                                   },
+                                                  "computedMaximum": {
+                                                    "type": "boolean"
+                                                  },
                                                   "validations": {
                                                     "type": "array",
                                                     "items": {
@@ -23597,6 +23603,9 @@
                                                           }
                                                         ]
                                                       },
+                                                      "computedMaximum": {
+                                                        "type": "boolean"
+                                                      },
                                                       "validations": {
                                                         "type": "array",
                                                         "items": {
@@ -24661,6 +24670,14 @@
                                           },
                                           {
                                             "const": "inputs",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "item",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "aggregates",
                                             "type": "string"
                                           }
                                         ]
@@ -26805,6 +26822,9 @@
                                                           }
                                                         ]
                                                       },
+                                                      "computedMaximum": {
+                                                        "type": "boolean"
+                                                      },
                                                       "validations": {
                                                         "type": "array",
                                                         "items": {
@@ -27869,6 +27889,14 @@
                                           },
                                           {
                                             "const": "inputs",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "item",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "aggregates",
                                             "type": "string"
                                           }
                                         ]
@@ -30024,6 +30052,9 @@
                                                           }
                                                         ]
                                                       },
+                                                      "computedMaximum": {
+                                                        "type": "boolean"
+                                                      },
                                                       "validations": {
                                                         "type": "array",
                                                         "items": {
@@ -31088,6 +31119,14 @@
                                           },
                                           {
                                             "const": "inputs",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "item",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "aggregates",
                                             "type": "string"
                                           }
                                         ]
@@ -33234,6 +33273,9 @@
                                                           }
                                                         ]
                                                       },
+                                                      "computedMaximum": {
+                                                        "type": "boolean"
+                                                      },
                                                       "validations": {
                                                         "type": "array",
                                                         "items": {
@@ -34298,6 +34340,14 @@
                                           },
                                           {
                                             "const": "inputs",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "item",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "aggregates",
                                             "type": "string"
                                           }
                                         ]
@@ -36446,6 +36496,9 @@
                                                           }
                                                         ]
                                                       },
+                                                      "computedMaximum": {
+                                                        "type": "boolean"
+                                                      },
                                                       "validations": {
                                                         "type": "array",
                                                         "items": {
@@ -37510,6 +37563,14 @@
                                           },
                                           {
                                             "const": "inputs",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "item",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "aggregates",
                                             "type": "string"
                                           }
                                         ]
@@ -38875,6 +38936,14 @@
                                   },
                                   {
                                     "const": "inputs",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "item",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "aggregates",
                                     "type": "string"
                                   }
                                 ]
@@ -41973,6 +42042,9 @@
                                                           }
                                                         ]
                                                       },
+                                                      "computedMaximum": {
+                                                        "type": "boolean"
+                                                      },
                                                       "validations": {
                                                         "type": "array",
                                                         "items": {
@@ -43037,6 +43109,14 @@
                                           },
                                           {
                                             "const": "inputs",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "item",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "aggregates",
                                             "type": "string"
                                           }
                                         ]
@@ -45228,6 +45308,9 @@
                                                           }
                                                         ]
                                                       },
+                                                      "computedMaximum": {
+                                                        "type": "boolean"
+                                                      },
                                                       "validations": {
                                                         "type": "array",
                                                         "items": {
@@ -46292,6 +46375,14 @@
                                           },
                                           {
                                             "const": "inputs",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "item",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "aggregates",
                                             "type": "string"
                                           }
                                         ]
@@ -48542,6 +48633,9 @@
                                                           }
                                                         ]
                                                       },
+                                                      "computedMaximum": {
+                                                        "type": "boolean"
+                                                      },
                                                       "validations": {
                                                         "type": "array",
                                                         "items": {
@@ -49606,6 +49700,14 @@
                                           },
                                           {
                                             "const": "inputs",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "item",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "aggregates",
                                             "type": "string"
                                           }
                                         ]
@@ -51748,6 +51850,9 @@
                                                           }
                                                         ]
                                                       },
+                                                      "computedMaximum": {
+                                                        "type": "boolean"
+                                                      },
                                                       "validations": {
                                                         "type": "array",
                                                         "items": {
@@ -52812,6 +52917,14 @@
                                           },
                                           {
                                             "const": "inputs",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "item",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "aggregates",
                                             "type": "string"
                                           }
                                         ]
@@ -54962,6 +55075,9 @@
                                                           }
                                                         ]
                                                       },
+                                                      "computedMaximum": {
+                                                        "type": "boolean"
+                                                      },
                                                       "validations": {
                                                         "type": "array",
                                                         "items": {
@@ -56026,6 +56142,14 @@
                                           },
                                           {
                                             "const": "inputs",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "item",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "aggregates",
                                             "type": "string"
                                           }
                                         ]
@@ -57385,6 +57509,10 @@
                                           }
                                         }
                                       }
+                                    },
+                                    "optionsFrom": {
+                                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                      "type": "string"
                                     }
                                   }
                                 },
@@ -57442,6 +57570,10 @@
                                           }
                                         }
                                       }
+                                    },
+                                    "optionsFrom": {
+                                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                      "type": "string"
                                     }
                                   }
                                 },
@@ -57495,6 +57627,10 @@
                                     },
                                     "step": {
                                       "type": "number"
+                                    },
+                                    "maxExpressionId": {
+                                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                      "type": "string"
                                     },
                                     "resetTo": {
                                       "anyOf": [
@@ -59437,6 +59573,9 @@
                                                           }
                                                         ]
                                                       },
+                                                      "computedMaximum": {
+                                                        "type": "boolean"
+                                                      },
                                                       "validations": {
                                                         "type": "array",
                                                         "items": {
@@ -60501,6 +60640,14 @@
                                           },
                                           {
                                             "const": "inputs",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "item",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "aggregates",
                                             "type": "string"
                                           }
                                         ]
@@ -64827,6 +64974,9 @@
                                                           }
                                                         ]
                                                       },
+                                                      "computedMaximum": {
+                                                        "type": "boolean"
+                                                      },
                                                       "validations": {
                                                         "type": "array",
                                                         "items": {
@@ -65891,6 +66041,14 @@
                                           },
                                           {
                                             "const": "inputs",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "item",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "aggregates",
                                             "type": "string"
                                           }
                                         ]
@@ -68012,6 +68170,9 @@
                                                       }
                                                     ]
                                                   },
+                                                  "computedMaximum": {
+                                                    "type": "boolean"
+                                                  },
                                                   "validations": {
                                                     "type": "array",
                                                     "items": {
@@ -70035,6 +70196,14 @@
                                         },
                                         {
                                           "const": "inputs",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "item",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "aggregates",
                                           "type": "string"
                                         }
                                       ]
@@ -75736,6 +75905,9 @@
                               }
                             ]
                           },
+                          "aggregateQuantity": {
+                            "type": "boolean"
+                          },
                           "description": {
                             "maxLength": 2000,
                             "type": "string"
@@ -75960,6 +76132,10 @@
                                           }
                                         }
                                       }
+                                    },
+                                    "optionsFrom": {
+                                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                      "type": "string"
                                     }
                                   }
                                 },
@@ -76017,6 +76193,10 @@
                                           }
                                         }
                                       }
+                                    },
+                                    "optionsFrom": {
+                                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                      "type": "string"
                                     }
                                   }
                                 },
@@ -76070,6 +76250,10 @@
                                     },
                                     "step": {
                                       "type": "number"
+                                    },
+                                    "maxExpressionId": {
+                                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                      "type": "string"
                                     },
                                     "resetTo": {
                                       "anyOf": [
@@ -94771,6 +94955,9 @@
                                                       }
                                                     ]
                                                   },
+                                                  "computedMaximum": {
+                                                    "type": "boolean"
+                                                  },
                                                   "validations": {
                                                     "type": "array",
                                                     "items": {
@@ -97224,6 +97411,9 @@
                                                       }
                                                     ]
                                                   },
+                                                  "computedMaximum": {
+                                                    "type": "boolean"
+                                                  },
                                                   "validations": {
                                                     "type": "array",
                                                     "items": {
@@ -99397,6 +99587,9 @@
                                                         "type": "string"
                                                       }
                                                     ]
+                                                  },
+                                                  "computedMaximum": {
+                                                    "type": "boolean"
                                                   },
                                                   "validations": {
                                                     "type": "array",
@@ -101576,6 +101769,9 @@
                                                         "type": "string"
                                                       }
                                                     ]
+                                                  },
+                                                  "computedMaximum": {
+                                                    "type": "boolean"
                                                   },
                                                   "validations": {
                                                     "type": "array",

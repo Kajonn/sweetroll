@@ -166,8 +166,8 @@ A system version is a validated declarative package with stable identifiers for 
 | **Category** | **MVP types**                              | **Notes**                                         |
 |--------------|--------------------------------------------|---------------------------------------------------|
 | Scalar       | text, integer, decimal, boolean            | movable; numeric constraints and step supported   |
-| Choice       | single choice, multi-choice                | Static options only; reference-data source        |
-| Resource     | current/max pair                           | Optional min/max and reset action                 |
+| Choice       | single choice, multi-choice                | Manual options or options from dataset rows        |
+| Resource     | current/max pair                           | Bounded current and a manual or computed maximum                 |
 | Computed     | number, text, boolean                      | Read-only result of a math-only expression        |
 | Media        | image attachment reference                 | Reserved image field; character portraits and item art delivered in M1/M2 (Section 7.8) |
 
@@ -199,7 +199,7 @@ Expressions are declarative math, conditionals, and dice, parsed into a lightwei
 - Conditionals: `if(condition, a, b)` requires two branches of the same scalar type and evaluates only the selected branch.
 - Dice: standard notation (`2d6`, `d20 + 2`), keep-high/low (`4d6kh3`), advantage-style helpers, field-derived pools, and counted successes at a threshold; server-side deterministic dice
 - Computed fields may depend on other computed fields of the same owner; dependency cycles are rejected at publish
-- **No** lookup/aggregation over collections (`equipped.armor.bonus` is out)
+- Typed dataset lookups and bounded single-slot aggregates read reference data and equipped or carried items.
 - **No** effect engine (set/increment/append) — resource changes are simple built-in "bump" actions
 - **No** `against target.defense` action chains
 
@@ -242,6 +242,26 @@ expression. The sheet's increase control stops at the character's stored maximum
 grammar. Choice sets and resource parts are recorded in roll bindings for saved
 push replay. Changes to an expression remain non-breaking when its context and
 declared result type stay the same.
+
+**Data-driven rules, stage R3.** Fields are scoped to an entity or item template.
+Option IDs are local to their choice field, inputs are local to their action,
+and granted action IDs are local to their template. Sheet and validation
+pickers identify a field by its owner and field ID. A granted roll reads common
+character fields through `fields.` and its own entry through `item.`. A
+template formula reads its own fields through `item.`.
+
+Tables can declare a key column and typed columns. `lookup` finds an exact
+key and `lookupBand` finds the highest numeric key at or below its argument.
+A choice field can populate its options from the IDs and labels of dataset rows.
+Slot aggregates read one slot and charge its maximum capacity against the sheet
+evaluation budget. Sums and counts multiply by entry quantity when the template
+opts in. `maxOf` selects the largest individual value. Compose checks the
+field types of all templates accepted by a referenced slot, including extensions.
+
+A resource's calculated maximum is rounded down to its step within its bounds.
+The sheet permits edits to the current value and clamps it when the maximum
+decreases. Version dry runs evaluate the target version's data and formulas
+before saving the new pin.
 
 ## 6.5 Draft, validation, and publishing
 

@@ -1,13 +1,13 @@
 import type { RulesDiagnostic } from "./diagnostic.js";
 
-const FUNCTION_NAMES = ["min", "max", "round", "dice", "countSuccesses", "group", "floor", "ceil", "abs", "if", "has"] as const;
+const FUNCTION_NAMES = ["min", "max", "round", "dice", "countSuccesses", "group", "floor", "ceil", "abs", "if", "has", "lookup", "lookupBand", "sum", "count", "sumWhere", "countWhere", "maxOf"] as const;
 export type FunctionName = typeof FUNCTION_NAMES[number];
 
 export type Token =
   | { kind: "number"; value: number; start: number }
   | { kind: "string"; value: string; start: number }
   | { kind: "boolean"; value: boolean; start: number }
-  | { kind: "id"; scope: "fields" | "inputs"; id: string; part?: "current" | "max"; start: number }
+  | { kind: "id"; scope: "fields" | "inputs" | "item"; id: string; part?: "current" | "max"; start: number }
   | { kind: "function"; name: FunctionName; start: number }
   | { kind: "advDis"; which: "adv" | "dis"; start: number }
   | { kind: "dice"; count: number; sides: number; keep?: { mode: "highest" | "lowest"; count: number }; start: number }
@@ -24,7 +24,7 @@ export type TokenizeResult =
 const FUNCTIONS = new Set<string>(FUNCTION_NAMES);
 const ASSIGNED_FUNCTIONS = new Set(["adv", "dis"]);
 const ID_RE = /^[a-z][a-z0-9_]{0,63}$/;
-const SCOPE_RE = /^(fields|inputs)$/;
+const SCOPE_RE = /^(fields|inputs|item)$/;
 
 function error(message: string): RulesDiagnostic {
   return { code: "invalid_syntax", path: "", message };
@@ -94,11 +94,11 @@ export function tokenize(source: string): TokenizeResult {
             let part: "current" | "max" | undefined;
             if (source[k] === ".") {
               const match = /^\.(current|max)\b/.exec(source.slice(k));
-              if (word !== "fields" || !match) return fail("only resource fields support .current or .max");
+              if (word === "inputs" || !match) return fail("only resource fields support .current or .max");
               part = match[1] as "current" | "max";
               k += match[0].length;
             }
-            tokens.push({ kind: "id", scope: word as "fields" | "inputs", id: idPart, start, ...(part && { part }) });
+            tokens.push({ kind: "id", scope: word as "fields" | "inputs" | "item", id: idPart, start, ...(part && { part }) });
             i = k;
             continue;
           }

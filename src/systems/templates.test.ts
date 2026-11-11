@@ -58,7 +58,7 @@ describe("campaign base capability", () => {
   });
 });
 
-it("rejects an inherited action depending on a template computed value the entry runtime cannot supply", () => {
+it("accepts an inherited action depending on its computed item value", () => {
   const p = pkg((d) => {
     d.templates![0]!.fields.push({
       id: "total_bonus",
@@ -80,17 +80,17 @@ it("rejects an inherited action depending on a template computed value the entry
         id: "base_bonus_expr",
         context: "computed",
         resultType: "number",
-        source: "fields.damage_bonus + 1",
+        source: "item.damage_bonus + 1",
         fallback: 0,
       },
       {
         id: "sword_expr",
         context: "roll",
         resultType: "number",
-        source: "d20 + fields.total_bonus",
+        source: "d20 + item.total_bonus",
         fallback: 0,
       },
     );
   });
-  expect(resolveTemplateBase(p, "sword", "item", {})).toBeUndefined();
+  expect(resolveTemplateBase(p, "sword", "item", {})).toBeDefined();
 });

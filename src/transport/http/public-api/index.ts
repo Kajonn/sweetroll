@@ -247,7 +247,7 @@ export function buildPublicApi({ identity, authoring, characters, pool, campaign
 
     route({
       method: "PUT", path: "/characters/:characterId/resources/:resourceId", id: "setCharacterResource",
-      description: "Set a character resource's current value, its maximum, or both. Lowering only the maximum lowers a higher current value with it.",
+      description: "Set a character resource's current value, editable maximum, or both. A computed maximum follows the published formula. Lowering a maximum clamps the current value.",
       scope: "characters:write", input: { params: s.resourceId, body: s.setResource }, output: "CharacterMutation",
       example: { max: 24, expectedRevision: 4, idempotencyKey: "level-up-hp" },
     }, async (ctx, { params, body }) => {

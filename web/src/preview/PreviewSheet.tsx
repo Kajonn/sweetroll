@@ -1,4 +1,4 @@
-import { entityFieldTypes, type BindingValue } from "@sweetroll/rules";
+import { entityFieldTypes, type BindingValue, type RulesDataset, type SlotEnvironment } from "@sweetroll/rules";
 import { buildSampleBindings } from "./sampleData.js";
 import { DebugOnly } from "../ui/debugMode.js";
 import { SystemPresentationScope } from "../theme/SystemPresentation.js";
@@ -297,6 +297,8 @@ export function PreviewSheet({ pkg, sample, sheetId }: PreviewSheetProps) {
           entity={entity}
           actions={actions}
           expressions={pkg.expressions}
+          datasets={pkg.datasets}
+          slots={pkg.slotsByEntity?.[entity.id]}
           sample={sample}
         />
       ))}
@@ -309,6 +311,8 @@ type PreviewSectionProps = {
   entity: EntityDefinitionV1;
   actions: ActionV1[];
   expressions: CompiledExpressionSummary[];
+  datasets?: readonly RulesDataset[] | undefined;
+  slots?: SlotEnvironment | undefined;
   sample: SampleData;
 };
 
@@ -317,6 +321,8 @@ function PreviewSection({
   entity,
   actions,
   expressions,
+  datasets,
+  slots,
   sample,
 }: PreviewSectionProps) {
   const record = sample[entity.id];
@@ -336,6 +342,8 @@ function PreviewSection({
           entity={entity}
           actions={actions}
           expressions={expressions}
+          datasets={datasets}
+          slots={slots}
           record={record}
         />
       ))}
@@ -348,6 +356,8 @@ type PreviewElementProps = {
   entity: EntityDefinitionV1;
   actions: ActionV1[];
   expressions: CompiledExpressionSummary[];
+  datasets?: readonly RulesDataset[] | undefined;
+  slots?: SlotEnvironment | undefined;
   record: { fields: Record<DefinitionId, SampleFieldValue> } | undefined;
 };
 
@@ -356,6 +366,8 @@ function PreviewElement({
   entity,
   actions,
   expressions,
+  datasets,
+  slots,
   record,
 }: PreviewElementProps) {
   switch (element.kind) {
@@ -396,6 +408,8 @@ function PreviewElement({
           action={action}
           entity={entity}
           expressions={expressions}
+          datasets={datasets}
+          slots={slots}
           record={record}
         />
       );
@@ -504,6 +518,8 @@ type PreviewActionProps = {
   action: ActionV1 | null;
   entity: EntityDefinitionV1;
   expressions: CompiledExpressionSummary[];
+  datasets?: readonly RulesDataset[] | undefined;
+  slots?: SlotEnvironment | undefined;
   record: { fields: Record<DefinitionId, SampleFieldValue> } | undefined;
 };
 
@@ -512,6 +528,8 @@ function PreviewAction({
   action,
   entity,
   expressions,
+  datasets,
+  slots,
   record,
 }: PreviewActionProps) {
   const [openRollResult, setOpenRollResult] = useState(false);
@@ -538,6 +556,8 @@ function PreviewAction({
           action={action}
           entity={entity}
           expressions={expressions}
+          datasets={datasets}
+          slots={slots}
           record={record}
           onClose={() => setOpenRollResult(false)}
         />
@@ -550,6 +570,8 @@ type RollResultSheetProps = {
   action: RollActionV1;
   entity: EntityDefinitionV1;
   expressions: CompiledExpressionSummary[];
+  datasets?: readonly RulesDataset[] | undefined;
+  slots?: SlotEnvironment | undefined;
   record: { fields: Record<DefinitionId, SampleFieldValue> };
   onClose: () => void;
 };
@@ -558,6 +580,8 @@ function RollResultSheet({
   action,
   entity,
   expressions,
+  datasets,
+  slots,
   record,
   onClose,
 }: RollResultSheetProps) {
@@ -565,7 +589,7 @@ function RollResultSheet({
   const source = expression === null ? "0" : renderExpression(expression.ast);
   const fieldTypes = entityFieldTypes(entity.fields);
   const inputTypes = expressionInputTypes(action);
-  const env = { fields: fieldTypes, inputs: inputTypes };
+  const env = { fields: fieldTypes, inputs: inputTypes, ...(datasets && { datasets }), ...(slots && { slots }) };
   const bindings = buildActionBindings(entity, record, action);
   const evaluation = evaluateRoll({
     source,

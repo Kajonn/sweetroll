@@ -32,8 +32,8 @@ function extensionDocument(): ExtensionDocumentV1 {
     schemaVersion: "2.0",
     metadata: { name: "Frost pack", description: "Cold weapons", language: "en" },
     expressions: [
-      { id: "axe_hit_expr", context: "roll", resultType: "number", source: "d20 + fields.modifier + fields.edge + inputs.bonus", fallback: 0 },
-      { id: "axe_total_expr", context: "computed", resultType: "number", source: "fields.edge * 2", fallback: 0 },
+      { id: "axe_hit_expr", context: "roll", resultType: "number", source: "d20 + fields.modifier + item.edge + inputs.bonus", fallback: 0 },
+      { id: "axe_total_expr", context: "computed", resultType: "number", source: "item.edge * 2", fallback: 0 },
     ],
     templates: [{
       id: "frost_axe",
@@ -110,20 +110,18 @@ describe("compileExtensionDocument", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("does not let a granted roll read a computed template field the entry runtime cannot supply", () => {
+  it("lets a granted roll read a computed template field in item scope", () => {
     const document = extensionDocument();
-    document.expressions[0]!.source = "d20 + fields.edge_total";
+    document.expressions[0]!.source = "d20 + item.edge_total";
     const result = compileExtensionDocument(document, basePackage(), { extensionId: EXT_A, versionId: EXT_A, semanticVersion: "1.0.0" });
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.diagnostics[0]).toMatchObject({ code: "missing_reference", path: "/expressions/0" });
+    expect(result.ok).toBe(true);
   });
 
   it("warns when no base sheet slot accepts a template kind", () => {
     const document = extensionDocument();
     document.templates[0]!.kind = "spell";
     // An unplaceable kind exposes no character fields to its granted rolls.
-    document.expressions[0]!.source = "d20 + fields.edge";
+    document.expressions[0]!.source = "d20 + item.edge";
     const result = compileExtensionDocument(document, basePackage(), { extensionId: EXT_A, versionId: EXT_A, semanticVersion: "1.0.0" });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -257,7 +255,7 @@ describe("composeRules", () => {
   it("reports per-extension warnings with their origin", () => {
     const document = extensionDocument();
     document.templates[0]!.kind = "talent";
-    document.expressions[0]!.source = "d20 + fields.edge";
+    document.expressions[0]!.source = "d20 + item.edge";
     const result = composeRules(basePackage(), [compileExtension(document)]);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.warnings[0]!.path).toBe(`/extensions/${EXT_A}/templates/0/kind`);

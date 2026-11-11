@@ -227,6 +227,7 @@
       "expressionId": "ability_valid_expr",
       "severity": "error",
       "message": "Ability score must be between 3 and 18",
+      "targetEntityId": "character",
       "targetId": "ability"
     }
   ]

@@ -189,7 +189,7 @@ export function checkVersionChange(input: {
   if (!observed.ok) return block({ code: "evaluation_failed", message: observed.error.message });
 
   report.validations = observed.value.validations;
-  report.nextState = nextState.value;
+  report.nextState = observed.value.state;
   report.ok = report.blockers.length === 0;
   if (!report.ok) report.nextState = null;
   return report;
@@ -219,7 +219,10 @@ function characterFootprint(
     .flatMap((sheet) => sheet.sections.flatMap((section) =>
       section.elements.flatMap((element) => (element.kind === "action" ? [element.actionId] : [])))));
   const expressionIds = new Set<string>();
-  for (const field of entity.fields) if (field.kind === "computed") expressionIds.add(field.expressionId);
+  for (const field of entity.fields) {
+    if (field.kind === "computed") expressionIds.add(field.expressionId);
+    if (field.kind === "resource" && field.maxExpressionId !== undefined) expressionIds.add(field.maxExpressionId);
+  }
   for (const action of pkg.actions) if (actionIds.has(action.id) && action.kind === "roll") expressionIds.add(action.expressionId);
   for (const template of pkg.templates) {
     if (!templateIds.has(template.id)) continue;

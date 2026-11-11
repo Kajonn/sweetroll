@@ -184,7 +184,7 @@ function entryDocument(): SystemDocumentV1 {
     id: "longsword_attack_expr",
     context: "roll",
     resultType: "number",
-    source: "d20 + fields.weapon_bonus",
+    source: "d20 + item.weapon_bonus",
     fallback: 0,
   });
   (document.sheets[0]!.sections[0]!.elements as unknown[]).push({

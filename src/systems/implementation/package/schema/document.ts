@@ -92,6 +92,7 @@ export const SingleChoiceFieldV1Schema = Type.Object(
     required: Type.Boolean(),
     default: Type.Union([DefinitionIdSchema, Type.Null()]),
     options: Type.Array(ChoiceOptionV1Schema),
+    optionsFrom: Type.Optional(DefinitionIdSchema),
   },
   { additionalProperties: false },
 );
@@ -105,6 +106,7 @@ export const MultiChoiceFieldV1Schema = Type.Object(
     required: Type.Boolean(),
     default: Type.Array(DefinitionIdSchema),
     options: Type.Array(ChoiceOptionV1Schema),
+    optionsFrom: Type.Optional(DefinitionIdSchema),
   },
   { additionalProperties: false },
 );
@@ -128,6 +130,7 @@ export const ResourceFieldV1Schema = Type.Object(
     min: Type.Number(),
     max: Type.Number(),
     step: Type.Number(),
+    maxExpressionId: Type.Optional(DefinitionIdSchema),
     resetTo: Type.Union([Type.Literal("min"), Type.Literal("max")]),
   },
   { additionalProperties: false },
@@ -198,6 +201,8 @@ export const ReferenceDataV1Schema = Type.Object(
   {
     id: DefinitionIdSchema,
     label: LabelSchema,
+    keyColumn: Type.Optional(DefinitionIdSchema),
+    columns: Type.Optional(Type.Record(DefinitionIdSchema, ValueTypeSchema, { additionalProperties: false, maxProperties: PACKAGE_LIMITS.referenceRecordValues })),
     records: Type.Array(ReferenceRecordV1Schema, {
       maxItems: PACKAGE_LIMITS.referenceRecordsPerSet,
     }),
@@ -424,6 +429,7 @@ export const ObjectTemplateV1Schema = Type.Object(
     image: Type.Optional(ImageDescriptorSchema),
     label: LabelSchema,
     kind: TemplateKindSchema,
+    aggregateQuantity: Type.Optional(Type.Boolean()),
     description: Type.Optional(Type.String({ maxLength: LONG_TEXT_MAX_LENGTH })),
     fields: Type.Array(FieldV1Schema, { maxItems: 64 }),
     grantedActions: Type.Array(GrantedActionV1Schema, { maxItems: 16 }),
@@ -450,6 +456,7 @@ export const ValidationV1Schema = Type.Object(
     severity: Type.Union([Type.Literal("error"), Type.Literal("warning")]),
     message: Type.String({ maxLength: LONG_TEXT_MAX_LENGTH }),
     targetId: DefinitionIdSchema,
+    targetEntityId: Type.Optional(DefinitionIdSchema),
   },
   { additionalProperties: false },
 );

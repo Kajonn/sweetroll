@@ -112,6 +112,7 @@ function projectElement(
       max: field.max,
       step: field.step,
       resetTo: field.resetTo,
+      ...(field.maxExpressionId === undefined ? {} : { computedMaximum: true }),
       validations: validationsFor(field.id),
     }];
   }
